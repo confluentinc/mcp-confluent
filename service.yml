@@ -1,0 +1,11 @@
+name: mcp-confluent
+lang: unknown
+lang_version: unknown
+git:
+  enable: true
+codeowners:
+  enable: true
+renovatebot:
+  enable: true
+  automerge:
+    enable: true

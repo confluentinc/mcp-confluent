@@ -42,28 +42,48 @@ import {
 import env from "@src/env.js";
 import createClient from "openapi-fetch";
 import z from "zod";
+import { AsyncLazy, Lazy } from "./lazy";
 
-const kafkaClient = new KafkaJS.Kafka({
-  kafkaJS: {
-    brokers: env.BOOTSTRAP_SERVERS.split(","),
-    clientId: "mcp-client",
-    ssl: true,
-    sasl: {
-      mechanism: "plain",
-      username: env.KAFKA_API_KEY,
-      password: env.KAFKA_API_SECRET,
-    },
-    logLevel: KafkaJS.logLevel.ERROR,
-  },
-});
+const kafkaClient = new Lazy(
+  () =>
+    new KafkaJS.Kafka({
+      kafkaJS: {
+        brokers: env.BOOTSTRAP_SERVERS?.split(",") ?? [],
+        clientId: "mcp-client",
+        ssl: true,
+        sasl: {
+          mechanism: "plain",
+          username: env.KAFKA_API_KEY,
+          password: env.KAFKA_API_SECRET,
+        },
+        logLevel: KafkaJS.logLevel.ERROR,
+      },
+    }),
+);
 
-const kafkaAdminClient = kafkaClient.admin();
-const kafkaProducer = kafkaClient.producer({
-  kafkaJS: {
-    acks: 1,
-    compression: KafkaJS.CompressionTypes.GZIP,
+const kafkaAdminClient = new AsyncLazy(
+  async () => {
+    const admin = kafkaClient.get().admin();
+    await admin.connect();
+    return admin;
   },
-});
+  (admin) => admin.disconnect(),
+);
+
+const kafkaProducer = new AsyncLazy(
+  async () => {
+    const producer = kafkaClient.get().producer({
+      kafkaJS: {
+        acks: 1,
+        compression: KafkaJS.CompressionTypes.GZIP,
+      },
+    });
+    await producer.connect();
+    return producer;
+  },
+  (producer) => producer.disconnect(),
+);
+
 const confluentCloudFlinkRestClient = createClient<paths>({
   baseUrl: env.FLINK_REST_ENDPOINT,
 });
@@ -149,19 +169,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case "list-topics":
-        return await handleListTopics(kafkaAdminClient);
+        return await handleListTopics(await kafkaAdminClient.get());
       case "create-topics": {
         const { topicNames } = CreateTopicsArgumentsSchema.parse(args);
-        return await handleCreateTopics(kafkaAdminClient, topicNames);
+        return await handleCreateTopics(
+          await kafkaAdminClient.get(),
+          topicNames,
+        );
       }
       case "delete-topics": {
         const { topicNames } = DeleteTopicsArgumentsSchema.parse(args);
-        return await handleDeleteTopics(kafkaAdminClient, topicNames);
+        return await handleDeleteTopics(
+          await kafkaAdminClient.get(),
+          topicNames,
+        );
       }
       case "produce-message": {
         const { topicName, message } =
           ProduceMessageArgumentsSchema.parse(args);
-        return await handleProduceMessage(kafkaProducer, topicName, message);
+        return await handleProduceMessage(
+          await kafkaProducer.get(),
+          topicName,
+          message,
+        );
       }
       case "list-flink-statements": {
         const { computePoolId, pageSize, pageToken, labelSelector } =
@@ -243,8 +273,6 @@ async function main() {
     process.on("SIGINT", cleanup);
     process.on("SIGTERM", cleanup);
 
-    await kafkaAdminClient.connect();
-    await kafkaProducer.connect();
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error("Confluent MCP Server running on stdio");
@@ -257,8 +285,9 @@ async function main() {
 
 async function cleanup() {
   console.error("Shutting down...");
-  await kafkaAdminClient.disconnect();
-  await kafkaProducer.disconnect();
+  await kafkaAdminClient.close();
+  await kafkaProducer.close();
+  await server.close();
   process.exit(0);
 }
 

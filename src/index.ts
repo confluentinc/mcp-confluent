@@ -10,9 +10,11 @@ import {
   handleCreateTopics,
   handleDeleteFlinkStatement,
   handleDeleteTopics,
+  handleListConnectors,
   handleListFlinkStatements,
   handleListTopics,
   handleProduceMessage,
+  handleReadConnector,
   handleReadFlinkStatement,
 } from "@src/confluent/handlers.js";
 import { authMiddleware } from "@src/confluent/middleware.js";
@@ -26,11 +28,14 @@ import {
   DeleteFlinkStatementsInputSchema,
   DeleteTopicsArgumentsSchema,
   DeleteTopicsInputSchema,
+  ListConnectorsInputSchema,
   ListFlinkStatementsArgumentsSchema,
   ListFlinkStatementsInputSchema,
   ListTopicsInputSchema,
   ProduceMessageArgumentsSchema,
   ProduceMessageInputSchema,
+  ReadConnectorArgumentsSchema,
+  ReadConnectorInputSchema,
   ReadFlinkStatementArgumentsSchema,
   ReadFlinkStatementInputSchema,
 } from "@src/confluent/schema.js";
@@ -59,8 +64,13 @@ const kafkaProducer = kafkaClient.producer({
     compression: KafkaJS.CompressionTypes.GZIP,
   },
 });
-const confluentCloudRestClient = createClient<paths>({
+const confluentCloudFlinkRestClient = createClient<paths>({
   baseUrl: env.FLINK_REST_ENDPOINT,
+});
+confluentCloudFlinkRestClient.use(authMiddleware);
+
+const confluentCloudRestClient = createClient<paths>({
+  baseUrl: env.CONFLUENT_CLOUD_REST_ENDPOINT,
 });
 confluentCloudRestClient.use(authMiddleware);
 
@@ -120,6 +130,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         description: "Delete Flink SQL statement",
         inputSchema: DeleteFlinkStatementsInputSchema,
       },
+      {
+        name: "list-connectors",
+        description: "List Active Connectors",
+        inputSchema: ListConnectorsInputSchema,
+      },
+      {
+        name: "read-connector",
+        description: "Get Connector Details",
+        inputSchema: ReadConnectorInputSchema,
+      },
     ],
   };
 });
@@ -147,7 +167,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { computePoolId, pageSize, pageToken, labelSelector } =
           ListFlinkStatementsArgumentsSchema.parse(args);
         return await handleListFlinkStatements(
-          confluentCloudRestClient,
+          confluentCloudFlinkRestClient,
           env.FLINK_ORG_ID,
           env.FLINK_ENV_ID,
           computePoolId,
@@ -160,7 +180,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { statementName, statement } =
           CreateFlinkStatementArgumentsSchema.parse(args);
         return handleCreateFlinkStatement(
-          confluentCloudRestClient,
+          confluentCloudFlinkRestClient,
           env.FLINK_ORG_ID,
           env.FLINK_ENV_ID,
           env.FLINK_COMPUTE_POOL_ID,
@@ -173,7 +193,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "read-flink-statement": {
         const { statementName } = ReadFlinkStatementArgumentsSchema.parse(args);
         return handleReadFlinkStatement(
-          confluentCloudRestClient,
+          confluentCloudFlinkRestClient,
           env.FLINK_ORG_ID,
           env.FLINK_ENV_ID,
           statementName,
@@ -183,10 +203,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { statementName } =
           DeleteFlinkStatementArgumentsSchema.parse(args);
         return handleDeleteFlinkStatement(
-          confluentCloudRestClient,
+          confluentCloudFlinkRestClient,
           env.FLINK_ORG_ID,
           env.FLINK_ENV_ID,
           statementName,
+        );
+      }
+      case "list-connectors": {
+        return handleListConnectors(
+          confluentCloudRestClient,
+          env.KAFKA_ENV_ID,
+          env.KAFKA_CLUSTER_ID,
+        );
+      }
+      case "read-connector": {
+        const { connectorName } = ReadConnectorArgumentsSchema.parse(args);
+        return handleReadConnector(
+          confluentCloudRestClient,
+          env.KAFKA_ENV_ID,
+          env.KAFKA_CLUSTER_ID,
+          connectorName,
         );
       }
       default:

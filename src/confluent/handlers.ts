@@ -289,3 +289,76 @@ export async function handleDeleteFlinkStatement(
     `Flink SQL Statement Deletion Status Code: ${response?.status}`,
   );
 }
+
+/**
+ * Lists Confluent Cloud connectors for a given cluster.
+ *
+ * @param confluentCloudRestClient - The Confluent Cloud REST API client instance
+ * @param envId - The Confluent Cloud environment ID
+ * @param clusterId - The Confluent Cloud cluster ID
+ * @returns An object containing a content array with a message listing the active connectors
+ * @throws {Error} if the request to list Confluent Cloud connectors fails
+ */
+export async function handleListConnectors(
+  confluentCloudRestClient: Client<paths, `${string}/${string}`>,
+  envId: string,
+  clusterId: string,
+) {
+  const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
+  const { data: response, error } = await pathBasedClient[
+    "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors"
+  ].GET({
+    params: {
+      path: {
+        environment_id: envId,
+        kafka_cluster_id: clusterId,
+      },
+    },
+  });
+  if (error) {
+    return createResponse(
+      `Failed to list Confluent Cloud connectors for ${clusterId}: ${JSON.stringify(error)}`,
+    );
+  }
+  return createResponse(
+    `Active Connectors: ${JSON.stringify(response?.join(","))}`,
+  );
+}
+
+/**
+ * Gets the configuration details for a given connector
+ *
+ * @param confluentCloudRestClient - The Confluent Cloud REST API client instance
+ * @param envId - The Confluent Cloud environment ID
+ * @param clusterId - The Confluent Cloud cluster ID
+ * @param connectorName - The name of the connector
+ * @returns An object containing the connector details
+ * @throws {Error} if the request to get the connector details fails
+ */
+export async function handleReadConnector(
+  confluentCloudRestClient: Client<paths, `${string}/${string}`>,
+  envId: string,
+  clusterId: string,
+  connectorName: string,
+) {
+  const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
+  const { data: response, error } = await pathBasedClient[
+    "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}"
+  ].GET({
+    params: {
+      path: {
+        connector_name: connectorName,
+        environment_id: envId,
+        kafka_cluster_id: clusterId,
+      },
+    },
+  });
+  if (error) {
+    return createResponse(
+      `Failed to get information about connector ${connectorName}: ${JSON.stringify(error)}`,
+    );
+  }
+  return createResponse(
+    `Connector Details for ${connectorName}: ${JSON.stringify(response)}`,
+  );
+}

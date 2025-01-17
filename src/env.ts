@@ -14,6 +14,11 @@ const envSchema = z.object({
   FLINK_COMPUTE_POOL_ID: z.string().trim().startsWith("lfcp-"),
   FLINK_ENV_NAME: z.string().trim().min(1),
   FLINK_DATABASE_NAME: z.string().trim().min(1),
+  CONFLUENT_CLOUD_API_KEY: z.string().trim().min(1),
+  CONFLUENT_CLOUD_API_SECRET: z.string().trim().min(1),
+  KAFKA_CLUSTER_ID: z.string().trim().min(1),
+  KAFKA_ENV_ID: z.string().trim().startsWith("env-"),
+  CONFLUENT_CLOUD_REST_ENDPOINT: z.string().trim().url(),
 });
 
 // Validate `process.env` against our schema

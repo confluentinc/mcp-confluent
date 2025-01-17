@@ -11,11 +11,17 @@ import { Middleware } from "openapi-fetch";
  */
 export const authMiddleware: Middleware = {
   async onRequest({ request }) {
+    // use appropriate api key and api secret from env based on the request url
+    let apiKey = env.FLINK_API_KEY;
+    let apiSecret = env.FLINK_API_SECRET;
+    if (request.url.startsWith(env.CONFLUENT_CLOUD_REST_ENDPOINT)) {
+      apiKey = env.CONFLUENT_CLOUD_API_KEY;
+      apiSecret = env.CONFLUENT_CLOUD_API_SECRET;
+    }
     // add Authorization header to every request
-    // us flink api key and flink api secret from env
     request.headers.set(
       "Authorization",
-      `Basic ${Buffer.from(`${env.FLINK_API_KEY}:${env.FLINK_API_SECRET}`).toString("base64")}`,
+      `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`,
     );
     return request;
   },

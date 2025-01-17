@@ -45,6 +45,14 @@ export const DeleteFlinkStatementArgumentsSchema = z.object({
   statementName: z.string().nonempty().max(255),
 });
 
+export const ListConnectorsArgumentsSchema = z.object({
+  // No arguments
+});
+
+export const ReadConnectorArgumentsSchema = z.object({
+  connectorName: z.string().nonempty(),
+});
+
 export const ListTopicsInputSchema = {
   type: "object",
   properties: {},
@@ -153,6 +161,23 @@ export const DeleteFlinkStatementsInputSchema = {
   required: ["statementName"],
 };
 
+export const ListConnectorsInputSchema = {
+  type: "object",
+  properties: {},
+  required: [],
+};
+
+export const ReadConnectorInputSchema = {
+  type: "object",
+  properties: {
+    connectorName: {
+      type: "string",
+      description: "The unique name of the connector.",
+    },
+  },
+  required: ["connectorName"],
+};
+
 // Add type exports for TypeScript
 export type ListTopicsArguments = z.infer<typeof ListTopicsArgumentsSchema>;
 export type CreateTopicsArguments = z.infer<typeof CreateTopicsArgumentsSchema>;
@@ -171,4 +196,10 @@ export type ReadFlinkStatementArguments = z.infer<
 >;
 export type DeleteFlinkStatementArguments = z.infer<
   typeof DeleteFlinkStatementArgumentsSchema
+>;
+export type ListConnectorsArguments = z.infer<
+  typeof ListConnectorsArgumentsSchema
+>;
+export type ReadConnectorArguments = z.infer<
+  typeof ReadConnectorArgumentsSchema
 >;

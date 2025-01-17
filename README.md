@@ -15,6 +15,12 @@ FLINK_ENV_NAME=""
 FLINK_DATABASE_NAME=""
 FLINK_API_KEY=""
 FLINK_API_SECRET=""
+FLINK_COMPUTE_POOL_ID="lfcp-..."
+CONFLUENT_CLOUD_API_KEY=""
+CONFLUENT_CLOUD_API_SECRET=""
+KAFKA_CLUSTER_ID=""
+KAFKA_ENV_ID="env-..."
+CONFLUENT_CLOUD_REST_ENDPOINT="https://api.confluent.cloud"
 ```
 
 ### Incremental watch mode of typescript

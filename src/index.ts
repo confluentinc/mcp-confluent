@@ -20,28 +20,21 @@ import {
 import { authMiddleware } from "@src/confluent/middleware.js";
 import type { paths } from "@src/confluent/openapi-schema";
 import {
-  CreateFlinkStatementArgumentsSchema,
-  CreateFlinkStatementInputSchema,
-  CreateTopicsArgumentsSchema,
-  CreateTopicsInputSchema,
-  DeleteFlinkStatementArgumentsSchema,
-  DeleteFlinkStatementsInputSchema,
-  DeleteTopicsArgumentsSchema,
-  DeleteTopicsInputSchema,
-  ListConnectorsInputSchema,
-  ListFlinkStatementsArgumentsSchema,
-  ListFlinkStatementsInputSchema,
-  ListTopicsInputSchema,
-  ProduceMessageArgumentsSchema,
-  ProduceMessageInputSchema,
-  ReadConnectorArgumentsSchema,
-  ReadConnectorInputSchema,
-  ReadFlinkStatementArgumentsSchema,
-  ReadFlinkStatementInputSchema,
+  CreateFlinkStatementArguments,
+  CreateKafkaTopicsArguments,
+  DeleteFlinkStatementArguments,
+  DeleteKafkaTopicsArguments,
+  ListConnectorsArguments,
+  ListFlinkStatementsArguments,
+  ListKafkaTopicsArguments,
+  ProduceKafkaMessageArguments,
+  ReadConnectorArguments,
+  ReadFlinkStatementArguments,
 } from "@src/confluent/schema.js";
 import env from "@src/env.js";
 import createClient from "openapi-fetch";
 import z from "zod";
+import zodToJsonSchema from "zod-to-json-schema";
 import { AsyncLazy, Lazy } from "./lazy";
 
 const kafkaClient = new Lazy(
@@ -111,54 +104,57 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "list-topics",
-        description: "List Kafka topics",
-        inputSchema: ListTopicsInputSchema,
+        description:
+          "Return the list of topics that belong to the specified Kafka cluster.",
+        inputSchema: zodToJsonSchema(ListKafkaTopicsArguments),
       },
       {
         name: "create-topics",
-        description: "Create Kafka topics",
-        inputSchema: CreateTopicsInputSchema,
+        description: "Create topics with the given names.",
+        inputSchema: zodToJsonSchema(CreateKafkaTopicsArguments),
       },
       {
         name: "delete-topics",
-        description: "Delete Kafka topics",
-        inputSchema: DeleteTopicsInputSchema,
+        description: "Delete the topic with the given names.",
+        inputSchema: zodToJsonSchema(DeleteKafkaTopicsArguments),
       },
       {
         name: "produce-message",
         description:
-          "Produces all user messages to a Kafka topic named claude-conversations. If the topic does not exist, it will be created via the create-topics tool.",
-        inputSchema: ProduceMessageInputSchema,
+          "Produce records to the given topic. For saving user messages/history they should be saved to a kafka topic named claude-conversations unless otherwise specified. If the topic does not exist, it will be created via the create-topics tool.",
+        inputSchema: zodToJsonSchema(ProduceKafkaMessageArguments),
       },
       {
         name: "list-flink-statements",
-        description: "List Flink SQL statements",
-        inputSchema: ListFlinkStatementsInputSchema,
+        description:
+          "Retrieve a sorted, filtered, paginated list of all statements.",
+        inputSchema: zodToJsonSchema(ListFlinkStatementsArguments),
       },
       {
         name: "create-flink-statement",
-        description: "Create Flink SQL statement",
-        inputSchema: CreateFlinkStatementInputSchema,
+        description: "Make a request to create a statement.",
+        inputSchema: zodToJsonSchema(CreateFlinkStatementArguments),
       },
       {
         name: "read-flink-statement",
-        description: "Read Flink SQL statement",
-        inputSchema: ReadFlinkStatementInputSchema,
+        description: "Make a request to read a statement.",
+        inputSchema: zodToJsonSchema(ReadFlinkStatementArguments),
       },
       {
         name: "delete-flink-statements",
-        description: "Delete Flink SQL statement",
-        inputSchema: DeleteFlinkStatementsInputSchema,
+        description: "Make a request to delete a statement.",
+        inputSchema: zodToJsonSchema(DeleteFlinkStatementArguments),
       },
       {
         name: "list-connectors",
-        description: "List Active Connectors",
-        inputSchema: ListConnectorsInputSchema,
+        description:
+          'Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.',
+        inputSchema: zodToJsonSchema(ListConnectorsArguments),
       },
       {
         name: "read-connector",
-        description: "Get Connector Details",
-        inputSchema: ReadConnectorInputSchema,
+        description: "Get information about the connector.",
+        inputSchema: zodToJsonSchema(ReadConnectorArguments),
       },
     ],
   };
@@ -171,22 +167,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "list-topics":
         return await handleListTopics(await kafkaAdminClient.get());
       case "create-topics": {
-        const { topicNames } = CreateTopicsArgumentsSchema.parse(args);
+        const { topicNames } = CreateKafkaTopicsArguments.parse(args);
         return await handleCreateTopics(
           await kafkaAdminClient.get(),
           topicNames,
         );
       }
       case "delete-topics": {
-        const { topicNames } = DeleteTopicsArgumentsSchema.parse(args);
+        const { topicNames } = DeleteKafkaTopicsArguments.parse(args);
         return await handleDeleteTopics(
           await kafkaAdminClient.get(),
           topicNames,
         );
       }
       case "produce-message": {
-        const { topicName, message } =
-          ProduceMessageArgumentsSchema.parse(args);
+        const { topicName, message } = ProduceKafkaMessageArguments.parse(args);
         return await handleProduceMessage(
           await kafkaProducer.get(),
           topicName,
@@ -194,12 +189,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
       }
       case "list-flink-statements": {
-        const { computePoolId, pageSize, pageToken, labelSelector } =
-          ListFlinkStatementsArgumentsSchema.parse(args);
+        const {
+          organizationId,
+          environmentId,
+          computePoolId,
+          pageSize,
+          pageToken,
+          labelSelector,
+        } = ListFlinkStatementsArguments.parse(args);
         return await handleListFlinkStatements(
           confluentCloudFlinkRestClient,
-          env.FLINK_ORG_ID,
-          env.FLINK_ENV_ID,
+          organizationId,
+          environmentId,
           computePoolId,
           pageSize,
           pageToken,
@@ -207,51 +208,62 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
       }
       case "create-flink-statement": {
-        const { statementName, statement } =
-          CreateFlinkStatementArgumentsSchema.parse(args);
+        const {
+          organizationId,
+          environmentId,
+          statementName,
+          statement,
+          catalogName,
+          databaseName,
+          computePoolId,
+        } = CreateFlinkStatementArguments.parse(args);
         return handleCreateFlinkStatement(
           confluentCloudFlinkRestClient,
-          env.FLINK_ORG_ID,
-          env.FLINK_ENV_ID,
-          env.FLINK_COMPUTE_POOL_ID,
+          organizationId,
+          environmentId,
+          computePoolId,
           statement,
           statementName,
-          env.FLINK_ENV_NAME,
-          env.FLINK_DATABASE_NAME,
+          catalogName,
+          databaseName,
         );
       }
       case "read-flink-statement": {
-        const { statementName } = ReadFlinkStatementArgumentsSchema.parse(args);
+        const { organizationId, environmentId, statementName } =
+          ReadFlinkStatementArguments.parse(args);
         return handleReadFlinkStatement(
           confluentCloudFlinkRestClient,
-          env.FLINK_ORG_ID,
-          env.FLINK_ENV_ID,
+          organizationId,
+          environmentId,
           statementName,
         );
       }
       case "delete-flink-statements": {
-        const { statementName } =
-          DeleteFlinkStatementArgumentsSchema.parse(args);
+        const { organizationId, environmentId, statementName } =
+          DeleteFlinkStatementArguments.parse(args);
         return handleDeleteFlinkStatement(
           confluentCloudFlinkRestClient,
-          env.FLINK_ORG_ID,
-          env.FLINK_ENV_ID,
+          organizationId,
+          environmentId,
           statementName,
         );
       }
       case "list-connectors": {
+        const { clusterId, environmentId } =
+          ListConnectorsArguments.parse(args);
         return handleListConnectors(
           confluentCloudRestClient,
-          env.KAFKA_ENV_ID,
-          env.KAFKA_CLUSTER_ID,
+          environmentId,
+          clusterId,
         );
       }
       case "read-connector": {
-        const { connectorName } = ReadConnectorArgumentsSchema.parse(args);
+        const { environmentId, clusterId, connectorName } =
+          ReadConnectorArguments.parse(args);
         return handleReadConnector(
           confluentCloudRestClient,
-          env.KAFKA_ENV_ID,
-          env.KAFKA_CLUSTER_ID,
+          environmentId,
+          clusterId,
           connectorName,
         );
       }

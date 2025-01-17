@@ -1,15 +1,8 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript/index.js";
+import { createResponse, validateParam } from "@src/confluent/helpers";
 import type { paths } from "@src/confluent/openapi-schema";
 import { Client, wrapAsPathBasedClient } from "openapi-fetch";
 
-const createResponse = (message: string) => ({
-  content: [
-    {
-      type: "text",
-      text: message,
-    },
-  ],
-});
 /**
  * Handles the listing of Kafka topics using the provided KafkaJS Admin client.
  *
@@ -92,21 +85,32 @@ export async function handleProduceMessage(
  */
 export async function handleListFlinkStatements(
   confluentCloudRestClient: Client<paths, `${string}/${string}`>,
-  orgId: string,
-  envId: string,
+  orgId: string | undefined,
+  envId: string | undefined,
   computePoolId: string | undefined,
   pageSize: number = 10,
   pageToken: string | undefined,
   labelSelector: string | undefined,
 ) {
+  const organization_id = validateParam(
+    "FLINK_ORG_ID",
+    "Organization ID is required",
+    orgId,
+  );
+  const environment_id = validateParam(
+    "FLINK_ENV_ID",
+    "Environment ID is required",
+    envId,
+  );
+
   const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
   const { data: response, error } = await pathBasedClient[
     "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements"
   ].GET({
     params: {
       path: {
-        organization_id: orgId,
-        environment_id: envId,
+        organization_id: organization_id,
+        environment_id: environment_id,
       },
       query: {
         compute_pool_id: computePoolId,

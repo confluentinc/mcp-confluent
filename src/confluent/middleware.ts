@@ -11,6 +11,7 @@ import { Middleware } from "openapi-fetch";
  */
 export const flinkAuthMiddleware: Middleware = {
   async onRequest({ request }) {
+    console.error(`${JSON.stringify(request)}`);
     // add Authorization header to every request
     request.headers.set(
       "Authorization",
@@ -22,6 +23,7 @@ export const flinkAuthMiddleware: Middleware = {
 
 export const confluentCloudAuthMiddleware: Middleware = {
   async onRequest({ request }) {
+    console.error(`${JSON.stringify(request)}`);
     // add Authorization header to every request
     request.headers.set(
       "Authorization",

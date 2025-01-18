@@ -100,7 +100,6 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
-      logging: {},
     },
   },
 );

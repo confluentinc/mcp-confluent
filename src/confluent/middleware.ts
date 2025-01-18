@@ -9,19 +9,23 @@ import { Middleware } from "openapi-fetch";
  * @param {Object} request - The request object.
  * @returns {Object} The modified request object with the Authorization header.
  */
-export const authMiddleware: Middleware = {
+export const flinkAuthMiddleware: Middleware = {
   async onRequest({ request }) {
-    // use appropriate api key and api secret from env based on the request url
-    let apiKey = env.FLINK_API_KEY;
-    let apiSecret = env.FLINK_API_SECRET;
-    if (request.url.startsWith(env.CONFLUENT_CLOUD_REST_ENDPOINT)) {
-      apiKey = env.CONFLUENT_CLOUD_API_KEY;
-      apiSecret = env.CONFLUENT_CLOUD_API_SECRET;
-    }
     // add Authorization header to every request
     request.headers.set(
       "Authorization",
-      `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`,
+      `Basic ${Buffer.from(`${env.FLINK_API_KEY}:${env.FLINK_API_SECRET}`).toString("base64")}`,
+    );
+    return request;
+  },
+};
+
+export const confluentCloudAuthMiddleware: Middleware = {
+  async onRequest({ request }) {
+    // add Authorization header to every request
+    request.headers.set(
+      "Authorization",
+      `Basic ${Buffer.from(`${env.CONFLUENT_CLOUD_API_KEY}:${env.CONFLUENT_CLOUD_API_SECRET}`).toString("base64")}`,
     );
     return request;
   },

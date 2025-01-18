@@ -1,15 +1,14 @@
-import env, { Environment } from "@src/env";
+import env, { Environment } from "@src/env.js";
 
 /**
- * Validates the presence of a parameter by checking if it is provided directly or via an environment variable.
- *
- * @param envVarName - The name of the environment variable to check if the parameter is not provided.
- * @param errorMessage - The error message to throw if the parameter is not found.
- * @param param - The optional parameter to validate.
- * @returns The validated parameter, either from the provided value or the environment variable. Prefers the provided value vs the one loaded from environment variables.
- * @throws Will throw an error if the parameter is not found in both the provided value and the environment variable.
+ * Ensures a parameter exists either from the provided value or environment variable. Favor the provided param over the environment variable when truthy.
+ * @param envVarName - The name of the environment variable to check
+ * @param errorMessage - The error message to throw if neither parameter nor environment variable exists
+ * @param param - Optional parameter value to use instead of environment variable
+ * @returns The parameter value or environment variable value
+ * @throws {Error} When neither parameter nor environment variable exists
  */
-export const validateParam = (
+export const getEnsuredParam = (
   envVarName: keyof Environment,
   errorMessage: string,
   param?: string,
@@ -20,6 +19,17 @@ export const validateParam = (
   }
   return finalParam;
 };
+
+// /**
+//  * Returns the value from the environment variable if the provided value is falsy
+//  * @param envVarName - The name of the environment variable to retrieve
+//  * @param value - Optional value to use instead of environment variable
+//  * @returns The provided value if it exists, otherwise the value from the environment variable
+//  */
+// export const getValueWithEnvVarFallback = (
+//   envVarName: keyof Environment,
+//   value?: string,
+// ) => value || env[envVarName];
 
 export const createResponse = (message: string) => ({
   content: [

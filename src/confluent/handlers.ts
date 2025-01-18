@@ -1,6 +1,7 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript/index.js";
-import { createResponse, validateParam } from "@src/confluent/helpers";
+import { createResponse, getEnsuredParam } from "@src/confluent/helpers.js";
 import type { paths } from "@src/confluent/openapi-schema";
+import env from "@src/env.js";
 import { Client, wrapAsPathBasedClient } from "openapi-fetch";
 
 /**
@@ -87,17 +88,17 @@ export async function handleListFlinkStatements(
   confluentCloudRestClient: Client<paths, `${string}/${string}`>,
   orgId: string | undefined,
   envId: string | undefined,
-  computePoolId: string | undefined,
+  computePoolId: string | undefined = env["FLINK_COMPUTE_POOL_ID"],
   pageSize: number = 10,
   pageToken: string | undefined,
   labelSelector: string | undefined,
 ) {
-  const organization_id = validateParam(
+  const organization_id = getEnsuredParam(
     "FLINK_ORG_ID",
     "Organization ID is required",
     orgId,
   );
-  const environment_id = validateParam(
+  const environment_id = getEnsuredParam(
     "FLINK_ENV_ID",
     "Environment ID is required",
     envId,
@@ -125,18 +126,7 @@ export async function handleListFlinkStatements(
       `Failed to list Flink SQL statements: ${JSON.stringify(error)}`,
     );
   }
-  const formattedSqlStatements = response?.data.map((statement) => {
-    return {
-      name: statement.name,
-      orgId: statement.organization_id,
-      envId: statement.environment_id,
-      properties: statement.spec.properties,
-      statement: statement.spec.statement,
-    };
-  });
-  return createResponse(
-    `Flink SQL statements: ${JSON.stringify(formattedSqlStatements)}`,
-  );
+  return createResponse(`${JSON.stringify(response)}`);
 }
 
 /**
@@ -156,34 +146,46 @@ export async function handleListFlinkStatements(
  */
 export async function handleCreateFlinkStatement(
   confluentCloudRestClient: Client<paths, `${string}/${string}`>,
-  orgId: string,
-  envId: string,
-  computePoolId: string | undefined,
+  orgId: string | undefined,
+  envId: string | undefined,
+  computePoolId: string | undefined = env["FLINK_COMPUTE_POOL_ID"],
   statement: string | undefined,
   statementName: string,
-  catalogName: string,
-  kafkaClusterName: string,
+  catalogName: string | undefined = env["FLINK_ENV_NAME"],
+  kafkaClusterName: string | undefined = env["KAFKA_CLUSTER_ID"],
 ) {
+  const organization_id = getEnsuredParam(
+    "FLINK_ORG_ID",
+    "Organization ID is required",
+    orgId,
+  );
+  const environment_id = getEnsuredParam(
+    "FLINK_ENV_ID",
+    "Environment ID is required",
+    envId,
+  );
+
   const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
   const { data: response, error } = await pathBasedClient[
     "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements"
   ].POST({
     params: {
       path: {
-        environment_id: envId,
-        organization_id: orgId,
+        environment_id: environment_id,
+        organization_id: organization_id,
       },
     },
     body: {
       name: statementName,
-      organization_id: orgId,
-      environment_id: envId,
+      organization_id: organization_id,
+      environment_id: environment_id,
       spec: {
         compute_pool_id: computePoolId,
         statement: statement,
         properties: {
-          "sql.current-catalog": catalogName,
-          "sql.current-database": kafkaClusterName,
+          // only include the catalog and database properties if they are defined
+          ...(catalogName && { "sql.current-catalog": catalogName }),
+          ...(kafkaClusterName && { "sql.current-database": kafkaClusterName }),
         },
       },
     },
@@ -193,9 +195,7 @@ export async function handleCreateFlinkStatement(
       `Failed to create Flink SQL statements: ${JSON.stringify(error)}`,
     );
   }
-  return createResponse(
-    `Flink SQL Statement Creation Status: ${JSON.stringify(response?.status)}`,
-  );
+  return createResponse(`${JSON.stringify(response)}`);
 }
 
 /**
@@ -205,25 +205,49 @@ export async function handleCreateFlinkStatement(
  * @param orgId - The organization ID
  * @param envId - The environment ID
  * @param statementName - The name of the Flink SQL statement
+ * @param timeoutInMilliseconds - The timeout in milliseconds for fetching results. Set to -1 to disable timeout and rely on the api's next page token to stop fetching results.
  *
  * @returns A promise that resolves to an object containing the results in a text format
  * @throws {Error} If the API request to read the Flink SQL statement fails
  *
  * @remarks
- * The function implements pagination with a 5-second timeout. It will continue to fetch results
+ * The function implements pagination. It will continue to fetch results
  * using the next page token until either there are no more results or the timeout is reached.
+ * Tables backed by kafka topics can be thought of as never-ending streams as data could be continuously
+ * produced in near real-time. Therefore, if you wish to sample values from a stream, you may want to set a timeout.
  *
  */
 export async function handleReadFlinkStatement(
   confluentCloudRestClient: Client<paths, `${string}/${string}`>,
-  orgId: string,
-  envId: string,
+  orgId: string | undefined,
+  envId: string | undefined,
   statementName: string,
+  timeoutInMilliseconds: number | undefined = 5000,
 ) {
+  const organization_id = getEnsuredParam(
+    "FLINK_ORG_ID",
+    "Organization ID is required",
+    orgId,
+  );
+  const environment_id = getEnsuredParam(
+    "FLINK_ENV_ID",
+    "Environment ID is required",
+    envId,
+  );
+
   const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
   let allResults: unknown[] = [];
   let nextToken: string | undefined = undefined;
-  const timeout = Date.now() + 5000; // 5 seconds
+  const timeout =
+    timeoutInMilliseconds === -1 || timeoutInMilliseconds === undefined
+      ? undefined
+      : Date.now() + timeoutInMilliseconds;
+
+  /**
+   * A timeout period has elapsed if a timeout is defined and the current time has exceeded it,
+   * `false` otherwise.
+   */
+  const hasTimedOut = () => timeout !== undefined && Date.now() >= timeout;
 
   do {
     const { data: response, error } = await pathBasedClient[
@@ -231,8 +255,8 @@ export async function handleReadFlinkStatement(
     ].GET({
       params: {
         path: {
-          organization_id: orgId,
-          environment_id: envId,
+          organization_id: organization_id,
+          environment_id: environment_id,
           name: statementName,
         },
         // only include the page token if it's defined
@@ -248,7 +272,7 @@ export async function handleReadFlinkStatement(
 
     allResults = allResults.concat(response?.results.data || []);
     nextToken = response?.metadata.next?.split("page_token=")[1];
-  } while (nextToken && Date.now() < timeout);
+  } while (nextToken && !hasTimedOut());
 
   return createResponse(
     `Flink SQL Statement Results: ${JSON.stringify(allResults)}`,
@@ -268,18 +292,28 @@ export async function handleReadFlinkStatement(
  */
 export async function handleDeleteFlinkStatement(
   confluentCloudRestClient: Client<paths, `${string}/${string}`>,
-  orgId: string,
-  envId: string,
+  orgId: string | undefined,
+  envId: string | undefined,
   statementName: string,
 ) {
+  const organization_id = getEnsuredParam(
+    "FLINK_ORG_ID",
+    "Organization ID is required",
+    orgId,
+  );
+  const environment_id = getEnsuredParam(
+    "FLINK_ENV_ID",
+    "Environment ID is required",
+    envId,
+  );
   const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
   const { response, error } = await pathBasedClient[
     "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements/{statement_name}"
   ].DELETE({
     params: {
       path: {
-        organization_id: orgId,
-        environment_id: envId,
+        organization_id: organization_id,
+        environment_id: environment_id,
         statement_name: statementName,
       },
     },
@@ -305,17 +339,28 @@ export async function handleDeleteFlinkStatement(
  */
 export async function handleListConnectors(
   confluentCloudRestClient: Client<paths, `${string}/${string}`>,
-  envId: string,
-  clusterId: string,
+  envId: string | undefined,
+  clusterId: string | undefined,
 ) {
+  const environment_id = getEnsuredParam(
+    "FLINK_ENV_ID",
+    "Environment ID is required",
+    envId,
+  );
+  const kafka_cluster_id = getEnsuredParam(
+    "KAFKA_CLUSTER_ID",
+    "Kafka Cluster ID is required",
+    clusterId,
+  );
+
   const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
   const { data: response, error } = await pathBasedClient[
     "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors"
   ].GET({
     params: {
       path: {
-        environment_id: envId,
-        kafka_cluster_id: clusterId,
+        environment_id: environment_id,
+        kafka_cluster_id: kafka_cluster_id,
       },
     },
   });
@@ -341,10 +386,21 @@ export async function handleListConnectors(
  */
 export async function handleReadConnector(
   confluentCloudRestClient: Client<paths, `${string}/${string}`>,
-  envId: string,
-  clusterId: string,
+  envId: string | undefined,
+  clusterId: string | undefined,
   connectorName: string,
 ) {
+  const environment_id = getEnsuredParam(
+    "FLINK_ENV_ID",
+    "Environment ID is required",
+    envId,
+  );
+  const kafka_cluster_id = getEnsuredParam(
+    "KAFKA_CLUSTER_ID",
+    "Kafka Cluster ID is required",
+    clusterId,
+  );
+
   const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
   const { data: response, error } = await pathBasedClient[
     "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}"
@@ -352,8 +408,8 @@ export async function handleReadConnector(
     params: {
       path: {
         connector_name: connectorName,
-        environment_id: envId,
-        kafka_cluster_id: clusterId,
+        environment_id: environment_id,
+        kafka_cluster_id: kafka_cluster_id,
       },
     },
   });

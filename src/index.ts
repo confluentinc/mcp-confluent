@@ -17,7 +17,10 @@ import {
   handleReadConnector,
   handleReadFlinkStatement,
 } from "@src/confluent/handlers.js";
-import { authMiddleware } from "@src/confluent/middleware.js";
+import {
+  confluentCloudAuthMiddleware,
+  flinkAuthMiddleware,
+} from "@src/confluent/middleware.js";
 import type { paths } from "@src/confluent/openapi-schema";
 import {
   CreateFlinkStatementArguments,
@@ -32,10 +35,10 @@ import {
   ReadFlinkStatementArguments,
 } from "@src/confluent/schema.js";
 import env from "@src/env.js";
+import { AsyncLazy, Lazy } from "@src/lazy.js";
 import createClient from "openapi-fetch";
 import z from "zod";
 import zodToJsonSchema from "zod-to-json-schema";
-import { AsyncLazy, Lazy } from "./lazy";
 
 const kafkaClient = new Lazy(
   () =>
@@ -80,12 +83,12 @@ const kafkaProducer = new AsyncLazy(
 const confluentCloudFlinkRestClient = createClient<paths>({
   baseUrl: env.FLINK_REST_ENDPOINT,
 });
-confluentCloudFlinkRestClient.use(authMiddleware);
+confluentCloudFlinkRestClient.use(flinkAuthMiddleware);
 
 const confluentCloudRestClient = createClient<paths>({
   baseUrl: env.CONFLUENT_CLOUD_REST_ENDPOINT,
 });
-confluentCloudRestClient.use(authMiddleware);
+confluentCloudRestClient.use(confluentCloudAuthMiddleware);
 
 const server = new Server(
   {

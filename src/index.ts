@@ -59,6 +59,7 @@ const kafkaClient = new Lazy(
 
 const kafkaAdminClient = new AsyncLazy(
   async () => {
+    console.error("Connecting Kafka Admin");
     const admin = kafkaClient.get().admin();
     await admin.connect();
     return admin;
@@ -68,6 +69,7 @@ const kafkaAdminClient = new AsyncLazy(
 
 const kafkaProducer = new AsyncLazy(
   async () => {
+    console.error("Connecting Kafka Producer");
     const producer = kafkaClient.get().producer({
       kafkaJS: {
         acks: 1,
@@ -98,6 +100,7 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
+      logging: {},
     },
   },
 );
@@ -284,18 +287,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function main() {
-  try {
-    process.on("SIGINT", cleanup);
-    process.on("SIGTERM", cleanup);
+  process.on("SIGINT", cleanup);
+  process.on("SIGTERM", cleanup);
+  process.on("SIGQUIT", cleanup);
+  process.on("SIGUSR2", cleanup);
 
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error("Confluent MCP Server running on stdio");
-  } catch (error) {
-    console.error("Error starting server:", error);
-    await cleanup();
-    process.exit(1);
-  }
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("Confluent MCP Server running on stdio");
 }
 
 async function cleanup() {
@@ -306,4 +305,7 @@ async function cleanup() {
   process.exit(0);
 }
 
-main();
+main().catch((error) => {
+  console.error("Error starting server:", error);
+  process.exit(1);
+});

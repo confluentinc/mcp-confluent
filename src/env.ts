@@ -1,8 +1,9 @@
 import { readFile } from "fs/promises";
 import { z } from "zod";
 
-// Schema for required API keys from .env
+// Schema for required environment variables
 const envSchema = z.object({
+  BOOTSTRAP_SERVERS: z.string().trim(),
   KAFKA_API_KEY: z.string().trim().min(1),
   KAFKA_API_SECRET: z.string().trim().min(1),
   FLINK_API_KEY: z.string().trim().min(1),
@@ -15,7 +16,6 @@ const envSchema = z.object({
 // Schema for optional configuration from file
 const configSchema = z
   .object({
-    BOOTSTRAP_SERVERS: z.string().trim(),
     FLINK_ENV_ID: z.string().trim().startsWith("env-"),
     FLINK_ORG_ID: z.string().trim().min(1),
     FLINK_REST_ENDPOINT: z.string().trim().url(),

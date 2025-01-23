@@ -1,15 +1,14 @@
 {
   "compilerOptions": {
-    "target": "ES2023",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
-    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
     // this was specifically added to bypass typechecking for any in handleReadFlinkStatement

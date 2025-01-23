@@ -19,23 +19,3 @@ export const getEnsuredParam = (
   }
   return finalParam;
 };
-
-// /**
-//  * Returns the value from the environment variable if the provided value is falsy
-//  * @param envVarName - The name of the environment variable to retrieve
-//  * @param value - Optional value to use instead of environment variable
-//  * @returns The provided value if it exists, otherwise the value from the environment variable
-//  */
-// export const getValueWithEnvVarFallback = (
-//   envVarName: keyof Environment,
-//   value?: string,
-// ) => value || env[envVarName];
-
-export const createResponse = (message: string) => ({
-  content: [
-    {
-      type: "text",
-      text: message,
-    },
-  ],
-});

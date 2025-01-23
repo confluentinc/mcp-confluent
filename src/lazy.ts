@@ -1,32 +1,87 @@
+/**
+ * A class that implements lazy loading for synchronous values.
+ * It defers the initialization of a value until it's first requested.
+ * @template T The type of value to be lazily loaded
+ */
 export class Lazy<T> {
+  /** The cached instance of the lazily loaded value */
   private instance: T | undefined;
-  private supplier: () => T;
-  private closeHandler?: (instance: T) => void;
+
+  /** A function that produces the value to be lazily loaded */
+  private readonly supplier: () => T;
+
+  /** Optional handler to clean up the instance when closed */
+  private readonly closeHandler?: (instance: T) => void;
+
+  /**
+   * Creates a new Lazy instance
+   * @param supplier A function that creates the lazy-loaded value
+   * @param closeHandler Optional function to clean up the instance when closed
+   */
   constructor(supplier: () => T, closeHandler?: (instance: T) => void) {
     this.supplier = supplier;
     this.closeHandler = closeHandler;
   }
 
+  /**
+   * Retrieves the lazy-loaded value, initializing it if necessary
+   * @returns The lazy-loaded value
+   * @throws If the supplier function fails to initialize the value
+   */
   get(): T {
-    if (!this.instance) {
+    try {
       this.instance = this.supplier();
+      console.error(
+        `Lazy instance created with type ${this.instance?.constructor.name || typeof this.instance}`,
+      );
+    } catch (error) {
+      throw new Error(`Failed to initialize lazy instance: ${error}`);
     }
-    return this.instance;
+    return this.instance!;
   }
 
+  /**
+   * Closes and cleans up the lazy-loaded instance if it exists.
+   * If a closeHandler was provided, it will be called with the instance.
+   * The instance is set to undefined after cleanup.
+   */
   close(): void {
-    if (this.instance && this.closeHandler) {
-      this.closeHandler(this.instance);
+    if (this.instance) {
+      if (this.closeHandler) {
+        console.error(
+          `Initiating close handler for lazy instance of type ${typeof this.instance}`,
+        );
+        this.closeHandler(this.instance);
+        console.error(`Lazy instance closed with type ${typeof this.instance}`);
+      }
       this.instance = undefined;
     }
   }
 }
 
+/**
+ * A class that implements lazy loading for asynchronous values.
+ * It defers the initialization of a value until it's first requested.
+ * @template T The type of value to be lazily loaded
+ */
 export class AsyncLazy<T> {
+  /** The cached instance of the lazily loaded value */
   private instance: T | undefined;
-  private supplier: () => Promise<T>;
-  private closeHandler?: (instance: T) => Promise<void>;
 
+  /** A function that produces the value to be lazily loaded */
+  private readonly supplier: () => Promise<T>;
+
+  /** Optional handler to clean up the instance when closed */
+  private readonly closeHandler?: (instance: T) => Promise<void>;
+
+  /** Tracks the ongoing initialization promise to prevent multiple simultaneous initializations */
+  private initializationPromise: Promise<T> | null = null;
+
+  /**
+   * Creates a new AsyncLazy instance
+   * @param supplier An async function that creates the lazy-loaded value
+   * @param closeHandler Optional async function to clean up the instance when closed
+   */
   constructor(
     supplier: () => Promise<T>,
     closeHandler?: (instance: T) => Promise<void>,
@@ -35,17 +90,38 @@ export class AsyncLazy<T> {
     this.closeHandler = closeHandler;
   }
 
+  /**
+   * Retrieves the lazy-loaded value, initializing it if necessary
+   * @returns A promise that resolves to the lazy-loaded value
+   * @throws If the supplier function fails to initialize the value
+   */
   async get(): Promise<T> {
     if (!this.instance) {
-      this.instance = await this.supplier();
+      if (!this.initializationPromise) {
+        this.initializationPromise = this.supplier();
+      }
+      this.instance = await this.initializationPromise;
     }
+    console.error(
+      `Async Lazy instance created with type ${this.instance?.constructor.name || typeof this.instance}`,
+    );
     return this.instance;
   }
 
+  /**
+   * Closes and cleans up the lazy-loaded instance if it exists
+   * If a closeHandler was provided, it will be called with the instance
+   * @returns A promise that resolves when the cleanup is complete
+   */
   async close(): Promise<void> {
-    if (this.instance && this.closeHandler) {
-      await this.closeHandler(this.instance);
-      this.instance = undefined;
+    if (this.instance) {
+      if (this.closeHandler) {
+        console.error(
+          `Initiating close handler for lazy instance of type ${typeof this.instance}`,
+        );
+        await this.closeHandler(this.instance);
+        console.error(`Lazy instance closed with type ${typeof this.instance}`);
+      }
     }
   }
 }

@@ -362,3 +362,50 @@ export async function handleReadConnector(
     `Connector Details for ${connectorName}: ${JSON.stringify(response)}`,
   );
 }
+
+/**
+ * Get the required configuration for a connector plugin.
+ *
+ */
+export async function handleGetConnectorConfig(
+  confluentCloudRestClient: Client<paths, `${string}/${string}`>,
+  envId: string,
+  clusterId: string,
+  pluginName: string,
+) {
+  const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
+  const { data: response, error } = await pathBasedClient[
+    "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connector-plugins/{plugin_name}/config/validate"
+  ].PUT({
+    params: {
+      path: {
+        environment_id: envId,
+        kafka_cluster_id: clusterId,
+        plugin_name: pluginName,
+      },
+    },
+    body: {},
+  });
+  if (error) {
+    return createResponse(
+      `Failed to get connector config: ${JSON.stringify(error)}`,
+    );
+  }
+  const formattedValidationResponse = response?.configs?.map((config) => {
+    return {
+      name: config.definition?.name,
+      type: config.definition?.type,
+      required: config.definition?.required,
+      default_value: config.definition?.default_value,
+      importance: config.definition?.importance,
+      documentation: config.definition?.documentation,
+      group: config.definition?.group,
+      dependents: config.definition?.dependents,
+      recommended_values: config.value?.recommended_values,
+    };
+  });
+
+  return createResponse(
+    `Configuration properties for ${pluginName}: ${JSON.stringify(formattedValidationResponse)}`,
+  );
+}

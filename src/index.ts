@@ -6,6 +6,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import {
+  handleGetConnectorConfig,
   handleCreateFlinkStatement,
   handleCreateTopics,
   handleDeleteFlinkStatement,
@@ -28,6 +29,8 @@ import {
   DeleteFlinkStatementsInputSchema,
   DeleteTopicsArgumentsSchema,
   DeleteTopicsInputSchema,
+  GetConnectorConfigArgumentsSchema,
+  GetConnectorConfigInputSchema,
   ListConnectorsInputSchema,
   ListFlinkStatementsArgumentsSchema,
   ListFlinkStatementsInputSchema,
@@ -140,6 +143,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         description: "Get Connector Details",
         inputSchema: ReadConnectorInputSchema,
       },
+      {
+        name: "get-connector-config",
+        description: "Get Connector Config for a connector plugin",
+        inputSchema: GetConnectorConfigInputSchema,
+      },
     ],
   };
 });
@@ -223,6 +231,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           env.KAFKA_ENV_ID,
           env.KAFKA_CLUSTER_ID,
           connectorName,
+        );
+      }
+      case "get-connector-config": {
+        const { pluginName } = GetConnectorConfigArgumentsSchema.parse(args);
+        return handleGetConnectorConfig(
+          confluentCloudRestClient,
+          env.KAFKA_ENV_ID,
+          env.KAFKA_CLUSTER_ID,
+          pluginName,
         );
       }
       default:

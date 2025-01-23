@@ -53,6 +53,10 @@ export const ReadConnectorArgumentsSchema = z.object({
   connectorName: z.string().nonempty(),
 });
 
+export const GetConnectorConfigArgumentsSchema = z.object({
+  pluginName: z.string().nonempty(),
+});
+
 export const ListTopicsInputSchema = {
   type: "object",
   properties: {},
@@ -178,6 +182,17 @@ export const ReadConnectorInputSchema = {
   required: ["connectorName"],
 };
 
+export const GetConnectorConfigInputSchema = {
+  type: "object",
+  properties: {
+    pluginName: {
+      type: "string",
+      description: "The unique name of the connector plugin.",
+    },
+  },
+  required: ["pluginName"],
+};
+
 // Add type exports for TypeScript
 export type ListTopicsArguments = z.infer<typeof ListTopicsArgumentsSchema>;
 export type CreateTopicsArguments = z.infer<typeof CreateTopicsArgumentsSchema>;
@@ -202,4 +217,7 @@ export type ListConnectorsArguments = z.infer<
 >;
 export type ReadConnectorArguments = z.infer<
   typeof ReadConnectorArgumentsSchema
+>;
+export type GetConnectorConfigArguments = z.infer<
+  typeof GetConnectorConfigArgumentsSchema
 >;

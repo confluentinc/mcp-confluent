@@ -409,3 +409,36 @@ export async function handleGetConnectorConfig(
     `Configuration properties for ${pluginName}: ${JSON.stringify(formattedValidationResponse)}`,
   );
 }
+
+export async function handleCreateConnector(
+  confluentCloudRestClient: Client<paths, `${string}/${string}`>,
+  envId: string,
+  clusterId: string,
+  connectorName: string,
+  connectorConfig: string,
+) {
+  const configJson = JSON.parse(connectorConfig);
+  const pathBasedClient = wrapAsPathBasedClient(confluentCloudRestClient);
+  const { data: response, error } = await pathBasedClient[
+    "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors"
+  ].POST({
+    params: {
+      path: {
+        environment_id: envId,
+        kafka_cluster_id: clusterId,
+      },
+    },
+    body: {
+      name: connectorName,
+      config: configJson,
+    },
+  });
+  if (error) {
+    return createResponse(
+      `Failed to create connector ${connectorName}: ${JSON.stringify(error)}`,
+    );
+  }
+  return createResponse(
+    `${connectorName} created: ${JSON.stringify(response)}`,
+  );
+}

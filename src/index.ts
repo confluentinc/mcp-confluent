@@ -17,10 +17,13 @@ import {
   handleProduceMessage,
   handleReadConnector,
   handleReadFlinkStatement,
+  handleCreateConnector,
 } from "@src/confluent/handlers.js";
 import { authMiddleware } from "@src/confluent/middleware.js";
 import type { paths } from "@src/confluent/openapi-schema";
 import {
+  CreateConnectorArgumentsSchema,
+  CreateConnectorInputSchema,
   CreateFlinkStatementArgumentsSchema,
   CreateFlinkStatementInputSchema,
   CreateTopicsArgumentsSchema,
@@ -148,6 +151,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         description: "Get Connector Config for a connector plugin",
         inputSchema: GetConnectorConfigInputSchema,
       },
+      {
+        name: "create-connector",
+        description:
+          "Create a new connector. Returns the new connector information if successful.",
+        inputSchema: CreateConnectorInputSchema,
+      },
     ],
   };
 });
@@ -240,6 +249,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           env.KAFKA_ENV_ID,
           env.KAFKA_CLUSTER_ID,
           pluginName,
+        );
+      }
+      case "create-connector": {
+        const { connectorName, connectorConfig } =
+          CreateConnectorArgumentsSchema.parse(args);
+        return handleCreateConnector(
+          confluentCloudRestClient,
+          env.KAFKA_ENV_ID,
+          env.KAFKA_CLUSTER_ID,
+          connectorName,
+          connectorConfig,
         );
       }
       default:

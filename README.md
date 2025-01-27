@@ -66,7 +66,7 @@ npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --e
 To add a new tool, you can follow these steps:
 
 1. Add a new enum to the enum class `ToolName`
-2. Add your new to the handlers map in the `ToolFactory` class.
+2. Add your new tool to the handlers map in the `ToolFactory` class.
 3. Create a new file, exporting the class that extends `BaseToolHandler`.
    1. Implement the `handle` method of the base class.
    2. Implement the `getToolConfig` method of the base class.

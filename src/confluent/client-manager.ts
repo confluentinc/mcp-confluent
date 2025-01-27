@@ -93,7 +93,9 @@ export class DefaultClientManager implements ClientManager {
     );
 
     this.confluentCloudRestClient = new Lazy(() => {
-      console.error("Initializing Confluent Cloud REST client");
+      console.error(
+        `Initializing Confluent Cloud REST client for base URL ${confluentCloudBaseUrl}`,
+      );
       const client = createClient<paths>({
         baseUrl: confluentCloudBaseUrl,
       });
@@ -102,7 +104,9 @@ export class DefaultClientManager implements ClientManager {
     });
 
     this.confluentCloudFlinkRestClient = new Lazy(() => {
-      console.error("Initializing Confluent Cloud Flink REST client");
+      console.error(
+        `Initializing Confluent Cloud Flink REST client for base URL ${confluentCloudFlinkBaseUrl}`,
+      );
       const client = createClient<paths>({
         baseUrl: confluentCloudFlinkBaseUrl,
       });

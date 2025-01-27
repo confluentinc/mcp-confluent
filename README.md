@@ -60,3 +60,14 @@ If you need to regenerate the typescript types from the openapi schema, you can 
 # as of v7.5.2 there is a bug when using allOf w/ required https://github.com/openapi-ts/openapi-typescript/issues/1474. need --empty-objects-unknown flag to avoid it
 npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --empty-objects-unknown
 ```
+
+## Adding a new Tool
+
+To add a new tool, you can follow these steps:
+
+1. Add a new enum to the enum class `ToolName`
+2. Add your new tool to the handlers map in the `ToolFactory` class.
+3. Create a new file, exporting the class that extends `BaseToolHandler`.
+   1. Implement the `handle` method of the base class.
+   2. Implement the `getToolConfig` method of the base class.
+4. Once satisfied, add it to the set of `enabledTools` in `index.ts`.

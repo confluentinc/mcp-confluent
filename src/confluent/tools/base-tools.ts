@@ -1,7 +1,6 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
-import { ToolName } from "./tool-name.js";
-
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 export interface ToolHandler {
   handle(
     clientManager: ClientManager,

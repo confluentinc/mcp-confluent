@@ -5,18 +5,18 @@ import {
   BaseToolHandler,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { ToolName } from "../../tool-name.js";
 
 const createFlinkStatementArguments = z.object({
   baseUrl: z
     .string()
     .describe("The base URL of the Flink REST API.")
     .url()
-    .default(env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
+    .default(env.FLINK_REST_ENDPOINT ?? "")
     .optional(),
   organizationId: z
     .string()

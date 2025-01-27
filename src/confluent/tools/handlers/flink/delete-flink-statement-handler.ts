@@ -4,19 +4,29 @@ import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
-  ToolName,
 } from "@src/confluent/tools/base-tools.js";
+import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { ToolName } from "../../tool-name.js";
 
 const deleteFlinkStatementArguments = z.object({
+  baseUrl: z
+    .string()
+    .trim()
+    .describe("The base URL of the Flink REST API.")
+    .url()
+    .default(env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
+    .optional(),
   organizationId: z
     .string()
+    .trim()
     .optional()
     .describe("The unique identifier for the organization."),
   environmentId: z
     .string()
+    .trim()
     .optional()
     .describe("The unique identifier for the environment."),
   statementName: z
@@ -38,7 +48,7 @@ export class DeleteFlinkStatementHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { statementName, environmentId, organizationId } =
+    const { statementName, environmentId, organizationId, baseUrl } =
       deleteFlinkStatementArguments.parse(toolArguments);
     const organization_id = getEnsuredParam(
       "FLINK_ORG_ID",
@@ -50,6 +60,10 @@ export class DeleteFlinkStatementHandler extends BaseToolHandler {
       "Environment ID is required",
       environmentId,
     );
+
+    if (baseUrl !== undefined && baseUrl !== "") {
+      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
+    }
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),
     );

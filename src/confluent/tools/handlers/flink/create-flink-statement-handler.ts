@@ -4,27 +4,35 @@ import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
-  ToolName,
 } from "@src/confluent/tools/base-tools.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { ToolName } from "../../tool-name.js";
 
 const createFlinkStatementArguments = z.object({
+  baseUrl: z
+    .string()
+    .describe("The base URL of the Flink REST API.")
+    .url()
+    .default(env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
+    .optional(),
   organizationId: z
     .string()
+    .trim()
     .optional()
     .describe("The unique identifier for the organization."),
   environmentId: z
     .string()
+    .trim()
     .optional()
     .describe("The unique identifier for the environment."),
   computePoolId: z
     .string()
+    .trim()
     .optional()
-    .default(env["FLINK_COMPUTE_POOL_ID"] ?? "")
-    .describe("Filter the results by exact match for compute_pool."),
+    .describe("The id associated with the compute pool in context."),
   statement: z
     .string()
     .nonempty()
@@ -46,6 +54,7 @@ const createFlinkStatementArguments = z.object({
     ),
   catalogName: z
     .string()
+    .trim()
     .nonempty()
     .default(env["FLINK_ENV_NAME"] ?? "")
     .describe(
@@ -53,6 +62,7 @@ const createFlinkStatementArguments = z.object({
     ),
   databaseName: z
     .string()
+    .trim()
     .nonempty()
     .default(env["KAFKA_CLUSTER_ID"] ?? "")
     .describe(
@@ -73,6 +83,7 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
       computePoolId,
       environmentId,
       organizationId,
+      baseUrl,
     } = createFlinkStatementArguments.parse(toolArguments);
     const organization_id = getEnsuredParam(
       "FLINK_ORG_ID",
@@ -84,6 +95,16 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
       "Environment ID is required",
       environmentId,
     );
+    const compute_pool_id = getEnsuredParam(
+      "FLINK_COMPUTE_POOL_ID",
+      "Compute Pool ID is required",
+      computePoolId,
+    );
+
+    if (baseUrl !== undefined && baseUrl !== "") {
+      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
+    }
+
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),
     );
@@ -101,7 +122,7 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
         organization_id: organization_id,
         environment_id: environment_id,
         spec: {
-          compute_pool_id: computePoolId,
+          compute_pool_id: compute_pool_id,
           statement: statement,
           properties: {
             // only include the catalog and database properties if they are defined

@@ -35,6 +35,9 @@ export interface ConfluentCloudRestClientManager {
   getConfluentCloudFlinkRestClient(): Client<paths, `${string}/${string}`>;
   /** Gets a configured REST client for general Confluent Cloud operations */
   getConfluentCloudRestClient(): Client<paths, `${string}/${string}`>;
+
+  setConfluentCloudRestEndpoint(endpoint: string): void;
+  setConfluentCloudFlinkEndpoint(endpoint: string): void;
 }
 
 export interface ClientManager
@@ -46,6 +49,8 @@ export interface ClientManager
  * Manages lifecycle and lazy initialization of various client connections.
  */
 export class DefaultClientManager implements ClientManager {
+  private confluentCloudBaseUrl: string;
+  private confluentCloudFlinkBaseUrl: string;
   private readonly kafkaClient: Lazy<KafkaJS.Kafka>;
   private readonly adminClient: AsyncLazy<KafkaJS.Admin>;
   private readonly producer: AsyncLazy<KafkaJS.Producer>;
@@ -67,6 +72,8 @@ export class DefaultClientManager implements ClientManager {
     confluentCloudBaseUrl?: string,
     confluentCloudFlinkBaseUrl?: string,
   ) {
+    this.confluentCloudBaseUrl = confluentCloudBaseUrl || "";
+    this.confluentCloudFlinkBaseUrl = confluentCloudFlinkBaseUrl || "";
     this.kafkaClient = new Lazy(() => new KafkaJS.Kafka(config));
     this.adminClient = new AsyncLazy(
       async () => {
@@ -94,10 +101,10 @@ export class DefaultClientManager implements ClientManager {
 
     this.confluentCloudRestClient = new Lazy(() => {
       console.error(
-        `Initializing Confluent Cloud REST client for base URL ${confluentCloudBaseUrl}`,
+        `Initializing Confluent Cloud REST client for base URL ${this.confluentCloudBaseUrl}`,
       );
       const client = createClient<paths>({
-        baseUrl: confluentCloudBaseUrl,
+        baseUrl: this.confluentCloudBaseUrl,
       });
       client.use(confluentCloudAuthMiddleware);
       return client;
@@ -105,14 +112,27 @@ export class DefaultClientManager implements ClientManager {
 
     this.confluentCloudFlinkRestClient = new Lazy(() => {
       console.error(
-        `Initializing Confluent Cloud Flink REST client for base URL ${confluentCloudFlinkBaseUrl}`,
+        `Initializing Confluent Cloud Flink REST client for base URL ${this.confluentCloudFlinkBaseUrl}`,
       );
       const client = createClient<paths>({
-        baseUrl: confluentCloudFlinkBaseUrl,
+        baseUrl: this.confluentCloudFlinkBaseUrl,
       });
       client.use(confluentCloudFlinkAuthMiddleware);
       return client;
     });
+  }
+  /**
+   * a function that sets a new confluent cloud rest endpoint.
+   * Closes the current client first.
+   * @param endpoint the endpoint to set
+   */
+  setConfluentCloudRestEndpoint(endpoint: string): void {
+    this.confluentCloudRestClient.close();
+    this.confluentCloudBaseUrl = endpoint;
+  }
+  setConfluentCloudFlinkEndpoint(endpoint: string): void {
+    this.confluentCloudFlinkRestClient.close();
+    this.confluentCloudFlinkBaseUrl = endpoint;
   }
   getConsumer(): Promise<KafkaJS.Consumer> {
     throw new Error("Method not implemented.");

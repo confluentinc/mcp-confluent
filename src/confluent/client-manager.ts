@@ -5,7 +5,7 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import {
   confluentCloudAuthMiddleware,
-  flinkAuthMiddleware,
+  confluentCloudFlinkAuthMiddleware,
 } from "@src/confluent/middleware.js";
 import { paths } from "@src/confluent/openapi-schema.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
@@ -60,12 +60,12 @@ export class DefaultClientManager implements ClientManager {
    * Creates a new DefaultClientManager instance.
    * @param config - Configuration options for KafkaJS client
    * @param confluentCloudBaseUrl - Base URL for Confluent Cloud REST API
-   * @param flinkBaseUrl - Base URL for Flink REST API
+   * @param confluentCloudFlinkBaseUrl - Base URL for Flink REST API
    */
   constructor(
     config: KafkaJS.CommonConstructorConfig,
     confluentCloudBaseUrl?: string,
-    flinkBaseUrl?: string,
+    confluentCloudFlinkBaseUrl?: string,
   ) {
     this.kafkaClient = new Lazy(() => new KafkaJS.Kafka(config));
     this.adminClient = new AsyncLazy(
@@ -93,20 +93,20 @@ export class DefaultClientManager implements ClientManager {
     );
 
     this.confluentCloudRestClient = new Lazy(() => {
-      console.error("Initializing Flink REST client");
+      console.error("Initializing Confluent Cloud REST client");
       const client = createClient<paths>({
         baseUrl: confluentCloudBaseUrl,
       });
-      client.use(flinkAuthMiddleware);
+      client.use(confluentCloudAuthMiddleware);
       return client;
     });
 
     this.confluentCloudFlinkRestClient = new Lazy(() => {
-      console.error("Initializing Confluent Cloud REST client");
+      console.error("Initializing Confluent Cloud Flink REST client");
       const client = createClient<paths>({
-        baseUrl: flinkBaseUrl,
+        baseUrl: confluentCloudFlinkBaseUrl,
       });
-      client.use(confluentCloudAuthMiddleware);
+      client.use(confluentCloudFlinkAuthMiddleware);
       return client;
     });
   }

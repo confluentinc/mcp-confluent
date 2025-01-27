@@ -35,7 +35,7 @@ export class ReadConnectorHandler extends BaseToolHandler {
     const { clusterId, environmentId, connectorName } =
       readConnectorArguments.parse(toolArguments);
     const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
+      "KAFKA_ENV_ID",
       "Environment ID is required",
       environmentId,
     );

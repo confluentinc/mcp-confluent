@@ -17,7 +17,7 @@ const deleteFlinkStatementArguments = z.object({
     .trim()
     .describe("The base URL of the Flink REST API.")
     .url()
-    .default(env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
+    .default(env.FLINK_REST_ENDPOINT ?? "")
     .optional(),
   organizationId: z
     .string()

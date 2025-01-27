@@ -31,7 +31,7 @@ export class ListConnectorsHandler extends BaseToolHandler {
     const { clusterId, environmentId } =
       listConnectorArguments.parse(toolArguments);
     const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
+      "KAFKA_ENV_ID",
       "Environment ID is required",
       environmentId,
     );

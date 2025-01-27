@@ -5,53 +5,14 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import {
-  handleGetConnectorConfig,
-  handleCreateFlinkStatement,
-  handleCreateTopics,
-  handleDeleteFlinkStatement,
-  handleDeleteTopics,
-  handleListConnectors,
-  handleListFlinkStatements,
-  handleListTopics,
-  handleProduceMessage,
-  handleReadConnector,
-  handleReadFlinkStatement,
-  handleCreateConnector,
-} from "@src/confluent/handlers.js";
-import { authMiddleware } from "@src/confluent/middleware.js";
-import type { paths } from "@src/confluent/openapi-schema";
-import {
-  CreateConnectorArgumentsSchema,
-  CreateConnectorInputSchema,
-  CreateFlinkStatementArgumentsSchema,
-  CreateFlinkStatementInputSchema,
-  CreateTopicsArgumentsSchema,
-  CreateTopicsInputSchema,
-  DeleteFlinkStatementArgumentsSchema,
-  DeleteFlinkStatementsInputSchema,
-  DeleteTopicsArgumentsSchema,
-  DeleteTopicsInputSchema,
-  GetConnectorConfigArgumentsSchema,
-  GetConnectorConfigInputSchema,
-  ListConnectorsInputSchema,
-  ListFlinkStatementsArgumentsSchema,
-  ListFlinkStatementsInputSchema,
-  ListTopicsInputSchema,
-  ProduceMessageArgumentsSchema,
-  ProduceMessageInputSchema,
-  ReadConnectorArgumentsSchema,
-  ReadConnectorInputSchema,
-  ReadFlinkStatementArgumentsSchema,
-  ReadFlinkStatementInputSchema,
-} from "@src/confluent/schema.js";
+import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { ToolHandler, ToolName } from "@src/confluent/tools/base-tools.js";
+import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import env from "@src/env.js";
-import createClient from "openapi-fetch";
-import z from "zod";
 
-const kafkaClient = new KafkaJS.Kafka({
+const kafkaClientConfig: KafkaJS.CommonConstructorConfig = {
   kafkaJS: {
-    brokers: env.BOOTSTRAP_SERVERS.split(","),
+    brokers: env.BOOTSTRAP_SERVERS?.split(",") ?? [],
     clientId: "mcp-client",
     ssl: true,
     sasl: {
@@ -61,24 +22,32 @@ const kafkaClient = new KafkaJS.Kafka({
     },
     logLevel: KafkaJS.logLevel.ERROR,
   },
-});
+};
 
-const kafkaAdminClient = kafkaClient.admin();
-const kafkaProducer = kafkaClient.producer({
-  kafkaJS: {
-    acks: 1,
-    compression: KafkaJS.CompressionTypes.GZIP,
-  },
-});
-const confluentCloudFlinkRestClient = createClient<paths>({
-  baseUrl: env.FLINK_REST_ENDPOINT,
-});
-confluentCloudFlinkRestClient.use(authMiddleware);
+const clientManager = new DefaultClientManager(
+  kafkaClientConfig,
+  env.CONFLUENT_CLOUD_REST_ENDPOINT,
+  env.FLINK_REST_ENDPOINT,
+);
 
-const confluentCloudRestClient = createClient<paths>({
-  baseUrl: env.CONFLUENT_CLOUD_REST_ENDPOINT,
+const toolHandlers = new Map<ToolName, ToolHandler>();
+const enabledTools = new Set<ToolName>([
+  ToolName.LIST_TOPICS,
+  ToolName.CREATE_TOPICS,
+  ToolName.DELETE_TOPICS,
+  ToolName.PRODUCE_MESSAGE,
+  ToolName.LIST_FLINK_STATEMENTS,
+  ToolName.READ_FLINK_STATEMENT,
+  ToolName.CREATE_FLINK_STATEMENT,
+  ToolName.DELETE_FLINK_STATEMENTS,
+  ToolName.LIST_CONNECTORS,
+  ToolName.READ_CONNECTOR,
+  ToolName.CREATE_CONNECTOR,
+]);
+
+enabledTools.forEach((toolName) => {
+  toolHandlers.set(toolName, ToolFactory.createToolHandler(toolName));
 });
-confluentCloudRestClient.use(authMiddleware);
 
 const server = new Server(
   {
@@ -94,209 +63,39 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
-    tools: [
-      {
-        name: "list-topics",
-        description: "List Kafka topics",
-        inputSchema: ListTopicsInputSchema,
-      },
-      {
-        name: "create-topics",
-        description: "Create Kafka topics",
-        inputSchema: CreateTopicsInputSchema,
-      },
-      {
-        name: "delete-topics",
-        description: "Delete Kafka topics",
-        inputSchema: DeleteTopicsInputSchema,
-      },
-      {
-        name: "produce-message",
-        description:
-          "Produces all user messages to a Kafka topic named claude-conversations. If the topic does not exist, it will be created via the create-topics tool.",
-        inputSchema: ProduceMessageInputSchema,
-      },
-      {
-        name: "list-flink-statements",
-        description: "List Flink SQL statements",
-        inputSchema: ListFlinkStatementsInputSchema,
-      },
-      {
-        name: "create-flink-statement",
-        description: "Create Flink SQL statement",
-        inputSchema: CreateFlinkStatementInputSchema,
-      },
-      {
-        name: "read-flink-statement",
-        description: "Read Flink SQL statement",
-        inputSchema: ReadFlinkStatementInputSchema,
-      },
-      {
-        name: "delete-flink-statements",
-        description: "Delete Flink SQL statement",
-        inputSchema: DeleteFlinkStatementsInputSchema,
-      },
-      {
-        name: "list-connectors",
-        description: "List Active Connectors",
-        inputSchema: ListConnectorsInputSchema,
-      },
-      {
-        name: "read-connector",
-        description: "Get Connector Details",
-        inputSchema: ReadConnectorInputSchema,
-      },
-      {
-        name: "get-connector-config",
-        description: "Get Connector Config for a connector plugin",
-        inputSchema: GetConnectorConfigInputSchema,
-      },
-      {
-        name: "create-connector",
-        description:
-          "Create a new connector. Returns the new connector information if successful.",
-        inputSchema: CreateConnectorInputSchema,
-      },
-    ],
+    tools: ToolFactory.getToolConfigs(),
   };
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
-  try {
-    switch (name) {
-      case "list-topics":
-        return await handleListTopics(kafkaAdminClient);
-      case "create-topics": {
-        const { topicNames } = CreateTopicsArgumentsSchema.parse(args);
-        return await handleCreateTopics(kafkaAdminClient, topicNames);
-      }
-      case "delete-topics": {
-        const { topicNames } = DeleteTopicsArgumentsSchema.parse(args);
-        return await handleDeleteTopics(kafkaAdminClient, topicNames);
-      }
-      case "produce-message": {
-        const { topicName, message } =
-          ProduceMessageArgumentsSchema.parse(args);
-        return await handleProduceMessage(kafkaProducer, topicName, message);
-      }
-      case "list-flink-statements": {
-        const { computePoolId, pageSize, pageToken, labelSelector } =
-          ListFlinkStatementsArgumentsSchema.parse(args);
-        return await handleListFlinkStatements(
-          confluentCloudFlinkRestClient,
-          env.FLINK_ORG_ID,
-          env.FLINK_ENV_ID,
-          computePoolId,
-          pageSize,
-          pageToken,
-          labelSelector,
-        );
-      }
-      case "create-flink-statement": {
-        const { statementName, statement } =
-          CreateFlinkStatementArgumentsSchema.parse(args);
-        return handleCreateFlinkStatement(
-          confluentCloudFlinkRestClient,
-          env.FLINK_ORG_ID,
-          env.FLINK_ENV_ID,
-          env.FLINK_COMPUTE_POOL_ID,
-          statement,
-          statementName,
-          env.FLINK_ENV_NAME,
-          env.FLINK_DATABASE_NAME,
-        );
-      }
-      case "read-flink-statement": {
-        const { statementName } = ReadFlinkStatementArgumentsSchema.parse(args);
-        return handleReadFlinkStatement(
-          confluentCloudFlinkRestClient,
-          env.FLINK_ORG_ID,
-          env.FLINK_ENV_ID,
-          statementName,
-        );
-      }
-      case "delete-flink-statements": {
-        const { statementName } =
-          DeleteFlinkStatementArgumentsSchema.parse(args);
-        return handleDeleteFlinkStatement(
-          confluentCloudFlinkRestClient,
-          env.FLINK_ORG_ID,
-          env.FLINK_ENV_ID,
-          statementName,
-        );
-      }
-      case "list-connectors": {
-        return handleListConnectors(
-          confluentCloudRestClient,
-          env.KAFKA_ENV_ID,
-          env.KAFKA_CLUSTER_ID,
-        );
-      }
-      case "read-connector": {
-        const { connectorName } = ReadConnectorArgumentsSchema.parse(args);
-        return handleReadConnector(
-          confluentCloudRestClient,
-          env.KAFKA_ENV_ID,
-          env.KAFKA_CLUSTER_ID,
-          connectorName,
-        );
-      }
-      case "get-connector-config": {
-        const { pluginName } = GetConnectorConfigArgumentsSchema.parse(args);
-        return handleGetConnectorConfig(
-          confluentCloudRestClient,
-          env.KAFKA_ENV_ID,
-          env.KAFKA_CLUSTER_ID,
-          pluginName,
-        );
-      }
-      case "create-connector": {
-        const { connectorName, connectorConfig } =
-          CreateConnectorArgumentsSchema.parse(args);
-        return handleCreateConnector(
-          confluentCloudRestClient,
-          env.KAFKA_ENV_ID,
-          env.KAFKA_CLUSTER_ID,
-          connectorName,
-          connectorConfig,
-        );
-      }
-      default:
-        throw new Error(`Unknown tool: ${name}`);
-    }
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new Error(
-        `Invalid arguments: ${error.errors.map((e) => e.message).join(", ")}`,
-      );
-    }
-    throw error;
+  const toolHandler = toolHandlers.get(name as ToolName);
+  console.error(`${name}`);
+  if (!toolHandler) {
+    throw new Error(`Tool handler not found for: ${name}`);
   }
+  return await toolHandler.handle(clientManager, args);
 });
 
 async function main() {
-  try {
-    process.on("SIGINT", cleanup);
-    process.on("SIGTERM", cleanup);
+  process.on("SIGINT", cleanup);
+  process.on("SIGTERM", cleanup);
+  process.on("SIGQUIT", cleanup);
+  process.on("SIGUSR2", cleanup);
 
-    await kafkaAdminClient.connect();
-    await kafkaProducer.connect();
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error("Confluent MCP Server running on stdio");
-  } catch (error) {
-    console.error("Error starting server:", error);
-    await cleanup();
-    process.exit(1);
-  }
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("Confluent MCP Server running on stdio");
 }
 
 async function cleanup() {
   console.error("Shutting down...");
-  await kafkaAdminClient.disconnect();
-  await kafkaProducer.disconnect();
+  await clientManager.disconnect();
+  await server.close();
   process.exit(0);
 }
 
-main();
+main().catch((error) => {
+  console.error("Error starting server:", error);
+  process.exit(1);
+});

@@ -26,11 +26,44 @@ const createConnectorArguments = z.object({
     .nonempty()
     .describe("The name of the connector to create."),
   connectorConfig: z
-    .string()
-    .nonempty()
-    .describe(
-      "Configuration parameters for the connector in JSON format. All values should be strings.",
-    ),
+    .object({
+      // Required fields
+      "connector.class": z
+        .string()
+        .describe(
+          "Required for Managed Connector, Ignored for Custom Connector. The connector class name, e.g., BigQuerySink, GcsSink, etc.",
+        ),
+      // Optional fields
+      "confluent.connector.type": z
+        .string()
+        .default("MANAGED")
+        .describe("Required for Custom Connector. The connector type")
+        .optional(),
+
+      "confluent.custom.plugin.id": z
+        .string()
+        .describe(
+          "Required for Custom Connector. The custom plugin id of custom connector",
+        )
+        .optional(),
+
+      "confluent.custom.connection.endpoints": z
+        .string()
+        .describe(
+          "Optional for Custom Connector. Egress endpoint(s) for the connector",
+        )
+        .optional(),
+
+      "confluent.custom.schema.registry.auto": z
+        .string()
+        .default("FALSE")
+        .describe(
+          "Optional for Custom Connector. Automatically add required schema registry properties",
+        )
+        .optional(),
+    })
+    // Allow additional string properties
+    .catchall(z.string()),
 });
 
 export class CreateConnectorHandler extends BaseToolHandler {
@@ -50,7 +83,6 @@ export class CreateConnectorHandler extends BaseToolHandler {
       "Kafka Cluster ID is required",
       clusterId,
     );
-    const configJson = JSON.parse(connectorConfig);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudRestClient(),
@@ -63,9 +95,20 @@ export class CreateConnectorHandler extends BaseToolHandler {
           environment_id: environment_id,
           kafka_cluster_id: kafka_cluster_id,
         },
-        body: {
+      },
+      body: {
+        name: connectorName,
+        config: {
           name: connectorName,
-          config: configJson,
+          "kafka.api.key": getEnsuredParam(
+            "KAFKA_API_KEY",
+            "Kafka API Key is required to create the connector. Check if env vars are properly set",
+          ),
+          "kafka.api.secret": getEnsuredParam(
+            "KAFKA_API_SECRET",
+            "Kafka API Secret is required to create the connector. Check if env vars are properly set",
+          ),
+          ...connectorConfig,
         },
       },
     });

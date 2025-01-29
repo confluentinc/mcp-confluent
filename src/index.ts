@@ -6,8 +6,9 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
-import { ToolHandler, ToolName } from "@src/confluent/tools/base-tools.js";
+import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
 
 const kafkaClientConfig: KafkaJS.CommonConstructorConfig = {

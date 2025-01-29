@@ -1,8 +1,4 @@
-import {
-  ToolConfig,
-  ToolHandler,
-  ToolName,
-} from "@src/confluent/tools/base-tools.js";
+import { ToolConfig, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
@@ -14,6 +10,7 @@ import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([

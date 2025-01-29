@@ -4,10 +4,11 @@ import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
-  ToolName,
 } from "@src/confluent/tools/base-tools.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+
 const produceKafkaMessageArguments = z.object({
   topicName: z
     .string()

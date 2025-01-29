@@ -27,7 +27,11 @@ const configSchema = z
     FLINK_DATABASE_NAME: z.string().trim().min(1),
     KAFKA_CLUSTER_ID: z.string().trim().min(1),
     KAFKA_ENV_ID: z.string().trim().startsWith("env-"),
-    CONFLUENT_CLOUD_REST_ENDPOINT: z.string().trim().url(),
+    CONFLUENT_CLOUD_REST_ENDPOINT: z
+      .string()
+      .trim()
+      .url()
+      .default("https://api.confluent.cloud"),
   })
   .partial(); // Makes all fields optional
 

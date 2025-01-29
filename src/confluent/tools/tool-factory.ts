@@ -10,11 +10,13 @@ import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
+import { TopicsWithTagsHandler } from "@src/confluent/tools/handlers/entity/topics-with-tags-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
     [ToolName.LIST_TOPICS, new ListTopicsHandler()],
+    [ToolName.LIST_TOPICS_WITH_A_SPECIFIED_TAG, new TopicsWithTagsHandler()],
     [ToolName.CREATE_TOPICS, new CreateTopicsHandler()],
     [ToolName.DELETE_TOPICS, new DeleteTopicsHandler()],
     [ToolName.PRODUCE_MESSAGE, new ProduceKafkaMessageHandler()],

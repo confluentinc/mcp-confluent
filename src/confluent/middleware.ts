@@ -32,3 +32,15 @@ export const confluentCloudAuthMiddleware: Middleware = {
     return request;
   },
 };
+
+export const confluentCloudSchemaRegistryAuthMiddleware: Middleware = {
+  async onRequest({ request }) {
+    console.error(`${JSON.stringify(request)}`);
+    // add Authorization header to every request
+    request.headers.set(
+      "Authorization",
+      `Basic ${Buffer.from(`${env.SCHEMA_REGISTRY_API_KEY}:${env.SCHEMA_REGISTRY_SECRET}`).toString("base64")}`,
+    );
+    return request;
+  },
+};

@@ -29,11 +29,13 @@ const clientManager = new DefaultClientManager(
   kafkaClientConfig,
   env.CONFLUENT_CLOUD_REST_ENDPOINT,
   env.FLINK_REST_ENDPOINT,
+  env.SCHEMA_REGISTRY_ENDPOINT,
 );
 
 const toolHandlers = new Map<ToolName, ToolHandler>();
 const enabledTools = new Set<ToolName>([
   ToolName.LIST_TOPICS,
+  ToolName.LIST_TOPICS_WITH_A_SPECIFIED_TAG,
   ToolName.CREATE_TOPICS,
   ToolName.DELETE_TOPICS,
   ToolName.PRODUCE_MESSAGE,

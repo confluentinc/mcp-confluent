@@ -2,6 +2,7 @@ export enum ToolName {
   LIST_TOPICS = "list-topics",
   CREATE_TOPICS = "create-topics",
   DELETE_TOPICS = "delete-topics",
+  LIST_TOPICS_WITH_A_SPECIFIED_TAG = "list-topics-with-specified-tag",
   PRODUCE_MESSAGE = "produce-message",
   LIST_FLINK_STATEMENTS = "list-flink-statements",
   CREATE_FLINK_STATEMENT = "create-flink-statement",

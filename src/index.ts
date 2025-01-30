@@ -43,6 +43,7 @@ const enabledTools = new Set<ToolName>([
   ToolName.DELETE_FLINK_STATEMENTS,
   ToolName.LIST_CONNECTORS,
   ToolName.READ_CONNECTOR,
+  ToolName.CREATE_CONNECTOR,
 ]);
 
 enabledTools.forEach((toolName) => {

@@ -9,4 +9,5 @@ export enum ToolName {
   DELETE_FLINK_STATEMENTS = "delete-flink-statements",
   LIST_CONNECTORS = "list-connectors",
   READ_CONNECTOR = "read-connector",
+  CREATE_CONNECTOR = "create-connector",
 }

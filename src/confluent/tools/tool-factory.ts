@@ -1,4 +1,5 @@
 import { ToolConfig, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
 import { CreateFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/create-flink-statement-handler.js";
@@ -23,6 +24,7 @@ export class ToolFactory {
     [ToolName.DELETE_FLINK_STATEMENTS, new DeleteFlinkStatementHandler()],
     [ToolName.LIST_CONNECTORS, new ListConnectorsHandler()],
     [ToolName.READ_CONNECTOR, new ReadConnectorHandler()],
+    [ToolName.CREATE_CONNECTOR, new CreateConnectorHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

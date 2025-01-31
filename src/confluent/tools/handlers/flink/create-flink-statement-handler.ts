@@ -63,7 +63,7 @@ const createFlinkStatementArguments = z.object({
     .string()
     .trim()
     .nonempty()
-    .default(env["KAFKA_CLUSTER_ID"] ?? "")
+    .default(env["FLINK_DATABASE_NAME"] ?? "")
     .describe(
       "The database name to be used for the statement. Typically the Kafka cluster name.",
     ),

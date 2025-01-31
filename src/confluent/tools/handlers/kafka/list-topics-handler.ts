@@ -1,12 +1,11 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
-import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
+import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const listTopicArgs = z.object({
   // No arguments
@@ -26,7 +25,7 @@ export class ListTopicsHandler extends BaseToolHandler {
     return {
       name: ToolName.LIST_TOPICS,
       description: "List all topics in the Kafka cluster.",
-      inputSchema: zodToJsonSchema(listTopicArgs) as ToolInput,
+      inputSchema: listTopicArgs.shape,
     };
   }
 }

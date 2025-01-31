@@ -1,6 +1,6 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
-import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
+import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
@@ -9,7 +9,6 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const listConnectorArguments = z.object({
   baseUrl: z
@@ -83,7 +82,7 @@ export class ListConnectorsHandler extends BaseToolHandler {
       name: ToolName.LIST_CONNECTORS,
       description:
         'Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.',
-      inputSchema: zodToJsonSchema(listConnectorArguments) as ToolInput,
+      inputSchema: listConnectorArguments.shape,
     };
   }
 }

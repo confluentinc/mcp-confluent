@@ -1,6 +1,6 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
-import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
+import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
@@ -9,7 +9,6 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const readFlinkStatementArguments = z.object({
   baseUrl: z
@@ -123,7 +122,7 @@ export class ReadFlinkStatementHandler extends BaseToolHandler {
     return {
       name: ToolName.READ_FLINK_STATEMENT,
       description: "Make a request to read a statement and its results",
-      inputSchema: zodToJsonSchema(readFlinkStatementArguments) as ToolInput,
+      inputSchema: readFlinkStatementArguments.shape,
     };
   }
 }

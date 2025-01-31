@@ -1,6 +1,6 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
-import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
+import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
@@ -9,7 +9,6 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const createFlinkStatementArguments = z.object({
   baseUrl: z
@@ -145,7 +144,7 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
     return {
       name: ToolName.CREATE_FLINK_STATEMENT,
       description: "Make a request to create a statement.",
-      inputSchema: zodToJsonSchema(createFlinkStatementArguments) as ToolInput,
+      inputSchema: createFlinkStatementArguments.shape,
     };
   }
 }

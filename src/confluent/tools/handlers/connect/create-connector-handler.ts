@@ -1,6 +1,6 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
-import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
+import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
@@ -8,7 +8,6 @@ import {
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const createConnectorArguments = z.object({
   environmentId: z
@@ -127,7 +126,7 @@ export class CreateConnectorHandler extends BaseToolHandler {
       name: ToolName.CREATE_CONNECTOR,
       description:
         "Create a new connector. Returns the new connector information if successful.",
-      inputSchema: zodToJsonSchema(createConnectorArguments) as ToolInput,
+      inputSchema: createConnectorArguments.shape,
     };
   }
 }

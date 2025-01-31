@@ -1,10 +1,6 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
@@ -50,34 +46,23 @@ enabledTools.forEach((toolName) => {
   toolHandlers.set(toolName, ToolFactory.createToolHandler(toolName));
 });
 
-const server = new Server(
-  {
-    name: "confluent",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      tools: {},
+const server = new McpServer({
+  name: "confluent",
+  version: "1.0.0",
+});
+
+toolHandlers.forEach((handler, name) => {
+  const config = handler.getToolConfig();
+
+  server.tool(
+    name as string,
+    config.description,
+    config.inputSchema,
+    async (args) => {
+      return await handler.handle(clientManager, args);
     },
-  },
-);
-
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: ToolFactory.getToolConfigs(),
-  };
+  );
 });
-
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-  const toolHandler = toolHandlers.get(name as ToolName);
-  console.error(`${name}`);
-  if (!toolHandler) {
-    throw new Error(`Tool handler not found for: ${name}`);
-  }
-  return await toolHandler.handle(clientManager, args);
-});
-
 async function main() {
   process.on("SIGINT", cleanup);
   process.on("SIGTERM", cleanup);

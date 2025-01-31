@@ -1,6 +1,6 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
-import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
+import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
@@ -9,7 +9,6 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const listFlinkStatementsArguments = z.object({
   baseUrl: z
@@ -109,7 +108,7 @@ export class ListFlinkStatementsHandler extends BaseToolHandler {
       name: ToolName.LIST_FLINK_STATEMENTS,
       description:
         "Retrieve a sorted, filtered, paginated list of all statements.",
-      inputSchema: zodToJsonSchema(listFlinkStatementsArguments) as ToolInput,
+      inputSchema: listFlinkStatementsArguments.shape,
     };
   }
 }

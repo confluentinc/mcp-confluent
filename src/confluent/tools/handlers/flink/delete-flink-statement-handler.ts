@@ -1,6 +1,6 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
-import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
+import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
@@ -9,7 +9,6 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const deleteFlinkStatementArguments = z.object({
   baseUrl: z
@@ -91,7 +90,7 @@ export class DeleteFlinkStatementHandler extends BaseToolHandler {
     return {
       name: ToolName.DELETE_FLINK_STATEMENTS,
       description: "Make a request to delete a statement.",
-      inputSchema: zodToJsonSchema(deleteFlinkStatementArguments) as ToolInput,
+      inputSchema: deleteFlinkStatementArguments.shape,
     };
   }
 }

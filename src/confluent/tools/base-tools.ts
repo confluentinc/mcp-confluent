@@ -1,6 +1,7 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
-import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
+import { CallToolResult } from "@src/confluent/schema.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { ZodRawShape } from "zod";
 export interface ToolHandler {
   handle(
     clientManager: ClientManager,
@@ -13,7 +14,7 @@ export interface ToolHandler {
 export interface ToolConfig {
   name: ToolName;
   description: string;
-  inputSchema: ToolInput;
+  inputSchema: ZodRawShape;
 }
 
 export abstract class BaseToolHandler implements ToolHandler {

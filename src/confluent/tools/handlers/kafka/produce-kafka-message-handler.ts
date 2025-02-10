@@ -1,13 +1,12 @@
 import { RecordMetadata } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { ClientManager } from "@src/confluent/client-manager.js";
-import { CallToolResult, ToolInput } from "@src/confluent/schema.js";
+import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 const produceKafkaMessageArguments = z.object({
   topicName: z
@@ -45,7 +44,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     return {
       name: ToolName.PRODUCE_MESSAGE,
       description: `Produce records to a Kafka topic. For saving user messages/history they should be saved to a kafka topic named claude-conversations unless otherwise specified. If the topic does not exist, it will be created via the ${ToolName.CREATE_TOPICS} tool.`,
-      inputSchema: zodToJsonSchema(produceKafkaMessageArguments) as ToolInput,
+      inputSchema: produceKafkaMessageArguments.shape,
     };
   }
 }

@@ -71,6 +71,7 @@ export class ListConnectorsHandler extends BaseToolHandler {
     if (error) {
       return this.createResponse(
         `Failed to list Confluent Cloud connectors for ${clusterId}: ${JSON.stringify(error)}`,
+        true,
       );
     }
     return this.createResponse(

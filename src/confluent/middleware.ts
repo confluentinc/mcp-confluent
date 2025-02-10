@@ -39,7 +39,7 @@ export const confluentCloudSchemaRegistryAuthMiddleware: Middleware = {
     // add Authorization header to every request
     request.headers.set(
       "Authorization",
-      `Basic ${Buffer.from(`${env.SCHEMA_REGISTRY_API_KEY}:${env.SCHEMA_REGISTRY_SECRET}`).toString("base64")}`,
+      `Basic ${Buffer.from(`${env.SCHEMA_REGISTRY_API_KEY}:${env.SCHEMA_REGISTRY_API_SECRET}`).toString("base64")}`,
     );
     return request;
   },

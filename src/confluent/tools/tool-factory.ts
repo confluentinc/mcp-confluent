@@ -1,4 +1,5 @@
 import { ToolConfig, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { CreateTopicTagsHandler } from "@src/confluent/tools/handlers/catalog/create-topic-tags.js";
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
@@ -10,13 +11,12 @@ import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
-import { TopicsWithTagsHandler } from "@src/confluent/tools/handlers/entity/topics-with-tags-handler.js";
+import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
     [ToolName.LIST_TOPICS, new ListTopicsHandler()],
-    [ToolName.LIST_TOPICS_WITH_A_SPECIFIED_TAG, new TopicsWithTagsHandler()],
     [ToolName.CREATE_TOPICS, new CreateTopicsHandler()],
     [ToolName.DELETE_TOPICS, new DeleteTopicsHandler()],
     [ToolName.PRODUCE_MESSAGE, new ProduceKafkaMessageHandler()],
@@ -27,6 +27,8 @@ export class ToolFactory {
     [ToolName.LIST_CONNECTORS, new ListConnectorsHandler()],
     [ToolName.READ_CONNECTOR, new ReadConnectorHandler()],
     [ToolName.CREATE_CONNECTOR, new CreateConnectorHandler()],
+    [ToolName.SEARCH_TOPICS_BY_TAG, new SearchTopicsByTagHandler()],
+    [ToolName.CREATE_TOPIC_TAGS, new CreateTopicTagsHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

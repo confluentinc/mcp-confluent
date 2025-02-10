@@ -15,7 +15,7 @@ const envSchema = z.object({
     .optional()
     .default(`${import.meta.dirname}/config/default.json`),
   SCHEMA_REGISTRY_API_KEY: z.string().trim().min(1),
-  SCHEMA_REGISTRY_SECRET: z.string().trim().min(1),
+  SCHEMA_REGISTRY_API_SECRET: z.string().trim().min(1),
 });
 
 // Schema for optional configuration from file

@@ -136,6 +136,7 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
     if (error) {
       return this.createResponse(
         `Failed to create Flink SQL statements: ${JSON.stringify(error)}`,
+        true,
       );
     }
     return this.createResponse(`${JSON.stringify(response)}`);

@@ -75,6 +75,7 @@ export class ReadConnectorHandler extends BaseToolHandler {
     if (error) {
       return this.createResponse(
         `Failed to get information about connector ${connectorName}: ${JSON.stringify(error)}`,
+        true,
       );
     }
     return this.createResponse(

@@ -12,4 +12,6 @@ export enum ToolName {
   CREATE_CONNECTOR = "create-connector",
   SEARCH_TOPICS_BY_TAG = "search-topics-by-tag",
   CREATE_TOPIC_TAGS = "create-topic-tags",
+  DELETE_TAG = "delete-tag",
+  REMOVE_TAG_FROM_ENTITY = "remove-tag-from-entity",
 }

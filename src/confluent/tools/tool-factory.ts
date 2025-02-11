@@ -1,5 +1,7 @@
 import { ToolConfig, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { CreateTopicTagsHandler } from "@src/confluent/tools/handlers/catalog/create-topic-tags.js";
+import { DeleteTagHandler } from "@src/confluent/tools/handlers/catalog/delete-tag.js";
+import { RemoveTagFromEntityHandler } from "@src/confluent/tools/handlers/catalog/remove-tag-from-entity.js";
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
@@ -29,6 +31,8 @@ export class ToolFactory {
     [ToolName.CREATE_CONNECTOR, new CreateConnectorHandler()],
     [ToolName.SEARCH_TOPICS_BY_TAG, new SearchTopicsByTagHandler()],
     [ToolName.CREATE_TOPIC_TAGS, new CreateTopicTagsHandler()],
+    [ToolName.DELETE_TAG, new DeleteTagHandler()],
+    [ToolName.REMOVE_TAG_FROM_ENTITY, new RemoveTagFromEntityHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

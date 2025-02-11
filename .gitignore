@@ -133,3 +133,6 @@ dist
 # vscode
 .vscode
 .idea
+.continue
+*.txt
+connector-config.json

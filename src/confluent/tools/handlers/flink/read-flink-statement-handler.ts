@@ -42,8 +42,9 @@ const readFlinkStatementArguments = z.object({
   timeoutInMilliseconds: z
     .number()
     .optional()
+    .default(60000)
     .describe(
-      "The function implements pagination. It will continue to fetch results using the next page token until either there are no more results or the timeout is reached. Tables backed by kafka topics can be thought of as never-ending streams as data could be continuously produced in near real-time. Therefore, if you wish to sample values from a stream, you may want to set a timeout.",
+      "The function implements pagination. It will continue to fetch results using the next page token until either there are no more results or the timeout is reached. Tables backed by kafka topics can be thought of as never-ending streams as data could be continuously produced in near real-time. Therefore, if you wish to sample values from a stream, you may want to set a timeout. If you are reading a statement after creating it, you may need to retry a couple times to ensure that the statement is ready and receiving data.",
     ),
 });
 

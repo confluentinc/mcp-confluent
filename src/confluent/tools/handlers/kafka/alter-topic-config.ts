@@ -13,7 +13,7 @@ import { z } from "zod";
 const alterTopicConfigArguments = z.object({
   baseUrl: z
     .string()
-    .describe("The base URL of the Schema Registry REST API.")
+    .describe("The base URL of the Confluent Cloud Kafka REST API.")
     .url()
     .default(env.KAFKA_REST_ENDPOINT ?? "")
     .optional(),

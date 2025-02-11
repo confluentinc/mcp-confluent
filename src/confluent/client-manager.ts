@@ -85,6 +85,7 @@ export class DefaultClientManager implements ClientManager {
    * @param confluentCloudBaseUrl - Base URL for Confluent Cloud REST API
    * @param confluentCloudFlinkBaseUrl - Base URL for Flink REST API
    * @param confluentCloudSchemaRegistryBaseUrl - Base URl for Schema Registry REST API
+   * @param confluentCloudKafkaRestBaseUrl - Base URl for Kafka REST API
    */
   constructor(
     config: KafkaJS.CommonConstructorConfig,

@@ -6,6 +6,7 @@ import { KafkaJS } from "@confluentinc/kafka-javascript";
 import {
   confluentCloudAuthMiddleware,
   confluentCloudFlinkAuthMiddleware,
+  confluentCloudKafkaAuthMiddleware,
   confluentCloudSchemaRegistryAuthMiddleware,
 } from "@src/confluent/middleware.js";
 import { paths } from "@src/confluent/openapi-schema.js";
@@ -41,10 +42,13 @@ export interface ConfluentCloudRestClientManager {
     paths,
     `${string}/${string}`
   >;
+  /** Gets a configured REST client for Confluent Cloud Kafka operations */
+  getConfluentCloudKafkaRestClient(): Client<paths, `${string}/${string}`>;
 
   setConfluentCloudRestEndpoint(endpoint: string): void;
   setConfluentCloudFlinkEndpoint(endpoint: string): void;
   setConfluentCloudSchemaRegistryEndpoint(endpoint: string): void;
+  setConfluentCloudKafkaRestEndpoint(endpoint: string): void;
 }
 
 export interface ClientManager
@@ -59,6 +63,7 @@ export class DefaultClientManager implements ClientManager {
   private confluentCloudBaseUrl: string;
   private confluentCloudFlinkBaseUrl: string;
   private confluentCloudSchemaRegistryBaseUrl: string;
+  private confluentCloudKafkaRestBaseUrl: string;
   private readonly kafkaClient: Lazy<KafkaJS.Kafka>;
   private readonly adminClient: AsyncLazy<KafkaJS.Admin>;
   private readonly producer: AsyncLazy<KafkaJS.Producer>;
@@ -69,6 +74,9 @@ export class DefaultClientManager implements ClientManager {
     Client<paths, `${string}/${string}`>
   >;
   private readonly confluentCloudSchemaRegistryRestClient: Lazy<
+    Client<paths, `${string}/${string}`>
+  >;
+  private readonly confluentCloudKafkaRestClient: Lazy<
     Client<paths, `${string}/${string}`>
   >;
   /**
@@ -83,11 +91,13 @@ export class DefaultClientManager implements ClientManager {
     confluentCloudBaseUrl?: string,
     confluentCloudFlinkBaseUrl?: string,
     confluentCloudSchemaRegistryBaseUrl?: string,
+    confluentCloudKafkaRestBaseUrl?: string,
   ) {
     this.confluentCloudBaseUrl = confluentCloudBaseUrl || "";
     this.confluentCloudFlinkBaseUrl = confluentCloudFlinkBaseUrl || "";
     this.confluentCloudSchemaRegistryBaseUrl =
       confluentCloudSchemaRegistryBaseUrl || "";
+    this.confluentCloudKafkaRestBaseUrl = confluentCloudKafkaRestBaseUrl || "";
     this.kafkaClient = new Lazy(() => new KafkaJS.Kafka(config));
     this.adminClient = new AsyncLazy(
       async () => {
@@ -145,6 +155,17 @@ export class DefaultClientManager implements ClientManager {
       client.use(confluentCloudSchemaRegistryAuthMiddleware);
       return client;
     });
+
+    this.confluentCloudKafkaRestClient = new Lazy(() => {
+      console.error(
+        `Initializing Confluent Cloud Kafka REST client for base URL ${this.confluentCloudKafkaRestBaseUrl}`,
+      );
+      const client = createClient<paths>({
+        baseUrl: this.confluentCloudKafkaRestBaseUrl,
+      });
+      client.use(confluentCloudKafkaAuthMiddleware);
+      return client;
+    });
   }
   /**
    * a function that sets a new confluent cloud rest endpoint.
@@ -162,6 +183,10 @@ export class DefaultClientManager implements ClientManager {
   setConfluentCloudSchemaRegistryEndpoint(endpoint: string): void {
     this.confluentCloudSchemaRegistryRestClient.close();
     this.confluentCloudSchemaRegistryBaseUrl = endpoint;
+  }
+  setConfluentCloudKafkaRestEndpoint(endpoint: string): void {
+    this.confluentCloudKafkaRestClient.close();
+    this.confluentCloudKafkaRestBaseUrl = endpoint;
   }
 
   getConsumer(): Promise<KafkaJS.Consumer> {
@@ -189,6 +214,11 @@ export class DefaultClientManager implements ClientManager {
     `${string}/${string}`
   > {
     return this.confluentCloudSchemaRegistryRestClient.get();
+  }
+
+  /** @inheritdoc */
+  getConfluentCloudKafkaRestClient(): Client<paths, `${string}/${string}`> {
+    return this.confluentCloudKafkaRestClient.get();
   }
 
   /** @inheritdoc */

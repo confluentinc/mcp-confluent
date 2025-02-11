@@ -35,6 +35,7 @@ const configSchema = z
       .url()
       .default("https://api.confluent.cloud"),
     SCHEMA_REGISTRY_ENDPOINT: z.string().trim().url(),
+    KAFKA_REST_ENDPOINT: z.string().trim().url(),
   })
   .partial(); // Makes all fields optional
 

@@ -16,4 +16,5 @@ export enum ToolName {
   REMOVE_TAG_FROM_ENTITY = "remove-tag-from-entity",
   ADD_TAGS_TO_TOPIC = "add-tags-to-topic",
   LIST_TAGS = "list-tags",
+  ALTER_TOPIC_CONFIG = "alter-topic-config",
 }

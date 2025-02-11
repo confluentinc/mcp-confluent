@@ -26,6 +26,7 @@ const clientManager = new DefaultClientManager(
   env.CONFLUENT_CLOUD_REST_ENDPOINT,
   env.FLINK_REST_ENDPOINT,
   env.SCHEMA_REGISTRY_ENDPOINT,
+  env.KAFKA_REST_ENDPOINT,
 );
 
 const toolHandlers = new Map<ToolName, ToolHandler>();

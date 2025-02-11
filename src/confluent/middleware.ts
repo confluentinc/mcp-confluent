@@ -44,3 +44,15 @@ export const confluentCloudSchemaRegistryAuthMiddleware: Middleware = {
     return request;
   },
 };
+
+export const confluentCloudKafkaAuthMiddleware: Middleware = {
+  async onRequest({ request }) {
+    console.error(`${JSON.stringify(request)}`);
+    // add Authorization header to every request
+    request.headers.set(
+      "Authorization",
+      `Basic ${Buffer.from(`${env.KAFKA_API_KEY}:${env.KAFKA_API_SECRET}`).toString("base64")}`,
+    );
+    return request;
+  },
+};

@@ -99,6 +99,7 @@ export class ListFlinkStatementsHandler extends BaseToolHandler {
     if (error) {
       return this.createResponse(
         `Failed to list Flink SQL statements: ${JSON.stringify(error)}`,
+        true,
       );
     }
     return this.createResponse(`${JSON.stringify(response)}`);

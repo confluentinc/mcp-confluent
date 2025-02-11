@@ -25,22 +25,13 @@ const clientManager = new DefaultClientManager(
   kafkaClientConfig,
   env.CONFLUENT_CLOUD_REST_ENDPOINT,
   env.FLINK_REST_ENDPOINT,
+  env.SCHEMA_REGISTRY_ENDPOINT,
+  env.KAFKA_REST_ENDPOINT,
 );
 
 const toolHandlers = new Map<ToolName, ToolHandler>();
-const enabledTools = new Set<ToolName>([
-  ToolName.LIST_TOPICS,
-  ToolName.CREATE_TOPICS,
-  ToolName.DELETE_TOPICS,
-  ToolName.PRODUCE_MESSAGE,
-  ToolName.LIST_FLINK_STATEMENTS,
-  ToolName.READ_FLINK_STATEMENT,
-  ToolName.CREATE_FLINK_STATEMENT,
-  ToolName.DELETE_FLINK_STATEMENTS,
-  ToolName.LIST_CONNECTORS,
-  ToolName.READ_CONNECTOR,
-  ToolName.CREATE_CONNECTOR,
-]);
+// TODO: Should we have the enabled tools come from configuration?
+const enabledTools = new Set<ToolName>(Object.values(ToolName));
 
 enabledTools.forEach((toolName) => {
   toolHandlers.set(toolName, ToolFactory.createToolHandler(toolName));

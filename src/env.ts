@@ -14,6 +14,8 @@ const envSchema = z.object({
     .string()
     .optional()
     .default(`${import.meta.dirname}/config/default.json`),
+  SCHEMA_REGISTRY_API_KEY: z.string().trim().min(1),
+  SCHEMA_REGISTRY_API_SECRET: z.string().trim().min(1),
 });
 
 // Schema for optional configuration from file
@@ -32,6 +34,8 @@ const configSchema = z
       .trim()
       .url()
       .default("https://api.confluent.cloud"),
+    SCHEMA_REGISTRY_ENDPOINT: z.string().trim().url(),
+    KAFKA_REST_ENDPOINT: z.string().trim().url(),
   })
   .partial(); // Makes all fields optional
 

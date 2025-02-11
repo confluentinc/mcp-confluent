@@ -80,6 +80,7 @@ export class DeleteFlinkStatementHandler extends BaseToolHandler {
     if (error) {
       return this.createResponse(
         `Failed to delete Flink SQL statement: ${JSON.stringify(error)}`,
+        true,
       );
     }
     return this.createResponse(

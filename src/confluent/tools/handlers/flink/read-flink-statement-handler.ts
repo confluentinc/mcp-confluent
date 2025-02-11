@@ -107,6 +107,7 @@ export class ReadFlinkStatementHandler extends BaseToolHandler {
       if (error) {
         return this.createResponse(
           `Failed to read Flink SQL statement: ${JSON.stringify(error)}`,
+          true,
         );
       }
 

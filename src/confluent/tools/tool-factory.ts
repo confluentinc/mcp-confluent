@@ -18,6 +18,7 @@ import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topi
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { DeleteConnectorHandler } from "./handlers/connect/delete-connector-handler.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
@@ -39,6 +40,7 @@ export class ToolFactory {
     [ToolName.ADD_TAGS_TO_TOPIC, new AddTagToTopicHandler()],
     [ToolName.LIST_TAGS, new ListTagsHandler()],
     [ToolName.ALTER_TOPIC_CONFIG, new AlterTopicConfigHandler()],
+    [ToolName.DELETE_CONNECTOR, new DeleteConnectorHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

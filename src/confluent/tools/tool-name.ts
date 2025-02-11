@@ -10,6 +10,7 @@ export enum ToolName {
   LIST_CONNECTORS = "list-connectors",
   READ_CONNECTOR = "read-connector",
   CREATE_CONNECTOR = "create-connector",
+  DELETE_CONNECTOR = "delete-connector",
   SEARCH_TOPICS_BY_TAG = "search-topics-by-tag",
   CREATE_TOPIC_TAGS = "create-topic-tags",
   DELETE_TAG = "delete-tag",

@@ -5,9 +5,12 @@
 ### Create your own .env file
 
 ```bash
-BOOTSTRAP_SERVERS="pkc-v12gj.northamerica-northeast2.gcp.confluent.cloud:9092"
+BOOTSTRAP_SERVERS="pkc-v12gj.us-east4.gcp.confluent.cloud:9092"
 KAFKA_API_KEY="..."
 KAFKA_API_SECRET="..."
+KAFKA_REST_ENDPOINT="https://pkc-v12gj.us-east4.gcp.confluent.cloud:443"
+KAFKA_CLUSTER_ID=""
+KAFKA_ENV_ID="env-..."
 FLINK_ENV_ID="env-..."
 FLINK_ORG_ID=""
 FLINK_REST_ENDPOINT="https://flink.us-east4.gcp.confluent.cloud"
@@ -18,9 +21,10 @@ FLINK_API_SECRET=""
 FLINK_COMPUTE_POOL_ID="lfcp-..."
 CONFLUENT_CLOUD_API_KEY=""
 CONFLUENT_CLOUD_API_SECRET=""
-KAFKA_CLUSTER_ID=""
-KAFKA_ENV_ID="env-..."
 CONFLUENT_CLOUD_REST_ENDPOINT="https://api.confluent.cloud"
+SCHEMA_REGISTRY_API_KEY="..."
+SCHEMA_REGISTRY_API_SECRET="..."
+SCHEMA_REGISTRY_ENDPOINT=https://psrc-zv01y.northamerica-northeast2.gcp.confluent.cloud
 ```
 
 ### Incremental watch mode of typescript

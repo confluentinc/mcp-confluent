@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "format": "prettier --write \"**/*.+(js|ts|json)\"",
     "build": "tsc && tsc-alias",
+    "print:schema": "node dist/print-md-schema.js",
     "prepare": "husky"
   },
   "devDependencies": {

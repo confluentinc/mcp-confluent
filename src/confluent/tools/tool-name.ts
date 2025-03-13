@@ -19,4 +19,5 @@ export enum ToolName {
   ADD_TAGS_TO_TOPIC = "add-tags-to-topic",
   LIST_TAGS = "list-tags",
   ALTER_TOPIC_CONFIG = "alter-topic-config",
+  LIST_CLUSTERS = "list-clusters",
 }

@@ -20,6 +20,7 @@ import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/s
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { DeleteConnectorHandler } from "./handlers/connect/delete-connector-handler.js";
 import { SearchTopicsByNameHandler } from "./handlers/search/search-topics-by-name-handler.js";
+import { ListClustersHandler } from "./handlers/clusters/list-clusters-handler.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
@@ -43,6 +44,7 @@ export class ToolFactory {
     [ToolName.ALTER_TOPIC_CONFIG, new AlterTopicConfigHandler()],
     [ToolName.DELETE_CONNECTOR, new DeleteConnectorHandler()],
     [ToolName.SEARCH_TOPICS_BY_NAME, new SearchTopicsByNameHandler()],
+    [ToolName.LIST_CLUSTERS, new ListClustersHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

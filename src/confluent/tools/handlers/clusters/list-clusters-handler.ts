@@ -6,9 +6,17 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
+import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listClustersArguments = z.object({
+  baseUrl: z
+    .string()
+    .trim()
+    .describe("The base URL of the Confluent Cloud REST API.")
+    .url()
+    .default(env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
+    .optional(),
   environmentId: z
     .string()
     .optional()
@@ -59,100 +67,58 @@ export type Cluster = z.infer<typeof clusterSchema>;
 export class ListClustersHandler extends BaseToolHandler {
   async handle(
     clientManager: ClientManager,
-    toolArguments: Record<string, unknown>,
+    toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { environmentId } = listClustersArguments.parse(toolArguments);
+    const { environmentId, baseUrl } =
+      listClustersArguments.parse(toolArguments);
 
     try {
-      const baseUrl = env.CONFLUENT_CLOUD_REST_ENDPOINT;
-      const url = new URL("/cmk/v2/clusters", baseUrl);
-      if (environmentId) {
-        url.searchParams.append("environment", environmentId);
+      if (baseUrl !== undefined && baseUrl !== "") {
+        clientManager.setConfluentCloudRestEndpoint(baseUrl);
       }
 
-      // MCP server log
-      await this.createResponse(`Making request to: ${url.toString()}`, false, {
-        requestUrl: url.toString(),
-      });
+      const pathBasedClient = wrapAsPathBasedClient(
+        clientManager.getConfluentCloudRestClient(),
+      );
 
-      const response = await fetch(url.toString(), {
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${env.CONFLUENT_CLOUD_API_KEY}:${env.CONFLUENT_CLOUD_API_SECRET}`).toString("base64")}`,
-          "Content-Type": "application/json",
+      const { data: response, error } = await pathBasedClient[
+        "/cmk/v2/clusters"
+      ].GET({
+        params: {
+          query: {
+            environment: environmentId ?? env.KAFKA_ENV_ID ?? "",
+            page_size: 100,
+          },
         },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API Error:", {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText,
-        });
+      if (error) {
+        console.error("API Error:", error);
         return this.createResponse(
-          `Failed to fetch clusters: ${response.status} ${response.statusText}\nResponse: ${errorText}`,
+          `Failed to fetch clusters: ${JSON.stringify(error)}`,
           true,
-          { status: response.status, statusText: response.statusText },
-        );
-      }
-
-      let data;
-      try {
-        const responseText = await response.text();
-
-        // Try to parse the response text as JSON
-        try {
-          data = JSON.parse(responseText);
-        } catch (jsonError) {
-          console.error("JSON Parse Error:", jsonError);
-          // If the response is already a string containing JSON, try to parse it again
-          if (
-            typeof responseText === "string" &&
-            responseText.startsWith("{")
-          ) {
-            try {
-              data = JSON.parse(responseText);
-            } catch (secondError: unknown) {
-              throw new Error(
-                `Failed to parse response as JSON: ${secondError instanceof Error ? secondError.message : String(secondError)}`,
-              );
-            }
-          } else {
-            throw new Error(`Invalid JSON response: ${responseText}`);
-          }
-        }
-      } catch (parseError) {
-        console.error("Response Parse Error:", parseError);
-        return this.createResponse(
-          `Failed to parse API response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-          true,
-          {
-            parseError:
-              parseError instanceof Error
-                ? parseError.message
-                : String(parseError),
-          },
+          { error },
         );
       }
 
       // Validate the response structure
-      if (!data || typeof data !== "object") {
+      if (!response || typeof response !== "object") {
         return this.createResponse(
           "Invalid response format: response is not an object",
           true,
-          { response: data },
+          { response },
         );
       }
 
-      if (!Array.isArray(data.data)) {
+      if (!Array.isArray(response.data)) {
         return this.createResponse(
           "Invalid response format: missing or invalid data array",
           true,
-          { response: data },
+          { response },
         );
       }
 
-      const clusters = data.data.map((cluster: unknown) => {
+      const clusters = response.data.map((cluster: unknown) => {
         try {
           const validatedCluster = clusterSchema.parse(cluster) as Cluster;
           return {
@@ -209,7 +175,7 @@ Cluster: ${cluster.name}
       return this.createResponse(
         `Successfully retrieved ${clusters.length} clusters:\n${clusterDetails}`,
         false,
-        { clusters, total: data.metadata?.total_size },
+        { clusters, total: response.metadata?.total_size },
       );
     } catch (error) {
       console.error("Error in ListClustersHandler:", error);

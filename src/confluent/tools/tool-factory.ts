@@ -20,9 +20,9 @@ import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topi
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { DeleteConnectorHandler } from "./handlers/connect/delete-connector-handler.js";
-import { SearchTopicsByNameHandler } from "./handlers/search/search-topics-by-name-handler.js";
-import { ListClustersHandler } from "./handlers/clusters/list-clusters-handler.js";
+import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
+import { SearchTopicsByNameHandler } from "@src/confluent/tools/handlers/search/search-topics-by-name-handler.js";
+import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list-clusters-handler.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([

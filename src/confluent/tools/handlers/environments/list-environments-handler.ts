@@ -6,6 +6,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
+import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listEnvironmentsArguments = z.object({
@@ -70,78 +71,36 @@ export class ListEnvironmentsHandler extends BaseToolHandler {
       listEnvironmentsArguments.parse(toolArguments);
 
     try {
-      const url = new URL(`org/v2/environments`, baseUrl);
-
-      if (pageToken) {
-        url.searchParams.append("page_token", pageToken);
+      if (baseUrl !== undefined && baseUrl !== "") {
+        clientManager.setConfluentCloudRestEndpoint(baseUrl);
       }
 
-      // MCP server log
-      await this.createResponse(`Making request to: ${url.toString()}`, false, {
-        requestUrl: url.toString(),
-      });
+      const pathBasedClient = wrapAsPathBasedClient(
+        clientManager.getConfluentCloudRestClient(),
+      );
 
-      const response = await fetch(url.toString(), {
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${env.CONFLUENT_CLOUD_API_KEY}:${env.CONFLUENT_CLOUD_API_SECRET}`).toString("base64")}`,
-          "Content-Type": "application/json",
+      const { data: response, error } = await pathBasedClient[
+        "/org/v2/environments"
+      ].GET({
+        params: {
+          query: {
+            page_token: pageToken,
+          },
         },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API Error:", {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText,
-        });
+      if (error) {
+        console.error("API Error:", error);
         return this.createResponse(
-          `Failed to fetch environments using ${url.toString()}: ${response.status} ${response.statusText}\nResponse: ${errorText}`,
+          `Failed to fetch environments: ${JSON.stringify(error)}`,
           true,
-          { status: response.status, statusText: response.statusText },
-        );
-      }
-
-      let data;
-      try {
-        const responseText = await response.text();
-
-        try {
-          data = JSON.parse(responseText);
-        } catch (jsonError) {
-          console.error("JSON Parse Error:", jsonError);
-          if (
-            typeof responseText === "string" &&
-            responseText.startsWith("{")
-          ) {
-            try {
-              data = JSON.parse(responseText);
-            } catch (secondError: unknown) {
-              throw new Error(
-                `Failed to parse response as JSON: ${secondError instanceof Error ? secondError.message : String(secondError)}`,
-              );
-            }
-          } else {
-            throw new Error(`Invalid JSON response: ${responseText}`);
-          }
-        }
-      } catch (parseError) {
-        console.error("Response Parse Error:", parseError);
-        return this.createResponse(
-          `Failed to parse API response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-          true,
-          {
-            parseError:
-              parseError instanceof Error
-                ? parseError.message
-                : String(parseError),
-          },
+          { error },
         );
       }
 
       try {
         const validatedResponse = environmentListSchema.parse(
-          data,
+          response,
         ) as EnvironmentList;
         const environments = validatedResponse.data.map((env) => ({
           id: env.id,

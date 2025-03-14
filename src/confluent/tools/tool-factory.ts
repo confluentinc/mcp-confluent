@@ -7,6 +7,8 @@ import { RemoveTagFromEntityHandler } from "@src/confluent/tools/handlers/catalo
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
+import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
+import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
 import { CreateFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/create-flink-statement-handler.js";
 import { DeleteFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/delete-flink-statement-handler.js";
 import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
@@ -45,6 +47,8 @@ export class ToolFactory {
     [ToolName.DELETE_CONNECTOR, new DeleteConnectorHandler()],
     [ToolName.SEARCH_TOPICS_BY_NAME, new SearchTopicsByNameHandler()],
     [ToolName.LIST_CLUSTERS, new ListClustersHandler()],
+    [ToolName.LIST_ENVIRONMENTS, new ListEnvironmentsHandler()],
+    [ToolName.READ_ENVIRONMENT, new ReadEnvironmentHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

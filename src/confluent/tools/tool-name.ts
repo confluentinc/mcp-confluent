@@ -20,4 +20,6 @@ export enum ToolName {
   LIST_TAGS = "list-tags",
   ALTER_TOPIC_CONFIG = "alter-topic-config",
   LIST_CLUSTERS = "list-clusters",
+  LIST_ENVIRONMENTS = "list-environments",
+  READ_ENVIRONMENT = "read-environment",
 }

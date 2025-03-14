@@ -101,4 +101,7 @@ function getTypeInfo(schema: z.ZodTypeAny): string {
   return schema.constructor.name.replace("Zod", "").toLowerCase();
 }
 
-console.log(zodSchemaToMarkdown(combinedSchema));
+// Generate and export the markdown documentation
+const markdownDocs = zodSchemaToMarkdown(combinedSchema);
+console.log(markdownDocs); // For debugging
+export { markdownDocs };

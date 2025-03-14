@@ -34,9 +34,9 @@ export const clusterSchema = z.object({
     availability: z.string(),
     cloud: z.string(),
     config: z.object({
-      cku: z.number(),
+      cku: z.number().optional(),
       kind: z.string(),
-      zones: z.array(z.string()),
+      zones: z.array(z.string()).optional(),
     }),
     display_name: z.string(),
     environment: z.object({
@@ -49,7 +49,7 @@ export const clusterSchema = z.object({
     region: z.string(),
   }),
   status: z.object({
-    cku: z.number(),
+    cku: z.number().optional(),
     phase: z.string(),
   }),
 });
@@ -99,7 +99,6 @@ export class ListClustersHandler extends BaseToolHandler {
       let data;
       try {
         const responseText = await response.text();
-        console.log("Raw response text:", responseText);
 
         // Try to parse the response text as JSON
         try {
@@ -136,9 +135,6 @@ export class ListClustersHandler extends BaseToolHandler {
         );
       }
 
-      // Log the parsed response for debugging
-      console.log("Parsed API Response:", JSON.stringify(data, null, 2));
-
       // Validate the response structure
       if (!data || typeof data !== "object") {
         return this.createResponse(
@@ -167,12 +163,18 @@ export class ListClustersHandler extends BaseToolHandler {
             region: validatedCluster.spec.region,
             environmentId: validatedCluster.spec.environment.id,
             status: validatedCluster.status.phase,
-            cku: validatedCluster.status.cku,
+            cku:
+              validatedCluster.status.cku ??
+              validatedCluster.spec.config.cku ??
+              0,
             endpoints: {
               http: validatedCluster.spec.http_endpoint,
               bootstrap: validatedCluster.spec.kafka_bootstrap_endpoint,
             },
-            config: validatedCluster.spec.config,
+            config: {
+              kind: validatedCluster.spec.config.kind,
+              zones: validatedCluster.spec.config.zones ?? [],
+            },
           };
         } catch (validationError) {
           console.error("Cluster validation error:", validationError);
@@ -182,8 +184,30 @@ export class ListClustersHandler extends BaseToolHandler {
         }
       });
 
+      // Format cluster details for display
+      const clusterDetails = clusters
+        .map(
+          (cluster) => `
+Cluster: ${cluster.name}
+  ID: ${cluster.id}
+  Environment ID: ${cluster.environmentId}
+  Status: ${cluster.status}
+  Availability: ${cluster.availability}
+  Cloud: ${cluster.cloud}
+  Region: ${cluster.region}
+  CKU: ${cluster.cku}
+  Endpoints:
+    HTTP: ${cluster.endpoints.http}
+    Bootstrap: ${cluster.endpoints.bootstrap}
+  Config:
+    Kind: ${cluster.config.kind}
+    Zones: ${cluster.config.zones.join(", ")}
+`,
+        )
+        .join("\n");
+
       return this.createResponse(
-        `Successfully retrieved ${clusters.length} clusters`,
+        `Successfully retrieved ${clusters.length} clusters:\n${clusterDetails}`,
         false,
         { clusters, total: data.metadata?.total_size },
       );

@@ -121,8 +121,8 @@ See [here](https://modelcontextprotocol.io/quickstart/user) for more details abo
 To configure Claude Desktop to use this MCP server:
 
 1. **Open Claude Desktop Configuration**
-   - On Mac: `~/Library/Application Support/Claude Desktop/config.json`
-   - On Windows: `%APPDATA%\Claude Desktop\config.json`
+   - On Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - On Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 2. **Edit Configuration File**
    - Open the config file in your preferred text editor

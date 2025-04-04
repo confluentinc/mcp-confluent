@@ -1,10 +1,28 @@
 {
-  "name": "confluent-mcp-server",
+  "name": "@confluentinc/mcp-confluent",
+  "description": "Confluent MCP Server",
   "version": "1.0.1",
+  "author": "Confluent Inc.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/confluentinc/mcp-confluent.git"
+  },
   "bin": {
     "mcp-confluent": "./dist/index.js"
   },
   "type": "module",
+  "keywords": [
+    "confluent",
+    "mcp",
+    "kafka",
+    "flink",
+    "modelcontextprotocol"
+  ],
+  "bugs": {
+    "url": "https://github.com/confluentinc/mcp-confluent/issues"
+  },
+  "homepage": "https://www.confluent.io/blog/ai-agents-using-anthropic-mcp/",
   "scripts": {
     "dev": "concurrently \"tsc --watch\" \"tsc-alias --watch\"",
     "test:ts": "tsc --noEmit",

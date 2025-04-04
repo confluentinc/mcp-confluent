@@ -50,13 +50,6 @@ const envSchema = z.object({
     )
     .trim()
     .min(1),
-  CONFIG_PATH: z
-    .string()
-    .describe(
-      "File system path to store and retrieve conversation-based configurations for session persistence (Future Implementation)",
-    )
-    .optional()
-    .default(`${import.meta.dirname}/config/default.json`),
   SCHEMA_REGISTRY_API_KEY: z
     .string()
     .describe(

@@ -23,6 +23,7 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
 import { SearchTopicsByNameHandler } from "@src/confluent/tools/handlers/search/search-topics-by-name-handler.js";
 import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list-clusters-handler.js";
+import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
@@ -49,6 +50,7 @@ export class ToolFactory {
     [ToolName.LIST_CLUSTERS, new ListClustersHandler()],
     [ToolName.LIST_ENVIRONMENTS, new ListEnvironmentsHandler()],
     [ToolName.READ_ENVIRONMENT, new ReadEnvironmentHandler()],
+    [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

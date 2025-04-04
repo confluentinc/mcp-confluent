@@ -22,4 +22,5 @@ export enum ToolName {
   LIST_CLUSTERS = "list-clusters",
   LIST_ENVIRONMENTS = "list-environments",
   READ_ENVIRONMENT = "read-environment",
+  LIST_SCHEMAS = "list-schemas",
 }

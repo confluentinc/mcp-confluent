@@ -44,7 +44,7 @@ export class ListSchemasHandler extends BaseToolHandler {
 
     if (error) {
       return this.createResponse(
-        `Failed to list subjects: ${JSON.stringify(error)}`,
+        `Failed to list schemas: ${JSON.stringify(error)}`,
         true,
       );
     }

@@ -16,6 +16,16 @@ const listSchemasArguments = z.object({
     .url()
     .default(env.SCHEMA_REGISTRY_ENDPOINT ?? "")
     .optional(),
+  latestOnly: z
+    .boolean()
+    .describe("If true, only return the latest version of each schema.")
+    .default(false)
+    .optional(),
+  subjectPrefix: z
+    .string()
+    .describe("The prefix of the subject to list schemas for.")
+    .optional(),
+  deleted: z.string().describe("List deleted schemas.").optional(),
 });
 
 export class ListSchemasHandler extends BaseToolHandler {
@@ -23,7 +33,8 @@ export class ListSchemasHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { baseUrl } = listSchemasArguments.parse(toolArguments);
+    const { baseUrl, latestOnly, subjectPrefix, deleted } =
+      listSchemasArguments.parse(toolArguments);
 
     if (baseUrl !== undefined && baseUrl !== "") {
       clientManager.setConfluentCloudSchemaRegistryEndpoint(baseUrl);
@@ -33,12 +44,14 @@ export class ListSchemasHandler extends BaseToolHandler {
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
 
-    // First get all subjects
+    // First get all schemas
     const { data: response, error: error } = await pathBasedClient[
       "/schemas"
     ].GET({
       query: {
-        latestOnly: "true",
+        ...(latestOnly ? { latestOnly: true } : {}),
+        ...(subjectPrefix ? { subjectPrefix: subjectPrefix } : {}),
+        ...(deleted ? { deleted: true } : {}),
       },
     });
 

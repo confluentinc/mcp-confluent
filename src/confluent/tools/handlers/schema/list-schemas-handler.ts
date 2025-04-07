@@ -19,7 +19,7 @@ const listSchemasArguments = z.object({
   latestOnly: z
     .boolean()
     .describe("If true, only return the latest version of each schema.")
-    .default(false)
+    .default(true)
     .optional(),
   subjectPrefix: z
     .string()

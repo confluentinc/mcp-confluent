@@ -1,6 +1,6 @@
 # mcp-confluent
 
-An MCP server implementation built to interact with Confluent Kafka and Confluent Cloud REST APIs.
+An MCP server implementation that enables AI assistants to interact with Confluent Kafka and Confluent Cloud REST APIs. This server allows AI tools like Claude Desktop and Goose CLI to manage Kafka topics, connectors, and Flink SQL statements through natural language interactions.
 
 ## Demo
 
@@ -22,6 +22,7 @@ An MCP server implementation built to interact with Confluent Kafka and Confluen
   - [User Guide](#user-guide)
     - [Getting Started](#getting-started)
     - [Configuration](#configuration)
+    - [Environment Variables Reference](#environment-variables-reference)
     - [Usage](#usage)
     - [Configuring Claude Desktop](#configuring-claude-desktop)
     - [Configuring Goose CLI](#configuring-goose-cli)
@@ -51,6 +52,11 @@ An MCP server implementation built to interact with Confluent Kafka and Confluen
 
 ### Configuration
 
+Create a `.env` file in the root directory of your project with the following configuration:
+
+<details>
+<summary>Example .env file structure</summary>
+
 ```properties
 # .env file
 BOOTSTRAP_SERVERS="pkc-v12gj.us-east4.gcp.confluent.cloud:9092"
@@ -74,6 +80,9 @@ SCHEMA_REGISTRY_API_KEY="..."
 SCHEMA_REGISTRY_API_SECRET="..."
 SCHEMA_REGISTRY_ENDPOINT="https://psrc-zv01y.northamerica-northeast2.gcp.confluent.cloud"
 ```
+</details>
+
+### Environment Variables Reference
 
 | Variable                      | Description                                                                                                                               | Default Value | Required |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------- |
@@ -113,10 +122,9 @@ This MCP server is designed to be used with various MCP clients, such as Claude 
 
 4. **Interact with Confluent through the Client:** Once the client is connected, you can use the client's interface to interact with Confluent Cloud resources.  The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
 
-
 ### Configuring Claude Desktop
 
-See [here](https://modelcontextprotocol.io/quickstart/user) for more details about installing claude desktop, mcp servers.
+See [here](https://modelcontextprotocol.io/quickstart/user) for more details about installing Claude Desktop and MCP servers.
 
 To configure Claude Desktop to use this MCP server:
 
@@ -126,7 +134,10 @@ To configure Claude Desktop to use this MCP server:
 
 2. **Edit Configuration File**
    - Open the config file in your preferred text editor
-   - Add or modify the configuration to include the MCP server:
+   - Add or modify the configuration using one of the following methods:
+
+   <details>
+   <summary>Option 1: Run from source</summary>
 
    ```json
    {
@@ -134,18 +145,39 @@ To configure Claude Desktop to use this MCP server:
        "confluent": {
          "command": "node",
          "args": [
-           "--env-file",
+           "/path/to/confluent-mcp-server/dist/index.js",
+            "--env-file",
            "/path/to/confluent-mcp-server/.env",
-           "/path/to/confluent-mcp-server/dist/index.js"
          ]
        }
      }
    }
    ```
+   </details>
+
+   <details>
+   <summary>Option 2: Run from npx</summary>
+
+   ```json
+   {
+     "mcpServers": {
+       "confluent": {
+         "command": "npx",
+         "args": [
+           "-y"
+           "@confluentinc/mcp-confluent",
+           "-e",
+           "/path/to/confluent-mcp-server/.env"
+         ]
+       }
+     }
+   }
+   ```
+   </details>
 
    Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
 
-3. **Restart Claude Desktop**
+1. **Restart Claude Desktop**
    - Close and reopen Claude Desktop for the changes to take effect
    - The MCP server will automatically start when Claude Desktop launches
 
@@ -155,11 +187,36 @@ Now Claude Desktop will be configured to use your local MCP server for Confluent
 
 ### Configuring Goose CLI
 
-See [here](https://block.github.io/goose/docs/quickstart#install-an-extension) for detailed instructions on how to install the Goose CLI. Once installed, you can add this server as an extension
+See [here](https://block.github.io/goose/docs/quickstart#install-an-extension) for detailed instructions on how to install the Goose CLI.
 
-Once you have it installed, run the configuration command `goose configure` and select the following
+Once installed, follow these steps:
 
-`Add extension`>`Command-line Extension`>`mcp-confluent`>`node --env-file /path/to/confluent-mcp-server/.env /path/to/confluent-mcp-server/dist/index.js`>`No`
+1. **Run the Configuration Command:**
+   ```bash
+   goose configure
+   ```
+
+2. **Follow the Interactive Prompts:**
+   - Select `Add extension`
+   - Choose `Command-line Extension`
+   - Enter `mcp-confluent` as the extension name
+   - Choose one of the following configuration methods:
+
+   <details>
+   <summary>Option 1: Run from source</summary>
+
+   ```bash
+   node /path/to/confluent-mcp-server/dist/index.js --env-file /path/to/confluent-mcp-server/.env
+   ```
+   </details>
+
+   <details>
+   <summary>Option 2: Run from npx</summary>
+
+   ```bash
+   npx -y @confluentinc/mcp-confluent -e /path/to/confluent-mcp-server/.env
+   ```
+   </details>
 
 Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
 
@@ -219,7 +276,7 @@ For testing MCP servers, you can use [MCP Inspector](https://modelcontextprotoco
 
 ```bash
 # make sure you've already built the project either in dev mode or by running npm run build
-npx @modelcontextprotocol/inspector node --env-file $PATH_TO_PROJECT/.env /$PATH_TO_PROJECT/dist/index.js
+npx @modelcontextprotocol/inspector node  $PATH_TO_PROJECT/dist/index.js --env-file $PATH_TO_PROJECT/.env
 ```
 
 ### Adding a New Tool
@@ -240,4 +297,4 @@ npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --e
 
 ### Contributing
 
-<!-- Will fill in later. -->
+Bug reports and feedback is appreciated in the form of Github Issues. For guidelines on contributing please see [CONTRIBUTING.md](CONTRIBUTING.MD)

@@ -64,5 +64,8 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "engines": {
+    "node": ">=22"
+  }
 }

@@ -6,10 +6,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/confluentinc/mcp-confluent.git"
+    "url": "git+https://github.com/confluentinc/mcp-confluent.git"
   },
   "bin": {
-    "mcp-confluent": "./dist/index.js"
+    "mcp-confluent": "dist/index.js"
   },
   "type": "module",
   "keywords": [

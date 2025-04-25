@@ -1,6 +1,6 @@
 # mcp-confluent
 
-An MCP server implementation that enables AI assistants to interact with Confluent Kafka and Confluent Cloud REST APIs. This server allows AI tools like Claude Desktop and Goose CLI to manage Kafka topics, connectors, and Flink SQL statements through natural language interactions.
+An MCP server implementation that enables AI assistants to interact with Confluent Cloud REST APIs. This server allows AI tools like Claude Desktop and Goose CLI to manage Kafka topics, connectors, and Flink SQL statements through natural language interactions.
 
 ## Demo
 

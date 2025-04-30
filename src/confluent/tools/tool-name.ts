@@ -3,6 +3,7 @@ export enum ToolName {
   CREATE_TOPICS = "create-topics",
   DELETE_TOPICS = "delete-topics",
   PRODUCE_MESSAGE = "produce-message",
+  CONSUME_MESSAGES = "consume-messages",
   LIST_FLINK_STATEMENTS = "list-flink-statements",
   CREATE_FLINK_STATEMENT = "create-flink-statement",
   READ_FLINK_STATEMENT = "read-flink-statement",

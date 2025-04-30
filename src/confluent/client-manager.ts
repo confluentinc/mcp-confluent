@@ -24,7 +24,7 @@ export interface KafkaClientManager {
   /** Gets a connected producer client for publishing messages */
   getProducer(): Promise<KafkaJS.Producer>;
   /** Gets a connected consumer client for subscribing to topics */
-  getConsumer(): Promise<KafkaJS.Consumer>;
+  getConsumer(sessionId?: string): Promise<KafkaJS.Consumer>;
   /** Disconnects and cleans up all client connections */
   disconnect(): Promise<void>;
 }
@@ -113,10 +113,8 @@ export class DefaultClientManager implements ClientManager {
       async () => {
         console.error("Connecting Kafka Producer");
         const producer = this.kafkaClient.get().producer({
-          kafkaJS: {
-            acks: 1,
-            compression: KafkaJS.CompressionTypes.GZIP,
-          },
+          "compression.type": "gzip",
+          "linger.ms": 5,
         });
         await producer.connect();
         return producer;
@@ -168,6 +166,21 @@ export class DefaultClientManager implements ClientManager {
       return client;
     });
   }
+
+  /** @inheritdoc */
+  async getConsumer(sessionId?: string): Promise<KafkaJS.Consumer> {
+    const baseGroupId = "mcp-confluent"; // should be configurable?
+    const groupId = sessionId ? `${baseGroupId}-${sessionId}` : baseGroupId;
+    console.error(`Creating new Kafka Consumer with groupId: ${groupId}`);
+    return this.kafkaClient.get().consumer({
+      kafkaJS: {
+        fromBeginning: true,
+        groupId,
+        allowAutoTopicCreation: false,
+        autoCommit: false,
+      },
+    });
+  }
   /**
    * a function that sets a new confluent cloud rest endpoint.
    * Closes the current client first.
@@ -188,10 +201,6 @@ export class DefaultClientManager implements ClientManager {
   setConfluentCloudKafkaRestEndpoint(endpoint: string): void {
     this.confluentCloudKafkaRestClient.close();
     this.confluentCloudKafkaRestBaseUrl = endpoint;
-  }
-
-  getConsumer(): Promise<KafkaJS.Consumer> {
-    throw new Error("Method not implemented.");
   }
 
   /** @inheritdoc */

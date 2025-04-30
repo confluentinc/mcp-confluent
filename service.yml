@@ -9,3 +9,15 @@ renovatebot:
   enable: true
   automerge:
     enable: true
+semaphore:
+  enable: true
+  pipeline_enable: false
+  tasks:
+    - name: create-github-tag
+      branch: main
+      pipeline_file: .semaphore/create-github-tag.yml
+      parameters:
+        - name: TAG_NAME
+          required: true
+          description: The name of the tag to be created.
+          default_value: "X.Y.Z"

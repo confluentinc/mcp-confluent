@@ -2,6 +2,10 @@
 
 An MCP server implementation that enables AI assistants to interact with Confluent Cloud REST APIs. This server allows AI tools like Claude Desktop and Goose CLI to manage Kafka topics, connectors, and Flink SQL statements through natural language interactions.
 
+<a href="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent/badge" alt="mcp-confluent MCP server" />
+</a>
+
 ## Demo
 
 ### Goose CLI

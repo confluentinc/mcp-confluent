@@ -75,8 +75,8 @@ type ProduceKafkaMessageArguments = z.infer<
 export class ProduceKafkaMessageHandler extends BaseToolHandler {
   /**
    * Handles the result of a schema check, returning a CallToolResult if a schema issue is found, or null otherwise.
-   * @param result The schema check result to handle.
-   * @returns A CallToolResult if a schema issue is found, or null otherwise.
+   * @param result - The schema check result to handle
+   * @returns A CallToolResult if a schema issue is found, or null otherwise
    */
   handleSchemaCheckResult(result: SchemaCheckResult): CallToolResult | null {
     if (!result) return null;
@@ -102,9 +102,9 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
   /**
    * Main handler for producing a message to a Kafka topic, including schema registry logic and serialization.
    * Handles both value and key, and returns a CallToolResult with the outcome.
-   * @param clientManager The client manager for Kafka and registry clients.
-   * @param toolArguments The arguments for the tool, including topic, value, and key.
-   * @returns A CallToolResult describing the outcome of the produce operation.
+   * @param clientManager - The client manager for Kafka and registry clients
+   * @param toolArguments - The arguments for the tool, including topic, value, and key
+   * @returns A CallToolResult describing the outcome of the produce operation
    */
   async handle(
     clientManager: ClientManager,
@@ -197,6 +197,10 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     return this.createResponse(formattedResponse, isError);
   }
 
+  /**
+   * Returns the tool configuration including name, description, and input schema.
+   * @returns The tool configuration
+   */
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.PRODUCE_MESSAGE,

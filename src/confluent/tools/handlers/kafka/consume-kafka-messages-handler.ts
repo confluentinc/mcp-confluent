@@ -71,7 +71,22 @@ interface ProcessedMessage {
   partition: number;
 }
 
+/**
+ * Handler for consuming messages from Kafka topics with support for Schema Registry deserialization.
+ * This handler allows consuming messages from one or more topics with configurable message limits and timeouts.
+ * It supports automatic deserialization of Schema Registry encoded messages (AVRO, JSON, PROTOBUF).
+ */
 export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
+  /**
+   * Processes a single Kafka message, handling deserialization of both key and value.
+   * @param topic - The topic the message was consumed from
+   * @param partition - The partition the message was consumed from
+   * @param message - The raw Kafka message
+   * @param registry - Optional Schema Registry client for deserialization
+   * @param valueOptions - Options for value deserialization
+   * @param keyOptions - Optional options for key deserialization
+   * @returns A processed message with deserialized key and value
+   */
   async processMessage(
     topic: string,
     partition: number,
@@ -80,9 +95,6 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     valueOptions: ValueOptions,
     keyOptions?: KeyOptions,
   ): Promise<ProcessedMessage> {
-    console.error(
-      `[processMessage] Called for topic: ${topic}, partition: ${partition}`,
-    );
     let processedKey: unknown = message.key?.toString();
     let processedValue: unknown = message.value?.toString();
 
@@ -99,15 +111,9 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         `${topic}-${serdeType === SerdeType.KEY ? "key" : "value"}`;
       const schema = await getLatestSchemaIfExists(registry, subject);
       if (!schema || !schema.schemaType) {
-        console.error(
-          `[processMessage] No latest schema found for subject: ${subject}`,
-        );
         return buffer?.toString();
       }
       try {
-        console.error(
-          `[processMessage] Attempting to deserialize message ${serdeType} for topic: ${topic}`,
-        );
         return await deserializeMessage(
           topic,
           buffer as Buffer,
@@ -119,9 +125,6 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         console.error(
           `Error deserializing message ${serdeType} for topic ${topic} with schema type ${schema.schemaType}:`,
           err,
-        );
-        console.error(
-          `[processMessage] Falling back to default processed${serdeType} for topic: ${topic}`,
         );
         return buffer?.toString();
       }
@@ -137,10 +140,6 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         message.key as Buffer,
         keyOptions,
         SerdeType.KEY,
-      );
-    } else {
-      console.error(
-        `[processMessage] No message key present for topic: ${topic}`,
       );
     }
 
@@ -162,6 +161,12 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     };
   }
 
+  /**
+   * Main handler for consuming messages from Kafka topics.
+   * @param clientManager - The client manager for Kafka and registry clients
+   * @param toolArguments - The arguments for the tool, including topics, message limits, and deserialization options
+   * @returns A CallToolResult containing the consumed messages or error information
+   */
   async handle(
     clientManager: ClientManager,
     toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,

@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/confluentinc-mcp-confluent-badge.png)](https://mseep.ai/app/confluentinc-mcp-confluent)
+
 # mcp-confluent
 
 An MCP server implementation that enables AI assistants to interact with Confluent Cloud REST APIs. This server allows AI tools like Claude Desktop and Goose CLI to manage Kafka topics, connectors, and Flink SQL statements through natural language interactions.

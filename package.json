@@ -1,7 +1,7 @@
 {
   "name": "@confluentinc/mcp-confluent",
   "description": "Confluent MCP Server",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Confluent Inc.",
   "license": "MIT",
   "repository": {
@@ -34,33 +34,34 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@eslint/js": "^9.23.0",
+    "@eslint/js": "^9.25.1",
     "@types/content-type": "^1.1.8",
     "@types/eslint__js": "^8.42.3",
-    "@types/node": "^22.14.0",
+    "@types/node": "^22.15.3",
     "@types/ws": "^8.18.1",
-    "@typescript-eslint/eslint-plugin": "^8.29.0",
-    "@typescript-eslint/parser": "^8.29.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.0",
+    "@typescript-eslint/parser": "^8.31.0",
     "concurrently": "^9.1.2",
-    "eslint": "^9.23.0",
-    "eslint-config-prettier": "^10.1.1",
+    "eslint": "^9.25.1",
+    "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-prettier": "^5.2.6",
     "globals": "^16.0.0",
     "husky": "^9.1.7",
     "openapi-typescript": "^7.6.1",
     "prettier": "3.5.3",
-    "tsc-alias": "^1.8.13",
-    "typescript": "^5.8.2",
-    "typescript-eslint": "^8.29.0"
+    "tsc-alias": "^1.8.15",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.31.0"
   },
   "dependencies": {
     "@commander-js/extra-typings": "^13.1.0",
-    "@confluentinc/kafka-javascript": "^1.2.0",
-    "@modelcontextprotocol/sdk": "^1.8.0",
+    "@confluentinc/kafka-javascript": "^1.3.0",
+    "@confluentinc/schemaregistry": "^1.3.1",
+    "@modelcontextprotocol/sdk": "^1.10.2",
     "commander": "^13.1.0",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.5.0",
     "openapi-fetch": "^0.13.5",
-    "zod": "^3.24.2"
+    "zod": "^3.24.3"
   },
   "files": [
     "dist"

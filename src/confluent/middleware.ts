@@ -1,58 +1,27 @@
-import env from "@src/env.js";
 import { Middleware } from "openapi-fetch";
+
+export interface ConfluentEndpoints {
+  cloud: string;
+  flink: string;
+  schemaRegistry: string;
+  kafka: string;
+}
+
+export interface ConfluentAuth {
+  apiKey: string;
+  apiSecret: string;
+}
+
 /**
- * Middleware to add Authorization header to every request.
- *
- * This middleware intercepts each request and adds an Authorization header
- * using the Flink API key and secret from the environment variables.
- *
- * @param {Object} request - The request object.
- * @returns {Object} The modified request object with the Authorization header.
+ * Creates a middleware that adds Authorization header using the provided auth credentials
  */
-export const confluentCloudFlinkAuthMiddleware: Middleware = {
+export const createAuthMiddleware = (auth: ConfluentAuth): Middleware => ({
   async onRequest({ request }) {
     console.error(`${JSON.stringify(request)}`);
-    // add Authorization header to every request
     request.headers.set(
       "Authorization",
-      `Basic ${Buffer.from(`${env.FLINK_API_KEY}:${env.FLINK_API_SECRET}`).toString("base64")}`,
+      `Basic ${Buffer.from(`${auth.apiKey}:${auth.apiSecret}`).toString("base64")}`,
     );
     return request;
   },
-};
-
-export const confluentCloudAuthMiddleware: Middleware = {
-  async onRequest({ request }) {
-    console.error(`${JSON.stringify(request)}`);
-    // add Authorization header to every request
-    request.headers.set(
-      "Authorization",
-      `Basic ${Buffer.from(`${env.CONFLUENT_CLOUD_API_KEY}:${env.CONFLUENT_CLOUD_API_SECRET}`).toString("base64")}`,
-    );
-    return request;
-  },
-};
-
-export const confluentCloudSchemaRegistryAuthMiddleware: Middleware = {
-  async onRequest({ request }) {
-    console.error(`${JSON.stringify(request)}`);
-    // add Authorization header to every request
-    request.headers.set(
-      "Authorization",
-      `Basic ${Buffer.from(`${env.SCHEMA_REGISTRY_API_KEY}:${env.SCHEMA_REGISTRY_API_SECRET}`).toString("base64")}`,
-    );
-    return request;
-  },
-};
-
-export const confluentCloudKafkaAuthMiddleware: Middleware = {
-  async onRequest({ request }) {
-    console.error(`${JSON.stringify(request)}`);
-    // add Authorization header to every request
-    request.headers.set(
-      "Authorization",
-      `Basic ${Buffer.from(`${env.KAFKA_API_KEY}:${env.KAFKA_API_SECRET}`).toString("base64")}`,
-    );
-    return request;
-  },
-};
+});

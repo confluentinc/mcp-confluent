@@ -3,11 +3,11 @@
  */
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
-  confluentCloudAuthMiddleware,
-  confluentCloudFlinkAuthMiddleware,
-  confluentCloudKafkaAuthMiddleware,
-  confluentCloudSchemaRegistryAuthMiddleware,
+  ConfluentAuth,
+  ConfluentEndpoints,
+  createAuthMiddleware,
 } from "@src/confluent/middleware.js";
 import { paths } from "@src/confluent/openapi-schema.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
@@ -51,15 +51,38 @@ export interface ConfluentCloudRestClientManager {
   setConfluentCloudKafkaRestEndpoint(endpoint: string): void;
 }
 
+/**
+ * Interface for managing Schema Registry client connections.
+ */
+export interface SchemaRegistryClientHandler {
+  getSchemaRegistryClient(): SchemaRegistryClient;
+}
+
 export interface ClientManager
   extends KafkaClientManager,
-    ConfluentCloudRestClientManager {}
+    ConfluentCloudRestClientManager,
+    SchemaRegistryClientHandler {
+  getSchemaRegistryClient(): SchemaRegistryClient;
+}
+
+export interface ClientManagerConfig {
+  kafka: KafkaJS.CommonConstructorConfig;
+  endpoints: ConfluentEndpoints;
+  auth: {
+    cloud: ConfluentAuth;
+    flink: ConfluentAuth;
+    schemaRegistry: ConfluentAuth;
+    kafka: ConfluentAuth;
+  };
+}
 
 /**
  * Default implementation of client management for Kafka and Confluent Cloud services.
  * Manages lifecycle and lazy initialization of various client connections.
  */
-export class DefaultClientManager implements ClientManager {
+export class DefaultClientManager
+  implements ClientManager, SchemaRegistryClientHandler
+{
   private confluentCloudBaseUrl: string;
   private confluentCloudFlinkBaseUrl: string;
   private confluentCloudSchemaRegistryBaseUrl: string;
@@ -79,27 +102,19 @@ export class DefaultClientManager implements ClientManager {
   private readonly confluentCloudKafkaRestClient: Lazy<
     Client<paths, `${string}/${string}`>
   >;
+  private readonly schemaRegistryClient: Lazy<SchemaRegistryClient>;
+
   /**
    * Creates a new DefaultClientManager instance.
-   * @param config - Configuration options for KafkaJS client
-   * @param confluentCloudBaseUrl - Base URL for Confluent Cloud REST API
-   * @param confluentCloudFlinkBaseUrl - Base URL for Flink REST API
-   * @param confluentCloudSchemaRegistryBaseUrl - Base URL for Schema Registry REST API
-   * @param confluentCloudKafkaRestBaseUrl - Base URL for Kafka REST API
+   * @param config - Configuration for all clients
    */
-  constructor(
-    config: KafkaJS.CommonConstructorConfig,
-    confluentCloudBaseUrl?: string,
-    confluentCloudFlinkBaseUrl?: string,
-    confluentCloudSchemaRegistryBaseUrl?: string,
-    confluentCloudKafkaRestBaseUrl?: string,
-  ) {
-    this.confluentCloudBaseUrl = confluentCloudBaseUrl || "";
-    this.confluentCloudFlinkBaseUrl = confluentCloudFlinkBaseUrl || "";
-    this.confluentCloudSchemaRegistryBaseUrl =
-      confluentCloudSchemaRegistryBaseUrl || "";
-    this.confluentCloudKafkaRestBaseUrl = confluentCloudKafkaRestBaseUrl || "";
-    this.kafkaClient = new Lazy(() => new KafkaJS.Kafka(config));
+  constructor(config: ClientManagerConfig) {
+    this.confluentCloudBaseUrl = config.endpoints.cloud;
+    this.confluentCloudFlinkBaseUrl = config.endpoints.flink;
+    this.confluentCloudSchemaRegistryBaseUrl = config.endpoints.schemaRegistry;
+    this.confluentCloudKafkaRestBaseUrl = config.endpoints.kafka;
+
+    this.kafkaClient = new Lazy(() => new KafkaJS.Kafka(config.kafka));
     this.adminClient = new AsyncLazy(
       async () => {
         console.error("Connecting Kafka Admin");
@@ -129,7 +144,7 @@ export class DefaultClientManager implements ClientManager {
       const client = createClient<paths>({
         baseUrl: this.confluentCloudBaseUrl,
       });
-      client.use(confluentCloudAuthMiddleware);
+      client.use(createAuthMiddleware(config.auth.cloud));
       return client;
     });
 
@@ -140,7 +155,7 @@ export class DefaultClientManager implements ClientManager {
       const client = createClient<paths>({
         baseUrl: this.confluentCloudFlinkBaseUrl,
       });
-      client.use(confluentCloudFlinkAuthMiddleware);
+      client.use(createAuthMiddleware(config.auth.flink));
       return client;
     });
 
@@ -151,7 +166,7 @@ export class DefaultClientManager implements ClientManager {
       const client = createClient<paths>({
         baseUrl: this.confluentCloudSchemaRegistryBaseUrl,
       });
-      client.use(confluentCloudSchemaRegistryAuthMiddleware);
+      client.use(createAuthMiddleware(config.auth.schemaRegistry));
       return client;
     });
 
@@ -162,8 +177,19 @@ export class DefaultClientManager implements ClientManager {
       const client = createClient<paths>({
         baseUrl: this.confluentCloudKafkaRestBaseUrl,
       });
-      client.use(confluentCloudKafkaAuthMiddleware);
+      client.use(createAuthMiddleware(config.auth.kafka));
       return client;
+    });
+
+    this.schemaRegistryClient = new Lazy(() => {
+      const { apiKey, apiSecret } = config.auth.schemaRegistry;
+      return new SchemaRegistryClient({
+        baseURLs: [config.endpoints.schemaRegistry],
+        basicAuthCredentials: {
+          credentialsSource: "USER_INFO",
+          userInfo: `${apiKey}:${apiSecret}`,
+        },
+      });
     });
   }
 
@@ -246,5 +272,10 @@ export class DefaultClientManager implements ClientManager {
     await this.adminClient.close();
     await this.producer.close();
     this.kafkaClient.close();
+  }
+
+  /** @inheritdoc */
+  getSchemaRegistryClient(): SchemaRegistryClient {
+    return this.schemaRegistryClient.get();
   }
 }

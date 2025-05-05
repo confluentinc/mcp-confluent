@@ -3,6 +3,7 @@
  */
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   confluentCloudAuthMiddleware,
   confluentCloudFlinkAuthMiddleware,
@@ -10,6 +11,7 @@ import {
   confluentCloudSchemaRegistryAuthMiddleware,
 } from "@src/confluent/middleware.js";
 import { paths } from "@src/confluent/openapi-schema.js";
+import env from "@src/env.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
 import createClient, { Client } from "openapi-fetch";
 
@@ -51,15 +53,27 @@ export interface ConfluentCloudRestClientManager {
   setConfluentCloudKafkaRestEndpoint(endpoint: string): void;
 }
 
+/**
+ * Interface for managing Schema Registry client connections.
+ */
+export interface SchemaRegistryClientHandler {
+  getSchemaRegistryClient(): SchemaRegistryClient;
+}
+
 export interface ClientManager
   extends KafkaClientManager,
-    ConfluentCloudRestClientManager {}
+    ConfluentCloudRestClientManager,
+    SchemaRegistryClientHandler {
+  getSchemaRegistryClient(): SchemaRegistryClient;
+}
 
 /**
  * Default implementation of client management for Kafka and Confluent Cloud services.
  * Manages lifecycle and lazy initialization of various client connections.
  */
-export class DefaultClientManager implements ClientManager {
+export class DefaultClientManager
+  implements ClientManager, SchemaRegistryClientHandler
+{
   private confluentCloudBaseUrl: string;
   private confluentCloudFlinkBaseUrl: string;
   private confluentCloudSchemaRegistryBaseUrl: string;
@@ -79,6 +93,8 @@ export class DefaultClientManager implements ClientManager {
   private readonly confluentCloudKafkaRestClient: Lazy<
     Client<paths, `${string}/${string}`>
   >;
+  private readonly schemaRegistryClient: Lazy<SchemaRegistryClient>;
+
   /**
    * Creates a new DefaultClientManager instance.
    * @param config - Configuration options for KafkaJS client
@@ -165,6 +181,32 @@ export class DefaultClientManager implements ClientManager {
       client.use(confluentCloudKafkaAuthMiddleware);
       return client;
     });
+
+    this.schemaRegistryClient = new Lazy(() => {
+      const requiredEnvVars = {
+        SCHEMA_REGISTRY_ENDPOINT: env.SCHEMA_REGISTRY_ENDPOINT,
+        SCHEMA_REGISTRY_API_KEY: env.SCHEMA_REGISTRY_API_KEY,
+        SCHEMA_REGISTRY_API_SECRET: env.SCHEMA_REGISTRY_API_SECRET,
+      };
+
+      const missingVars = Object.entries(requiredEnvVars)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        .filter(([key, value]) => !value)
+        .map(([key]) => key);
+
+      if (missingVars.length > 0) {
+        throw new Error(
+          `Missing required environment variables for Schema Registry client: ${missingVars.join(", ")}`,
+        );
+      }
+      return new SchemaRegistryClient({
+        baseURLs: [String(env.SCHEMA_REGISTRY_ENDPOINT)],
+        basicAuthCredentials: {
+          credentialsSource: "USER_INFO",
+          userInfo: `${String(env.SCHEMA_REGISTRY_API_KEY)}:${String(env.SCHEMA_REGISTRY_API_SECRET)}`,
+        },
+      });
+    });
   }
 
   /** @inheritdoc */
@@ -246,5 +288,10 @@ export class DefaultClientManager implements ClientManager {
     await this.adminClient.close();
     await this.producer.close();
     this.kafkaClient.close();
+  }
+
+  /** @inheritdoc */
+  getSchemaRegistryClient(): SchemaRegistryClient {
+    return this.schemaRegistryClient.get();
   }
 }

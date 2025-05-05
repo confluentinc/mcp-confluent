@@ -217,7 +217,7 @@ export class DefaultClientManager
     return this.kafkaClient.get().consumer({
       kafkaJS: {
         fromBeginning: true,
-        groupId,
+        groupId: `${groupId}`,
         allowAutoTopicCreation: false,
         autoCommit: false,
       },

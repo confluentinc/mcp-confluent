@@ -1,14 +1,12 @@
 import { RecordMetadata } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import {
-  AvroSerializer,
-  JsonSerializer,
-  ProtobufSerializer,
-  SchemaRegistryClient,
-  SerdeType,
-  Serializer,
-  SerializerConfig,
-} from "@confluentinc/schemaregistry";
+import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
 import { ClientManager } from "@src/confluent/client-manager.js";
+import {
+  checkSchemaNeeded,
+  MessageOptions,
+  SchemaCheckResult,
+  serializeMessage,
+} from "@src/confluent/schema-registry-helper.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -49,7 +47,6 @@ const messageOptions = z.object({
   normalize: z.boolean().optional(),
 });
 
-type MessageOptions = z.infer<typeof messageOptions>;
 const valueOptions = z.object({}).extend(messageOptions.shape);
 const keyOptions = z.object({}).extend(messageOptions.shape);
 
@@ -65,16 +62,6 @@ type ProduceKafkaMessageArguments = z.infer<
   typeof produceKafkaMessageArguments
 >;
 
-type SchemaCheckResult =
-  | {
-      type: "schema-needed";
-      latestSchema: string;
-      subject: string;
-      schemaType: string;
-    }
-  | { type: "no-schema"; subject: string }
-  | null;
-
 /**
  * Handler for producing messages to a Kafka topic, with support for Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value.
  *
@@ -86,194 +73,6 @@ type SchemaCheckResult =
  * - Produces the message to the specified Kafka topic, handling both key and value serialization as needed.
  */
 export class ProduceKafkaMessageHandler extends BaseToolHandler {
-  /**
-   * Returns the appropriate serializer instance for the given schema type, registry, and serde type.
-   * @param schemaType The type of schema (AVRO, JSON, PROTOBUF).
-   * @param registry The schema registry client instance.
-   * @param serdeType Whether this is for key or value serialization.
-   * @param schemaId (Optional) The schema ID to use for serialization. If not provided, uses the latest version.
-   * @returns The appropriate Serializer instance.
-   * @throws If the schema type is unknown.
-   */
-  getSerializer(
-    schemaType: MessageOptions["schemaType"],
-    registry: SchemaRegistryClient,
-    serdeType: SerdeType,
-    schemaId?: number,
-  ): Serializer {
-    const serializerConfig: SerializerConfig =
-      typeof schemaId === "number"
-        ? { useSchemaId: schemaId }
-        : { useLatestVersion: true };
-    const serializers = {
-      AVRO: () => new AvroSerializer(registry, serdeType, serializerConfig),
-      JSON: () => new JsonSerializer(registry, serdeType, serializerConfig),
-      PROTOBUF: () =>
-        new ProtobufSerializer(registry, serdeType, serializerConfig),
-    };
-
-    if (!schemaType || !(schemaType in serializers)) {
-      throw new Error(`Unknown schemaType: ${schemaType}`);
-    }
-
-    return serializers[schemaType]();
-  }
-
-  /**
-   * Fetches the latest schema string and schema type for a given subject from the schema registry, or null if not found.
-   * @param registry The schema registry client instance.
-   * @param subject The subject to look up in the registry.
-   * @returns An object with the latest schema string and schema type, or null if not found.
-   * @throws If an error occurs other than not found.
-   */
-  async getLatestSchemaIfExists(
-    registry: SchemaRegistryClient,
-    subject: string,
-  ): Promise<{ schema: string; schemaType: string } | null> {
-    try {
-      const latest = await registry.getLatestSchemaMetadata(subject);
-      // the docs say that when no schemaType is supplied, its assumed to be AVRO
-      // See: https://docs.confluent.io/platform/current/schema-registry/develop/api.html#get--subjects-(string-%20subject)-versions-(versionId-%20version)
-      const schemaType = latest.schemaType || "AVRO";
-      console.error(
-        `Latest schema for subject '${subject}': ${latest.schema}, schemaType: ${schemaType}`,
-      );
-      return { schema: latest.schema!, schemaType };
-    } catch (err: unknown) {
-      if (
-        err &&
-        typeof err === "object" &&
-        "status" in err &&
-        (err as { status?: number }).status === 404
-      ) {
-        return null;
-      }
-      throw err;
-    }
-  }
-
-  /**
-   * Serializes a message using the provided options and schema registry configuration.
-   * Registers the schema if provided, and validates the message type.
-   * @param topicName The Kafka topic name.
-   * @param options The message options including schema, type, and payload.
-   * @param serdeType Whether this is for key or value serialization.
-   * @param registry The schema registry client instance (if used).
-   * @returns The serialized message as a Buffer or string.
-   * @throws If serialization or registration fails, or if the message type is invalid.
-   */
-  async serializeMessage(
-    topicName: string,
-    options: MessageOptions,
-    serdeType: SerdeType,
-    registry: SchemaRegistryClient | undefined,
-  ): Promise<Buffer | string> {
-    if (!options.useSchemaRegistry) {
-      // Warn if topic is known to require schema (not implemented: topic config check)
-      // For now, just warn in the response
-      if (typeof options.message !== "string") {
-        console.warn(
-          "Warning: Sending non-string message without schema registry. This may fail if the topic expects a schema.",
-        );
-      }
-      return typeof options.message === "string"
-        ? options.message
-        : JSON.stringify(options.message);
-    }
-    if (!options.schemaType) {
-      throw new Error("schemaType is required when useSchemaRegistry is true");
-    }
-    if (!registry) {
-      throw new Error("Schema Registry client is required for serialization");
-    }
-    // Default subject naming
-    const subject =
-      options.subject ||
-      `${topicName}-${serdeType === SerdeType.KEY ? "key" : "value"}`;
-
-    let schemaId: number | undefined;
-    // Register schema if provided
-    if (options.schema) {
-      console.error(
-        `Registering schema '${options.schema}' for subject '${subject}'`,
-      );
-      try {
-        schemaId = await registry.register(
-          subject,
-          {
-            schema: options.schema,
-            schemaType: options.schemaType,
-          },
-          options.normalize,
-        );
-        console.error(`Schema registered with ID ${schemaId}`);
-      } catch (err) {
-        throw new Error(
-          `Failed to register schema for subject '${subject}': ${err}`,
-        );
-      }
-    }
-    // Validate message type
-    if (typeof options.message !== "object" || options.message === null) {
-      throw new Error(
-        "When using schema registry, message must be an object matching the schema.",
-      );
-    }
-    let serializer: Serializer;
-    try {
-      serializer = this.getSerializer(
-        options.schemaType,
-        registry,
-        serdeType,
-        schemaId,
-      );
-    } catch (err) {
-      throw new Error(`Failed to get serializer: ${err}`);
-    }
-    try {
-      return await serializer.serialize(topicName, options.message);
-    } catch (err) {
-      throw new Error(
-        `Failed to serialize message for subject '${subject}': ${err}`,
-      );
-    }
-  }
-
-  /**
-   * Checks if a schema is needed for the given message options and returns a result describing the schema state.
-   * @param topicName The Kafka topic name.
-   * @param options The message options including schema, type, and payload.
-   * @param serdeType Whether this is for key or value serialization.
-   * @param registry The schema registry client instance (if used).
-   * @returns An object describing the schema state, or null if no schema action is needed.
-   */
-  async checkSchemaNeeded(
-    topicName: string,
-    options: MessageOptions,
-    serdeType: SerdeType,
-    registry: SchemaRegistryClient | undefined,
-  ): Promise<SchemaCheckResult> {
-    if (options.useSchemaRegistry && !options.schema) {
-      const subject =
-        options.subject ||
-        `${topicName}-${serdeType === SerdeType.KEY ? "key" : "value"}`;
-      const latest = registry
-        ? await this.getLatestSchemaIfExists(registry, subject)
-        : null;
-      if (latest) {
-        return {
-          type: "schema-needed",
-          latestSchema: latest.schema,
-          subject,
-          schemaType: latest.schemaType,
-        };
-      } else {
-        return { type: "no-schema", subject };
-      }
-    }
-    return null;
-  }
-
   /**
    * Handles the result of a schema check, returning a CallToolResult if a schema issue is found, or null otherwise.
    * @param result The schema check result to handle.
@@ -322,9 +121,9 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       : undefined;
 
     // Check for latest schema if needed (value)
-    const valueSchemaCheck = await this.checkSchemaNeeded(
+    const valueSchemaCheck = await checkSchemaNeeded(
       topicName,
-      value,
+      value as MessageOptions,
       SerdeType.VALUE,
       registry,
     );
@@ -333,9 +132,9 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
 
     // Check for latest schema if needed (key)
     if (key) {
-      const keySchemaCheck = await this.checkSchemaNeeded(
+      const keySchemaCheck = await checkSchemaNeeded(
         topicName,
-        key,
+        key as MessageOptions,
         SerdeType.KEY,
         registry,
       );
@@ -346,16 +145,16 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     let valueToSend: Buffer | string;
     let keyToSend: Buffer | string | undefined;
     try {
-      valueToSend = await this.serializeMessage(
+      valueToSend = await serializeMessage(
         topicName,
-        value,
+        value as MessageOptions,
         SerdeType.VALUE,
         registry,
       );
       if (key) {
-        keyToSend = await this.serializeMessage(
+        keyToSend = await serializeMessage(
           topicName,
-          key,
+          key as MessageOptions,
           SerdeType.KEY,
           registry,
         );

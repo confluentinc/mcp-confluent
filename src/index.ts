@@ -32,13 +32,64 @@ async function main() {
       },
     };
 
-    const clientManager = new DefaultClientManager(
-      kafkaClientConfig,
-      env.CONFLUENT_CLOUD_REST_ENDPOINT,
-      env.FLINK_REST_ENDPOINT,
-      env.SCHEMA_REGISTRY_ENDPOINT,
-      env.KAFKA_REST_ENDPOINT,
-    );
+    const requiredEnvVars = {
+      CONFLUENT_CLOUD_REST_ENDPOINT: env.CONFLUENT_CLOUD_REST_ENDPOINT,
+      CONFLUENT_CLOUD_API_KEY: env.CONFLUENT_CLOUD_API_KEY,
+      CONFLUENT_CLOUD_API_SECRET: env.CONFLUENT_CLOUD_API_SECRET,
+      FLINK_REST_ENDPOINT: env.FLINK_REST_ENDPOINT,
+      FLINK_API_KEY: env.FLINK_API_KEY,
+      FLINK_API_SECRET: env.FLINK_API_SECRET,
+      SCHEMA_REGISTRY_ENDPOINT: env.SCHEMA_REGISTRY_ENDPOINT,
+      SCHEMA_REGISTRY_API_KEY: env.SCHEMA_REGISTRY_API_KEY,
+      SCHEMA_REGISTRY_API_SECRET: env.SCHEMA_REGISTRY_API_SECRET,
+      KAFKA_REST_ENDPOINT: env.KAFKA_REST_ENDPOINT,
+      KAFKA_API_KEY: env.KAFKA_API_KEY,
+      KAFKA_API_SECRET: env.KAFKA_API_SECRET,
+    };
+
+    const missingVars = Object.entries(requiredEnvVars)
+      .filter(([, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingVars.length > 0) {
+      throw new Error(
+        `Missing required environment variables: ${missingVars.join(", ")}`,
+      );
+    }
+
+    // After the check, we know all values are defined
+    const envVars = requiredEnvVars as Record<
+      keyof typeof requiredEnvVars,
+      string
+    >;
+
+    const clientManager = new DefaultClientManager({
+      kafka: kafkaClientConfig,
+      endpoints: {
+        cloud: envVars.CONFLUENT_CLOUD_REST_ENDPOINT,
+        flink: envVars.FLINK_REST_ENDPOINT,
+        schemaRegistry: envVars.SCHEMA_REGISTRY_ENDPOINT,
+        kafka: envVars.KAFKA_REST_ENDPOINT,
+      },
+      auth: {
+        cloud: {
+          apiKey: envVars.CONFLUENT_CLOUD_API_KEY,
+          apiSecret: envVars.CONFLUENT_CLOUD_API_SECRET,
+        },
+        flink: {
+          apiKey: envVars.FLINK_API_KEY,
+          apiSecret: envVars.FLINK_API_SECRET,
+        },
+        schemaRegistry: {
+          apiKey: envVars.SCHEMA_REGISTRY_API_KEY,
+          apiSecret: envVars.SCHEMA_REGISTRY_API_SECRET,
+        },
+        kafka: {
+          apiKey: envVars.KAFKA_API_KEY,
+          apiSecret: envVars.KAFKA_API_SECRET,
+        },
+      },
+    });
 
     const toolHandlers = new Map<ToolName, ToolHandler>();
     // TODO: Should we have the enabled tools come from configuration?

@@ -6,6 +6,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
+import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -93,7 +94,7 @@ export class ListClustersHandler extends BaseToolHandler {
       });
 
       if (error) {
-        console.error("API Error:", error);
+        logger.error({ error }, "API Error");
         return this.createResponse(
           `Failed to fetch clusters: ${JSON.stringify(error)}`,
           true,
@@ -143,7 +144,7 @@ export class ListClustersHandler extends BaseToolHandler {
             },
           };
         } catch (validationError) {
-          console.error("Cluster validation error:", validationError);
+          logger.error({ error: validationError }, "Cluster validation error");
           throw new Error(
             `Invalid cluster data: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
           );
@@ -178,7 +179,7 @@ Cluster: ${cluster.name}
         { clusters, total: response.metadata?.total_size },
       );
     } catch (error) {
-      console.error("Error in ListClustersHandler:", error);
+      logger.error({ error }, "Error in ListClustersHandler");
       return this.createResponse(
         `Failed to fetch clusters: ${error instanceof Error ? error.message : String(error)}`,
         true,

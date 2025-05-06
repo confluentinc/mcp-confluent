@@ -18,6 +18,7 @@ import {
   Serializer,
   SerializerConfig,
 } from "@confluentinc/schemaregistry";
+import { logger } from "@src/logger.js";
 
 /**
  * Supported schema types for Confluent Schema Registry.
@@ -230,7 +231,7 @@ export async function serializeMessage(
 ): Promise<Buffer | string> {
   if (!options.useSchemaRegistry) {
     if (typeof options.message !== "string") {
-      console.warn(
+      logger.warn(
         "Warning: Sending non-string message without schema registry. This may fail if the topic expects a schema.",
       );
     }

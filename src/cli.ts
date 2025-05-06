@@ -1,11 +1,14 @@
 import { Command } from "@commander-js/extra-typings";
+import { logger } from "@src/logger.js";
 import * as dotenv from "dotenv";
 import fs from "fs";
+import os from "os";
 import path from "path";
 
 // Define the interface for our CLI options
 export interface CLIOptions {
   envFile?: string;
+  logDir?: string;
 }
 
 /**
@@ -20,6 +23,7 @@ export function parseCliArgs(): CLIOptions {
     )
     .version(process.env.npm_package_version ?? "dev")
     .option("-e, --env-file <path>", "Load environment variables from file")
+    .option("-l, --log-dir <path>", "Directory for log files")
     .action((options) => {
       if (options.envFile) {
         loadEnvironmentVariables(options);
@@ -39,6 +43,16 @@ export function parseCliArgs(): CLIOptions {
 }
 
 /**
+ * Get the log directory path, using CLI option if provided, otherwise default to user's home directory
+ * Note: This function expects CLI options to be already parsed via parseCliArgs() in index.ts
+ * @param cliOptions - The parsed CLI options from parseCliArgs()
+ * @returns Path to the log directory
+ */
+export function getLogDir(cliOptions: CLIOptions): string {
+  return cliOptions.logDir || path.join(os.homedir(), "mcp-confluent", "logs");
+}
+
+/**
  * Load environment variables from file if specified in options
  * @param options CLI options containing envFile path
  */
@@ -48,7 +62,7 @@ export function loadEnvironmentVariables(options: CLIOptions): void {
 
     // Check if file exists
     if (!fs.existsSync(envPath)) {
-      console.error(`Environment file not found: ${envPath}`);
+      logger.error(`Environment file not found: ${envPath}`);
       return;
     }
 
@@ -56,12 +70,13 @@ export function loadEnvironmentVariables(options: CLIOptions): void {
     const result = dotenv.config({ path: envPath });
 
     if (result.error) {
-      console.error(
-        `Error loading environment variables: ${result.error.message}`,
+      logger.error(
+        { error: result.error },
+        "Error loading environment variables",
       );
       return;
     }
 
-    console.error(`Loaded environment variables from ${envPath}`);
+    logger.info(`Loaded environment variables from ${envPath}`);
   }
 }

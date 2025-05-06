@@ -1,3 +1,4 @@
+import { logger } from "@src/logger.js";
 import { Middleware } from "openapi-fetch";
 
 export interface ConfluentEndpoints {
@@ -17,7 +18,7 @@ export interface ConfluentAuth {
  */
 export const createAuthMiddleware = (auth: ConfluentAuth): Middleware => ({
   async onRequest({ request }) {
-    console.error(`${JSON.stringify(request)}`);
+    logger.debug({ request }, "Processing request");
     request.headers.set(
       "Authorization",
       `Basic ${Buffer.from(`${auth.apiKey}:${auth.apiSecret}`).toString("base64")}`,

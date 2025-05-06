@@ -1,4 +1,5 @@
 import { combinedSchema } from "@src/env-schema.js";
+import { logger } from "@src/logger.js";
 import { z } from "zod";
 
 export type Environment = z.infer<typeof combinedSchema>;
@@ -16,7 +17,7 @@ export async function loadEnv(): Promise<Environment> {
     const envVars = combinedSchema.parse(process.env);
     return envVars;
   } catch (error) {
-    console.error("Environment validation error:", error);
+    logger.error({ error }, "Environment validation error");
     process.exit(1);
   }
 }

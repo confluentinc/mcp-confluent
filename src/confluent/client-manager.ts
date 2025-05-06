@@ -11,6 +11,7 @@ import {
 } from "@src/confluent/middleware.js";
 import { paths } from "@src/confluent/openapi-schema.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
+import { logger } from "@src/logger.js";
 import createClient, { Client } from "openapi-fetch";
 
 /**
@@ -117,7 +118,7 @@ export class DefaultClientManager
     this.kafkaClient = new Lazy(() => new KafkaJS.Kafka(config.kafka));
     this.adminClient = new AsyncLazy(
       async () => {
-        console.error("Connecting Kafka Admin");
+        logger.info("Connecting Kafka Admin");
         const admin = this.kafkaClient.get().admin();
         await admin.connect();
         return admin;
@@ -126,7 +127,7 @@ export class DefaultClientManager
     );
     this.producer = new AsyncLazy(
       async () => {
-        console.error("Connecting Kafka Producer");
+        logger.info("Connecting Kafka Producer");
         const producer = this.kafkaClient.get().producer({
           "compression.type": "gzip",
           "linger.ms": 5,
@@ -138,7 +139,7 @@ export class DefaultClientManager
     );
 
     this.confluentCloudRestClient = new Lazy(() => {
-      console.error(
+      logger.info(
         `Initializing Confluent Cloud REST client for base URL ${this.confluentCloudBaseUrl}`,
       );
       const client = createClient<paths>({
@@ -149,7 +150,7 @@ export class DefaultClientManager
     });
 
     this.confluentCloudFlinkRestClient = new Lazy(() => {
-      console.error(
+      logger.info(
         `Initializing Confluent Cloud Flink REST client for base URL ${this.confluentCloudFlinkBaseUrl}`,
       );
       const client = createClient<paths>({
@@ -160,7 +161,7 @@ export class DefaultClientManager
     });
 
     this.confluentCloudSchemaRegistryRestClient = new Lazy(() => {
-      console.error(
+      logger.info(
         `Initializing Confluent Cloud Schema Registry REST client for base URL ${this.confluentCloudSchemaRegistryBaseUrl}`,
       );
       const client = createClient<paths>({
@@ -171,7 +172,7 @@ export class DefaultClientManager
     });
 
     this.confluentCloudKafkaRestClient = new Lazy(() => {
-      console.error(
+      logger.info(
         `Initializing Confluent Cloud Kafka REST client for base URL ${this.confluentCloudKafkaRestBaseUrl}`,
       );
       const client = createClient<paths>({
@@ -197,7 +198,7 @@ export class DefaultClientManager
   async getConsumer(sessionId?: string): Promise<KafkaJS.Consumer> {
     const baseGroupId = "mcp-confluent"; // should be configurable?
     const groupId = sessionId ? `${baseGroupId}-${sessionId}` : baseGroupId;
-    console.error(`Creating new Kafka Consumer with groupId: ${groupId}`);
+    logger.info(`Creating new Kafka Consumer with groupId: ${groupId}`);
     return this.kafkaClient.get().consumer({
       kafkaJS: {
         fromBeginning: true,

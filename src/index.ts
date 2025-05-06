@@ -9,7 +9,7 @@ import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { initEnv } from "@src/env.js";
-import { logger } from "@src/logger.js";
+import { kafkaLogger, logger } from "@src/logger.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
 parseCliArgs();
@@ -29,7 +29,7 @@ async function main() {
           username: env.KAFKA_API_KEY,
           password: env.KAFKA_API_SECRET,
         },
-        logLevel: KafkaJS.logLevel.ERROR,
+        logger: kafkaLogger,
       },
     };
 

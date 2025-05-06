@@ -6,6 +6,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
+import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 import { Environment, environmentSchema } from "./list-environments-handler.js";
@@ -51,7 +52,7 @@ export class ReadEnvironmentHandler extends BaseToolHandler {
       });
 
       if (error) {
-        console.error("API Error:", error);
+        logger.error({ error }, "API Error");
         return this.createResponse(
           `Failed to fetch environment: ${JSON.stringify(error)}`,
           true,
@@ -96,7 +97,10 @@ Environment: ${environmentDetails.name}
           { environment: environmentDetails },
         );
       } catch (validationError) {
-        console.error("Environment validation error:", validationError);
+        logger.error(
+          { error: validationError },
+          "Environment validation error",
+        );
         return this.createResponse(
           `Invalid environment data: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
           true,
@@ -104,7 +108,7 @@ Environment: ${environmentDetails.name}
         );
       }
     } catch (error) {
-      console.error("Error in ReadEnvironmentHandler:", error);
+      logger.error({ error }, "Error in ReadEnvironmentHandler");
       return this.createResponse(
         `Failed to fetch environment: ${error instanceof Error ? error.message : String(error)}`,
         true,

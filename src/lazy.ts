@@ -3,6 +3,9 @@
  * It defers the initialization of a value until it's first requested.
  * @template T The type of value to be lazily loaded
  */
+
+import { logger } from "@src/logger.js";
+
 export class Lazy<T> {
   /** The cached instance of the lazily loaded value */
   private instance: T | undefined;
@@ -31,7 +34,7 @@ export class Lazy<T> {
   get(): T {
     try {
       this.instance = this.supplier();
-      console.error(
+      logger.debug(
         `Lazy instance created with type ${this.instance?.constructor.name || typeof this.instance}`,
       );
     } catch (error) {
@@ -48,11 +51,11 @@ export class Lazy<T> {
   close(): void {
     if (this.instance) {
       if (this.closeHandler) {
-        console.error(
+        logger.debug(
           `Initiating close handler for lazy instance of type ${typeof this.instance}`,
         );
         this.closeHandler(this.instance);
-        console.error(`Lazy instance closed with type ${typeof this.instance}`);
+        logger.debug(`Lazy instance closed with type ${typeof this.instance}`);
       }
       this.instance = undefined;
     }
@@ -102,7 +105,7 @@ export class AsyncLazy<T> {
       }
       this.instance = await this.initializationPromise;
     }
-    console.error(
+    logger.debug(
       `Async Lazy instance created with type ${this.instance?.constructor.name || typeof this.instance}`,
     );
     return this.instance;
@@ -116,11 +119,11 @@ export class AsyncLazy<T> {
   async close(): Promise<void> {
     if (this.instance) {
       if (this.closeHandler) {
-        console.error(
+        logger.debug(
           `Initiating close handler for lazy instance of type ${typeof this.instance}`,
         );
         await this.closeHandler(this.instance);
-        console.error(`Lazy instance closed with type ${typeof this.instance}`);
+        logger.debug(`Lazy instance closed with type ${typeof this.instance}`);
       }
     }
   }

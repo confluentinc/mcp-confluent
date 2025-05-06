@@ -1,4 +1,5 @@
 import { Command } from "@commander-js/extra-typings";
+import { logger } from "@src/logger.js";
 import * as dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
@@ -48,7 +49,7 @@ export function loadEnvironmentVariables(options: CLIOptions): void {
 
     // Check if file exists
     if (!fs.existsSync(envPath)) {
-      console.error(`Environment file not found: ${envPath}`);
+      logger.error(`Environment file not found: ${envPath}`);
       return;
     }
 
@@ -56,12 +57,13 @@ export function loadEnvironmentVariables(options: CLIOptions): void {
     const result = dotenv.config({ path: envPath });
 
     if (result.error) {
-      console.error(
-        `Error loading environment variables: ${result.error.message}`,
+      logger.error(
+        { error: result.error },
+        "Error loading environment variables",
       );
       return;
     }
 
-    console.error(`Loaded environment variables from ${envPath}`);
+    logger.info(`Loaded environment variables from ${envPath}`);
   }
 }

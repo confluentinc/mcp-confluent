@@ -6,6 +6,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import env from "@src/env.js";
+import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -90,7 +91,7 @@ export class ListEnvironmentsHandler extends BaseToolHandler {
       });
 
       if (error) {
-        console.error("API Error:", error);
+        logger.error({ error }, "API Error");
         return this.createResponse(
           `Failed to fetch environments: ${JSON.stringify(error)}`,
           true,
@@ -149,7 +150,10 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
           },
         );
       } catch (validationError) {
-        console.error("Environment list validation error:", validationError);
+        logger.error(
+          { error: validationError },
+          "Environment list validation error",
+        );
         return this.createResponse(
           `Invalid environment list data: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
           true,
@@ -157,7 +161,7 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
         );
       }
     } catch (error) {
-      console.error("Error in ListEnvironmentsHandler:", error);
+      logger.error({ error }, "Error in ListEnvironmentsHandler");
       return this.createResponse(
         `Failed to fetch environments: ${error instanceof Error ? error.message : String(error)}`,
         true,

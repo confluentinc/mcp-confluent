@@ -9,12 +9,10 @@ import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { initEnv } from "@src/env.js";
-import { initLogger, logger } from "@src/logger.js";
+import { logger } from "@src/logger.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
-const cliOptions = parseCliArgs();
-
-initLogger(cliOptions);
+parseCliArgs();
 
 async function main() {
   try {

@@ -62,7 +62,6 @@
     "dotenv": "^16.5.0",
     "openapi-fetch": "^0.13.7",
     "pino": "^9.6.0",
-    "pino-roll": "^3.1.0",
     "zod": "^3.24.4"
   },
   "files": [

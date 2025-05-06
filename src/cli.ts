@@ -2,13 +2,11 @@ import { Command } from "@commander-js/extra-typings";
 import { logger } from "@src/logger.js";
 import * as dotenv from "dotenv";
 import fs from "fs";
-import os from "os";
 import path from "path";
 
 // Define the interface for our CLI options
 export interface CLIOptions {
   envFile?: string;
-  logDir?: string;
 }
 
 /**
@@ -23,7 +21,6 @@ export function parseCliArgs(): CLIOptions {
     )
     .version(process.env.npm_package_version ?? "dev")
     .option("-e, --env-file <path>", "Load environment variables from file")
-    .option("-l, --log-dir <path>", "Directory for log files")
     .action((options) => {
       if (options.envFile) {
         loadEnvironmentVariables(options);
@@ -40,16 +37,6 @@ export function parseCliArgs(): CLIOptions {
     // as these will throw an error due to exitOverride()
     process.exit(0);
   }
-}
-
-/**
- * Get the log directory path, using CLI option if provided, otherwise default to user's home directory
- * Note: This function expects CLI options to be already parsed via parseCliArgs() in index.ts
- * @param cliOptions - The parsed CLI options from parseCliArgs()
- * @returns Path to the log directory
- */
-export function getLogDir(cliOptions: CLIOptions): string {
-  return cliOptions.logDir || path.join(os.homedir(), "mcp-confluent", "logs");
 }
 
 /**

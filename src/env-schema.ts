@@ -145,6 +145,19 @@ const configSchema = z
       )
       .trim()
       .url(),
+    // HTTP transport configuration
+    HTTP_PORT: z
+      .number()
+      .int()
+      .positive()
+      .describe("Port to use for HTTP transport")
+      .optional()
+      .default(3000),
+    HTTP_HOST: z
+      .string()
+      .describe("Host to bind for HTTP transport")
+      .optional()
+      .default("localhost"),
   })
   .partial(); // Makes all fields optional
 

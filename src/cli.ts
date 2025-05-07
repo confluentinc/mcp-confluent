@@ -1,5 +1,6 @@
-import { Command } from "@commander-js/extra-typings";
+import { Command, Option } from "@commander-js/extra-typings";
 import { logger } from "@src/logger.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 import * as dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
@@ -7,6 +8,7 @@ import path from "path";
 // Define the interface for our CLI options
 export interface CLIOptions {
   envFile?: string;
+  transport: TransportType;
 }
 
 /**
@@ -21,6 +23,11 @@ export function parseCliArgs(): CLIOptions {
     )
     .version(process.env.npm_package_version ?? "dev")
     .option("-e, --env-file <path>", "Load environment variables from file")
+    .addOption(
+      new Option("-t, --transport <type>", "Transport type (stdio or http)")
+        .choices(Object.values(TransportType))
+        .default(TransportType.STDIO),
+    )
     .action((options) => {
       if (options.envFile) {
         loadEnvironmentVariables(options);
@@ -30,8 +37,11 @@ export function parseCliArgs(): CLIOptions {
     .exitOverride();
 
   try {
-    // Parse arguments and get options (no need for generic type parameter with extra-typings)
-    return program.parse().opts();
+    const opts = program.parse().opts();
+    return {
+      ...opts,
+      transport: opts.transport as TransportType,
+    };
   } catch {
     // This block is reached when --help or --version is called
     // as these will throw an error due to exitOverride()

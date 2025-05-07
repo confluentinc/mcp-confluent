@@ -27,6 +27,7 @@
     "dev": "concurrently \"tsc --watch\" \"tsc-alias --watch\"",
     "test:ts": "tsc --noEmit",
     "start": "node dist/index.js --env-file .env",
+    "start:http": "node dist/index.js --env-file .env --transport http",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.+(js|ts|json)\"",
     "build": "tsc && tsc-alias",
@@ -60,6 +61,7 @@
     "@modelcontextprotocol/sdk": "^1.11.0",
     "commander": "^13.1.0",
     "dotenv": "^16.5.0",
+    "fastify": "^5.3.2",
     "openapi-fetch": "^0.13.7",
     "pino": "^9.6.0",
     "zod": "^3.24.4"

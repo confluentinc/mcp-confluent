@@ -2,7 +2,6 @@
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { parseCliArgs } from "@src/cli.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
@@ -10,9 +9,10 @@ import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { initEnv } from "@src/env.js";
 import { kafkaLogger, logger } from "@src/logger.js";
+import { TransportFactory } from "@src/mcp/transports/factory.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
-parseCliArgs();
+const cliOptions = parseCliArgs();
 
 async function main() {
   try {
@@ -112,16 +112,29 @@ async function main() {
         name as string,
         config.description,
         config.inputSchema,
-        async (args) => {
-          return await handler.handle(clientManager, args);
+        async (args, context) => {
+          // Pass the session ID from the transport to the tool handler
+          const sessionId = context?.sessionId;
+          return await handler.handle(clientManager, args, sessionId);
         },
       );
     });
+
+    // Create transport based on CLI options
+    const transport = TransportFactory.createTransport(
+      cliOptions.transport,
+      server,
+      {
+        port: env.HTTP_PORT ? Number(env.HTTP_PORT) : undefined,
+        host: env.HTTP_HOST,
+      },
+    );
 
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
       await clientManager.disconnect();
+      await transport.disconnect();
       await server.close();
       process.exit(0);
     };
@@ -131,9 +144,8 @@ async function main() {
     process.on("SIGQUIT", performCleanup);
     process.on("SIGUSR2", performCleanup);
 
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    logger.info("Confluent MCP Server running on stdio");
+    // Connect the transport
+    await transport.connect();
   } catch (error) {
     logger.error({ error }, "Error starting server");
     process.exit(1);

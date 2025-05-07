@@ -2,10 +2,12 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ZodRawShape } from "zod";
+
 export interface ToolHandler {
   handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
+    sessionId?: string,
   ): Promise<CallToolResult> | CallToolResult;
 
   getToolConfig(): ToolConfig;
@@ -21,6 +23,7 @@ export abstract class BaseToolHandler implements ToolHandler {
   abstract handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
+    sessionId?: string,
   ): Promise<CallToolResult> | CallToolResult;
 
   abstract getToolConfig(): ToolConfig;

@@ -18493,6 +18493,20 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "400",
+         *           "code": "invalid_filter",
+         *           "title": "Invalid Filter",
+         *           "detail": "The 'delorean' resource can't be filtered by 'num_doors'",
+         *           "source": {
+         *             "parameter": "num_doors"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18509,6 +18523,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "401",
+         *           "code": "user_unauthenticated",
+         *           "title": "Authentication Required",
+         *           "detail": "Valid authentication credentials must be provided"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18520,6 +18545,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "402",
+         *           "code": "quota_exceeded",
+         *           "title": "Kafka Clusters Per Org Quota Exceeded",
+         *           "detail": "The request would exceed the quota: kafka_clusters_per_environment"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18531,6 +18567,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "403",
+         *           "code": "user_unauthorized",
+         *           "title": "User Access Unauthorized",
+         *           "detail": "The user 'mcfly' is not allowed to access the 'delorean' resource without the 'plutonium' role."
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18544,6 +18591,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "409",
+         *           "code": "resource_already_exists",
+         *           "title": "Resource Already exists",
+         *           "detail": "The entitlement '91e3e86f-fca6-4f14-98f5-a48e64113ce2' already exists."
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18555,6 +18613,15 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "404",
+         *           "title": "Not Found"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18566,6 +18633,320 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18596,6 +18977,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "500",
+         *           "code": "out_of_gas",
+         *           "title": "DeLorean Out Of Gas",
+         *           "detail": "The DeLorean has run out of gas, but Doc Brown will fill 'er up for you asap"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18605,6 +18997,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 401,
+         *         "message": "Unauthorized"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18614,6 +19012,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 403,
+         *         "message": "Forbidden"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18623,6 +19027,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 404,
+         *         "message": "account not found"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18632,6 +19042,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 404,
+         *         "message": "resource not found"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18641,6 +19057,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 500,
+         *         "message": "Oops, something went wrong"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18650,6 +19072,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 400,
+         *         "message": "Bad Request"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18659,6 +19087,9 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": null
+         *     } */
         "application/json": {
           error?: Record<string, unknown> | null;
         };
@@ -18670,6 +19101,27 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopic",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-X",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-X"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-X",
+         *       "is_internal": false,
+         *       "replication_factor": 3,
+         *       "partitions_count": 1,
+         *       "partitions": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-X/partitions"
+         *       },
+         *       "configs": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-X/configs"
+         *       },
+         *       "partition_reassignments": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-X/partitions/-/reassignments"
+         *       }
+         *     } */
         "application/json": components["schemas"]["TopicData"];
       };
     };
@@ -18679,6 +19131,38 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAcl",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?resource_type=TOPIC&resource_name=topic-&pattern_type=PREFIXED&principal=User%3Aalice&host=*&operation=ALL&permission=ALLOW"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "resource_type": "TOPIC",
+         *           "resource_name": "topic-",
+         *           "pattern_type": "PREFIXED",
+         *           "principal": "User:alice",
+         *           "host": "*",
+         *           "operation": "ALL",
+         *           "permission": "ALLOW"
+         *         },
+         *         {
+         *           "kind": "KafkaAcl",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?resource_type=CLUSTER&resource_name=kafka-cluster&pattern_type=LITERAL&principal=User%3Aalice&host=*&operation=DESCRIBE&permission=DENY"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "resource_type": "CLUSTER",
+         *           "resource_name": "kafka-cluster",
+         *           "pattern_type": "LITERAL",
+         *           "principal": "User:alice",
+         *           "host": "*",
+         *           "operation": "DESCRIBE",
+         *           "permission": "DENY"
+         *         }
+         *       ]
+         *     } */
         "application/json": {
           data: components["schemas"]["AclData"][];
         };
@@ -18690,6 +19174,33 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerConfig",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs/compression.type",
+         *         "resource_name": "crn:///kafka=cluster-1/broker=1/config=compression.type"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "name": "compression.type",
+         *       "value": "gzip",
+         *       "is_default": false,
+         *       "is_read_only": false,
+         *       "is_sensitive": false,
+         *       "source": "DYNAMIC_BROKER_CONFIG",
+         *       "synonyms": [
+         *         {
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "source": "DYNAMIC_BROKER_CONFIG"
+         *         },
+         *         {
+         *           "name": "compression.type",
+         *           "value": "producer",
+         *           "source": "DEFAULT_CONFIG"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerConfigData"];
       };
     };
@@ -18699,6 +19210,23 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBroker",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *         "resource_name": "crn:///kafka=cluster-1/broker=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "host": "localhost",
+         *       "port": 9291,
+         *       "configs": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs"
+         *       },
+         *       "partition_replicas": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/partition-replicas"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BrokerData"];
       };
     };
@@ -18708,6 +19236,33 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaClusterConfig",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs/compression.type",
+         *         "resource_name": "crn:///kafka=cluster-1/broker-config=compression.type"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "config_type": "BROKER",
+         *       "name": "compression.type",
+         *       "value": "gzip",
+         *       "is_default": false,
+         *       "is_read_only": false,
+         *       "is_sensitive": false,
+         *       "source": "DYNAMIC_DEFAULT_BROKER_CONFIG",
+         *       "synonyms": [
+         *         {
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "source": "DYNAMIC_DEFAULT_BROKER_CONFIG"
+         *         },
+         *         {
+         *           "name": "compression.type",
+         *           "value": "producer",
+         *           "source": "DEFAULT_CONFIG"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ClusterConfigData"];
       };
     };
@@ -18717,6 +19272,35 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaCluster",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1",
+         *         "resource_name": "crn:///kafka=cluster-1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "controller": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       },
+         *       "acls": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls"
+         *       },
+         *       "brokers": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers"
+         *       },
+         *       "broker_configs": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs"
+         *       },
+         *       "consumer_groups": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups"
+         *       },
+         *       "topics": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics"
+         *       },
+         *       "partition_reassignments": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/-/partitions/-/reassignment"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ClusterData"];
       };
     };
@@ -18726,6 +19310,24 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerAssignment",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments/topic-1/partitions/1",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1/assignment=topic=1/partition=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "consumer_id": "consumer-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "partition": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1"
+         *       },
+         *       "lag": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ConsumerAssignmentData"];
       };
     };
@@ -18735,6 +19337,27 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerGroup",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "is_simple": false,
+         *       "partition_assignor": "org.apache.kafka.clients.consumer.RoundRobinAssignor",
+         *       "state": "STABLE",
+         *       "coordinator": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       },
+         *       "consumers": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers"
+         *       },
+         *       "lag_summary": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lag-summary"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ConsumerGroupData"];
       };
     };
@@ -18744,6 +19367,28 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerGroupLagSummary",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lag-summary",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-groups=consumer-group-1/lag-summary"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "max_lag_consumer_id": "consumer-1",
+         *       "max_lag_instance_id": "consumer-instance-1",
+         *       "max_lag_client_id": "client-1",
+         *       "max_lag_topic_name": "topic-1",
+         *       "max_lag_partition_id": 1,
+         *       "max_lag": 100,
+         *       "total_lag": 110,
+         *       "max_lag_consumer": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1"
+         *       },
+         *       "max_lag_partition": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ConsumerGroupLagSummaryData"];
       };
     };
@@ -18753,6 +19398,23 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerLag",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/1",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/lag=topic-1/partition=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "consumer_id": "consumer-1",
+         *       "instance_id": "consumer-instance-1",
+         *       "client_id": "client-1",
+         *       "current_offset": 1,
+         *       "log_end_offset": 101,
+         *       "lag": 100
+         *     } */
         "application/json": components["schemas"]["ConsumerLagData"];
       };
     };
@@ -18762,6 +19424,21 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumer",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "consumer_id": "consumer-1",
+         *       "instance_id": "consumer-instance-1",
+         *       "client_id": "client-1",
+         *       "assignments": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ConsumerData"];
       };
     };
@@ -18771,6 +19448,25 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaPartition",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "leader": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/1"
+         *       },
+         *       "replicas": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *       },
+         *       "reassignment": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment"
+         *       }
+         *     } */
         "application/json": components["schemas"]["PartitionData"];
       };
     };
@@ -18780,6 +19476,26 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReassignment",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/reassignment"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "adding_replicas": [
+         *         1,
+         *         2
+         *       ],
+         *       "removing_replicas": [
+         *         3
+         *       ],
+         *       "replicas": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ReassignmentData"];
       };
     };
@@ -18789,6 +19505,22 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReplica",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/1",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/replica=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "broker_id": 1,
+         *       "is_leader": true,
+         *       "is_in_sync": true,
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ReplicaData"];
       };
     };
@@ -18798,6 +19530,33 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopicConfig",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/compression.type",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1/config=compression.type"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "name": "compression.type",
+         *       "value": "gzip",
+         *       "is_default": false,
+         *       "is_read_only": false,
+         *       "is_sensitive": false,
+         *       "source": "DYNAMIC_TOPIC_CONFIG",
+         *       "synonyms": [
+         *         {
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "source": "DYNAMIC_TOPIC_CONFIG"
+         *         },
+         *         {
+         *           "name": "compression.type",
+         *           "value": "producer",
+         *           "source": "DEFAULT_CONFIG"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["TopicConfigData"];
       };
     };
@@ -18807,6 +19566,27 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopic",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "is_internal": false,
+         *       "replication_factor": 3,
+         *       "partitions_count": 1,
+         *       "partitions": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions"
+         *       },
+         *       "configs": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs"
+         *       },
+         *       "partition_reassignments": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/-/reassignments"
+         *       }
+         *     } */
         "application/json": components["schemas"]["TopicData"];
       };
     };
@@ -18816,6 +19596,75 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReassignmentList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/-/partitions/-/reassignment",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "adding_replicas": [
+         *             1,
+         *             2
+         *           ],
+         *           "removing_replicas": [
+         *             3
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/2/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-2/partition=2/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-2",
+         *           "partition_id": 2,
+         *           "adding_replicas": [
+         *             1
+         *           ],
+         *           "removing_replicas": [
+         *             2,
+         *             3
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/2/replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/3/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-3/partition=3/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-3",
+         *           "partition_id": 3,
+         *           "adding_replicas": [
+         *             3
+         *           ],
+         *           "removing_replicas": [
+         *             1,
+         *             2
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/3/replicas"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReassignmentDataList"];
       };
     };
@@ -18825,6 +19674,69 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerConfigList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs/max.connections",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/config=max.connections"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "name": "max.connections",
+         *           "value": "1000",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_BROKER_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "max.connections",
+         *               "value": "1000",
+         *               "source": "DYNAMIC_BROKER_CONFIG"
+         *             },
+         *             {
+         *               "name": "max.connections",
+         *               "value": "2147483647",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs/compression.type",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/config=compression.type"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_BROKER_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "compression.type",
+         *               "value": "gzip",
+         *               "source": "DYNAMIC_BROKER_CONFIG"
+         *             },
+         *             {
+         *               "name": "compression.type",
+         *               "value": "producer",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerConfigDataList"];
       };
     };
@@ -18834,6 +19746,66 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBroker",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "host": "localhost",
+         *           "port": 9291,
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs"
+         *           },
+         *           "partition_replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/partition-replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBroker",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "host": "localhost",
+         *           "port": 9292,
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2/configs"
+         *           },
+         *           "partition_replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2/partition-replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBroker",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 3,
+         *           "host": "localhost",
+         *           "port": 9293,
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3/configs"
+         *           },
+         *           "partition_replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3/partition-replicas"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerDataList"];
       };
     };
@@ -18843,6 +19815,69 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaClusterConfigList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaClusterConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs/max.connections",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-config=max.connections"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "config_type": "BROKER",
+         *           "name": "max.connections",
+         *           "value": "1000",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_DEFAULT_BROKER_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "max.connections",
+         *               "value": "1000",
+         *               "source": "DYNAMIC_DEFAULT_BROKER_CONFIG"
+         *             },
+         *             {
+         *               "name": "max.connections",
+         *               "value": "2147483647",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "kind": "KafkaClusterConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs/compression.type",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-config=compression.type"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "config_type": "BROKER",
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_DEFAULT_BROKER_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "compression.type",
+         *               "value": "gzip",
+         *               "source": "DYNAMIC_DEFAULT_BROKER_CONFIG"
+         *             },
+         *             {
+         *               "name": "compression.type",
+         *               "value": "producer",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ClusterConfigDataList"];
       };
     };
@@ -18852,6 +19887,44 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaClusterList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaCluster",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1",
+         *             "resource_name": "crn:///kafka=cluster-1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "controller": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           },
+         *           "acls": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls"
+         *           },
+         *           "brokers": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers"
+         *           },
+         *           "broker_configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs"
+         *           },
+         *           "consumer_groups": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups"
+         *           },
+         *           "topics": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics"
+         *           },
+         *           "partition_reassignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/-/partitions/-/reassignment"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ClusterDataList"];
       };
     };
@@ -18861,6 +19934,69 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerAssignmentList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaConsumerAssignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments/topic-1/partitions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1/assignment=topic=1/partition=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "partition": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1"
+         *           },
+         *           "lag": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerAssignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments/topic-2/partitions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1/assignment=topic=2/partition=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-1",
+         *           "topic_name": "topic-2",
+         *           "partition_id": 2,
+         *           "partition": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/2"
+         *           },
+         *           "lag": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-2/partitions/2"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerAssignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments/topic-3/partitions/3",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1/assignment=topic=3/partition=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-1",
+         *           "topic_name": "topic-3",
+         *           "partition_id": 3,
+         *           "partition": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/3"
+         *           },
+         *           "lag": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-3/partitions/3"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ConsumerAssignmentDataList"];
       };
     };
@@ -18870,6 +20006,78 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerGroupList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaConsumerGroup",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "is_simple": false,
+         *           "partition_assignor": "org.apache.kafka.clients.consumer.RoundRobinAssignor",
+         *           "state": "STABLE",
+         *           "coordinator": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           },
+         *           "consumers": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers"
+         *           },
+         *           "lag_summary": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lag-summary"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerGroup",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-2",
+         *           "is_simple": false,
+         *           "partition_assignor": "org.apache.kafka.clients.consumer.StickyAssignor",
+         *           "state": "PREPARING_REBALANCE",
+         *           "coordinator": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           },
+         *           "consumers": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-2/consumers"
+         *           },
+         *           "lag_summary": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-2/lag-summary"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerGroup",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-3",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-3",
+         *           "is_simple": false,
+         *           "partition_assignor": "org.apache.kafka.clients.consumer.RangeAssignor",
+         *           "state": "DEAD",
+         *           "coordinator": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3"
+         *           },
+         *           "consumers": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-3/consumers"
+         *           },
+         *           "lag_summary": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-3/lag-summary"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ConsumerGroupDataList"];
       };
     };
@@ -18879,6 +20087,66 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerLagList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaConsumerLag",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/lag=topic-1/partition=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "consumer_id": "consumer-1",
+         *           "instance_id": "consumer-instance-1",
+         *           "client_id": "client-1",
+         *           "current_offset": 1,
+         *           "log_end_offset": 101,
+         *           "lag": 100
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerLag",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/lag=topic-1/partition=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 2,
+         *           "consumer_id": "consumer-2",
+         *           "instance_id": "consumer-instance-2",
+         *           "client_id": "client-2",
+         *           "current_offset": 1,
+         *           "log_end_offset": 11,
+         *           "lag": 10
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerLag",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/3",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/lag=topic-1/partition=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 3,
+         *           "consumer_id": "consumer-3",
+         *           "instance_id": "consumer-instance-3",
+         *           "client_id": "client-3",
+         *           "current_offset": 1,
+         *           "log_end_offset": 1,
+         *           "lag": 0
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ConsumerLagDataList"];
       };
     };
@@ -18888,6 +20156,60 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaConsumer",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-1",
+         *           "instance_id": "consumer-instance-1",
+         *           "client_id": "client-1",
+         *           "assignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumer",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-2",
+         *           "instance_id": "consumer-instance-2",
+         *           "client_id": "client-2",
+         *           "assignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-2/assignments"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumer",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-2",
+         *           "instance_id": "consumer-instance-2",
+         *           "client_id": "client-2",
+         *           "assignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-2/assignments"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ConsumerDataList"];
       };
     };
@@ -18897,6 +20219,72 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaPartitionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaPartition",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "leader": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/1"
+         *           },
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *           },
+         *           "reassignment": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaPartition",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 2,
+         *           "leader": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/replicas/2"
+         *           },
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/replicas"
+         *           },
+         *           "reassignment": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/reassignment"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaPartition",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 3,
+         *           "leader": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/replicas/3"
+         *           },
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/replicas"
+         *           },
+         *           "reassignment": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/reassignment"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["PartitionDataList"];
       };
     };
@@ -18906,6 +20294,63 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReplicaList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/replica=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "broker_id": 1,
+         *           "is_leader": true,
+         *           "is_in_sync": true,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/2",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/replica=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "broker_id": 2,
+         *           "is_leader": false,
+         *           "is_in_sync": true,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/3",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/replica=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "broker_id": 3,
+         *           "is_leader": false,
+         *           "is_in_sync": false,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReplicaDataList"];
       };
     };
@@ -18915,6 +20360,69 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopicConfigList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaTopicConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs/cleanup.policy",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/config=cleanup.policy"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "name": "cleanup.policy",
+         *           "value": "compact",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_TOPIC_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "cleanup.policy",
+         *               "value": "compact",
+         *               "source": "DYNAMIC_TOPIC_CONFIG"
+         *             },
+         *             {
+         *               "name": "cleanup.policy",
+         *               "value": "delete",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "kind": "KafkaTopicConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs/compression.type",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/config=compression.type"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_TOPIC_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "compression.type",
+         *               "value": "gzip",
+         *               "source": "DYNAMIC_TOPIC_CONFIG"
+         *             },
+         *             {
+         *               "name": "compression.type",
+         *               "value": "producer",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["TopicConfigDataList"];
       };
     };
@@ -18924,6 +20432,78 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopicList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaTopic",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "is_internal": false,
+         *           "replication_factor": 3,
+         *           "partitions_count": 1,
+         *           "partitions": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions"
+         *           },
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs"
+         *           },
+         *           "partition_reassignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/-/reassignments"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaTopic",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-2",
+         *           "is_internal": true,
+         *           "replication_factor": 4,
+         *           "partitions_count": 1,
+         *           "partitions": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions"
+         *           },
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/configs"
+         *           },
+         *           "partition_reassignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/-/reassignments"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaTopic",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-3",
+         *           "is_internal": false,
+         *           "replication_factor": 5,
+         *           "partitions_count": 1,
+         *           "partitions": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions"
+         *           },
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/configs"
+         *           },
+         *           "partition_reassignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/-/reassignments"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["TopicDataList"];
       };
     };
@@ -18944,6 +20524,42 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAclList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?principal=User%3Aalice"
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAcl",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?resource_type=TOPIC&resource_name=topic-&pattern_type=PREFIXED&principal=User%3Aalice&host=*&operation=ALL&permission=ALLOW"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "resource_type": "TOPIC",
+         *           "resource_name": "topic-",
+         *           "pattern_type": "PREFIXED",
+         *           "principal": "User:alice",
+         *           "host": "*",
+         *           "operation": "ALL",
+         *           "permission": "ALLOW"
+         *         },
+         *         {
+         *           "kind": "KafkaAcl",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?resource_type=CLUSTER&resource_name=kafka-cluster&pattern_type=LITERAL&principal=User%3Aalice&host=*&operation=DESCRIBE&permission=DENY"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "resource_type": "CLUSTER",
+         *           "resource_name": "kafka-cluster",
+         *           "pattern_type": "LITERAL",
+         *           "principal": "User:alice",
+         *           "host": "*",
+         *           "operation": "DESCRIBE",
+         *           "permission": "DENY"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AclDataList"];
       };
     };
@@ -18953,6 +20569,75 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReassignmentList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/-/partitions/-/reassignment",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "adding_replicas": [
+         *             1,
+         *             2
+         *           ],
+         *           "removing_replicas": [
+         *             3
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=2/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 2,
+         *           "adding_replicas": [
+         *             1
+         *           ],
+         *           "removing_replicas": [
+         *             2,
+         *             3
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=3/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 3,
+         *           "adding_replicas": [
+         *             3
+         *           ],
+         *           "removing_replicas": [
+         *             1,
+         *             2
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/replicas"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReassignmentDataList"];
       };
     };
@@ -18962,6 +20647,63 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReplicaList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/partition-replicas",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/replicas/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=2/replica=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 2,
+         *           "broker_id": 1,
+         *           "is_leader": true,
+         *           "is_in_sync": true,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/3/replicas/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-3/partition=3/replica=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-2",
+         *           "partition_id": 3,
+         *           "broker_id": 1,
+         *           "is_leader": false,
+         *           "is_in_sync": true,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/1/replicas/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-3/partition=1/replica=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-3",
+         *           "partition_id": 1,
+         *           "broker_id": 1,
+         *           "is_leader": false,
+         *           "is_in_sync": false,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReplicaDataList"];
       };
     };
@@ -19061,6 +20803,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "description": "A sample response from Jetty's DoSFilter.",
+         *       "value": "<html> <head> <meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\"/> <title>Error 429 Too Many Requests</title> </head> <body> <h2>HTTP ERROR 429 Too Many Requests</h2> <table> <tr> <th>URI:</th> <td>/v3/clusters/my-cluster</td> </tr> <tr> <th>STATUS:</th> <td>429</td> </tr> <tr> <th>MESSAGE:</th> <td>Too Many Requests</td> </tr> <tr> <th>SERVLET:</th> <td>default</td> </tr> </table> </body> </html>"
+         *     } */
         "text/html": string;
       };
     };
@@ -19097,6 +20843,55 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReplicaStatusList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/topics/topic_1/partitions/0/replica-status",
+         *         "resource_name": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReplicaStatus",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/topics/topic-1/partitions/0/brokers/1/replica-status"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "broker_id": 1,
+         *           "partition_id": 0,
+         *           "is_leader": true,
+         *           "is_observer": false,
+         *           "is_isr_eligible": true,
+         *           "is_in_isr": true,
+         *           "is_caught_up": true,
+         *           "log_start_offset": 0,
+         *           "log_end_offset": 0,
+         *           "last_caught_up_time_ms": 100,
+         *           "last_fetch_time_ms": 200,
+         *           "link_name": "test-link"
+         *         },
+         *         {
+         *           "kind": "KafkaReplicaStatus",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/topics/topic-1/partitions/0/brokers/2/replica-status"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "broker_id": 2,
+         *           "partition_id": 0,
+         *           "is_leader": false,
+         *           "is_observer": false,
+         *           "is_isr_eligible": true,
+         *           "is_in_isr": true,
+         *           "is_caught_up": true,
+         *           "log_start_offset": 0,
+         *           "log_end_offset": 0,
+         *           "last_caught_up_time_ms": 100,
+         *           "last_fetch_time_ms": 200,
+         *           "link_name": "test-link"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReplicaStatusDataList"];
       };
     };
@@ -19106,6 +20901,23 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAnyUnevenLoad",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/any-uneven-load",
+         *         "resource_name": "crn:///kafka=cluster-1/any-uneven-load"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "status": "BALANCING",
+         *       "previous_status": "BALANCING_FAILED",
+         *       "status_updated_at": "2019-10-12T07:20:50Z",
+         *       "previous_status_updated_at": "2019-10-12T07:20:35Z",
+         *       "error_code": 10013,
+         *       "error_message": "The Confluent Balancer operation was overridden by a higher priority operation.",
+         *       "broker_tasks": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks"
+         *       }
+         *     } */
         "application/json": components["schemas"]["AnyUnevenLoadData"];
       };
     };
@@ -19115,6 +20927,23 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBalancerStatus",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/balancer",
+         *         "resource_name": "crn:///kafka=cluster-1/balancer"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "status": "ERROR",
+         *       "error_code": 10014,
+         *       "error_message": "The Confluent Balancer failed to start as JBOD is enabled for the cluster.",
+         *       "any_uneven_load": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/even-cluster-load"
+         *       },
+         *       "broker_tasks": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BalancerStatusData"];
       };
     };
@@ -19124,6 +20953,21 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerRemoval",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *         "resource_name": "crn:///kafka=cluster-1/broker=1/"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "broker_task": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       },
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BrokerRemovalData"];
       };
     };
@@ -19133,6 +20977,45 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerRemovalList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers:delete",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerRemoval",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "broker_task": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           },
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerRemoval",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "broker_task": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           },
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerRemovalDataList"];
       };
     };
@@ -19142,6 +21025,27 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerTask",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/add-broker",
+         *         "resource_name": "crn:///kafka=cluster-1/broker=1/task=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "task_type": "add-broker",
+         *       "task_status": "FAILED",
+         *       "sub_task_statuses": {
+         *         "partition_reassignment_status": "ERROR"
+         *       },
+         *       "created_at": "2019-10-12T07:20:50Z",
+         *       "updated_at": "2019-10-12T07:20:55Z",
+         *       "error_code": 10013,
+         *       "error_message": "The Confluent Balancer operation was overridden by a higher priority operation",
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BrokerTaskData"];
       };
     };
@@ -19151,6 +21055,58 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerTaskList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/add-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/task=add-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 1,
+         *           "task_type": "add-broker",
+         *           "task_status": "SUCCESS",
+         *           "sub_task_statuses": {
+         *             "partition_reassignment_status": "COMPLETED"
+         *           },
+         *           "created_at": "2019-10-12T10:20:40Z",
+         *           "updated_at": "2019-10-12T10:20:45Z",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2/tasks/remove-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=2/task=remove-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 2,
+         *           "task_type": "remove-broker",
+         *           "task_status": "FAILED",
+         *           "shutdown_scheduled": true,
+         *           "sub_task_statuses": {
+         *             "broker_replica_exclusion_status": "COMPLETED",
+         *             "partition_reassignment_status": "ERROR",
+         *             "broker_shutdown_status": "CANCELED"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial remove broker plan for brokers [2] prior to shutdown.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerTaskDataList"];
       };
     };
@@ -19160,6 +21116,58 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerTaskList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/add-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/task=add-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 1,
+         *           "task_type": "add-broker",
+         *           "task_status": "IN_PROGRESS",
+         *           "sub_task_statuses": {
+         *             "partition_reassignment_status": "IN_PROGRESS"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/remove-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/task=remove-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 1,
+         *           "task_type": "remove-broker",
+         *           "task_status": "FAILED",
+         *           "shutdown_scheduled": false,
+         *           "sub_task_statuses": {
+         *             "broker_replica_exclusion_status": "EXCLUDED",
+         *             "partition_reassignment_status": "ERROR",
+         *             "broker_shutdown_status": "CANCELED"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial remove broker plan for brokers [1] prior to shutdown.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerTaskDataList"];
       };
     };
@@ -19169,6 +21177,55 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerTaskList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/add-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/task=add-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 1,
+         *           "task_type": "add-broker",
+         *           "task_status": "IN_PROGRESS",
+         *           "sub_task_statuses": {
+         *             "partition_reassignment_status": "IN_PROGRESS"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2/tasks/add-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=2/task=add-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 2,
+         *           "task_type": "add-broker",
+         *           "task_status": "FAILED",
+         *           "sub_task_statuses": {
+         *             "partition_reassignment_status": "ERROR"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial add broker plan for brokers [2]",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerTaskDataList"];
       };
     };
@@ -19178,6 +21235,41 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerReplicaExclusionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "reason": "Broker is to be removed.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "reason": "Broker is to be removed.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerReplicaExclusionDataList"];
       };
     };
@@ -19187,6 +21279,19 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerReplicaExclusion",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *         "next": null
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "reason": "Broker is to be removed.",
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BrokerReplicaExclusionData"];
       };
     };
@@ -19196,6 +21301,47 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAlterBrokerReplicaExclusionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "exclusion": "SET",
+         *           "reason": "Broker is to be removed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "exclusion": "SET",
+         *           "reason": "Broker is to be removed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AlterBrokerReplicaExclusionDataList"];
       };
     };
@@ -19205,6 +21351,47 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAlterBrokerReplicaExclusionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "exclusion": "DELETE",
+         *           "reason": "Broker removal is completed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "exclusion": "DELETE",
+         *           "reason": "Broker removal is completed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AlterBrokerReplicaExclusionDataList"];
       };
     };
@@ -19214,6 +21401,47 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAlterBrokerReplicaExclusionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "exclusion": "DELETE",
+         *           "reason": "Broker removal is completed.",
+         *           "error_code": 404,
+         *           "error_message": "No replica exclusion for broker 1 was present.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "exclusion": "DELETE",
+         *           "reason": "Broker removal is completed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AlterBrokerReplicaExclusionDataList"];
       };
     };
@@ -19223,6 +21451,24 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaRemoveBrokerTask",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/remove-broker-tasks/1",
+         *         "resource_name": "crn:///kafka=cluster-1/remove-broker-task=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "shutdown_scheduled": false,
+         *       "broker_replica_exclusion_status": "COMPLETED",
+         *       "partition_reassignment_status": "FAILED",
+         *       "broker_shutdown_status": "CANCELED",
+         *       "error_code": 10006,
+         *       "error_message": "Error while computing the initial remove broker plan for brokers [1] prior to shutdown.",
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["RemoveBrokerTaskData"];
       };
     };
@@ -19232,6 +21478,51 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaRemoveBrokerTaskList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/remove-broker-tasks",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaRemoveBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/remove-broker-tasks/1",
+         *             "resource_name": "crn:///kafka=cluster-1/remove-broker-task=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "shutdown_scheduled": true,
+         *           "broker_replica_exclusion_status": "COMPLETED",
+         *           "partition_reassignment_status": "FAILED",
+         *           "broker_shutdown_status": "CANCELED",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial remove broker plan for brokers [1] prior to shutdown.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaRemoveBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/remove-broker-tasks/2",
+         *             "resource_name": "crn:///kafka=cluster-1/remove-broker-task=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "shutdown_scheduled": true,
+         *           "broker_replica_exclusion_status": "EXCLUDED",
+         *           "partition_reassignment_status": "FAILED",
+         *           "broker_shutdown_status": "CANCELED",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial remove broker plan for brokers [2] prior to shutdown.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["RemoveBrokerTaskDataList"];
       };
     };
@@ -19248,6 +21539,62 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaLinkDataList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/Fds7TcT9TTqEXsoRLEKMcQ/links",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaLinkData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/CIL-69l7S1CwoVNAhoQLug/links/my-new-link-1",
+         *             "resource_name": null
+         *           },
+         *           "source_cluster_id": "src-cluster-id",
+         *           "link_name": "my-new-link-1",
+         *           "link_id": "7840644d-f7d8-4844-a577-a10ef3df31df",
+         *           "cluster_link_id": "eEBkTffYSESld6EO898x3w",
+         *           "topic_names": [
+         *             "topic-sb-1",
+         *             "topic-sb-2"
+         *           ],
+         *           "link_state": "ACTIVE"
+         *         },
+         *         {
+         *           "kind": "KafkaLinkData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/CIL-69l7S1CwoVNAhoQLug/links/my-new-link-2",
+         *             "resource_name": null
+         *           },
+         *           "remote_cluster_id": "src-cluster-id",
+         *           "link_name": "my-new-link-2",
+         *           "link_id": "f749116e-f847-4bd2-b1f6-5c4e518a0678",
+         *           "cluster_link_id": "90kRbvhHS9Kx9lxOUYoGeA",
+         *           "topic_names": [
+         *             "topic-db-1",
+         *             "topic-db-2"
+         *           ],
+         *           "link_state": "UNAVAILABLE",
+         *           "link_error": "AUTHENTICATION_ERROR",
+         *           "link_error_message": "Please check your api key and secret"
+         *         },
+         *         {
+         *           "kind": "KafkaLinkData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/CIL-69l7S1CwoVNAhoQLug/links/my-new-link-3",
+         *             "resource_name": null
+         *           },
+         *           "destination_cluster_id": "dest-cluster-id",
+         *           "link_name": "my-new-link-3",
+         *           "link_id": "9cd1711e-a4ef-4390-a35e-dfd758d97a82",
+         *           "cluster_link_id": "nNFxHqTvQ5CjXt_XWNl6gg",
+         *           "topic_names": [],
+         *           "link_state": "ACTIVE"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ListLinksResponseDataList"];
       };
     };
@@ -19266,6 +21613,53 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaLinkConfigDataList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/v-0Ce-CkTyKQol9v46LaCQ/links/link-nb-1/configs",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaLinkConfigData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/links/my-new-link-1",
+         *             "resource_name": null
+         *           },
+         *           "cluster_id": "1Rh_4htxSuen7RYGvGmgNw",
+         *           "name": "consumer.offset.sync.ms",
+         *           "value": "3825940",
+         *           "default": false,
+         *           "read_only": false,
+         *           "sensitive": false,
+         *           "source": "DYNAMIC_CLUSTER_LINK_CONFIG",
+         *           "synonyms": [
+         *             "cosm"
+         *           ],
+         *           "link_name": "link-db-1",
+         *           "link_id": "7840644d-f7d8-4844-a577-a10ef3df31df"
+         *         },
+         *         {
+         *           "kind": "KafkaLinkConfigData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/links/my-new-link-1",
+         *             "resource_name": null
+         *           },
+         *           "cluster_id": "1Rh_4htxSuen7RYGvGmgNw",
+         *           "name": "acl.sync.ms",
+         *           "value": "5000",
+         *           "default": false,
+         *           "read_only": false,
+         *           "sensitive": false,
+         *           "source": "DYNAMIC_CLUSTER_LINK_CONFIG",
+         *           "synonyms": [
+         *             "asm"
+         *           ],
+         *           "link_name": "link-db-1",
+         *           "link_id": "7840644d-f7d8-4844-a577-a10ef3df31df"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ListLinkConfigsResponseDataList"];
       };
     };
@@ -19275,6 +21669,29 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaLinkConfigData",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/links/my-new-link-1",
+         *         "resource_name": null
+         *       },
+         *       "cluster_id": "1Rh_4htxSuen7RYGvGmgNw",
+         *       "name": "consumer.offset.sync.ms",
+         *       "value": "3825940",
+         *       "default": false,
+         *       "read_only": false,
+         *       "sensitive": false,
+         *       "source": "DYNAMIC_CLUSTER_LINK_CONFIG",
+         *       "synonyms": [
+         *         "cosm"
+         *       ],
+         *       "link_name": "link-db-1",
+         *       "link_id": "7840644d-f7d8-4844-a577-a10ef3df31df",
+         *       "topics": [
+         *         "topic-db-1",
+         *         "topic-db-2"
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ListLinkConfigsResponseData"];
       };
     };
@@ -19284,6 +21701,78 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaMirrorDataList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/link/link-1/mirrors",
+         *         "resource_name": "crn:///kafka=cluster-1",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaMirrorData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/Fds7TcT9TTqEXsoRLEKMcQ/links/link-1/mirrors/topic-1",
+         *             "resource_name": "crn:///kafka=cluster-1"
+         *           },
+         *           "link_name": "link-sb-1",
+         *           "resource_name": "crn:///kafka=cluster-1",
+         *           "mirror_topic_name": "topic-1",
+         *           "source_topic_name": "topic-1",
+         *           "num_partitions": 3,
+         *           "mirror_lags": [
+         *             {
+         *               "partition": 0,
+         *               "lag": 0,
+         *               "last_source_fetch_offset": 0
+         *             },
+         *             {
+         *               "partition": 1,
+         *               "lag": 10000,
+         *               "last_source_fetch_offset": 1000
+         *             },
+         *             {
+         *               "partition": 2,
+         *               "lag": 40000,
+         *               "last_source_fetch_offset": 12030
+         *             }
+         *           ],
+         *           "mirror_status": "ACTIVE",
+         *           "state_time_ms": 1612550939300
+         *         },
+         *         {
+         *           "kind": "KafkaMirrorData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/Fds7TcT9TTqEXsoRLEKMcQ/links/link-1/mirrors/topic-2",
+         *             "resource_name": "crn:///kafka=cluster-1"
+         *           },
+         *           "link_name": "link-sb-2",
+         *           "resource_name": "crn:///kafka=cluster-1",
+         *           "mirror_topic_name": "topic-2",
+         *           "source_topic_name": "topic-2",
+         *           "num_partitions": 3,
+         *           "mirror_lags": [
+         *             {
+         *               "partition": 0,
+         *               "lag": 0,
+         *               "last_source_fetch_offset": 0
+         *             },
+         *             {
+         *               "partition": 1,
+         *               "lag": 10000,
+         *               "last_source_fetch_offset": 1000
+         *             },
+         *             {
+         *               "partition": 2,
+         *               "lag": 40000,
+         *               "last_source_fetch_offset": 12030
+         *             }
+         *           ],
+         *           "mirror_status": "STOPPED",
+         *           "state_time_ms": 1612551353640
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ListMirrorTopicsResponseDataList"];
       };
     };
@@ -19293,6 +21782,36 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaMirrorData",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/link/link-1/mirrors/topic-1",
+         *         "resource_name": "crn:///kafka=cluster-1"
+         *       },
+         *       "link_name": "link-sb-1",
+         *       "mirror_topic_name": "topic-1",
+         *       "source_topic_name": "topic-1",
+         *       "num_partitions": 3,
+         *       "mirror_lags": [
+         *         {
+         *           "partition": 0,
+         *           "lag": 0,
+         *           "last_source_fetch_offset": 0
+         *         },
+         *         {
+         *           "partition": 1,
+         *           "lag": 10000,
+         *           "last_source_fetch_offset": 1000
+         *         },
+         *         {
+         *           "partition": 2,
+         *           "lag": 40000,
+         *           "last_source_fetch_offset": 12030
+         *         }
+         *       ],
+         *       "mirror_status": "ACTIVE",
+         *       "state_time_ms": 1612550939300
+         *     } */
         "application/json": components["schemas"]["ListMirrorTopicsResponseData"];
       };
     };
@@ -19302,6 +21821,105 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaPromoteMirror",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/links/link-1/mirrors",
+         *         "resource_name": "crn:///kafka=cluster-1"
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "AlterMirrorsData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/links/my-new-link-1/mirrors/topic-1",
+         *             "resource": "crn:///kafka=cluster-1"
+         *           },
+         *           "mirror_topic_name": "topic-sb",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "mirror_lags": [
+         *             {
+         *               "partition": 0,
+         *               "lag": 0,
+         *               "last_source_fetch_offset": 0
+         *             },
+         *             {
+         *               "partition": 1,
+         *               "lag": 10000,
+         *               "last_source_fetch_offset": 1000
+         *             },
+         *             {
+         *               "partition": 2,
+         *               "lag": 40000,
+         *               "last_source_fetch_offset": 12030
+         *             }
+         *           ],
+         *           "messages_truncated": null,
+         *           "partition_level_truncation_data": [
+         *             {
+         *               "partition_id": 0,
+         *               "offset_truncated_to": 10000,
+         *               "messages_truncated": 10000
+         *             },
+         *             {
+         *               "partition_id": 1,
+         *               "offset_truncated_to": 40000,
+         *               "messages_truncated": 12030
+         *             },
+         *             {
+         *               "partition_id": 2,
+         *               "offset_truncated_to": 20000,
+         *               "messages_truncated": 20000
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "kind": "AlterMirrorsData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/links/my-new-link-1/mirrors/topic-2",
+         *             "resource": "crn:///kafka=cluster-1"
+         *           },
+         *           "mirror_topic_name": "topic-2",
+         *           "error_code": 400,
+         *           "error_message": "Topic 'topic-2' has already stopped its mirror from 'my-new-link-1'",
+         *           "mirror_lags": [
+         *             {
+         *               "partition": 0,
+         *               "lag": 0,
+         *               "last_source_fetch_offset": 0
+         *             },
+         *             {
+         *               "partition": 1,
+         *               "lag": 10000,
+         *               "last_source_fetch_offset": 1000
+         *             },
+         *             {
+         *               "partition": 2,
+         *               "lag": 40000,
+         *               "last_source_fetch_offset": 12030
+         *             }
+         *           ],
+         *           "messages_truncated": null,
+         *           "partition_level_truncation_data": [
+         *             {
+         *               "partition_id": 0,
+         *               "offset_truncated_to": 10000,
+         *               "messages_truncated": 10000
+         *             },
+         *             {
+         *               "partition_id": 1,
+         *               "offset_truncated_to": 40000,
+         *               "messages_truncated": 12030
+         *             },
+         *             {
+         *               "partition_id": 2,
+         *               "offset_truncated_to": 20000,
+         *               "messages_truncated": 20000
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AlterMirrorStatusResponseDataList"];
       };
     };
@@ -19320,6 +21938,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "The Confluent Balancer component is disabled or not started yet."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19329,6 +21951,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "Broker not found. Broker: 1 not found in the cluster: cluster-1"
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19338,6 +21964,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "The given broker id -10 is invalid"
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19347,6 +21977,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 500,
+         *       "message": "The Confluent Balancer component is disabled or not started yet."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19356,6 +21990,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 401,
+         *       "message": "Not authorized: the authenticated user didn't have the right access to the resource."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19365,6 +22003,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "The cluster link doesn't exist."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19374,6 +22016,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "Invalid Cluster Link Name."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19383,6 +22029,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "Invalid Config Name."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19392,6 +22042,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "A cluster link already exists with the provided link name"
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19401,6 +22055,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 408,
+         *       "message": "The server received the request, but the operation timed out"
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19410,6 +22068,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "Bad Request"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19419,6 +22081,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 401,
+         *       "message": "Unauthorized"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19428,6 +22094,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 403,
+         *       "message": "Forbidden"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19437,6 +22107,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "account not found"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19446,6 +22120,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "resource not found"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19455,6 +22133,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 500,
+         *       "message": "Oops, something went wrong"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -22729,6 +25411,11 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example [
+           *       "MyGcsLogsBucketConnector",
+           *       "MyS3BucketConnector",
+           *       "MyDatagenConnector"
+           *     ] */
           "application/json": string[];
         };
       };
@@ -22802,6 +25489,44 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "config": {
+           *         "cloud.environment": "prod",
+           *         "cloud.provider": "aws",
+           *         "connector.class": "GcsSink",
+           *         "data.format": "BYTES",
+           *         "flush.size": "1000",
+           *         "gcs.bucket.name": "APILogsBucket",
+           *         "gcs.credentials.config": "****************",
+           *         "kafka.api.key": "****************",
+           *         "kafka.api.secret": "****************",
+           *         "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *         "kafka.region": "us-west-2",
+           *         "name": "MyGcsLogsBucketConnector",
+           *         "tasks.max": "1",
+           *         "time.interval": "DAILY",
+           *         "topics": "APILogsTopic"
+           *       },
+           *       "tasks": [
+           *         {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 0
+           *         }
+           *       ],
+           *       "type": "sink",
+           *       "offsets": [
+           *         {
+           *           "partition": {
+           *             "kafka_partition": 0,
+           *             "kafka_topic": "APILogsTopic"
+           *           },
+           *           "offset": {
+           *             "kafka_offset": 1000
+           *           }
+           *         }
+           *       ]
+           *     } */
           "application/json": components["schemas"]["connect.v1.ConnectorWithOffsets"];
         };
       };
@@ -22811,6 +25536,12 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "error": {
+           *         "code": 400,
+           *         "message": "Unauthorized"
+           *       }
+           *     } */
           "application/json": {
             code?: number;
             message?: string;
@@ -22825,6 +25556,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "error_code": 500,
+           *       "message": "Failed to find any class that implements Connector and which name matches io.confluent.connect.<connector-class>..."
+           *     } */
           "application/json": {
             error_code?: number;
             message?: string;
@@ -22859,6 +25594,126 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "MyGcsLogsBucketConnector": {
+           *         "id": {
+           *           "id": "lcc-xxxxx",
+           *           "id_type": "ID"
+           *         },
+           *         "info": {
+           *           "name": "MyGcsLogsBucketConnector",
+           *           "config": {
+           *             "cloud.environment": "prod",
+           *             "cloud.provider": "aws",
+           *             "connector.class": "GcsSink",
+           *             "data.format": "BYTES",
+           *             "flush.size": "1000",
+           *             "gcs.bucket.name": "APILogsBucket",
+           *             "gcs.credentials.config": "****************",
+           *             "kafka.api.key": "****************",
+           *             "kafka.api.secret": "****************",
+           *             "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *             "kafka.region": "us-west-2",
+           *             "name": "MyGcsLogsBucketConnector",
+           *             "tasks.max": "1",
+           *             "time.interval": "DAILY",
+           *             "topics": "APILogsTopic",
+           *             "type": "sink"
+           *           }
+           *         },
+           *         "status": {
+           *           "name": "MyGcsLogsBucketConnector",
+           *           "connector": {
+           *             "state": "PROVISIONING",
+           *             "worker_id": "MyGcsLogsBucketConnector",
+           *             "trace": ""
+           *           },
+           *           "tasks": [],
+           *           "type": "sink"
+           *         }
+           *       },
+           *       "MyS3BucketConnector": {
+           *         "id": {
+           *           "id": "lcc-xxxxx",
+           *           "id_type": "ID"
+           *         },
+           *         "info": {
+           *           "name": "MyS3BucketConnector",
+           *           "config": {
+           *             "cloud.environment": "prod",
+           *             "cloud.provider": "aws",
+           *             "connector.class": "S3Sink",
+           *             "data.format": "BYTES",
+           *             "flush.size": "1000",
+           *             "s3.bucket": "APILogsBucket",
+           *             "aws.access.key.id": "************",
+           *             "aws.secret.access.key": "**********",
+           *             "kafka.api.key": "****************",
+           *             "kafka.api.secret": "****************",
+           *             "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *             "kafka.region": "us-west-2",
+           *             "name": "MyS3BucketConnector",
+           *             "tasks.max": "1",
+           *             "time.interval": "DAILY",
+           *             "topics": "APILogsTopic",
+           *             "type": "source"
+           *           }
+           *         },
+           *         "status": {
+           *           "name": "MyS3BucketConnector",
+           *           "connector": {
+           *             "state": "FAILED",
+           *             "worker_id": "MyS3BucketConnector",
+           *             "trace": "There were some errors with your configuration:\ntopics: Provided Kafka ApiKey is invalid\nkafka.api.secret: Provided Kafka ApiKey is invalid\n"
+           *           },
+           *           "tasks": [],
+           *           "type": "sink"
+           *         }
+           *       },
+           *       "MyDatagenConnector": {
+           *         "id": {
+           *           "id": "lcc-xxxxx",
+           *           "id_type": "ID"
+           *         },
+           *         "info": {
+           *           "name": "MyDatagenConnector",
+           *           "config": {
+           *             "cloud.environment": "prod",
+           *             "cloud.provider": "aws",
+           *             "connector.class": "DatagenSource",
+           *             "data.format": "BYTES",
+           *             "flush.size": "1000",
+           *             "quickstart": "ORDERS",
+           *             "kafka.api.key": "****************",
+           *             "kafka.api.secret": "****************",
+           *             "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *             "kafka.region": "us-west-2",
+           *             "name": "MyDatagenConnector",
+           *             "tasks.max": "1",
+           *             "time.interval": "DAILY",
+           *             "topics": "APILogsTopic",
+           *             "type": "source"
+           *           }
+           *         },
+           *         "status": {
+           *           "name": "MyDatagenConnector",
+           *           "connector": {
+           *             "state": "RUNNING",
+           *             "worker_id": "MyDatagenConnector",
+           *             "trace": ""
+           *           },
+           *           "tasks": [
+           *             {
+           *               "id": 0,
+           *               "msg": "",
+           *               "state": "RUNNING",
+           *               "worker_id": "MyDatagenConnector"
+           *             }
+           *           ],
+           *           "type": "source"
+           *         }
+           *       }
+           *     } */
           "application/json": components["schemas"]["connect.v1.ConnectorExpansionMap"];
         };
       };
@@ -22890,6 +25745,23 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "cloud.environment": "prod",
+           *       "cloud.provider": "aws",
+           *       "connector.class": "GcsSink",
+           *       "data.format": "BYTES",
+           *       "flush.size": "1000",
+           *       "gcs.bucket.name": "APILogsBucket",
+           *       "gcs.credentials.config": "****************",
+           *       "kafka.api.key": "****************",
+           *       "kafka.api.secret": "****************",
+           *       "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *       "kafka.region": "us-west-2",
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "tasks.max": "2",
+           *       "time.interval": "DAILY",
+           *       "topics": "APILogsTopic"
+           *     } */
           "application/json": {
             /** @description The cloud environment type. */
             "cloud.environment": string;
@@ -22992,6 +25864,37 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "config": {
+           *         "cloud.environment": "prod",
+           *         "cloud.provider": "aws",
+           *         "connector.class": "GcsSink",
+           *         "data.format": "BYTES",
+           *         "flush.size": "1000",
+           *         "gcs.bucket.name": "APILogsBucket",
+           *         "gcs.credentials.config": "****************",
+           *         "kafka.api.key": "****************",
+           *         "kafka.api.secret": "****************",
+           *         "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *         "kafka.region": "us-west-2",
+           *         "name": "MyGcsLogsBucketConnector",
+           *         "tasks.max": "2",
+           *         "time.interval": "DAILY",
+           *         "topics": "APILogsTopic"
+           *       },
+           *       "tasks": [
+           *         {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 0
+           *         },
+           *         {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 1
+           *         }
+           *       ],
+           *       "type": "sink"
+           *     } */
           "application/json": components["schemas"]["connect.v1.Connector"];
         };
       };
@@ -23005,6 +25908,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "error_code": 500,
+           *       "message": "Failed to find any class that implements Connector and which name matches io.confluent.connect.<connector-class>..."
+           *     } */
           "application/json": {
             error_code?: number;
             message?: string;
@@ -23035,6 +25942,33 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "config": {
+           *         "cloud.environment": "prod",
+           *         "cloud.provider": "aws",
+           *         "connector.class": "GcsSink",
+           *         "data.format": "BYTES",
+           *         "flush.size": "1000",
+           *         "gcs.bucket.name": "APILogsBucket",
+           *         "gcs.credentials.config": "****************",
+           *         "kafka.api.key": "****************",
+           *         "kafka.api.secret": "****************",
+           *         "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *         "kafka.region": "us-west-2",
+           *         "name": "MyGcsLogsBucketConnector",
+           *         "tasks.max": "1",
+           *         "time.interval": "DAILY",
+           *         "topics": "APILogsTopic"
+           *       },
+           *       "tasks": [
+           *         {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 0
+           *         }
+           *       ],
+           *       "type": "sink"
+           *     } */
           "application/json": components["schemas"]["connect.v1.Connector"];
         };
       };
@@ -23177,6 +26111,16 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "connector": {
+           *         "state": "PROVISIONING",
+           *         "worker_id": "MyGcsLogsBucketConnector",
+           *         "trace": ""
+           *       },
+           *       "tasks": [],
+           *       "type": "source"
+           *     } */
           "application/json": {
             /** @description The name of the connector. */
             name: string;
@@ -23245,6 +26189,31 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example [
+           *       {
+           *         "id": {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 2
+           *         },
+           *         "config": {
+           *           "cloud.environment": "prod",
+           *           "cloud.provider": "aws",
+           *           "connector.class": "GcsSink",
+           *           "data.format": "BYTES",
+           *           "flush.size": "1000",
+           *           "gcs.bucket.name": "APILogsBucket",
+           *           "gcs.credentials.config": "****************",
+           *           "kafka.api.key": "****************",
+           *           "kafka.api.secret": "****************",
+           *           "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *           "kafka.region": "us-west-2",
+           *           "name": "MyGcsLogsBucketConnector",
+           *           "tasks.max": "2",
+           *           "time.interval": "DAILY",
+           *           "topics": "APILogsTopic"
+           *         }
+           *       }
+           *     ] */
           "application/json": components["schemas"]["connect.v1.Connectors"];
         };
       };
@@ -23274,6 +26243,31 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example [
+           *       {
+           *         "class": "BigQuerySink",
+           *         "type": "sink"
+           *       },
+           *       {
+           *         "class": "KinesisSource",
+           *         "type": "source",
+           *         "version": "0.1.0"
+           *       },
+           *       {
+           *         "class": "PostgresSource",
+           *         "type": "source",
+           *         "version": "0.1.0"
+           *       },
+           *       {
+           *         "class": "S3_SINK",
+           *         "type": "sink"
+           *       },
+           *       {
+           *         "class": "GcsSink",
+           *         "type": "sink",
+           *         "version": "0.2.0"
+           *       }
+           *     ] */
           "application/json": {
             /** @description The connector class name. E.g. BigQuerySink. */
             class: string;
@@ -23339,6 +26333,296 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "io.confluent.connect.gcs.GcsSinkConnector",
+           *       "groups": [
+           *         "Organize my data by...",
+           *         "Which topics do you want to get data from?",
+           *         "Messages",
+           *         "How should we connect to your data?",
+           *         "Google Cloud Storage details",
+           *         "Kafka Cluster credentials",
+           *         "Number of tasks for this connector"
+           *       ],
+           *       "error_count": 1,
+           *       "configs": [
+           *         {
+           *           "definition": {
+           *             "name": "name",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Sets a name for your connector.",
+           *             "group": "How should we connect to your data?",
+           *             "width": "NONE",
+           *             "display_name": "Connector name",
+           *             "dependents": [],
+           *             "order": 2,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "name",
+           *             "value": "{{.logicalClusterId}}",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "connector.class",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "",
+           *             "group": "How should we connect to your data?",
+           *             "width": "NONE",
+           *             "display_name": "Connector class",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "connector.class",
+           *             "value": "io.confluent.connect.gcs.GcsSinkConnector",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "kafka.api.key",
+           *             "type": "PASSWORD",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "",
+           *             "group": "Kafka Cluster credentials",
+           *             "width": "NONE",
+           *             "display_name": "Kafka API Key",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "kafka.api.key",
+           *             "value": "",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "kafka.api.secret",
+           *             "type": "PASSWORD",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "",
+           *             "group": "Kafka Cluster credentials",
+           *             "width": "NONE",
+           *             "display_name": "Kafka API Secret",
+           *             "dependents": [
+           *               "kafka.api.key"
+           *             ],
+           *             "order": 2,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "kafka.api.secret",
+           *             "value": "",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "topics",
+           *             "type": "LIST",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Identifies the topic name or a comma-separated list of topic names.",
+           *             "group": "Which topics do you want to get data from?",
+           *             "width": "NONE",
+           *             "display_name": "Topic names",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "topics",
+           *             "value": "test1",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "data.format",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Sets the input/output message format. Valid entries are AVRO, JSON, or BYTES",
+           *             "group": "Messages",
+           *             "width": "NONE",
+           *             "display_name": "Message format",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "data.format",
+           *             "value": "BYTES",
+           *             "recommended_values": [
+           *               "BYTES",
+           *               "JSON",
+           *               "AVRO"
+           *             ],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "gcs.credentials.config",
+           *             "type": "PASSWORD",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Contents of the downloaded GCP service account JSON file.",
+           *             "group": "Google Cloud Storage details",
+           *             "width": "NONE",
+           *             "display_name": "Google Cloud Storage credentials.",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "gcs.credentials.config",
+           *             "value": "",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "gcs.bucket.name",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "A Google Cloud Storage bucket must be in the same region as your Confluent Cloud cluster.",
+           *             "group": "Google Cloud Storage details",
+           *             "width": "NONE",
+           *             "display_name": "Bucket name.",
+           *             "dependents": [],
+           *             "order": 2,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "gcs.bucket.name",
+           *             "value": "gmagare",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "time.interval",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Sets how your messages grouped in storage. Valid entries are DAILY or HOURLY.",
+           *             "group": "Organize my data by...",
+           *             "width": "NONE",
+           *             "display_name": "Time interval",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "time.interval",
+           *             "value": "DAILY",
+           *             "recommended_values": [
+           *               "DAILY",
+           *               "HOURLY"
+           *             ],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "tasks.max",
+           *             "type": "INT",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "",
+           *             "group": "Number of tasks for this connector",
+           *             "width": "NONE",
+           *             "display_name": "Tasks",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "tasks.max",
+           *             "value": "1",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "flush.size",
+           *             "type": "INT",
+           *             "required": true,
+           *             "default_value": "1000",
+           *             "importance": "HIGH",
+           *             "documentation": "This value defaults to 1000. For example, if you use the default setting of 1000 and your topic has six partitions, files start to be created in the storage bucket after more than 1000 records exist in each partition. Note that the default value of 1000 can be increased if needed.",
+           *             "group": "Organize my data by...",
+           *             "width": "NONE",
+           *             "display_name": "Flush size",
+           *             "dependents": [],
+           *             "order": 2,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "flush.size",
+           *             "value": "1",
+           *             "recommended_values": [],
+           *             "errors": [
+           *               "\"flush.size\" should be greater than or equal to 1000"
+           *             ],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         }
+           *       ]
+           *     } */
           "application/json": {
             /** @description The class name of the connector plugin. */
             name?: string;
@@ -26741,8 +30025,11 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example FULL_TRANSITIVE */
           "application/vnd.schemaregistry.v1+json": string;
+          /** @example FULL_TRANSITIVE */
           "application/vnd.schemaregistry+json; qs=0.9": string;
+          /** @example FULL_TRANSITIVE */
           "application/json; qs=0.5": string;
         };
       };

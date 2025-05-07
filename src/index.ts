@@ -9,6 +9,7 @@ import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { initEnv } from "@src/env.js";
+import { kafkaLogger, logger } from "@src/logger.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
 parseCliArgs();
@@ -28,7 +29,7 @@ async function main() {
           username: env.KAFKA_API_KEY,
           password: env.KAFKA_API_SECRET,
         },
-        logLevel: KafkaJS.logLevel.ERROR,
+        logger: kafkaLogger,
       },
     };
 
@@ -119,7 +120,7 @@ async function main() {
 
     // Set up cleanup handlers
     const performCleanup = async () => {
-      console.error("Shutting down...");
+      logger.info("Shutting down...");
       await clientManager.disconnect();
       await server.close();
       process.exit(0);
@@ -132,14 +133,14 @@ async function main() {
 
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("Confluent MCP Server running on stdio");
+    logger.info("Confluent MCP Server running on stdio");
   } catch (error) {
-    console.error("Error starting server:", error);
+    logger.error({ error }, "Error starting server");
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error("Error starting server:", error);
+  logger.error({ error }, "Error starting server");
   process.exit(1);
 });

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Utility script to generate markdown documentation for environment variables.
+ * This script is only used to generate markdown content for the README file and is not used by the server.
+ * It converts Zod schema definitions into a formatted markdown table.
+ */
+
 import { z } from "zod";
 import { combinedSchema } from "./env-schema.js";
 
@@ -101,4 +107,5 @@ function getTypeInfo(schema: z.ZodTypeAny): string {
   return schema.constructor.name.replace("Zod", "").toLowerCase();
 }
 
+// Generate markdown table from schema and print to console
 console.log(zodSchemaToMarkdown(combinedSchema));

@@ -12,6 +12,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { logger } from "@src/logger.js";
 import { z } from "zod";
 
 const messageOptions = z.object({
@@ -122,9 +123,9 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
           serdeType,
         );
       } catch (err) {
-        console.error(
-          `Error deserializing message ${serdeType} for topic ${topic} with schema type ${schema.schemaType}:`,
-          err,
+        logger.error(
+          { error: err, topic, schemaType: schema.schemaType, serdeType },
+          `Error deserializing message ${serdeType} for topic ${topic}`,
         );
         return buffer?.toString();
       }
@@ -242,7 +243,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         try {
           await consumer.disconnect();
         } catch (error) {
-          console.error("Error cleaning up consumer:", error);
+          logger.error({ error }, "Error cleaning up consumer");
         }
       }
     }

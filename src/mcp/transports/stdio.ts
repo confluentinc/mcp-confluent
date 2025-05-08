@@ -1,17 +1,18 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { logger } from "@src/logger.js";
-import { BaseTransport } from "./base.js";
+import { Transport } from "@src/mcp/transports/types.js";
 
-export class StdioTransport extends BaseTransport {
-  private transport?: StdioServerTransport;
+export class StdioTransport implements Transport {
+  constructor(private server: McpServer) {}
 
   async connect(): Promise<void> {
-    this.transport = new StdioServerTransport();
-    await this.server.connect(this.transport);
-    logger.info("Confluent MCP Server running on stdio");
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+    logger.info("STDIO transport connected");
   }
 
   async disconnect(): Promise<void> {
-    // Stdio transport doesn't need explicit cleanup
+    // Nothing to clean up for stdio transport
   }
 }

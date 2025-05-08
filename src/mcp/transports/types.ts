@@ -1,9 +1,15 @@
 export enum TransportType {
-  STDIO = "stdio",
   HTTP = "http",
+  SSE = "sse",
+  STDIO = "stdio",
 }
 
-export interface TransportConfig {
-  port?: number;
-  host?: string;
+export interface Transport {
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+}
+
+export interface ServerConfig {
+  port: number;
+  host: string;
 }

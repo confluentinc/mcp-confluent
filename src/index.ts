@@ -9,7 +9,7 @@ import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { initEnv } from "@src/env.js";
 import { kafkaLogger, logger } from "@src/logger.js";
-import { TransportFactory } from "@src/mcp/transports/factory.js";
+import { TransportManager } from "@src/mcp/transports/index.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
 const cliOptions = parseCliArgs();
@@ -93,7 +93,6 @@ async function main() {
     });
 
     const toolHandlers = new Map<ToolName, ToolHandler>();
-    // TODO: Should we have the enabled tools come from configuration?
     const enabledTools = new Set<ToolName>(Object.values(ToolName));
 
     enabledTools.forEach((toolName) => {
@@ -113,28 +112,26 @@ async function main() {
         config.description,
         config.inputSchema,
         async (args, context) => {
-          // Pass the session ID from the transport to the tool handler
           const sessionId = context?.sessionId;
           return await handler.handle(clientManager, args, sessionId);
         },
       );
     });
 
-    // Create transport based on CLI options
-    const transport = TransportFactory.createTransport(
-      cliOptions.transport,
-      server,
-      {
-        port: env.HTTP_PORT ? Number(env.HTTP_PORT) : undefined,
-        host: env.HTTP_HOST,
-      },
+    const transportManager = new TransportManager(server);
+
+    // Start all transports with a single call
+    await transportManager.start(
+      cliOptions.transports,
+      env.HTTP_PORT ? Number(env.HTTP_PORT) : undefined,
+      env.HTTP_HOST,
     );
 
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
       await clientManager.disconnect();
-      await transport.disconnect();
+      await transportManager.stop();
       await server.close();
       process.exit(0);
     };
@@ -143,9 +140,6 @@ async function main() {
     process.on("SIGTERM", performCleanup);
     process.on("SIGQUIT", performCleanup);
     process.on("SIGUSR2", performCleanup);
-
-    // Connect the transport
-    await transport.connect();
   } catch (error) {
     logger.error({ error }, "Error starting server");
     process.exit(1);

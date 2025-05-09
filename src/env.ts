@@ -7,15 +7,15 @@ export type Environment = z.infer<typeof combinedSchema>;
 // Track if environment is initialized
 let isInitialized = false;
 let envValues: Environment = {} as Environment;
+
 /**
  * Loads and validates environment variables
  * @returns Validated environment object
  */
 export async function loadEnv(): Promise<Environment> {
   try {
-    // Load and validate environment variables
-    const envVars = combinedSchema.parse(process.env);
-    return envVars;
+    // Load and validate environment variables with automatic type conversion
+    return combinedSchema.parse(process.env);
   } catch (error) {
     logger.error({ error }, "Environment validation error");
     process.exit(1);

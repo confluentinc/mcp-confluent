@@ -1,5 +1,6 @@
-import { Command } from "@commander-js/extra-typings";
+import { Command, Option } from "@commander-js/extra-typings";
 import { logger } from "@src/logger.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 import * as dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
@@ -7,6 +8,30 @@ import path from "path";
 // Define the interface for our CLI options
 export interface CLIOptions {
   envFile?: string;
+  transports: TransportType[];
+}
+
+function parseTransportList(value: string): TransportType[] {
+  // Split, trim, and filter out empty strings
+  const types = value
+    .split(",")
+    .map((type) => type.trim())
+    .filter(Boolean);
+
+  // Validate each transport type
+  const validTypes = new Set(Object.values(TransportType));
+  const invalidTypes = types.filter(
+    (type) => !validTypes.has(type as TransportType),
+  );
+
+  if (invalidTypes.length > 0) {
+    throw new Error(
+      `Invalid transport type(s): ${invalidTypes.join(", ")}. Valid options: ${Array.from(validTypes).join(", ")}`,
+    );
+  }
+
+  // Deduplicate using Set
+  return Array.from(new Set(types)) as TransportType[];
 }
 
 /**
@@ -21,17 +46,31 @@ export function parseCliArgs(): CLIOptions {
     )
     .version(process.env.npm_package_version ?? "dev")
     .option("-e, --env-file <path>", "Load environment variables from file")
+    .addOption(
+      new Option(
+        "-t, --transport <types>",
+        "Transport types (comma-separated list)",
+      )
+        .choices(Object.values(TransportType))
+        .default(TransportType.STDIO)
+        .argParser((value) => parseTransportList(value)),
+    )
     .action((options) => {
       if (options.envFile) {
-        loadEnvironmentVariables(options);
+        loadEnvironmentVariables(options.envFile);
       }
     })
     .allowExcessArguments(false)
     .exitOverride();
 
   try {
-    // Parse arguments and get options (no need for generic type parameter with extra-typings)
-    return program.parse().opts();
+    const opts = program.parse().opts();
+    return {
+      envFile: opts.envFile,
+      transports: Array.isArray(opts.transport)
+        ? opts.transport
+        : [opts.transport],
+    };
   } catch {
     // This block is reached when --help or --version is called
     // as these will throw an error due to exitOverride()
@@ -40,30 +79,28 @@ export function parseCliArgs(): CLIOptions {
 }
 
 /**
- * Load environment variables from file if specified in options
- * @param options CLI options containing envFile path
+ * Load environment variables from file
+ * @param envFile Path to the environment file
  */
-export function loadEnvironmentVariables(options: CLIOptions): void {
-  if (options.envFile) {
-    const envPath = path.resolve(options.envFile);
+export function loadEnvironmentVariables(envFile: string): void {
+  const envPath = path.resolve(envFile);
 
-    // Check if file exists
-    if (!fs.existsSync(envPath)) {
-      logger.error(`Environment file not found: ${envPath}`);
-      return;
-    }
-
-    // Load environment variables from file
-    const result = dotenv.config({ path: envPath });
-
-    if (result.error) {
-      logger.error(
-        { error: result.error },
-        "Error loading environment variables",
-      );
-      return;
-    }
-
-    logger.info(`Loaded environment variables from ${envPath}`);
+  // Check if file exists
+  if (!fs.existsSync(envPath)) {
+    logger.error(`Environment file not found: ${envPath}`);
+    process.exit(1);
   }
+
+  // Load environment variables from file
+  const result = dotenv.config({ path: envPath });
+
+  if (result.error) {
+    logger.error(
+      { error: result.error },
+      "Error loading environment variables",
+    );
+    process.exit(1);
+  }
+
+  logger.info(`Loaded environment variables from ${envPath}`);
 }

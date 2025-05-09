@@ -2,7 +2,6 @@
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { parseCliArgs } from "@src/cli.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
@@ -10,9 +9,10 @@ import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { initEnv } from "@src/env.js";
 import { kafkaLogger, logger } from "@src/logger.js";
+import { TransportManager } from "@src/mcp/transports/index.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
-parseCliArgs();
+const cliOptions = parseCliArgs();
 
 async function main() {
   try {
@@ -93,7 +93,6 @@ async function main() {
     });
 
     const toolHandlers = new Map<ToolName, ToolHandler>();
-    // TODO: Should we have the enabled tools come from configuration?
     const enabledTools = new Set<ToolName>(Object.values(ToolName));
 
     enabledTools.forEach((toolName) => {
@@ -112,15 +111,29 @@ async function main() {
         name as string,
         config.description,
         config.inputSchema,
-        async (args) => {
-          return await handler.handle(clientManager, args);
+        async (args, context) => {
+          const sessionId = context?.sessionId;
+          return await handler.handle(clientManager, args, sessionId);
         },
       );
     });
 
+    const transportManager = new TransportManager(server);
+
+    // Start all transports with a single call
+    logger.info(
+      `Starting transports: ${cliOptions.transports.join(", ")} on ${env.HTTP_HOST}:${env.HTTP_PORT}`,
+    );
+    await transportManager.start(
+      cliOptions.transports,
+      env.HTTP_PORT,
+      env.HTTP_HOST,
+    );
+
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
+      await transportManager.stop();
       await clientManager.disconnect();
       await server.close();
       process.exit(0);
@@ -130,10 +143,6 @@ async function main() {
     process.on("SIGTERM", performCleanup);
     process.on("SIGQUIT", performCleanup);
     process.on("SIGUSR2", performCleanup);
-
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    logger.info("Confluent MCP Server running on stdio");
   } catch (error) {
     logger.error({ error }, "Error starting server");
     process.exit(1);

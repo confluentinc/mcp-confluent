@@ -89,7 +89,7 @@ export class ListFlinkStatementsHandler extends BaseToolHandler {
           environment_id: environment_id,
         },
         query: {
-          compute_pool_id: computePoolId,
+          "spec.compute_pool_id": computePoolId,
           page_size: pageSize,
           page_token: pageToken,
           label_selector: labelSelector,

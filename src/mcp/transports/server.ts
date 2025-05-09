@@ -2,14 +2,21 @@ import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import { logger } from "@src/logger.js";
 import { ServerConfig } from "@src/mcp/transports/types.js";
-import { default as Fastify, FastifyInstance } from "fastify";
+import {
+  default as Fastify,
+  FastifyBaseLogger,
+  FastifyInstance,
+} from "fastify";
 
 export class HttpServer {
   private fastify: FastifyInstance;
   private isSwaggerConfigured = false;
-
   constructor() {
-    this.fastify = Fastify();
+    this.fastify = Fastify({
+      loggerInstance: logger as FastifyBaseLogger,
+      // Useful for when ongoing http/sse connections are present
+      forceCloseConnections: true,
+    });
   }
 
   async prepare(): Promise<void> {

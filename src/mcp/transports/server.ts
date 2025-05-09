@@ -48,7 +48,6 @@ export class HttpServer {
           },
         },
         tags: [
-          { name: "health", description: "Health check endpoints" },
           { name: "mcp", description: "Model Context Protocol endpoints" },
         ],
       },

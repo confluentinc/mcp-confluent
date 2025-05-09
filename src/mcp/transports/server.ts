@@ -81,11 +81,6 @@ export class HttpServer {
         port: config.port,
         host: config.host,
       });
-
-      logger.info(`Server running at ${config.host}:${config.port}`);
-      logger.info(
-        `API documentation available at http://${config.host}:${config.port}/documentation`,
-      );
     } catch (error) {
       logger.error({ error }, "Failed to start server");
       throw error;

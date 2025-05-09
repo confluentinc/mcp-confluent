@@ -255,6 +255,28 @@ export interface paths {
     patch: operations["updateIamV2User"];
     trace?: never;
   };
+  "/iam/v2/users/{id}/auth": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update Auth Type of a User
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Update the auth type of a user
+     */
+    patch: operations["update_auth_typeIamV2User"];
+    trace?: never;
+  };
   "/iam/v2/service-accounts": {
     parameters: {
       query?: never;
@@ -514,6 +536,28 @@ export interface paths {
      *
      */
     patch: operations["updateIamV2IpFilter"];
+    trace?: never;
+  };
+  "/iam/v2/ip-filter-summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read an IP Filter Summary
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Make a request to read an IP filter summary.
+     */
+    get: operations["getIamV2IpFilterSummary"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/iam/v2/role-bindings": {
@@ -1909,7 +1953,8 @@ export interface paths {
      * Update Partition Count
      * @description [![Generally Available](https://img.shields.io/badge/Lifecycle%20Stage-Generally%20Available-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
      *
-     *     Increase the number of partitions for a topic.
+     *     Increase the number of partitions for a topic. To update other topic
+     *     configurations, see https://docs.confluent.io/cloud/current/api.html#tag/Configs-(v3)/operation/updateKafkaTopicConfig.
      */
     patch: operations["updatePartitionCountKafkaTopic"];
     trace?: never;
@@ -2016,7 +2061,9 @@ export interface paths {
      * Update Topic Config
      * @description [![Generally Available](https://img.shields.io/badge/Lifecycle%20Stage-Generally%20Available-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
      *
-     *     Update the configuration parameter with given `name`.
+     *     Update the configuration parameter with given `name`. To update the
+     *     number of partitions, see
+     *     https://docs.confluent.io/cloud/current/api.html#tag/Topic-(v3)/operation/updatePartitionCountKafkaTopic.
      */
     put: operations["updateKafkaTopicConfig"];
     post?: never;
@@ -5497,70 +5544,6 @@ export interface paths {
     patch: operations["updateKafkaQuotasV1ClientQuota"];
     trace?: never;
   };
-  "/sd/v1/pipelines": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * List of Pipelines
-     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
-     *
-     *     Retrieve a sorted, filtered, paginated list of all pipelines.
-     */
-    get: operations["listSdV1Pipelines"];
-    put?: never;
-    /**
-     * Create a Pipeline
-     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
-     *
-     *     Make a request to create a pipeline.
-     */
-    post: operations["createSdV1Pipeline"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/sd/v1/pipelines/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Read a Pipeline
-     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
-     *
-     *     Make a request to read a pipeline.
-     */
-    get: operations["getSdV1Pipeline"];
-    put?: never;
-    post?: never;
-    /**
-     * Delete a Pipeline
-     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
-     *
-     *     Make a request to delete a pipeline.
-     */
-    delete: operations["deleteSdV1Pipeline"];
-    options?: never;
-    head?: never;
-    /**
-     * Update a Pipeline
-     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
-     *
-     *     Make a request to update a pipeline.
-     *
-     *
-     */
-    patch: operations["updateSdV1Pipeline"];
-    trace?: never;
-  };
   "/byok/v1/keys": {
     parameters: {
       query?: never;
@@ -6354,18 +6337,15 @@ export interface paths {
     };
     /**
      * List of Flink Artifacts
-     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Flink Artifact API EA](https://img.shields.io/badge/-Request%20Access%20To%20Flink%20Artifact%20API%20EA-%23bc8540)](mailto:ccloud-api-access+artifact-v1-early-access@confluent.io?subject=Request%20to%20join%20artifact/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20artifact/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
      *
      *     Retrieve a sorted, filtered, paginated list of all flink artifacts.
-     *
-     *     If no `environment` filter is specified, returns Artifacts across envs for cloud & region.
-     *
      */
     get: operations["listArtifactV1FlinkArtifacts"];
     put?: never;
     /**
      * Create a new Flink Artifact.
-     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Flink Artifact API EA](https://img.shields.io/badge/-Request%20Access%20To%20Flink%20Artifact%20API%20EA-%23bc8540)](mailto:ccloud-api-access+artifact-v1-early-access@confluent.io?subject=Request%20to%20join%20artifact/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20artifact/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
      *
      *     Make a request to create a flink artifact.
      */
@@ -6385,7 +6365,7 @@ export interface paths {
     };
     /**
      * Read a Flink Artifact
-     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Flink Artifact API EA](https://img.shields.io/badge/-Request%20Access%20To%20Flink%20Artifact%20API%20EA-%23bc8540)](mailto:ccloud-api-access+artifact-v1-early-access@confluent.io?subject=Request%20to%20join%20artifact/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20artifact/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
      *
      *     Make a request to read a flink artifact.
      */
@@ -6394,7 +6374,7 @@ export interface paths {
     post?: never;
     /**
      * Delete a Flink Artifact
-     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Flink Artifact API EA](https://img.shields.io/badge/-Request%20Access%20To%20Flink%20Artifact%20API%20EA-%23bc8540)](mailto:ccloud-api-access+artifact-v1-early-access@confluent.io?subject=Request%20to%20join%20artifact/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20artifact/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
      *
      *     Make a request to delete a flink artifact.
      */
@@ -6403,7 +6383,7 @@ export interface paths {
     head?: never;
     /**
      * Update a Flink Artifact
-     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Flink Artifact API EA](https://img.shields.io/badge/-Request%20Access%20To%20Flink%20Artifact%20API%20EA-%23bc8540)](mailto:ccloud-api-access+artifact-v1-early-access@confluent.io?subject=Request%20to%20join%20artifact/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20artifact/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
      *
      *     Make a request to update a flink artifact.
      *
@@ -6423,7 +6403,7 @@ export interface paths {
     put?: never;
     /**
      * Request a presigned upload URL for a new Flink Artifact.
-     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Flink Artifact API EA](https://img.shields.io/badge/-Request%20Access%20To%20Flink%20Artifact%20API%20EA-%23bc8540)](mailto:ccloud-api-access+artifact-v1-early-access@confluent.io?subject=Request%20to%20join%20artifact/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20artifact/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
      *
      *     Request a presigned upload URL to upload a Flink Artifact archive.
      */
@@ -6498,6 +6478,220 @@ export interface paths {
     patch: operations["updateNetworkingV1Gateway"];
     trace?: never;
   };
+  "/ccl/v1/custom-code-loggings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List of Custom Code Loggings
+     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Custom Code Logging API EA](https://img.shields.io/badge/-Request%20Access%20To%20Custom%20Code%20Logging%20API%20EA-%23bc8540)](mailto:ccloud-api-access+ccl-v1-early-access@confluent.io?subject=Request%20to%20join%20ccl/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20ccl/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     *
+     *     Retrieve a sorted, filtered, paginated list of all custom code loggings.
+     */
+    get: operations["listCclV1CustomCodeLoggings"];
+    put?: never;
+    /**
+     * Create a Custom Code Logging
+     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Custom Code Logging API EA](https://img.shields.io/badge/-Request%20Access%20To%20Custom%20Code%20Logging%20API%20EA-%23bc8540)](mailto:ccloud-api-access+ccl-v1-early-access@confluent.io?subject=Request%20to%20join%20ccl/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20ccl/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     *
+     *     Make a request to create a custom code logging.
+     */
+    post: operations["createCclV1CustomCodeLogging"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/ccl/v1/custom-code-loggings/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read a Custom Code Logging
+     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Custom Code Logging API EA](https://img.shields.io/badge/-Request%20Access%20To%20Custom%20Code%20Logging%20API%20EA-%23bc8540)](mailto:ccloud-api-access+ccl-v1-early-access@confluent.io?subject=Request%20to%20join%20ccl/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20ccl/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     *
+     *     Make a request to read a custom code logging.
+     */
+    get: operations["getCclV1CustomCodeLogging"];
+    put?: never;
+    post?: never;
+    /**
+     * Delete a Custom Code Logging
+     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Custom Code Logging API EA](https://img.shields.io/badge/-Request%20Access%20To%20Custom%20Code%20Logging%20API%20EA-%23bc8540)](mailto:ccloud-api-access+ccl-v1-early-access@confluent.io?subject=Request%20to%20join%20ccl/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20ccl/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     *
+     *     Make a request to delete a custom code logging.
+     */
+    delete: operations["deleteCclV1CustomCodeLogging"];
+    options?: never;
+    head?: never;
+    /**
+     * Update a Custom Code Logging
+     * @description [![Early Access](https://img.shields.io/badge/Lifecycle%20Stage-Early%20Access-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy) [![Request Access To Custom Code Logging API EA](https://img.shields.io/badge/-Request%20Access%20To%20Custom%20Code%20Logging%20API%20EA-%23bc8540)](mailto:ccloud-api-access+ccl-v1-early-access@confluent.io?subject=Request%20to%20join%20ccl/v1%20API%20Early%20Access&body=I%E2%80%99d%20like%20to%20join%20the%20Confluent%20Cloud%20API%20Early%20Access%20for%20ccl/v1%20to%20provide%20early%20feedback%21%20My%20Cloud%20Organization%20ID%20is%20%3Cretrieve%20from%20https%3A//confluent.cloud/settings/billing/payment%3E.)
+     *
+     *     Make a request to update a custom code logging.
+     *
+     *
+     */
+    patch: operations["updateCclV1CustomCodeLogging"];
+    trace?: never;
+  };
+  "/tableflow/v1/regions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List of Regions
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Retrieve a sorted, filtered, paginated list of all regions.
+     */
+    get: operations["listTableflowV1Regions"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tableflow/v1/tableflow-topics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List of Tableflow Topics
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Retrieve a sorted, filtered, paginated list of all tableflow topics.
+     */
+    get: operations["listTableflowV1TableflowTopics"];
+    put?: never;
+    /**
+     * Create a Tableflow Topic
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Make a request to create a tableflow topic.
+     */
+    post: operations["createTableflowV1TableflowTopic"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tableflow/v1/tableflow-topics/{display_name}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read a Tableflow Topic
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Make a request to read a tableflow topic.
+     */
+    get: operations["getTableflowV1TableflowTopic"];
+    put?: never;
+    post?: never;
+    /**
+     * Delete a Tableflow Topic
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Make a request to delete a tableflow topic.
+     */
+    delete: operations["deleteTableflowV1TableflowTopic"];
+    options?: never;
+    head?: never;
+    /**
+     * Update a Tableflow Topic
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Make a request to update a tableflow topic.
+     *
+     *
+     */
+    patch: operations["updateTableflowV1TableflowTopic"];
+    trace?: never;
+  };
+  "/tableflow/v1/catalog-integrations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List of Catalog Integrations
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Retrieve a sorted, filtered, paginated list of all catalog integrations.
+     */
+    get: operations["listTableflowV1CatalogIntegrations"];
+    put?: never;
+    /**
+     * Create a Catalog Integration
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Make a request to create a catalog integration.
+     */
+    post: operations["createTableflowV1CatalogIntegration"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tableflow/v1/catalog-integrations/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read a Catalog Integration
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Make a request to read a catalog integration.
+     */
+    get: operations["getTableflowV1CatalogIntegration"];
+    put?: never;
+    post?: never;
+    /**
+     * Delete a Catalog Integration
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Make a request to delete a catalog integration.
+     */
+    delete: operations["deleteTableflowV1CatalogIntegration"];
+    options?: never;
+    head?: never;
+    /**
+     * Update a Catalog Integration
+     * @description [![General Availability](https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8)](#section/Versioning/API-Lifecycle-Policy)
+     *
+     *     Make a request to update a catalog integration.
+     *
+     *
+     */
+    patch: operations["updateTableflowV1CatalogIntegration"];
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6506,6 +6700,7 @@ export interface components {
      *     of API keys represent access to a single cluster/resource such as a Kafka cluster,
      *     Schema Registry cluster or a ksqlDB cluster. Cloud API Keys represent access to resources within an organization
      *     that are not tied to a specific cluster, such as the Org API, IAM API, Metrics API or Connect API.
+     *     Tableflow API keys are not tied to a specific cluster.
      *
      *     The API allows you to list, create, update and delete your API Keys.
      *
@@ -6551,6 +6746,7 @@ export interface components {
      *     of API keys represent access to a single cluster/resource such as a Kafka cluster,
      *     Schema Registry cluster or a ksqlDB cluster. Cloud API Keys represent access to resources within an organization
      *     that are not tied to a specific cluster, such as the Org API, IAM API, Metrics API or Connect API.
+     *     Tableflow API keys are not tied to a specific cluster.
      *
      *     The API allows you to list, create, update and delete your API Keys.
      *
@@ -6614,7 +6810,8 @@ export interface components {
       /** @description The resource associated with this object. The resource can be one of Kafka Cluster ID (example: lkc-12345),
        *     Schema Registry Cluster ID (example: lsrc-12345), ksqlDB Cluster ID (example: lksqlc-12345), or Flink
        *     (Environment + Region pair, example: env-abc123.aws.us-east-2).
-       *     May be null or omitted if not associated with a resource. For Cloud API keys, resource should be `null`.
+       *     May be null or omitted if not associated with a resource. For creating Cloud API key, resource should be `CLOUD`,
+       *     for creating Tableflow API key, resource should be `TABLEFLOW`. The resource id is case-insensitive.
        *     [Learn more in Authentication](https://docs.confluent.io/cloud/current/api.html#section/Authentication).
        *
        *     Note - Flink is in the [Preview lifecycle stage](https://docs.confluent.io/cloud/current/api.html#section/Versioning/API-Lifecycle-Policy)
@@ -7149,6 +7346,37 @@ export interface components {
       /** @description The invitation creator */
       readonly creator?: components["schemas"]["GlobalObjectReference"];
     };
+    /** @description Configure user auth type */
+    "iam.v2.User.ConfigureUserAuthRequest": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version?: "iam.v2/User";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind?: "ConfigureUserAuthRequest";
+      /**
+       * @description ID is the "natural identifier" for an object within its scope/namespace; it is normally unique across time but not space. That is, you can assume that the ID will not be reclaimed and reused after an object is deleted ("time"); however, it may collide with IDs for other object `kinds` or objects of the same `kind` within a different scope/namespace ("space").
+       * @example dlz-f3a90de
+       */
+      readonly id?: string;
+      metadata?: components["schemas"]["ObjectMeta"] & {
+        /** @example https://api.confluent.cloud/iam.v2/User/configure-user-auth-requests/cuar-12345 */
+        self?: unknown;
+        /** @example crn://confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/configure-user-auth-request=cuar-12345 */
+        resource_name?: unknown;
+      };
+      /**
+       * @description The user's authentication method.
+       * @example AUTH_TYPE_SSO
+       */
+      auth_type?: string;
+    };
+    /** @description Filter a collection by a string search for one or more values */
+    MultipleSearchFilter: string[];
     /** @description `User` objects represent individuals who may access your Confluent resources.
      *
      *     The API allows you to retrieve, update, and delete individual users, as well as list of all your
@@ -7373,13 +7601,84 @@ export interface components {
        */
       filter_name?: string;
       /**
-       * @description Scope of resources covered by this IP filter. The only resource_group currently available is "management".
+       * @description Scope of resources covered by this IP filter. Available resource groups include "management" and "multiple".
        *
        * @example management
        */
       resource_group?: string;
+      /**
+       * Format: uri
+       * @description A CRN that specifies the scope of the ip filter, specifically the organization
+       *     or environment. Without specifying this property, the ip filter
+       *     would apply to the whole organization.
+       *
+       * @example crn://confluent.cloud/organization=org-123/environment=env-abc
+       */
+      resource_scope?: string;
+      /**
+       * @description Scope of resources covered by this IP filter. Resource group must be set to 'multiple'
+       *     in order to use this property.During update operations, note that the operation
+       *     groups passed in will replace the list of existing operation groups
+       *     (passing in an empty list will remove all operation groups) from the filter
+       *     (in line with the behavior for ip_groups).
+       *
+       * @example [
+       *       "MANAGEMENT",
+       *       "SCHEMA",
+       *       "FLINK"
+       *     ]
+       */
+      operation_groups?: string[];
       /** @description A list of IP Groups. */
       ip_groups?: components["schemas"]["GlobalObjectReference"][];
+    };
+    /** @description The IP Filter Summary endpoint returns an aggregation of the IP Filters across the system.
+     *     This API can be queried in the context of an organization or an environment. It returns a
+     *     summary of every operation group in the system grouped with a higher summary by operation
+     *     group category.
+     *      */
+    "iam.v2.IpFilterSummary": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version?: "iam/v2";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind?: "IpFilterSummary";
+      /** @description The scope associated with this object. */
+      scope?: string;
+      /**
+       * @description Summary of the operation groups and IP filters created in those operation groups.
+       *
+       * @example [
+       *       {
+       *         "name": "management",
+       *         "status": "MIXED",
+       *         "operation_groups": [
+       *           {
+       *             "name": "MANAGEMENT",
+       *             "status": "LIMITED"
+       *           }
+       *         ]
+       *       }
+       *     ]
+       */
+      categories?: {
+        /** @description Name of the category. */
+        name?: string;
+        /** @description Open, limited, or mixed. */
+        status?: string;
+        /** @description Operation groups part of this category. */
+        operation_groups?: {
+          /** @description Name of the operation group. */
+          name?: string;
+          /** @description Open, limited, or no access. */
+          status?: string;
+        }[];
+      }[];
     };
     /** @description Definitions of networks which can be named and referred by IP blocks, commonly used to attach to IP Filter rules.
      *
@@ -8040,8 +8339,6 @@ export interface components {
     "cmk.v2.Freight": {
       /**
        * @description Freight cluster type.
-       *
-       *     Note - Freight clusters are in an [Early Access lifecycle stage](https://docs.confluent.io/cloud/current/api.html#section/Versioning/API-Lifecycle-Policy).
        *      (enum property replaced by openapi-typescript)
        * @enum {string}
        */
@@ -8063,8 +8360,6 @@ export interface components {
        */
       readonly zones?: string[];
     };
-    /** @description Filter a collection by a string search for one or more values */
-    MultipleSearchFilter: string[];
     /** @description `Clusters` objects represent Apache Kafka Clusters on Confluent Cloud.
      *
      *     The API allows you to list, create, read, update, and delete your Kafka clusters.
@@ -10032,6 +10327,37 @@ export interface components {
        * @example https://psrc-00000.us-central1.gcp.confluent.cloud
        */
       readonly http_endpoint?: string;
+      /**
+       * Format: uri
+       * @description The cluster's catalog HTTP request URL.
+       * @example https://psrc-00000.us-central1.gcp.confluent.cloud
+       */
+      readonly catalog_http_endpoint?: string;
+      /**
+       * Format: uri
+       * @description The cluster's private HTTP request URL.
+       *
+       *     DEPRECATED - Please use the `private_networking_config.regional_endpoints` attribute instead,
+       *     which supersedes the `private_http_endpoint` attribute.
+       *
+       * @example https://lsrc-abc.us-central-1.aws.private.confluent.cloud
+       */
+      readonly private_http_endpoint?: string;
+      /**
+       * @description Available HTTP request URLs for private connectivity.
+       * @example {
+       *       "regional_endpoints": {
+       *         "us-central-1": "https://lsrc-abc.us-central-1.aws.private.confluent.cloud",
+       *         "us-west-2": "https://lsrc-abc.us-west-2.aws.private.confluent.cloud"
+       *       }
+       *     }
+       */
+      readonly private_networking_config?: {
+        /** @description A map of region identifiers to their corresponding private HTTP request URL. */
+        regional_endpoints?: {
+          [key: string]: string;
+        };
+      };
       /**
        * @description The cloud service provider in which the cluster is running.
        * @example GCP
@@ -13690,9 +14016,9 @@ export interface components {
        */
       readonly private_link_service_resource_id: string;
     };
-    /** @description GCP PrivateLink attachment represents reserved capacity in zonal
-     *     GCP PSC Service attachments.  A PSC Endpoint can be connected to
-     *     the Service attachment corresponding to each zone.
+    /** @description GCP PrivateLink attachment represents reserved capacity in a
+     *     GCP PSC Service attachment.  A PSC Endpoint can be connected to
+     *     the Service attachment.
      *      */
     "networking.v1.GcpPrivateLinkAttachmentStatus": {
       /**
@@ -13700,23 +14026,18 @@ export interface components {
        * @enum {string}
        */
       kind: "GcpPrivateLinkAttachmentStatus";
-      /** @description Array of GCP PSC Service attachments that can be used to connect
-       *     PSC Endpoints for each zone.
+      /** @description GCP PSC Service attachment that can be used to connect
+       *     to a PSC Endpoint.
        *      */
-      readonly service_attachments: components["schemas"]["networking.v1.GcpPscServiceAttachment"][];
+      readonly service_attachment: components["schemas"]["networking.v1.GcpPscServiceAttachment"];
     };
-    /** @description GCP PSC Service attachment for a zone with reserved capacity to
+    /** @description GCP PSC Service attachment with reserved capacity to
      *     connect a PSC Endpoint.
      *      */
     "networking.v1.GcpPscServiceAttachment": {
       /**
-       * @description Zone associated with the PSC Service attachment.
-       * @example us-central1-a
-       */
-      readonly zone: string;
-      /**
        * @description Id of a Private Service Connect Service Attachment in Confluent Cloud.
-       * @example projects/example-project/regions/us-central1/serviceAttachments/plt-abcdef-service-attachment-us-central1-a
+       * @example projects/example-project/regions/us-central1/serviceAttachments/plt-abcdef-service-attachment-us-central1
        */
       readonly private_service_connect_service_attachment: string;
     };
@@ -13738,7 +14059,7 @@ export interface components {
        */
       readonly vpc_endpoint_id: string;
     };
-    /** @description Status of an Azure PrivateLink attachment connection for an availability zone. */
+    /** @description Status of a Azure PrivateLink attachment connection. */
     "networking.v1.AzurePrivateLinkAttachmentConnectionStatus": {
       /**
        * @description PrivateLinkAttachmentConnectionStatus kind. (enum property replaced by openapi-typescript)
@@ -13746,29 +14067,24 @@ export interface components {
        */
       kind: "AzurePrivateLinkAttachmentConnectionStatus";
       /**
-       * @description Availability zone associated with the Azure PrivateLink service.
-       * @example 1
-       */
-      readonly zone: string;
-      /**
-       * @description Azure PrivateLink service alias for the availability zone.
+       * @description Azure PrivateLink service alias.
        * @example pls-plt-abcdef-az3.38748da8-3322-42f7-b97a-6448c21af653.centralus.azure.privatelinkservice
        */
       readonly private_link_service_alias: string;
       /**
-       * @description Azure PrivateLink service resource id for the availability zone.
+       * @description Azure PrivateLink service resource id.
        * @example /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/s-abcde/providers/Microsoft.Network/privateLinkServices/pls-plt-abcdef-az3
        */
       readonly private_link_service_resource_id: string;
       /**
        * @description Resource Id of the PrivateEndpoint (if any) that is connected to
-       *     the PrivateLink service for this availability zone.
+       *     the PrivateLink service.
        *
        * @example /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testvpc/providers/Microsoft.Network/privateEndpoints/pe-plt-abcdef-az3
        */
       readonly private_endpoint_resource_id: string;
     };
-    /** @description Status of a GCP PrivateLink attachment connection for a zone. */
+    /** @description Status of GCP PrivateLink attachment connection. */
     "networking.v1.GcpPrivateLinkAttachmentConnectionStatus": {
       /**
        * @description PrivateLinkAttachmentConnectionStatus kind. (enum property replaced by openapi-typescript)
@@ -13776,12 +14092,7 @@ export interface components {
        */
       kind: "GcpPrivateLinkAttachmentConnectionStatus";
       /**
-       * @description Zone associated with the GCP PrivateLink attachment connection.
-       * @example us-central1-a
-       */
-      readonly zone: string;
-      /**
-       * @description GCP Private Service Connect ServiceAttachment for the zone.
+       * @description GCP Private Service Connect ServiceAttachment.
        * @example projects/example-project/regions/us-central1/serviceAttachments/plt-abcdef-service-attachment-us-central1-a
        */
       readonly private_service_connect_service_attachment: string;
@@ -13829,7 +14140,7 @@ export interface components {
        * @description Id of the Private Service connection.
        * @example 00000000000000000
        */
-      readonly private_service_connect_connection_id: string;
+      private_service_connect_connection_id: string;
     };
     /** @description PrivateLink attachment objects represent reservations to establish PrivateLink connections
      *     to a cloud region in order to access resources that belong to a Confluent Cloud Environment.
@@ -13990,6 +14301,16 @@ export interface components {
       display_name?: string;
       /** @description A description of the identity provider. */
       description?: string;
+      /**
+       * @description The JSON Web Token (JWT) claim to extract the authenticating identity to Confluent resources from
+       *     [Registered Claim Names](https://datatracker.ietf.org/doc/html/rfc7519#section-4.1). This appears
+       *     in audit log records. Note: if the client specifies mapping to one identity pool ID, the identity
+       *     claim configured with that pool will be used instead.
+       *     Note - The attribute is in an [Early Access lifecycle stage]
+       *     (https://docs.confluent.io/cloud/current/api.html#section/Versioning/API-Lifecycle-Policy)
+       * @example claims.sub
+       */
+      identity_claim?: string;
       /**
        * @description The current state of the identity provider.
        * @example ENABLED
@@ -14444,186 +14765,6 @@ export interface components {
       /** @description The environment to which this belongs. */
       environment?: components["schemas"]["GlobalObjectReference"];
     };
-    /** @description `Pipeline` objects represent information about a user-defined pipeline of Confluent Cloud components.
-     *     The pipeline's content is available separately.
-     *
-     *     The API allows you to create, retrieve, update, and delete your pipelines,
-     *     as well as list all of your pipelines for the particular environment and Kafka cluster.
-     *
-     *
-     *     Related guide: [Pipelines in Confluent Cloud](https://docs.confluent.io/cloud/current/stream-designer/).
-     *
-     *     ## The Pipelines Model
-     *     <SchemaDefinition schemaRef="#/components/schemas/sd.v1.Pipeline" />
-     *
-     *     ## Quotas and Limits
-     *     This resource is subject to the [following quotas](https://docs.confluent.io/cloud/current/quotas/overview.html):
-     *
-     *     | Quota | Description |
-     *     | --- | --- |
-     *     | `pipelines_per_org` | Pipelines in one Confluent Cloud organization |
-     *     | `pipelines_per_cluster` | Pipelines in one Confluent Cloud Kafka cluster | */
-    "sd.v1.Pipeline": {
-      /**
-       * @description APIVersion defines the schema version of this representation of a resource.
-       * @enum {string}
-       */
-      readonly api_version?: "sd/v1";
-      /**
-       * @description Kind defines the object this REST resource represents.
-       * @enum {string}
-       */
-      readonly kind?: "Pipeline";
-      /**
-       * @description ID is the "natural identifier" for an object within its scope/namespace; it is normally unique across time but not space. That is, you can assume that the ID will not be reclaimed and reused after an object is deleted ("time"); however, it may collide with IDs for other object `kinds` or objects of the same `kind` within a different scope/namespace ("space").
-       * @example dlz-f3a90de
-       */
-      readonly id?: string;
-      metadata?: components["schemas"]["ObjectMeta"] & {
-        /** @example https://api.confluent.cloud/sd/v1/pipelines/pipe-12345 */
-        self?: unknown;
-        /** @example crn://confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/pipeline=pipe-12345 */
-        resource_name?: unknown;
-      };
-      spec?: components["schemas"]["sd.v1.PipelineSpec"];
-      status?: components["schemas"]["sd.v1.PipelineStatus"];
-    };
-    /** @description The status of the Pipeline */
-    "sd.v1.PipelineStatus": {
-      /** @description The current state of the pipeline.:
-       *       DRAFT:  the pipeline is a draft and not activated yet;
-       *       ACTIVATING:  the pipeline activation is in progress;
-       *       DEACTIVATING:  the pipeline deactivation is in progress;
-       *       ACTIVE:  the pipeline is actived and running;
-       *       FAILED:  the pipeline activation or deactivation failed;
-       *       DELETED:  the pipeline is deleted
-       *      */
-      readonly state?: string;
-      /**
-       * Format: int32
-       * @description The number of Kafka topics defined in the pipeline.
-       */
-      readonly topic_count?: number;
-      /**
-       * Format: int32
-       * @description The number of connectors defined in the pipeline.
-       */
-      readonly connector_count?: number;
-      /**
-       * Format: int32
-       * @description The number of KSQL queries defined in the pipeline.
-       */
-      readonly query_count?: number;
-    };
-    /** @description A object containing pipeline's source code definition. */
-    "sd.v1.SourceCodeObject": {
-      /**
-       * @description A list of KSQL statements that defines a pipeline.
-       * @example CREATE STREAM `upstream` (id INTEGER, name STRING)
-       *       WITH (kafka_topic = 'topic', partitions=1, value_format='JSON');
-       *     CREATE STREAM `downstream` AS SELECT * FROM upstream;
-       *
-       */
-      sql: string;
-    };
-    /** @description `Pipeline` objects represent information about a user-defined pipeline of Confluent Cloud components.
-     *     The pipeline's content is available separately.
-     *
-     *     The API allows you to create, retrieve, update, and delete your pipelines,
-     *     as well as list all of your pipelines for the particular environment and Kafka cluster.
-     *
-     *
-     *     Related guide: [Pipelines in Confluent Cloud](https://docs.confluent.io/cloud/current/stream-designer/).
-     *
-     *     ## The Pipelines Model
-     *     <SchemaDefinition schemaRef="#/components/schemas/sd.v1.Pipeline" />
-     *
-     *     ## Quotas and Limits
-     *     This resource is subject to the [following quotas](https://docs.confluent.io/cloud/current/quotas/overview.html):
-     *
-     *     | Quota | Description |
-     *     | --- | --- |
-     *     | `pipelines_per_org` | Pipelines in one Confluent Cloud organization |
-     *     | `pipelines_per_cluster` | Pipelines in one Confluent Cloud Kafka cluster | */
-    "sd.v1.PipelineList": {
-      /**
-       * @description APIVersion defines the schema version of this representation of a resource.
-       * @enum {string}
-       */
-      readonly api_version: "sd/v1";
-      /**
-       * @description Kind defines the object this REST resource represents.
-       * @enum {string}
-       */
-      readonly kind: "PipelineList";
-      metadata: components["schemas"]["ListMeta"] & {
-        /** @example https://api.confluent.cloud/sd/v1/pipelines */
-        first?: unknown;
-        /** @example https://api.confluent.cloud/sd/v1/pipelines?page_token=bcAOehAY8F16YD84Z1wT */
-        last?: unknown;
-        /** @example https://api.confluent.cloud/sd/v1/pipelines?page_token=YIXRY97wWYmwzrax4dld */
-        prev?: unknown;
-        /** @example https://api.confluent.cloud/sd/v1/pipelines?page_token=UvmDWOB1iwfAIBPj6EYb */
-        next?: unknown;
-      };
-      /** @description A data property that contains an array of resource items. Each entry in the array is a separate resource. */
-      data: (components["schemas"]["sd.v1.Pipeline"] & {
-        spec: Record<string, unknown>;
-      })[];
-    };
-    /** @description The desired state of the Pipeline */
-    "sd.v1.PipelineSpec": {
-      /**
-       * @description The name of the pipeline.
-       * @example MyFirstPipeline
-       */
-      display_name?: string;
-      /**
-       * @description The description of the pipeline.
-       * @example My first pipeline
-       */
-      description?: string;
-      /**
-       * @description A list of Kafka topic names from the activated pipeline to be retained when
-       *     this pipeline is deactivated.
-       *
-       * @example [
-       *       "topic1",
-       *       "topic2"
-       *     ]
-       */
-      retained_topic_names?: string[];
-      /**
-       * @description The desired state of the pipeline.
-       * @default false
-       */
-      activated: boolean;
-      /**
-       * @description Whether the pipeline has privileges to be activated.
-       * @default false
-       */
-      activation_privilege: boolean;
-      /** @description A map of source code format and statements that define this pipeline. */
-      source_code?: components["schemas"]["sd.v1.SourceCodeObject"];
-      /**
-       * @description A map of secrets used in the pipeline source code.
-       * @example {
-       *       "secret_name_1": "secret1",
-       *       "secret_name_2": "secret2"
-       *     }
-       */
-      secrets?: {
-        [key: string]: string;
-      };
-      /** @description The environment to which this belongs. */
-      environment?: components["schemas"]["ObjectReference"];
-      /** @description The kafka_cluster to which this belongs. */
-      kafka_cluster?: components["schemas"]["ObjectReference"];
-      /** @description The ksql_cluster associated with this object. */
-      ksql_cluster?: components["schemas"]["ObjectReference"];
-      /** @description The stream_governance_cluster associated with this object. */
-      stream_governance_cluster?: components["schemas"]["ObjectReference"];
-    };
     /** @description `Key` objects represent customer managed keys on dedicated Confluent Cloud clusters.
      *
      *     Keys are used to protect data at rest stored in your dedicated Confluent Cloud clusters on AWS, Azure, and GCP.
@@ -15076,6 +15217,7 @@ export interface components {
     };
     /** @description A Compute Pool represents a set of compute resources that is used to run your Queries.
      *     The resources (CPUs, memory,…) provided by a Compute Pool are shared between all Queries that use it.
+     *     Note that the Compute Pool API supports a limited pagination API, only the `next` field will be populated.
      *
      *
      *     ## The Compute Pools Model
@@ -15175,6 +15317,7 @@ export interface components {
     };
     /** @description A Compute Pool represents a set of compute resources that is used to run your Queries.
      *     The resources (CPUs, memory,…) provided by a Compute Pool are shared between all Queries that use it.
+     *     Note that the Compute Pool API supports a limited pagination API, only the `next` field will be populated.
      *
      *
      *     ## The Compute Pools Model
@@ -15229,6 +15372,13 @@ export interface components {
        * @example 5
        */
       max_cfu?: number;
+      /**
+       * @description The flag to enable AI computing using Ray for the Flink compute pool. It's available in the Early Access API
+       *     lifecycle stage only.
+       *
+       * @default false
+       */
+      enable_ai: boolean;
       /** @description The environment to which this belongs. */
       environment?: components["schemas"]["GlobalObjectReference"];
       /** @description The network to which this belongs. */
@@ -16081,6 +16231,12 @@ export interface components {
        *
        *       DEPROVISIONING: Access point deprovisioning is in progress;
        *
+       *       DISCONNECTED: Access Point has been disconnected in the cloud provider by the customer;
+       *
+       *       DEGRADED: Access Point is experiencing reduced performance or partial failure;
+       *
+       *       ERROR: Invalid customer input during Access Point creation;
+       *
        * @example READY
        */
       readonly phase: string;
@@ -16091,7 +16247,8 @@ export interface components {
       /** @description Cloud specific status of the access point. */
       readonly config?:
         | components["schemas"]["networking.v1.AwsEgressPrivateLinkEndpointStatus"]
-        | components["schemas"]["networking.v1.AzureEgressPrivateLinkEndpointStatus"];
+        | components["schemas"]["networking.v1.AzureEgressPrivateLinkEndpointStatus"]
+        | components["schemas"]["networking.v1.GcpEgressPrivateServiceConnectEndpointStatus"];
     };
     /** @description DNS record objects are associated with Confluent Cloud networking resources. This API allows you to list, create, read, update, and delete your DNS records.
      *
@@ -16162,6 +16319,11 @@ export interface components {
        * @example false
        */
       enable_high_availability?: boolean;
+      /**
+       * @description [Used by the Confluent Cloud Console] The target system or service that the PrivateLink Endpoint connects to (e.g. "MONGODB" or "SNOWFLAKE").
+       * @example S3
+       */
+      target_system?: string;
     };
     /** @description Azure Private Endpoint. */
     "networking.v1.AzureEgressPrivateLinkEndpoint": {
@@ -16180,6 +16342,29 @@ export interface components {
        * @example sqlServer
        */
       private_link_subresource_name?: string;
+      /**
+       * @description [Used by the Confluent Cloud Console] The target system or service that the PrivateLink Endpoint connects to (e.g. "MONGODB" or "SNOWFLAKE").
+       * @example SNOWFLAKE
+       */
+      target_system?: string;
+    };
+    /** @description GCP Private Service Connect Endpoint. */
+    "networking.v1.GcpEgressPrivateServiceConnectEndpoint": {
+      /**
+       * @description GcpEgressPrivateServiceConnectEndpoint kind. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "GcpEgressPrivateServiceConnectEndpoint";
+      /**
+       * @description URI of the service attachment for the published service that the Private Service Connect Endpoint connects to or "ALL_GOOGLE_APIS" for global Google APIs.
+       * @example projects/project-name/regions/us-central1/serviceAttachments/service-attachment-name
+       */
+      private_service_connect_endpoint_target: string;
+      /**
+       * @description [Used by the Confluent Cloud Console] The target system or service that the PrivateLink Endpoint connects to (e.g. "GCS" or "SNOWFLAKE").
+       * @example GCS
+       */
+      target_system?: string;
     };
     /**
      * AWS
@@ -16224,6 +16409,37 @@ export interface components {
        * @example 10.2.0.68
        */
       readonly private_endpoint_ip_address: string;
+      /**
+       * @description Domains of the Private Endpoint (if any) based off FQDNs in Azure custom DNS configs, which are required in your private DNS setup.
+       * @example [
+       *       "dbname.database.windows.net",
+       *       "dbname-region.database.windows.net"
+       *     ]
+       */
+      readonly private_endpoint_custom_dns_config_domains?: string[];
+    };
+    /** @description Status of a GCP Private Service Connect Endpoint. */
+    "networking.v1.GcpEgressPrivateServiceConnectEndpointStatus": {
+      /**
+       * @description GcpEgressPrivateServiceConnectEndpointStatus kind. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "GcpEgressPrivateServiceConnectEndpointStatus";
+      /**
+       * @description Connection ID of the Private Service Connect Endpoint (if any) that is connected to the endpoint target.
+       * @example
+       */
+      readonly private_service_connect_endpoint_connection_id: string;
+      /**
+       * @description Name of the Private Service Connect Endpoint (if any) that is connected to the endpoint target.
+       * @example plap-123456
+       */
+      readonly private_service_connect_endpoint_name: string;
+      /**
+       * @description IP address of the Private Service Connect Endpoint (if any) that is connected to the endpoint target.
+       * @example 10.2.0.68
+       */
+      readonly private_service_connect_endpoint_ip_address: string;
     };
     /** @description DNS record that is associated with a PrivateLink access point. */
     "networking.v1.PrivateLinkAccessPoint": {
@@ -16237,6 +16453,76 @@ export interface components {
        * @example ap-12345
        */
       resource_id: string;
+    };
+    /** @description Confluent Private Network Interface powered by AWS ENI. */
+    "networking.v1.AwsPrivateNetworkInterface": {
+      /**
+       * @description AwsPrivateNetworkInterface kind. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "AwsPrivateNetworkInterface";
+      /**
+       * @description List of the IDs of the Elastic Network Interfaces.
+       * @example [
+       *       "eni-00000000000000000",
+       *       "eni-00000000000000001",
+       *       "eni-00000000000000002",
+       *       "eni-00000000000000003",
+       *       "eni-00000000000000004",
+       *       "eni-00000000000000005",
+       *       "eni-00000000000000006",
+       *       "eni-00000000000000007",
+       *       "eni-00000000000000008",
+       *       "eni-00000000000000009",
+       *       "eni-00000000000000010",
+       *       "eni-00000000000000011",
+       *       "eni-00000000000000012",
+       *       "eni-00000000000000013",
+       *       "eni-00000000000000014",
+       *       "eni-00000000000000015",
+       *       "eni-00000000000000016",
+       *       "eni-00000000000000017",
+       *       "eni-00000000000000018",
+       *       "eni-00000000000000019",
+       *       "eni-00000000000000020",
+       *       "eni-00000000000000021",
+       *       "eni-00000000000000022",
+       *       "eni-00000000000000023",
+       *       "eni-00000000000000024",
+       *       "eni-00000000000000025",
+       *       "eni-00000000000000026",
+       *       "eni-00000000000000027",
+       *       "eni-00000000000000028",
+       *       "eni-00000000000000029",
+       *       "eni-00000000000000030",
+       *       "eni-00000000000000031",
+       *       "eni-00000000000000032",
+       *       "eni-00000000000000033",
+       *       "eni-00000000000000034",
+       *       "eni-00000000000000035",
+       *       "eni-00000000000000036",
+       *       "eni-00000000000000037",
+       *       "eni-00000000000000038",
+       *       "eni-00000000000000039",
+       *       "eni-00000000000000040",
+       *       "eni-00000000000000041",
+       *       "eni-00000000000000042",
+       *       "eni-00000000000000043",
+       *       "eni-00000000000000044",
+       *       "eni-00000000000000045",
+       *       "eni-00000000000000046",
+       *       "eni-00000000000000047",
+       *       "eni-00000000000000048",
+       *       "eni-00000000000000049",
+       *       "eni-00000000000000050"
+       *     ]
+       */
+      network_interfaces?: string[];
+      /**
+       * @description The AWS account ID associated with the ENIs you are using for the Confluent Private Network Interface.
+       * @example 000000000000
+       */
+      account?: string;
     };
     /** @description AccessPoint objects represent network connections in and out of Gateways.
      *     This API allows you to list, create, read, update, and delete your access points.
@@ -16280,7 +16566,9 @@ export interface components {
       /** @description The specific details of the different access point configurations. */
       config?:
         | components["schemas"]["networking.v1.AwsEgressPrivateLinkEndpoint"]
-        | components["schemas"]["networking.v1.AzureEgressPrivateLinkEndpoint"];
+        | components["schemas"]["networking.v1.AzureEgressPrivateLinkEndpoint"]
+        | components["schemas"]["networking.v1.AwsPrivateNetworkInterface"]
+        | components["schemas"]["networking.v1.GcpEgressPrivateServiceConnectEndpoint"];
       /** @description The environment to which this belongs. */
       environment?: components["schemas"]["ObjectReference"];
       /** @description The gateway to which this belongs. */
@@ -16526,7 +16814,7 @@ export interface components {
        */
       description?: string;
       /**
-       * @description The Base64 encoded string containing the signing certificate chain
+       * @description The PEM encoded string containing the signing certificate chain
        *     used to validate client certs.
        * @example -----BEGIN CERTIFICATE-----
        *     MIIDdTCCAl2gAwIBAgILBAAAAAABFUtaw5QwDQYJKoZIhvcNAQEFBQAwVzELMAkGA1UEBhMCQkUx
@@ -16559,7 +16847,7 @@ export interface components {
        */
       crl_url?: string;
       /**
-       * @description The Base64 encoded string containing the CRL for this certificate authority.
+       * @description The PEM encoded string containing the CRL for this certificate authority.
        *     Defaults to this over `crl_url` if available.
        * @example -----BEGIN X509 CRL-----
        *     MIICNTCCAR0CAQEwDQYJKoZIhvcNAQELBQAwgbExCzAJBgNVBAYTAlVTMQswCQYD
@@ -16612,7 +16900,7 @@ export interface components {
        */
       description?: string;
       /**
-       * @description The Base64 encoded string containing the signing certificate chain
+       * @description The PEM encoded string containing the signing certificate chain
        *     used to validate client certs.
        * @example -----BEGIN CERTIFICATE-----
        *     MIIDdTCCAl2gAwIBAgILBAAAAAABFUtaw5QwDQYJKoZIhvcNAQEFBQAwVzELMAkGA1UEBhMCQkUx
@@ -16645,7 +16933,7 @@ export interface components {
        */
       crl_url?: string;
       /**
-       * @description The Base64 encoded string containing the CRL for this certificate authority.
+       * @description The PEM encoded string containing the CRL for this certificate authority.
        *     Defaults to this over `crl_url` if available.
        * @example -----BEGIN X509 CRL-----
        *     MIICNTCCAR0CAQEwDQYJKoZIhvcNAQELBQAwgbExCzAJBgNVBAYTAlVTMQswCQYD
@@ -16890,10 +17178,11 @@ export interface components {
        * @example env-00000
        */
       environment?: string;
-      /** @description Display name of the Flink Artifact. */
+      /** @description Unique name of the Flink Artifact per cloud, region, environment scope. */
       display_name?: string;
       /**
-       * @description Java class or alias for the artifact as provided by developer.
+       * @deprecated
+       * @description Java class or alias for the artifact as provided by developer. Deprecated
        * @example io.confluent.example.SumScalarFunction
        */
       class?: string;
@@ -16904,7 +17193,7 @@ export interface components {
       content_format?: string;
       /** @description Description of the Flink Artifact. */
       description?: string;
-      /** @description Document link of the Flink Artifact. */
+      /** @description Documentation link of the Flink Artifact. */
       documentation_link?: string;
       /**
        * @description Runtime language of the Flink Artifact.
@@ -16948,6 +17237,11 @@ export interface components {
        * @example us-east-1
        */
       readonly region?: string;
+      /**
+       * @description The Environment the uploaded Flink Artifact belongs to.
+       * @example env-00000
+       */
+      readonly environment?: string;
       /**
        * @description Unique identifier of this upload.
        * @example e53bb2e8-8de3-49fa-9fb1-4e3fd9a16b66
@@ -17030,6 +17324,11 @@ export interface components {
        * @example us-east-1
        */
       region?: string;
+      /**
+       * @description The Environment the uploaded Flink Artifact belongs to.
+       * @example env-00000
+       */
+      environment?: string;
     };
     /** @description Request a presigned upload URL for new Flink Artifact. Note that
      *     the URL policy expires in one hour. If the policy expires, you can request
@@ -17164,7 +17463,22 @@ export interface components {
       /** @description Gateway type specific status. */
       readonly cloud_gateway?:
         | components["schemas"]["networking.v1.AwsEgressPrivateLinkGatewayStatus"]
-        | components["schemas"]["networking.v1.AzureEgressPrivateLinkGatewayStatus"];
+        | components["schemas"]["networking.v1.AwsPrivateNetworkInterfaceGatewayStatus"]
+        | components["schemas"]["networking.v1.AzureEgressPrivateLinkGatewayStatus"]
+        | components["schemas"]["networking.v1.GcpPeeringGatewayStatus"]
+        | components["schemas"]["networking.v1.GcpEgressPrivateServiceConnectGatewayStatus"];
+    };
+    /** @description AWS Private Network Interface Gateway details from AWS. */
+    "networking.v1.AwsPrivateNetworkInterfaceGatewaySpec": {
+      /**
+       * @description AWS Private Network Interface Gateway Spec kind type. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "AwsPrivateNetworkInterfaceGatewaySpec";
+      /** @description AWS region of the Private Network Interface Gateway. */
+      region: string;
+      /** @description AWS availability zone ids of the Private Network Interface Gateway. */
+      zones: string[];
     };
     /** @description AWS Peering Gateway details from AWS. */
     "networking.v1.AwsPeeringGatewaySpec": {
@@ -17206,6 +17520,39 @@ export interface components {
       /** @description Azure region of the Egress Private Link Gateway. */
       region: string;
     };
+    /** @description GCP Peering Gateway details. */
+    "networking.v1.GcpPeeringGatewaySpec": {
+      /**
+       * @description GCP Peering Gateway Spec kind type. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "GcpPeeringGatewaySpec";
+      /** @description GCP region of the Peering Gateway. */
+      region: string;
+    };
+    /** @description GCP Private Service Connect Gateway details from GCP. */
+    "networking.v1.GcpEgressPrivateServiceConnectGatewaySpec": {
+      /**
+       * @description GCP Private Service Connect Gateway Spec kind type. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "GcpEgressPrivateServiceConnectGatewaySpec";
+      /** @description GCP region of the Egress Private Service Connect Gateway. */
+      region: string;
+    };
+    /** @description AWS Private Network Interface Gateway details from AWS. */
+    "networking.v1.AwsPrivateNetworkInterfaceGatewayStatus": {
+      /**
+       * @description AWS Private Network Interface Gateway Status kind type. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "AwsPrivateNetworkInterfaceGatewayStatus";
+      /**
+       * @description The AWS account ID associated with the Private Network Interface Gateway.
+       * @example 000000000000
+       */
+      readonly account?: string;
+    };
     /** @description AWS Egress Private Link Gateway details from AWS. */
     "networking.v1.AwsEgressPrivateLinkGatewayStatus": {
       /**
@@ -17231,6 +17578,32 @@ export interface components {
        * @example 00000000-0000-0000-0000-000000000000
        */
       readonly subscription?: string;
+    };
+    /** @description GCP Peering Gateway details from GCP. */
+    "networking.v1.GcpPeeringGatewayStatus": {
+      /**
+       * @description GCP Peering Gateway Status kind type. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "GcpPeeringGatewayStatus";
+      /**
+       * @description The IAM principal email used by the GCP Peering Gateway.
+       * @example my-service-account@my-project.iam.gserviceaccount.com
+       */
+      readonly iam_principal?: string;
+    };
+    /** @description GCP Private Service Connect Gateway details from GCP. */
+    "networking.v1.GcpEgressPrivateServiceConnectGatewayStatus": {
+      /**
+       * @description GCP Private Service Connect Gateway Status kind type. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "GcpEgressPrivateServiceConnectGatewayStatus";
+      /**
+       * @description The GCP project used by the GCP Private Service Connect Gateway.
+       * @example proj-tenant-1
+       */
+      readonly project?: string;
     };
     /** @description A Gateway represents a slice of traffic capacity in a region that is reserved for a customer.
      *
@@ -17280,11 +17653,586 @@ export interface components {
       /** @description Gateway type specific configuration. Please note that Peering configs are not supported in Create requests. */
       config?:
         | components["schemas"]["networking.v1.AwsEgressPrivateLinkGatewaySpec"]
+        | components["schemas"]["networking.v1.AwsPrivateNetworkInterfaceGatewaySpec"]
         | components["schemas"]["networking.v1.AwsPeeringGatewaySpec"]
         | components["schemas"]["networking.v1.AzurePeeringGatewaySpec"]
-        | components["schemas"]["networking.v1.AzureEgressPrivateLinkGatewaySpec"];
+        | components["schemas"]["networking.v1.AzureEgressPrivateLinkGatewaySpec"]
+        | components["schemas"]["networking.v1.GcpPeeringGatewaySpec"]
+        | components["schemas"]["networking.v1.GcpEgressPrivateServiceConnectGatewaySpec"];
       /** @description The environment to which this belongs. */
       environment?: components["schemas"]["ObjectReference"];
+    };
+    /** @description CustomCodeLogging objects represent Custom Code Logging on Confluent Cloud.
+     *     The API allows you to list, create, read, update, and delete your Custom Code Logging.
+     *
+     *
+     *     ## The Custom Code Loggings Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/ccl.v1.CustomCodeLogging" /> */
+    "ccl.v1.CustomCodeLogging": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version?: "ccl/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind?: "CustomCodeLogging";
+      /**
+       * @description ID is the "natural identifier" for an object within its scope/namespace; it is normally unique across time but not space. That is, you can assume that the ID will not be reclaimed and reused after an object is deleted ("time"); however, it may collide with IDs for other object `kinds` or objects of the same `kind` within a different scope/namespace ("space").
+       * @example dlz-f3a90de
+       */
+      readonly id?: string;
+      metadata?: components["schemas"]["ObjectMeta"] & {
+        /** @example https://api.confluent.cloud/ccl/v1/custom-code-loggings/ccl-12345 */
+        self?: unknown;
+        /** @example crn://confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/custom-code-logging=ccl-12345 */
+        resource_name?: unknown;
+      };
+      /**
+       * @description Cloud provider where the Custom Code Logging is sent.
+       * @example AWS
+       */
+      cloud?: string;
+      /**
+       * @description The Cloud provider region the Custom Code Logging is sent.
+       * @example us-west-2
+       */
+      region?: string;
+      /** @description Destination Settings of the Custom Code Logging. */
+      destination_settings?: components["schemas"]["ccl.v1.KafkaDestinationSettings"];
+      /** @description The environment to which this belongs. */
+      environment?: components["schemas"]["EnvScopedObjectReference"];
+    };
+    /** @description Kafka Destination Settings of the Custom Code Logging.
+     *      */
+    "ccl.v1.KafkaDestinationSettings": {
+      /**
+       * @description The destination where Custom Code Logging is sent. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "Kafka";
+      /**
+       * @description The kafka cluster id where Custom Code Logging is sent.
+       * @example lkc-123
+       */
+      cluster_id: string;
+      /**
+       * @description The kafka topic where Custom Code Logging is sent.
+       * @example topic-123
+       */
+      topic: string;
+      /**
+       * @description Minimum log level for Custom Code Logging.
+       * @default INFO
+       * @example INFO
+       */
+      log_level: string;
+    };
+    /** @description CustomCodeLogging objects represent Custom Code Logging on Confluent Cloud.
+     *     The API allows you to list, create, read, update, and delete your Custom Code Logging.
+     *
+     *
+     *     ## The Custom Code Loggings Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/ccl.v1.CustomCodeLogging" /> */
+    "ccl.v1.CustomCodeLoggingList": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version: "ccl/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind: "CustomCodeLoggingList";
+      metadata: components["schemas"]["ListMeta"] & {
+        /** @example https://api.confluent.cloud/ccl/v1/custom-code-loggings */
+        first?: unknown;
+        /** @example https://api.confluent.cloud/ccl/v1/custom-code-loggings?page_token=bcAOehAY8F16YD84Z1wT */
+        last?: unknown;
+        /** @example https://api.confluent.cloud/ccl/v1/custom-code-loggings?page_token=YIXRY97wWYmwzrax4dld */
+        prev?: unknown;
+        /** @example https://api.confluent.cloud/ccl/v1/custom-code-loggings?page_token=UvmDWOB1iwfAIBPj6EYb */
+        next?: unknown;
+      };
+      /** @description A data property that contains an array of resource items. Each entry in the array is a separate resource. */
+      data: (components["schemas"]["ccl.v1.CustomCodeLogging"] &
+        Record<string, unknown>)[];
+    };
+    /** @description `Region` objects represent cloud provider regions where Tableflow can be enabled.
+     *     This API allows you to list all supported Tableflow regions.
+     *
+     *
+     *     ## The Regions Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/tableflow.v1.Region" /> */
+    "tableflow.v1.Region": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version?: "tableflow/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind?: "Region";
+      /**
+       * @description ID is the "natural identifier" for an object within its scope/namespace; it is normally unique across time but not space. That is, you can assume that the ID will not be reclaimed and reused after an object is deleted ("time"); however, it may collide with IDs for other object `kinds` or objects of the same `kind` within a different scope/namespace ("space").
+       * @example dlz-f3a90de
+       */
+      readonly id?: string;
+      metadata?: components["schemas"]["ObjectMeta"] & {
+        /** @example https://api.confluent.cloud/tableflow/v1/regions/r-12345 */
+        self?: unknown;
+        /** @example crn://confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/region=r-12345 */
+        resource_name?: unknown;
+      };
+      /**
+       * @description The cloud service provider that hosts the region.
+       * @example AWS
+       */
+      readonly cloud?: string;
+      /**
+       * @description The cloud service provider region.
+       * @example us-east-2
+       */
+      readonly region?: string;
+    };
+    /** @description A Tableflow Topic represents configuration related to a Tableflow enabled kafka topic
+     *
+     *
+     *     ## The Tableflow Topics Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/tableflow.v1.TableflowTopic" /> */
+    "tableflow.v1.TableflowTopic": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version?: "tableflow/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind?: "TableflowTopic";
+      metadata?: components["schemas"]["ObjectMeta"] & {
+        /** @example https://api.confluent.cloud/tableflow/v1/tableflow-topics/tt-12345 */
+        self?: unknown;
+        /** @example crn://confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/tableflow-topic=tt-12345 */
+        resource_name?: unknown;
+      };
+      spec?: components["schemas"]["tableflow.v1.TableflowTopicSpec"];
+      status?: components["schemas"]["tableflow.v1.TableflowTopicStatus"];
+    };
+    /** @description The status of the Tableflow Topic */
+    "tableflow.v1.TableflowTopicStatus": {
+      /**
+       * @description The lifecycle phase of the Tableflow:
+       *
+       *       PENDING: Tableflow setup is pending;
+       *
+       *       RUNNING: Tableflow is currently running;
+       *
+       *       FAILED: Tableflow failed
+       *
+       * @example PENDING
+       */
+      readonly phase?: string;
+      /**
+       * @description Displayable error message if Tableflow topic is in an error state
+       * @example Could not enable catalog integration
+       */
+      readonly error_message?: string;
+    };
+    /** @description A Catalog Integration represents configuration related to a catalog integration
+     *
+     *
+     *     ## The Catalog Integrations Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/tableflow.v1.CatalogIntegration" /> */
+    "tableflow.v1.CatalogIntegration": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version?: "tableflow/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind?: "CatalogIntegration";
+      /**
+       * @description ID is the "natural identifier" for an object within its scope/namespace; it is normally unique across time but not space. That is, you can assume that the ID will not be reclaimed and reused after an object is deleted ("time"); however, it may collide with IDs for other object `kinds` or objects of the same `kind` within a different scope/namespace ("space").
+       * @example dlz-f3a90de
+       */
+      readonly id?: string;
+      metadata?: components["schemas"]["ObjectMeta"] & {
+        /** @example https://api.confluent.cloud/tableflow/v1/catalog-integrations/tci-12345 */
+        self?: unknown;
+        /** @example crn://confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/catalog-integration=tci-12345 */
+        resource_name?: unknown;
+      };
+      spec?: components["schemas"]["tableflow.v1.CatalogIntegrationSpec"];
+      status?: components["schemas"]["tableflow.v1.CatalogIntegrationStatus"];
+    };
+    /** @description The status of the Catalog Integration */
+    "tableflow.v1.CatalogIntegrationStatus": {
+      /**
+       * @description The lifecycle phase of the catalog integration:
+       *
+       *       PENDING: sync to catalog integration is pending;
+       *
+       *       CONNECTED: catalog integration is connected and syncing;
+       *
+       *       FAILED: catalog integration failed.
+       *
+       * @example CONNECTED
+       */
+      readonly phase?: string;
+      /**
+       * @description Displayable error message if catalog integration is in a failed state.
+       * @example Could not enable catalog integration
+       */
+      readonly error_message?: string;
+      /** @description The date and time at which the catalog was last synced. It is represented in RFC3339 format and is in UTC.
+       *      */
+      readonly last_sync_at?: string;
+    };
+    /** @description The configs for the Tableflow enabled topic */
+    "tableflow.v1.TableFlowTopicConfigsSpec": {
+      /**
+       * @description This flag determines whether to enable compaction for the Tableflow enabled topic.
+       * @example true
+       */
+      readonly enable_compaction?: boolean;
+      /**
+       * @description This flag determines whether to enable partitioning for the Tableflow enabled topic.
+       * @example true
+       */
+      readonly enable_partitioning?: boolean;
+      /**
+       * Format: int64
+       * @description The maximum age, in milliseconds, of snapshots (for Iceberg) or versions (for Delta)
+       *     to retain in the table for the Tableflow-enabled topic (snapshot/version expiration)
+       *
+       *     The default value is "604800000" milliseconds (equivalent to 7 days).
+       *
+       *     The minimum allowed value is "86400000" milliseconds (equivalent to 24 hours).
+       *
+       * @example 7776000000
+       */
+      retention_ms?: string;
+      /**
+       * @description The strategy to handle record failures in the Tableflow enabled topic during materialization.
+       *
+       *     For `SKIP`, we skip the bad records and move to the next record,
+       *
+       *     and for `SUSPEND`, we suspend the materialization of the topic.
+       *
+       * @default SUSPEND
+       */
+      record_failure_strategy: string;
+    };
+    /** @description The Tableflow storage config for BYOB enabled topic in AWS */
+    "tableflow.v1.ByobAwsSpec": {
+      /**
+       * @description The storage type
+       *      (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "ByobAws";
+      /**
+       * @description Bucket name
+       * @example bucket_1
+       */
+      bucket_name: string;
+      /**
+       * @description Bucket region
+       * @example us-east-1
+       */
+      readonly bucket_region?: string;
+      /**
+       * @description The provider integration id
+       * @example cspi-stgce89r7
+       */
+      provider_integration_id: string;
+    };
+    /** @description The storage config for confluent managed Tableflow enabled topic. */
+    "tableflow.v1.ManagedStorageSpec": {
+      /**
+       * @description The storage type.
+       *      (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "Managed";
+    };
+    /** @description The catalog integration Glue connection config. */
+    "tableflow.v1.CatalogIntegrationAwsGlueSpec": {
+      /**
+       * @description The type of the catalog integration. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "AwsGlue";
+      /**
+       * @description The provider integration id.
+       * @example cspi-stgce89r7
+       */
+      provider_integration_id: string;
+    };
+    /** @description The catalog integration connection config for Snowflake Open Catalog. */
+    "tableflow.v1.CatalogIntegrationSnowflakeSpec": {
+      /**
+       * @description The type of the catalog integration. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "Snowflake";
+      /**
+       * @description The catalog integration connection endpoint for Snowflake Open Catalog.
+       *
+       * @example https://vuser1_polaris.snowflakecomputing.com/
+       */
+      endpoint: string;
+      /** @description The client ID of the catalog integration. */
+      client_id: string;
+      /** @description The client secret of the catalog integration. */
+      client_secret: string;
+      /** @description Warehouse name of the Snowflake Open Catalog. */
+      warehouse: string;
+      /** @description Allowed scope of the Snowflake Open Catalog. */
+      allowed_scope: string;
+    };
+    /** @description The catalog integration connection config for Snowflake Open Catalog (update operations). */
+    "tableflow.v1.CatalogIntegrationSnowflakeUpdateSpec": {
+      /**
+       * @description The type of the catalog integration. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "Snowflake";
+      /**
+       * @description The catalog integration connection endpoint for Snowflake Open Catalog.
+       * @example https://vuser1_polaris.snowflakecomputing.com/
+       */
+      endpoint?: string;
+      /** @description The client ID of the catalog integration. */
+      client_id?: string;
+      /** @description The client secret of the catalog integration. */
+      client_secret?: string;
+      /** @description Warehouse name of the Snowflake Open Catalog. */
+      warehouse?: string;
+      /** @description Allowed scope of the Snowflake Open Catalog. */
+      allowed_scope?: string;
+    };
+    /** @description The catalog integration Glue connection config for update operations. */
+    "tableflow.v1.CatalogIntegrationAwsGlueUpdateSpec": {
+      /**
+       * @description The type of the catalog integration. (enum property replaced by openapi-typescript)
+       * @enum {string}
+       */
+      kind: "AwsGlue";
+    };
+    /** @description The desired state of the Catalog Integration */
+    "tableflow.v1.CatalogIntegrationUpdateRequest": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version?: "tableflow/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind?: "CatalogIntegrationUpdateRequest";
+      /**
+       * @description ID is the "natural identifier" for an object within its scope/namespace; it is normally unique across time but not space. That is, you can assume that the ID will not be reclaimed and reused after an object is deleted ("time"); however, it may collide with IDs for other object `kinds` or objects of the same `kind` within a different scope/namespace ("space").
+       * @example dlz-f3a90de
+       */
+      readonly id?: string;
+      metadata?: components["schemas"]["ObjectMeta"] & {
+        /** @example https://api.confluent.cloud/tableflow/v1/catalog-integration-update-requests/ciur-12345 */
+        self?: unknown;
+        /** @example crn://confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/catalog-integration-update-request=ciur-12345 */
+        resource_name?: unknown;
+      };
+      spec?: components["schemas"]["tableflow.v1.CatalogIntegrationUpdateSpec"];
+    };
+    /** @description The desired state of the Catalog Integration */
+    "tableflow.v1.CatalogIntegrationUpdateSpec": {
+      /**
+       * @description The name of the catalog integration
+       * @example catalog_integration_1
+       */
+      display_name?: string;
+      /**
+       * @description Indicates whether the Catalog Integration should be suspended.
+       * @example false
+       */
+      suspended?: boolean;
+      /** @description The integration config */
+      config?:
+        | components["schemas"]["tableflow.v1.CatalogIntegrationAwsGlueUpdateSpec"]
+        | components["schemas"]["tableflow.v1.CatalogIntegrationSnowflakeUpdateSpec"];
+      /**
+       * @description The environment to which the target Kafka cluster belongs.
+       * @example {
+       *       "id": "env-00000"
+       *     }
+       */
+      environment: components["schemas"]["GlobalObjectReference"];
+      /**
+       * @description The kafka cluster of the topic for which Tableflow is enabled
+       * @example {
+       *       "id": "lkc-00000"
+       *     }
+       */
+      kafka_cluster: components["schemas"]["EnvScopedObjectReference"];
+    };
+    /** @description `Region` objects represent cloud provider regions where Tableflow can be enabled.
+     *     This API allows you to list all supported Tableflow regions.
+     *
+     *
+     *     ## The Regions Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/tableflow.v1.Region" /> */
+    "tableflow.v1.RegionList": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version: "tableflow/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind: "RegionList";
+      metadata: components["schemas"]["ListMeta"] & {
+        /** @example https://api.confluent.cloud/tableflow/v1/regions */
+        first?: unknown;
+        /** @example https://api.confluent.cloud/tableflow/v1/regions?page_token=bcAOehAY8F16YD84Z1wT */
+        last?: unknown;
+        /** @example https://api.confluent.cloud/tableflow/v1/regions?page_token=YIXRY97wWYmwzrax4dld */
+        prev?: unknown;
+        /** @example https://api.confluent.cloud/tableflow/v1/regions?page_token=UvmDWOB1iwfAIBPj6EYb */
+        next?: unknown;
+      };
+      /** @description A data property that contains an array of resource items. Each entry in the array is a separate resource. */
+      data: (components["schemas"]["tableflow.v1.Region"] &
+        Record<string, unknown>)[];
+    };
+    /** @description A Tableflow Topic represents configuration related to a Tableflow enabled kafka topic
+     *
+     *
+     *     ## The Tableflow Topics Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/tableflow.v1.TableflowTopic" /> */
+    "tableflow.v1.TableflowTopicList": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version: "tableflow/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind: "TableflowTopicList";
+      metadata: components["schemas"]["ListMeta"] & {
+        /** @example https://api.confluent.cloud/tableflow/v1/tableflow-topics */
+        first?: unknown;
+        /** @example https://api.confluent.cloud/tableflow/v1/tableflow-topics?page_token=bcAOehAY8F16YD84Z1wT */
+        last?: unknown;
+        /** @example https://api.confluent.cloud/tableflow/v1/tableflow-topics?page_token=YIXRY97wWYmwzrax4dld */
+        prev?: unknown;
+        /** @example https://api.confluent.cloud/tableflow/v1/tableflow-topics?page_token=UvmDWOB1iwfAIBPj6EYb */
+        next?: unknown;
+      };
+      /** @description A data property that contains an array of resource items. Each entry in the array is a separate resource. */
+      data: (components["schemas"]["tableflow.v1.TableflowTopic"] & {
+        spec: Record<string, unknown>;
+      })[];
+    };
+    /** @description The desired state of the Tableflow Topic */
+    "tableflow.v1.TableflowTopicSpec": {
+      /**
+       * @description The name of the Kafka topic for which Tableflow is enabled.
+       * @example topic_1
+       */
+      display_name?: string;
+      /**
+       * @description Indicates whether the Tableflow should be suspended. The API allows setting it only to `false` i.e., to resume the Tableflow. Pausing the Tableflow on-demand is not currently supported.
+       * @example false
+       */
+      suspended?: boolean;
+      /** @description The config for the Tableflow enabled topic */
+      config?: components["schemas"]["tableflow.v1.TableFlowTopicConfigsSpec"];
+      /** @description The storage config */
+      storage?:
+        | components["schemas"]["tableflow.v1.ByobAwsSpec"]
+        | components["schemas"]["tableflow.v1.ManagedStorageSpec"];
+      /**
+       * @description The supported table formats for the Tableflow-enabled topic.
+       *
+       * @default [
+       *       "ICEBERG"
+       *     ]
+       * @example [
+       *       "DELTA"
+       *     ]
+       */
+      table_formats: string[];
+      /** @description The environment to which the target Kafka cluster belongs. */
+      environment?: components["schemas"]["GlobalObjectReference"];
+      /** @description The kafka cluster of the topic for which Tableflow is enabled */
+      kafka_cluster?: components["schemas"]["EnvScopedObjectReference"];
+    };
+    /** @description A Catalog Integration represents configuration related to a catalog integration
+     *
+     *
+     *     ## The Catalog Integrations Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/tableflow.v1.CatalogIntegration" /> */
+    "tableflow.v1.CatalogIntegrationList": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version: "tableflow/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind: "CatalogIntegrationList";
+      metadata: components["schemas"]["ListMeta"] & {
+        /** @example https://api.confluent.cloud/tableflow/v1/catalog-integrations */
+        first?: unknown;
+        /** @example https://api.confluent.cloud/tableflow/v1/catalog-integrations?page_token=bcAOehAY8F16YD84Z1wT */
+        last?: unknown;
+        /** @example https://api.confluent.cloud/tableflow/v1/catalog-integrations?page_token=YIXRY97wWYmwzrax4dld */
+        prev?: unknown;
+        /** @example https://api.confluent.cloud/tableflow/v1/catalog-integrations?page_token=UvmDWOB1iwfAIBPj6EYb */
+        next?: unknown;
+      };
+      /** @description A data property that contains an array of resource items. Each entry in the array is a separate resource. */
+      data: (components["schemas"]["tableflow.v1.CatalogIntegration"] & {
+        spec: Record<string, unknown>;
+      })[];
+    };
+    /** @description The desired state of the Catalog Integration */
+    "tableflow.v1.CatalogIntegrationSpec": {
+      /**
+       * @description The name of the catalog integration
+       * @example catalog_integration_1
+       */
+      display_name?: string;
+      /**
+       * @description Indicates whether the Catalog Integration should be suspended. The API allows setting it only to `false` i.e., to resume the Catalog Integration. Pausing the Catalog Integration on-demand is not currently supported.
+       * @example false
+       */
+      suspended?: boolean;
+      /** @description The integration config */
+      config?:
+        | components["schemas"]["tableflow.v1.CatalogIntegrationAwsGlueSpec"]
+        | components["schemas"]["tableflow.v1.CatalogIntegrationSnowflakeSpec"];
+      /** @description The environment to which the target Kafka cluster belongs. */
+      environment?: components["schemas"]["GlobalObjectReference"];
+      /** @description The kafka cluster of the topic for which Tableflow is enabled */
+      kafka_cluster?: components["schemas"]["EnvScopedObjectReference"];
     };
     /** @description The desired state of the Api Key */
     "iam.v2.ApiKeySpecUpdate": {
@@ -17303,6 +18251,7 @@ export interface components {
      *     of API keys represent access to a single cluster/resource such as a Kafka cluster,
      *     Schema Registry cluster or a ksqlDB cluster. Cloud API Keys represent access to resources within an organization
      *     that are not tied to a specific cluster, such as the Org API, IAM API, Metrics API or Connect API.
+     *     Tableflow API keys are not tied to a specific cluster.
      *
      *     The API allows you to list, create, update and delete your API Keys.
      *
@@ -17391,52 +18340,6 @@ export interface components {
        * @example AUTH_TYPE_SSO
        */
       readonly auth_type?: string;
-    };
-    /** @description `ServiceAccount` objects are typically used to represent applications and other non-human principals
-     *     that may access your Confluent resources.
-     *
-     *     The API allows you to create, retrieve, update, and delete individual service accounts, as well as
-     *     list all your service accounts.
-     *
-     *
-     *     Related guide: [Service Accounts in Confluent Cloud](https://docs.confluent.io/cloud/current/access-management/service-account.html).
-     *
-     *     ## The Service Accounts Model
-     *     <SchemaDefinition schemaRef="#/components/schemas/iam.v2.ServiceAccount" />
-     *
-     *     ## Quotas and Limits
-     *     This resource is subject to the [following quotas](https://docs.confluent.io/cloud/current/quotas/overview.html):
-     *
-     *     | Quota | Description |
-     *     | --- | --- |
-     *     | `service_accounts_per_org` | Service Accounts in one Confluent Cloud organization | */
-    "iam.v2.ServiceAccountUpdate": {
-      /**
-       * @description APIVersion defines the schema version of this representation of a resource.
-       * @enum {string}
-       */
-      readonly api_version?: "iam/v2";
-      /**
-       * @description Kind defines the object this REST resource represents.
-       * @enum {string}
-       */
-      readonly kind?: "ServiceAccount";
-      /**
-       * @description ID is the "natural identifier" for an object within its scope/namespace; it is normally unique across time but not space. That is, you can assume that the ID will not be reclaimed and reused after an object is deleted ("time"); however, it may collide with IDs for other object `kinds` or objects of the same `kind` within a different scope/namespace ("space").
-       * @example dlz-f3a90de
-       */
-      readonly id?: string;
-      metadata?: components["schemas"]["ObjectMeta"] & {
-        /** @example https://api.confluent.cloud/iam/v2/service-accounts/sa-12345 */
-        self?: unknown;
-        /** @example crn://confluent.cloud/service-account=sa-12345 */
-        resource_name?: unknown;
-      };
-      /**
-       * @description A free-form description of the Service Account
-       * @example Doc's repair bot for the DeLorean
-       */
-      description?: string;
     };
     /** @description `Subscription` objects represent the intent of the customers to get notifications of particular types.
      *     A subscription is created for a particular `NotificationType` and the user will get notifications on the
@@ -18209,6 +19112,7 @@ export interface components {
     };
     /** @description A Compute Pool represents a set of compute resources that is used to run your Queries.
      *     The resources (CPUs, memory,…) provided by a Compute Pool are shared between all Queries that use it.
+     *     Note that the Compute Pool API supports a limited pagination API, only the `next` field will be populated.
      *
      *
      *     ## The Compute Pools Model
@@ -18299,6 +19203,12 @@ export interface components {
        * @example prod-ap-egress-usw2
        */
       display_name?: string;
+      /** @description The specific details of the different access point configurations. */
+      config?:
+        | components["schemas"]["networking.v1.AwsEgressPrivateLinkEndpoint"]
+        | components["schemas"]["networking.v1.AzureEgressPrivateLinkEndpoint"]
+        | components["schemas"]["networking.v1.AwsPrivateNetworkInterface"]
+        | components["schemas"]["networking.v1.GcpEgressPrivateServiceConnectEndpoint"];
       /** @description The environment to which this belongs. */
       environment?: components["schemas"]["ObjectReference"];
     };
@@ -18416,7 +19326,7 @@ export interface components {
        * @example env-00000
        */
       environment?: string;
-      /** @description Display name of the Flink Artifact. */
+      /** @description Unique name of the Flink Artifact per cloud, region, environment scope. */
       display_name?: string;
       /**
        * @description Archive format of the Flink Artifact.
@@ -18425,7 +19335,7 @@ export interface components {
       content_format?: string;
       /** @description Description of the Flink Artifact. */
       description?: string;
-      /** @description Document link of the Flink Artifact. */
+      /** @description Documentation link of the Flink Artifact. */
       documentation_link?: string;
       /**
        * @description Runtime language of the Flink Artifact.
@@ -18483,6 +19393,89 @@ export interface components {
       spec?: components["schemas"]["networking.v1.GatewaySpecUpdate"];
       status?: components["schemas"]["networking.v1.GatewayStatus"];
     };
+    /** @description CustomCodeLogging objects represent Custom Code Logging on Confluent Cloud.
+     *     The API allows you to list, create, read, update, and delete your Custom Code Logging.
+     *
+     *
+     *     ## The Custom Code Loggings Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/ccl.v1.CustomCodeLogging" /> */
+    "ccl.v1.CustomCodeLoggingUpdate": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version?: "ccl/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind?: "CustomCodeLogging";
+      /**
+       * @description ID is the "natural identifier" for an object within its scope/namespace; it is normally unique across time but not space. That is, you can assume that the ID will not be reclaimed and reused after an object is deleted ("time"); however, it may collide with IDs for other object `kinds` or objects of the same `kind` within a different scope/namespace ("space").
+       * @example dlz-f3a90de
+       */
+      readonly id?: string;
+      metadata?: components["schemas"]["ObjectMeta"] & {
+        /** @example https://api.confluent.cloud/ccl/v1/custom-code-loggings/ccl-12345 */
+        self?: unknown;
+        /** @example crn://confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/custom-code-logging=ccl-12345 */
+        resource_name?: unknown;
+      };
+      /** @description Destination Settings of the Custom Code Logging. */
+      destination_settings?: components["schemas"]["ccl.v1.KafkaDestinationSettings"];
+      /** @description The environment to which this belongs. */
+      environment?: components["schemas"]["EnvScopedObjectReference"];
+    };
+    /** @description The desired state of the Tableflow Topic */
+    "tableflow.v1.TableflowTopicSpecUpdate": {
+      /**
+       * @description Indicates whether the Tableflow should be suspended. The API allows setting it only to `false` i.e., to resume the Tableflow. Pausing the Tableflow on-demand is not currently supported.
+       * @example false
+       */
+      suspended?: boolean;
+      /** @description The config for the Tableflow enabled topic */
+      config?: components["schemas"]["tableflow.v1.TableFlowTopicConfigsSpec"];
+      /**
+       * @description The supported table formats for the Tableflow-enabled topic.
+       *
+       * @default [
+       *       "ICEBERG"
+       *     ]
+       * @example [
+       *       "DELTA"
+       *     ]
+       */
+      table_formats: string[];
+      /** @description The environment to which the target Kafka cluster belongs. */
+      environment?: components["schemas"]["GlobalObjectReference"];
+      /** @description The kafka cluster of the topic for which Tableflow is enabled */
+      kafka_cluster?: components["schemas"]["EnvScopedObjectReference"];
+    };
+    /** @description A Tableflow Topic represents configuration related to a Tableflow enabled kafka topic
+     *
+     *
+     *     ## The Tableflow Topics Model
+     *     <SchemaDefinition schemaRef="#/components/schemas/tableflow.v1.TableflowTopic" /> */
+    "tableflow.v1.TableflowTopicUpdate": {
+      /**
+       * @description APIVersion defines the schema version of this representation of a resource.
+       * @enum {string}
+       */
+      readonly api_version?: "tableflow/v1";
+      /**
+       * @description Kind defines the object this REST resource represents.
+       * @enum {string}
+       */
+      readonly kind?: "TableflowTopic";
+      metadata?: components["schemas"]["ObjectMeta"] & {
+        /** @example https://api.confluent.cloud/tableflow/v1/tableflow-topics/tt-12345 */
+        self?: unknown;
+        /** @example crn://confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/tableflow-topic=tt-12345 */
+        resource_name?: unknown;
+      };
+      spec?: components["schemas"]["tableflow.v1.TableflowTopicSpecUpdate"];
+      status?: components["schemas"]["tableflow.v1.TableflowTopicStatus"];
+    };
   };
   responses: {
     /** @description Bad Request */
@@ -18493,6 +19486,20 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "400",
+         *           "code": "invalid_filter",
+         *           "title": "Invalid Filter",
+         *           "detail": "The 'delorean' resource can't be filtered by 'num_doors'",
+         *           "source": {
+         *             "parameter": "num_doors"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18509,6 +19516,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "401",
+         *           "code": "user_unauthenticated",
+         *           "title": "Authentication Required",
+         *           "detail": "Valid authentication credentials must be provided"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18520,6 +19538,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "402",
+         *           "code": "quota_exceeded",
+         *           "title": "Kafka Clusters Per Org Quota Exceeded",
+         *           "detail": "The request would exceed the quota: kafka_clusters_per_environment"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18531,6 +19560,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "403",
+         *           "code": "user_unauthorized",
+         *           "title": "User Access Unauthorized",
+         *           "detail": "The user 'mcfly' is not allowed to access the 'delorean' resource without the 'plutonium' role."
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18544,6 +19584,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "409",
+         *           "code": "resource_already_exists",
+         *           "title": "Resource Already exists",
+         *           "detail": "The entitlement '91e3e86f-fca6-4f14-98f5-a48e64113ce2' already exists."
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18555,6 +19606,15 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "404",
+         *           "title": "Not Found"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18566,6 +19626,330 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         },
+         *         {
+         *           "status": "422",
+         *           "code": "invalid_configuration",
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "title": "Validation Failed",
+         *           "detail": "The property '/cluster/storage_size' of type string did not match the following type: integer",
+         *           "source": {
+         *             "pointer": "/cluster/storage_size"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18596,6 +19980,17 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "errors": [
+         *         {
+         *           "id": "ed42afdc-f0d5-4c0d-b428-9fc6ed6e279d",
+         *           "status": "500",
+         *           "code": "out_of_gas",
+         *           "title": "DeLorean Out Of Gas",
+         *           "detail": "The DeLorean has run out of gas, but Doc Brown will fill 'er up for you asap"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["Failure"];
       };
     };
@@ -18605,6 +20000,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 401,
+         *         "message": "Unauthorized"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18614,6 +20015,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 403,
+         *         "message": "Forbidden"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18623,6 +20030,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 404,
+         *         "message": "account not found"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18632,6 +20045,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 404,
+         *         "message": "resource not found"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18641,6 +20060,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 500,
+         *         "message": "Oops, something went wrong"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18650,6 +20075,12 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": {
+         *         "code": 400,
+         *         "message": "Bad Request"
+         *       }
+         *     } */
         "application/json": components["schemas"]["connect.v1.ConnectorError"];
       };
     };
@@ -18659,6 +20090,9 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error": null
+         *     } */
         "application/json": {
           error?: Record<string, unknown> | null;
         };
@@ -18670,6 +20104,27 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopic",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-X",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-X"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-X",
+         *       "is_internal": false,
+         *       "replication_factor": 3,
+         *       "partitions_count": 1,
+         *       "partitions": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-X/partitions"
+         *       },
+         *       "configs": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-X/configs"
+         *       },
+         *       "partition_reassignments": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-X/partitions/-/reassignments"
+         *       }
+         *     } */
         "application/json": components["schemas"]["TopicData"];
       };
     };
@@ -18679,6 +20134,38 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAcl",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?resource_type=TOPIC&resource_name=topic-&pattern_type=PREFIXED&principal=User%3Aalice&host=*&operation=ALL&permission=ALLOW"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "resource_type": "TOPIC",
+         *           "resource_name": "topic-",
+         *           "pattern_type": "PREFIXED",
+         *           "principal": "User:alice",
+         *           "host": "*",
+         *           "operation": "ALL",
+         *           "permission": "ALLOW"
+         *         },
+         *         {
+         *           "kind": "KafkaAcl",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?resource_type=CLUSTER&resource_name=kafka-cluster&pattern_type=LITERAL&principal=User%3Aalice&host=*&operation=DESCRIBE&permission=DENY"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "resource_type": "CLUSTER",
+         *           "resource_name": "kafka-cluster",
+         *           "pattern_type": "LITERAL",
+         *           "principal": "User:alice",
+         *           "host": "*",
+         *           "operation": "DESCRIBE",
+         *           "permission": "DENY"
+         *         }
+         *       ]
+         *     } */
         "application/json": {
           data: components["schemas"]["AclData"][];
         };
@@ -18690,6 +20177,33 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerConfig",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs/compression.type",
+         *         "resource_name": "crn:///kafka=cluster-1/broker=1/config=compression.type"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "name": "compression.type",
+         *       "value": "gzip",
+         *       "is_default": false,
+         *       "is_read_only": false,
+         *       "is_sensitive": false,
+         *       "source": "DYNAMIC_BROKER_CONFIG",
+         *       "synonyms": [
+         *         {
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "source": "DYNAMIC_BROKER_CONFIG"
+         *         },
+         *         {
+         *           "name": "compression.type",
+         *           "value": "producer",
+         *           "source": "DEFAULT_CONFIG"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerConfigData"];
       };
     };
@@ -18699,6 +20213,23 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBroker",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *         "resource_name": "crn:///kafka=cluster-1/broker=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "host": "localhost",
+         *       "port": 9291,
+         *       "configs": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs"
+         *       },
+         *       "partition_replicas": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/partition-replicas"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BrokerData"];
       };
     };
@@ -18708,6 +20239,33 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaClusterConfig",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs/compression.type",
+         *         "resource_name": "crn:///kafka=cluster-1/broker-config=compression.type"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "config_type": "BROKER",
+         *       "name": "compression.type",
+         *       "value": "gzip",
+         *       "is_default": false,
+         *       "is_read_only": false,
+         *       "is_sensitive": false,
+         *       "source": "DYNAMIC_DEFAULT_BROKER_CONFIG",
+         *       "synonyms": [
+         *         {
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "source": "DYNAMIC_DEFAULT_BROKER_CONFIG"
+         *         },
+         *         {
+         *           "name": "compression.type",
+         *           "value": "producer",
+         *           "source": "DEFAULT_CONFIG"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ClusterConfigData"];
       };
     };
@@ -18717,6 +20275,35 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaCluster",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1",
+         *         "resource_name": "crn:///kafka=cluster-1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "controller": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       },
+         *       "acls": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls"
+         *       },
+         *       "brokers": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers"
+         *       },
+         *       "broker_configs": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs"
+         *       },
+         *       "consumer_groups": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups"
+         *       },
+         *       "topics": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics"
+         *       },
+         *       "partition_reassignments": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/-/partitions/-/reassignment"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ClusterData"];
       };
     };
@@ -18726,6 +20313,24 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerAssignment",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments/topic-1/partitions/1",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1/assignment=topic=1/partition=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "consumer_id": "consumer-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "partition": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1"
+         *       },
+         *       "lag": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ConsumerAssignmentData"];
       };
     };
@@ -18735,6 +20340,27 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerGroup",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "is_simple": false,
+         *       "partition_assignor": "org.apache.kafka.clients.consumer.RoundRobinAssignor",
+         *       "state": "STABLE",
+         *       "coordinator": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       },
+         *       "consumers": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers"
+         *       },
+         *       "lag_summary": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lag-summary"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ConsumerGroupData"];
       };
     };
@@ -18744,6 +20370,28 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerGroupLagSummary",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lag-summary",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-groups=consumer-group-1/lag-summary"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "max_lag_consumer_id": "consumer-1",
+         *       "max_lag_instance_id": "consumer-instance-1",
+         *       "max_lag_client_id": "client-1",
+         *       "max_lag_topic_name": "topic-1",
+         *       "max_lag_partition_id": 1,
+         *       "max_lag": 100,
+         *       "total_lag": 110,
+         *       "max_lag_consumer": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1"
+         *       },
+         *       "max_lag_partition": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ConsumerGroupLagSummaryData"];
       };
     };
@@ -18753,6 +20401,23 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerLag",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/1",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/lag=topic-1/partition=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "consumer_id": "consumer-1",
+         *       "instance_id": "consumer-instance-1",
+         *       "client_id": "client-1",
+         *       "current_offset": 1,
+         *       "log_end_offset": 101,
+         *       "lag": 100
+         *     } */
         "application/json": components["schemas"]["ConsumerLagData"];
       };
     };
@@ -18762,6 +20427,21 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumer",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1",
+         *         "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "consumer_group_id": "consumer-group-1",
+         *       "consumer_id": "consumer-1",
+         *       "instance_id": "consumer-instance-1",
+         *       "client_id": "client-1",
+         *       "assignments": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ConsumerData"];
       };
     };
@@ -18771,6 +20451,25 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaPartition",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "leader": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/1"
+         *       },
+         *       "replicas": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *       },
+         *       "reassignment": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment"
+         *       }
+         *     } */
         "application/json": components["schemas"]["PartitionData"];
       };
     };
@@ -18780,6 +20479,26 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReassignment",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/reassignment"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "adding_replicas": [
+         *         1,
+         *         2
+         *       ],
+         *       "removing_replicas": [
+         *         3
+         *       ],
+         *       "replicas": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ReassignmentData"];
       };
     };
@@ -18789,6 +20508,22 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReplica",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/1",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/replica=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "partition_id": 1,
+         *       "broker_id": 1,
+         *       "is_leader": true,
+         *       "is_in_sync": true,
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["ReplicaData"];
       };
     };
@@ -18798,6 +20533,33 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopicConfig",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/compression.type",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1/config=compression.type"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "name": "compression.type",
+         *       "value": "gzip",
+         *       "is_default": false,
+         *       "is_read_only": false,
+         *       "is_sensitive": false,
+         *       "source": "DYNAMIC_TOPIC_CONFIG",
+         *       "synonyms": [
+         *         {
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "source": "DYNAMIC_TOPIC_CONFIG"
+         *         },
+         *         {
+         *           "name": "compression.type",
+         *           "value": "producer",
+         *           "source": "DEFAULT_CONFIG"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["TopicConfigData"];
       };
     };
@@ -18807,6 +20569,27 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopic",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1",
+         *         "resource_name": "crn:///kafka=cluster-1/topic=topic-1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "topic_name": "topic-1",
+         *       "is_internal": false,
+         *       "replication_factor": 3,
+         *       "partitions_count": 1,
+         *       "partitions": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions"
+         *       },
+         *       "configs": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs"
+         *       },
+         *       "partition_reassignments": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/-/reassignments"
+         *       }
+         *     } */
         "application/json": components["schemas"]["TopicData"];
       };
     };
@@ -18816,6 +20599,75 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReassignmentList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/-/partitions/-/reassignment",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "adding_replicas": [
+         *             1,
+         *             2
+         *           ],
+         *           "removing_replicas": [
+         *             3
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/2/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-2/partition=2/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-2",
+         *           "partition_id": 2,
+         *           "adding_replicas": [
+         *             1
+         *           ],
+         *           "removing_replicas": [
+         *             2,
+         *             3
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/2/replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/3/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-3/partition=3/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-3",
+         *           "partition_id": 3,
+         *           "adding_replicas": [
+         *             3
+         *           ],
+         *           "removing_replicas": [
+         *             1,
+         *             2
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/3/replicas"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReassignmentDataList"];
       };
     };
@@ -18825,6 +20677,69 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerConfigList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs/max.connections",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/config=max.connections"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "name": "max.connections",
+         *           "value": "1000",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_BROKER_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "max.connections",
+         *               "value": "1000",
+         *               "source": "DYNAMIC_BROKER_CONFIG"
+         *             },
+         *             {
+         *               "name": "max.connections",
+         *               "value": "2147483647",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs/compression.type",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/config=compression.type"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_BROKER_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "compression.type",
+         *               "value": "gzip",
+         *               "source": "DYNAMIC_BROKER_CONFIG"
+         *             },
+         *             {
+         *               "name": "compression.type",
+         *               "value": "producer",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerConfigDataList"];
       };
     };
@@ -18834,6 +20749,66 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBroker",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "host": "localhost",
+         *           "port": 9291,
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/configs"
+         *           },
+         *           "partition_replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/partition-replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBroker",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "host": "localhost",
+         *           "port": 9292,
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2/configs"
+         *           },
+         *           "partition_replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2/partition-replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBroker",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 3,
+         *           "host": "localhost",
+         *           "port": 9293,
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3/configs"
+         *           },
+         *           "partition_replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3/partition-replicas"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerDataList"];
       };
     };
@@ -18843,6 +20818,69 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaClusterConfigList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaClusterConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs/max.connections",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-config=max.connections"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "config_type": "BROKER",
+         *           "name": "max.connections",
+         *           "value": "1000",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_DEFAULT_BROKER_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "max.connections",
+         *               "value": "1000",
+         *               "source": "DYNAMIC_DEFAULT_BROKER_CONFIG"
+         *             },
+         *             {
+         *               "name": "max.connections",
+         *               "value": "2147483647",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "kind": "KafkaClusterConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs/compression.type",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-config=compression.type"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "config_type": "BROKER",
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_DEFAULT_BROKER_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "compression.type",
+         *               "value": "gzip",
+         *               "source": "DYNAMIC_DEFAULT_BROKER_CONFIG"
+         *             },
+         *             {
+         *               "name": "compression.type",
+         *               "value": "producer",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ClusterConfigDataList"];
       };
     };
@@ -18852,6 +20890,44 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaClusterList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaCluster",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1",
+         *             "resource_name": "crn:///kafka=cluster-1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "controller": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           },
+         *           "acls": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls"
+         *           },
+         *           "brokers": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers"
+         *           },
+         *           "broker_configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-configs"
+         *           },
+         *           "consumer_groups": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups"
+         *           },
+         *           "topics": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics"
+         *           },
+         *           "partition_reassignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/-/partitions/-/reassignment"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ClusterDataList"];
       };
     };
@@ -18861,6 +20937,69 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerAssignmentList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaConsumerAssignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments/topic-1/partitions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1/assignment=topic=1/partition=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "partition": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1"
+         *           },
+         *           "lag": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerAssignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments/topic-2/partitions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1/assignment=topic=2/partition=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-1",
+         *           "topic_name": "topic-2",
+         *           "partition_id": 2,
+         *           "partition": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/2"
+         *           },
+         *           "lag": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-2/partitions/2"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerAssignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments/topic-3/partitions/3",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1/assignment=topic=3/partition=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-1",
+         *           "topic_name": "topic-3",
+         *           "partition_id": 3,
+         *           "partition": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/3"
+         *           },
+         *           "lag": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-3/partitions/3"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ConsumerAssignmentDataList"];
       };
     };
@@ -18870,6 +21009,78 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerGroupList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaConsumerGroup",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "is_simple": false,
+         *           "partition_assignor": "org.apache.kafka.clients.consumer.RoundRobinAssignor",
+         *           "state": "STABLE",
+         *           "coordinator": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           },
+         *           "consumers": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers"
+         *           },
+         *           "lag_summary": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lag-summary"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerGroup",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-2",
+         *           "is_simple": false,
+         *           "partition_assignor": "org.apache.kafka.clients.consumer.StickyAssignor",
+         *           "state": "PREPARING_REBALANCE",
+         *           "coordinator": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           },
+         *           "consumers": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-2/consumers"
+         *           },
+         *           "lag_summary": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-2/lag-summary"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerGroup",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-3",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-3",
+         *           "is_simple": false,
+         *           "partition_assignor": "org.apache.kafka.clients.consumer.RangeAssignor",
+         *           "state": "DEAD",
+         *           "coordinator": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3"
+         *           },
+         *           "consumers": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-3/consumers"
+         *           },
+         *           "lag_summary": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-3/lag-summary"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ConsumerGroupDataList"];
       };
     };
@@ -18879,6 +21090,66 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerLagList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaConsumerLag",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/lag=topic-1/partition=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "consumer_id": "consumer-1",
+         *           "instance_id": "consumer-instance-1",
+         *           "client_id": "client-1",
+         *           "current_offset": 1,
+         *           "log_end_offset": 101,
+         *           "lag": 100
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerLag",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/lag=topic-1/partition=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 2,
+         *           "consumer_id": "consumer-2",
+         *           "instance_id": "consumer-instance-2",
+         *           "client_id": "client-2",
+         *           "current_offset": 1,
+         *           "log_end_offset": 11,
+         *           "lag": 10
+         *         },
+         *         {
+         *           "kind": "KafkaConsumerLag",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/lags/topic-1/partitions/3",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/lag=topic-1/partition=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 3,
+         *           "consumer_id": "consumer-3",
+         *           "instance_id": "consumer-instance-3",
+         *           "client_id": "client-3",
+         *           "current_offset": 1,
+         *           "log_end_offset": 1,
+         *           "lag": 0
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ConsumerLagDataList"];
       };
     };
@@ -18888,6 +21159,60 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaConsumerList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaConsumer",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-1",
+         *           "instance_id": "consumer-instance-1",
+         *           "client_id": "client-1",
+         *           "assignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-1/assignments"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumer",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-2",
+         *           "instance_id": "consumer-instance-2",
+         *           "client_id": "client-2",
+         *           "assignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-2/assignments"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaConsumer",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-2",
+         *             "resource_name": "crn:///kafka=cluster-1/consumer-group=consumer-group-1/consumer=consumer-2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "consumer_group_id": "consumer-group-1",
+         *           "consumer_id": "consumer-2",
+         *           "instance_id": "consumer-instance-2",
+         *           "client_id": "client-2",
+         *           "assignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/consumer-groups/consumer-group-1/consumers/consumer-2/assignments"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ConsumerDataList"];
       };
     };
@@ -18897,6 +21222,72 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaPartitionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaPartition",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "leader": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/1"
+         *           },
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *           },
+         *           "reassignment": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaPartition",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 2,
+         *           "leader": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/replicas/2"
+         *           },
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/replicas"
+         *           },
+         *           "reassignment": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/reassignment"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaPartition",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 3,
+         *           "leader": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/replicas/3"
+         *           },
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/replicas"
+         *           },
+         *           "reassignment": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/reassignment"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["PartitionDataList"];
       };
     };
@@ -18906,6 +21297,63 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReplicaList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/replica=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "broker_id": 1,
+         *           "is_leader": true,
+         *           "is_in_sync": true,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/2",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/replica=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "broker_id": 2,
+         *           "is_leader": false,
+         *           "is_in_sync": true,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas/3",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/replica=3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "broker_id": 3,
+         *           "is_leader": false,
+         *           "is_in_sync": false,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReplicaDataList"];
       };
     };
@@ -18915,6 +21363,69 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopicConfigList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaTopicConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs/cleanup.policy",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/config=cleanup.policy"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "name": "cleanup.policy",
+         *           "value": "compact",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_TOPIC_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "cleanup.policy",
+         *               "value": "compact",
+         *               "source": "DYNAMIC_TOPIC_CONFIG"
+         *             },
+         *             {
+         *               "name": "cleanup.policy",
+         *               "value": "delete",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "kind": "KafkaTopicConfig",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs/compression.type",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/config=compression.type"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "name": "compression.type",
+         *           "value": "gzip",
+         *           "is_default": false,
+         *           "is_read_only": false,
+         *           "is_sensitive": false,
+         *           "source": "DYNAMIC_TOPIC_CONFIG",
+         *           "synonyms": [
+         *             {
+         *               "name": "compression.type",
+         *               "value": "gzip",
+         *               "source": "DYNAMIC_TOPIC_CONFIG"
+         *             },
+         *             {
+         *               "name": "compression.type",
+         *               "value": "producer",
+         *               "source": "DEFAULT_CONFIG"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["TopicConfigDataList"];
       };
     };
@@ -18924,6 +21435,78 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaTopicList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaTopic",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "is_internal": false,
+         *           "replication_factor": 3,
+         *           "partitions_count": 1,
+         *           "partitions": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions"
+         *           },
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/configs"
+         *           },
+         *           "partition_reassignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/-/reassignments"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaTopic",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-2",
+         *           "is_internal": true,
+         *           "replication_factor": 4,
+         *           "partitions_count": 1,
+         *           "partitions": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions"
+         *           },
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/configs"
+         *           },
+         *           "partition_reassignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/-/reassignments"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaTopic",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-3"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-3",
+         *           "is_internal": false,
+         *           "replication_factor": 5,
+         *           "partitions_count": 1,
+         *           "partitions": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions"
+         *           },
+         *           "configs": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/configs"
+         *           },
+         *           "partition_reassignments": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/-/reassignments"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["TopicDataList"];
       };
     };
@@ -18944,6 +21527,42 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAclList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?principal=User%3Aalice"
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAcl",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?resource_type=TOPIC&resource_name=topic-&pattern_type=PREFIXED&principal=User%3Aalice&host=*&operation=ALL&permission=ALLOW"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "resource_type": "TOPIC",
+         *           "resource_name": "topic-",
+         *           "pattern_type": "PREFIXED",
+         *           "principal": "User:alice",
+         *           "host": "*",
+         *           "operation": "ALL",
+         *           "permission": "ALLOW"
+         *         },
+         *         {
+         *           "kind": "KafkaAcl",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/acls?resource_type=CLUSTER&resource_name=kafka-cluster&pattern_type=LITERAL&principal=User%3Aalice&host=*&operation=DESCRIBE&permission=DENY"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "resource_type": "CLUSTER",
+         *           "resource_name": "kafka-cluster",
+         *           "pattern_type": "LITERAL",
+         *           "principal": "User:alice",
+         *           "host": "*",
+         *           "operation": "DESCRIBE",
+         *           "permission": "DENY"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AclDataList"];
       };
     };
@@ -18953,6 +21572,75 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReassignmentList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/-/partitions/-/reassignment",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=1/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 1,
+         *           "adding_replicas": [
+         *             1,
+         *             2
+         *           ],
+         *           "removing_replicas": [
+         *             3
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/1/replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=2/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 2,
+         *           "adding_replicas": [
+         *             1
+         *           ],
+         *           "removing_replicas": [
+         *             2,
+         *             3
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/replicas"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReassignment",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/reassignment",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=3/reassignment"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 3,
+         *           "adding_replicas": [
+         *             3
+         *           ],
+         *           "removing_replicas": [
+         *             1,
+         *             2
+         *           ],
+         *           "replicas": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/3/replicas"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReassignmentDataList"];
       };
     };
@@ -18962,6 +21650,63 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReplicaList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/partition-replicas",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-1/partitions/2/replicas/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-1/partition=2/replica=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "partition_id": 2,
+         *           "broker_id": 1,
+         *           "is_leader": true,
+         *           "is_in_sync": true,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-2/partitions/3/replicas/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-3/partition=3/replica=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-2",
+         *           "partition_id": 3,
+         *           "broker_id": 1,
+         *           "is_leader": false,
+         *           "is_in_sync": true,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaReplica",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics/topic-3/partitions/1/replicas/1",
+         *             "resource_name": "crn:///kafka=cluster-1/topic=topic-3/partition=1/replica=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-3",
+         *           "partition_id": 1,
+         *           "broker_id": 1,
+         *           "is_leader": false,
+         *           "is_in_sync": false,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReplicaDataList"];
       };
     };
@@ -19061,6 +21806,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "description": "A sample response from Jetty's DoSFilter.",
+         *       "value": "<html> <head> <meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\"/> <title>Error 429 Too Many Requests</title> </head> <body> <h2>HTTP ERROR 429 Too Many Requests</h2> <table> <tr> <th>URI:</th> <td>/v3/clusters/my-cluster</td> </tr> <tr> <th>STATUS:</th> <td>429</td> </tr> <tr> <th>MESSAGE:</th> <td>Too Many Requests</td> </tr> <tr> <th>SERVLET:</th> <td>default</td> </tr> </table> </body> </html>"
+         *     } */
         "text/html": string;
       };
     };
@@ -19097,6 +21846,55 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaReplicaStatusList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/topics/topic_1/partitions/0/replica-status",
+         *         "resource_name": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaReplicaStatus",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/topics/topic-1/partitions/0/brokers/1/replica-status"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "broker_id": 1,
+         *           "partition_id": 0,
+         *           "is_leader": true,
+         *           "is_observer": false,
+         *           "is_isr_eligible": true,
+         *           "is_in_isr": true,
+         *           "is_caught_up": true,
+         *           "log_start_offset": 0,
+         *           "log_end_offset": 0,
+         *           "last_caught_up_time_ms": 100,
+         *           "last_fetch_time_ms": 200,
+         *           "link_name": "test-link"
+         *         },
+         *         {
+         *           "kind": "KafkaReplicaStatus",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/topics/topic-1/partitions/0/brokers/2/replica-status"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "topic_name": "topic-1",
+         *           "broker_id": 2,
+         *           "partition_id": 0,
+         *           "is_leader": false,
+         *           "is_observer": false,
+         *           "is_isr_eligible": true,
+         *           "is_in_isr": true,
+         *           "is_caught_up": true,
+         *           "log_start_offset": 0,
+         *           "log_end_offset": 0,
+         *           "last_caught_up_time_ms": 100,
+         *           "last_fetch_time_ms": 200,
+         *           "link_name": "test-link"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ReplicaStatusDataList"];
       };
     };
@@ -19106,6 +21904,23 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAnyUnevenLoad",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/any-uneven-load",
+         *         "resource_name": "crn:///kafka=cluster-1/any-uneven-load"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "status": "BALANCING",
+         *       "previous_status": "BALANCING_FAILED",
+         *       "status_updated_at": "2019-10-12T07:20:50Z",
+         *       "previous_status_updated_at": "2019-10-12T07:20:35Z",
+         *       "error_code": 10013,
+         *       "error_message": "The Confluent Balancer operation was overridden by a higher priority operation.",
+         *       "broker_tasks": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks"
+         *       }
+         *     } */
         "application/json": components["schemas"]["AnyUnevenLoadData"];
       };
     };
@@ -19115,6 +21930,23 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBalancerStatus",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/balancer",
+         *         "resource_name": "crn:///kafka=cluster-1/balancer"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "status": "ERROR",
+         *       "error_code": 10014,
+         *       "error_message": "The Confluent Balancer failed to start as JBOD is enabled for the cluster.",
+         *       "any_uneven_load": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/even-cluster-load"
+         *       },
+         *       "broker_tasks": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BalancerStatusData"];
       };
     };
@@ -19124,6 +21956,21 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerRemoval",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *         "resource_name": "crn:///kafka=cluster-1/broker=1/"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "broker_task": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       },
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BrokerRemovalData"];
       };
     };
@@ -19133,6 +21980,45 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerRemovalList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers:delete",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerRemoval",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "broker_task": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           },
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerRemoval",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "broker_task": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           },
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerRemovalDataList"];
       };
     };
@@ -19142,6 +22028,27 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerTask",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/add-broker",
+         *         "resource_name": "crn:///kafka=cluster-1/broker=1/task=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "task_type": "add-broker",
+         *       "task_status": "FAILED",
+         *       "sub_task_statuses": {
+         *         "partition_reassignment_status": "ERROR"
+         *       },
+         *       "created_at": "2019-10-12T07:20:50Z",
+         *       "updated_at": "2019-10-12T07:20:55Z",
+         *       "error_code": 10013,
+         *       "error_message": "The Confluent Balancer operation was overridden by a higher priority operation",
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BrokerTaskData"];
       };
     };
@@ -19151,6 +22058,58 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerTaskList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/add-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/task=add-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 1,
+         *           "task_type": "add-broker",
+         *           "task_status": "SUCCESS",
+         *           "sub_task_statuses": {
+         *             "partition_reassignment_status": "COMPLETED"
+         *           },
+         *           "created_at": "2019-10-12T10:20:40Z",
+         *           "updated_at": "2019-10-12T10:20:45Z",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2/tasks/remove-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=2/task=remove-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 2,
+         *           "task_type": "remove-broker",
+         *           "task_status": "FAILED",
+         *           "shutdown_scheduled": true,
+         *           "sub_task_statuses": {
+         *             "broker_replica_exclusion_status": "COMPLETED",
+         *             "partition_reassignment_status": "ERROR",
+         *             "broker_shutdown_status": "CANCELED"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial remove broker plan for brokers [2] prior to shutdown.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerTaskDataList"];
       };
     };
@@ -19160,6 +22119,58 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerTaskList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/add-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/task=add-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 1,
+         *           "task_type": "add-broker",
+         *           "task_status": "IN_PROGRESS",
+         *           "sub_task_statuses": {
+         *             "partition_reassignment_status": "IN_PROGRESS"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/remove-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/task=remove-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 1,
+         *           "task_type": "remove-broker",
+         *           "task_status": "FAILED",
+         *           "shutdown_scheduled": false,
+         *           "sub_task_statuses": {
+         *             "broker_replica_exclusion_status": "EXCLUDED",
+         *             "partition_reassignment_status": "ERROR",
+         *             "broker_shutdown_status": "CANCELED"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial remove broker plan for brokers [1] prior to shutdown.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerTaskDataList"];
       };
     };
@@ -19169,6 +22180,55 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerTaskList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/-/tasks",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1/tasks/add-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=1/task=add-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 1,
+         *           "task_type": "add-broker",
+         *           "task_status": "IN_PROGRESS",
+         *           "sub_task_statuses": {
+         *             "partition_reassignment_status": "IN_PROGRESS"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2/tasks/add-broker",
+         *             "resource_name": "crn:///kafka=cluster-1/broker=2/task=add-broker"
+         *           },
+         *           "cluster_id": "cluster_id",
+         *           "broker_id": 2,
+         *           "task_type": "add-broker",
+         *           "task_status": "FAILED",
+         *           "sub_task_statuses": {
+         *             "partition_reassignment_status": "ERROR"
+         *           },
+         *           "created_at": "2019-10-12T07:20:50Z",
+         *           "updated_at": "2019-10-12T07:20:55Z",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial add broker plan for brokers [2]",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerTaskDataList"];
       };
     };
@@ -19178,6 +22238,41 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerReplicaExclusionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "reason": "Broker is to be removed.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "reason": "Broker is to be removed.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["BrokerReplicaExclusionDataList"];
       };
     };
@@ -19187,6 +22282,19 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaBrokerReplicaExclusion",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *         "next": null
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "reason": "Broker is to be removed.",
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["BrokerReplicaExclusionData"];
       };
     };
@@ -19196,6 +22304,47 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAlterBrokerReplicaExclusionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "exclusion": "SET",
+         *           "reason": "Broker is to be removed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "exclusion": "SET",
+         *           "reason": "Broker is to be removed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AlterBrokerReplicaExclusionDataList"];
       };
     };
@@ -19205,6 +22354,47 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAlterBrokerReplicaExclusionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "exclusion": "DELETE",
+         *           "reason": "Broker removal is completed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "exclusion": "DELETE",
+         *           "reason": "Broker removal is completed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AlterBrokerReplicaExclusionDataList"];
       };
     };
@@ -19214,6 +22404,47 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaAlterBrokerReplicaExclusionList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/1",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "exclusion": "DELETE",
+         *           "reason": "Broker removal is completed.",
+         *           "error_code": 404,
+         *           "error_message": "No replica exclusion for broker 1 was present.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaAlterBrokerReplicaExclusion",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/broker-replica-exclusions/2",
+         *             "resource_name": "crn:///kafka=cluster-1/broker-replica-exclusions=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "exclusion": "DELETE",
+         *           "reason": "Broker removal is completed.",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AlterBrokerReplicaExclusionDataList"];
       };
     };
@@ -19223,6 +22454,24 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaRemoveBrokerTask",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/remove-broker-tasks/1",
+         *         "resource_name": "crn:///kafka=cluster-1/remove-broker-task=1"
+         *       },
+         *       "cluster_id": "cluster-1",
+         *       "broker_id": 1,
+         *       "shutdown_scheduled": false,
+         *       "broker_replica_exclusion_status": "COMPLETED",
+         *       "partition_reassignment_status": "FAILED",
+         *       "broker_shutdown_status": "CANCELED",
+         *       "error_code": 10006,
+         *       "error_message": "Error while computing the initial remove broker plan for brokers [1] prior to shutdown.",
+         *       "broker": {
+         *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *       }
+         *     } */
         "application/json": components["schemas"]["RemoveBrokerTaskData"];
       };
     };
@@ -19232,6 +22481,51 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaRemoveBrokerTaskList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/remove-broker-tasks",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaRemoveBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/remove-broker-tasks/1",
+         *             "resource_name": "crn:///kafka=cluster-1/remove-broker-task=1"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 1,
+         *           "shutdown_scheduled": true,
+         *           "broker_replica_exclusion_status": "COMPLETED",
+         *           "partition_reassignment_status": "FAILED",
+         *           "broker_shutdown_status": "CANCELED",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial remove broker plan for brokers [1] prior to shutdown.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
+         *           }
+         *         },
+         *         {
+         *           "kind": "KafkaRemoveBrokerTask",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/remove-broker-tasks/2",
+         *             "resource_name": "crn:///kafka=cluster-1/remove-broker-task=2"
+         *           },
+         *           "cluster_id": "cluster-1",
+         *           "broker_id": 2,
+         *           "shutdown_scheduled": true,
+         *           "broker_replica_exclusion_status": "EXCLUDED",
+         *           "partition_reassignment_status": "FAILED",
+         *           "broker_shutdown_status": "CANCELED",
+         *           "error_code": 10006,
+         *           "error_message": "Error while computing the initial remove broker plan for brokers [2] prior to shutdown.",
+         *           "broker": {
+         *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
+         *           }
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["RemoveBrokerTaskDataList"];
       };
     };
@@ -19248,6 +22542,62 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaLinkDataList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/Fds7TcT9TTqEXsoRLEKMcQ/links",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaLinkData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/CIL-69l7S1CwoVNAhoQLug/links/my-new-link-1",
+         *             "resource_name": null
+         *           },
+         *           "source_cluster_id": "src-cluster-id",
+         *           "link_name": "my-new-link-1",
+         *           "link_id": "7840644d-f7d8-4844-a577-a10ef3df31df",
+         *           "cluster_link_id": "eEBkTffYSESld6EO898x3w",
+         *           "topic_names": [
+         *             "topic-sb-1",
+         *             "topic-sb-2"
+         *           ],
+         *           "link_state": "ACTIVE"
+         *         },
+         *         {
+         *           "kind": "KafkaLinkData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/CIL-69l7S1CwoVNAhoQLug/links/my-new-link-2",
+         *             "resource_name": null
+         *           },
+         *           "remote_cluster_id": "src-cluster-id",
+         *           "link_name": "my-new-link-2",
+         *           "link_id": "f749116e-f847-4bd2-b1f6-5c4e518a0678",
+         *           "cluster_link_id": "90kRbvhHS9Kx9lxOUYoGeA",
+         *           "topic_names": [
+         *             "topic-db-1",
+         *             "topic-db-2"
+         *           ],
+         *           "link_state": "UNAVAILABLE",
+         *           "link_error": "AUTHENTICATION_ERROR",
+         *           "link_error_message": "Please check your api key and secret"
+         *         },
+         *         {
+         *           "kind": "KafkaLinkData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/CIL-69l7S1CwoVNAhoQLug/links/my-new-link-3",
+         *             "resource_name": null
+         *           },
+         *           "destination_cluster_id": "dest-cluster-id",
+         *           "link_name": "my-new-link-3",
+         *           "link_id": "9cd1711e-a4ef-4390-a35e-dfd758d97a82",
+         *           "cluster_link_id": "nNFxHqTvQ5CjXt_XWNl6gg",
+         *           "topic_names": [],
+         *           "link_state": "ACTIVE"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ListLinksResponseDataList"];
       };
     };
@@ -19266,6 +22616,53 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaLinkConfigDataList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/v-0Ce-CkTyKQol9v46LaCQ/links/link-nb-1/configs",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaLinkConfigData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/links/my-new-link-1",
+         *             "resource_name": null
+         *           },
+         *           "cluster_id": "1Rh_4htxSuen7RYGvGmgNw",
+         *           "name": "consumer.offset.sync.ms",
+         *           "value": "3825940",
+         *           "default": false,
+         *           "read_only": false,
+         *           "sensitive": false,
+         *           "source": "DYNAMIC_CLUSTER_LINK_CONFIG",
+         *           "synonyms": [
+         *             "cosm"
+         *           ],
+         *           "link_name": "link-db-1",
+         *           "link_id": "7840644d-f7d8-4844-a577-a10ef3df31df"
+         *         },
+         *         {
+         *           "kind": "KafkaLinkConfigData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/links/my-new-link-1",
+         *             "resource_name": null
+         *           },
+         *           "cluster_id": "1Rh_4htxSuen7RYGvGmgNw",
+         *           "name": "acl.sync.ms",
+         *           "value": "5000",
+         *           "default": false,
+         *           "read_only": false,
+         *           "sensitive": false,
+         *           "source": "DYNAMIC_CLUSTER_LINK_CONFIG",
+         *           "synonyms": [
+         *             "asm"
+         *           ],
+         *           "link_name": "link-db-1",
+         *           "link_id": "7840644d-f7d8-4844-a577-a10ef3df31df"
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ListLinkConfigsResponseDataList"];
       };
     };
@@ -19275,6 +22672,29 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaLinkConfigData",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/1Rh_4htxSuen7RYGvGmgNw/links/my-new-link-1",
+         *         "resource_name": null
+         *       },
+         *       "cluster_id": "1Rh_4htxSuen7RYGvGmgNw",
+         *       "name": "consumer.offset.sync.ms",
+         *       "value": "3825940",
+         *       "default": false,
+         *       "read_only": false,
+         *       "sensitive": false,
+         *       "source": "DYNAMIC_CLUSTER_LINK_CONFIG",
+         *       "synonyms": [
+         *         "cosm"
+         *       ],
+         *       "link_name": "link-db-1",
+         *       "link_id": "7840644d-f7d8-4844-a577-a10ef3df31df",
+         *       "topics": [
+         *         "topic-db-1",
+         *         "topic-db-2"
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ListLinkConfigsResponseData"];
       };
     };
@@ -19284,6 +22704,78 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaMirrorDataList",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/link/link-1/mirrors",
+         *         "resource_name": "crn:///kafka=cluster-1",
+         *         "next": null
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "KafkaMirrorData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/Fds7TcT9TTqEXsoRLEKMcQ/links/link-1/mirrors/topic-1",
+         *             "resource_name": "crn:///kafka=cluster-1"
+         *           },
+         *           "link_name": "link-sb-1",
+         *           "resource_name": "crn:///kafka=cluster-1",
+         *           "mirror_topic_name": "topic-1",
+         *           "source_topic_name": "topic-1",
+         *           "num_partitions": 3,
+         *           "mirror_lags": [
+         *             {
+         *               "partition": 0,
+         *               "lag": 0,
+         *               "last_source_fetch_offset": 0
+         *             },
+         *             {
+         *               "partition": 1,
+         *               "lag": 10000,
+         *               "last_source_fetch_offset": 1000
+         *             },
+         *             {
+         *               "partition": 2,
+         *               "lag": 40000,
+         *               "last_source_fetch_offset": 12030
+         *             }
+         *           ],
+         *           "mirror_status": "ACTIVE",
+         *           "state_time_ms": 1612550939300
+         *         },
+         *         {
+         *           "kind": "KafkaMirrorData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/Fds7TcT9TTqEXsoRLEKMcQ/links/link-1/mirrors/topic-2",
+         *             "resource_name": "crn:///kafka=cluster-1"
+         *           },
+         *           "link_name": "link-sb-2",
+         *           "resource_name": "crn:///kafka=cluster-1",
+         *           "mirror_topic_name": "topic-2",
+         *           "source_topic_name": "topic-2",
+         *           "num_partitions": 3,
+         *           "mirror_lags": [
+         *             {
+         *               "partition": 0,
+         *               "lag": 0,
+         *               "last_source_fetch_offset": 0
+         *             },
+         *             {
+         *               "partition": 1,
+         *               "lag": 10000,
+         *               "last_source_fetch_offset": 1000
+         *             },
+         *             {
+         *               "partition": 2,
+         *               "lag": 40000,
+         *               "last_source_fetch_offset": 12030
+         *             }
+         *           ],
+         *           "mirror_status": "STOPPED",
+         *           "state_time_ms": 1612551353640
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["ListMirrorTopicsResponseDataList"];
       };
     };
@@ -19293,6 +22785,36 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaMirrorData",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/link/link-1/mirrors/topic-1",
+         *         "resource_name": "crn:///kafka=cluster-1"
+         *       },
+         *       "link_name": "link-sb-1",
+         *       "mirror_topic_name": "topic-1",
+         *       "source_topic_name": "topic-1",
+         *       "num_partitions": 3,
+         *       "mirror_lags": [
+         *         {
+         *           "partition": 0,
+         *           "lag": 0,
+         *           "last_source_fetch_offset": 0
+         *         },
+         *         {
+         *           "partition": 1,
+         *           "lag": 10000,
+         *           "last_source_fetch_offset": 1000
+         *         },
+         *         {
+         *           "partition": 2,
+         *           "lag": 40000,
+         *           "last_source_fetch_offset": 12030
+         *         }
+         *       ],
+         *       "mirror_status": "ACTIVE",
+         *       "state_time_ms": 1612550939300
+         *     } */
         "application/json": components["schemas"]["ListMirrorTopicsResponseData"];
       };
     };
@@ -19302,6 +22824,105 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "kind": "KafkaPromoteMirror",
+         *       "metadata": {
+         *         "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/links/link-1/mirrors",
+         *         "resource_name": "crn:///kafka=cluster-1"
+         *       },
+         *       "data": [
+         *         {
+         *           "kind": "AlterMirrorsData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/links/my-new-link-1/mirrors/topic-1",
+         *             "resource": "crn:///kafka=cluster-1"
+         *           },
+         *           "mirror_topic_name": "topic-sb",
+         *           "error_code": null,
+         *           "error_message": null,
+         *           "mirror_lags": [
+         *             {
+         *               "partition": 0,
+         *               "lag": 0,
+         *               "last_source_fetch_offset": 0
+         *             },
+         *             {
+         *               "partition": 1,
+         *               "lag": 10000,
+         *               "last_source_fetch_offset": 1000
+         *             },
+         *             {
+         *               "partition": 2,
+         *               "lag": 40000,
+         *               "last_source_fetch_offset": 12030
+         *             }
+         *           ],
+         *           "messages_truncated": null,
+         *           "partition_level_truncation_data": [
+         *             {
+         *               "partition_id": 0,
+         *               "offset_truncated_to": 10000,
+         *               "messages_truncated": 10000
+         *             },
+         *             {
+         *               "partition_id": 1,
+         *               "offset_truncated_to": 40000,
+         *               "messages_truncated": 12030
+         *             },
+         *             {
+         *               "partition_id": 2,
+         *               "offset_truncated_to": 20000,
+         *               "messages_truncated": 20000
+         *             }
+         *           ]
+         *         },
+         *         {
+         *           "kind": "AlterMirrorsData",
+         *           "metadata": {
+         *             "self": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/links/my-new-link-1/mirrors/topic-2",
+         *             "resource": "crn:///kafka=cluster-1"
+         *           },
+         *           "mirror_topic_name": "topic-2",
+         *           "error_code": 400,
+         *           "error_message": "Topic 'topic-2' has already stopped its mirror from 'my-new-link-1'",
+         *           "mirror_lags": [
+         *             {
+         *               "partition": 0,
+         *               "lag": 0,
+         *               "last_source_fetch_offset": 0
+         *             },
+         *             {
+         *               "partition": 1,
+         *               "lag": 10000,
+         *               "last_source_fetch_offset": 1000
+         *             },
+         *             {
+         *               "partition": 2,
+         *               "lag": 40000,
+         *               "last_source_fetch_offset": 12030
+         *             }
+         *           ],
+         *           "messages_truncated": null,
+         *           "partition_level_truncation_data": [
+         *             {
+         *               "partition_id": 0,
+         *               "offset_truncated_to": 10000,
+         *               "messages_truncated": 10000
+         *             },
+         *             {
+         *               "partition_id": 1,
+         *               "offset_truncated_to": 40000,
+         *               "messages_truncated": 12030
+         *             },
+         *             {
+         *               "partition_id": 2,
+         *               "offset_truncated_to": 20000,
+         *               "messages_truncated": 20000
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     } */
         "application/json": components["schemas"]["AlterMirrorStatusResponseDataList"];
       };
     };
@@ -19320,6 +22941,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "The Confluent Balancer component is disabled or not started yet."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19329,6 +22954,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "Broker not found. Broker: 1 not found in the cluster: cluster-1"
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19338,6 +22967,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "The given broker id -10 is invalid"
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19347,6 +22980,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 500,
+         *       "message": "The Confluent Balancer component is disabled or not started yet."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19356,6 +22993,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 401,
+         *       "message": "Not authorized: the authenticated user didn't have the right access to the resource."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19365,6 +23006,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "The cluster link doesn't exist."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19374,6 +23019,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "Invalid Cluster Link Name."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19383,6 +23032,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "Invalid Config Name."
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19392,6 +23045,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "A cluster link already exists with the provided link name"
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19401,6 +23058,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 408,
+         *       "message": "The server received the request, but the operation timed out"
+         *     } */
         "application/json": components["schemas"]["Error"];
       };
     };
@@ -19410,6 +23071,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 400,
+         *       "message": "Bad Request"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19419,6 +23084,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 401,
+         *       "message": "Unauthorized"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19428,6 +23097,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 403,
+         *       "message": "Forbidden"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19437,6 +23110,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "account not found"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19446,6 +23123,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 404,
+         *       "message": "resource not found"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -19455,6 +23136,10 @@ export interface components {
         [name: string]: unknown;
       };
       content: {
+        /** @example {
+         *       "error_code": 500,
+         *       "message": "Oops, something went wrong"
+         *     } */
         "application/json": components["schemas"]["ErrorMessage"];
       };
     };
@@ -20583,9 +24268,48 @@ export interface operations {
       500: components["responses"]["DefaultSystemError"];
     };
   };
+  update_auth_typeIamV2User: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The unique identifier for the user. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["iam.v2.User.ConfigureUserAuthRequest"];
+      };
+    };
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
   listIamV2ServiceAccounts: {
     parameters: {
       query?: {
+        /**
+         * @description Filter the results by exact match for display_name. Pass multiple times to see results matching any of the values.
+         * @example [
+         *       "tf_runner_sa",
+         *       "mySA"
+         *     ]
+         */
+        display_name?: components["schemas"]["MultipleSearchFilter"];
         /** @description A pagination size for collection requests. */
         page_size?: number;
         /** @description An opaque pagination token for collection requests. */
@@ -20625,7 +24349,13 @@ export interface operations {
   };
   createIamV2ServiceAccount: {
     parameters: {
-      query?: never;
+      query?: {
+        /**
+         * @description The resource_id of the principal who will be assigned resource owner on the created service account. Principal can be group-mapping (group-xxx), user (u-xxx), service-account (sa-xxx) or identity-pool (pool-xxx).
+         * @example u-a83k9b
+         */
+        assigned_resource_owner?: components["schemas"]["SearchFilter"];
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -20758,7 +24488,7 @@ export interface operations {
     };
     requestBody?: {
       content: {
-        "application/json": components["schemas"]["iam.v2.ServiceAccountUpdate"];
+        "application/json": components["schemas"]["iam.v2.ServiceAccount"];
       };
     };
     responses: {
@@ -21054,6 +24784,7 @@ export interface operations {
       };
       400: components["responses"]["BadRequestError"];
       401: components["responses"]["UnauthenticatedError"];
+      402: components["responses"]["OverQuotaError"];
       403: components["responses"]["UnauthorizedError"];
       409: components["responses"]["ConflictError"];
       422: components["responses"]["ValidationError"];
@@ -21187,6 +24918,10 @@ export interface operations {
   listIamV2IpFilters: {
     parameters: {
       query?: {
+        /** @description Lists all filters belonging to the specified resource scope. */
+        resource_scope?: string;
+        /** @description If set to true, this includes filters defined at the organization level. The resource scope must also be set to use this parameter. */
+        include_parent_scopes?: string;
         /** @description A pagination size for collection requests. */
         page_size?: number;
         /** @description An opaque pagination token for collection requests. */
@@ -21262,6 +24997,7 @@ export interface operations {
       };
       400: components["responses"]["BadRequestError"];
       401: components["responses"]["UnauthenticatedError"];
+      402: components["responses"]["OverQuotaError"];
       403: components["responses"]["UnauthorizedError"];
       409: components["responses"]["ConflictError"];
       422: components["responses"]["ValidationError"];
@@ -21388,6 +25124,49 @@ export interface operations {
       404: components["responses"]["NotFoundError"];
       409: components["responses"]["ConflictError"];
       422: components["responses"]["ValidationError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  getIamV2IpFilterSummary: {
+    parameters: {
+      query: {
+        /**
+         * @description Scope the operation to the given scope.
+         * @example crn://confluent.cloud/organization=org-123/environment=env-abc
+         */
+        scope: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description IP Filter Summary. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["iam.v2.IpFilterSummary"] &
+            Record<string, unknown>;
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
       429: components["responses"]["RateLimitError"];
       500: components["responses"]["DefaultSystemError"];
     };
@@ -22729,6 +26508,11 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example [
+           *       "MyGcsLogsBucketConnector",
+           *       "MyS3BucketConnector",
+           *       "MyDatagenConnector"
+           *     ] */
           "application/json": string[];
         };
       };
@@ -22802,6 +26586,44 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "config": {
+           *         "cloud.environment": "prod",
+           *         "cloud.provider": "aws",
+           *         "connector.class": "GcsSink",
+           *         "data.format": "BYTES",
+           *         "flush.size": "1000",
+           *         "gcs.bucket.name": "APILogsBucket",
+           *         "gcs.credentials.config": "****************",
+           *         "kafka.api.key": "****************",
+           *         "kafka.api.secret": "****************",
+           *         "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *         "kafka.region": "us-west-2",
+           *         "name": "MyGcsLogsBucketConnector",
+           *         "tasks.max": "1",
+           *         "time.interval": "DAILY",
+           *         "topics": "APILogsTopic"
+           *       },
+           *       "tasks": [
+           *         {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 0
+           *         }
+           *       ],
+           *       "type": "sink",
+           *       "offsets": [
+           *         {
+           *           "partition": {
+           *             "kafka_partition": 0,
+           *             "kafka_topic": "APILogsTopic"
+           *           },
+           *           "offset": {
+           *             "kafka_offset": 1000
+           *           }
+           *         }
+           *       ]
+           *     } */
           "application/json": components["schemas"]["connect.v1.ConnectorWithOffsets"];
         };
       };
@@ -22811,6 +26633,12 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "error": {
+           *         "code": 400,
+           *         "message": "Unauthorized"
+           *       }
+           *     } */
           "application/json": {
             code?: number;
             message?: string;
@@ -22825,6 +26653,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "error_code": 500,
+           *       "message": "Failed to find any class that implements Connector and which name matches io.confluent.connect.<connector-class>..."
+           *     } */
           "application/json": {
             error_code?: number;
             message?: string;
@@ -22859,6 +26691,126 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "MyGcsLogsBucketConnector": {
+           *         "id": {
+           *           "id": "lcc-xxxxx",
+           *           "id_type": "ID"
+           *         },
+           *         "info": {
+           *           "name": "MyGcsLogsBucketConnector",
+           *           "config": {
+           *             "cloud.environment": "prod",
+           *             "cloud.provider": "aws",
+           *             "connector.class": "GcsSink",
+           *             "data.format": "BYTES",
+           *             "flush.size": "1000",
+           *             "gcs.bucket.name": "APILogsBucket",
+           *             "gcs.credentials.config": "****************",
+           *             "kafka.api.key": "****************",
+           *             "kafka.api.secret": "****************",
+           *             "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *             "kafka.region": "us-west-2",
+           *             "name": "MyGcsLogsBucketConnector",
+           *             "tasks.max": "1",
+           *             "time.interval": "DAILY",
+           *             "topics": "APILogsTopic",
+           *             "type": "sink"
+           *           }
+           *         },
+           *         "status": {
+           *           "name": "MyGcsLogsBucketConnector",
+           *           "connector": {
+           *             "state": "PROVISIONING",
+           *             "worker_id": "MyGcsLogsBucketConnector",
+           *             "trace": ""
+           *           },
+           *           "tasks": [],
+           *           "type": "sink"
+           *         }
+           *       },
+           *       "MyS3BucketConnector": {
+           *         "id": {
+           *           "id": "lcc-xxxxx",
+           *           "id_type": "ID"
+           *         },
+           *         "info": {
+           *           "name": "MyS3BucketConnector",
+           *           "config": {
+           *             "cloud.environment": "prod",
+           *             "cloud.provider": "aws",
+           *             "connector.class": "S3Sink",
+           *             "data.format": "BYTES",
+           *             "flush.size": "1000",
+           *             "s3.bucket": "APILogsBucket",
+           *             "aws.access.key.id": "************",
+           *             "aws.secret.access.key": "**********",
+           *             "kafka.api.key": "****************",
+           *             "kafka.api.secret": "****************",
+           *             "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *             "kafka.region": "us-west-2",
+           *             "name": "MyS3BucketConnector",
+           *             "tasks.max": "1",
+           *             "time.interval": "DAILY",
+           *             "topics": "APILogsTopic",
+           *             "type": "source"
+           *           }
+           *         },
+           *         "status": {
+           *           "name": "MyS3BucketConnector",
+           *           "connector": {
+           *             "state": "FAILED",
+           *             "worker_id": "MyS3BucketConnector",
+           *             "trace": "There were some errors with your configuration:\ntopics: Provided Kafka ApiKey is invalid\nkafka.api.secret: Provided Kafka ApiKey is invalid\n"
+           *           },
+           *           "tasks": [],
+           *           "type": "sink"
+           *         }
+           *       },
+           *       "MyDatagenConnector": {
+           *         "id": {
+           *           "id": "lcc-xxxxx",
+           *           "id_type": "ID"
+           *         },
+           *         "info": {
+           *           "name": "MyDatagenConnector",
+           *           "config": {
+           *             "cloud.environment": "prod",
+           *             "cloud.provider": "aws",
+           *             "connector.class": "DatagenSource",
+           *             "data.format": "BYTES",
+           *             "flush.size": "1000",
+           *             "quickstart": "ORDERS",
+           *             "kafka.api.key": "****************",
+           *             "kafka.api.secret": "****************",
+           *             "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *             "kafka.region": "us-west-2",
+           *             "name": "MyDatagenConnector",
+           *             "tasks.max": "1",
+           *             "time.interval": "DAILY",
+           *             "topics": "APILogsTopic",
+           *             "type": "source"
+           *           }
+           *         },
+           *         "status": {
+           *           "name": "MyDatagenConnector",
+           *           "connector": {
+           *             "state": "RUNNING",
+           *             "worker_id": "MyDatagenConnector",
+           *             "trace": ""
+           *           },
+           *           "tasks": [
+           *             {
+           *               "id": 0,
+           *               "msg": "",
+           *               "state": "RUNNING",
+           *               "worker_id": "MyDatagenConnector"
+           *             }
+           *           ],
+           *           "type": "source"
+           *         }
+           *       }
+           *     } */
           "application/json": components["schemas"]["connect.v1.ConnectorExpansionMap"];
         };
       };
@@ -22890,6 +26842,23 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "cloud.environment": "prod",
+           *       "cloud.provider": "aws",
+           *       "connector.class": "GcsSink",
+           *       "data.format": "BYTES",
+           *       "flush.size": "1000",
+           *       "gcs.bucket.name": "APILogsBucket",
+           *       "gcs.credentials.config": "****************",
+           *       "kafka.api.key": "****************",
+           *       "kafka.api.secret": "****************",
+           *       "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *       "kafka.region": "us-west-2",
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "tasks.max": "2",
+           *       "time.interval": "DAILY",
+           *       "topics": "APILogsTopic"
+           *     } */
           "application/json": {
             /** @description The cloud environment type. */
             "cloud.environment": string;
@@ -22992,6 +26961,37 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "config": {
+           *         "cloud.environment": "prod",
+           *         "cloud.provider": "aws",
+           *         "connector.class": "GcsSink",
+           *         "data.format": "BYTES",
+           *         "flush.size": "1000",
+           *         "gcs.bucket.name": "APILogsBucket",
+           *         "gcs.credentials.config": "****************",
+           *         "kafka.api.key": "****************",
+           *         "kafka.api.secret": "****************",
+           *         "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *         "kafka.region": "us-west-2",
+           *         "name": "MyGcsLogsBucketConnector",
+           *         "tasks.max": "2",
+           *         "time.interval": "DAILY",
+           *         "topics": "APILogsTopic"
+           *       },
+           *       "tasks": [
+           *         {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 0
+           *         },
+           *         {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 1
+           *         }
+           *       ],
+           *       "type": "sink"
+           *     } */
           "application/json": components["schemas"]["connect.v1.Connector"];
         };
       };
@@ -23005,6 +27005,10 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "error_code": 500,
+           *       "message": "Failed to find any class that implements Connector and which name matches io.confluent.connect.<connector-class>..."
+           *     } */
           "application/json": {
             error_code?: number;
             message?: string;
@@ -23035,6 +27039,33 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "config": {
+           *         "cloud.environment": "prod",
+           *         "cloud.provider": "aws",
+           *         "connector.class": "GcsSink",
+           *         "data.format": "BYTES",
+           *         "flush.size": "1000",
+           *         "gcs.bucket.name": "APILogsBucket",
+           *         "gcs.credentials.config": "****************",
+           *         "kafka.api.key": "****************",
+           *         "kafka.api.secret": "****************",
+           *         "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *         "kafka.region": "us-west-2",
+           *         "name": "MyGcsLogsBucketConnector",
+           *         "tasks.max": "1",
+           *         "time.interval": "DAILY",
+           *         "topics": "APILogsTopic"
+           *       },
+           *       "tasks": [
+           *         {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 0
+           *         }
+           *       ],
+           *       "type": "sink"
+           *     } */
           "application/json": components["schemas"]["connect.v1.Connector"];
         };
       };
@@ -23177,6 +27208,16 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "MyGcsLogsBucketConnector",
+           *       "connector": {
+           *         "state": "PROVISIONING",
+           *         "worker_id": "MyGcsLogsBucketConnector",
+           *         "trace": ""
+           *       },
+           *       "tasks": [],
+           *       "type": "source"
+           *     } */
           "application/json": {
             /** @description The name of the connector. */
             name: string;
@@ -23245,6 +27286,31 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example [
+           *       {
+           *         "id": {
+           *           "connector": "MyGcsLogsBucketConnector",
+           *           "task": 2
+           *         },
+           *         "config": {
+           *           "cloud.environment": "prod",
+           *           "cloud.provider": "aws",
+           *           "connector.class": "GcsSink",
+           *           "data.format": "BYTES",
+           *           "flush.size": "1000",
+           *           "gcs.bucket.name": "APILogsBucket",
+           *           "gcs.credentials.config": "****************",
+           *           "kafka.api.key": "****************",
+           *           "kafka.api.secret": "****************",
+           *           "kafka.endpoint": "SASL_SSL://pkc-xxxxx.us-west-2.aws.confluent.cloud:9092",
+           *           "kafka.region": "us-west-2",
+           *           "name": "MyGcsLogsBucketConnector",
+           *           "tasks.max": "2",
+           *           "time.interval": "DAILY",
+           *           "topics": "APILogsTopic"
+           *         }
+           *       }
+           *     ] */
           "application/json": components["schemas"]["connect.v1.Connectors"];
         };
       };
@@ -23274,6 +27340,31 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example [
+           *       {
+           *         "class": "BigQuerySink",
+           *         "type": "sink"
+           *       },
+           *       {
+           *         "class": "KinesisSource",
+           *         "type": "source",
+           *         "version": "0.1.0"
+           *       },
+           *       {
+           *         "class": "PostgresSource",
+           *         "type": "source",
+           *         "version": "0.1.0"
+           *       },
+           *       {
+           *         "class": "S3_SINK",
+           *         "type": "sink"
+           *       },
+           *       {
+           *         "class": "GcsSink",
+           *         "type": "sink",
+           *         "version": "0.2.0"
+           *       }
+           *     ] */
           "application/json": {
             /** @description The connector class name. E.g. BigQuerySink. */
             class: string;
@@ -23339,6 +27430,296 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example {
+           *       "name": "io.confluent.connect.gcs.GcsSinkConnector",
+           *       "groups": [
+           *         "Organize my data by...",
+           *         "Which topics do you want to get data from?",
+           *         "Messages",
+           *         "How should we connect to your data?",
+           *         "Google Cloud Storage details",
+           *         "Kafka Cluster credentials",
+           *         "Number of tasks for this connector"
+           *       ],
+           *       "error_count": 1,
+           *       "configs": [
+           *         {
+           *           "definition": {
+           *             "name": "name",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Sets a name for your connector.",
+           *             "group": "How should we connect to your data?",
+           *             "width": "NONE",
+           *             "display_name": "Connector name",
+           *             "dependents": [],
+           *             "order": 2,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "name",
+           *             "value": "{{.logicalClusterId}}",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "connector.class",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "",
+           *             "group": "How should we connect to your data?",
+           *             "width": "NONE",
+           *             "display_name": "Connector class",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "connector.class",
+           *             "value": "io.confluent.connect.gcs.GcsSinkConnector",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "kafka.api.key",
+           *             "type": "PASSWORD",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "",
+           *             "group": "Kafka Cluster credentials",
+           *             "width": "NONE",
+           *             "display_name": "Kafka API Key",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "kafka.api.key",
+           *             "value": "",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "kafka.api.secret",
+           *             "type": "PASSWORD",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "",
+           *             "group": "Kafka Cluster credentials",
+           *             "width": "NONE",
+           *             "display_name": "Kafka API Secret",
+           *             "dependents": [
+           *               "kafka.api.key"
+           *             ],
+           *             "order": 2,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "kafka.api.secret",
+           *             "value": "",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "topics",
+           *             "type": "LIST",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Identifies the topic name or a comma-separated list of topic names.",
+           *             "group": "Which topics do you want to get data from?",
+           *             "width": "NONE",
+           *             "display_name": "Topic names",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "topics",
+           *             "value": "test1",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "data.format",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Sets the input/output message format. Valid entries are AVRO, JSON, or BYTES",
+           *             "group": "Messages",
+           *             "width": "NONE",
+           *             "display_name": "Message format",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "data.format",
+           *             "value": "BYTES",
+           *             "recommended_values": [
+           *               "BYTES",
+           *               "JSON",
+           *               "AVRO"
+           *             ],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "gcs.credentials.config",
+           *             "type": "PASSWORD",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Contents of the downloaded GCP service account JSON file.",
+           *             "group": "Google Cloud Storage details",
+           *             "width": "NONE",
+           *             "display_name": "Google Cloud Storage credentials.",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "gcs.credentials.config",
+           *             "value": "",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "gcs.bucket.name",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "A Google Cloud Storage bucket must be in the same region as your Confluent Cloud cluster.",
+           *             "group": "Google Cloud Storage details",
+           *             "width": "NONE",
+           *             "display_name": "Bucket name.",
+           *             "dependents": [],
+           *             "order": 2,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "gcs.bucket.name",
+           *             "value": "gmagare",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "time.interval",
+           *             "type": "STRING",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "Sets how your messages grouped in storage. Valid entries are DAILY or HOURLY.",
+           *             "group": "Organize my data by...",
+           *             "width": "NONE",
+           *             "display_name": "Time interval",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "time.interval",
+           *             "value": "DAILY",
+           *             "recommended_values": [
+           *               "DAILY",
+           *               "HOURLY"
+           *             ],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "tasks.max",
+           *             "type": "INT",
+           *             "required": true,
+           *             "default_value": "",
+           *             "importance": "HIGH",
+           *             "documentation": "",
+           *             "group": "Number of tasks for this connector",
+           *             "width": "NONE",
+           *             "display_name": "Tasks",
+           *             "dependents": [],
+           *             "order": 1,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "tasks.max",
+           *             "value": "1",
+           *             "recommended_values": [],
+           *             "errors": [],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         },
+           *         {
+           *           "definition": {
+           *             "name": "flush.size",
+           *             "type": "INT",
+           *             "required": true,
+           *             "default_value": "1000",
+           *             "importance": "HIGH",
+           *             "documentation": "This value defaults to 1000. For example, if you use the default setting of 1000 and your topic has six partitions, files start to be created in the storage bucket after more than 1000 records exist in each partition. Note that the default value of 1000 can be increased if needed.",
+           *             "group": "Organize my data by...",
+           *             "width": "NONE",
+           *             "display_name": "Flush size",
+           *             "dependents": [],
+           *             "order": 2,
+           *             "alias": ""
+           *           },
+           *           "value": {
+           *             "name": "flush.size",
+           *             "value": "1",
+           *             "recommended_values": [],
+           *             "errors": [
+           *               "\"flush.size\" should be greater than or equal to 1000"
+           *             ],
+           *             "visible": true
+           *           },
+           *           "metadata": {}
+           *         }
+           *       ]
+           *     } */
           "application/json": {
             /** @description The class name of the connector plugin. */
             name?: string;
@@ -26741,8 +31122,11 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
+          /** @example FULL_TRANSITIVE */
           "application/vnd.schemaregistry.v1+json": string;
+          /** @example FULL_TRANSITIVE */
           "application/vnd.schemaregistry+json; qs=0.9": string;
+          /** @example FULL_TRANSITIVE */
           "application/json; qs=0.5": string;
         };
       };
@@ -34335,7 +38719,13 @@ export interface operations {
   };
   createIamV2IdentityPool: {
     parameters: {
-      query?: never;
+      query?: {
+        /**
+         * @description The resource_id of the principal who will be assigned resource owner on the created identity pool. Principal can be group-mapping (group-xxx), user (u-xxx), service-account (sa-xxx) or identity-pool (pool-xxx).
+         * @example u-a83k9b
+         */
+        assigned_resource_owner?: components["schemas"]["SearchFilter"];
+      };
       header?: never;
       path: {
         /** @description The Provider */
@@ -34830,332 +39220,6 @@ export interface operations {
       };
       400: components["responses"]["BadRequestError"];
       401: components["responses"]["UnauthenticatedError"];
-      403: components["responses"]["UnauthorizedError"];
-      404: components["responses"]["NotFoundError"];
-      409: components["responses"]["ConflictError"];
-      422: components["responses"]["ValidationError"];
-      429: components["responses"]["RateLimitError"];
-      500: components["responses"]["DefaultSystemError"];
-    };
-  };
-  listSdV1Pipelines: {
-    parameters: {
-      query: {
-        /**
-         * @description Filter the results by exact match for environment.
-         * @example env-00000
-         */
-        environment: components["schemas"]["SearchFilter"];
-        /**
-         * @description Filter the results by exact match for spec.kafka_cluster.
-         * @example lkc-00000
-         */
-        "spec.kafka_cluster": components["schemas"]["SearchFilter"];
-        /** @description A pagination size for collection requests. */
-        page_size?: number;
-        /** @description An opaque pagination token for collection requests. */
-        page_token?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Pipeline. */
-      200: {
-        headers: {
-          /** @description The unique identifier for the API request. */
-          "X-Request-Id"?: string;
-          /** @description The maximum number of requests you're permitted to make per time period. */
-          "X-RateLimit-Limit"?: number;
-          /** @description The number of requests remaining in the current rate limit window. */
-          "X-RateLimit-Remaining"?: number;
-          /** @description The relative time in seconds until the current rate-limit window resets.
-           *
-           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
-          "X-RateLimit-Reset"?: number;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["sd.v1.PipelineList"] & {
-            data?: {
-              spec?: {
-                /** @example {
-                 *       "id": "env-00000",
-                 *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
-                 *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
-                 *     } */
-                environment?: unknown;
-                /** @example {
-                 *       "id": "lkc-00000",
-                 *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
-                 *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
-                 *     } */
-                kafka_cluster?: unknown;
-              };
-            }[];
-          };
-        };
-      };
-      400: components["responses"]["BadRequestError"];
-      401: components["responses"]["UnauthenticatedError"];
-      403: components["responses"]["UnauthorizedError"];
-      429: components["responses"]["RateLimitError"];
-      500: components["responses"]["DefaultSystemError"];
-    };
-  };
-  createSdV1Pipeline: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        "application/json": components["schemas"]["sd.v1.Pipeline"] & {
-          spec: Record<string, unknown>;
-        } & {
-          spec?: {
-            /** @example {
-             *       "id": "env-00000"
-             *     } */
-            environment?: unknown;
-            /** @example {
-             *       "id": "lkc-00000"
-             *     } */
-            kafka_cluster?: unknown;
-          };
-        };
-      };
-    };
-    responses: {
-      /** @description A Pipeline is being created. */
-      202: {
-        headers: {
-          /** @description The unique identifier for the API request. */
-          "X-Request-Id"?: string;
-          /** @description The maximum number of requests you're permitted to make per time period. */
-          "X-RateLimit-Limit"?: number;
-          /** @description The number of requests remaining in the current rate limit window. */
-          "X-RateLimit-Remaining"?: number;
-          /** @description The relative time in seconds until the current rate-limit window resets.
-           *
-           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
-          "X-RateLimit-Reset"?: number;
-          /** @description Pipeline resource uri */
-          Location?: string;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["sd.v1.Pipeline"] & {
-            spec: Record<string, unknown>;
-          } & {
-            spec?: {
-              /** @example {
-               *       "id": "env-00000",
-               *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
-               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
-               *     } */
-              environment?: unknown;
-              /** @example {
-               *       "id": "lkc-00000",
-               *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
-               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
-               *     } */
-              kafka_cluster?: unknown;
-            };
-          };
-        };
-      };
-      400: components["responses"]["BadRequestError"];
-      401: components["responses"]["UnauthenticatedError"];
-      402: components["responses"]["OverQuotaError"];
-      403: components["responses"]["UnauthorizedError"];
-      409: components["responses"]["ConflictError"];
-      422: components["responses"]["ValidationError"];
-      429: components["responses"]["RateLimitError"];
-      500: components["responses"]["DefaultSystemError"];
-    };
-  };
-  getSdV1Pipeline: {
-    parameters: {
-      query: {
-        /**
-         * @description Scope the operation to the given environment.
-         * @example env-00000
-         */
-        environment: components["schemas"]["SearchFilter"];
-        /**
-         * @description Scope the operation to the given spec.kafka_cluster.
-         * @example lkc-00000
-         */
-        "spec.kafka_cluster": components["schemas"]["SearchFilter"];
-      };
-      header?: never;
-      path: {
-        /** @description The unique identifier for the pipeline. */
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Pipeline. */
-      200: {
-        headers: {
-          /** @description The unique identifier for the API request. */
-          "X-Request-Id"?: string;
-          /** @description The maximum number of requests you're permitted to make per time period. */
-          "X-RateLimit-Limit"?: number;
-          /** @description The number of requests remaining in the current rate limit window. */
-          "X-RateLimit-Remaining"?: number;
-          /** @description The relative time in seconds until the current rate-limit window resets.
-           *
-           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
-          "X-RateLimit-Reset"?: number;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["sd.v1.Pipeline"] & {
-            spec: Record<string, unknown>;
-          } & {
-            spec?: {
-              /** @example {
-               *       "id": "env-00000",
-               *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
-               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
-               *     } */
-              environment?: unknown;
-              /** @example {
-               *       "id": "lkc-00000",
-               *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
-               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
-               *     } */
-              kafka_cluster?: unknown;
-            };
-          };
-        };
-      };
-      400: components["responses"]["BadRequestError"];
-      401: components["responses"]["UnauthenticatedError"];
-      403: components["responses"]["UnauthorizedError"];
-      404: components["responses"]["NotFoundError"];
-      429: components["responses"]["RateLimitError"];
-      500: components["responses"]["DefaultSystemError"];
-    };
-  };
-  deleteSdV1Pipeline: {
-    parameters: {
-      query: {
-        /**
-         * @description Scope the operation to the given environment.
-         * @example env-00000
-         */
-        environment: components["schemas"]["SearchFilter"];
-        /**
-         * @description Scope the operation to the given spec.kafka_cluster.
-         * @example lkc-00000
-         */
-        "spec.kafka_cluster": components["schemas"]["SearchFilter"];
-      };
-      header?: never;
-      path: {
-        /** @description The unique identifier for the pipeline. */
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A Pipeline is being deleted. */
-      204: {
-        headers: {
-          /** @description The unique identifier for the API request. */
-          "X-Request-Id"?: string;
-          /** @description The maximum number of requests you're permitted to make per time period. */
-          "X-RateLimit-Limit"?: number;
-          /** @description The number of requests remaining in the current rate limit window. */
-          "X-RateLimit-Remaining"?: number;
-          /** @description The relative time in seconds until the current rate-limit window resets.
-           *
-           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
-          "X-RateLimit-Reset"?: number;
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      400: components["responses"]["BadRequestError"];
-      401: components["responses"]["UnauthenticatedError"];
-      403: components["responses"]["UnauthorizedError"];
-      404: components["responses"]["NotFoundError"];
-      429: components["responses"]["RateLimitError"];
-      500: components["responses"]["DefaultSystemError"];
-    };
-  };
-  updateSdV1Pipeline: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The unique identifier for the pipeline. */
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        "application/json": components["schemas"]["sd.v1.Pipeline"] & {
-          spec: {
-            /** @example {
-             *       "id": "env-00000"
-             *     } */
-            environment: unknown;
-          };
-        };
-      };
-    };
-    responses: {
-      /** @description Pipeline. */
-      200: {
-        headers: {
-          /** @description The unique identifier for the API request. */
-          "X-Request-Id"?: string;
-          /** @description The maximum number of requests you're permitted to make per time period. */
-          "X-RateLimit-Limit"?: number;
-          /** @description The number of requests remaining in the current rate limit window. */
-          "X-RateLimit-Remaining"?: number;
-          /** @description The relative time in seconds until the current rate-limit window resets.
-           *
-           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
-          "X-RateLimit-Reset"?: number;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["sd.v1.Pipeline"] & {
-            spec: Record<string, unknown>;
-          } & {
-            spec?: {
-              /** @example {
-               *       "id": "env-00000",
-               *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
-               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
-               *     } */
-              environment?: unknown;
-              /** @example {
-               *       "id": "lkc-00000",
-               *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
-               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
-               *     } */
-              kafka_cluster?: unknown;
-            };
-          };
-        };
-      };
-      400: components["responses"]["BadRequestError"];
-      401: components["responses"]["UnauthenticatedError"];
-      402: components["responses"]["OverQuotaError"];
       403: components["responses"]["UnauthorizedError"];
       404: components["responses"]["NotFoundError"];
       409: components["responses"]["ConflictError"];
@@ -36808,6 +40872,14 @@ export interface operations {
          *     ]
          */
         "spec.gateway"?: components["schemas"]["MultipleSearchFilter"];
+        /**
+         * @description Filter the results by exact match for id. Pass multiple times to see results matching any of the values.
+         * @example [
+         *       "ap-1",
+         *       "ap-2"
+         *     ]
+         */
+        id?: components["schemas"]["MultipleSearchFilter"];
         /** @description A pagination size for collection requests. */
         page_size?: number;
         /** @description An opaque pagination token for collection requests. */
@@ -37707,7 +41779,13 @@ export interface operations {
   };
   createIamV2CertificateIdentityPool: {
     parameters: {
-      query?: never;
+      query?: {
+        /**
+         * @description The resource_id of the principal who will be assigned resource owner on the created certificate identity pool. Principal can be group-mapping (group-xxx), user (u-xxx), service-account (sa-xxx) or identity-pool (pool-xxx).
+         * @example u-a83k9b
+         */
+        assigned_resource_owner?: components["schemas"]["SearchFilter"];
+      };
       header?: never;
       path: {
         /** @description The Certificate Authority */
@@ -38116,7 +42194,7 @@ export interface operations {
          * @description Filter the results by exact match for environment.
          * @example env-00000
          */
-        environment?: components["schemas"]["SearchFilter"];
+        environment: components["schemas"]["SearchFilter"];
         /** @description A pagination size for collection requests. */
         page_size?: number;
         /** @description An opaque pagination token for collection requests. */
@@ -38190,13 +42268,14 @@ export interface operations {
            * @example env-00000
            */
           environment: string;
-          /** @description Display name of the Flink Artifact. */
+          /** @description Unique name of the Flink Artifact per cloud, region, environment scope. */
           display_name: string;
           /**
-           * @description Java class or alias for the artifact as provided by developer.
+           * @deprecated
+           * @description Java class or alias for the artifact as provided by developer. Deprecated
            * @example io.confluent.example.SumScalarFunction
            */
-          class: string;
+          class?: string;
           /**
            * @description Archive format of the Flink Artifact.
            * @example JAR
@@ -38204,7 +42283,7 @@ export interface operations {
           content_format?: string;
           /** @description Description of the Flink Artifact. */
           description?: string;
-          /** @description Document link of the Flink Artifact. */
+          /** @description Documentation link of the Flink Artifact. */
           documentation_link?: string;
           /**
            * @description Runtime language of the Flink Artifact.
@@ -38262,6 +42341,11 @@ export interface operations {
          * @example us-east-1
          */
         region: components["schemas"]["SearchFilter"];
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
       };
       header?: never;
       path: {
@@ -38313,6 +42397,11 @@ export interface operations {
          * @example us-east-1
          */
         region: components["schemas"]["SearchFilter"];
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
       };
       header?: never;
       path: {
@@ -38361,6 +42450,11 @@ export interface operations {
          * @example us-east-1
          */
         region: components["schemas"]["SearchFilter"];
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
       };
       header?: never;
       path: {
@@ -38738,6 +42832,963 @@ export interface operations {
       400: components["responses"]["BadRequestError"];
       401: components["responses"]["UnauthenticatedError"];
       402: components["responses"]["OverQuotaError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      409: components["responses"]["ConflictError"];
+      422: components["responses"]["ValidationError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  listCclV1CustomCodeLoggings: {
+    parameters: {
+      query: {
+        /**
+         * @description Filter the results by exact match for environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+        /** @description A pagination size for collection requests. */
+        page_size?: number;
+        /** @description An opaque pagination token for collection requests. */
+        page_token?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Custom Code Logging. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ccl.v1.CustomCodeLoggingList"] & {
+            data?: {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+            }[];
+          };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  createCclV1CustomCodeLogging: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ccl.v1.CustomCodeLogging"] &
+          Record<string, unknown> & {
+            /** @example {
+             *       "id": "env-00000"
+             *     } */
+            environment?: unknown;
+          };
+      };
+    };
+    responses: {
+      /** @description A Custom Code Logging was created. */
+      201: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          /** @description CustomCodeLogging resource uri */
+          Location?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ccl.v1.CustomCodeLogging"] &
+            Record<string, unknown> & {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+            };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      409: components["responses"]["ConflictError"];
+      422: components["responses"]["ValidationError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  getCclV1CustomCodeLogging: {
+    parameters: {
+      query: {
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+      };
+      header?: never;
+      path: {
+        /** @description The unique identifier for the custom code logging. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Custom Code Logging. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ccl.v1.CustomCodeLogging"] &
+            Record<string, unknown> & {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+            };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  deleteCclV1CustomCodeLogging: {
+    parameters: {
+      query: {
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+      };
+      header?: never;
+      path: {
+        /** @description The unique identifier for the custom code logging. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description A Custom Code Logging is being deleted. */
+      204: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  updateCclV1CustomCodeLogging: {
+    parameters: {
+      query: {
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+      };
+      header?: never;
+      path: {
+        /** @description The unique identifier for the custom code logging. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ccl.v1.CustomCodeLoggingUpdate"] & {
+          /** @example {
+           *       "id": "env-00000"
+           *     } */
+          environment: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Custom Code Logging. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ccl.v1.CustomCodeLogging"] &
+            Record<string, unknown> & {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+            };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      409: components["responses"]["ConflictError"];
+      422: components["responses"]["ValidationError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  listTableflowV1Regions: {
+    parameters: {
+      query?: {
+        /**
+         * @description Filter the results by exact match for cloud.
+         * @example AWS
+         */
+        cloud?: components["schemas"]["SearchFilter"];
+        /** @description A pagination size for collection requests. */
+        page_size?: number;
+        /** @description An opaque pagination token for collection requests. */
+        page_token?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Region. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["tableflow.v1.RegionList"];
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  listTableflowV1TableflowTopics: {
+    parameters: {
+      query: {
+        /**
+         * @description Filter the results by exact match for environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+        /**
+         * @description Filter the results by exact match for spec.kafka_cluster.
+         * @example lkc-00000
+         */
+        "spec.kafka_cluster": components["schemas"]["SearchFilter"];
+        /** @description A pagination size for collection requests. */
+        page_size?: number;
+        /** @description An opaque pagination token for collection requests. */
+        page_token?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Tableflow Topic. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["tableflow.v1.TableflowTopicList"] & {
+            data?: {
+              spec?: {
+                /** @example {
+                 *       "id": "env-00000",
+                 *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
+                 *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+                 *     } */
+                environment?: unknown;
+                /** @example {
+                 *       "id": "lkc-00000",
+                 *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
+                 *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
+                 *     } */
+                kafka_cluster?: unknown;
+              };
+            }[];
+          };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  createTableflowV1TableflowTopic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["tableflow.v1.TableflowTopic"] & {
+          spec: Record<string, unknown>;
+        } & {
+          spec?: {
+            /** @example {
+             *       "id": "env-00000"
+             *     } */
+            environment?: unknown;
+            /** @example {
+             *       "id": "lkc-00000"
+             *     } */
+            kafka_cluster?: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      /** @description A Tableflow Topic is being created. */
+      202: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          /** @description TableflowTopic resource uri */
+          Location?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["tableflow.v1.TableflowTopic"] & {
+            spec: Record<string, unknown>;
+          } & {
+            spec?: {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+              /** @example {
+               *       "id": "lkc-00000",
+               *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
+               *     } */
+              kafka_cluster?: unknown;
+            };
+          };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      409: components["responses"]["ConflictError"];
+      422: components["responses"]["ValidationError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  getTableflowV1TableflowTopic: {
+    parameters: {
+      query: {
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+        /**
+         * @description Scope the operation to the given spec.kafka_cluster.
+         * @example lkc-00000
+         */
+        "spec.kafka_cluster": components["schemas"]["SearchFilter"];
+      };
+      header?: never;
+      path: {
+        /** @description The name of the Kafka topic for which Tableflow is enabled. */
+        display_name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Tableflow Topic. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["tableflow.v1.TableflowTopic"] & {
+            spec: Record<string, unknown>;
+          } & {
+            spec?: {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+              /** @example {
+               *       "id": "lkc-00000",
+               *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
+               *     } */
+              kafka_cluster?: unknown;
+            };
+          };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  deleteTableflowV1TableflowTopic: {
+    parameters: {
+      query: {
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+        /**
+         * @description Scope the operation to the given spec.kafka_cluster.
+         * @example lkc-00000
+         */
+        "spec.kafka_cluster": components["schemas"]["SearchFilter"];
+      };
+      header?: never;
+      path: {
+        /** @description The name of the Kafka topic for which Tableflow is enabled. */
+        display_name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description A Tableflow Topic is being deleted. */
+      204: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  updateTableflowV1TableflowTopic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The name of the Kafka topic for which Tableflow is enabled. */
+        display_name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["tableflow.v1.TableflowTopicUpdate"] & {
+          spec: {
+            /** @example {
+             *       "id": "env-00000"
+             *     } */
+            environment: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      /** @description Tableflow Topic. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["tableflow.v1.TableflowTopic"] & {
+            spec: Record<string, unknown>;
+          } & {
+            spec?: {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+              /** @example {
+               *       "id": "lkc-00000",
+               *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
+               *     } */
+              kafka_cluster?: unknown;
+            };
+          };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      409: components["responses"]["ConflictError"];
+      422: components["responses"]["ValidationError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  listTableflowV1CatalogIntegrations: {
+    parameters: {
+      query: {
+        /**
+         * @description Filter the results by exact match for environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+        /**
+         * @description Filter the results by exact match for spec.kafka_cluster.
+         * @example lkc-00000
+         */
+        "spec.kafka_cluster": components["schemas"]["SearchFilter"];
+        /** @description A pagination size for collection requests. */
+        page_size?: number;
+        /** @description An opaque pagination token for collection requests. */
+        page_token?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Catalog Integration. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["tableflow.v1.CatalogIntegrationList"] & {
+            data?: {
+              spec?: {
+                /** @example {
+                 *       "id": "env-00000",
+                 *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
+                 *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+                 *     } */
+                environment?: unknown;
+                /** @example {
+                 *       "id": "lkc-00000",
+                 *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
+                 *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
+                 *     } */
+                kafka_cluster?: unknown;
+              };
+            }[];
+          };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  createTableflowV1CatalogIntegration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["tableflow.v1.CatalogIntegration"] & {
+          spec: Record<string, unknown>;
+        } & {
+          spec?: {
+            /** @example {
+             *       "id": "env-00000"
+             *     } */
+            environment?: unknown;
+            /** @example {
+             *       "id": "lkc-00000"
+             *     } */
+            kafka_cluster?: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      /** @description A Catalog Integration is being created. */
+      202: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          /** @description CatalogIntegration resource uri */
+          Location?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["tableflow.v1.CatalogIntegration"] & {
+            spec: Record<string, unknown>;
+          } & {
+            spec?: {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+              /** @example {
+               *       "id": "lkc-00000",
+               *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
+               *     } */
+              kafka_cluster?: unknown;
+            };
+          };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      409: components["responses"]["ConflictError"];
+      422: components["responses"]["ValidationError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  getTableflowV1CatalogIntegration: {
+    parameters: {
+      query: {
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+        /**
+         * @description Scope the operation to the given spec.kafka_cluster.
+         * @example lkc-00000
+         */
+        "spec.kafka_cluster": components["schemas"]["SearchFilter"];
+      };
+      header?: never;
+      path: {
+        /** @description The unique identifier for the catalog integration. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Catalog Integration. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["tableflow.v1.CatalogIntegration"] & {
+            spec: Record<string, unknown>;
+          } & {
+            spec?: {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+              /** @example {
+               *       "id": "lkc-00000",
+               *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
+               *     } */
+              kafka_cluster?: unknown;
+            };
+          };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  deleteTableflowV1CatalogIntegration: {
+    parameters: {
+      query: {
+        /**
+         * @description Scope the operation to the given environment.
+         * @example env-00000
+         */
+        environment: components["schemas"]["SearchFilter"];
+        /**
+         * @description Scope the operation to the given spec.kafka_cluster.
+         * @example lkc-00000
+         */
+        "spec.kafka_cluster": components["schemas"]["SearchFilter"];
+      };
+      header?: never;
+      path: {
+        /** @description The unique identifier for the catalog integration. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description A Catalog Integration is being deleted. */
+      204: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
+      403: components["responses"]["UnauthorizedError"];
+      404: components["responses"]["NotFoundError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["DefaultSystemError"];
+    };
+  };
+  updateTableflowV1CatalogIntegration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The unique identifier for the catalog integration. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["tableflow.v1.CatalogIntegrationUpdateRequest"];
+      };
+    };
+    responses: {
+      /** @description Catalog Integration. */
+      200: {
+        headers: {
+          /** @description The unique identifier for the API request. */
+          "X-Request-Id"?: string;
+          /** @description The maximum number of requests you're permitted to make per time period. */
+          "X-RateLimit-Limit"?: number;
+          /** @description The number of requests remaining in the current rate limit window. */
+          "X-RateLimit-Remaining"?: number;
+          /** @description The relative time in seconds until the current rate-limit window resets.
+           *
+           *     **Important:** This differs from Github and Twitter's same-named header which uses UTC epoch seconds. We use relative time to avoid client/server time synchronization issues. */
+          "X-RateLimit-Reset"?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["tableflow.v1.CatalogIntegration"] & {
+            spec: Record<string, unknown>;
+          } & {
+            spec?: {
+              /** @example {
+               *       "id": "env-00000",
+               *       "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
+               *     } */
+              environment?: unknown;
+              /** @example {
+               *       "id": "lkc-00000",
+               *       "related": "https://api.confluent.cloud/cmk/v2/clusters/lkc-00000",
+               *       "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-abc123/cloud-cluster=lkc-00000"
+               *     } */
+              kafka_cluster?: unknown;
+            };
+          };
+        };
+      };
+      400: components["responses"]["BadRequestError"];
+      401: components["responses"]["UnauthenticatedError"];
       403: components["responses"]["UnauthorizedError"];
       404: components["responses"]["NotFoundError"];
       409: components["responses"]["ConflictError"];

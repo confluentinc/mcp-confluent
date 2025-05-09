@@ -166,11 +166,13 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    * Main handler for consuming messages from Kafka topics.
    * @param clientManager - The client manager for Kafka and registry clients
    * @param toolArguments - The arguments for the tool, including topics, message limits, and deserialization options
+   * @param sessionId - Optional session ID for Kafka consumer
    * @returns A CallToolResult containing the consumed messages or error information
    */
   async handle(
     clientManager: ClientManager,
     toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,
+    sessionId?: string,
   ): Promise<CallToolResult> {
     const { topicNames, maxMessages, timeoutMs, value, key } =
       consumeKafkaMessagesArgs.parse(toolArguments);
@@ -184,7 +186,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         : undefined;
 
     try {
-      consumer = await clientManager.getConsumer();
+      consumer = await clientManager.getConsumer(sessionId);
       await consumer.connect();
       await consumer.subscribe({ topics: topicNames });
 

@@ -1,7 +1,7 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { pino } from "pino";
 
-const logLevel = process.env.LOG_LEVEL || "info";
+const logLevel = process.env.LOG_LEVEL || "debug";
 
 // Create logger with stderr destination
 export const logger = pino(

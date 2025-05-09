@@ -39,10 +39,15 @@ export class TransportManager {
 
       // Start HTTP server if needed (after routes are registered)
       if (needsHttpServer && this.httpServer) {
-        await this.httpServer.start({
-          port: port ?? 3000,
-          host: host ?? "localhost",
-        });
+        if (port && host) {
+          await this.httpServer.start({
+            port,
+            host,
+          });
+        } else {
+          logger.error("Port and host are required");
+          throw new Error("Port and host are required");
+        }
       }
 
       logger.info("All transports started successfully");

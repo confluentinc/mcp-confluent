@@ -121,17 +121,20 @@ async function main() {
     const transportManager = new TransportManager(server);
 
     // Start all transports with a single call
+    logger.info(
+      `Starting transports: ${cliOptions.transports.join(", ")} on ${env.HTTP_HOST}:${env.HTTP_PORT}`,
+    );
     await transportManager.start(
       cliOptions.transports,
-      env.HTTP_PORT ? Number(env.HTTP_PORT) : undefined,
+      env.HTTP_PORT,
       env.HTTP_HOST,
     );
 
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
-      await clientManager.disconnect();
       await transportManager.stop();
+      await clientManager.disconnect();
       await server.close();
       process.exit(0);
     };

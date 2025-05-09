@@ -2,6 +2,17 @@ import { z } from "zod";
 
 // Schema for required environment variables
 const envSchema = z.object({
+  HTTP_PORT: z.coerce
+    .number()
+    .int()
+    .positive()
+    .describe("Port to use for HTTP transport")
+    .default(3000),
+
+  HTTP_HOST: z
+    .string()
+    .describe("Host to bind for HTTP transport")
+    .default("localhost"),
   BOOTSTRAP_SERVERS: z
     .string()
     .describe(
@@ -145,20 +156,7 @@ const configSchema = z
       )
       .trim()
       .url(),
-    // HTTP transport configuration
-    HTTP_PORT: z
-      .number()
-      .int()
-      .positive()
-      .describe("Port to use for HTTP transport")
-      .optional()
-      .default(3000),
-    HTTP_HOST: z
-      .string()
-      .describe("Host to bind for HTTP transport")
-      .optional()
-      .default("localhost"),
   })
-  .partial(); // Makes all fields optional
+  .partial();
 
 export const combinedSchema = envSchema.merge(configSchema);

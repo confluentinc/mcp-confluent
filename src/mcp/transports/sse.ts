@@ -20,7 +20,7 @@ const sseErrorSchema = {
 };
 
 export class SseTransport implements Transport {
-  private sessions: Map<string, SSEServerTransport> = new Map();
+  private sessions: Record<string, SSEServerTransport> = {};
 
   constructor(
     private server: McpServer,
@@ -54,12 +54,12 @@ export class SseTransport implements Transport {
           }
 
           // Store the session before connecting to ensure it's available for messages
-          this.sessions.set(sessionId, transport);
+          this.sessions[sessionId] = transport;
 
           // Set up cleanup on connection close
           reply.raw.on("close", () => {
             logger.info(`SSE connection closed for session ${sessionId}`);
-            this.sessions.delete(sessionId);
+            delete this.sessions[sessionId];
           });
 
           // Connect the transport to the server
@@ -110,7 +110,7 @@ export class SseTransport implements Transport {
           const sessionId = request.query.sessionId;
           logger.info(`Received message for sessionId ${sessionId}`);
 
-          const transport = this.sessions.get(sessionId);
+          const transport = this.sessions[sessionId];
 
           if (!transport) {
             logger.warn(`No transport found for sessionId: ${sessionId}`);
@@ -141,7 +141,7 @@ export class SseTransport implements Transport {
     Object.values(this.sessions).forEach((transport) => {
       const sessionId = transport.sessionId;
       if (sessionId) {
-        this.sessions.delete(sessionId);
+        delete this.sessions[sessionId];
       }
       transport.close();
     });

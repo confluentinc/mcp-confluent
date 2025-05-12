@@ -4,11 +4,20 @@ import { TransportType } from "@src/mcp/transports/types.js";
 import * as dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import pkg from "../package.json" with { type: "json" };
 
 // Define the interface for our CLI options
 export interface CLIOptions {
   envFile?: string;
   transports: TransportType[];
+}
+
+/**
+ * Get the package version from package.json
+ * @returns Package version string
+ */
+export function getPackageVersion(): string {
+  return pkg.version;
 }
 
 function parseTransportList(value: string): TransportType[] {
@@ -44,7 +53,7 @@ export function parseCliArgs(): CLIOptions {
     .description(
       "Confluent MCP Server - Model Context Protocol implementation for Confluent Cloud",
     )
-    .version(process.env.npm_package_version ?? "dev")
+    .version(getPackageVersion())
     .option("-e, --env-file <path>", "Load environment variables from file")
     .addOption(
       new Option(

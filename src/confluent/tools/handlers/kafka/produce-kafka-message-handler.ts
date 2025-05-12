@@ -13,6 +13,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import { z } from "zod";
 
 const messageOptions = z.object({
@@ -207,5 +208,9 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       description: `Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value.\n\nBefore producing, check if the topic has a registered schema for <topicName>-value and <topicName>-key. If a schema exists, set useSchemaRegistry to true and specify the appropriate schemaType. For saving user messages/history, use the kafka topic named mcp-conversations unless otherwise specified. If the topic does not exist, it can be created via the ${ToolName.CREATE_TOPICS} tool.`,
       inputSchema: produceKafkaMessageArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["KAFKA_API_KEY", "KAFKA_API_SECRET", "BOOTSTRAP_SERVERS"];
   }
 }

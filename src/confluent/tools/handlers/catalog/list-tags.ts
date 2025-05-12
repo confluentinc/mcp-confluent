@@ -14,7 +14,7 @@ const listTagsArguments = z.object({
     .string()
     .describe("The base URL of the Schema Registry REST API.")
     .url()
-    .default(env.SCHEMA_REGISTRY_ENDPOINT ?? "")
+    .default(() => env.SCHEMA_REGISTRY_ENDPOINT ?? "")
     .optional(),
 });
 

@@ -14,7 +14,7 @@ const searchTopicsByNameArguments = z.object({
     .string()
     .describe("The base URL of the Schema Registry REST API.")
     .url()
-    .default(env.SCHEMA_REGISTRY_ENDPOINT ?? "")
+    .default(() => env.SCHEMA_REGISTRY_ENDPOINT ?? "")
     .optional(),
   topicName: z.string().describe("The topic name to search for"),
 });

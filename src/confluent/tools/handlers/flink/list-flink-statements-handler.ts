@@ -15,7 +15,7 @@ const listFlinkStatementsArguments = z.object({
     .string()
     .describe("The base URL of the Flink REST API.")
     .url()
-    .default(env.FLINK_REST_ENDPOINT ?? "")
+    .default(() => env.FLINK_REST_ENDPOINT ?? "")
     .optional(),
   organizationId: z
     .string()
@@ -28,7 +28,7 @@ const listFlinkStatementsArguments = z.object({
   computePoolId: z
     .string()
     .optional()
-    .default(env.FLINK_COMPUTE_POOL_ID ?? "")
+    .default(() => env.FLINK_COMPUTE_POOL_ID ?? "")
     .describe("Filter the results by exact match for compute_pool."),
   pageSize: z
     .number()

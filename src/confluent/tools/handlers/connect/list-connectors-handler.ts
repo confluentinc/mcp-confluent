@@ -16,7 +16,7 @@ const listConnectorArguments = z.object({
     .trim()
     .describe("The base URL of the Kafka Connect REST API.")
     .url()
-    .default(env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
+    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
     .optional(),
   environmentId: z
     .string()

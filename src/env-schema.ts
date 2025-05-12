@@ -160,3 +160,6 @@ const configSchema = z
   .partial();
 
 export const combinedSchema = envSchema.merge(configSchema);
+
+// Export type for environment variable names
+export type EnvVar = keyof z.infer<typeof combinedSchema>;

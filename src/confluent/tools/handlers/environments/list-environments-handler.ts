@@ -15,7 +15,7 @@ const listEnvironmentsArguments = z.object({
     .string()
     .describe("The base URL of the Confluent Cloud REST API.")
     .url()
-    .default(env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
+    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
     .optional(),
   pageToken: z
     .string()

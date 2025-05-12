@@ -15,7 +15,7 @@ const alterTopicConfigArguments = z.object({
     .string()
     .describe("The base URL of the Confluent Cloud Kafka REST API.")
     .url()
-    .default(env.KAFKA_REST_ENDPOINT ?? "")
+    .default(() => env.KAFKA_REST_ENDPOINT ?? "")
     .optional(),
   clusterId: z
     .string()

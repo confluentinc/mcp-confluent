@@ -6,6 +6,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -145,5 +146,15 @@ export class CreateConnectorHandler extends BaseToolHandler {
         "Create a new connector. Returns the new connector information if successful.",
       inputSchema: createConnectorArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return [
+      "CONFLUENT_CLOUD_REST_ENDPOINT",
+      "CONFLUENT_CLOUD_API_KEY",
+      "CONFLUENT_CLOUD_API_SECRET",
+      "KAFKA_API_KEY",
+      "KAFKA_API_SECRET",
+    ];
   }
 }

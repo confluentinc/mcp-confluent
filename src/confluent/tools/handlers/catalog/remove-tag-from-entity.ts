@@ -5,6 +5,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -78,5 +79,9 @@ export class RemoveTagFromEntityHandler extends BaseToolHandler {
       description: "Remove tag from an entity in Confluent Cloud.",
       inputSchema: removeTagFromEntityArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"];
   }
 }

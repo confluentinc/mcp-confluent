@@ -6,6 +6,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -88,5 +89,13 @@ export class ReadConnectorHandler extends BaseToolHandler {
       description: "Get information about the connector.",
       inputSchema: readConnectorArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return [
+      "CONFLUENT_CLOUD_REST_ENDPOINT",
+      "CONFLUENT_CLOUD_API_KEY",
+      "CONFLUENT_CLOUD_API_SECRET",
+    ];
   }
 }

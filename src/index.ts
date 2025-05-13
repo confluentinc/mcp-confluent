@@ -27,8 +27,8 @@ async function main() {
         ssl: true,
         sasl: {
           mechanism: "plain",
-          username: env.KAFKA_API_KEY,
-          password: env.KAFKA_API_SECRET,
+          username: env.KAFKA_API_KEY!,
+          password: env.KAFKA_API_SECRET!,
         },
         logger: kafkaLogger,
       },
@@ -44,20 +44,20 @@ async function main() {
       },
       auth: {
         cloud: {
-          apiKey: env.CONFLUENT_CLOUD_API_KEY,
-          apiSecret: env.CONFLUENT_CLOUD_API_SECRET,
+          apiKey: env.CONFLUENT_CLOUD_API_KEY!,
+          apiSecret: env.CONFLUENT_CLOUD_API_SECRET!,
         },
         flink: {
-          apiKey: env.FLINK_API_KEY,
-          apiSecret: env.FLINK_API_SECRET,
+          apiKey: env.FLINK_API_KEY!,
+          apiSecret: env.FLINK_API_SECRET!,
         },
         schemaRegistry: {
-          apiKey: env.SCHEMA_REGISTRY_API_KEY,
-          apiSecret: env.SCHEMA_REGISTRY_API_SECRET,
+          apiKey: env.SCHEMA_REGISTRY_API_KEY!,
+          apiSecret: env.SCHEMA_REGISTRY_API_SECRET!,
         },
         kafka: {
-          apiKey: env.KAFKA_API_KEY,
-          apiSecret: env.KAFKA_API_SECRET,
+          apiKey: env.KAFKA_API_KEY!,
+          apiSecret: env.KAFKA_API_SECRET!,
         },
       },
     });
@@ -65,7 +65,8 @@ async function main() {
     const toolHandlers = new Map<ToolName, ToolHandler>();
 
     // Initialize tools and check their requirements
-    Object.values(ToolName).forEach((toolName) => {
+    const sortedToolNames = Object.values(ToolName).sort();
+    sortedToolNames.forEach((toolName) => {
       const handler = ToolFactory.createToolHandler(toolName);
       const missingVars = handler
         .getRequiredEnvVars()
@@ -75,7 +76,7 @@ async function main() {
         toolHandlers.set(toolName, handler);
         logger.info(`Tool ${toolName} enabled`);
       } else {
-        logger.info(
+        logger.warn(
           `Tool ${toolName} disabled due to missing environment variables: ${missingVars.join(", ")}`,
         );
       }

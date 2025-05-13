@@ -2,7 +2,7 @@
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { parseCliArgs } from "@src/cli.js";
+import { getPackageVersion, parseCliArgs } from "@src/cli.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
@@ -101,7 +101,7 @@ async function main() {
 
     const server = new McpServer({
       name: "confluent",
-      version: process.env.npm_package_version ?? "dev",
+      version: getPackageVersion(),
     });
 
     toolHandlers.forEach((handler, name) => {

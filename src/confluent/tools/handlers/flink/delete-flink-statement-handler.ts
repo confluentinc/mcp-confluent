@@ -6,6 +6,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -16,7 +17,7 @@ const deleteFlinkStatementArguments = z.object({
     .trim()
     .describe("The base URL of the Flink REST API.")
     .url()
-    .default(env.FLINK_REST_ENDPOINT ?? "")
+    .default(() => env.FLINK_REST_ENDPOINT ?? "")
     .optional(),
   organizationId: z
     .string()
@@ -93,5 +94,9 @@ export class DeleteFlinkStatementHandler extends BaseToolHandler {
       description: "Make a request to delete a statement.",
       inputSchema: deleteFlinkStatementArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["FLINK_API_KEY", "FLINK_API_SECRET"];
   }
 }

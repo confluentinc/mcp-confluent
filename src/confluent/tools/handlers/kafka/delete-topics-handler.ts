@@ -5,6 +5,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import { z } from "zod";
 
 const deleteKafkaTopicsArguments = z.object({
@@ -30,5 +31,9 @@ export class DeleteTopicsHandler extends BaseToolHandler {
       description: "Delete the topic with the given names.",
       inputSchema: deleteKafkaTopicsArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["KAFKA_API_KEY", "KAFKA_API_SECRET", "BOOTSTRAP_SERVERS"];
   }
 }

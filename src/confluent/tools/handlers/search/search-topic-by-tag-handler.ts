@@ -5,6 +5,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -14,7 +15,7 @@ const searchTopicsByTagArguments = z.object({
     .string()
     .describe("The base URL of the Schema Registry REST API.")
     .url()
-    .default(env.SCHEMA_REGISTRY_ENDPOINT ?? "")
+    .default(() => env.SCHEMA_REGISTRY_ENDPOINT ?? "")
     .optional(),
   topicTag: z.string().optional().describe("The tag we wish to search for"),
   limit: z
@@ -68,5 +69,9 @@ export class SearchTopicsByTagHandler extends BaseToolHandler {
         "List all topics in the Kafka cluster with the specified tag.",
       inputSchema: searchTopicsByTagArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"];
   }
 }

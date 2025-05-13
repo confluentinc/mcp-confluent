@@ -25,6 +25,7 @@ import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-sc
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
 import { SearchTopicsByNameHandler } from "@src/confluent/tools/handlers/search/search-topics-by-name-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
@@ -53,6 +54,7 @@ export class ToolFactory {
     [ToolName.READ_ENVIRONMENT, new ReadEnvironmentHandler()],
     [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],
     [ToolName.CONSUME_MESSAGES, new ConsumeKafkaMessagesHandler()],
+    [ToolName.GET_TOPIC_CONFIG, new GetTopicConfigHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

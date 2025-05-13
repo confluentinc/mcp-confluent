@@ -24,4 +24,5 @@ export enum ToolName {
   LIST_ENVIRONMENTS = "list-environments",
   READ_ENVIRONMENT = "read-environment",
   LIST_SCHEMAS = "list-schemas",
+  GET_TOPIC_CONFIG = "get-topic-config",
 }

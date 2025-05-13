@@ -92,10 +92,6 @@ export class ReadConnectorHandler extends BaseToolHandler {
   }
 
   getRequiredEnvVars(): EnvVar[] {
-    return [
-      "CONFLUENT_CLOUD_REST_ENDPOINT",
-      "CONFLUENT_CLOUD_API_KEY",
-      "CONFLUENT_CLOUD_API_SECRET",
-    ];
+    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
   }
 }

@@ -21,7 +21,10 @@ const getTopicConfigArguments = z.object({
     .string()
     .optional()
     .describe("The unique identifier for the Kafka cluster."),
-  topicName: z.string().describe("Name of the topic to get configuration for").nonempty(),
+  topicName: z
+    .string()
+    .describe("Name of the topic to get configuration for")
+    .nonempty(),
 });
 
 /**
@@ -51,9 +54,10 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     );
 
     // First, get topic details
-    const { data: topicData, error: topicError } = await pathBasedClient[
-      `/kafka/v3/clusters/${kafka_cluster_id}/topics/${topicName}`
-    ].GET();
+    const { data: topicData, error: topicError } =
+      await pathBasedClient[
+        `/kafka/v3/clusters/${kafka_cluster_id}/topics/${topicName}`
+      ].GET();
 
     if (topicError) {
       return this.createResponse(
@@ -63,9 +67,10 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     }
 
     // Then, get topic configurations
-    const { data: configData, error: configError } = await pathBasedClient[
-      `/kafka/v3/clusters/${kafka_cluster_id}/topics/${topicName}/configs`
-    ].GET();
+    const { data: configData, error: configError } =
+      await pathBasedClient[
+        `/kafka/v3/clusters/${kafka_cluster_id}/topics/${topicName}/configs`
+      ].GET();
 
     if (configError) {
       return this.createResponse(

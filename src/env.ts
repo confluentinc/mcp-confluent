@@ -36,10 +36,12 @@ export async function initEnv(): Promise<Environment> {
 // Create a module to provide access to environment variables
 const env = new Proxy({} as Environment, {
   get: (_, property: string) => {
-    if (isInitialized) {
-      return envValues[property as keyof Environment];
+    if (!isInitialized) {
+      throw new Error(
+        `Environment not initialized. Attempted to access ${property} before initialization.`,
+      );
     }
-    return undefined;
+    return envValues[property as keyof Environment];
   },
 });
 

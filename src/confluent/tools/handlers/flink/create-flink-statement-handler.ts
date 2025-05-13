@@ -6,6 +6,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -15,7 +16,7 @@ const createFlinkStatementArguments = z.object({
     .string()
     .describe("The base URL of the Flink REST API.")
     .url()
-    .default(env.FLINK_REST_ENDPOINT ?? "")
+    .default(() => env.FLINK_REST_ENDPOINT ?? "")
     .optional(),
   organizationId: z
     .string()
@@ -55,7 +56,7 @@ const createFlinkStatementArguments = z.object({
     .string()
     .trim()
     .nonempty()
-    .default(env["FLINK_ENV_NAME"] ?? "")
+    .default(() => env.FLINK_ENV_NAME ?? "")
     .describe(
       "The catalog name to be used for the statement. Typically the confluent environment name.",
     ),
@@ -63,7 +64,7 @@ const createFlinkStatementArguments = z.object({
     .string()
     .trim()
     .nonempty()
-    .default(env["FLINK_DATABASE_NAME"] ?? "")
+    .default(() => env.FLINK_DATABASE_NAME ?? "")
     .describe(
       "The database name to be used for the statement. Typically the Kafka cluster name.",
     ),
@@ -147,5 +148,9 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
       description: "Make a request to create a statement.",
       inputSchema: createFlinkStatementArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["FLINK_API_KEY", "FLINK_API_SECRET"];
   }
 }

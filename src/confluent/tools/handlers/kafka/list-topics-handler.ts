@@ -5,6 +5,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import { z } from "zod";
 
 const listTopicArgs = z.object({
@@ -27,5 +28,9 @@ export class ListTopicsHandler extends BaseToolHandler {
       description: "List all topics in the Kafka cluster.",
       inputSchema: listTopicArgs.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["KAFKA_API_KEY", "KAFKA_API_SECRET", "BOOTSTRAP_SERVERS"];
   }
 }

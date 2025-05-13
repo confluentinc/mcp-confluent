@@ -12,6 +12,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
 import { z } from "zod";
 
@@ -258,5 +259,9 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         "Consumes messages from one or more Kafka topics. Supports automatic deserialization of Schema Registry encoded messages (AVRO, JSON, PROTOBUF).",
       inputSchema: consumeKafkaMessagesArgs.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["KAFKA_API_KEY", "KAFKA_API_SECRET", "BOOTSTRAP_SERVERS"];
   }
 }

@@ -1,4 +1,5 @@
 import { Command, Option } from "@commander-js/extra-typings";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 import * as dotenv from "dotenv";
@@ -10,6 +11,10 @@ import pkg from "../package.json" with { type: "json" };
 export interface CLIOptions {
   envFile?: string;
   transports: TransportType[];
+  allowTools?: string[];
+  blockTools?: string[];
+  listTools?: boolean;
+  disableConfluentCloudTools?: boolean;
 }
 
 /**
@@ -44,6 +49,47 @@ function parseTransportList(value: string): TransportType[] {
 }
 
 /**
+ * Parses a comma-separated list of tool names and returns an array of valid tool names.
+ * Trims whitespace from each tool name.
+ * Exits the process with an error if any invalid tool names are provided.
+ *
+ * @param value - Comma-separated list of tool names
+ * @returns Array of valid tool names
+ */
+function parseToolList(value: string): string[] {
+  return (
+    value
+      .split(",")
+      .map((t) => t.trim())
+      // Filter out any empty strings that may result from extra commas or whitespace
+      .filter(Boolean)
+  );
+}
+
+/**
+ * Reads a file and returns an array of non-empty, non-comment lines.
+ * Lines starting with '#' are treated as comments and ignored.
+ * Trims whitespace from each line.
+ * Exits the process with an error if the file does not exist.
+ *
+ * @param filePath - Path to the file to read
+ * @returns Array of valid lines from the file
+ */
+function readFileLines(filePath: string): string[] {
+  const absPath = path.resolve(filePath);
+  if (!fs.existsSync(absPath)) {
+    logger.error(`Tool list file not found: ${absPath}`);
+    process.exit(1);
+  }
+  const lines = fs
+    .readFileSync(absPath, "utf-8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  return lines;
+}
+
+/**
  * Parse command line arguments with strong typing
  * @returns Parsed CLI options
  */
@@ -64,6 +110,30 @@ export function parseCliArgs(): CLIOptions {
         .default(TransportType.STDIO)
         .argParser((value) => parseTransportList(value)),
     )
+    .option(
+      "--allow-tools <tools>",
+      "Comma-separated list of tool names to allow. If provided, takes precedence over --allow-tools-file. Allow-list is applied before block-list.",
+    )
+    .option(
+      "--block-tools <tools>",
+      "Comma-separated list of tool names to block. If provided, takes precedence over --block-tools-file. Block-list is applied after allow-list.",
+    )
+    .option(
+      "--allow-tools-file <file>",
+      "File with tool names to allow (one per line). Used only if --allow-tools is not provided. Allow-list is applied before block-list.",
+    )
+    .option(
+      "--block-tools-file <file>",
+      "File with tool names to block (one per line). Used only if --block-tools is not provided. Block-list is applied after allow-list.",
+    )
+    .option(
+      "--list-tools",
+      "Print the final set of enabled tool names (with descriptions) after allow/block filtering and exit. Does not start the server.",
+    )
+    .option(
+      "--disable-confluent-cloud-tools",
+      "Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).",
+    )
     .action((options) => {
       if (options.envFile) {
         loadEnvironmentVariables(options.envFile);
@@ -74,13 +144,37 @@ export function parseCliArgs(): CLIOptions {
 
   try {
     const opts = program.parse().opts();
+    // Precedence: CLI > file > undefined
+    let allowTools: string[] | undefined = undefined;
+    let blockTools: string[] | undefined = undefined;
+    if (opts.allowTools) {
+      allowTools = parseToolList(opts.allowTools);
+    } else if (opts.allowToolsFile) {
+      allowTools = readFileLines(opts.allowToolsFile);
+    }
+    if (opts.blockTools) {
+      blockTools = parseToolList(opts.blockTools);
+    } else if (opts.blockToolsFile) {
+      blockTools = readFileLines(opts.blockToolsFile);
+    }
     return {
       envFile: opts.envFile,
       transports: Array.isArray(opts.transport)
         ? opts.transport
         : [opts.transport],
+      allowTools,
+      blockTools,
+      listTools: !!opts.listTools,
+      disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
     };
-  } catch {
+  } catch (e: unknown) {
+    logger.error(
+      {
+        error: e,
+        errorString: e && e.toString ? e.toString() : String(e),
+      },
+      "Error parsing CLI options",
+    );
     // This block is reached when --help or --version is called
     // as these will throw an error due to exitOverride()
     process.exit(0);
@@ -112,4 +206,59 @@ export function loadEnvironmentVariables(envFile: string): void {
   }
 
   logger.info(`Loaded environment variables from ${envPath}`);
+}
+
+/**
+ * Filters and returns a sorted list of enabled ToolNames based on CLI allow/block options.
+ *
+ * This function determines which tools should be enabled for the server by applying
+ * the following logic:
+ *   1. If an allow list (`cliOptions.allowTools`) is provided and non-empty, only those
+ *      tool names present in the allow list (and valid) will be enabled. Any invalid
+ *      tool names in the allow list are ignored and a warning is logged.
+ *   2. If a block list (`cliOptions.blockTools`) is provided and non-empty, any tool
+ *      names present in the block list (and valid) will be removed from the enabled
+ *      set. Any invalid tool names in the block list are ignored and a warning is logged.
+ *   3. If neither allow nor block lists are provided, all available tools are enabled.
+ *
+ * The returned list is always sorted alphabetically.
+ *
+ * @param cliOptions - The parsed CLI options containing allow/block tool lists.
+ * @returns An alphabetically sorted array of enabled ToolNames.
+ */
+export function getFilteredToolNames(cliOptions: CLIOptions): ToolName[] {
+  let filteredToolNames: ToolName[] = Object.values(ToolName);
+  const validToolNames = new Set(Object.values(ToolName));
+
+  if (cliOptions.allowTools && cliOptions.allowTools.length > 0) {
+    const valid = cliOptions.allowTools.filter((t) =>
+      validToolNames.has(t as ToolName),
+    );
+    const invalid = cliOptions.allowTools.filter(
+      (t) => !validToolNames.has(t as ToolName),
+    );
+    if (invalid.length > 0) {
+      logger.warn(
+        `Ignoring invalid tool names in allow list: ${invalid.join(", ")}`,
+      );
+    }
+    filteredToolNames = valid.map((t) => t as ToolName);
+  }
+  if (cliOptions.blockTools && cliOptions.blockTools.length > 0) {
+    const validBlock = cliOptions.blockTools.filter((t) =>
+      validToolNames.has(t as ToolName),
+    );
+    const invalidBlock = cliOptions.blockTools.filter(
+      (t) => !validToolNames.has(t as ToolName),
+    );
+    if (invalidBlock.length > 0) {
+      logger.warn(
+        `Ignoring invalid tool names in block list: ${invalidBlock.join(", ")}`,
+      );
+    }
+    filteredToolNames = filteredToolNames.filter(
+      (t) => !validBlock.includes(t),
+    );
+  }
+  return filteredToolNames.sort();
 }

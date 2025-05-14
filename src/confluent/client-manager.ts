@@ -84,10 +84,10 @@ export interface ClientManagerConfig {
 export class DefaultClientManager
   implements ClientManager, SchemaRegistryClientHandler
 {
-  private confluentCloudBaseUrl: string;
-  private confluentCloudFlinkBaseUrl: string;
-  private confluentCloudSchemaRegistryBaseUrl: string;
-  private confluentCloudKafkaRestBaseUrl: string;
+  private confluentCloudBaseUrl: string | undefined;
+  private confluentCloudFlinkBaseUrl: string | undefined;
+  private confluentCloudSchemaRegistryBaseUrl: string | undefined;
+  private confluentCloudKafkaRestBaseUrl: string | undefined;
   private readonly kafkaClient: Lazy<KafkaJS.Kafka>;
   private readonly adminClient: AsyncLazy<KafkaJS.Admin>;
   private readonly producer: AsyncLazy<KafkaJS.Producer>;
@@ -139,6 +139,9 @@ export class DefaultClientManager
     );
 
     this.confluentCloudRestClient = new Lazy(() => {
+      if (!this.confluentCloudBaseUrl) {
+        throw new Error("Confluent Cloud REST endpoint not configured");
+      }
       logger.info(
         `Initializing Confluent Cloud REST client for base URL ${this.confluentCloudBaseUrl}`,
       );
@@ -150,6 +153,9 @@ export class DefaultClientManager
     });
 
     this.confluentCloudFlinkRestClient = new Lazy(() => {
+      if (!this.confluentCloudFlinkBaseUrl) {
+        throw new Error("Confluent Cloud Flink REST endpoint not configured");
+      }
       logger.info(
         `Initializing Confluent Cloud Flink REST client for base URL ${this.confluentCloudFlinkBaseUrl}`,
       );
@@ -161,6 +167,11 @@ export class DefaultClientManager
     });
 
     this.confluentCloudSchemaRegistryRestClient = new Lazy(() => {
+      if (!this.confluentCloudSchemaRegistryBaseUrl) {
+        throw new Error(
+          "Confluent Cloud Schema Registry REST endpoint not configured",
+        );
+      }
       logger.info(
         `Initializing Confluent Cloud Schema Registry REST client for base URL ${this.confluentCloudSchemaRegistryBaseUrl}`,
       );
@@ -172,6 +183,9 @@ export class DefaultClientManager
     });
 
     this.confluentCloudKafkaRestClient = new Lazy(() => {
+      if (!this.confluentCloudKafkaRestBaseUrl) {
+        throw new Error("Confluent Cloud Kafka REST endpoint not configured");
+      }
       logger.info(
         `Initializing Confluent Cloud Kafka REST client for base URL ${this.confluentCloudKafkaRestBaseUrl}`,
       );
@@ -183,9 +197,12 @@ export class DefaultClientManager
     });
 
     this.schemaRegistryClient = new Lazy(() => {
+      if (!this.confluentCloudSchemaRegistryBaseUrl) {
+        throw new Error("Schema Registry endpoint not configured");
+      }
       const { apiKey, apiSecret } = config.auth.schemaRegistry;
       return new SchemaRegistryClient({
-        baseURLs: [config.endpoints.schemaRegistry],
+        baseURLs: [this.confluentCloudSchemaRegistryBaseUrl],
         basicAuthCredentials: {
           credentialsSource: "USER_INFO",
           userInfo: `${apiKey}:${apiSecret}`,

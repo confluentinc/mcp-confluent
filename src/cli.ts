@@ -1,4 +1,4 @@
-import { Command, Option } from "@commander-js/extra-typings";
+import { Command, CommanderError, Option } from "@commander-js/extra-typings";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { TransportType } from "@src/mcp/transports/types.js";
@@ -167,16 +167,28 @@ export function parseCliArgs(): CLIOptions {
       listTools: !!opts.listTools,
       disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
     };
-  } catch (e: unknown) {
-    logger.error(
-      {
-        error: e,
-        errorString: e && e.toString ? e.toString() : String(e),
-      },
-      "Error parsing CLI options",
-    );
-    // This block is reached when --help or --version is called
-    // as these will throw an error due to exitOverride()
+  } catch (error: unknown) {
+    // Commander uses error.name === 'CommanderError' for its errors
+    if (
+      error instanceof CommanderError &&
+      (error.code === "commander.helpDisplayed" ||
+        error.code === "commander.version")
+    ) {
+      // Help or version was displayed, exit silently
+      process.exit(0);
+    }
+    if (error instanceof Error) {
+      logger.error(
+        {
+          error,
+          errorString: error.toString(),
+          errorMessage: error.message,
+        },
+        "Error parsing CLI options",
+      );
+    } else {
+      logger.error({ error }, "Error parsing CLI options");
+    }
     process.exit(0);
   }
 }

@@ -30,6 +30,13 @@ An MCP server implementation that enables AI assistants to interact with Conflue
     - [Usage](#usage)
     - [Configuring Claude Desktop](#configuring-claude-desktop)
     - [Configuring Goose CLI](#configuring-goose-cli)
+    - [mcp-confluent CLI Usage](#mcp-confluent-cli-usage)
+      - [Basic Usage](#basic-usage)
+      - [Example: Deploy using all transports](#example-deploy-using-all-transports)
+      - [Example: Allow Only Specific Tools](#example-allow-only-specific-tools)
+      - [Example: Block Certain Tools](#example-block-certain-tools)
+      - [Example: Use Tool Lists from Files](#example-use-tool-lists-from-files)
+      - [Example: List All Available Tools](#example-list-all-available-tools)
   - [Developer Guide](#developer-guide)
     - [Project Structure](#project-structure)
     - [Building and Running](#building-and-running)
@@ -84,6 +91,7 @@ SCHEMA_REGISTRY_API_KEY="..."
 SCHEMA_REGISTRY_API_SECRET="..."
 SCHEMA_REGISTRY_ENDPOINT="https://psrc-zv01y.northamerica-northeast2.gcp.confluent.cloud"
 ```
+
 </details>
 
 ### Environment Variables Reference
@@ -117,9 +125,15 @@ SCHEMA_REGISTRY_ENDPOINT="https://psrc-zv01y.northamerica-northeast2.gcp.conflue
 
 This MCP server is designed to be used with various MCP clients, such as Claude Desktop or Goose CLI/Desktop.  The specific configuration and interaction will depend on the client you are using.  However, the general steps are:
 
-1. **Build:** Follow the instructions in the [Developer Guide](#developer-guide) to build and run the server from source. This typically involves:
-    - Installing dependencies (`npm install`)
-    - Building the project (`npm run build` or `npm run dev`)
+1. **Start the Server:** You can run the MCP server in one of two ways:
+   - **From source:** Follow the instructions in the [Developer Guide](#developer-guide) to build and run the server from source. This typically involves:
+     - Installing dependencies (`npm install`)
+     - Building the project (`npm run build` or `npm run dev`)
+   - **With npx:** You can start the server directly using npx (no build required):
+
+     ```bash
+     npx -y @confluentinc/mcp-confluent -e /path/to/confluent-mcp-server/.env
+     ```
 
 2. **Configure your MCP Client:**  Each client will have its own way of specifying the MCP server's address and any required credentials.  You'll need to configure your client (e.g., Claude, Goose) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on may be configured by an environment variable.
 
@@ -158,6 +172,7 @@ To configure Claude Desktop to use this MCP server:
      }
    }
    ```
+
    </details>
 
    <details>
@@ -178,6 +193,7 @@ To configure Claude Desktop to use this MCP server:
      }
    }
    ```
+
    </details>
 
    Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
@@ -197,6 +213,7 @@ See [here](https://block.github.io/goose/docs/quickstart#install-an-extension) f
 Once installed, follow these steps:
 
 1. **Run the Configuration Command:**
+
    ```bash
    goose configure
    ```
@@ -213,6 +230,7 @@ Once installed, follow these steps:
    ```bash
    node /path/to/confluent-mcp-server/dist/index.js --env-file /path/to/confluent-mcp-server/.env
    ```
+
    </details>
 
    <details>
@@ -221,11 +239,249 @@ Once installed, follow these steps:
    ```bash
    npx -y @confluentinc/mcp-confluent -e /path/to/confluent-mcp-server/.env
    ```
+
    </details>
 
 Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
 
 ![Goose Configure](assets/goose-configure.png)
+
+### mcp-confluent CLI Usage
+
+The MCP server provides a flexible command line interface (CLI) for advanced configuration and control. The CLI allows you to specify environment files, transports, and fine-tune which tools are enabled or blocked.
+
+#### Basic Usage
+
+You can view all CLI options and help with:
+
+```bash
+npx @confluentinc/mcp-confluent --help 
+```
+
+<details>
+<summary>Show output</summary>
+
+```bash
+Usage: mcp-confluent [options]
+
+Confluent MCP Server - Model Context Protocol implementation for Confluent Cloud
+
+Options:
+  -V, --version              output the version number
+  -e, --env-file <path>      Load environment variables from file
+  -t, --transport <types>    Transport types (comma-separated list) (choices: "http", "sse",
+                             "stdio", default: "stdio")
+  --allow-tools <tools>      Comma-separated list of tool names to allow. If provided, takes
+                             precedence over --allow-tools-file. Allow-list is applied before
+                             block-list.
+  --block-tools <tools>      Comma-separated list of tool names to block. If provided, takes
+                             precedence over --block-tools-file. Block-list is applied after
+                             allow-list.
+  --allow-tools-file <file>  File with tool names to allow (one per line). Used only if
+                             --allow-tools is not provided. Allow-list is applied before
+                             block-list.
+  --block-tools-file <file>  File with tool names to block (one per line). Used only if
+                             --block-tools is not provided. Block-list is applied after
+                             allow-list.
+  --list-tools               Print the final set of enabled tool names (with descriptions)
+                             after allow/block filtering and exit. Does not start the server.
+  -h, --help                 display help for command
+```
+
+</details>
+
+#### Example: Deploy using all transports
+
+```bash
+npx @confluentinc/mcp-confluent -e .env --transport http,sse,stdio
+```
+
+<details>
+<summary>Show output</summary>
+
+```json
+...
+{"level":"info","time":"2025-05-14T17:03:02.883Z","pid":47959,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: http, sse, stdio"}
+{"level":"info","time":"2025-05-14T17:03:02.971Z","pid":47959,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"HTTP transport routes registered"}
+{"level":"info","time":"2025-05-14T17:03:02.972Z","pid":47959,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"SSE transport routes registered"}
+{"level":"info","time":"2025-05-14T17:03:02.972Z","pid":47959,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
+{"level":"info","time":"2025-05-14T17:03:03.012Z","pid":47959,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Server listening at http://[::1]:3000"}
+{"level":"info","time":"2025-05-14T17:03:03.013Z","pid":47959,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Server listening at http://127.0.0.1:3000"}
+{"level":"info","time":"2025-05-14T17:03:03.013Z","pid":47959,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
+```
+
+</details>
+
+#### Example: Allow Only Specific Tools
+
+```bash
+npx @confluentinc/mcp-confluent -e .env --allow-tools produce-message,consume-messages
+```
+
+<details>
+<summary>Show output</summary>
+
+```json
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-topics disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topics disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-topics disabled due to allow/block list rules"}
+{"level":"info","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool produce-message enabled"}
+{"level":"info","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool consume-messages enabled"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-flink-statements disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-flink-statement disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-flink-statement disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-flink-statements disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-connectors disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-connector disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-connector disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-connector disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-tag disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-name disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topic-tags disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tag disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool remove-tag-from-entity disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool add-tags-to-topic disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tags disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool alter-topic-config disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-clusters disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-environments disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config disabled due to allow/block list rules"}
+{"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio on localhost:3000"}
+{"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
+{"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
+```
+
+</details>
+
+#### Example: Block Certain Tools
+
+```bash
+npx @confluentinc/mcp-confluent -e .env --block-tools produce-message,consume-messages
+```
+
+<details>
+<summary>Show output</summary>
+
+```json
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-topics enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topics enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-topics enabled"}
+{"level":"warn","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool produce-message disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool consume-messages disabled due to allow/block list rules"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-flink-statements enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-flink-statement enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-flink-statement enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-flink-statements enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-connectors enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-connector enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-connector enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-connector enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-tag enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-name enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topic-tags enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tag enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool remove-tag-from-entity enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool add-tags-to-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tags enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool alter-topic-config enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-clusters enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-environments enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
+```
+
+</details>
+
+#### Example: Use Tool Lists from Files
+
+```bash
+npx -y @confluentinc/mcp-confluent -e .env --allow-tools-file allow.txt --block-tools-file block.txt
+```
+
+<details>
+<summary>Show output</summary>
+
+```json
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-topics enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topics enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-topics enabled"}
+{"level":"warn","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool produce-message disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool consume-messages disabled due to allow/block list rules"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-flink-statements enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-flink-statement enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-flink-statement enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-flink-statements enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-connectors enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-connector enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-connector enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-connector enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-tag enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-name enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topic-tags enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tag enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool remove-tag-from-entity enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool add-tags-to-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tags enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool alter-topic-config enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-clusters enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-environments enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
+```
+
+</details>
+
+#### Example: List All Available Tools
+
+```bash
+npx -y @confluentinc/mcp-confluent --list-tools
+```
+
+<details>
+<summary>Show output</summary>
+
+```text
+add-tags-to-topic: Assign existing tags to Kafka topics in Confluent Cloud.
+alter-topic-config: Alter topic configuration in Confluent Cloud.
+consume-messages: Consumes messages from one or more Kafka topics. Supports automatic deserialization of Schema Registry encoded messag...
+create-connector: Create a new connector. Returns the new connector information if successful.
+create-flink-statement: Make a request to create a statement.
+create-topic-tags: Create new tag definitions in Confluent Cloud.
+create-topics: Create one or more Kafka topics.
+delete-connector: Delete an existing connector. Returns success message if deletion was successful.
+delete-flink-statements: Make a request to delete a statement.
+delete-tag: Delete a tag definition from Confluent Cloud.
+delete-topics: Delete the topic with the given names.
+get-topic-config: Retrieve configuration details for a specific Kafka topic.
+list-clusters: Get all clusters in the Confluent Cloud environment
+list-connectors: Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.
+list-environments: Get all environments in Confluent Cloud with pagination support
+list-flink-statements: Retrieve a sorted, filtered, paginated list of all statements.
+list-schemas: List all schemas in the Schema Registry.
+list-tags: Retrieve all tags with definitions from Confluent Cloud Schema Registry.
+list-topics: List all topics in the Kafka cluster.
+produce-message: Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both ke...
+read-connector: Get information about the connector.
+read-environment: Get details of a specific environment by ID
+read-flink-statement: Make a request to read a statement and its results
+remove-tag-from-entity: Remove tag from an entity in Confluent Cloud.
+search-topics-by-name: List all topics in the Kafka cluster matching the specified name.
+search-topics-by-tag: List all topics in the Kafka cluster with the specified tag.
+```
+
+</details>
+
+> **Tip:** The allow-list is applied before the block-list. If neither is provided, all tools are enabled by default.
 
 ## Developer Guide
 
@@ -234,11 +490,12 @@ Replace `/path/to/confluent-mcp-server/` with the actual path where you've insta
 ```sh
 /
 ├── src/                 # Source code
-│   ├── confluent/       # Code related to Confluent integration (API clients, etc.)
-│   ├── tools/           # Tool implementations (each tool in a separate file)
-│   ├── index.ts         # Main entry point for the server
+│   ├── confluent/       # Confluent integration (API clients, etc.)
+│   │   └── tools/           # Tool implementations
+│   ├── mcp/             # MCP protocol and transport logic
+│   │   └── transports/
 │   └── ...              # Other server logic, utilities, etc.
-├── dist/                # Compiled output (TypeScript -> JavaScript)
+├── dist/                # Compiled output
 ├── openapi.json         # OpenAPI specification for Confluent Cloud
 ├── .env                 # Environment variables (example - should be copied and filled)
 ├── README.md            # This file

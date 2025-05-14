@@ -123,9 +123,7 @@ async function main() {
     const transportManager = new TransportManager(server);
 
     // Start all transports with a single call
-    logger.info(
-      `Starting transports: ${cliOptions.transports.join(", ")} on ${env.HTTP_HOST}:${env.HTTP_PORT}`,
-    );
+    logger.info(`Starting transports: ${cliOptions.transports.join(", ")}`);
     await transportManager.start(
       cliOptions.transports,
       env.HTTP_PORT,

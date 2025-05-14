@@ -2,7 +2,7 @@
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { parseCliArgs } from "@src/cli.js";
+import { getFilteredToolNames, parseCliArgs } from "@src/cli.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
@@ -62,11 +62,30 @@ async function main() {
       },
     });
 
+    const filteredToolNames = getFilteredToolNames(cliOptions);
+
+    // If --list-tools is set, print tool names with descriptions and exit
+    if (cliOptions.listTools) {
+      const MAX_DESC_LENGTH = 120;
+      filteredToolNames.forEach((toolName) => {
+        const config = ToolFactory.getToolConfig(toolName);
+        let desc = config.description.replace(/\s+/g, " ").trim();
+        if (desc.length > MAX_DESC_LENGTH) {
+          desc = desc.slice(0, MAX_DESC_LENGTH - 3) + "...";
+        }
+        console.log(`\x1b[32m${config.name}\x1b[0m: ${desc}`);
+      });
+      process.exit(0);
+    }
+
     const toolHandlers = new Map<ToolName, ToolHandler>();
 
     // Initialize tools and check their requirements
-    const sortedToolNames = Object.values(ToolName).sort();
-    sortedToolNames.forEach((toolName) => {
+    Object.values(ToolName).forEach((toolName) => {
+      if (!filteredToolNames.includes(toolName)) {
+        logger.warn(`Tool ${toolName} disabled due to allow/block list rules`);
+        return;
+      }
       const handler = ToolFactory.createToolHandler(toolName);
       const missingVars = handler
         .getRequiredEnvVars()

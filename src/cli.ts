@@ -14,6 +14,7 @@ export interface CLIOptions {
   allowTools?: string[];
   blockTools?: string[];
   listTools?: boolean;
+  disableConfluentCloudTools?: boolean;
 }
 
 /**
@@ -129,6 +130,10 @@ export function parseCliArgs(): CLIOptions {
       "--list-tools",
       "Print the final set of enabled tool names (with descriptions) after allow/block filtering and exit. Does not start the server.",
     )
+    .option(
+      "--disable-confluent-cloud-tools",
+      "Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).",
+    )
     .action((options) => {
       if (options.envFile) {
         loadEnvironmentVariables(options.envFile);
@@ -160,8 +165,16 @@ export function parseCliArgs(): CLIOptions {
       allowTools,
       blockTools,
       listTools: !!opts.listTools,
+      disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
     };
-  } catch {
+  } catch (e: unknown) {
+    logger.error(
+      {
+        error: e,
+        errorString: e && e.toString ? e.toString() : String(e),
+      },
+      "Error parsing CLI options",
+    );
     // This block is reached when --help or --version is called
     // as these will throw an error due to exitOverride()
     process.exit(0);

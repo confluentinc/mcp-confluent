@@ -99,4 +99,8 @@ export class DeleteFlinkStatementHandler extends BaseToolHandler {
   getRequiredEnvVars(): EnvVar[] {
     return ["FLINK_API_KEY", "FLINK_API_SECRET"];
   }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
 }

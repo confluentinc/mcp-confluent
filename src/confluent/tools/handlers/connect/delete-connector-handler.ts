@@ -95,4 +95,8 @@ export class DeleteConnectorHandler extends BaseToolHandler {
   getRequiredEnvVars(): EnvVar[] {
     return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
   }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
 }

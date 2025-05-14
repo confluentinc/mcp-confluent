@@ -91,6 +91,16 @@ async function main() {
         return;
       }
       const handler = ToolFactory.createToolHandler(toolName);
+      // Skip cloud-only tools if disabled by CLI/env
+      if (
+        cliOptions.disableConfluentCloudTools &&
+        handler.isConfluentCloudOnly()
+      ) {
+        logger.warn(
+          `Tool ${toolName} disabled due to --disable-confluent-cloud-tools flag or DISABLE_CONFLUENT_CLOUD_TOOLS env var`,
+        );
+        return;
+      }
       const missingVars = handler
         .getRequiredEnvVars()
         .filter((varName: EnvVar) => !env[varName]);

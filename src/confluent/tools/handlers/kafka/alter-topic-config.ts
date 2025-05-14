@@ -94,4 +94,8 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
   getRequiredEnvVars(): EnvVar[] {
     return ["KAFKA_API_KEY", "KAFKA_API_SECRET", "BOOTSTRAP_SERVERS"];
   }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
 }

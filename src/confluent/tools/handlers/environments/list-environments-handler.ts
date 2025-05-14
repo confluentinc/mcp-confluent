@@ -183,4 +183,8 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
   getRequiredEnvVars(): EnvVar[] {
     return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
   }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
 }

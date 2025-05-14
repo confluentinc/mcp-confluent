@@ -35,6 +35,12 @@ export interface ToolHandler {
    * @returns Array of environment variable names required by this tool
    */
   getRequiredEnvVars(): EnvVar[];
+
+  /**
+   * Returns true if this tool can only be used with Confluent Cloud REST APIs.
+   * Override in subclasses for cloud-only tools.
+   */
+  isConfluentCloudOnly(): boolean;
 }
 
 export interface ToolConfig {
@@ -61,6 +67,14 @@ export abstract class BaseToolHandler implements ToolHandler {
    */
   getRequiredEnvVars(): EnvVar[] {
     return [];
+  }
+
+  /**
+   * Default implementation returns false, indicating the tool is not Confluent Cloud only.
+   * Override in subclasses for cloud-only tools.
+   */
+  isConfluentCloudOnly(): boolean {
+    return false;
   }
 
   createResponse(

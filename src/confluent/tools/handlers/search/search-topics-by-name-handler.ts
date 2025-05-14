@@ -67,4 +67,8 @@ export class SearchTopicsByNameHandler extends BaseToolHandler {
   getRequiredEnvVars(): EnvVar[] {
     return ["SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"];
   }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
 }

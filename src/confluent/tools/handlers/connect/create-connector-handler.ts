@@ -156,4 +156,8 @@ export class CreateConnectorHandler extends BaseToolHandler {
       "KAFKA_API_SECRET",
     ];
   }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
 }

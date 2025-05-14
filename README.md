@@ -267,25 +267,16 @@ Usage: mcp-confluent [options]
 Confluent MCP Server - Model Context Protocol implementation for Confluent Cloud
 
 Options:
-  -V, --version              output the version number
-  -e, --env-file <path>      Load environment variables from file
-  -t, --transport <types>    Transport types (comma-separated list) (choices: "http", "sse",
-                             "stdio", default: "stdio")
-  --allow-tools <tools>      Comma-separated list of tool names to allow. If provided, takes
-                             precedence over --allow-tools-file. Allow-list is applied before
-                             block-list.
-  --block-tools <tools>      Comma-separated list of tool names to block. If provided, takes
-                             precedence over --block-tools-file. Block-list is applied after
-                             allow-list.
-  --allow-tools-file <file>  File with tool names to allow (one per line). Used only if
-                             --allow-tools is not provided. Allow-list is applied before
-                             block-list.
-  --block-tools-file <file>  File with tool names to block (one per line). Used only if
-                             --block-tools is not provided. Block-list is applied after
-                             allow-list.
-  --list-tools               Print the final set of enabled tool names (with descriptions)
-                             after allow/block filtering and exit. Does not start the server.
-  -h, --help                 display help for command
+  -V, --version                    output the version number
+  -e, --env-file <path>            Load environment variables from file
+  -t, --transport <types>          Transport types (comma-separated list) (choices: "http", "sse", "stdio", default: "stdio")
+  --allow-tools <tools>            Comma-separated list of tool names to allow. If provided, takes precedence over --allow-tools-file. Allow-list is applied before block-list.
+  --block-tools <tools>            Comma-separated list of tool names to block. If provided, takes precedence over --block-tools-file. Block-list is applied after allow-list.
+  --allow-tools-file <file>        File with tool names to allow (one per line). Used only if --allow-tools is not provided. Allow-list is applied before block-list.
+  --block-tools-file <file>        File with tool names to block (one per line). Used only if --block-tools is not provided. Block-list is applied after allow-list.
+  --list-tools                     Print the final set of enabled tool names (with descriptions) after allow/block filtering and exit. Does not start the server.
+  --disable-confluent-cloud-tools  Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).
+  -h, --help                       display help for command
 ```
 
 </details>

@@ -90,7 +90,7 @@ export class ListSchemasHandler extends BaseToolHandler {
             const versions: number[] = await registry.getAllVersions(subject);
             logger.debug({ subject, versions }, "Fetched all schema versions");
             result[subject] = [];
-            for (const version of versions) {
+            const versionPromises = versions.map(async (version) => {
               try {
                 const schema = await registry.getSchemaMetadata(
                   subject,
@@ -121,7 +121,8 @@ export class ListSchemasHandler extends BaseToolHandler {
                   error: err instanceof Error ? err.message : String(err),
                 });
               }
-            }
+            });
+            await Promise.all(versionPromises);
           } catch (err) {
             logger.warn(
               {

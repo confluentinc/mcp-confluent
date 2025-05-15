@@ -6,6 +6,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -15,7 +16,7 @@ const getTopicConfigArguments = z.object({
     .string()
     .describe("The base URL of the Confluent Cloud Kafka REST API.")
     .url()
-    .default(env.KAFKA_REST_ENDPOINT ?? "")
+    .default(() => env.KAFKA_REST_ENDPOINT ?? "")
     .optional(),
   clusterId: z
     .string()
@@ -96,5 +97,13 @@ export class GetTopicConfigHandler extends BaseToolHandler {
       description: "Retrieve configuration details for a specific Kafka topic.",
       inputSchema: getTopicConfigArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["KAFKA_API_KEY", "KAFKA_API_SECRET", "BOOTSTRAP_SERVERS"];
+  }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
   }
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { GlobalConfig } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   getFilteredToolNames,
@@ -13,7 +13,7 @@ import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
-import { kafkaLogger, logger } from "@src/logger.js";
+import { logger } from "@src/logger.js";
 import { TransportManager } from "@src/mcp/transports/index.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
@@ -24,18 +24,23 @@ async function main() {
     // Initialize environment after CLI args are processed
     const env = await initEnv();
 
-    const kafkaClientConfig: KafkaJS.CommonConstructorConfig = {
-      kafkaJS: {
-        brokers: env.BOOTSTRAP_SERVERS?.split(",") ?? [],
-        clientId: "mcp-client",
-        ssl: true,
-        sasl: {
-          mechanism: "plain",
-          username: env.KAFKA_API_KEY!,
-          password: env.KAFKA_API_SECRET!,
-        },
-        logger: kafkaLogger,
-      },
+    // Merge environment variables with kafka config from CLI
+    // some additional configurations could be set in the client manager
+    // like separating groupIds by sessionId
+    const kafkaClientConfig: GlobalConfig = {
+      // Base configuration from environment variables
+      "bootstrap.servers": env.BOOTSTRAP_SERVERS!,
+      "client.id": "mcp-confluent",
+      ...(env.KAFKA_API_KEY && env.KAFKA_API_SECRET
+        ? {
+            "security.protocol": "sasl_ssl",
+            "sasl.mechanisms": "PLAIN",
+            "sasl.username": env.KAFKA_API_KEY!,
+            "sasl.password": env.KAFKA_API_SECRET!,
+          }
+        : {}),
+      // Merge any additional properties from the kafka config file
+      ...cliOptions.kafkaConfig,
     };
 
     const clientManager = new DefaultClientManager({

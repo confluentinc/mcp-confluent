@@ -5,6 +5,7 @@ import { TransportType } from "@src/mcp/transports/types.js";
 import * as dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import { getProperties, KeyValuePairObject } from "properties-file";
 import pkg from "../package.json" with { type: "json" };
 
 // Define the interface for our CLI options
@@ -15,6 +16,7 @@ export interface CLIOptions {
   blockTools?: string[];
   listTools?: boolean;
   disableConfluentCloudTools?: boolean;
+  kafkaConfig: KeyValuePairObject;
 }
 
 /**
@@ -78,8 +80,7 @@ function parseToolList(value: string): string[] {
 function readFileLines(filePath: string): string[] {
   const absPath = path.resolve(filePath);
   if (!fs.existsSync(absPath)) {
-    logger.error(`Tool list file not found: ${absPath}`);
-    process.exit(1);
+    throw new Error(`Tool list file not found: ${absPath}`);
   }
   const lines = fs
     .readFileSync(absPath, "utf-8")
@@ -101,6 +102,10 @@ export function parseCliArgs(): CLIOptions {
     )
     .version(getPackageVersion())
     .option("-e, --env-file <path>", "Load environment variables from file")
+    .option(
+      "-k, --kafka-config-file <file>",
+      "Path to a properties file for configuring kafka clients",
+    )
     .addOption(
       new Option(
         "-t, --transport <types>",
@@ -134,16 +139,14 @@ export function parseCliArgs(): CLIOptions {
       "--disable-confluent-cloud-tools",
       "Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).",
     )
-    .action((options) => {
-      if (options.envFile) {
-        loadEnvironmentVariables(options.envFile);
-      }
-    })
     .allowExcessArguments(false)
     .exitOverride();
 
   try {
     const opts = program.parse().opts();
+    if (opts.envFile) {
+      loadEnvironmentVariables(opts.envFile);
+    }
     // Precedence: CLI > file > undefined
     let allowTools: string[] | undefined = undefined;
     let blockTools: string[] | undefined = undefined;
@@ -157,6 +160,10 @@ export function parseCliArgs(): CLIOptions {
     } else if (opts.blockToolsFile) {
       blockTools = readFileLines(opts.blockToolsFile);
     }
+    let kafkaConfig: KeyValuePairObject = {};
+    if (opts.kafkaConfigFile) {
+      kafkaConfig = parsePropertiesFile(opts.kafkaConfigFile);
+    }
     return {
       envFile: opts.envFile,
       transports: Array.isArray(opts.transport)
@@ -166,15 +173,14 @@ export function parseCliArgs(): CLIOptions {
       blockTools,
       listTools: !!opts.listTools,
       disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
+      kafkaConfig: kafkaConfig,
     };
   } catch (error: unknown) {
-    // Commander uses error.name === 'CommanderError' for its errors
     if (
       error instanceof CommanderError &&
       (error.code === "commander.helpDisplayed" ||
         error.code === "commander.version")
     ) {
-      // Help or version was displayed, exit silently
       process.exit(0);
     }
     if (error instanceof Error) {
@@ -187,9 +193,9 @@ export function parseCliArgs(): CLIOptions {
         "Error parsing CLI options",
       );
     } else {
-      logger.error({ error }, "Error parsing CLI options");
+      logger.error({ error: String(error) }, "Error parsing CLI options");
     }
-    process.exit(0);
+    process.exit(1);
   }
 }
 
@@ -202,19 +208,14 @@ export function loadEnvironmentVariables(envFile: string): void {
 
   // Check if file exists
   if (!fs.existsSync(envPath)) {
-    logger.error(`Environment file not found: ${envPath}`);
-    process.exit(1);
+    throw new Error(`Environment file not found: ${envPath}`);
   }
 
   // Load environment variables from file
   const result = dotenv.config({ path: envPath });
 
   if (result.error) {
-    logger.error(
-      { error: result.error },
-      "Error loading environment variables",
-    );
-    process.exit(1);
+    throw new Error(`Error loading environment variables: ${result.error}`);
   }
 
   logger.info(`Loaded environment variables from ${envPath}`);
@@ -272,5 +273,37 @@ export function getFilteredToolNames(cliOptions: CLIOptions): ToolName[] {
       (t) => !validBlock.includes(t),
     );
   }
-  return filteredToolNames.sort();
+  // Deduplicate and sort
+  const deduped = Array.from(new Set(filteredToolNames)).sort();
+  if (
+    (!cliOptions.allowTools || cliOptions.allowTools.length === 0) &&
+    (!cliOptions.blockTools || cliOptions.blockTools.length === 0)
+  ) {
+    logger.info(
+      "No allow/block tool lists provided; all tools are enabled by default.",
+    );
+  }
+  return deduped;
+}
+
+/**
+ * Loads configuration from a properties file
+ * @param filePath - Path to the properties file
+ * @returns configuration object
+ */
+export function parsePropertiesFile(filePath: string): KeyValuePairObject {
+  const absPath = path.resolve(filePath);
+  if (!fs.existsSync(absPath)) {
+    throw new Error(`Properties file not found: ${absPath}`);
+  }
+  try {
+    const properties: KeyValuePairObject = getProperties(
+      fs.readFileSync(absPath, "utf-8"),
+    );
+    return properties;
+  } catch (err) {
+    throw new Error(
+      `Failed to parse properties file: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }

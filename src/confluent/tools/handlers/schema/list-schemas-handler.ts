@@ -6,6 +6,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import { z } from "zod";
@@ -173,5 +174,9 @@ export class ListSchemasHandler extends BaseToolHandler {
       description: "List all schemas in the Schema Registry.",
       inputSchema: listSchemasArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"];
   }
 }

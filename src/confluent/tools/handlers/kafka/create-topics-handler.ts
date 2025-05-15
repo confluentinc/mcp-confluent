@@ -5,6 +5,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import { z } from "zod";
 
 const createTopicArgs = z.object({
@@ -35,8 +36,12 @@ export class CreateTopicsHandler extends BaseToolHandler {
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.CREATE_TOPICS,
-      description: "Create new topic(s) in the Kafka cluster.",
+      description: "Create one or more Kafka topics.",
       inputSchema: createTopicArgs.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["KAFKA_API_KEY", "KAFKA_API_SECRET", "BOOTSTRAP_SERVERS"];
   }
 }

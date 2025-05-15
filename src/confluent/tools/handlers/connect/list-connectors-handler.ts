@@ -6,6 +6,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -16,7 +17,7 @@ const listConnectorArguments = z.object({
     .trim()
     .describe("The base URL of the Kafka Connect REST API.")
     .url()
-    .default(env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
+    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
     .optional(),
   environmentId: z
     .string()
@@ -85,5 +86,13 @@ export class ListConnectorsHandler extends BaseToolHandler {
         'Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.',
       inputSchema: listConnectorArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
+  }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
   }
 }

@@ -6,6 +6,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -15,7 +16,7 @@ const listFlinkStatementsArguments = z.object({
     .string()
     .describe("The base URL of the Flink REST API.")
     .url()
-    .default(env.FLINK_REST_ENDPOINT ?? "")
+    .default(() => env.FLINK_REST_ENDPOINT ?? "")
     .optional(),
   organizationId: z
     .string()
@@ -28,7 +29,7 @@ const listFlinkStatementsArguments = z.object({
   computePoolId: z
     .string()
     .optional()
-    .default(env.FLINK_COMPUTE_POOL_ID ?? "")
+    .default(() => env.FLINK_COMPUTE_POOL_ID ?? "")
     .describe("Filter the results by exact match for compute_pool."),
   pageSize: z
     .number()
@@ -111,5 +112,13 @@ export class ListFlinkStatementsHandler extends BaseToolHandler {
         "Retrieve a sorted, filtered, paginated list of all statements.",
       inputSchema: listFlinkStatementsArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["FLINK_API_KEY", "FLINK_API_SECRET"];
+  }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
   }
 }

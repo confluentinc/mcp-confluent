@@ -9,6 +9,13 @@ export const logger = pino(
     level: logLevel,
     timestamp: pino.stdTimeFunctions.isoTime,
     name: "mcp-confluent",
+    formatters: {
+      level: (label) => {
+        return {
+          level: label,
+        };
+      },
+    },
   },
   pino.destination(2),
 );

@@ -5,6 +5,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -14,7 +15,7 @@ const addTagToTopicArguments = z.object({
     .string()
     .describe("The base URL of the Schema Registry REST API.")
     .url()
-    .default(env.SCHEMA_REGISTRY_ENDPOINT ?? "")
+    .default(() => env.SCHEMA_REGISTRY_ENDPOINT ?? "")
     .optional(),
   tagAssignments: z
     .array(
@@ -71,5 +72,13 @@ export class AddTagToTopicHandler extends BaseToolHandler {
       description: "Assign existing tags to Kafka topics in Confluent Cloud.",
       inputSchema: addTagToTopicArguments.shape,
     };
+  }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return ["SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"];
+  }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
   }
 }

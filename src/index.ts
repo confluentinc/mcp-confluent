@@ -26,12 +26,11 @@ async function main() {
 
     // Merge environment variables with kafka config from CLI
     // some additional configurations could be set in the client manager
-    // like seperating groupIds by sessionId
+    // like separating groupIds by sessionId
     const kafkaClientConfig: GlobalConfig = {
       // Base configuration from environment variables
       "bootstrap.servers": env.BOOTSTRAP_SERVERS!,
-      "client.id": "mcp-client",
-      "security.protocol": "plaintext",
+      "client.id": "mcp-confluent",
       ...(env.KAFKA_API_KEY && env.KAFKA_API_SECRET
         ? {
             "security.protocol": "sasl_ssl",

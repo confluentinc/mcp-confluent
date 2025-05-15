@@ -2,7 +2,7 @@
  * @fileoverview Provides client management functionality for Kafka and Confluent Cloud services.
  */
 
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   ConfluentAuth,
@@ -67,7 +67,7 @@ export interface ClientManager
 }
 
 export interface ClientManagerConfig {
-  kafka: KafkaJS.CommonConstructorConfig;
+  kafka: GlobalConfig;
   endpoints: ConfluentEndpoints;
   auth: {
     cloud: ConfluentAuth;
@@ -88,6 +88,7 @@ export class DefaultClientManager
   private confluentCloudFlinkBaseUrl: string | undefined;
   private confluentCloudSchemaRegistryBaseUrl: string | undefined;
   private confluentCloudKafkaRestBaseUrl: string | undefined;
+  private readonly kafkaConfig: GlobalConfig;
   private readonly kafkaClient: Lazy<KafkaJS.Kafka>;
   private readonly adminClient: AsyncLazy<KafkaJS.Admin>;
   private readonly producer: AsyncLazy<KafkaJS.Producer>;
@@ -115,7 +116,8 @@ export class DefaultClientManager
     this.confluentCloudSchemaRegistryBaseUrl = config.endpoints.schemaRegistry;
     this.confluentCloudKafkaRestBaseUrl = config.endpoints.kafka;
 
-    this.kafkaClient = new Lazy(() => new KafkaJS.Kafka(config.kafka));
+    this.kafkaConfig = config.kafka;
+    this.kafkaClient = new Lazy(() => new KafkaJS.Kafka(this.kafkaConfig));
     this.adminClient = new AsyncLazy(
       async () => {
         logger.info("Connecting Kafka Admin");
@@ -128,10 +130,7 @@ export class DefaultClientManager
     this.producer = new AsyncLazy(
       async () => {
         logger.info("Connecting Kafka Producer");
-        const producer = this.kafkaClient.get().producer({
-          "compression.type": "gzip",
-          "linger.ms": 5,
-        });
+        const producer = this.kafkaClient.get().producer();
         await producer.connect();
         return producer;
       },
@@ -213,18 +212,23 @@ export class DefaultClientManager
 
   /** @inheritdoc */
   async getConsumer(sessionId?: string): Promise<KafkaJS.Consumer> {
-    const baseGroupId = "mcp-confluent"; // should be configurable?
+    // Build the config inline, merging with defaults
+    const baseGroupId =
+      (this.kafkaConfig["group.id"] as string) || "mcp-confluent";
     const groupId = sessionId ? `${baseGroupId}-${sessionId}` : baseGroupId;
-    logger.info(`Creating new Kafka Consumer with groupId: ${groupId}`);
-    return this.kafkaClient.get().consumer({
-      kafkaJS: {
-        fromBeginning: true,
-        groupId,
-        allowAutoTopicCreation: false,
-        autoCommit: false,
-      },
-    });
+    const consumerConfig = {
+      // Spread all user-provided config
+      ...this.kafkaConfig,
+      // Override with our logic
+      "group.id": groupId,
+      "auto.offset.reset": this.kafkaConfig["auto.offset.reset"] || "earliest",
+      "allow.auto.create.topics":
+        this.kafkaConfig["allow.auto.create.topics"] || false,
+      "enable.auto.commit": this.kafkaConfig["enable.auto.commit"] || false,
+    };
+    return this.kafkaClient.get().consumer(consumerConfig);
   }
+
   /**
    * a function that sets a new confluent cloud rest endpoint.
    * Closes the current client first.

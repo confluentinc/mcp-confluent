@@ -70,7 +70,8 @@
     "openapi-fetch": "^0.13.7",
     "pino": "^9.6.0",
     "properties-file": "^3.5.12",
-    "zod": "^3.24.4"
+    "zod": "^3.24.4",
+    "mcp-evals": "^1.0.18"
   },
   "files": [
     "dist"

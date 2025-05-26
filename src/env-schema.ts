@@ -83,6 +83,36 @@ const envSchema = z.object({
     .trim()
     .min(1)
     .optional(),
+  OAUTH_AUTHORIZATION_URL: z
+    .string()
+    .url()
+    .describe("OAuth2 authorization endpoint URL"),
+  OAUTH_TOKEN_URL: z.string().url().describe("OAuth2 token endpoint URL"),
+  OAUTH_REVOCATION_URL: z
+    .string()
+    .url()
+    .describe("OAuth2 revocation endpoint URL"),
+  OAUTH_ISSUER_URL: z.string().url().describe("OAuth2 issuer URL"),
+  OAUTH_BASE_URL: z.string().url().describe("OAuth2 base URL for this service"),
+  OAUTH_DOCS_URL: z.string().url().describe("OAuth2 service documentation URL"),
+  OAUTH_REDIRECT_URI: z
+    .string()
+    .url()
+    .describe("OAuth2 redirect URI for client registration"),
+  OAUTH_CLIENT_ID: z
+    .string()
+    .min(1)
+    .describe("OAuth2 client ID for token validation"),
+  OAUTH_SCOPES: z
+    .string()
+    .min(1)
+    .transform((val) =>
+      val
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
+    .describe("Comma-separated OAuth2 scopes for token validation"),
 });
 
 // Environment variables that are optional for tools / could be provided at runtime

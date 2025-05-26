@@ -17,6 +17,7 @@ export interface CLIOptions {
   listTools?: boolean;
   disableConfluentCloudTools?: boolean;
   kafkaConfig: KeyValuePairObject;
+  enableOAuth?: boolean;
 }
 
 /**
@@ -139,6 +140,7 @@ export function parseCliArgs(): CLIOptions {
       "--disable-confluent-cloud-tools",
       "Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).",
     )
+    .option("--enable-oauth", "Enable OAuth endpoints for HTTP/SSE transports")
     .allowExcessArguments(false)
     .exitOverride();
 
@@ -174,6 +176,7 @@ export function parseCliArgs(): CLIOptions {
       listTools: !!opts.listTools,
       disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
       kafkaConfig: kafkaConfig,
+      enableOAuth: !!opts.enableOauth,
     };
   } catch (error: unknown) {
     if (

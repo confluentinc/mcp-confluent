@@ -22,7 +22,8 @@
     "baseUrl": "./",
     "paths": {
       "@src/*": ["src/*"]
-    }
+    },
+    "types": ["@fastify/express"]
   },
   "exclude": ["node_modules", "dist"]
 }

@@ -1,7 +1,9 @@
+import fastifyExpress from "@fastify/express";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import { logger } from "@src/logger.js";
 import { ServerConfig } from "@src/mcp/transports/types.js";
+import { RequestHandler } from "express";
 import {
   default as Fastify,
   FastifyBaseLogger,
@@ -17,6 +19,7 @@ export class HttpServer {
       // Useful for when ongoing http/sse connections are present
       forceCloseConnections: true,
     });
+    this.fastify.register(fastifyExpress);
   }
 
   async prepare(): Promise<void> {
@@ -94,5 +97,9 @@ export class HttpServer {
       logger.error({ error }, "Error while shutting down server");
       throw error;
     }
+  }
+
+  async registerOAuthRouter(oauthRouter: RequestHandler) {
+    this.fastify.use(oauthRouter);
   }
 }

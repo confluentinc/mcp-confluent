@@ -4,8 +4,8 @@
  * It converts Zod schema definitions into a formatted markdown table.
  */
 
+import { combinedSchema } from "@src/env-schema.js";
 import { z } from "zod";
-import { combinedSchema } from "./env-schema.js";
 
 function zodSchemaToMarkdown(schema: z.ZodTypeAny, parentKey = ""): string {
   // Initialize table header

@@ -339,6 +339,17 @@ npx @confluentinc/mcp-confluent -e .env --allow-tools produce-message,consume-me
 {"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment disabled due to allow/block list rules"}
 {"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas disabled due to allow/block list rules"}
 {"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool create-tableflow-topic disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool list-tableflow-regions disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool list-tableflow-topics disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool read-tableflow-topic disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool update-tableflow-topic disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool delete-tableflow-topic disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool create-tableflow-catalog-integration disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool list-tableflow-catalog-integrations disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool read-tableflow-catalog-integration disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool update-tableflow-catalog-integration disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool delete-tableflow-catalog-integration disabled due to allow/block list rules"}
 {"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio on localhost:3000"}
 {"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
 {"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
@@ -382,6 +393,17 @@ npx @confluentinc/mcp-confluent -e .env --block-tools produce-message,consume-me
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-regions enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-topics enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-catalog-integrations enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-catalog-integration enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
@@ -425,6 +447,17 @@ npx -y @confluentinc/mcp-confluent -e .env --allow-tools-file allow.txt --block-
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-regions enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-topics enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-catalog-integrations enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-catalog-integration enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
@@ -468,6 +501,18 @@ read-flink-statement: Make a request to read a statement and its results
 remove-tag-from-entity: Remove tag from an entity in Confluent Cloud.
 search-topics-by-name: List all topics in the Kafka cluster matching the specified name.
 search-topics-by-tag: List all topics in the Kafka cluster with the specified tag.
+create-tableflow-topic: Make a request to create a tableflow topic.
+create-tableflow-topic: Make a request to create a tableflow topic.
+list-tableflow-regions: Retrieve a sorted, filtered, paginated list of all tableflow regions.
+list-tableflow-topics: Retrieve a sorted, filtered, paginated list of all tableflow topics.
+read-tableflow-topic: Make a request to read a tableflow topic.
+update-tableflow-topic: Make a request to update a tableflow topic.
+delete-tableflow-topic: Make a request to delete a tableflow topic.
+create-tableflow-catalog-integration: Make a request to create a catalog integration.
+list-tableflow-catalog-integrations: Retrieve a sorted, filtered, paginated list of all catalog integrations.
+read-tableflow-catalog-integration: Make a request to read a catalog integration.
+update-tableflow-catalog-integration: Make a request to update a catalog integration.
+delete-tableflow-catalog-integration: Make a request to delete a tableflow catalog integration.
 ```
 
 </details>

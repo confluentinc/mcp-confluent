@@ -24,6 +24,17 @@ import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
 import { SearchTopicsByNameHandler } from "@src/confluent/tools/handlers/search/search-topics-by-name-handler.js";
+import { UpdateTableFlowTopicHandler } from "./handlers/tableflow/topic/update-tableflow-topic-handler.js";
+import { CreateTableFlowTopicHandler } from "./handlers/tableflow/topic/create-tableflow-topic-handler.js";
+import { DeleteTableFlowTopicHandler } from "./handlers/tableflow/topic/delete-tableflow-topic-handler.js";
+import { ListTableFlowRegionsHandler } from "./handlers/tableflow/list-tableflow-regions-handler.js";
+import { ListTableFlowTopicsHandler } from "./handlers/tableflow/topic/list-tableflow-topics-handler.js";
+import { ReadTableFlowTopicHandler } from "./handlers/tableflow/topic/read-tableflow-topic-handler.js";
+import { CreateTableFlowCatalogIntegrationHandler } from "./handlers/tableflow/catalog/create-tableflow-catalog-integration-handler.js";
+import { ReadTableFlowCatalogIntegrationHandler } from "./handlers/tableflow/catalog/read-tableflow-catalog-integration-handler.js";
+import { ListTableFlowCatalogIntegrationsHandler } from "./handlers/tableflow/catalog/list-tableflow-catalog-integrations-handler.js";
+import { UpdateTableFlowCatalogIntegrationHandler } from "./handlers/tableflow/catalog/update-tableflow-catalog-integration-handler.js";
+import { DeleteTableFlowCatalogIntegrationHandler } from "./handlers/tableflow/catalog/delete-tableflow-catalog-integration-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
 
@@ -55,6 +66,32 @@ export class ToolFactory {
     [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],
     [ToolName.CONSUME_MESSAGES, new ConsumeKafkaMessagesHandler()],
     [ToolName.GET_TOPIC_CONFIG, new GetTopicConfigHandler()],
+    [ToolName.CREATE_TABLEFLOW_TOPIC, new CreateTableFlowTopicHandler()],
+    [ToolName.LIST_TABLEFLOW_REGIONS, new ListTableFlowRegionsHandler()],
+    [ToolName.LIST_TABLEFLOW_TOPICS, new ListTableFlowTopicsHandler()],
+    [ToolName.READ_TABLEFLOW_TOPIC, new ReadTableFlowTopicHandler()],
+    [ToolName.UPDATE_TABLEFLOW_TOPIC, new UpdateTableFlowTopicHandler()],
+    [ToolName.DELETE_TABLEFLOW_TOPIC, new DeleteTableFlowTopicHandler()],
+    [
+      ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION,
+      new CreateTableFlowCatalogIntegrationHandler(),
+    ],
+    [
+      ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
+      new ReadTableFlowCatalogIntegrationHandler(),
+    ],
+    [
+      ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS,
+      new ListTableFlowCatalogIntegrationsHandler(),
+    ],
+    [
+      ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION,
+      new UpdateTableFlowCatalogIntegrationHandler(),
+    ],
+    [
+      ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
+      new DeleteTableFlowCatalogIntegrationHandler(),
+    ],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

@@ -11,7 +11,7 @@ import {
 } from "@src/confluent/middleware.js";
 import { paths } from "@src/confluent/openapi-schema.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
-import { logger } from "@src/logger.js";
+import { kafkaLogger, logger } from "@src/logger.js";
 import createClient, { Client } from "openapi-fetch";
 
 /**
@@ -117,7 +117,17 @@ export class DefaultClientManager
     this.confluentCloudKafkaRestBaseUrl = config.endpoints.kafka;
 
     this.kafkaConfig = config.kafka;
-    this.kafkaClient = new Lazy(() => new KafkaJS.Kafka(this.kafkaConfig));
+    this.kafkaClient = new Lazy(
+      () =>
+        new KafkaJS.Kafka({
+          ...this.kafkaConfig,
+          kafkaJS: {
+            logger: kafkaLogger,
+            // we need to do this since typescript will complain that we are missing configs like `brokers` even though we are passing them in kafkaConfig above
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+        }),
+    );
     this.adminClient = new AsyncLazy(
       async () => {
         logger.info("Connecting Kafka Admin");

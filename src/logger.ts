@@ -77,6 +77,6 @@ export const logLevels = {
 export type LogLevel = keyof typeof logLevels;
 
 // Add a function to update the logger's level after env is initialized
-export function setLogLevel(level: string) {
+export function setLogLevel(level: LogLevel) {
   logger.level = level;
 }

@@ -12,6 +12,14 @@ const envSchema = z.object({
     .string()
     .describe("Host to bind for HTTP transport")
     .default("localhost"),
+  LOG_LEVEL: z
+    .string()
+    .describe(
+      "Log level for application logging (trace, debug, info, warn, error, fatal)",
+    )
+    .trim()
+    .toLowerCase()
+    .default("info"),
   BOOTSTRAP_SERVERS: z
     .string()
     .describe(

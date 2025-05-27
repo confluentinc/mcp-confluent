@@ -13,7 +13,7 @@ import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
-import { logger } from "@src/logger.js";
+import { logger, setLogLevel } from "@src/logger.js";
 import { TransportManager } from "@src/mcp/transports/index.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
@@ -23,6 +23,7 @@ async function main() {
   try {
     // Initialize environment after CLI args are processed
     const env = await initEnv();
+    setLogLevel(env.LOG_LEVEL);
 
     // Merge environment variables with kafka config from CLI
     // some additional configurations could be set in the client manager

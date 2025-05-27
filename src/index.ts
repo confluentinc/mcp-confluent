@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 
 import { GlobalConfig } from "@confluentinc/kafka-javascript";
-import { ProxyOAuthServerProvider } from "@modelcontextprotocol/sdk/server/auth/providers/proxyProvider.js";
-import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   getFilteredToolNames,
@@ -156,40 +154,6 @@ async function main() {
       },
     });
 
-    const proxyProvider = new ProxyOAuthServerProvider({
-      endpoints: {
-        authorizationUrl: env.OAUTH_AUTHORIZATION_URL,
-        tokenUrl: env.OAUTH_TOKEN_URL,
-        revocationUrl: env.OAUTH_REVOCATION_URL,
-      },
-      verifyAccessToken: async (token) => {
-        return {
-          token,
-          clientId: env.OAUTH_CLIENT_ID,
-          scopes: env.OAUTH_SCOPES,
-        };
-      },
-      getClient: async (client_id) => {
-        return {
-          client_id,
-          redirect_uris: [env.OAUTH_REDIRECT_URI],
-        };
-      },
-    });
-
-    const oauthRouter = mcpAuthRouter({
-      provider: proxyProvider,
-      issuerUrl: new URL(env.OAUTH_ISSUER_URL),
-      baseUrl: new URL(env.OAUTH_BASE_URL),
-      serviceDocumentationUrl: new URL(env.OAUTH_DOCS_URL),
-    });
-
-    // Register the OAuth router on the Fastify server (if HTTP server is used)
-    const httpServer = transportManager.getHttpServer();
-    if (httpServer) {
-      await httpServer.registerOAuthRouter(oauthRouter);
-    }
-
     // Start all transports with a single call
     logger.info(`Starting transports: ${cliOptions.transports.join(", ")}`);
     await transportManager.start(
@@ -212,7 +176,15 @@ async function main() {
     process.on("SIGQUIT", performCleanup);
     process.on("SIGUSR2", performCleanup);
   } catch (error) {
-    logger.error({ error }, "Error starting server");
+    logger.error(
+      {
+        error:
+          error instanceof Error
+            ? { message: error.message, stack: error.stack }
+            : error,
+      },
+      "Error starting server",
+    );
     process.exit(1);
   }
 }

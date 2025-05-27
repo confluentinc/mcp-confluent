@@ -86,23 +86,39 @@ const envSchema = z.object({
   OAUTH_AUTHORIZATION_URL: z
     .string()
     .url()
-    .describe("OAuth2 authorization endpoint URL"),
-  OAUTH_TOKEN_URL: z.string().url().describe("OAuth2 token endpoint URL"),
+    .describe("OAuth2 authorization endpoint URL")
+    .optional(),
+  OAUTH_TOKEN_URL: z
+    .string()
+    .url()
+    .describe("OAuth2 token endpoint URL")
+    .optional(),
   OAUTH_REVOCATION_URL: z
     .string()
     .url()
-    .describe("OAuth2 revocation endpoint URL"),
-  OAUTH_ISSUER_URL: z.string().url().describe("OAuth2 issuer URL"),
-  OAUTH_BASE_URL: z.string().url().describe("OAuth2 base URL for this service"),
-  OAUTH_DOCS_URL: z.string().url().describe("OAuth2 service documentation URL"),
+    .describe("OAuth2 revocation endpoint URL")
+    .optional(),
+  OAUTH_ISSUER_URL: z.string().url().describe("OAuth2 issuer URL").optional(),
+  OAUTH_BASE_URL: z
+    .string()
+    .url()
+    .describe("OAuth2 base URL for this service")
+    .optional(),
+  OAUTH_DOCS_URL: z
+    .string()
+    .url()
+    .describe("OAuth2 service documentation URL")
+    .optional(),
   OAUTH_REDIRECT_URI: z
     .string()
     .url()
-    .describe("OAuth2 redirect URI for client registration"),
+    .describe("OAuth2 redirect URI for client registration")
+    .optional(),
   OAUTH_CLIENT_ID: z
     .string()
     .min(1)
-    .describe("OAuth2 client ID for token validation"),
+    .describe("OAuth2 client ID for token validation")
+    .optional(),
   OAUTH_SCOPES: z
     .string()
     .min(1)
@@ -112,7 +128,8 @@ const envSchema = z.object({
         .map((s) => s.trim())
         .filter(Boolean),
     )
-    .describe("Comma-separated OAuth2 scopes for token validation"),
+    .describe("Comma-separated OAuth2 scopes for token validation")
+    .optional(),
 });
 
 // Environment variables that are optional for tools / could be provided at runtime

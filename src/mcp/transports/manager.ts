@@ -7,22 +7,25 @@ import { HttpServer } from "@src/mcp/transports/server.js";
 import { SseTransport } from "@src/mcp/transports/sse.js";
 import { StdioTransport } from "@src/mcp/transports/stdio.js";
 import { Transport, TransportType } from "@src/mcp/transports/types.js";
+import { z } from "zod";
 
-export type OAuthEnv = {
-  OAUTH_AUTHORIZATION_URL: string;
-  OAUTH_TOKEN_URL: string;
-  OAUTH_REVOCATION_URL: string;
-  OAUTH_ISSUER_URL: string;
-  OAUTH_BASE_URL: string;
-  OAUTH_DOCS_URL: string;
-  OAUTH_REDIRECT_URI: string;
-  OAUTH_CLIENT_ID: string;
-  OAUTH_SCOPES: string[];
-};
+export const OAuthEnvSchema = z.object({
+  OAUTH_AUTHORIZATION_URL: z.string(),
+  OAUTH_TOKEN_URL: z.string(),
+  OAUTH_REVOCATION_URL: z.string(),
+  OAUTH_ISSUER_URL: z.string(),
+  OAUTH_BASE_URL: z.string(),
+  OAUTH_DOCS_URL: z.string(),
+  OAUTH_REDIRECT_URI: z.string(),
+  OAUTH_CLIENT_ID: z.string(),
+  OAUTH_SCOPES: z.array(z.string()),
+});
+
+export type OAuthEnv = z.infer<typeof OAuthEnvSchema>;
 
 type TransportManagerOptions = {
   enableOAuth?: boolean;
-  oauthConfig?: OAuthEnv;
+  oauthConfig?: Partial<OAuthEnv>;
 };
 
 export class TransportManager {
@@ -53,10 +56,14 @@ export class TransportManager {
 
         // Register OAuth router if enabled
         if (this.options.enableOAuth) {
-          if (!this.options.oauthConfig) {
-            throw new Error("OAuth is enabled but OAuth config is missing.");
+          const parsed = OAuthEnvSchema.safeParse(this.options.oauthConfig);
+          if (!parsed.success) {
+            throw new Error(
+              "OAuth is enabled but OAuth config is missing or invalid: " +
+                JSON.stringify(parsed.error.format()),
+            );
           }
-          const env = this.options.oauthConfig;
+          const env = parsed.data;
           const proxyProvider = new ProxyOAuthServerProvider({
             endpoints: {
               authorizationUrl: env.OAUTH_AUTHORIZATION_URL,
@@ -109,7 +116,15 @@ export class TransportManager {
 
       logger.info("All transports started successfully");
     } catch (error) {
-      logger.error({ error }, "Failed to start transports");
+      logger.error(
+        {
+          error:
+            error instanceof Error
+              ? { message: error.message, stack: error.stack }
+              : error,
+        },
+        "Failed to start transports",
+      );
       // Clean up any partially started transports
       await this.stop();
       throw error;

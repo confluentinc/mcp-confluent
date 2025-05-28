@@ -164,7 +164,7 @@ async function main() {
     process.on("SIGQUIT", performCleanup);
     process.on("SIGUSR2", performCleanup);
   } catch (error) {
-    logger.error({ error }, "Error starting server");
+    logger.error({ err: error }, "Error starting server");
     process.exit(1);
   }
 }

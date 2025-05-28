@@ -1,4 +1,5 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
+import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -23,19 +24,6 @@ const createTableflowCatalogIntegrationArguments = z.object({
     display_name: z
       .string()
       .describe("The name of the Kafka topic for which Tableflow is enabled."),
-    environment: z.object({
-      id: z
-        .string()
-        .describe(
-          "The unique identifier for the environment this resource belongs to.",
-        ),
-    }),
-    kafka_cluster: z.object({
-      id: z.string().describe("ID of the referred resource"),
-      environment: z
-        .string()
-        .describe("Environment of the referred resource, if env-scoped"),
-    }),
     config: z.object({
       kind: z
         .string()
@@ -64,6 +52,16 @@ export class CreateTableFlowCatalogIntegrationHandler extends BaseToolHandler {
     const { baseUrl, tableflowCatalogIntegrationConfig } =
       createTableflowCatalogIntegrationArguments.parse(toolArguments);
 
+    const environment_id = getEnsuredParam(
+      "KAFKA_ENV_ID",
+      "Environment ID is required",
+    );
+
+    const kafka_cluster_id = getEnsuredParam(
+      "KAFKA_CLUSTER_ID",
+      "Kafka Cluster ID is required",
+    );
+
     if (baseUrl !== undefined && baseUrl !== "") {
       clientManager.setConfluentCloudRestEndpoint(baseUrl);
     }
@@ -72,16 +70,19 @@ export class CreateTableFlowCatalogIntegrationHandler extends BaseToolHandler {
       clientManager.getConfluentCloudRestClient(),
     );
 
-    const { environment, ...restOfTableflowCatalogIntegrationConfig } =
-      tableflowCatalogIntegrationConfig;
-
     const { data: response, error } = await pathBasedClient[
       "/tableflow/v1/catalog-integrations"
     ].POST({
       body: {
         spec: {
-          ...restOfTableflowCatalogIntegrationConfig,
-          environment: { id: environment.id }, // Only include id, as the general environment as requires readonly and resource_name
+          environment: {
+            id: environment_id, // Only include id, as the general environment object also requires readonly and resource_name
+          },
+          kafka_cluster: {
+            id: kafka_cluster_id,
+            environment: environment_id,
+          },
+          ...tableflowCatalogIntegrationConfig,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any, // Due to how OpenAPI specification is structured and how generators interpret it, we have to treat it as any, as
         // The most likely culprit for mismatch is the reuse of a single base schema for both input (requestBody) and output (responses) evironment.

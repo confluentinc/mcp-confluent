@@ -4,6 +4,7 @@ import {
   BaseToolHandler,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
@@ -33,19 +34,6 @@ const createTableflowTopicArguments = z.object({
         .string()
         .describe("The provider integration id."),
     }),
-    environment: z.object({
-      id: z
-        .string()
-        .describe(
-          "The unique identifier for the environment this resource belongs to.",
-        ),
-    }),
-    kafka_cluster: z.object({
-      id: z.string().describe("ID of the referred resource"),
-      environment: z
-        .string()
-        .describe("Environment of the referred resource, if env-scoped"),
-    }),
     // Optional fields
     suspended: z
       .boolean()
@@ -63,7 +51,7 @@ const createTableflowTopicArguments = z.object({
         ),
       record_failure_strategy: z
         .string()
-        .default("SUSPENDED")
+        .default("SUSPEND")
         .describe(
           "The strategy to handle record failures in the Tableflow enabled topic during materialization.",
         ),
@@ -85,6 +73,16 @@ export class CreateTableFlowTopicHandler extends BaseToolHandler {
     const { baseUrl, tableflowTopicConfig } =
       createTableflowTopicArguments.parse(toolArguments);
 
+    const environment_id = getEnsuredParam(
+      "KAFKA_ENV_ID",
+      "Environment ID is required",
+    );
+
+    const kafka_cluster_id = getEnsuredParam(
+      "KAFKA_CLUSTER_ID",
+      "Kafka Cluster ID is required",
+    );
+
     if (baseUrl !== undefined && baseUrl !== "") {
       clientManager.setConfluentCloudRestEndpoint(baseUrl);
     }
@@ -93,15 +91,19 @@ export class CreateTableFlowTopicHandler extends BaseToolHandler {
       clientManager.getConfluentCloudRestClient(),
     );
 
-    const { environment, ...restOfTableflowConfig } = tableflowTopicConfig;
-
     const { data: response, error } = await pathBasedClient[
       "/tableflow/v1/tableflow-topics"
     ].POST({
       body: {
         spec: {
-          ...restOfTableflowConfig,
-          environment: { id: environment.id }, // Only include id, as the general environment as requires readonly and resource_name
+          environment: {
+            id: environment_id, // Only include id, as the general environment object also requires readonly and resource_name
+          },
+          kafka_cluster: {
+            id: kafka_cluster_id,
+            environment: environment_id,
+          },
+          ...tableflowTopicConfig,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any, // Due to how OpenAPI specification is structured and how generators interpret it, we have to treat it as any, as
         // The most likely culprit for mismatch is the reuse of a single base schema for both input (requestBody) and output (responses) evironment.

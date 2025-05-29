@@ -25,4 +25,9 @@ export enum ToolName {
   READ_ENVIRONMENT = "read-environment",
   LIST_SCHEMAS = "list-schemas",
   GET_TOPIC_CONFIG = "get-topic-config",
+  GET_TOPIC_METRICS = "get-topic-metrics",
+  GET_PRINCIPAL_METRICS = "get-principal-metrics",
+  GET_CONFLUENT_CLOUD_METRICS = "get-confluent-cloud-metrics",
+  GET_METRICS_DESCRIPTORS = "get-confluent-cloud-metrics-descriptors",
+  LIST_PROMPTS = "list-prompts",
 }

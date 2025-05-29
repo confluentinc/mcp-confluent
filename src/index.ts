@@ -15,6 +15,8 @@ import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
 import { TransportManager } from "@src/mcp/transports/index.js";
+import { PromptFactory } from "@src/confluent/prompts/prompt-factory.js";
+import { fillTemplate } from "./confluent/helpers.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
 const cliOptions = parseCliArgs();
@@ -51,6 +53,7 @@ async function main() {
         flink: env.FLINK_REST_ENDPOINT,
         schemaRegistry: env.SCHEMA_REGISTRY_ENDPOINT,
         kafka: env.KAFKA_REST_ENDPOINT,
+        telemetry: env.CONFLUENT_CLOUD_TELEMETRY_ENDPOINT,
       },
       auth: {
         cloud: {
@@ -138,6 +141,31 @@ async function main() {
           return await handler.handle(clientManager, args, sessionId);
         },
       );
+    });
+
+    const prompts = PromptFactory.getPrompts();
+    // Register prompts (add this block)
+    prompts.forEach((prompt) => {
+      server.prompt(prompt.name, (args) => {
+        // Remove extra properties (like 'signal') from args before passing to fillTemplate
+        // Convert all values to string for template replacement
+        const inputArgs = Object.fromEntries(
+          Object.entries(args)
+            .filter(([key]) => key !== "signal")
+            .map(([k, v]) => [k, v == null ? "" : String(v)]), // Ensure all values are strings
+        );
+        return {
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: fillTemplate(prompt.description, inputArgs),
+              },
+            },
+          ],
+        };
+      });
     });
 
     const transportManager = new TransportManager(server);

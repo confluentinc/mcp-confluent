@@ -6,6 +6,7 @@ export interface ConfluentEndpoints {
   flink?: string;
   schemaRegistry?: string;
   kafka?: string;
+  telemetry?: string;
 }
 
 export interface ConfluentAuth {

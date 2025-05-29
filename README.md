@@ -90,6 +90,7 @@ CONFLUENT_CLOUD_REST_ENDPOINT="https://api.confluent.cloud"
 SCHEMA_REGISTRY_API_KEY="..."
 SCHEMA_REGISTRY_API_SECRET="..."
 SCHEMA_REGISTRY_ENDPOINT="https://psrc-zv01y.northamerica-northeast2.gcp.confluent.cloud"
+CONFLUENT_CLOUD_TELEMETRY_ENDPOINT="https://api.telemetry.confluent.cloud"
 ```
 
 </details>
@@ -120,6 +121,9 @@ SCHEMA_REGISTRY_ENDPOINT="https://psrc-zv01y.northamerica-northeast2.gcp.conflue
 | SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                           |               | No       |
 | SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                             |               | No       |
 | SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                       |               | No       |
+| CONFLUENT_CLOUD_TELEMETRY_ENDPOINT | Endpoint for Confluent Cloud telemetry data collection (string)                                                                     |               | No       |
+
+Telemetry API requires the service account to be `MetricsViewer` in Confluent Cloud.  This is used to collect usage metrics for the MCP server.
 
 ### Usage
 

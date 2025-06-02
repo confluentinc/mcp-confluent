@@ -19,24 +19,24 @@ import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alt
 import { ConsumeKafkaMessagesHandler } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
 import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-topics-handler.js";
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
+import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
 import { SearchTopicsByNameHandler } from "@src/confluent/tools/handlers/search/search-topics-by-name-handler.js";
-import { UpdateTableFlowTopicHandler } from "./handlers/tableflow/topic/update-tableflow-topic-handler.js";
-import { CreateTableFlowTopicHandler } from "./handlers/tableflow/topic/create-tableflow-topic-handler.js";
-import { DeleteTableFlowTopicHandler } from "./handlers/tableflow/topic/delete-tableflow-topic-handler.js";
-import { ListTableFlowRegionsHandler } from "./handlers/tableflow/list-tableflow-regions-handler.js";
-import { ListTableFlowTopicsHandler } from "./handlers/tableflow/topic/list-tableflow-topics-handler.js";
-import { ReadTableFlowTopicHandler } from "./handlers/tableflow/topic/read-tableflow-topic-handler.js";
-import { CreateTableFlowCatalogIntegrationHandler } from "./handlers/tableflow/catalog/create-tableflow-catalog-integration-handler.js";
-import { ReadTableFlowCatalogIntegrationHandler } from "./handlers/tableflow/catalog/read-tableflow-catalog-integration-handler.js";
-import { ListTableFlowCatalogIntegrationsHandler } from "./handlers/tableflow/catalog/list-tableflow-catalog-integrations-handler.js";
-import { UpdateTableFlowCatalogIntegrationHandler } from "./handlers/tableflow/catalog/update-tableflow-catalog-integration-handler.js";
-import { DeleteTableFlowCatalogIntegrationHandler } from "./handlers/tableflow/catalog/delete-tableflow-catalog-integration-handler.js";
+import { CreateTableFlowCatalogIntegrationHandler } from "@src/confluent/tools/handlers/tableflow/catalog/create-tableflow-catalog-integration-handler.js";
+import { DeleteTableFlowCatalogIntegrationHandler } from "@src/confluent/tools/handlers/tableflow/catalog/delete-tableflow-catalog-integration-handler.js";
+import { ListTableFlowCatalogIntegrationsHandler } from "@src/confluent/tools/handlers/tableflow/catalog/list-tableflow-catalog-integrations-handler.js";
+import { ReadTableFlowCatalogIntegrationHandler } from "@src/confluent/tools/handlers/tableflow/catalog/read-tableflow-catalog-integration-handler.js";
+import { UpdateTableFlowCatalogIntegrationHandler } from "@src/confluent/tools/handlers/tableflow/catalog/update-tableflow-catalog-integration-handler.js";
+import { ListTableFlowRegionsHandler } from "@src/confluent/tools/handlers/tableflow/list-tableflow-regions-handler.js";
+import { CreateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/create-tableflow-topic-handler.js";
+import { DeleteTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/delete-tableflow-topic-handler.js";
+import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tableflow/topic/list-tableflow-topics-handler.js";
+import { ReadTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/read-tableflow-topic-handler.js";
+import { UpdateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/update-tableflow-topic-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([

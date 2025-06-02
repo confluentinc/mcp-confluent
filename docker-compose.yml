@@ -1,0 +1,38 @@
+
+services:
+  mcp-server:
+
+    build: .
+    
+
+    ports:
+      - "${HTTP_PORT:-3000}:${HTTP_PORT:-3000}" # Use default 3000 if HTTP_PORT not set in .env
+
+    # Pass environment variables from the .env file
+    # Docker Compose will automatically look for a .env file in the same directory
+    # You can also explicitly specify it with `env_file: ./.env`
+    environment:
+      # Required variables (with defaults if not in .env)
+      HTTP_HOST: "${HTTP_HOST:-0.0.0.0}" # Default to 0.0.0.0 for container accessibility
+      HTTP_PORT: "${HTTP_PORT:-3000}"    # Default to 3000
+
+      BOOTSTRAP_SERVERS: "${BOOTSTRAP_SERVERS}"
+      CONFLUENT_CLOUD_API_KEY: "${CONFLUENT_CLOUD_API_KEY}"
+      CONFLUENT_CLOUD_API_SECRET: "${CONFLUENT_CLOUD_API_SECRET}"
+      CONFLUENT_CLOUD_REST_ENDPOINT: "${CONFLUENT_CLOUD_REST_ENDPOINT}"
+      FLINK_API_KEY: "${FLINK_API_KEY}"
+      FLINK_API_SECRET: "${FLINK_API_SECRET}"
+      FLINK_COMPUTE_POOL_ID: "${FLINK_COMPUTE_POOL_ID}"
+      FLINK_DATABASE_NAME: "${FLINK_DATABASE_NAME}"
+      FLINK_ENV_ID: "${FLINK_ENV_ID}"
+      FLINK_ENV_NAME: "${FLINK_ENV_NAME}"
+      FLINK_ORG_ID: "${FLINK_ORG_ID}"
+      FLINK_REST_ENDPOINT: "${FLINK_REST_ENDPOINT}"
+      KAFKA_API_KEY: "${KAFKA_API_KEY}"
+      KAFKA_API_SECRET: "${KAFKA_API_SECRET}"
+      KAFKA_CLUSTER_ID: "${KAFKA_CLUSTER_ID}"
+      KAFKA_ENV_ID: "${KAFKA_ENV_ID}"
+      KAFKA_REST_ENDPOINT: "${KAFKA_REST_ENDPOINT}"
+      SCHEMA_REGISTRY_API_KEY: "${SCHEMA_REGISTRY_API_KEY}"
+      SCHEMA_REGISTRY_API_SECRET: "${SCHEMA_REGISTRY_API_SECRET}"
+      SCHEMA_REGISTRY_ENDPOINT: "${SCHEMA_REGISTRY_ENDPOINT}"

@@ -9330,14 +9330,17 @@ export interface components {
       is_simple: boolean;
       partition_assignor: string;
       state: components["schemas"]["ConsumerGroupState"];
+      type: components["schemas"]["ConsumerGroupType"];
+      is_mixed_consumer_group: boolean;
       coordinator: components["schemas"]["Relationship"];
-      consumer?: components["schemas"]["Relationship"];
+      consumers: components["schemas"]["Relationship"];
       lag_summary: components["schemas"]["Relationship"];
     };
     ConsumerGroupDataList: components["schemas"]["ResourceCollection"] & {
       data: components["schemas"]["ConsumerGroupData"][];
     };
     ConsumerGroupState: string;
+    ConsumerGroupType: string;
     ConsumerLagData: components["schemas"]["Resource"] & {
       cluster_id: string;
       consumer_group_id: string;
@@ -9647,6 +9650,15 @@ export interface components {
       state: components["schemas"]["LinkTaskState"];
       errors: components["schemas"]["LinkTaskError"][];
     };
+    LinkCategory: {
+      state_category: components["schemas"]["StateCategory"];
+      /**
+       * Format: int32
+       * @example 123
+       */
+      count: number;
+    };
+    StateCategory: string;
     LinkTaskError: {
       error_code: string;
       error_message: string;
@@ -9666,6 +9678,7 @@ export interface components {
       link_error_message?: string | null;
       link_state?: components["schemas"]["LinkState"];
       tasks?: components["schemas"]["LinkTask"][] | null;
+      category_counts?: components["schemas"]["LinkCategory"][] | null;
     };
     ListLinksResponseDataList: components["schemas"]["ResourceCollection"] & {
       data: components["schemas"]["ListLinksResponseData"][];
@@ -20351,6 +20364,8 @@ export interface components {
          *       "is_simple": false,
          *       "partition_assignor": "org.apache.kafka.clients.consumer.RoundRobinAssignor",
          *       "state": "STABLE",
+         *       "type": "CLASSIC",
+         *       "is_mixed_consumer_group": false,
          *       "coordinator": {
          *         "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
          *       },
@@ -21027,6 +21042,8 @@ export interface components {
          *           "is_simple": false,
          *           "partition_assignor": "org.apache.kafka.clients.consumer.RoundRobinAssignor",
          *           "state": "STABLE",
+         *           "type": "CLASSIC",
+         *           "is_mixed_consumer_group": false,
          *           "coordinator": {
          *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/1"
          *           },
@@ -21048,6 +21065,8 @@ export interface components {
          *           "is_simple": false,
          *           "partition_assignor": "org.apache.kafka.clients.consumer.StickyAssignor",
          *           "state": "PREPARING_REBALANCE",
+         *           "type": "CLASSIC",
+         *           "is_mixed_consumer_group": false,
          *           "coordinator": {
          *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/2"
          *           },
@@ -21069,6 +21088,8 @@ export interface components {
          *           "is_simple": false,
          *           "partition_assignor": "org.apache.kafka.clients.consumer.RangeAssignor",
          *           "state": "DEAD",
+         *           "type": "CLASSIC",
+         *           "is_mixed_consumer_group": false,
          *           "coordinator": {
          *             "related": "https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/brokers/3"
          *           },

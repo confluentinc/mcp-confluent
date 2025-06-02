@@ -15,9 +15,7 @@ execution_time_limit:
 queue:
   - when: "branch != 'main'"
     processing: parallel
-
-
-- name: "resolve dependencies and build"
+  - name: "resolve dependencies and build"
     dependencies: []
     task:
       prologue:

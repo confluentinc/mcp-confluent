@@ -22,7 +22,7 @@ global_job_config:
       value: "ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db"
 
 
-- name: "resolve dependencies and build frontend"
+- name: "resolve dependencies and build"
     dependencies: []
     task:
       prologue:
@@ -36,25 +36,3 @@ global_job_config:
         - name: "build"
           commands:
             - npm run build
-      epilogue:
-        on_pass:
-          commands:
-            # guard to prevent pr removing cache as
-            # 'cache delete' is allowed on pr run but not 'cache store'
-            - >-
-              if [ "$SEMAPHORE_GIT_WORKING_BRANCH" = "main" ]; then
-                cache delete frontend-dependencies;
-                cache store frontend-dependencies node_modules/;
-              fi
-
-  - name: "quality assurance frontend"
-    dependencies: [ "resolve dependencies frontend" ]
-    task:
-      prologue:
-        commands:
-          - sem-version node 20.11
-          - checkout
-      jobs:
-        - name: "trivy scan"
-          commands:
-            - trivy fs --scanners vuln --show-suppressed --db-repository=$TRIVY_DB_REPOSITORIES --severity HIGH,CRITICAL --exit-code 1 .

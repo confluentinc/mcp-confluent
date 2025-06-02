@@ -522,13 +522,56 @@ search-topics-by-tag: List all topics in the Kafka cluster with the specified ta
     npm run start
     ```
 
-5. **(Optional)Run in Docker**
 
-  Run the MCP server in dev mode as a dockerised container
+### **Run in Docker**
 
-  ```
-  docker-compose up -d
-  ```
+#### Prerequisites
+Before you begin, ensure you have the following installed on your system:
+
+Docker Desktop (or Docker Engine and Docker Compose): https://www.docker.com/products/docker-desktop
+
+#### Setup and Running
+
+##### Environment Variables
+
+The MCP server requires several environment variables to connect to Confluent Cloud and other relevant services. These should be provided in the `.env` file in the root directory of this project. Or you can add them directly in the `docker-compose.yml`
+
+
+##### Building and Running with Docker Compose
+
+1. Navigate to the project root:
+Open your terminal or command prompt and change to the directory containing Dockerfile and docker-compose.yml.
+
+```bash
+cd /path/to/your/mcp-server-project`
+```
+
+2. Build and run the service:
+Docker Compose will build the Docker image (if not already built) and start the mcp-server service.
+
+```bash 
+docker compose up --build
+```
+
+The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
+
+The server will be accessible on http://localhost:3000 (or the port specified in HTTP_PORT in your .env file).
+
+##### Stopping the Server
+To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
+
+Alternatively, in a new terminal from the project root, you can run:
+
+```bash 
+docker compose down
+```
+
+This command stops and removes the containers, networks, and volumes created by docker compose up.
+
+##### Development Mode
+The Dockerfile and docker-compose.yml are configured to run the server in development mode (npm run dev). This typically includes features like hot-reloading or detailed logging, depending on your Node.js server's dev script.
+
+For production deployments, you would typically modify the Dockerfile to use npm run start (or equivalent) and ensure the CMD instruction reflects the production startup command.
 
 ### Testing
 

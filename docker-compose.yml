@@ -1,10 +1,7 @@
 
 services:
   mcp-server:
-
-    build: .
-    
-
+    build: . ## build Dockerfile
     ports:
       - "${HTTP_PORT:-3000}:${HTTP_PORT:-3000}" # Use default 3000 if HTTP_PORT not set in .env
 

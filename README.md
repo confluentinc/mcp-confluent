@@ -269,6 +269,7 @@ Confluent MCP Server - Model Context Protocol implementation for Confluent Cloud
 Options:
   -V, --version                    output the version number
   -e, --env-file <path>            Load environment variables from file
+  -k, --kafka-config-file <file>   Path to a properties file for configuring kafka clients
   -t, --transport <types>          Transport types (comma-separated list) (choices: "http", "sse", "stdio", default: "stdio")
   --allow-tools <tools>            Comma-separated list of tool names to allow. If provided, takes precedence over --allow-tools-file. Allow-list is applied before block-list.
   --block-tools <tools>            Comma-separated list of tool names to block. If provided, takes precedence over --block-tools-file. Block-list is applied after allow-list.

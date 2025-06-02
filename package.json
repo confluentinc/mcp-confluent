@@ -1,7 +1,7 @@
 {
   "name": "@confluentinc/mcp-confluent",
   "description": "Confluent MCP Server",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "Confluent Inc.",
   "license": "MIT",
   "repository": {
@@ -69,6 +69,7 @@
     "fastify": "^5.3.2",
     "openapi-fetch": "^0.13.7",
     "pino": "^9.6.0",
+    "properties-file": "^3.5.12",
     "zod": "^3.24.4"
   },
   "files": [

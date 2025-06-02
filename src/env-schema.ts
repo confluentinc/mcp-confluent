@@ -1,3 +1,4 @@
+import { logLevels } from "@src/logger.js";
 import { z } from "zod";
 
 // Environment variables that are required for tools to be enabled/disabled
@@ -12,6 +13,20 @@ const envSchema = z.object({
     .string()
     .describe("Host to bind for HTTP transport")
     .default("localhost"),
+  LOG_LEVEL: z
+    .preprocess(
+      (val) => (typeof val === "string" ? val.toLowerCase() : val),
+      z.enum(
+        Object.keys(logLevels) as [
+          keyof typeof logLevels,
+          ...Array<keyof typeof logLevels>,
+        ],
+      ),
+    )
+    .describe(
+      "Log level for application logging (trace, debug, info, warn, error, fatal)",
+    )
+    .default("info"),
   BOOTSTRAP_SERVERS: z
     .string()
     .describe(

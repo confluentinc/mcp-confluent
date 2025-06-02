@@ -29,4 +29,5 @@ blocks:
             - npm install
         - name: "build"
           commands:
+            - npm install --save-dev typescript
             - npm run build

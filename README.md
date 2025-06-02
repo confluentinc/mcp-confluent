@@ -522,6 +522,14 @@ search-topics-by-tag: List all topics in the Kafka cluster with the specified ta
     npm run start
     ```
 
+5. **(Optional)Run in Docker**
+
+  Run the MCP server in dev mode as a dockerised container
+
+  ```
+  docker-compose up -d
+  ```
+
 ### Testing
 
 #### MCP Inspector

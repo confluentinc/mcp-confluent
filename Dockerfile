@@ -9,7 +9,7 @@ COPY package*.json ./
 # Install application dependencies
 RUN npm install
 
-# Copy the TypeScript source code to the working directory
+
 COPY . .
 
 RUN npm run build
@@ -17,4 +17,5 @@ RUN npm run build
 # Expose the port your MCP server listens on 
 EXPOSE 3000
 
+#  Run in dev mode
 CMD [ "npm", "run", "dev" ]

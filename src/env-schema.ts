@@ -98,6 +98,22 @@ const envSchema = z.object({
     .trim()
     .min(1)
     .optional(),
+  TABLEFLOW_API_KEY: z
+    .string()
+    .describe(
+      "Authentication key for accessing Confluent Cloud's Tabelflow services",
+    )
+    .trim()
+    .min(1)
+    .optional(),
+  TABLEFLOW_API_SECRET: z
+    .string()
+    .describe(
+      "Authentication secret paired with TABELFLOW_API_KEY for secure Tableflow access",
+    )
+    .trim()
+    .min(1)
+    .optional(),
 });
 
 // Environment variables that are optional for tools / could be provided at runtime

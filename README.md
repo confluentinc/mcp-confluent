@@ -84,6 +84,8 @@ FLINK_DATABASE_NAME=""
 FLINK_API_KEY=""
 FLINK_API_SECRET=""
 FLINK_COMPUTE_POOL_ID="lfcp-..."
+TABLEFLOW_API_KEY=""
+TABLEFLOW_API_SECRET=""
 CONFLUENT_CLOUD_API_KEY=""
 CONFLUENT_CLOUD_API_SECRET=""
 CONFLUENT_CLOUD_REST_ENDPOINT="https://api.confluent.cloud"
@@ -112,6 +114,10 @@ SCHEMA_REGISTRY_ENDPOINT="https://psrc-zv01y.northamerica-northeast2.gcp.conflue
 | FLINK_ENV_NAME                | Human-readable name for the Flink environment used for identification and display purposes (string (min: 1))                              |               | No       |
 | FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                            |               | No       |
 | FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                       |               | No       |
+| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))
+|                                              | No       |
+| TABLEFLOW_API_SECRET          | Secret token paired with TABLEFLOW_API_KEY for authenticated access to Confluent Cloud's Tableflow services (string (min:
+1))                            |               | No       |
 | KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                     |               | No       |
 | KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                          |               | No       |
 | KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                |               | No       |

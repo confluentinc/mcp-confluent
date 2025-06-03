@@ -99,7 +99,7 @@ export class ListTableFlowTopicsHandler extends BaseToolHandler {
   }
 
   getRequiredEnvVars(): EnvVar[] {
-    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
+    return ["TABLEFLOW_API_KEY", "TABLEFLOW_API_SECRET"];
   }
 
   isConfluentCloudOnly(): boolean {

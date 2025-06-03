@@ -1,5 +1,4 @@
-// Factory for registering and retrieving prompts, similar to ToolFactory
-import { reportClusterUsagePrompt } from "./report-cluster-usage-prompt.js";
+import { reportClusterUsagePrompt } from "@src/confluent/prompts/report-cluster-usage-prompt.js";
 // Import additional prompts here as you add them
 
 export type Prompt = typeof reportClusterUsagePrompt;

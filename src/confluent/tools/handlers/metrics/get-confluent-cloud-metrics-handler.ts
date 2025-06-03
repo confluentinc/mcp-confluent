@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { BaseToolHandler } from "../../base-tools.js";
+import { ClientManager } from "@src/confluent/client-manager.js";
 
 const resourceIdSchema = z.object({
   "resource.kafka.id": z
@@ -19,6 +20,11 @@ const resourceIdSchema = z.object({
 const getConfluentCloudMetricsArguments = z.object({
   resourceIds: resourceIdSchema
     .partial()
+    .default(
+      process.env.KAFKA_CLUSTER_ID
+        ? { "resource.kafka.id": [process.env.KAFKA_CLUSTER_ID] }
+        : {},
+    )
     .refine((obj) => Object.keys(obj).length > 0, {
       message: "At least one resource type must be specified in resourceIds.",
     }),
@@ -41,7 +47,7 @@ export class GetConfluentCloudMetricsHandler extends BaseToolHandler {
   }
 
   async handle(
-    clientManager: unknown,
+    clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<{ content: { type: "text"; text: string }[] }> {
     const args = this.getSchema().parse(toolArguments ?? {});
@@ -67,69 +73,65 @@ export class GetConfluentCloudMetricsHandler extends BaseToolHandler {
   }
 
   private async handleExportEndpoint(
-    clientManager: unknown,
+    clientManager: ClientManager,
     args: { resourceIds?: Record<string, string[] | string> },
   ): Promise<unknown> {
     const { resourceIds } = args;
-    // Only add resource IDs as query params, do not include interval.start or interval.end
-    const searchParams = new URLSearchParams();
-    if (resourceIds && typeof resourceIds === "object") {
-      for (const [key, value] of Object.entries(resourceIds)) {
-        if (Array.isArray(value)) {
-          for (const v of value) {
-            searchParams.append(key, v);
+
+    try {
+      const telemetryClient =
+        clientManager.getConfluentCloudTelemetryRestClient();
+
+      // Build query parameters for the export endpoint
+      const queryParams: Record<string, string | string[]> = {};
+
+      if (resourceIds && typeof resourceIds === "object") {
+        for (const [key, value] of Object.entries(resourceIds)) {
+          if (Array.isArray(value)) {
+            queryParams[key] = value;
+          } else if (typeof value === "string") {
+            queryParams[key] = value;
           }
-        } else if (typeof value === "string") {
-          searchParams.append(key, value);
         }
       }
-    }
-    // @ts-expect-error: config is present on DefaultClientManager
-    const baseUrl = (clientManager as unknown).config.endpoints.telemetry;
-    const url = `${baseUrl}/v2/metrics/cloud/export?${searchParams.toString()}`;
-    logger.info(`[GetConfluentCloudMetricsHandler] Fetching: ${url}`);
-    logger.info(
-      `[GetConfluentCloudMetricsHandler] Headers: Authorization: Basic <redacted>, Accept: application/json, text/plain, */*`,
-    );
-    // @ts-expect-error: config is present on DefaultClientManager
-    const { apiKey, apiSecret } = (clientManager as unknown).config.auth.cloud;
-    const authHeader = `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`;
-    try {
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: authHeader,
-          Accept: "application/json, text/plain, */*",
+
+      // Make request using the telemetry client
+      const response = await telemetryClient.GET(
+        "/v2/metrics/{dataset}/export",
+        {
+          params: {
+            path: {
+              dataset: "cloud",
+            },
+            query: queryParams,
+          },
+          parseAs: "text", // This tells the client to return raw text instead of trying to parse JSON
         },
-      });
-      const data = await response.text();
-      logger.info(
-        `[GetConfluentCloudMetricsHandler] Response: ${data.substring(0, 500)}`,
-      ); // Log first 500 chars for brevity
-      logger.info(
-        `[GetConfluentCloudMetricsHandler] Response status: ${response.status}, OK: ${response.ok}`,
       );
 
-      // Return the raw string data
-      if (!response.ok) {
-        return { error: JSON.stringify(data) };
+      if (response.error) {
+        logger.error(
+          `[GetConfluentCloudMetricsHandler] API Error: ${JSON.stringify(response.error)}`,
+        );
+        return { error: JSON.stringify(response.error) };
       }
 
+      // The response.data will be the raw text (Prometheus/OpenMetrics format)
+      const data = response.data as string;
+
       return this.createResponse(data, false, {
-        status: response.status,
-        headers: response.headers,
+        status: response.response.status,
+        headers: Object.fromEntries(response.response.headers.entries()),
       });
     } catch (error) {
       logger.error(`[GetConfluentCloudMetricsHandler] Error: ${error}`);
       return {
         error: JSON.stringify(
-          JSON.stringify(
-            {
-              error: error instanceof Error ? error.message : String(error),
-            },
-            null,
-            2,
-          ),
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2,
         ),
       };
     }

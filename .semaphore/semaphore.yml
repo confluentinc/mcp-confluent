@@ -1,0 +1,30 @@
+version: v1.0
+name: build
+agent:
+  machine:
+    type: s1-prod-ubuntu24-04-amd64-2
+
+auto_cancel:
+  running:
+    when: "branch != 'main'"
+
+execution_time_limit:
+  hours: 1
+
+queue:
+  - when: "branch != 'main'"
+    processing: parallel
+
+blocks:
+  - name: "resolve dependencies and build"
+    dependencies: []
+    task:
+      prologue:
+        commands:
+          - sem-version node 22
+          - checkout
+      jobs:
+        - name: "build"
+          commands:
+            - npm install 
+            - npm run build

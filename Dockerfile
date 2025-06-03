@@ -1,9 +1,14 @@
 FROM node:22-alpine AS builder
+
 WORKDIR /app
+
 COPY package.json package-lock.json ./
+
 RUN npm ci
+
 COPY tsconfig.json ./
 COPY src/ ./src/
+
 RUN npm run build
 
 # Production stage
@@ -16,7 +21,7 @@ COPY package.json package-lock.json ./
 # Copy the compiled application files
 COPY --from=builder /app/dist ./dist
 
-# Copy the node_modules from the builder (as per the previous successful attempt)
+# Copy the node_modules from the builder
 COPY --from=builder /app/node_modules ./node_modules/
 
 ENV NODE_ENV=production

@@ -4,17 +4,20 @@ services:
     ports:
       - "${HTTP_PORT:-3000}:${HTTP_PORT:-3000}" # Use default 3000 if HTTP_PORT not set in .env
 
+    # keeping the container running
+    stdin_open: true 
+    tty: true 
+
     # Docker Compose will automatically look for a .env file in the same directory
     # You can also explicitly specify it with `env_file: ./.env`
     env_file:
       - .env
-  
+    
     environment:
       # Required variables (with defaults if not in .env)
-      HTTP_HOST: "${HTTP_HOST:-0.0.0.0}" # Default to 0.0.0.0 for container accessibility
-      HTTP_PORT: "${HTTP_PORT:-3000}"    # Default to 3000
-
       # Also hardcode env variables in the docker compose environment section below
+      # HTTP_HOST: "${HTTP_HOST:-0.0.0.0}" # Default to 0.0.0.0 for container accessibility
+      # HTTP_PORT: "${HTTP_PORT:-3000}"    # Default to 3000
       # BOOTSTRAP_SERVERS: "${BOOTSTRAP_SERVERS}"
       # CONFLUENT_CLOUD_API_KEY: "${CONFLUENT_CLOUD_API_KEY}"
       # CONFLUENT_CLOUD_API_SECRET: "${CONFLUENT_CLOUD_API_SECRET}"

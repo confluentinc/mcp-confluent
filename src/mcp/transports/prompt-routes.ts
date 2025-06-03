@@ -2,6 +2,7 @@ import {
   PromptFactory,
   PromptMetadata,
 } from "@src/confluent/prompts/prompt-factory.js";
+import { PromptName } from "@src/confluent/prompts/prompt-name.js";
 import { logger } from "@src/logger.js";
 import { FastifyInstance } from "fastify";
 
@@ -107,9 +108,11 @@ export function registerPromptRoutes(fastify: FastifyInstance): void {
     async (request, reply) => {
       try {
         const { name } = request.params as { name: string };
-        const prompt = PromptFactory.getPrompt(name);
+        const promptHandler = PromptFactory.getPromptHandler(
+          name as PromptName,
+        );
 
-        if (!prompt) {
+        if (!promptHandler) {
           reply.code(404);
           return {
             error: "NOT_FOUND",
@@ -117,10 +120,11 @@ export function registerPromptRoutes(fastify: FastifyInstance): void {
           };
         }
 
+        const config = promptHandler.getPromptConfig();
         return {
-          name: prompt.name,
-          description: prompt.description,
-          arguments: prompt.arguments || [],
+          name: config.name,
+          description: config.description,
+          arguments: config.arguments || [],
         };
       } catch (error) {
         logger.error({ error }, "Error while fetching prompt metadata");

@@ -16,7 +16,6 @@ import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
 import { TransportManager } from "@src/mcp/transports/index.js";
 import { PromptFactory } from "@src/confluent/prompts/prompt-factory.js";
-import { fillTemplate } from "./confluent/helpers.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
 const cliOptions = parseCliArgs();
@@ -143,27 +142,38 @@ async function main() {
       );
     });
 
-    const prompts = PromptFactory.getPrompts();
-    // Register prompts (add this block)
-    prompts.forEach((prompt) => {
-      server.prompt(prompt.name, (args) => {
-        // Remove extra properties (like 'signal') from args before passing to fillTemplate
-        // Convert all values to string for template replacement
-        const inputArgs = Object.fromEntries(
-          Object.entries(args)
-            .filter(([key]) => key !== "signal")
-            .map(([k, v]) => [k, v == null ? "" : String(v)]), // Ensure all values are strings
-        );
+    const promptHandlers = PromptFactory.getPromptHandlers();
+    // Register prompts with proper schema validation
+    promptHandlers.forEach((promptHandler) => {
+      const config = promptHandler.getPromptConfig();
+      const schema = promptHandler.getSchema();
+
+      server.prompt(config.name, config.inputSchema, async (args) => {
+        // Parse and validate arguments using the handler's schema
+        const validatedArgs = schema.parse(args) as Record<string, unknown>;
+
+        // Execute the prompt handler
+        const result = await promptHandler.handle(clientManager, validatedArgs);
+
+        // Convert the handler result to MCP prompt response format
         return {
-          messages: [
-            {
-              role: "user",
-              content: {
-                type: "text",
-                text: fillTemplate(prompt.description, inputArgs),
-              },
-            },
-          ],
+          messages: result.content.map((content) => ({
+            role: "user" as const,
+            content:
+              content.type === "text"
+                ? {
+                    type: "text" as const,
+                    text: content.text || "",
+                  }
+                : {
+                    type: "resource" as const,
+                    resource: {
+                      uri: content.resource!.uri,
+                      text: content.resource!.name,
+                      mimeType: content.resource?.mimeType,
+                    },
+                  },
+          })),
         };
       });
     });

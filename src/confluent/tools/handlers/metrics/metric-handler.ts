@@ -303,26 +303,24 @@ export abstract class MetricHandler extends BaseToolHandler {
     requestBody: unknown,
     postFilter?: (data: unknown) => unknown,
   ): Promise<{ data?: unknown; error?: string }> {
-    // FIXME: ClientManager should expose config in a type-safe way
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const baseUrl = (clientManager as any).config.endpoints.telemetry;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { apiKey, apiSecret } = (clientManager as any).config.auth.cloud;
-    const authHeader = `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`;
+    const telemetryClient = wrapAsPathBasedClient(
+      clientManager.getConfluentCloudTelemetryRestClient(),
+    );
+
     try {
-      const response = await fetch(`${baseUrl}/v2/metrics/query`, {
-        method: "POST",
-        headers: {
-          Authorization: authHeader,
-          Accept: "application/json, text/plain, */*",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
+      const { data, error } = await telemetryClient["/v2/metrics/query"].POST({
+        body: requestBody as QueryRequest,
       });
-      const data = await response.json();
-      if (!response.ok) {
-        return { error: JSON.stringify(data) };
+
+      if (error) {
+        return {
+          error:
+            typeof error === "object" && error.message
+              ? error.message
+              : JSON.stringify(error),
+        };
       }
+
       return { data: postFilter ? postFilter(data) : data };
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) };

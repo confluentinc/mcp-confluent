@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MetricHandler } from "./metric-handler.js";
+import { MetricHandler } from "@src/confluent/tools/handlers/metrics/metric-handler.js";
 import { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ClientManager } from "@src/confluent/client-manager.js";

@@ -1,15 +1,17 @@
 import { z } from "zod";
-import { MetricHandler } from "./metric-handler.js";
+import { MetricHandler } from "@src/confluent/tools/handlers/metrics/metric-handler.js";
 import { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
+import { EnvVar } from "@src/env-schema.js";
+import env from "@src/env.js";
 
 const getPrincipalMetricsArguments = z.object({
   clusterId: z
     .string()
     .describe("The Kafka cluster ID (e.g., lkc-xxxxxx)")
-    .default(process.env.KAFKA_CLUSTER_ID || ""),
+    .default(() => env.KAFKA_CLUSTER_ID || ""),
   metrics: z
     .array(z.string())
     .default([
@@ -53,6 +55,19 @@ export class GetPrincipalMetricsHandler extends MetricHandler {
   getSchema() {
     return getPrincipalMetricsArguments;
   }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return [
+      "CONFLUENT_CLOUD_API_KEY",
+      "CONFLUENT_CLOUD_API_SECRET",
+      "CONFLUENT_CLOUD_TELEMETRY_ENDPOINT",
+    ];
+  }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
+
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.GET_PRINCIPAL_METRICS,
@@ -66,23 +81,18 @@ export class GetPrincipalMetricsHandler extends MetricHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const args = this.getSchema().parse(toolArguments) as Record<
-      string,
-      unknown
-    >;
-    if (args["specificMetric"]) {
-      args["metrics"] = [args["specificMetric"] as string];
-    }
-    let intervalStart = args["intervalStart"] as string | undefined;
-    let intervalEnd = args["intervalEnd"] as string | undefined;
+    const args = this.getSchema().parse(toolArguments);
+    // Override metrics if specificMetric is provided
+    const metrics = args.specificMetric ? [args.specificMetric] : args.metrics;
+    // Use default intervals if not provided
+    let intervalStart = args.intervalStart;
+    let intervalEnd = args.intervalEnd;
     if (!intervalStart || !intervalEnd) {
       const defaultIntervals = this.getDefaultIntervals();
       intervalStart = intervalStart || defaultIntervals.intervalStart;
       intervalEnd = intervalEnd || defaultIntervals.intervalEnd;
     }
-    const principalName = args["principalName"] as string | undefined;
-    const aggregationType = args["aggregationType"] as string | undefined;
-    const limit = args["limit"] as number | undefined;
+    const { principalName, aggregationType, limit } = args;
     const postFilter = principalName
       ? (data: unknown) =>
           typeof data === "object" && data !== null
@@ -103,7 +113,7 @@ export class GetPrincipalMetricsHandler extends MetricHandler {
       : undefined;
     return this.handleMetricsWithFilter(
       clientManager,
-      args,
+      { ...args, metrics },
       aggregationType,
       limit,
       intervalStart,

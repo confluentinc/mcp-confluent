@@ -4,12 +4,14 @@ import { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
+import { EnvVar } from "@src/env-schema.js";
+import env from "@src/env.js";
 
 const getTopicMetricsArguments = z.object({
   clusterId: z
     .string()
     .describe("The Kafka cluster ID (e.g., lkc-xxxxxx)")
-    .default(process.env.KAFKA_CLUSTER_ID || ""),
+    .default(() => env.KAFKA_CLUSTER_ID || ""),
   topicName: z.string().optional(), // Make topicName optional for filtering
   metrics: z
     .array(z.string())
@@ -50,27 +52,38 @@ export class GetTopicMetricsHandler extends MetricHandler {
   getSchema() {
     return getTopicMetricsArguments;
   }
+
+  getRequiredEnvVars(): EnvVar[] {
+    return [
+      "CONFLUENT_CLOUD_API_KEY",
+      "CONFLUENT_CLOUD_API_SECRET",
+      "CONFLUENT_CLOUD_TELEMETRY_ENDPOINT",
+    ];
+  }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
+
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const args = this.getSchema().parse(toolArguments) as Record<
-      string,
-      unknown
-    >;
-    if (args["specificMetric"]) {
-      args["metrics"] = [args["specificMetric"] as string];
-    }
-    let intervalStart = args["intervalStart"] as string | undefined;
-    let intervalEnd = args["intervalEnd"] as string | undefined;
+    const args = this.getSchema().parse(toolArguments);
+
+    // Override metrics if specificMetric is provided
+    const metrics = args.specificMetric ? [args.specificMetric] : args.metrics;
+
+    // Use default intervals if not provided
+    let intervalStart = args.intervalStart;
+    let intervalEnd = args.intervalEnd;
     if (!intervalStart || !intervalEnd) {
       const defaultIntervals = this.getDefaultIntervals();
       intervalStart = intervalStart || defaultIntervals.intervalStart;
       intervalEnd = intervalEnd || defaultIntervals.intervalEnd;
     }
-    const topicName = args["topicName"] as string | undefined;
-    const aggregationType = args["aggregationType"] as string | undefined;
-    const limit = args["limit"] as number | undefined;
+
+    const { topicName, aggregationType, limit } = args;
     const postFilter = topicName
       ? (data: unknown) =>
           typeof data === "object" && data !== null
@@ -91,7 +104,7 @@ export class GetTopicMetricsHandler extends MetricHandler {
       : undefined;
     return this.handleMetricsWithFilter(
       clientManager,
-      args,
+      { ...args, metrics },
       aggregationType,
       limit,
       intervalStart,

@@ -4,13 +4,6 @@ import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { CallToolResult } from "@src/confluent/schema.js";
 
-// Install openapi-typescript
-// npm install openapi-typescript
-
-// Generate types
-// npx openapi-typescript https://raw.githubusercontent.com/confluentinc/api/master/metrics/openapi.yaml -o src/types/telemetry-api.ts
-
-// Then import and use these types
 import { components } from "@src/confluent/tools/handlers/metrics/types/telemetry-api.js";
 
 type QueryRequest = components["schemas"]["QueryRequest"];

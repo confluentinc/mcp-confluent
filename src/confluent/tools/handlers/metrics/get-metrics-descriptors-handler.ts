@@ -8,6 +8,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { components } from "@src/confluent/tools/handlers/metrics/types/telemetry-api.js";
+import { EnvVar } from "@src/env-schema.js";
 
 type ListMetricDescriptorsResponse =
   components["schemas"]["ListMetricDescriptorsResponse"];
@@ -50,6 +51,18 @@ export class GetMetricsDescriptorsHandler extends BaseToolHandler {
     };
   }
 
+  getRequiredEnvVars(): EnvVar[] {
+    return [
+      "CONFLUENT_CLOUD_API_KEY",
+      "CONFLUENT_CLOUD_API_SECRET",
+      "CONFLUENT_CLOUD_TELEMETRY_ENDPOINT",
+    ];
+  }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
+
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
@@ -85,16 +98,12 @@ export class GetMetricsDescriptorsHandler extends BaseToolHandler {
 
       if (error) {
         return this.createResponse(
-          JSON.stringify(
-            {
-              error:
-                typeof error === "object" && error.message
-                  ? error.message
-                  : JSON.stringify(error),
-            },
-            null,
-            2,
-          ),
+          `API Error: ${
+            typeof error === "object" && error.message
+              ? error.message
+              : JSON.stringify(error)
+          }`,
+          true,
         );
       }
 
@@ -105,13 +114,8 @@ export class GetMetricsDescriptorsHandler extends BaseToolHandler {
       return this.createResponse(JSON.stringify(processedData, null, 2));
     } catch (error) {
       return this.createResponse(
-        JSON.stringify(
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2,
-        ),
+        `Error: ${error instanceof Error ? error.message : String(error)}`,
+        true,
       );
     }
   }

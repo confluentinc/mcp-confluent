@@ -26,6 +26,7 @@ An MCP server implementation that enables AI assistants to interact with Conflue
   - [User Guide](#user-guide)
     - [Getting Started](#getting-started)
     - [Configuration](#configuration)
+        [Prequisites for Tableflow commands](#Prerequisites-&-Setup-for-Tableflow-Commands)
     - [Environment Variables Reference](#environment-variables-reference)
     - [Usage](#usage)
     - [Configuring Claude Desktop](#configuring-claude-desktop)
@@ -95,6 +96,19 @@ SCHEMA_REGISTRY_ENDPOINT="https://psrc-zv01y.northamerica-northeast2.gcp.conflue
 ```
 
 </details>
+
+#### Prerequisites & Setup for Tableflow Commands
+
+In order to leverage **Tableflow commands** to interact with your data ecosystem and successfully execute these Tableflow commands and manage resources (e.g., interacting with data storage like AWS S3 and metadata catalogs like AWS Glue), certain **IAM (Identity and Access Management) permissions** and configurations are essential.
+
+It is crucial to set up the necessary roles and policies in your cloud environment (e.g., AWS) and link them correctly within Confluent Cloud. This ensures your Flink SQL cluster, which powers Tableflow, has the required authorization to perform operations on your behalf.
+
+Please refer to the following Confluent Cloud documentation for detailed instructions on setting up these permissions and integrating with custom storage and Glue:
+
+* **Confluent Cloud Tableflow Quick Start with Custom Storage & Glue:**
+    [https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html)
+
+Ensuring these prerequisites are met will prevent authorization errors when the `mcp-server` attempts to provision or manage Tableflow-enabled tables.
 
 ### Environment Variables Reference
 

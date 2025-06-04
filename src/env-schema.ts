@@ -109,7 +109,7 @@ const envSchema = z.object({
   TABLEFLOW_API_SECRET: z
     .string()
     .describe(
-      "Authentication secret paired with TABELFLOW_API_KEY for secure Tableflow access",
+      "Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access",
     )
     .trim()
     .min(1)

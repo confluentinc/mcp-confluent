@@ -101,7 +101,7 @@ const envSchema = z.object({
   TABLEFLOW_API_KEY: z
     .string()
     .describe(
-      "Authentication key for accessing Confluent Cloud's Tabelflow services",
+      "Authentication key for accessing Confluent Cloud's Tableflow services",
     )
     .trim()
     .min(1)

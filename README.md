@@ -123,6 +123,7 @@ Ensuring these prerequisites are met will prevent authorization errors when the 
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------- |
 | HTTP_HOST                     | Host to bind for HTTP transport (string)                                                                                                  | "localhost"   | Yes      |
 | HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 3000          | Yes      |
+| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal) (effects)                                                      | "info"        | Yes      |
 | BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)   |               | No       |
 | CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))   |               | No       |
 | CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))         |               | No       |
@@ -135,10 +136,6 @@ Ensuring these prerequisites are met will prevent authorization errors when the 
 | FLINK_ENV_NAME                | Human-readable name for the Flink environment used for identification and display purposes (string (min: 1))                              |               | No       |
 | FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                            |               | No       |
 | FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                       |               | No       |
-| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                   |
-|                               | No                                                                                                                                        |
-| TABLEFLOW_API_SECRET          | Secret token paired with TABLEFLOW_API_KEY for authenticated access to Confluent Cloud's Tableflow services (string (min:                 |
-| 1))                           |                                                                                                                                           | No            |
 | KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                     |               | No       |
 | KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                          |               | No       |
 | KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                |               | No       |
@@ -147,6 +144,8 @@ Ensuring these prerequisites are met will prevent authorization errors when the 
 | SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                           |               | No       |
 | SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                             |               | No       |
 | SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                       |               | No       |
+| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                   |               | No       |
+| TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                         |               | No       |
 
 ### Usage
 

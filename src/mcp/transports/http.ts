@@ -1,10 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { logger } from "@src/logger.js";
+import { HttpServer } from "@src/mcp/transports/server.js";
+import { Transport } from "@src/mcp/transports/types.js";
 import { randomUUID } from "crypto";
 import { FastifyReply, FastifyRequest } from "fastify";
-import { HttpServer } from "./server.js";
-import { Transport } from "./types.js";
 
 interface McpRequestHeaders {
   "mcp-session-id"?: string;

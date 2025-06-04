@@ -3,6 +3,7 @@ import { Middleware } from "openapi-fetch";
 
 export interface ConfluentEndpoints {
   cloud?: string;
+  tableflow?: string;
   flink?: string;
   schemaRegistry?: string;
   kafka?: string;

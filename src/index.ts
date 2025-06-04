@@ -57,6 +57,10 @@ async function main() {
           apiKey: env.CONFLUENT_CLOUD_API_KEY!,
           apiSecret: env.CONFLUENT_CLOUD_API_SECRET!,
         },
+        tableflow: {
+          apiKey: env.TABLEFLOW_API_KEY!,
+          apiSecret: env.TABLEFLOW_API_SECRET!,
+        },
         flink: {
           apiKey: env.FLINK_API_KEY!,
           apiSecret: env.FLINK_API_SECRET!,
@@ -164,7 +168,7 @@ async function main() {
     process.on("SIGQUIT", performCleanup);
     process.on("SIGUSR2", performCleanup);
   } catch (error) {
-    logger.error({ error }, "Error starting server");
+    logger.error({ err: error }, "Error starting server");
     process.exit(1);
   }
 }

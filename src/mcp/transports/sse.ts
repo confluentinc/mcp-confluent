@@ -1,9 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { logger } from "@src/logger.js";
+import { HttpServer } from "@src/mcp/transports/server.js";
+import { Transport } from "@src/mcp/transports/types.js";
 import { FastifyReply, FastifyRequest } from "fastify";
-import { HttpServer } from "./server.js";
-import { Transport } from "./types.js";
 
 interface SseMessageRequest {
   Querystring: {

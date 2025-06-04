@@ -40,6 +40,9 @@ An MCP server implementation that enables AI assistants to interact with Conflue
   - [Developer Guide](#developer-guide)
     - [Project Structure](#project-structure)
     - [Building and Running](#building-and-running)
+    - [Docker](#docker)
+        [Build & Run in Docker Container](#building-and-running-with-docker)
+        [Build & Run in Docker Compose](#building-and-running-with-docker-compose)
     - [Testing](#testing)
       - [MCP Inspector](#mcp-inspector)
     - [Adding a New Tool](#adding-a-new-tool)
@@ -521,6 +524,88 @@ search-topics-by-tag: List all topics in the Kafka cluster with the specified ta
     ```bash
     npm run start
     ```
+
+
+### Docker
+
+#### Prerequisites
+Before you begin, ensure you have the following installed on your system:
+
+Docker Desktop (or Docker Engine and Docker Compose): https://www.docker.com/products/docker-desktop
+
+##### Environment Variables
+
+The MCP server requires several environment variables to connect to Confluent Cloud and other relevant services. These should be provided in the `.env` file in the root directory of this project. Or you can add them directly in the `docker-compose.yml`
+
+#### Building and Running with Docker
+
+Here's how to build your Docker image and run it in different modes.
+
+1.  **Navigate to your project directory.** Open your terminal or command prompt and change to the directory containing the `Dockerfile`.
+
+    ```bash
+    cd /path/to/repo/mcp-confluent
+    ```
+
+2.  **Build the Docker image.** 
+
+    This command creates the `mcp-server` image based on the `Dockerfile` in the current directory.
+
+    ```bash
+    docker build -t mcp-server .
+    ```
+
+3.  **Run the container as a detached service.** 
+
+    * `-d`: Runs the container in **detached mode** (in the background).
+    * `-p 3000:3000`: **Maps port 3000** on your host machine to port 3000 inside the container. Adjust this if your app listens on a different port.
+    * `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
+
+    ```bash
+    docker run -d -p 3000:3000 --rm mcp-server
+    ```
+
+4.  **Run the container in interactive mode.** Use this for debugging, sending input, or getting a direct terminal into the container. The container will exit once your `dist/index.js` script finishes its execution.
+
+    * `-i`: Keeps **STDIN open** (interactive mode).
+    * `-t`: **Allocates a pseudo-TTY**, which gives you a proper terminal experience.
+    * `--rm`: Automatically removes the container when it exits.
+
+    ```bash
+    docker run -it --rm mcp-server
+    ```
+
+#### Building and Running with Docker Compose
+
+1. **Navigate to the project root:**
+    Open your terminal or command prompt and change to the directory containing Dockerfile and docker-compose.yml.
+
+    ```bash
+    cd /path/to/repo/mcp-confluent
+    ```
+
+2. **Build and run the service:**
+    Docker Compose will build the Docker image (if not already built) and start the mcp-server service.
+
+    ```bash 
+    docker compose up --build
+    ```
+
+    The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
+
+    The server will be accessible on http://localhost:3000 (or the port specified in HTTP_PORT in your .env file).
+
+3. **Stopping the Server**
+    To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
+
+    Alternatively, in a new terminal from the project root, you can run:
+
+    ```bash 
+    docker compose down
+    ```
+
+    This command stops and removes the containers, networks, and volumes created by docker compose up.
+
 
 ### Testing
 

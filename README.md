@@ -41,8 +41,8 @@ An MCP server implementation that enables AI assistants to interact with Conflue
     - [Project Structure](#project-structure)
     - [Building and Running](#building-and-running)
     - [Docker](#docker)
-        [Build & Run in Docker Container](#building-and-running-with-docker)
-        [Build & Run in Docker Compose](#building-and-running-with-docker-compose)
+      - [Build & Run in Docker Container](#building-and-running-with-docker)
+      - [Build & Run in Docker Compose](#building-and-running-with-docker-compose)
     - [Testing](#testing)
       - [MCP Inspector](#mcp-inspector)
     - [Adding a New Tool](#adding-a-new-tool)
@@ -555,24 +555,20 @@ Here's how to build your Docker image and run it in different modes.
     docker build -t mcp-server .
     ```
 
-3.  **Run the container as a detached service.** 
+3.  **Run the container** 
 
+    * `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
+    * `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
     * `-d`: Runs the container in **detached mode** (in the background).
     * `-p 3000:3000`: **Maps port 3000** on your host machine to port 3000 inside the container. Adjust this if your app listens on a different port.
-    * `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
 
     ```bash
-    docker run -d -p 3000:3000 --rm mcp-server
+    docker run --rm -i -d -p 3000:3000 mcp-server
     ```
-
-4.  **Run the container in interactive mode.** Use this for debugging, sending input, or getting a direct terminal into the container. The container will exit once your `dist/index.js` script finishes its execution.
-
-    * `-i`: Keeps **STDIN open** (interactive mode).
-    * `-t`: **Allocates a pseudo-TTY**, which gives you a proper terminal experience.
-    * `--rm`: Automatically removes the container when it exits.
-
+    (Optional)
+    * `-t` **Transport Mode** to enable http transport
     ```bash
-    docker run -it --rm mcp-server
+    docker run --rm -d -p 3000:3000 mcp-server -t http
     ```
 
 #### Building and Running with Docker Compose

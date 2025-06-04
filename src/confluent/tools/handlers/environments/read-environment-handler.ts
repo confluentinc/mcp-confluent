@@ -4,13 +4,16 @@ import {
   BaseToolHandler,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import {
+  Environment,
+  environmentSchema,
+} from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
-import { Environment, environmentSchema } from "./list-environments-handler.js";
 
 const readEnvironmentArguments = z.object({
   baseUrl: z

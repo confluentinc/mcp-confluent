@@ -6,6 +6,8 @@ An MCP server implementation that enables AI assistants to interact with Conflue
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent/badge" alt="mcp-confluent MCP server" />
 </a>
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/confluentinc/mcp-confluent)
+
 ## Demo
 
 ### Goose CLI
@@ -26,7 +28,7 @@ An MCP server implementation that enables AI assistants to interact with Conflue
   - [User Guide](#user-guide)
     - [Getting Started](#getting-started)
     - [Configuration](#configuration)
-        [Prequisites for Tableflow commands](#Prerequisites-&-Setup-for-Tableflow-Commands)
+      - [Prerequisites \& Setup for Tableflow Commands](#prerequisites--setup-for-tableflow-commands)
     - [Environment Variables Reference](#environment-variables-reference)
     - [Usage](#usage)
     - [Configuring Claude Desktop](#configuring-claude-desktop)
@@ -42,8 +44,10 @@ An MCP server implementation that enables AI assistants to interact with Conflue
     - [Project Structure](#project-structure)
     - [Building and Running](#building-and-running)
     - [Docker](#docker)
-      - [Build & Run in Docker Container](#building-and-running-with-docker)
-      - [Build & Run in Docker Compose](#building-and-running-with-docker-compose)
+      - [Prerequisites](#prerequisites)
+        - [Environment Variables](#environment-variables)
+      - [Building and Running with Docker](#building-and-running-with-docker)
+      - [Building and Running with Docker Compose](#building-and-running-with-docker-compose)
     - [Testing](#testing)
       - [MCP Inspector](#mcp-inspector)
     - [Adding a New Tool](#adding-a-new-tool)
@@ -131,10 +135,10 @@ Ensuring these prerequisites are met will prevent authorization errors when the 
 | FLINK_ENV_NAME                | Human-readable name for the Flink environment used for identification and display purposes (string (min: 1))                              |               | No       |
 | FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                            |               | No       |
 | FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                       |               | No       |
-| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))
-|                                              | No       |
-| TABLEFLOW_API_SECRET          | Secret token paired with TABLEFLOW_API_KEY for authenticated access to Confluent Cloud's Tableflow services (string (min:
-1))                            |               | No       |
+| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                   |
+|                               | No                                                                                                                                        |
+| TABLEFLOW_API_SECRET          | Secret token paired with TABLEFLOW_API_KEY for authenticated access to Confluent Cloud's Tableflow services (string (min:                 |
+| 1))                           |                                                                                                                                           | No            |
 | KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                     |               | No       |
 | KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                          |               | No       |
 | KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                |               | No       |

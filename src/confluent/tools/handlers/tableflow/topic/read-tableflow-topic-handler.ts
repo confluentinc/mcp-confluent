@@ -55,11 +55,11 @@ export class ReadTableFlowTopicHandler extends BaseToolHandler {
     );
 
     if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudRestEndpoint(baseUrl);
+      clientManager.setConfluentCloudTableflowEndpoint(baseUrl);
     }
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudRestClient(),
+      clientManager.getConfluentCloudTableflowClient(),
     );
 
     const { data: response, error } = await pathBasedClient[

@@ -57,6 +57,10 @@ async function main() {
           apiKey: env.CONFLUENT_CLOUD_API_KEY!,
           apiSecret: env.CONFLUENT_CLOUD_API_SECRET!,
         },
+        tableflow: {
+          apiKey: env.TABLEFLOW_API_KEY!,
+          apiSecret: env.TABLEFLOW_API_SECRET!,
+        },
         flink: {
           apiKey: env.FLINK_API_KEY!,
           apiSecret: env.FLINK_API_SECRET!,

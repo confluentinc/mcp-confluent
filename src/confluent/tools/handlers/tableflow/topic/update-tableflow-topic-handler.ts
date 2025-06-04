@@ -86,11 +86,11 @@ export class UpdateTableFlowTopicHandler extends BaseToolHandler {
       updateTableflowTopicArguments.parse(toolArguments);
 
     if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudRestEndpoint(baseUrl);
+      clientManager.setConfluentCloudTableflowEndpoint(baseUrl);
     }
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudRestClient(),
+      clientManager.getConfluentCloudTableflowClient(),
     );
 
     const { environment, ...restOfTableflowConfig } = tableflowTopicConfig;

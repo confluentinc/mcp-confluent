@@ -22,8 +22,8 @@ export class ListPromptsHandler extends BaseToolHandler {
 
   async handle(): Promise<CallToolResult> {
     try {
-      const promptMetadata = PromptFactory.getPromptMetadata();
-      const message = JSON.stringify({ prompts: promptMetadata }, null, 2);
+      const promptConfigs = PromptFactory.getPromptConfigsWithArguments();
+      const message = JSON.stringify({ prompts: promptConfigs }, null, 2);
       return this.createResponse(message);
     } catch (error) {
       return this.createResponse(`Error fetching prompts: ${error}`, true);

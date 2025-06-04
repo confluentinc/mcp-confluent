@@ -1,7 +1,4 @@
-import {
-  PromptFactory,
-  PromptMetadata,
-} from "@src/confluent/prompts/prompt-factory.js";
+import { PromptFactory } from "@src/confluent/prompts/prompt-factory.js";
 import { PromptName } from "@src/confluent/prompts/prompt-name.js";
 import { logger } from "@src/logger.js";
 import { FastifyInstance } from "fastify";
@@ -51,9 +48,8 @@ export function registerPromptRoutes(fastify: FastifyInstance): void {
     },
     async () => {
       try {
-        const promptMetadata: PromptMetadata[] =
-          PromptFactory.getPromptMetadata();
-        return { prompts: promptMetadata };
+        const promptConfigs = PromptFactory.getPromptConfigsWithArguments();
+        return { prompts: promptConfigs };
       } catch (error) {
         logger.error({ error }, "Error while fetching prompt metadata");
         throw error;
@@ -121,13 +117,14 @@ export function registerPromptRoutes(fastify: FastifyInstance): void {
         }
 
         const config = promptHandler.getPromptConfig();
-        const metadata = PromptFactory.getPromptMetadata().find(
-          (meta) => meta.name === config.name,
+        const promptConfigs = PromptFactory.getPromptConfigsWithArguments();
+        const configWithArgs = promptConfigs.find(
+          (cfg) => cfg.name === config.name,
         );
         return {
           name: config.name,
           description: config.description,
-          arguments: metadata?.arguments || [],
+          arguments: configWithArgs?.arguments || [],
         };
       } catch (error) {
         logger.error({ error }, "Error while fetching prompt metadata");

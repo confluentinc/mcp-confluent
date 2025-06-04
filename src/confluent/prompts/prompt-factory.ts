@@ -12,25 +12,16 @@ export interface PromptArgument {
   required?: boolean;
 }
 
-export interface PromptMetadata {
-  name: string;
-  description: string;
-  arguments: PromptArgument[];
-}
-
 /**
  * Convert Zod schema to prompt arguments array
  * Similar to how tools generate their arguments from schemas
  */
-function zodSchemaToPromptArguments(schema: z.ZodTypeAny): PromptArgument[] {
-  if (!(schema instanceof z.ZodObject)) {
-    return [];
-  }
-
-  const shape = schema.shape;
+function zodSchemaToPromptArguments(
+  inputSchema: Record<string, z.ZodTypeAny>,
+): PromptArgument[] {
   const args: PromptArgument[] = [];
 
-  for (const [key, fieldSchema] of Object.entries(shape)) {
+  for (const [key, fieldSchema] of Object.entries(inputSchema)) {
     const zodType = fieldSchema as z.ZodTypeAny;
     let description = "";
     let required = true;
@@ -72,14 +63,14 @@ export class PromptFactory {
     );
   }
 
-  public static getPromptMetadata(): PromptMetadata[] {
+  public static getPromptConfigsWithArguments(): Array<
+    PromptConfig & { arguments: PromptArgument[] }
+  > {
     return Array.from(this.promptHandlers.values()).map((handler) => {
       const config = handler.getPromptConfig();
-      const schema = handler.getSchema();
       return {
-        name: config.name,
-        description: config.description,
-        arguments: zodSchemaToPromptArguments(schema),
+        ...config,
+        arguments: zodSchemaToPromptArguments(config.inputSchema),
       };
     });
   }

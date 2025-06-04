@@ -4,15 +4,53 @@ import {
 } from "@src/confluent/prompts/base-prompts.js";
 import { PromptName } from "@src/confluent/prompts/prompt-name.js";
 import { ReportClusterUsagePromptHandler } from "@src/confluent/prompts/handlers/report-cluster-usage-prompt-handler.js";
+import { z } from "zod";
+
+export interface PromptArgument {
+  name: string;
+  description: string;
+  required?: boolean;
+}
 
 export interface PromptMetadata {
   name: string;
   description: string;
-  arguments: {
-    name: string;
-    description: string;
-    required?: boolean;
-  }[];
+  arguments: PromptArgument[];
+}
+
+/**
+ * Convert Zod schema to prompt arguments array
+ * Similar to how tools generate their arguments from schemas
+ */
+function zodSchemaToPromptArguments(schema: z.ZodTypeAny): PromptArgument[] {
+  if (!(schema instanceof z.ZodObject)) {
+    return [];
+  }
+
+  const shape = schema.shape;
+  const args: PromptArgument[] = [];
+
+  for (const [key, fieldSchema] of Object.entries(shape)) {
+    const zodType = fieldSchema as z.ZodTypeAny;
+    let description = "";
+    let required = true;
+
+    // Extract description and required status
+    if (zodType._def?.description) {
+      description = zodType._def.description;
+    }
+    if (zodType instanceof z.ZodOptional) {
+      required = false;
+    }
+
+    args.push({
+      name: key,
+      description,
+      required,
+    });
+  }
+
+  return args;
 }
 
 export class PromptFactory {
@@ -37,10 +75,11 @@ export class PromptFactory {
   public static getPromptMetadata(): PromptMetadata[] {
     return Array.from(this.promptHandlers.values()).map((handler) => {
       const config = handler.getPromptConfig();
+      const schema = handler.getSchema();
       return {
         name: config.name,
         description: config.description,
-        arguments: config.arguments || [],
+        arguments: zodSchemaToPromptArguments(schema),
       };
     });
   }

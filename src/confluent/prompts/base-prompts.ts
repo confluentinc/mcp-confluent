@@ -51,13 +51,6 @@ export interface PromptConfig {
   name: PromptName;
   description: string;
   inputSchema: ZodRawShape;
-  arguments: PromptArgument[];
-}
-
-export interface PromptArgument {
-  name: string;
-  description: string;
-  required?: boolean;
 }
 
 export interface PromptResult {

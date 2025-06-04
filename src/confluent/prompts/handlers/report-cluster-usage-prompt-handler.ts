@@ -7,12 +7,15 @@ import { PromptName } from "@src/confluent/prompts/prompt-name.js";
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { PromptResult } from "@src/confluent/prompts/base-prompts.js";
 import { EnvVar } from "@src/env-schema.js";
+import env from "@src/env.js";
 
 const reportClusterUsageArguments = z.object({
   clusterId: z
     .string()
-    .describe("The Kafka cluster ID (e.g., lkc-xxxxxx)")
-    .default(process.env.KAFKA_CLUSTER_ID || ""),
+    .optional()
+    .describe(
+      "The Kafka cluster ID (e.g., lkc-xxxxxx). If not provided, will use KAFKA_CLUSTER_ID environment variable.",
+    ),
 });
 
 export class ReportClusterUsagePromptHandler extends BasePromptHandler {
@@ -38,13 +41,6 @@ export class ReportClusterUsagePromptHandler extends BasePromptHandler {
         "If you need more data to solve this task, use the get-principal-metrics tool to get the metrics grouped by principal. " +
         "7. Report for unused resources, like inactive topics, where inactive topics means no received data or not consumed data from the topic",
       inputSchema: reportClusterUsageArguments.shape,
-      arguments: [
-        {
-          name: "clusterId",
-          description: "The Kafka cluster ID (e.g., lkc-xxxxxx)",
-          required: true,
-        },
-      ],
     };
   }
 
@@ -65,7 +61,16 @@ export class ReportClusterUsagePromptHandler extends BasePromptHandler {
     promptArguments: Record<string, unknown> | undefined,
   ): Promise<PromptResult> {
     const args = this.getSchema().parse(promptArguments ?? {});
-    const { clusterId } = args;
+
+    // Use provided clusterId or fall back to environment variable
+    const clusterId = args.clusterId || env.KAFKA_CLUSTER_ID || "";
+
+    if (!clusterId) {
+      return this.createResponse(
+        "Error: No cluster ID provided and KAFKA_CLUSTER_ID environment variable is not set.",
+        true,
+      );
+    }
 
     // This is a template prompt that provides instructions for the AI assistant
     // The actual analysis will be performed by the AI using the available tools

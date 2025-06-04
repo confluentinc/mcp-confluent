@@ -121,10 +121,13 @@ export function registerPromptRoutes(fastify: FastifyInstance): void {
         }
 
         const config = promptHandler.getPromptConfig();
+        const metadata = PromptFactory.getPromptMetadata().find(
+          (meta) => meta.name === config.name,
+        );
         return {
           name: config.name,
           description: config.description,
-          arguments: config.arguments || [],
+          arguments: metadata?.arguments || [],
         };
       } catch (error) {
         logger.error({ error }, "Error while fetching prompt metadata");

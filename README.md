@@ -40,6 +40,9 @@ An MCP server implementation that enables AI assistants to interact with Conflue
   - [Developer Guide](#developer-guide)
     - [Project Structure](#project-structure)
     - [Building and Running](#building-and-running)
+    - [Docker](#docker)
+        [Build & Run in Docker Container](#building-and-running-with-docker)
+        [Build & Run in Docker Compose](#building-and-running-with-docker-compose)
     - [Testing](#testing)
       - [MCP Inspector](#mcp-inspector)
     - [Adding a New Tool](#adding-a-new-tool)
@@ -523,7 +526,7 @@ search-topics-by-tag: List all topics in the Kafka cluster with the specified ta
     ```
 
 
-### **Run in Docker**
+### Docker
 
 #### Prerequisites
 Before you begin, ensure you have the following installed on your system:

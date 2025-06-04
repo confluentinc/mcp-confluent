@@ -26,5 +26,5 @@ blocks:
       jobs:
         - name: "build"
           commands:
-            - npm install 
+            - npm ci 
             - npm run build

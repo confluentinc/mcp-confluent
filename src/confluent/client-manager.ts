@@ -39,7 +39,7 @@ export interface ConfluentCloudRestClientManager {
   /** Gets a configured REST client for general Confluent Cloud operations */
   getConfluentCloudRestClient(): Client<paths, `${string}/${string}`>;
   /** Gets a configured REST client for Tableflow operations */
-  getConfluentCloudTableflowClient(): Client<paths, `${string}/${string}`>;
+  getConfluentCloudTableflowRestClient(): Client<paths, `${string}/${string}`>;
   /** Gets a configured REST client for Confluent Cloud Schema Registry operations */
   getConfluentCloudSchemaRegistryRestClient(): Client<
     paths,
@@ -52,7 +52,7 @@ export interface ConfluentCloudRestClientManager {
   setConfluentCloudFlinkEndpoint(endpoint: string): void;
   setConfluentCloudSchemaRegistryEndpoint(endpoint: string): void;
   setConfluentCloudKafkaRestEndpoint(endpoint: string): void;
-  setConfluentCloudTableflowEndpoint(endpoint: string): void;
+  setConfluentCloudTableflowRestEndpoint(endpoint: string): void;
 }
 
 /**
@@ -103,7 +103,7 @@ export class DefaultClientManager
   private readonly confluentCloudRestClient: Lazy<
     Client<paths, `${string}/${string}`>
   >;
-  private readonly confluentCloudTableflowClient: Lazy<
+  private readonly confluentCloudTableflowRestClient: Lazy<
     Client<paths, `${string}/${string}`>
   >;
   private readonly confluentCloudSchemaRegistryRestClient: Lazy<
@@ -120,7 +120,7 @@ export class DefaultClientManager
    */
   constructor(config: ClientManagerConfig) {
     this.confluentCloudBaseUrl = config.endpoints.cloud;
-    this.confluentCloudTableflowBaseUrl = config.endpoints.cloud; // Uses the same confluent cloud base url (for now)
+    this.confluentCloudTableflowBaseUrl = config.endpoints.cloud; // at the time of writing, apis are exposed on the same base url as confluent cloud
     this.confluentCloudFlinkBaseUrl = config.endpoints.flink;
     this.confluentCloudSchemaRegistryBaseUrl = config.endpoints.schemaRegistry;
     this.confluentCloudKafkaRestBaseUrl = config.endpoints.kafka;
@@ -170,12 +170,14 @@ export class DefaultClientManager
       return client;
     });
 
-    this.confluentCloudTableflowClient = new Lazy(() => {
+    this.confluentCloudTableflowRestClient = new Lazy(() => {
       if (!this.confluentCloudTableflowBaseUrl) {
-        throw new Error("Confluent Cloud Tableflow endpoint not configured");
+        throw new Error(
+          "Confluent Cloud Tableflow REST endpoint not configured",
+        );
       }
       logger.info(
-        `Initializing Confluent Cloud Tableflow client for base URL ${this.confluentCloudTableflowBaseUrl}`,
+        `Initializing Confluent Cloud Tableflow REST client for base URL ${this.confluentCloudTableflowBaseUrl}`,
       );
       const client = createClient<paths>({
         baseUrl: this.confluentCloudTableflowBaseUrl,
@@ -272,8 +274,8 @@ export class DefaultClientManager
     this.confluentCloudBaseUrl = endpoint;
   }
 
-  setConfluentCloudTableflowEndpoint(endpoint: string): void {
-    this.confluentCloudTableflowClient.close();
+  setConfluentCloudTableflowRestEndpoint(endpoint: string): void {
+    this.confluentCloudTableflowRestClient.close();
     this.confluentCloudTableflowBaseUrl = endpoint;
   }
 
@@ -306,8 +308,8 @@ export class DefaultClientManager
   }
 
   /** @inheritdoc */
-  getConfluentCloudTableflowClient(): Client<paths, `${string}/${string}`> {
-    return this.confluentCloudTableflowClient.get();
+  getConfluentCloudTableflowRestClient(): Client<paths, `${string}/${string}`> {
+    return this.confluentCloudTableflowRestClient.get();
   }
 
   /** @inheritdoc */

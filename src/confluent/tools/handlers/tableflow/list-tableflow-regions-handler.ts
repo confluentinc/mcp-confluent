@@ -46,11 +46,11 @@ export class ListTableFlowRegionsHandler extends BaseToolHandler {
       listTableFlowRegionsArguments.parse(toolArguments);
 
     if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudTableflowEndpoint(baseUrl);
+      clientManager.setConfluentCloudTableflowRestEndpoint(baseUrl);
     }
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudTableflowClient(),
+      clientManager.getConfluentCloudTableflowRestClient(),
     );
 
     const { data: response, error } = await pathBasedClient[

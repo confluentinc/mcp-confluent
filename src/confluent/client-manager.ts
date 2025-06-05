@@ -13,6 +13,7 @@ import { paths } from "@src/confluent/openapi-schema.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
 import { kafkaLogger, logger } from "@src/logger.js";
 import createClient, { Client } from "openapi-fetch";
+import { paths as telemetryPaths } from "@src/confluent/tools/handlers/metrics/types/telemetry-api.js";
 
 /**
  * Interface for managing Kafka client connections and operations.
@@ -48,10 +49,17 @@ export interface ConfluentCloudRestClientManager {
   /** Gets a configured REST client for Confluent Cloud Kafka operations */
   getConfluentCloudKafkaRestClient(): Client<paths, `${string}/${string}`>;
 
+  /** Gets a configured REST client for Confluent Cloud Telemetry Metrics API */
+  getConfluentCloudTelemetryRestClient(): Client<
+    telemetryPaths,
+    `${string}/${string}`
+  >;
+
   setConfluentCloudRestEndpoint(endpoint: string): void;
   setConfluentCloudFlinkEndpoint(endpoint: string): void;
   setConfluentCloudSchemaRegistryEndpoint(endpoint: string): void;
   setConfluentCloudKafkaRestEndpoint(endpoint: string): void;
+  setConfluentCloudTelemetryEndpoint(endpoint: string): void;
   setConfluentCloudTableflowRestEndpoint(endpoint: string): void;
 }
 
@@ -93,6 +101,7 @@ export class DefaultClientManager
   private confluentCloudFlinkBaseUrl: string | undefined;
   private confluentCloudSchemaRegistryBaseUrl: string | undefined;
   private confluentCloudKafkaRestBaseUrl: string | undefined;
+  private confluentCloudTelemetryBaseUrl: string | undefined;
   private readonly kafkaConfig: GlobalConfig;
   private readonly kafkaClient: Lazy<KafkaJS.Kafka>;
   private readonly adminClient: AsyncLazy<KafkaJS.Admin>;
@@ -114,16 +123,23 @@ export class DefaultClientManager
   >;
   private readonly schemaRegistryClient: Lazy<SchemaRegistryClient>;
 
+  private readonly confluentCloudTelemetryRestClient: Lazy<
+    Client<telemetryPaths, `${string}/${string}`>
+  >;
+  // Store the config for access by tool handlers that need auth details
+  public readonly config: ClientManagerConfig;
   /**
    * Creates a new DefaultClientManager instance.
    * @param config - Configuration for all clients
    */
   constructor(config: ClientManagerConfig) {
+    this.config = config;
     this.confluentCloudBaseUrl = config.endpoints.cloud;
     this.confluentCloudTableflowBaseUrl = config.endpoints.cloud; // at the time of writing, apis are exposed on the same base url as confluent cloud
     this.confluentCloudFlinkBaseUrl = config.endpoints.flink;
     this.confluentCloudSchemaRegistryBaseUrl = config.endpoints.schemaRegistry;
     this.confluentCloudKafkaRestBaseUrl = config.endpoints.kafka;
+    this.confluentCloudTelemetryBaseUrl = config.endpoints.telemetry;
 
     this.kafkaConfig = config.kafka;
     this.kafkaClient = new Lazy(
@@ -243,6 +259,17 @@ export class DefaultClientManager
         },
       });
     });
+
+    this.confluentCloudTelemetryRestClient = new Lazy(() => {
+      logger.info(
+        `Initializing Confluent Cloud Telemetry REST client for base URL ${this.confluentCloudTelemetryBaseUrl}`,
+      );
+      const client = createClient<telemetryPaths>({
+        baseUrl: this.confluentCloudTelemetryBaseUrl,
+      });
+      client.use(createAuthMiddleware(config.auth.cloud));
+      return client;
+    });
   }
 
   /** @inheritdoc */
@@ -290,6 +317,10 @@ export class DefaultClientManager
   setConfluentCloudKafkaRestEndpoint(endpoint: string): void {
     this.confluentCloudKafkaRestClient.close();
     this.confluentCloudKafkaRestBaseUrl = endpoint;
+  }
+  setConfluentCloudTelemetryEndpoint(endpoint: string): void {
+    this.confluentCloudTelemetryRestClient.close();
+    this.confluentCloudTelemetryBaseUrl = endpoint;
   }
 
   /** @inheritdoc */
@@ -345,5 +376,13 @@ export class DefaultClientManager
   /** @inheritdoc */
   getSchemaRegistryClient(): SchemaRegistryClient {
     return this.schemaRegistryClient.get();
+  }
+
+  /** @inheritdoc */
+  getConfluentCloudTelemetryRestClient(): Client<
+    telemetryPaths,
+    `${string}/${string}`
+  > {
+    return this.confluentCloudTelemetryRestClient.get();
   }
 }

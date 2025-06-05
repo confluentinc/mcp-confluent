@@ -98,6 +98,20 @@ const envSchema = z.object({
     .trim()
     .min(1)
     .optional(),
+  CONFLUENT_CLOUD_REST_ENDPOINT: z
+    .string()
+    .describe("Base URL for Confluent Cloud's REST API services")
+    .trim()
+    .url()
+    .default("https://api.confluent.cloud"),
+  CONFLUENT_CLOUD_TELEMETRY_ENDPOINT: z
+    .string()
+    .describe(
+      "Base URL for Confluent Cloud's Telemetry API services used for metrics and monitoring",
+    )
+    .trim()
+    .url()
+    .default("https://api.telemetry.confluent.cloud"),
   TABLEFLOW_API_KEY: z
     .string()
     .describe(
@@ -175,12 +189,6 @@ const configSchema = z
       )
       .trim()
       .startsWith("env-"),
-    CONFLUENT_CLOUD_REST_ENDPOINT: z
-      .string()
-      .describe("Base URL for Confluent Cloud's REST API services")
-      .trim()
-      .url()
-      .default("https://api.confluent.cloud"),
     SCHEMA_REGISTRY_ENDPOINT: z
       .string()
       .describe(

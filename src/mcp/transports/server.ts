@@ -7,6 +7,7 @@ import {
   FastifyBaseLogger,
   FastifyInstance,
 } from "fastify";
+import { registerPromptRoutes } from "@src/mcp/transports/prompt-routes.js";
 
 export class HttpServer {
   private fastify: FastifyInstance;
@@ -62,7 +63,8 @@ export class HttpServer {
       },
       staticCSP: true,
     });
-
+    // Register the prompt routes
+    registerPromptRoutes(this.fastify);
     this.isSwaggerConfigured = true;
   }
 

@@ -37,6 +37,11 @@ import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tablef
 import { ReadTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/read-tableflow-topic-handler.js";
 import { UpdateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/update-tableflow-topic-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { GetTopicMetricsHandler } from "@src/confluent/tools/handlers/metrics/get-topic-metrics-handler.js";
+import { GetPrincipalMetricsHandler } from "@src/confluent/tools/handlers/metrics/get-principal-metrics-handler.js";
+import { GetConfluentCloudMetricsHandler } from "@src/confluent/tools/handlers/metrics/get-confluent-cloud-metrics-handler.js";
+import { GetMetricsDescriptorsHandler } from "@src/confluent/tools/handlers/metrics/get-metrics-descriptors-handler.js";
+import { ListPromptsHandler } from "@src/confluent/tools/handlers/prompts/list-prompts-handler.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
@@ -92,6 +97,14 @@ export class ToolFactory {
       ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
       new DeleteTableFlowCatalogIntegrationHandler(),
     ],
+    [ToolName.GET_TOPIC_METRICS, new GetTopicMetricsHandler()],
+    [ToolName.GET_PRINCIPAL_METRICS, new GetPrincipalMetricsHandler()],
+    [
+      ToolName.GET_CONFLUENT_CLOUD_METRICS,
+      new GetConfluentCloudMetricsHandler(),
+    ],
+    [ToolName.GET_METRICS_DESCRIPTORS, new GetMetricsDescriptorsHandler()],
+    [ToolName.LIST_PROMPTS, new ListPromptsHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

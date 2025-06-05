@@ -6,6 +6,8 @@ An MCP server implementation that enables AI assistants to interact with Conflue
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent/badge" alt="mcp-confluent MCP server" />
 </a>
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/confluentinc/mcp-confluent)
+
 ## Demo
 
 ### Goose CLI
@@ -26,6 +28,7 @@ An MCP server implementation that enables AI assistants to interact with Conflue
   - [User Guide](#user-guide)
     - [Getting Started](#getting-started)
     - [Configuration](#configuration)
+      - [Prerequisites \& Setup for Tableflow Commands](#prerequisites--setup-for-tableflow-commands)
     - [Environment Variables Reference](#environment-variables-reference)
     - [Usage](#usage)
     - [Configuring Claude Desktop](#configuring-claude-desktop)
@@ -40,6 +43,11 @@ An MCP server implementation that enables AI assistants to interact with Conflue
   - [Developer Guide](#developer-guide)
     - [Project Structure](#project-structure)
     - [Building and Running](#building-and-running)
+    - [Docker](#docker)
+      - [Prerequisites](#prerequisites)
+        - [Environment Variables](#environment-variables)
+      - [Building and Running with Docker](#building-and-running-with-docker)
+      - [Building and Running with Docker Compose](#building-and-running-with-docker-compose)
     - [Testing](#testing)
       - [MCP Inspector](#mcp-inspector)
     - [Adding a New Tool](#adding-a-new-tool)
@@ -84,6 +92,8 @@ FLINK_DATABASE_NAME=""
 FLINK_API_KEY=""
 FLINK_API_SECRET=""
 FLINK_COMPUTE_POOL_ID="lfcp-..."
+TABLEFLOW_API_KEY=""
+TABLEFLOW_API_SECRET=""
 CONFLUENT_CLOUD_API_KEY=""
 CONFLUENT_CLOUD_API_SECRET=""
 CONFLUENT_CLOUD_REST_ENDPOINT="https://api.confluent.cloud"
@@ -95,12 +105,26 @@ CONFLUENT_CLOUD_TELEMETRY_ENDPOINT="https://api.telemetry.confluent.cloud"
 
 </details>
 
+#### Prerequisites & Setup for Tableflow Commands
+
+In order to leverage **Tableflow commands** to interact with your data ecosystem and successfully execute these Tableflow commands and manage resources (e.g., interacting with data storage like AWS S3 and metadata catalogs like AWS Glue), certain **IAM (Identity and Access Management) permissions** and configurations are essential.
+
+It is crucial to set up the necessary roles and policies in your cloud environment (e.g., AWS) and link them correctly within Confluent Cloud. This ensures your Flink SQL cluster, which powers Tableflow, has the required authorization to perform operations on your behalf.
+
+Please refer to the following Confluent Cloud documentation for detailed instructions on setting up these permissions and integrating with custom storage and Glue:
+
+* **Confluent Cloud Tableflow Quick Start with Custom Storage & Glue:**
+    [https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html)
+
+Ensuring these prerequisites are met will prevent authorization errors when the `mcp-server` attempts to provision or manage Tableflow-enabled tables.
+
 ### Environment Variables Reference
 
 | Variable                      | Description                                                                                                                               | Default Value | Required |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------- |
 | HTTP_HOST                     | Host to bind for HTTP transport (string)                                                                                                  | "localhost"   | Yes      |
 | HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 3000          | Yes      |
+| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal) (effects)                                                      | "info"        | Yes      |
 | BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)   |               | No       |
 | CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))   |               | No       |
 | CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))         |               | No       |
@@ -121,9 +145,8 @@ CONFLUENT_CLOUD_TELEMETRY_ENDPOINT="https://api.telemetry.confluent.cloud"
 | SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                           |               | No       |
 | SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                             |               | No       |
 | SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                       |               | No       |
-| CONFLUENT_CLOUD_TELEMETRY_ENDPOINT | Endpoint for Confluent Cloud telemetry data collection (string)                                                                     |               | No       |
-
-Telemetry API requires the service account to be `MetricsViewer` in Confluent Cloud.  This is used to collect usage metrics for the MCP server.
+| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                   |               | No       |
+| TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                         |               | No       |
 
 ### Usage
 
@@ -344,6 +367,17 @@ npx @confluentinc/mcp-confluent -e .env --allow-tools produce-message,consume-me
 {"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment disabled due to allow/block list rules"}
 {"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas disabled due to allow/block list rules"}
 {"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool create-tableflow-topic disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool list-tableflow-regions disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool list-tableflow-topics disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool read-tableflow-topic disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool update-tableflow-topic disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool delete-tableflow-topic disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool create-tableflow-catalog-integration disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool list-tableflow-catalog-integrations disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool read-tableflow-catalog-integration disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool update-tableflow-catalog-integration disabled due to allow/block list rules"}
+{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool delete-tableflow-catalog-integration disabled due to allow/block list rules"}
 {"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio on localhost:3000"}
 {"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
 {"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
@@ -387,6 +421,17 @@ npx @confluentinc/mcp-confluent -e .env --block-tools produce-message,consume-me
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-regions enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-topics enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-catalog-integrations enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-catalog-integration enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
@@ -430,6 +475,17 @@ npx -y @confluentinc/mcp-confluent -e .env --allow-tools-file allow.txt --block-
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-regions enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-topics enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-topic enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-catalog-integrations enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-catalog-integration enabled"}
+{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-catalog-integration enabled"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
 {"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
@@ -473,6 +529,18 @@ read-flink-statement: Make a request to read a statement and its results
 remove-tag-from-entity: Remove tag from an entity in Confluent Cloud.
 search-topics-by-name: List all topics in the Kafka cluster matching the specified name.
 search-topics-by-tag: List all topics in the Kafka cluster with the specified tag.
+create-tableflow-topic: Make a request to create a tableflow topic.
+create-tableflow-topic: Make a request to create a tableflow topic.
+list-tableflow-regions: Retrieve a sorted, filtered, paginated list of all tableflow regions.
+list-tableflow-topics: Retrieve a sorted, filtered, paginated list of all tableflow topics.
+read-tableflow-topic: Make a request to read a tableflow topic.
+update-tableflow-topic: Make a request to update a tableflow topic.
+delete-tableflow-topic: Make a request to delete a tableflow topic.
+create-tableflow-catalog-integration: Make a request to create a catalog integration.
+list-tableflow-catalog-integrations: Retrieve a sorted, filtered, paginated list of all catalog integrations.
+read-tableflow-catalog-integration: Make a request to read a catalog integration.
+update-tableflow-catalog-integration: Make a request to update a catalog integration.
+delete-tableflow-catalog-integration: Make a request to delete a tableflow catalog integration.
 ```
 
 </details>
@@ -525,6 +593,84 @@ search-topics-by-tag: List all topics in the Kafka cluster with the specified ta
     ```bash
     npm run start
     ```
+
+
+### Docker
+
+#### Prerequisites
+Before you begin, ensure you have the following installed on your system:
+
+Docker Desktop (or Docker Engine and Docker Compose): https://www.docker.com/products/docker-desktop
+
+##### Environment Variables
+
+The MCP server requires several environment variables to connect to Confluent Cloud and other relevant services. These should be provided in the `.env` file in the root directory of this project. Or you can add them directly in the `docker-compose.yml`
+
+#### Building and Running with Docker
+
+Here's how to build your Docker image and run it in different modes.
+
+1.  **Navigate to your project directory.** Open your terminal or command prompt and change to the directory containing the `Dockerfile`.
+
+    ```bash
+    cd /path/to/repo/mcp-confluent
+    ```
+
+2.  **Build the Docker image.** 
+
+    This command creates the `mcp-server` image based on the `Dockerfile` in the current directory.
+
+    ```bash
+    docker build -t mcp-server .
+    ```
+
+3.  **Run the container** 
+
+    * `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
+    * `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
+    * `-d`: Runs the container in **detached mode** (in the background).
+    * `-p 3000:3000`: **Maps port 3000** on your host machine to port 3000 inside the container. Adjust this if your app listens on a different port.
+
+    ```bash
+    docker run --rm -i -d -p 3000:3000 mcp-server
+    ```
+    (Optional)
+    * `-t` **Transport Mode** to enable http transport
+    ```bash
+    docker run --rm -d -p 3000:3000 mcp-server -t http
+    ```
+
+#### Building and Running with Docker Compose
+
+1. **Navigate to the project root:**
+    Open your terminal or command prompt and change to the directory containing Dockerfile and docker-compose.yml.
+
+    ```bash
+    cd /path/to/repo/mcp-confluent
+    ```
+
+2. **Build and run the service:**
+    Docker Compose will build the Docker image (if not already built) and start the mcp-server service.
+
+    ```bash 
+    docker compose up --build
+    ```
+
+    The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
+
+    The server will be accessible on http://localhost:3000 (or the port specified in HTTP_PORT in your .env file).
+
+3. **Stopping the Server**
+    To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
+
+    Alternatively, in a new terminal from the project root, you can run:
+
+    ```bash 
+    docker compose down
+    ```
+
+    This command stops and removes the containers, networks, and volumes created by docker compose up.
+
 
 ### Testing
 

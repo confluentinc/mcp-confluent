@@ -152,6 +152,9 @@ async function main() {
       cliOptions.transports,
       env.HTTP_PORT,
       env.HTTP_HOST,
+      env.HTTP_MCP_ENDPOINT_PATH,
+      env.SSE_MCP_ENDPOINT_PATH,
+      env.SSE_MCP_MESSAGE_ENDPOINT_PATH,
     );
 
     // Set up cleanup handlers

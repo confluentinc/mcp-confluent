@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { logger } from "@src/logger.js";
+import { pingHandler, pingResponseSchema } from "@src/mcp/transports/ping.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
 import { Transport } from "@src/mcp/transports/types.js";
 import { FastifyReply, FastifyRequest } from "fastify";
@@ -25,6 +26,8 @@ export class SseTransport implements Transport {
   constructor(
     private server: McpServer,
     private httpServer: HttpServer,
+    private sseMcpEndpointPath: string = "/sse",
+    private sseMcpMessageEndpointPath: string = "/messages",
   ) {}
 
   async connect(): Promise<void> {
@@ -32,7 +35,7 @@ export class SseTransport implements Transport {
 
     // SSE endpoint for establishing SSE connection
     fastify.get(
-      "/sse",
+      this.sseMcpEndpointPath,
       {
         schema: {
           tags: ["mcp"],
@@ -45,7 +48,10 @@ export class SseTransport implements Transport {
       async (request: FastifyRequest, reply: FastifyReply) => {
         try {
           // Create transport with the correct message endpoint
-          const transport = new SSEServerTransport("/messages", reply.raw);
+          const transport = new SSEServerTransport(
+            this.sseMcpMessageEndpointPath,
+            reply.raw,
+          );
 
           // Get the session ID from the transport
           const sessionId = transport.sessionId;
@@ -81,7 +87,7 @@ export class SseTransport implements Transport {
 
     // Message endpoint for receiving messages from clients
     fastify.post(
-      "/messages",
+      this.sseMcpMessageEndpointPath,
       {
         schema: {
           tags: ["mcp"],
@@ -130,6 +136,36 @@ export class SseTransport implements Transport {
           }
         }
       },
+    );
+
+    // GET ping endpoint for health checks
+    fastify.get(
+      "/ping",
+      {
+        schema: {
+          tags: ["health"],
+          summary: "Health check endpoint",
+          response: {
+            200: pingResponseSchema,
+          },
+        },
+      },
+      pingHandler("sse"),
+    );
+
+    // POST ping endpoint for health checks
+    fastify.post(
+      "/ping",
+      {
+        schema: {
+          tags: ["health"],
+          summary: "Health check endpoint (POST)",
+          response: {
+            200: pingResponseSchema,
+          },
+        },
+      },
+      pingHandler("sse"),
     );
 
     logger.info("SSE transport routes registered");

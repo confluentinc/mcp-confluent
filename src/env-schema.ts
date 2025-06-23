@@ -18,7 +18,7 @@ const envSchema = z.object({
     .describe(
       "HTTP endpoint path for MCP transport (e.g., '/mcp', '/invocations')",
     )
-    .default("/mcp"),
+    .default("/invocations"),
   SSE_MCP_ENDPOINT_PATH: z
     .string()
     .describe(

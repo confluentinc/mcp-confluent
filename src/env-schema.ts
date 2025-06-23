@@ -8,11 +8,29 @@ const envSchema = z.object({
     .int()
     .positive()
     .describe("Port to use for HTTP transport")
-    .default(3000),
+    .default(8080),
   HTTP_HOST: z
     .string()
     .describe("Host to bind for HTTP transport")
     .default("localhost"),
+  HTTP_MCP_ENDPOINT_PATH: z
+    .string()
+    .describe(
+      "HTTP endpoint path for MCP transport (e.g., '/mcp', '/invocations')",
+    )
+    .default("/mcp"),
+  SSE_MCP_ENDPOINT_PATH: z
+    .string()
+    .describe(
+      "SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events')",
+    )
+    .default("/sse"),
+  SSE_MCP_MESSAGE_ENDPOINT_PATH: z
+    .string()
+    .describe(
+      "SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages')",
+    )
+    .default("/messages"),
   LOG_LEVEL: z
     .preprocess(
       (val) => (typeof val === "string" ? val.toLowerCase() : val),

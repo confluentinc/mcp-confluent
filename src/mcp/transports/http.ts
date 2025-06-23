@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { logger } from "@src/logger.js";
+import { pingHandler, pingResponseSchema } from "@src/mcp/transports/ping.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
 import { Transport } from "@src/mcp/transports/types.js";
 import { randomUUID } from "crypto";
@@ -30,6 +31,7 @@ export class HttpTransport implements Transport {
   constructor(
     private server: McpServer,
     private httpServer: HttpServer,
+    private httpMcpEndpointPath: string = "/mcp",
   ) {}
 
   async connect(): Promise<void> {
@@ -37,7 +39,7 @@ export class HttpTransport implements Transport {
 
     // POST handler for new sessions and message sending
     fastify.post(
-      "/mcp",
+      this.httpMcpEndpointPath,
       {
         schema: {
           tags: ["mcp"],
@@ -80,7 +82,7 @@ export class HttpTransport implements Transport {
 
     // GET handler for session status and message receiving
     fastify.get(
-      "/mcp",
+      this.httpMcpEndpointPath,
       {
         schema: {
           tags: ["mcp"],
@@ -115,7 +117,7 @@ export class HttpTransport implements Transport {
 
     // DELETE handler for session cleanup
     fastify.delete(
-      "/mcp",
+      this.httpMcpEndpointPath,
       {
         schema: {
           tags: ["mcp"],
@@ -148,6 +150,36 @@ export class HttpTransport implements Transport {
         // Clean up the session
         delete this.sessions[sessionId];
       },
+    );
+
+    // GET ping endpoint for health checks
+    fastify.get(
+      "/ping",
+      {
+        schema: {
+          tags: ["health"],
+          summary: "Health check endpoint",
+          response: {
+            200: pingResponseSchema,
+          },
+        },
+      },
+      pingHandler("http"),
+    );
+
+    // POST ping endpoint for health checks
+    fastify.post(
+      "/ping",
+      {
+        schema: {
+          tags: ["health"],
+          summary: "Health check endpoint (POST)",
+          response: {
+            200: pingResponseSchema,
+          },
+        },
+      },
+      pingHandler("http"),
     );
 
     logger.info("HTTP transport routes registered");

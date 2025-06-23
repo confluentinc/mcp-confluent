@@ -32,6 +32,7 @@
     "start:all": "node dist/index.js --env-file .env --transport http,sse,stdio",
     "help": "node dist/index.js -h",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.+(js|ts|json)\"",
     "build": "tsc && tsc-alias",
     "print:schema": "node dist/print-md-schema.js",

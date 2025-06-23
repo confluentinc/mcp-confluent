@@ -1,7 +1,7 @@
 {
   "name": "@confluentinc/mcp-confluent",
   "description": "Confluent MCP Server",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "author": "Confluent Inc.",
   "license": "MIT",
   "repository": {

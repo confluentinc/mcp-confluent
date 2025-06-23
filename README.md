@@ -122,8 +122,11 @@ Ensuring these prerequisites are met will prevent authorization errors when the 
 | Variable                      | Description                                                                                                                               | Default Value | Required |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------- |
 | HTTP_HOST                     | Host to bind for HTTP transport (string)                                                                                                  | "localhost"   | Yes      |
-| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 3000          | Yes      |
+| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp', '/invocations') (string)                                                              | "/mcp"        | Yes      |
+| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 8080          | Yes      |
 | LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal) (effects)                                                      | "info"        | Yes      |
+| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                     | "/sse"        | Yes      |
+| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                         | "/messages"   | Yes      |
 | BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)   |               | No       |
 | CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))   |               | No       |
 | CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))         |               | No       |

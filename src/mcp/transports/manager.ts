@@ -16,6 +16,9 @@ export class TransportManager {
     types: TransportType[],
     port?: number,
     host?: string,
+    httpMcpEndpointPath?: string,
+    sseMcpEndpointPath?: string,
+    sseMcpMessageEndpointPath?: string,
   ): Promise<void> {
     try {
       const needsHttpServer = types.some(
@@ -31,7 +34,12 @@ export class TransportManager {
       // Create and connect all transports
       await Promise.all(
         types.map(async (type) => {
-          const transport = await this.createTransport(type);
+          const transport = await this.createTransport(
+            type,
+            httpMcpEndpointPath,
+            sseMcpEndpointPath,
+            sseMcpMessageEndpointPath,
+          );
           this.transports.set(type, transport);
           await transport.connect();
         }),
@@ -83,18 +91,32 @@ export class TransportManager {
     this.httpServer = null;
   }
 
-  private async createTransport(type: TransportType): Promise<Transport> {
+  private async createTransport(
+    type: TransportType,
+    httpMcpEndpointPath?: string,
+    sseMcpEndpointPath?: string,
+    sseMcpMessageEndpointPath?: string,
+  ): Promise<Transport> {
     switch (type) {
       case "http":
         if (!this.httpServer) {
           throw new Error("HTTP server not initialized");
         }
-        return new HttpTransport(this.server, this.httpServer);
+        return new HttpTransport(
+          this.server,
+          this.httpServer,
+          httpMcpEndpointPath,
+        );
       case "sse":
         if (!this.httpServer) {
           throw new Error("HTTP server not initialized");
         }
-        return new SseTransport(this.server, this.httpServer);
+        return new SseTransport(
+          this.server,
+          this.httpServer,
+          sseMcpEndpointPath,
+          sseMcpMessageEndpointPath,
+        );
       case "stdio":
         return new StdioTransport(this.server);
       default:

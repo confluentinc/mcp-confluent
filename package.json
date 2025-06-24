@@ -52,7 +52,7 @@
     "eslint-plugin-prettier": "^5.4.0",
     "globals": "^16.0.0",
     "husky": "^9.1.7",
-    "openapi-typescript": "^7.7.1",
+    "openapi-typescript": "^7.8.0",
     "prettier": "3.5.3",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.8.3",
@@ -68,7 +68,7 @@
     "commander": "^13.1.0",
     "dotenv": "^16.5.0",
     "fastify": "^5.3.2",
-    "openapi-fetch": "^0.13.7",
+    "openapi-fetch": "^0.14.0",
     "pino": "^9.6.0",
     "properties-file": "^3.5.12",
     "zod": "^3.24.4"

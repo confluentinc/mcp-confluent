@@ -121,7 +121,7 @@ Ensuring these prerequisites are met will prevent authorization errors when the 
 
 | Variable                      | Description                                                                                                                               | Default Value  | Required |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------- | -------- |
-| HTTP_HOST                     | Host to bind for HTTP transport (string)                                                                                                  | "localhost"    | Yes      |
+| HTTP_HOST                     | Host to bind for HTTP transport. 0.0.0.0 means all interfaces. (string)                                                                   | "0.0.0.0"      | Yes      |
 | HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp', '/invocations') (string)                                                              | "/invocations" | Yes      |
 | HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 8080           | Yes      |
 | LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal) (effects)                                                      | "info"         | Yes      |

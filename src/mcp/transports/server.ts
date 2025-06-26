@@ -7,6 +7,7 @@ import {
   FastifyBaseLogger,
   FastifyInstance,
 } from "fastify";
+import { env } from "process";
 
 export class HttpServer {
   private fastify: FastifyInstance;
@@ -34,7 +35,7 @@ export class HttpServer {
         },
         servers: [
           {
-            url: "http://localhost:3000",
+            url: `http://${env.HTTP_HOST}:${env.HTTP_PORT}`,
             description: "Local development server",
           },
         ],

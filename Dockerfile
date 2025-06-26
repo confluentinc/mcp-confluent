@@ -2,6 +2,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Update npm to the latest version to fix CVE-2024-21626 (brace-expansion vulnerability)
+RUN npm install -g npm@latest
+
 COPY package.json package-lock.json ./
 
 RUN npm ci
@@ -15,6 +18,9 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 
+# Update npm to the latest version in production stage as well
+RUN npm install -g npm@latest
+
 # Explicitly copy package.json and package-lock.json to the root of /app
 COPY package.json package-lock.json ./
 
@@ -25,6 +31,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules/
 
 ENV NODE_ENV=production
+ENV HTTP_HOST=0.0.0.0
 EXPOSE 8080
 ENTRYPOINT ["node", "dist/index.js"]
 CMD ["--transport", "http"]

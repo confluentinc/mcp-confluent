@@ -156,7 +156,7 @@ export class HttpTransport implements Transport {
       },
     );
 
-    // GET ping endpoint for health checks
+    // POST ping endpoint for health checks
     fastify.post(
       "/ping",
       {

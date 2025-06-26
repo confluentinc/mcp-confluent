@@ -11,8 +11,8 @@ const envSchema = z.object({
     .default(8080),
   HTTP_HOST: z
     .string()
-    .describe("Host to bind for HTTP transport")
-    .default("localhost"),
+    .describe("Host to bind for HTTP transport. 0.0.0.0 means all interfaces.")
+    .default("0.0.0.0"),
   HTTP_MCP_ENDPOINT_PATH: z
     .string()
     .describe(

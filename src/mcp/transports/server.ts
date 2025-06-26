@@ -1,5 +1,6 @@
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
+import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import { ServerConfig } from "@src/mcp/transports/types.js";
 import {
@@ -34,7 +35,7 @@ export class HttpServer {
         },
         servers: [
           {
-            url: "http://localhost:3000",
+            url: `http://${env.HTTP_HOST}:${env.HTTP_PORT}`,
             description: "Local development server",
           },
         ],

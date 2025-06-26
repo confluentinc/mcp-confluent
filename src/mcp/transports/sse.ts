@@ -1,7 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { logger } from "@src/logger.js";
-import { pingHandler, pingResponseSchema } from "@src/mcp/transports/ping.js";
+import {
+  pingHandler,
+  pingRequestSchema,
+  pingResponseSchema,
+} from "@src/mcp/transports/ping.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
 import { Transport } from "@src/mcp/transports/types.js";
 import { FastifyReply, FastifyRequest } from "fastify";
@@ -138,34 +142,20 @@ export class SseTransport implements Transport {
       },
     );
 
-    // GET ping endpoint for health checks
-    fastify.get(
-      "/ping",
-      {
-        schema: {
-          tags: ["health"],
-          summary: "Health check endpoint",
-          response: {
-            200: pingResponseSchema,
-          },
-        },
-      },
-      pingHandler("sse"),
-    );
-
     // POST ping endpoint for health checks
     fastify.post(
       "/ping",
       {
         schema: {
-          tags: ["health"],
-          summary: "Health check endpoint (POST)",
+          tags: ["mcp"],
+          summary: "JSON-RPC 2.0 ping endpoint",
+          body: pingRequestSchema,
           response: {
             200: pingResponseSchema,
           },
         },
       },
-      pingHandler("sse"),
+      pingHandler(),
     );
 
     logger.info("SSE transport routes registered");

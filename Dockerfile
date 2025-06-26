@@ -31,7 +31,6 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules/
 
 ENV NODE_ENV=production
-ENV HTTP_HOST=0.0.0.0
 EXPOSE 8080
 ENTRYPOINT ["node", "dist/index.js"]
 CMD ["--transport", "http"]

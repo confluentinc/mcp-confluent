@@ -30,7 +30,17 @@ COPY --from=builder /app/dist ./dist
 # Copy the node_modules from the builder
 COPY --from=builder /app/node_modules ./node_modules/
 
+# Copy the entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Set environment variables for HTTP transport
 ENV NODE_ENV=production
+
+
+# Expose the HTTP port
 EXPOSE 8080
-ENTRYPOINT ["node", "dist/index.js"]
+
+# Use the custom entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["--transport", "http"]

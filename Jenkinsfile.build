@@ -1,0 +1,29 @@
+@Library('jenkins_shared_library@aravindv/eks-migration-helm-update') _
+
+def valuesFilePaths = []
+valuesFilePaths.add("helm-values/mcp-confluent/aws/${ENV}/values.yaml")
+
+
+stage('Build Push'){
+    ImageTag = awsBuildPush(
+      appname: "mcp-confluent",
+      branch: "$GITBRANCH",
+      giturl: "https://github.com/cloudqwest/mcp-confluent.git",
+      env : "$ENV",
+      clusterType: "BU-based",
+      dockerfile: "Dockerfile",
+      buildArg: ["SERVICE_NAME=mcp-confluent"]
+    )
+}
+
+stage("Image tag Update on env Values File"){
+    helmImageTagUpdate(
+        env: "$ENV",
+        appname: "mcp-confluent",
+        cloudname: "ops-jenkins-nonprod",
+        imageTag: "$ImageTag",
+        valuesFilePaths: valuesFilePaths,
+        githelmurl: "https://github.com/cloudqwest/devops-tools.git",
+        helmbranch: "$HELMBRANCH"
+    )
+}

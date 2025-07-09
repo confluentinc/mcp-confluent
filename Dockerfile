@@ -2,8 +2,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Update npm to the latest version to fix CVE-2024-21626 (brace-expansion vulnerability)
 RUN npm install -g npm@latest
+
+RUN apk update && apk upgrade
 
 COPY package.json package-lock.json ./
 
@@ -20,6 +21,9 @@ WORKDIR /app
 
 # Update npm to the latest version in production stage as well
 RUN npm install -g npm@latest
+
+# Update Alpine packages to fix CVE-2025-4575 (OpenSSL vulnerability)
+RUN apk update && apk upgrade
 
 # Explicitly copy package.json and package-lock.json to the root of /app
 COPY package.json package-lock.json ./

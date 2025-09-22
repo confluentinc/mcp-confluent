@@ -1,0 +1,15 @@
+{
+  "name": "mcp-confluent",
+  "version": "1.0.6",
+  "mcpServers": {
+    "mcp-confluent": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@confluentinc/mcp-confluent@1.0.6",
+        "-e",
+        "${extensionPath}${pathSeparator}.env"
+      ]
+    }
+  }
+}

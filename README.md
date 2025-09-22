@@ -33,6 +33,7 @@ An MCP server implementation that enables AI assistants to interact with Conflue
     - [Usage](#usage)
     - [Configuring Claude Desktop](#configuring-claude-desktop)
     - [Configuring Goose CLI](#configuring-goose-cli)
+    - [Configuring Gemini CLI](#configuring-gemini-cli)
     - [mcp-confluent CLI Usage](#mcp-confluent-cli-usage)
       - [Basic Usage](#basic-usage)
       - [Example: Deploy using all transports](#example-deploy-using-all-transports)
@@ -112,7 +113,7 @@ It is crucial to set up the necessary roles and policies in your cloud environme
 
 Please refer to the following Confluent Cloud documentation for detailed instructions on setting up these permissions and integrating with custom storage and Glue:
 
-* **Confluent Cloud Tableflow Quick Start with Custom Storage & Glue:**
+- **Confluent Cloud Tableflow Quick Start with Custom Storage & Glue:**
     [https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html)
 
 Ensuring these prerequisites are met will prevent authorization errors when the `mcp-server` attempts to provision or manage Tableflow-enabled tables.
@@ -274,6 +275,73 @@ Once installed, follow these steps:
 Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
 
 ![Goose Configure](assets/goose-configure.png)
+
+### Configuring Gemini CLI
+
+For detailed information about Gemini CLI extensions and MCP servers, please refer to the official documentation:
+
+- [Gemini CLI Extensions](https://github.com/google-gemini/gemini-cli/blob/main/docs/extension.md)
+- [Gemini CLI MCP Server Tools](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
+
+Here's how to get `mcp-confluent` running with Gemini CLI:
+
+1. **Install Gemini CLI:**
+    If you haven't already, install the Gemini CLI. You can find installation instructions on the [official GitHub repository](https://github.com/google-gemini/gemini-cli).
+
+2. **Install the `mcp-confluent` Extension:**
+
+    ```bash
+    gemini extensions install https://github.com/confluentinc/mcp-confluent 
+    # Navigate to the root directory of this project (where `gemini-extension.json` is located) and run:
+    # gemini extension install .
+    ```
+
+    This command registers the `mcp-confluent` server with Gemini CLI and creates a dedicated directory for it under `~/.gemini/extensions/mcp-confluent`.
+
+3. **Provide Environment Variables:**
+    The extension requires your Confluent Cloud credentials and configuration to be available in a `.env` file.
+
+    - First, ensure you have a correctly populated `.env` file in the root of this project. For instructions, see the [Configuration](#configuration) section.
+    - Next, copy your `.env` file into the extension's directory so Gemini CLI can access it (The gemini extension uses the path `${extensionPath}${pathSeparator}.env`. Variables defined in <https://github.com/google-gemini/gemini-cli/blob/main/docs/extension.md#variables> ):
+
+    ```bash
+    cp .env ~/.gemini/extensions/mcp-confluent/.env
+    ```
+
+4. **Verify and Use:**
+    You can now start using the Confluent tools via Gemini CLI. To verify that the tools are available, you can list them:
+
+    ```bash
+    gemini -l
+    # or `gemini extensions list`
+    ```
+
+    And here's an example of invoking a tool:
+
+    ```bash
+    
+    gemini
+    ....
+
+    🟢 mcp-confluent (from mcp-confluent) - Ready (24 tools)
+    ....
+    
+    Using: 1 MCP server (ctrl+t to toggle)
+    ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+    │ > list topics                                                                                                                                             │
+    ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+    ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+    │ ✓  list-topics (mcp-confluent MCP Server) {}                                                                                                       │
+    │                                                                                                                                                    │
+    │    Kafka topics:                                                                                                                                   │
+    │    products_summarized,products,topic_8,products_summarized_with_embeddings,elastic_minimized,user_message_related_products,user_message_embeddin  │
+    │    gs,dlq-lcc-d3738o,user_message,elastic                                                                                          │
+    ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+    ✦ Okay, I see the following topics: products_summarized, products, topic_8, products_summarized_with_embeddings, elastic_minimized,
+      user_message_related_products, user_message_embeddings, dlq-lcc-d3738o, user_message, and elastic.
+
+    ```
 
 ### mcp-confluent CLI Usage
 
@@ -596,13 +664,13 @@ delete-tableflow-catalog-integration: Make a request to delete a tableflow catal
     npm run start
     ```
 
-
 ### Docker
 
 #### Prerequisites
+
 Before you begin, ensure you have the following installed on your system:
 
-Docker Desktop (or Docker Engine and Docker Compose): https://www.docker.com/products/docker-desktop
+Docker Desktop (or Docker Engine and Docker Compose): <https://www.docker.com/products/docker-desktop>
 
 ##### Environment Variables
 
@@ -612,13 +680,13 @@ The MCP server requires several environment variables to connect to Confluent Cl
 
 Here's how to build your Docker image and run it in different modes.
 
-1.  **Navigate to your project directory.** Open your terminal or command prompt and change to the directory containing the `Dockerfile`.
+1. **Navigate to your project directory.** Open your terminal or command prompt and change to the directory containing the `Dockerfile`.
 
     ```bash
     cd /path/to/repo/mcp-confluent
     ```
 
-2.  **Build the Docker image.** 
+2. **Build the Docker image.**
 
     This command creates the `mcp-server` image based on the `Dockerfile` in the current directory.
 
@@ -626,18 +694,20 @@ Here's how to build your Docker image and run it in different modes.
     docker build -t mcp-server .
     ```
 
-3.  **Run the container** 
+3. **Run the container**
 
-    * `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
-    * `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
-    * `-d`: Runs the container in **detached mode** (in the background).
-    * `-p 3000:3000`: **Maps port 3000** on your host machine to port 3000 inside the container. Adjust this if your app listens on a different port.
+    - `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
+    - `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
+    - `-d`: Runs the container in **detached mode** (in the background).
+    - `-p 3000:3000`: **Maps port 3000** on your host machine to port 3000 inside the container. Adjust this if your app listens on a different port.
 
     ```bash
     docker run --rm -i -d -p 3000:3000 mcp-server
     ```
+
     (Optional)
-    * `-t` **Transport Mode** to enable http transport
+    - `-t` **Transport Mode** to enable http transport
+
     ```bash
     docker run --rm -d -p 3000:3000 mcp-server -t http
     ```
@@ -654,25 +724,24 @@ Here's how to build your Docker image and run it in different modes.
 2. **Build and run the service:**
     Docker Compose will build the Docker image (if not already built) and start the mcp-server service.
 
-    ```bash 
+    ```bash
     docker compose up --build
     ```
 
     The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
 
-    The server will be accessible on http://localhost:3000 (or the port specified in HTTP_PORT in your .env file).
+    The server will be accessible on <http://localhost:3000> (or the port specified in HTTP_PORT in your .env file).
 
 3. **Stopping the Server**
     To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
 
     Alternatively, in a new terminal from the project root, you can run:
 
-    ```bash 
+    ```bash
     docker compose down
     ```
 
     This command stops and removes the containers, networks, and volumes created by docker compose up.
-
 
 ### Testing
 

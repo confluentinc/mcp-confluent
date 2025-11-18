@@ -101,6 +101,7 @@ CONFLUENT_CLOUD_REST_ENDPOINT="https://api.confluent.cloud"
 SCHEMA_REGISTRY_API_KEY="..."
 SCHEMA_REGISTRY_API_SECRET="..."
 SCHEMA_REGISTRY_ENDPOINT="https://psrc-zv01y.northamerica-northeast2.gcp.confluent.cloud"
+CONFLUENT_CLOUD_TELEMETRY_ENDPOINT="https://api.telemetry.confluent.cloud"
 ```
 
 </details>

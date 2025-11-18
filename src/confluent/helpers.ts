@@ -19,3 +19,18 @@ export const getEnsuredParam = <T extends Environment[keyof Environment]>(
   }
   return finalParam as T;
 };
+
+/**
+ *  Resolves a template string by replacing placeholders with corresponding values from the args object.
+ *  Placeholders are in the format {key}, where key corresponds to a key in the args object.
+ *  If a key is not found in the args object, it will be replaced with the original placeholder.
+ *  @param template - The template string containing placeholders
+ *  @param args - An object containing key-value pairs for replacement
+ *  @returns The resolved string with placeholders replaced by corresponding values
+ */
+export const fillTemplate = (
+  template: string,
+  args: Record<string, string>,
+): string => {
+  return template.replace(/{(\w+)}/g, (_, key) => args[key] ?? `{${key}}`);
+};

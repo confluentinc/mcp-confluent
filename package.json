@@ -71,7 +71,7 @@
     "openapi-fetch": "^0.14.0",
     "pino": "^9.7.0",
     "properties-file": "^3.5.12",
-    "zod": "^3.25.67"
+    "zod": "^4.0.0"
   },
   "files": [
     "dist"

@@ -64,8 +64,8 @@ function formatTableRow(key: string, schema: z.ZodTypeAny): string {
 
   // Extract default value if exists
   if (schema instanceof z.ZodDefault) {
-    defaultValue = JSON.stringify(schema._def.defaultValue());
-    schema = schema.removeDefault();
+    defaultValue = JSON.stringify(schema.def.defaultValue);
+    schema = schema.unwrap() as z.ZodTypeAny;
   }
 
   // Add type information to description if not empty
@@ -98,12 +98,13 @@ function getTypeInfo(schema: z.ZodTypeAny): string {
   if (schema instanceof z.ZodBoolean) return "boolean";
   if (schema instanceof z.ZodEnum) return `enum: ${schema.options.join(" | ")}`;
   if (schema instanceof z.ZodArray)
-    return `array of ${getTypeInfo(schema.element)}`;
-  if (schema instanceof z.ZodOptional) return `${getTypeInfo(schema.unwrap())}`;
+    return `array of ${getTypeInfo(schema.element as z.ZodTypeAny)}`;
+  if (schema instanceof z.ZodOptional)
+    return `${getTypeInfo(schema.unwrap() as z.ZodTypeAny)}`;
   if (schema instanceof z.ZodNullable)
-    return `nullable ${getTypeInfo(schema.unwrap())}`;
+    return `nullable ${getTypeInfo(schema.unwrap() as z.ZodTypeAny)}`;
   if (schema instanceof z.ZodUnion)
-    return `union: ${schema.options.map((opt) => getTypeInfo(opt)).join(" | ")}`;
+    return `union: ${schema.options.map((opt) => getTypeInfo(opt as z.ZodTypeAny)).join(" | ")}`;
   return schema.constructor.name.replace("Zod", "").toLowerCase();
 }
 

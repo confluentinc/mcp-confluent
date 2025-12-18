@@ -1,5 +1,5 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import { pino } from "pino";
+import pino from "pino";
 
 const logLevel = process.env.LOG_LEVEL || "info";
 

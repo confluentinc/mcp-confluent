@@ -29,6 +29,7 @@ An MCP server implementation that enables AI assistants to interact with Conflue
     - [Getting Started](#getting-started)
     - [Configuration](#configuration)
       - [Prerequisites \& Setup for Tableflow Commands](#prerequisites--setup-for-tableflow-commands)
+    - [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports)
     - [Environment Variables Reference](#environment-variables-reference)
     - [Usage](#usage)
     - [Configuring Claude Desktop](#configuring-claude-desktop)
@@ -118,17 +119,90 @@ Please refer to the following Confluent Cloud documentation for detailed instruc
 
 Ensuring these prerequisites are met will prevent authorization errors when the `mcp-server` attempts to provision or manage Tableflow-enabled tables.
 
+### Authentication for HTTP/SSE Transports
+
+When using HTTP or SSE transports, the MCP server requires API key authentication to prevent unauthorized access and protect against DNS rebinding attacks. This is **enabled by default**.
+
+#### Generating an API Key
+
+Generate a secure API key using the built-in utility:
+
+```bash
+npx @confluentinc/mcp-confluent --generate-key
+```
+
+This will output a 64-character key genetated using secure cryptography:
+
+```
+Generated MCP API Key:
+================================================================
+a1b2c3d4e5f6...your-64-char-key-here...
+================================================================
+
+```
+
+#### Configuring Authentication
+
+Add the generated key to your `.env` file:
+
+```properties
+# MCP Server Authentication (required for HTTP/SSE transports)
+MCP_API_KEY=your-generated-64-char-key-here
+```
+
+#### Making Authenticated Requests
+
+Include the API key in the `cflt-mcp-api-Key` header for all HTTP/SSE requests:
+
+```bash
+curl -H "cflt-mcp-api-Key: your-api-key" http://localhost:8080/mcp
+```
+
+#### DNS Rebinding Protection
+
+The server includes additional protections against DNS rebinding attacks:
+
+- **Host Header Validation**: Only requests with allowed Host headers are accepted
+
+Configure allowed hosts if needed:
+
+```properties
+# Allow additional hosts (comma-separated)
+MCP_ALLOWED_HOSTS=localhost,127.0.0.1,myhost.local
+```
+
+#### Additional security to prevent internet exposure of MCP server
+
+- **Localhost Binding**: Server binds to `127.0.0.1` by default (not `0.0.0.0`)
+
+#### Disabling Authentication (Development Only)
+
+For local development, you can disable authentication:
+
+```bash
+# Via CLI flag
+npx @confluentinc/mcp-confluent -e .env --transport http --disable-auth
+
+# Or via environment variable
+MCP_AUTH_DISABLED=true
+```
+
+> **Warning:** Never disable authentication in production or when the server is network-accessible.
+
 ### Environment Variables Reference
 
-| Variable                      | Description                                                                                                                               | Default Value | Required |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------- |
-| HTTP_HOST                     | Host to bind for HTTP transport. 0.0.0.0 means all interfaces. (string)                                                                   | "0.0.0.0"     | Yes      |
-| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp') (string)                                                                              | "/mcp"        | Yes      |
-| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 8080          | Yes      |
-| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal) (effects)                                                      | "info"        | Yes      |
-| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                     | "/sse"        | Yes      |
-| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                         | "/messages"   | Yes      |
-| BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)   |               | No       |
+| Variable                      | Description                                                                                                                               | Default Value             | Required |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | -------- |
+| HTTP_HOST                     | Host to bind for HTTP transport. Defaults to localhost only for security.                                                                  | "127.0.0.1"               | Yes      |
+| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp') (string)                                                                              | "/mcp"                    | Yes      |
+| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 8080                      | Yes      |
+| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal)                                                                | "info"                    | Yes      |
+| MCP_API_KEY                   | API key for HTTP/SSE authentication. Generate using `--generate-key`. Required when auth is enabled.                                       |                           | No*      |
+| MCP_AUTH_DISABLED             | Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.                                             | false                     | No       |
+| MCP_ALLOWED_HOSTS             | Comma-separated list of allowed Host header values for DNS rebinding protection.                                                           | "localhost,127.0.0.1"     | No       |
+| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                     | "/sse"                    | Yes      |
+| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                         | "/messages"               | Yes      |
+| BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)   |                           | No       |
 | CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))   |               | No       |
 | CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))         |               | No       |
 | CONFLUENT_CLOUD_REST_ENDPOINT | Base URL for Confluent Cloud's REST API services (default)                                                                                |               | No       |
@@ -374,6 +448,9 @@ Options:
   --block-tools-file <file>        File with tool names to block (one per line). Used only if --block-tools is not provided. Block-list is applied after allow-list.
   --list-tools                     Print the final set of enabled tool names (with descriptions) after allow/block filtering and exit. Does not start the server.
   --disable-confluent-cloud-tools  Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).
+  --disable-auth                   Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.
+  --allowed-hosts <hosts>          Comma-separated list of allowed Host header values for DNS rebinding protection.
+  --generate-key                   Generate a secure API key for MCP_API_KEY and print it to stdout, then exit.
   -h, --help                       display help for command
 ```
 

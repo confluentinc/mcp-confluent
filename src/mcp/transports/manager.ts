@@ -1,16 +1,32 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logger } from "@src/logger.js";
+import { AuthConfig } from "@src/mcp/transports/auth.js";
 import { HttpTransport } from "@src/mcp/transports/http.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
 import { SseTransport } from "@src/mcp/transports/sse.js";
 import { StdioTransport } from "@src/mcp/transports/stdio.js";
 import { Transport, TransportType } from "@src/mcp/transports/types.js";
 
+/**
+ * Configuration for the transport manager
+ */
+export interface TransportManagerConfig {
+  /** Disable authentication for HTTP/SSE transports */
+  disableAuth?: boolean;
+  /** List of allowed Host header values for DNS rebinding protection */
+  allowedHosts?: string[];
+  /** API key for authentication (required when auth is enabled) */
+  apiKey?: string;
+}
+
 export class TransportManager {
   private transports: Map<TransportType, Transport> = new Map();
   private httpServer: HttpServer | null = null;
 
-  constructor(private server: McpServer) {}
+  constructor(
+    private server: McpServer,
+    private config?: TransportManagerConfig,
+  ) {}
 
   async start(
     types: TransportType[],
@@ -27,8 +43,30 @@ export class TransportManager {
 
       // Initialize and prepare HTTP server if needed
       if (needsHttpServer) {
-        this.httpServer = new HttpServer();
+        // Prepare auth configuration
+        const authEnabled = !this.config?.disableAuth;
+        const apiKey = this.config?.apiKey;
+
+        // Require API key when auth is enabled
+        if (authEnabled && !apiKey) {
+          throw new Error(
+            "MCP_API_KEY is required when authentication is enabled for HTTP/SSE transports. " +
+              "Generate a key using: npx mcp-confluent --generate-key",
+          );
+        }
+
+        const authConfig: AuthConfig = {
+          apiKey: apiKey || "",
+          enabled: authEnabled,
+          allowedHosts: this.config?.allowedHosts || ["localhost", "127.0.0.1"],
+        };
+
+        this.httpServer = new HttpServer({ auth: authConfig });
         await this.httpServer.prepare();
+
+        if (authEnabled) {
+          logger.info("MCP Server authentication enabled");
+        }
       }
 
       // Create and connect all transports

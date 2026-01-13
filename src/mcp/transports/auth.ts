@@ -95,13 +95,8 @@ export function createAuthHook(config: AuthConfig) {
     request: FastifyRequest,
     reply: FastifyReply,
   ): Promise<void> => {
-    // Skip auth if disabled
-    if (!config.enabled) {
-      logger.debug("Authentication disabled, skipping auth check");
-      return;
-    }
-
-    // 1. Validate Host header (DNS rebinding protection)
+    // 1. ALWAYS validate Host header (DNS rebinding protection)
+    // This runs regardless of whether API key auth is enabled
     const hostHeader = request.headers.host;
     if (!isHostAllowed(hostHeader, config.allowedHosts)) {
       logger.warn(
@@ -115,7 +110,13 @@ export function createAuthHook(config: AuthConfig) {
       return;
     }
 
-    // 2. Validate API Key (header names are lowercased by Fastify)
+    // 2. Skip API key auth if disabled
+    if (!config.enabled) {
+      logger.debug("API key authentication disabled, skipping API key check");
+      return;
+    }
+
+    // 3. Validate API Key (header names are lowercased by Fastify)
     const apiKey = request.headers["cflt-mcp-api-key"];
 
     if (!apiKey || typeof apiKey !== "string") {

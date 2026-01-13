@@ -48,7 +48,7 @@ const envSchema = z.object({
   MCP_API_KEY: z
     .string()
     .describe(
-      "API key for HTTP/SSE authentication. If not provided, a random key will be auto-generated on startup.",
+      "API key for HTTP/SSE authentication. Not required when authentication is disabled.",
     )
     .trim()
     .min(32, "API key must be at least 32 characters for security")

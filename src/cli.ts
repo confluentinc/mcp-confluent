@@ -152,7 +152,7 @@ export function parseCliArgs(): CLIOptions {
     )
     .option(
       "--generate-key",
-      "Generate a secure API key for MCP_API_KEY and print it to stdout, then exit. Use this to create a key for your .env file.",
+      "Generate a secure API key for MCP_API_KEY and print it to stdout, then exit. Use this to set MCP_API_KEY in your .env file.",
     )
     .allowExcessArguments(false)
     .exitOverride();

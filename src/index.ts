@@ -14,10 +14,22 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
-import { TransportManager } from "@src/mcp/transports/index.js";
+import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
 
 // Parse command line arguments and load environment variables if --env-file is specified
 const cliOptions = parseCliArgs();
+
+// Handle --generate-key early (before any other initialization)
+if (cliOptions.generateKey) {
+  const apiKey = generateApiKey();
+  console.log("\nGenerated MCP API Key:");
+  console.log("=".repeat(64));
+  console.log(apiKey);
+  console.log("=".repeat(64));
+  console.log("\nAdd this to your .env file:");
+  console.log(`MCP_API_KEY=${apiKey}\n`);
+  process.exit(0);
+}
 
 async function main() {
   try {
@@ -144,7 +156,24 @@ async function main() {
       );
     });
 
-    const transportManager = new TransportManager(server);
+    // Prepare auth configuration
+    const disableAuth = cliOptions.disableAuth || env.MCP_AUTH_DISABLED;
+    const allowedHosts = cliOptions.allowedHosts || env.MCP_ALLOWED_HOSTS;
+    const apiKey = env.MCP_API_KEY;
+
+    // Warn if auth is disabled
+    if (disableAuth) {
+      logger.warn(
+        "Authentication is DISABLED for HTTP/SSE transports. " +
+          "This should only be used in development environments.",
+      );
+    }
+
+    const transportManager = new TransportManager(server, {
+      disableAuth,
+      allowedHosts,
+      apiKey,
+    });
 
     // Start all transports with a single call
     logger.info(`Starting transports: ${cliOptions.transports.join(", ")}`);

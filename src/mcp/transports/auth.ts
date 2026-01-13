@@ -40,6 +40,21 @@ function secureCompare(a: string, b: string): boolean {
 }
 
 /**
+ * Extracts hostname from Host header using URL parsing
+ * Handles IPv4, IPv6, and regular hostnames correctly
+ */
+function parseHostname(hostHeader: string): string | null {
+  try {
+    // Prepend dummy protocol since URL requires one
+    const url = new URL(`http://${hostHeader}`);
+    return url.hostname.toLowerCase();
+  } catch {
+    // Invalid host header format
+    return null;
+  }
+}
+
+/**
  * Validates the Host header against allowed hosts list
  * Used for DNS rebinding protection
  */
@@ -51,17 +66,19 @@ function isHostAllowed(
     return false;
   }
 
-  // Extract hostname without port
-  const hostParts = hostHeader.split(":");
-  const hostname = (hostParts[0] ?? "").toLowerCase();
+  const hostname = parseHostname(hostHeader);
+  if (!hostname) {
+    return false;
+  }
 
   return allowedHosts.some((allowed) => {
-    // Exact match on hostname
-    if (hostname === allowed) {
+    const allowedLower = allowed.toLowerCase();
+    // Exact match on hostname (e.g., "localhost" matches "localhost:8080")
+    if (hostname === allowedLower) {
       return true;
     }
     // Allow matching with port in allowed list (e.g., "localhost:8080")
-    if (hostHeader.toLowerCase() === allowed) {
+    if (hostHeader.toLowerCase() === allowedLower) {
       return true;
     }
     return false;

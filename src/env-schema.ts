@@ -11,8 +11,10 @@ const envSchema = z.object({
     .default(8080),
   HTTP_HOST: z
     .string()
-    .describe("Host to bind for HTTP transport. 0.0.0.0 means all interfaces.")
-    .default("0.0.0.0"),
+    .describe(
+      "Host to bind for HTTP transport. Defaults to localhost only for security.",
+    )
+    .default("127.0.0.1"),
   HTTP_MCP_ENDPOINT_PATH: z
     .string()
     .describe("HTTP endpoint path for MCP transport (e.g., '/mcp')")
@@ -43,6 +45,27 @@ const envSchema = z.object({
       "Log level for application logging (trace, debug, info, warn, error, fatal)",
     )
     .default("info"),
+  MCP_API_KEY: z
+    .string()
+    .describe(
+      "API key for HTTP/SSE authentication. Not required when authentication is disabled.",
+    )
+    .trim()
+    .min(32, "API key must be at least 32 characters for security")
+    .optional(),
+  MCP_AUTH_DISABLED: z
+    .preprocess((val) => val === "true" || val === "1", z.boolean())
+    .describe(
+      "Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.",
+    )
+    .default(false),
+  MCP_ALLOWED_HOSTS: z
+    .string()
+    .describe(
+      "Comma-separated list of allowed Host header values for DNS rebinding protection.",
+    )
+    .default("localhost,127.0.0.1")
+    .transform((val) => val.split(",").map((h) => h.trim().toLowerCase())),
   BOOTSTRAP_SERVERS: z
     .string()
     .describe(

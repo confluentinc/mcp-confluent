@@ -17,6 +17,9 @@ export interface CLIOptions {
   listTools?: boolean;
   disableConfluentCloudTools?: boolean;
   kafkaConfig: KeyValuePairObject;
+  disableAuth?: boolean;
+  allowedHosts?: string[];
+  generateKey?: boolean;
 }
 
 /**
@@ -139,6 +142,18 @@ export function parseCliArgs(): CLIOptions {
       "--disable-confluent-cloud-tools",
       "Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).",
     )
+    .option(
+      "--disable-auth",
+      "Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.",
+    )
+    .option(
+      "--allowed-hosts <hosts>",
+      "Comma-separated list of allowed Host header values for DNS rebinding protection (e.g., 'localhost,127.0.0.1,myhost.local').",
+    )
+    .option(
+      "--generate-key",
+      "Generate a secure API key for MCP_API_KEY and print it to stdout, then exit. Use this to set MCP_API_KEY in your .env file.",
+    )
     .allowExcessArguments(false)
     .exitOverride();
 
@@ -174,6 +189,13 @@ export function parseCliArgs(): CLIOptions {
       listTools: !!opts.listTools,
       disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
       kafkaConfig: kafkaConfig,
+      disableAuth: !!opts.disableAuth,
+      allowedHosts: opts.allowedHosts
+        ? opts.allowedHosts
+            .split(",")
+            .map((h: string) => h.trim().toLowerCase())
+        : undefined,
+      generateKey: !!opts.generateKey,
     };
   } catch (error: unknown) {
     if (

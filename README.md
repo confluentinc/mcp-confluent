@@ -131,7 +131,7 @@ Generate a secure API key using the built-in utility:
 npx @confluentinc/mcp-confluent --generate-key
 ```
 
-This will output a 64-character key genetated using secure cryptography:
+This will output a 64-character key generated using secure cryptography:
 
 ```
 Generated MCP API Key:

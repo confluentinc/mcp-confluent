@@ -36,4 +36,6 @@ export enum ToolName {
   READ_TABLEFLOW_CATALOG_INTEGRATION = "read-tableflow-catalog-integration",
   UPDATE_TABLEFLOW_CATALOG_INTEGRATION = "update-tableflow-catalog-integration",
   DELETE_TABLEFLOW_CATALOG_INTEGRATION = "delete-tableflow-catalog-integration",
+  VERIFY_TLS_PROTOCOLS = "verify-tls-protocols",
+  UPDATE_TLS_PROTOCOLS = "update-tls-protocols",
 }

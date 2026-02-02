@@ -37,6 +37,8 @@ import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tablef
 import { ReadTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/read-tableflow-topic-handler.js";
 import { UpdateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/update-tableflow-topic-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { VerifyTlsProtocolsHandler } from "@src/confluent/tools/handlers/kafka/verify-tls-protocol-handler.js";
+import { UpdateTlsProtocolsHandler } from "@src/confluent/tools/handlers/kafka/update-tls-protocols-handler.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
@@ -92,6 +94,8 @@ export class ToolFactory {
       ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
       new DeleteTableFlowCatalogIntegrationHandler(),
     ],
+    [ToolName.VERIFY_TLS_PROTOCOLS, new VerifyTlsProtocolsHandler()],
+    [ToolName.UPDATE_TLS_PROTOCOLS, new UpdateTlsProtocolsHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

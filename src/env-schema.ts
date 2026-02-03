@@ -234,6 +234,12 @@ const configSchema = z
       )
       .trim()
       .url(),
+    TELEMETRY_ENDPOINT: z
+      .string()
+      .describe("Base URL for Confluent Cloud Telemetry API (metrics)")
+      .trim()
+      .url()
+      .default("https://api.telemetry.confluent.cloud"),
   })
   .partial();
 

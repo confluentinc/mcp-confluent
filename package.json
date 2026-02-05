@@ -68,7 +68,7 @@
     "@modelcontextprotocol/sdk": "^1.23.1",
     "commander": "^14.0.0",
     "dotenv": "^16.5.0",
-    "fastify": "^5.4.0",
+    "fastify": "^5.7.3",
     "openapi-fetch": "^0.14.0",
     "pino": "^10.1.0",
     "properties-file": "^3.5.12"

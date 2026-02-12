@@ -47,12 +47,15 @@ export interface ConfluentCloudRestClientManager {
   >;
   /** Gets a configured REST client for Confluent Cloud Kafka operations */
   getConfluentCloudKafkaRestClient(): Client<paths, `${string}/${string}`>;
+  /** Gets a configured REST client for Confluent Cloud Telemetry/Metrics API */
+  getConfluentCloudTelemetryRestClient(): Client<paths, `${string}/${string}`>;
 
   setConfluentCloudRestEndpoint(endpoint: string): void;
   setConfluentCloudFlinkEndpoint(endpoint: string): void;
   setConfluentCloudSchemaRegistryEndpoint(endpoint: string): void;
   setConfluentCloudKafkaRestEndpoint(endpoint: string): void;
   setConfluentCloudTableflowRestEndpoint(endpoint: string): void;
+  setConfluentCloudTelemetryEndpoint(endpoint: string): void;
 }
 
 /**
@@ -78,6 +81,7 @@ export interface ClientManagerConfig {
     tableflow: ConfluentAuth;
     schemaRegistry: ConfluentAuth;
     kafka: ConfluentAuth;
+    telemetry: ConfluentAuth;
   };
 }
 
@@ -93,6 +97,7 @@ export class DefaultClientManager
   private confluentCloudFlinkBaseUrl: string | undefined;
   private confluentCloudSchemaRegistryBaseUrl: string | undefined;
   private confluentCloudKafkaRestBaseUrl: string | undefined;
+  private confluentCloudTelemetryBaseUrl: string | undefined;
   private readonly kafkaConfig: GlobalConfig;
   private readonly kafkaClient: Lazy<KafkaJS.Kafka>;
   private readonly adminClient: AsyncLazy<KafkaJS.Admin>;
@@ -112,6 +117,9 @@ export class DefaultClientManager
   private readonly confluentCloudKafkaRestClient: Lazy<
     Client<paths, `${string}/${string}`>
   >;
+  private readonly confluentCloudTelemetryRestClient: Lazy<
+    Client<paths, `${string}/${string}`>
+  >;
   private readonly schemaRegistryClient: Lazy<SchemaRegistryClient>;
 
   /**
@@ -124,6 +132,7 @@ export class DefaultClientManager
     this.confluentCloudFlinkBaseUrl = config.endpoints.flink;
     this.confluentCloudSchemaRegistryBaseUrl = config.endpoints.schemaRegistry;
     this.confluentCloudKafkaRestBaseUrl = config.endpoints.kafka;
+    this.confluentCloudTelemetryBaseUrl = config.endpoints.telemetry;
 
     this.kafkaConfig = config.kafka;
     this.kafkaClient = new Lazy(
@@ -230,6 +239,20 @@ export class DefaultClientManager
       return client;
     });
 
+    this.confluentCloudTelemetryRestClient = new Lazy(() => {
+      if (!this.confluentCloudTelemetryBaseUrl) {
+        throw new Error("Confluent Cloud Telemetry endpoint not configured");
+      }
+      logger.info(
+        `Initializing Confluent Cloud Telemetry REST client for base URL ${this.confluentCloudTelemetryBaseUrl}`,
+      );
+      const client = createClient<paths>({
+        baseUrl: this.confluentCloudTelemetryBaseUrl,
+      });
+      client.use(createAuthMiddleware(config.auth.telemetry));
+      return client;
+    });
+
     this.schemaRegistryClient = new Lazy(() => {
       if (!this.confluentCloudSchemaRegistryBaseUrl) {
         throw new Error("Schema Registry endpoint not configured");
@@ -292,6 +315,11 @@ export class DefaultClientManager
     this.confluentCloudKafkaRestBaseUrl = endpoint;
   }
 
+  setConfluentCloudTelemetryEndpoint(endpoint: string): void {
+    this.confluentCloudTelemetryRestClient.close();
+    this.confluentCloudTelemetryBaseUrl = endpoint;
+  }
+
   /** @inheritdoc */
   getKafkaClient(): KafkaJS.Kafka {
     return this.kafkaClient.get();
@@ -323,6 +351,11 @@ export class DefaultClientManager
   /** @inheritdoc */
   getConfluentCloudKafkaRestClient(): Client<paths, `${string}/${string}`> {
     return this.confluentCloudKafkaRestClient.get();
+  }
+
+  /** @inheritdoc */
+  getConfluentCloudTelemetryRestClient(): Client<paths, `${string}/${string}`> {
+    return this.confluentCloudTelemetryRestClient.get();
   }
 
   /** @inheritdoc */

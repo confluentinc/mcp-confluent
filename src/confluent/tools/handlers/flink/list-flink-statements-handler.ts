@@ -36,8 +36,10 @@ const listFlinkStatementsArguments = z.object({
     .int()
     .nonnegative()
     .max(100)
-    .default(10)
-    .describe("A pagination size for collection requests."),
+    .default(100)
+    .describe(
+      "A pagination size for collection requests. Default is 100 (max).",
+    ),
   pageToken: z
     .string()
     .max(255)
@@ -47,6 +49,12 @@ const listFlinkStatementsArguments = z.object({
     .string()
     .optional()
     .describe("A comma-separated label selector to filter the statements."),
+  statusPhase: z
+    .string()
+    .optional()
+    .describe(
+      "Filter by status phase: PENDING, RUNNING, COMPLETED, FAILED, STOPPED, etc.",
+    ),
 });
 
 export class ListFlinkStatementsHandler extends BaseToolHandler {
@@ -62,6 +70,7 @@ export class ListFlinkStatementsHandler extends BaseToolHandler {
       organizationId,
       pageToken,
       baseUrl,
+      statusPhase,
     } = listFlinkStatementsArguments.parse(toolArguments);
     const organization_id = getEnsuredParam(
       "FLINK_ORG_ID",
@@ -94,6 +103,7 @@ export class ListFlinkStatementsHandler extends BaseToolHandler {
           page_size: pageSize,
           page_token: pageToken,
           label_selector: labelSelector,
+          ...(statusPhase && { "status.phase": [statusPhase] }),
         },
       },
     });
@@ -103,6 +113,25 @@ export class ListFlinkStatementsHandler extends BaseToolHandler {
         true,
       );
     }
+
+    // Client-side filtering by status phase (server-side filter doesn't work reliably)
+    if (statusPhase && response?.data) {
+      const filteredData = response.data.filter(
+        (statement: { status?: { phase?: string } }) =>
+          statement.status?.phase === statusPhase,
+      );
+      const filteredResponse = {
+        ...response,
+        data: filteredData,
+      };
+      const paginationNote = response.metadata?.next
+        ? `\nNote: Results are filtered client-side by status '${statusPhase}'. The count (${filteredData.length}) is from a filtered subset of page_size=${pageSize}. More results may be available — use page_token from metadata to fetch the next page.`
+        : "";
+      return this.createResponse(
+        `Found ${filteredData.length} statement(s) with status '${statusPhase}':\n${JSON.stringify(filteredResponse)}${paginationNote}`,
+      );
+    }
+
     return this.createResponse(`${JSON.stringify(response)}`);
   }
   getToolConfig(): ToolConfig {

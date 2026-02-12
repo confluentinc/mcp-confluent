@@ -42,6 +42,9 @@ An MCP server implementation that enables AI assistants to interact with Conflue
       - [Example: Block Certain Tools](#example-block-certain-tools)
       - [Example: Use Tool Lists from Files](#example-use-tool-lists-from-files)
       - [Example: List All Available Tools](#example-list-all-available-tools)
+  - [Flink Catalog and Diagnostics](#flink-catalog-and-diagnostics)
+    - [Flink Tools](#flink-tools)
+    - [Example Workflows](#example-workflows)
   - [Developer Guide](#developer-guide)
     - [Project Structure](#project-structure)
     - [Building and Running](#building-and-running)
@@ -661,6 +664,15 @@ delete-connector: Delete an existing connector. Returns success message if delet
 delete-flink-statements: Make a request to delete a statement.
 delete-tag: Delete a tag definition from Confluent Cloud.
 delete-topics: Delete the topic with the given names.
+check-flink-statement-health: Perform an aggregate health check for a Flink SQL statement.
+describe-flink-table: Get full schema details for a Flink table via INFORMATION_SCHEMA.COLUMNS.
+detect-flink-statement-issues: Detect issues for a Flink SQL statement by analyzing status, exceptions, and metrics.
+get-flink-statement-profile: Get Query Profiler data with task graph, metrics, and automated issue detection.
+get-flink-table-info: Get table metadata via INFORMATION_SCHEMA.TABLES.
+list-flink-catalogs: List all catalogs in the Flink environment.
+list-flink-databases: List all databases (schemas) in a Flink catalog via INFORMATION_SCHEMA.SCHEMATA.
+list-flink-tables: List all tables in a Flink database.
+get-flink-statement-exceptions: Retrieve the 10 most recent exceptions for a Flink SQL statement.
 get-topic-config: Retrieve configuration details for a specific Kafka topic.
 list-clusters: Get all clusters in the Confluent Cloud environment
 list-connectors: Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.
@@ -677,7 +689,6 @@ remove-tag-from-entity: Remove tag from an entity in Confluent Cloud.
 search-topics-by-name: List all topics in the Kafka cluster matching the specified name.
 search-topics-by-tag: List all topics in the Kafka cluster with the specified tag.
 create-tableflow-topic: Make a request to create a tableflow topic.
-create-tableflow-topic: Make a request to create a tableflow topic.
 list-tableflow-regions: Retrieve a sorted, filtered, paginated list of all tableflow regions.
 list-tableflow-topics: Retrieve a sorted, filtered, paginated list of all tableflow topics.
 read-tableflow-topic: Make a request to read a tableflow topic.
@@ -693,6 +704,64 @@ delete-tableflow-catalog-integration: Make a request to delete a tableflow catal
 </details>
 
 > **Tip:** The allow-list is applied before the block-list. If neither is provided, all tools are enabled by default.
+
+## Flink Catalog and Diagnostics
+
+Tools for Flink SQL catalog introspection and statement diagnostics.
+
+### Flink Tools
+
+| Tool | Description |
+|------|-------------|
+| `create-flink-statement` | Create and execute a Flink SQL statement |
+| `list-flink-statements` | List all Flink SQL statements with filtering |
+| `read-flink-statement` | Read statement results with pagination |
+| `delete-flink-statements` | Delete a Flink SQL statement |
+| `get-flink-statement-exceptions` | Retrieve recent exceptions for a statement |
+| `list-flink-catalogs` | List catalogs via INFORMATION_SCHEMA |
+| `list-flink-databases` | List databases via INFORMATION_SCHEMA |
+| `list-flink-tables` | List tables in a database |
+| `describe-flink-table` | Get full table schema including $rowtime, types, nullability |
+| `get-flink-table-info` | Get table metadata (watermarks, distribution) |
+| `check-flink-statement-health` | Aggregate health check with status (healthy/warning/critical) |
+| `detect-flink-statement-issues` | Detect issues from status, exceptions, and metrics |
+| `get-flink-statement-profile` | Query Profiler with task graph, metrics, and issue detection |
+
+### Example Workflows
+
+#### Deduplication Workflow
+
+```
+User: "I want to deduplicate events from my_topic"
+        ↓
+Claude: Uses describe-flink-table → gets schema (event_id, user_id, ...)
+        ↓
+Claude: "Which field should I deduplicate on?"
+        ↓
+User: "event_id"
+        ↓
+Claude: Generates SQL using ROW_NUMBER() pattern
+        ↓
+Claude: Uses create-flink-statement → submits query
+        ↓
+Claude: Uses check-flink-statement-health → monitors status
+        ↓
+Claude: "Running successfully!"
+```
+
+#### Debugging a Failed Statement
+
+```
+User: "My statement xyz is failing. What's wrong?"
+        ↓
+Claude: Uses get-flink-statement-exceptions → gets error details
+        ↓
+Claude: Uses detect-flink-statement-issues → analyzes status, exceptions, metrics
+        ↓
+Claude: Uses get-flink-statement-profile → gets task-level metrics
+        ↓
+Claude: "The statement has high backpressure on task 'Sink'. Try increasing parallelism..."
+```
 
 ## Developer Guide
 

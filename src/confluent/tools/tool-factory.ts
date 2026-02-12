@@ -13,6 +13,15 @@ import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environme
 import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
 import { CreateFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/create-flink-statement-handler.js";
 import { DeleteFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/delete-flink-statement-handler.js";
+import { DescribeTableHandler } from "@src/confluent/tools/handlers/flink/catalog/describe-table-handler.js";
+import { GetTableInfoHandler } from "@src/confluent/tools/handlers/flink/catalog/get-table-info-handler.js";
+import { ListCatalogsHandler } from "@src/confluent/tools/handlers/flink/catalog/list-catalogs-handler.js";
+import { ListDatabasesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-databases-handler.js";
+import { ListTablesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-tables-handler.js";
+import { CheckHealthHandler } from "@src/confluent/tools/handlers/flink/diagnostics/check-health-handler.js";
+import { DetectIssuesHandler } from "@src/confluent/tools/handlers/flink/diagnostics/detect-issues-handler.js";
+import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
+import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
 import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
 import { ReadFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/read-flink-statement-handler.js";
 import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alter-topic-config.js";
@@ -49,6 +58,15 @@ export class ToolFactory {
     [ToolName.CREATE_FLINK_STATEMENT, new CreateFlinkStatementHandler()],
     [ToolName.READ_FLINK_STATEMENT, new ReadFlinkStatementHandler()],
     [ToolName.DELETE_FLINK_STATEMENTS, new DeleteFlinkStatementHandler()],
+    [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS, new GetFlinkExceptionsHandler()],
+    [ToolName.LIST_FLINK_CATALOGS, new ListCatalogsHandler()],
+    [ToolName.LIST_FLINK_DATABASES, new ListDatabasesHandler()],
+    [ToolName.LIST_FLINK_TABLES, new ListTablesHandler()],
+    [ToolName.DESCRIBE_FLINK_TABLE, new DescribeTableHandler()],
+    [ToolName.GET_FLINK_TABLE_INFO, new GetTableInfoHandler()],
+    [ToolName.CHECK_FLINK_STATEMENT_HEALTH, new CheckHealthHandler()],
+    [ToolName.DETECT_FLINK_STATEMENT_ISSUES, new DetectIssuesHandler()],
+    [ToolName.GET_FLINK_STATEMENT_PROFILE, new QueryProfilerHandler()],
     [ToolName.LIST_CONNECTORS, new ListConnectorsHandler()],
     [ToolName.READ_CONNECTOR, new ReadConnectorHandler()],
     [ToolName.CREATE_CONNECTOR, new CreateConnectorHandler()],

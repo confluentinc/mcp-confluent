@@ -63,6 +63,8 @@ async function main() {
         flink: env.FLINK_REST_ENDPOINT,
         schemaRegistry: env.SCHEMA_REGISTRY_ENDPOINT,
         kafka: env.KAFKA_REST_ENDPOINT,
+        telemetry:
+          env.TELEMETRY_ENDPOINT ?? "https://api.telemetry.confluent.cloud",
       },
       auth: {
         cloud: {
@@ -84,6 +86,11 @@ async function main() {
         kafka: {
           apiKey: env.KAFKA_API_KEY!,
           apiSecret: env.KAFKA_API_SECRET!,
+        },
+        telemetry: {
+          apiKey: (env.TELEMETRY_API_KEY ?? env.CONFLUENT_CLOUD_API_KEY)!,
+          apiSecret: (env.TELEMETRY_API_SECRET ??
+            env.CONFLUENT_CLOUD_API_SECRET)!,
         },
       },
     });

@@ -36,4 +36,5 @@ export enum ToolName {
   READ_TABLEFLOW_CATALOG_INTEGRATION = "read-tableflow-catalog-integration",
   UPDATE_TABLEFLOW_CATALOG_INTEGRATION = "update-tableflow-catalog-integration",
   DELETE_TABLEFLOW_CATALOG_INTEGRATION = "delete-tableflow-catalog-integration",
+  LIST_BILLING_COSTS = "list-billing-costs",
 }

@@ -122,7 +122,7 @@ export class GetTableInfoHandler extends BaseToolHandler {
     const schemaFilter = schema_name
       ? ` AND \`TABLE_SCHEMA\` = '${schema_name}'`
       : "";
-    const sql = `SELECT \`TABLE_CATALOG\`, \`TABLE_SCHEMA\`, \`TABLE_NAME\`, \`TABLE_TYPE\`, \`IS_INSERTABLE_INTO\`, \`WATERMARK_COLUMN\`, \`WATERMARK_EXPRESSION\`, \`DISTRIBUTION_ALGORITHM\`, \`DISTRIBUTION_COLUMNS\`, \`DISTRIBUTION_BUCKET_COUNT\` FROM \`${catalog_name}\`.\`INFORMATION_SCHEMA\`.\`TABLES\` WHERE \`TABLE_NAME\` = '${tableName}'${schemaFilter}`;
+    const sql = `SELECT \`TABLE_CATALOG\`, \`TABLE_SCHEMA\`, \`TABLE_NAME\`, \`TABLE_TYPE\`, \`IS_DISTRIBUTED\`, \`DISTRIBUTION_ALGORITHM\`, \`DISTRIBUTION_BUCKETS\`, \`IS_WATERMARKED\`, \`WATERMARK_COLUMN\`, \`WATERMARK_EXPRESSION\`, \`WATERMARK_IS_HIDDEN\`, \`COMMENT\` FROM \`${catalog_name}\`.\`INFORMATION_SCHEMA\`.\`TABLES\` WHERE \`TABLE_NAME\` = '${tableName}'${schemaFilter}`;
 
     const result = await executeFlinkSql(clientManager, sql, {
       organizationId: organization_id,

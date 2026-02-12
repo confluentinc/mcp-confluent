@@ -240,6 +240,20 @@ const configSchema = z
       .trim()
       .url()
       .default("https://api.telemetry.confluent.cloud"),
+    TELEMETRY_API_KEY: z
+      .string()
+      .describe(
+        "Optional API key for telemetry access with basic read permissions. Falls back to CONFLUENT_CLOUD_API_KEY if not set.",
+      )
+      .trim()
+      .min(1),
+    TELEMETRY_API_SECRET: z
+      .string()
+      .describe(
+        "Optional API secret paired with TELEMETRY_API_KEY. Falls back to CONFLUENT_CLOUD_API_SECRET if not set.",
+      )
+      .trim()
+      .min(1),
   })
   .partial();
 

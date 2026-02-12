@@ -124,8 +124,11 @@ export class ListFlinkStatementsHandler extends BaseToolHandler {
         ...response,
         data: filteredData,
       };
+      const paginationNote = response.metadata?.next
+        ? `\nNote: Results are filtered client-side by status '${statusPhase}'. The count (${filteredData.length}) is from a filtered subset of page_size=${pageSize}. More results may be available — use page_token from metadata to fetch the next page.`
+        : "";
       return this.createResponse(
-        `Found ${filteredData.length} statement(s) with status '${statusPhase}':\n${JSON.stringify(filteredResponse)}`,
+        `Found ${filteredData.length} statement(s) with status '${statusPhase}':\n${JSON.stringify(filteredResponse)}${paginationNote}`,
       );
     }
 

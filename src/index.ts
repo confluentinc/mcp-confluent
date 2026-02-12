@@ -88,8 +88,9 @@ async function main() {
           apiSecret: env.KAFKA_API_SECRET!,
         },
         telemetry: {
-          apiKey: env.CONFLUENT_CLOUD_API_KEY!,
-          apiSecret: env.CONFLUENT_CLOUD_API_SECRET!,
+          apiKey: (env.TELEMETRY_API_KEY ?? env.CONFLUENT_CLOUD_API_KEY)!,
+          apiSecret: (env.TELEMETRY_API_SECRET ??
+            env.CONFLUENT_CLOUD_API_SECRET)!,
         },
       },
     });

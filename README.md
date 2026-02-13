@@ -63,7 +63,10 @@ An MCP server implementation that enables AI assistants to interact with Conflue
 
 ### Getting Started
 
-1. **Create a `.env` file:**  Copy the example `.env` file structure (shown below) into a new file named `.env` in the root of your project.
+1. **Create a `.env` file:**  Copy the provided `.env.example` file to `.env` in the root of your project:
+   ```bash
+   cp .env.example .env
+   ```
 2. **Populate the `.env` file:** Fill in the necessary values for your Confluent Cloud environment.  See the [Configuration](#configuration) section for details on each variable.
 3. **Install Node.js** (if not already installed)
    - We recommend using [NVM](https://github.com/nvm-sh/nvm) (Node Version Manager) to manage Node.js versions
@@ -76,7 +79,7 @@ An MCP server implementation that enables AI assistants to interact with Conflue
 
 ### Configuration
 
-Create a `.env` file in the root directory of your project with the following configuration:
+Copy `.env.example` to `.env` in the root directory and fill in your values. See the example structure below:
 
 <details>
 <summary>Example .env file structure</summary>
@@ -291,7 +294,7 @@ To configure Claude Desktop to use this MCP server:
        "confluent": {
          "command": "npx",
          "args": [
-           "-y"
+           "-y",
            "@confluentinc/mcp-confluent",
            "-e",
            "/path/to/confluent-mcp-server/.env"
@@ -305,7 +308,7 @@ To configure Claude Desktop to use this MCP server:
 
    Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
 
-1. **Restart Claude Desktop**
+3. **Restart Claude Desktop**
    - Close and reopen Claude Desktop for the changes to take effect
    - The MCP server will automatically start when Claude Desktop launches
 
@@ -769,17 +772,42 @@ Claude: "The statement has high backpressure on task 'Sink'. Try increasing para
 
 ```sh
 /
-├── src/                 # Source code
-│   ├── confluent/       # Confluent integration (API clients, etc.)
-│   │   └── tools/           # Tool implementations
-│   ├── mcp/             # MCP protocol and transport logic
-│   │   └── transports/
-│   └── ...              # Other server logic, utilities, etc.
-├── dist/                # Compiled output
-├── openapi.json         # OpenAPI specification for Confluent Cloud
-├── .env                 # Environment variables (example - should be copied and filled)
-├── README.md            # This file
-└── package.json         # Node.js project metadata and dependencies
+├── src/                    # Source code
+│   ├── index.ts                # Main entry point
+│   ├── cli.ts                  # CLI argument parsing
+│   ├── env.ts                  # Environment initialization
+│   ├── env-schema.ts           # Environment variable schema (Zod)
+│   ├── logger.ts               # Logger configuration
+│   ├── confluent/              # Confluent integration
+│   │   ├── client-manager.ts       # API client management
+│   │   ├── schema-registry-helper.ts
+│   │   └── tools/
+│   │       ├── base-tools.ts        # Base handler class
+│   │       ├── tool-factory.ts      # Tool registry
+│   │       ├── tool-name.ts         # Tool name enum
+│   │       └── handlers/
+│   │           ├── billing/         # Billing tools
+│   │           ├── catalog/         # Catalog & tag tools
+│   │           ├── clusters/        # Cluster tools
+│   │           ├── connect/         # Connector tools
+│   │           ├── environments/    # Environment tools
+│   │           ├── flink/           # Flink SQL, catalog & diagnostics tools
+│   │           ├── kafka/           # Kafka topic & message tools
+│   │           ├── schema/          # Schema Registry tools
+│   │           ├── search/          # Search tools
+│   │           └── tableflow/       # Tableflow topic & catalog tools
+│   └── mcp/                    # MCP protocol and transport logic
+│       └── transports/
+│           ├── http.ts              # HTTP transport
+│           ├── sse.ts               # SSE transport
+│           ├── stdio.ts             # STDIO transport
+│           ├── auth.ts              # Authentication middleware
+│           └── manager.ts           # Transport manager
+├── dist/                   # Compiled output
+├── openapi.json            # OpenAPI specification for Confluent Cloud
+├── .env.example            # Example environment variables
+├── README.md               # This file
+└── package.json            # Node.js project metadata and dependencies
 ```
 
 ### Building and Running
@@ -845,17 +873,17 @@ Here's how to build your Docker image and run it in different modes.
     - `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
     - `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
     - `-d`: Runs the container in **detached mode** (in the background).
-    - `-p 3000:3000`: **Maps port 3000** on your host machine to port 3000 inside the container. Adjust this if your app listens on a different port.
+    - `-p 8080:8080`: **Maps port 8080** on your host machine to port 8080 inside the container. The default HTTP_PORT is 8080; adjust if you've configured a different port.
 
     ```bash
-    docker run --rm -i -d -p 3000:3000 mcp-server
+    docker run --rm -i -d -p 8080:8080 mcp-server
     ```
 
     (Optional)
     - `-t` **Transport Mode** to enable http transport
 
     ```bash
-    docker run --rm -d -p 3000:3000 mcp-server -t http
+    docker run --rm -d -p 8080:8080 mcp-server -t http
     ```
 
 #### Building and Running with Docker Compose
@@ -876,7 +904,7 @@ Here's how to build your Docker image and run it in different modes.
 
     The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
 
-    The server will be accessible on <http://localhost:3000> (or the port specified in HTTP_PORT in your .env file).
+    The server will be accessible on <http://localhost:8080> (or the port specified in HTTP_PORT in your .env file).
 
 3. **Stopping the Server**
     To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
@@ -918,4 +946,4 @@ npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --e
 
 ### Contributing
 
-Bug reports and feedback is appreciated in the form of Github Issues. For guidelines on contributing please see [CONTRIBUTING.md](CONTRIBUTING.MD)
+Bug reports and feedback is appreciated in the form of Github Issues. For guidelines on contributing please see [CONTRIBUTING.md](CONTRIBUTING.md)

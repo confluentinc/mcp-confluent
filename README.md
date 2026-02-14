@@ -8,6 +8,8 @@ An MCP server implementation that enables AI assistants to interact with Conflue
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/confluentinc/mcp-confluent)
 
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/confluentinc/mcp-confluent)](https://archestra.ai/mcp-catalog/confluentinc__mcp-confluent)
+
 ## Demo
 
 ### Goose CLI

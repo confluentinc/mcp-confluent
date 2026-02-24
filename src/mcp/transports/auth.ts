@@ -62,6 +62,11 @@ function isHostAllowed(
   hostHeader: string | undefined,
   allowedHosts: string[],
 ): boolean {
+  // Wildcard allows all hosts (useful for cloud deployments with dynamic IPs)
+  if (allowedHosts.includes("*")) {
+    return true;
+  }
+
   if (!hostHeader) {
     return false;
   }

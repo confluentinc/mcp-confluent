@@ -42,6 +42,9 @@ An MCP server implementation that enables AI assistants to interact with Conflue
       - [Example: Block Certain Tools](#example-block-certain-tools)
       - [Example: Use Tool Lists from Files](#example-use-tool-lists-from-files)
       - [Example: List All Available Tools](#example-list-all-available-tools)
+  - [Flink Catalog and Diagnostics](#flink-catalog-and-diagnostics)
+    - [Flink Tools](#flink-tools)
+    - [Example Workflows](#example-workflows)
   - [Developer Guide](#developer-guide)
     - [Project Structure](#project-structure)
     - [Building and Running](#building-and-running)
@@ -60,7 +63,10 @@ An MCP server implementation that enables AI assistants to interact with Conflue
 
 ### Getting Started
 
-1. **Create a `.env` file:**  Copy the example `.env` file structure (shown below) into a new file named `.env` in the root of your project.
+1. **Create a `.env` file:**  Copy the provided `.env.example` file to `.env` in the root of your project:
+   ```bash
+   cp .env.example .env
+   ```
 2. **Populate the `.env` file:** Fill in the necessary values for your Confluent Cloud environment.  See the [Configuration](#configuration) section for details on each variable.
 3. **Install Node.js** (if not already installed)
    - We recommend using [NVM](https://github.com/nvm-sh/nvm) (Node Version Manager) to manage Node.js versions
@@ -73,7 +79,7 @@ An MCP server implementation that enables AI assistants to interact with Conflue
 
 ### Configuration
 
-Create a `.env` file in the root directory of your project with the following configuration:
+Copy `.env.example` to `.env` in the root directory and fill in your values. See the example structure below:
 
 <details>
 <summary>Example .env file structure</summary>
@@ -288,7 +294,7 @@ To configure Claude Desktop to use this MCP server:
        "confluent": {
          "command": "npx",
          "args": [
-           "-y"
+           "-y",
            "@confluentinc/mcp-confluent",
            "-e",
            "/path/to/confluent-mcp-server/.env"
@@ -302,7 +308,7 @@ To configure Claude Desktop to use this MCP server:
 
    Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
 
-1. **Restart Claude Desktop**
+3. **Restart Claude Desktop**
    - Close and reopen Claude Desktop for the changes to take effect
    - The MCP server will automatically start when Claude Desktop launches
 
@@ -661,6 +667,15 @@ delete-connector: Delete an existing connector. Returns success message if delet
 delete-flink-statements: Make a request to delete a statement.
 delete-tag: Delete a tag definition from Confluent Cloud.
 delete-topics: Delete the topic with the given names.
+check-flink-statement-health: Perform an aggregate health check for a Flink SQL statement.
+describe-flink-table: Get full schema details for a Flink table via INFORMATION_SCHEMA.COLUMNS.
+detect-flink-statement-issues: Detect issues for a Flink SQL statement by analyzing status, exceptions, and metrics.
+get-flink-statement-profile: Get Query Profiler data with task graph, metrics, and automated issue detection.
+get-flink-table-info: Get table metadata via INFORMATION_SCHEMA.TABLES.
+list-flink-catalogs: List all catalogs in the Flink environment.
+list-flink-databases: List all databases (schemas) in a Flink catalog via INFORMATION_SCHEMA.SCHEMATA.
+list-flink-tables: List all tables in a Flink database.
+get-flink-statement-exceptions: Retrieve the 10 most recent exceptions for a Flink SQL statement.
 get-topic-config: Retrieve configuration details for a specific Kafka topic.
 list-clusters: Get all clusters in the Confluent Cloud environment
 list-connectors: Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.
@@ -676,7 +691,6 @@ read-flink-statement: Make a request to read a statement and its results
 remove-tag-from-entity: Remove tag from an entity in Confluent Cloud.
 search-topics-by-name: List all topics in the Kafka cluster matching the specified name.
 search-topics-by-tag: List all topics in the Kafka cluster with the specified tag.
-create-tableflow-topic: Make a request to create a tableflow topic.
 create-tableflow-topic: Make a request to create a tableflow topic.
 list-tableflow-regions: Retrieve a sorted, filtered, paginated list of all tableflow regions.
 list-tableflow-topics: Retrieve a sorted, filtered, paginated list of all tableflow topics.
@@ -694,23 +708,106 @@ delete-tableflow-catalog-integration: Make a request to delete a tableflow catal
 
 > **Tip:** The allow-list is applied before the block-list. If neither is provided, all tools are enabled by default.
 
+## Flink Catalog and Diagnostics
+
+Tools for Flink SQL catalog introspection and statement diagnostics.
+
+### Flink Tools
+
+| Tool | Description |
+|------|-------------|
+| `create-flink-statement` | Create and execute a Flink SQL statement |
+| `list-flink-statements` | List all Flink SQL statements with filtering |
+| `read-flink-statement` | Read statement results with pagination |
+| `delete-flink-statements` | Delete a Flink SQL statement |
+| `get-flink-statement-exceptions` | Retrieve recent exceptions for a statement |
+| `list-flink-catalogs` | List catalogs via INFORMATION_SCHEMA |
+| `list-flink-databases` | List databases via INFORMATION_SCHEMA |
+| `list-flink-tables` | List tables in a database |
+| `describe-flink-table` | Get full table schema including $rowtime, types, nullability |
+| `get-flink-table-info` | Get table metadata (watermarks, distribution) |
+| `check-flink-statement-health` | Aggregate health check with status (healthy/warning/critical) |
+| `detect-flink-statement-issues` | Detect issues from status, exceptions, and metrics |
+| `get-flink-statement-profile` | Query Profiler with task graph, metrics, and issue detection |
+
+### Example Workflows
+
+#### Deduplication Workflow
+
+```
+User: "I want to deduplicate events from my_topic"
+        ↓
+Claude: Uses describe-flink-table → gets schema (event_id, user_id, ...)
+        ↓
+Claude: "Which field should I deduplicate on?"
+        ↓
+User: "event_id"
+        ↓
+Claude: Generates SQL using ROW_NUMBER() pattern
+        ↓
+Claude: Uses create-flink-statement → submits query
+        ↓
+Claude: Uses check-flink-statement-health → monitors status
+        ↓
+Claude: "Running successfully!"
+```
+
+#### Debugging a Failed Statement
+
+```
+User: "My statement xyz is failing. What's wrong?"
+        ↓
+Claude: Uses get-flink-statement-exceptions → gets error details
+        ↓
+Claude: Uses detect-flink-statement-issues → analyzes status, exceptions, metrics
+        ↓
+Claude: Uses get-flink-statement-profile → gets task-level metrics
+        ↓
+Claude: "The statement has high backpressure on task 'Sink'. Try increasing parallelism..."
+```
+
 ## Developer Guide
 
 ### Project Structure
 
 ```sh
 /
-├── src/                 # Source code
-│   ├── confluent/       # Confluent integration (API clients, etc.)
-│   │   └── tools/           # Tool implementations
-│   ├── mcp/             # MCP protocol and transport logic
-│   │   └── transports/
-│   └── ...              # Other server logic, utilities, etc.
-├── dist/                # Compiled output
-├── openapi.json         # OpenAPI specification for Confluent Cloud
-├── .env                 # Environment variables (example - should be copied and filled)
-├── README.md            # This file
-└── package.json         # Node.js project metadata and dependencies
+├── src/                    # Source code
+│   ├── index.ts                # Main entry point
+│   ├── cli.ts                  # CLI argument parsing
+│   ├── env.ts                  # Environment initialization
+│   ├── env-schema.ts           # Environment variable schema (Zod)
+│   ├── logger.ts               # Logger configuration
+│   ├── confluent/              # Confluent integration
+│   │   ├── client-manager.ts       # API client management
+│   │   ├── schema-registry-helper.ts
+│   │   └── tools/
+│   │       ├── base-tools.ts        # Base handler class
+│   │       ├── tool-factory.ts      # Tool registry
+│   │       ├── tool-name.ts         # Tool name enum
+│   │       └── handlers/
+│   │           ├── billing/         # Billing tools
+│   │           ├── catalog/         # Catalog & tag tools
+│   │           ├── clusters/        # Cluster tools
+│   │           ├── connect/         # Connector tools
+│   │           ├── environments/    # Environment tools
+│   │           ├── flink/           # Flink SQL, catalog & diagnostics tools
+│   │           ├── kafka/           # Kafka topic & message tools
+│   │           ├── schema/          # Schema Registry tools
+│   │           ├── search/          # Search tools
+│   │           └── tableflow/       # Tableflow topic & catalog tools
+│   └── mcp/                    # MCP protocol and transport logic
+│       └── transports/
+│           ├── http.ts              # HTTP transport
+│           ├── sse.ts               # SSE transport
+│           ├── stdio.ts             # STDIO transport
+│           ├── auth.ts              # Authentication middleware
+│           └── manager.ts           # Transport manager
+├── dist/                   # Compiled output
+├── openapi.json            # OpenAPI specification for Confluent Cloud
+├── .env.example            # Example environment variables
+├── README.md               # This file
+└── package.json            # Node.js project metadata and dependencies
 ```
 
 ### Building and Running
@@ -776,17 +873,17 @@ Here's how to build your Docker image and run it in different modes.
     - `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
     - `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
     - `-d`: Runs the container in **detached mode** (in the background).
-    - `-p 3000:3000`: **Maps port 3000** on your host machine to port 3000 inside the container. Adjust this if your app listens on a different port.
+    - `-p 8080:8080`: **Maps port 8080** on your host machine to port 8080 inside the container. The default HTTP_PORT is 8080; adjust if you've configured a different port.
 
     ```bash
-    docker run --rm -i -d -p 3000:3000 mcp-server
+    docker run --rm -i -d -p 8080:8080 mcp-server
     ```
 
     (Optional)
     - `-t` **Transport Mode** to enable http transport
 
     ```bash
-    docker run --rm -d -p 3000:3000 mcp-server -t http
+    docker run --rm -d -p 8080:8080 mcp-server -t http
     ```
 
 #### Building and Running with Docker Compose
@@ -807,7 +904,7 @@ Here's how to build your Docker image and run it in different modes.
 
     The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
 
-    The server will be accessible on <http://localhost:3000> (or the port specified in HTTP_PORT in your .env file).
+    The server will be accessible on <http://localhost:8080> (or the port specified in HTTP_PORT in your .env file).
 
 3. **Stopping the Server**
     To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
@@ -849,4 +946,4 @@ npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --e
 
 ### Contributing
 
-Bug reports and feedback is appreciated in the form of Github Issues. For guidelines on contributing please see [CONTRIBUTING.md](CONTRIBUTING.MD)
+Bug reports and feedback is appreciated in the form of Github Issues. For guidelines on contributing please see [CONTRIBUTING.md](CONTRIBUTING.md)

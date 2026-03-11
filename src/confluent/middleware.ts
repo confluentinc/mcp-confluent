@@ -1,5 +1,6 @@
 import { logger } from "@src/logger.js";
 import { Middleware } from "openapi-fetch";
+import pkg from "../../package.json" with { type: "json" };
 
 export interface ConfluentEndpoints {
   cloud?: string;
@@ -25,7 +26,7 @@ export const createAuthMiddleware = (auth: ConfluentAuth): Middleware => ({
       "Authorization",
       `Basic ${Buffer.from(`${auth.apiKey}:${auth.apiSecret}`).toString("base64")}`,
     );
-    request.headers.set("User-Agent", "mcp-confluent");
+    request.headers.set("User-Agent", `mcp-confluent/${pkg.version}`);
     return request;
   },
 });

@@ -51,4 +51,4 @@ blocks:
       jobs:
         - name: "Test"
           commands:
-            - echo "No tests configured yet"
+            - npm run test

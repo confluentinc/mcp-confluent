@@ -12,6 +12,7 @@ renovatebot:
 semaphore:
   enable: true
   pipeline_enable: false
+  status_level: block
   tasks:
     - name: create-github-tag
       branch: main

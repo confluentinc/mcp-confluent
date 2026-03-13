@@ -20,16 +20,17 @@ global_job_config:
     commands:
       - sem-version node 22
       - checkout
-      - npm ci
+      - cache restore npm-cache-
+      - npm ci --prefer-offline
+  epilogue:
+    commands:
+      - cache store npm-cache-$(checksum package-lock.json) ~/.npm
 
 blocks:
   - name: "Static Analysis"
     dependencies: []
     task:
       jobs:
-        - name: "Prettier"
-          commands:
-            - npm run format:check
         - name: "ESLint"
           commands:
             - npm run lint

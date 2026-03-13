@@ -63,7 +63,6 @@
     "tsc-alias": "^1.8.16",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.35.0",
-    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.0"
   },
   "dependencies": {

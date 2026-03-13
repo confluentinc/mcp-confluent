@@ -52,3 +52,17 @@ blocks:
         - name: "Test"
           commands:
             - npm run test
+      epilogue:
+        always:
+          commands:
+            - >-
+              if [ -f TEST-result.xml ]; then
+                test-results publish TEST-result.xml --force;
+              fi
+
+after_pipeline:
+  task:
+    jobs:
+      - name: Publish Test Results
+        commands:
+          - test-results gen-pipeline-report || true

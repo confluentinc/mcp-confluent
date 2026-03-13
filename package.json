@@ -34,7 +34,6 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.+(js|ts|json)\"",
-    "format:check": "prettier --check \"**/*.+(js|ts|json)\"",
     "build": "tsc && tsc-alias",
     "print:schema": "node dist/print-md-schema.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js --env-file .env",

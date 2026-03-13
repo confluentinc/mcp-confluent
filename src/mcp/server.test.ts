@@ -37,9 +37,4 @@ describe("MCP server startup", () => {
     expect(caps).toBeDefined();
     expect(caps?.tools).toBeDefined();
   });
-
-  // TEMPORARY:
-  it("should fail on purpose", () => {
-    expect(true).toBe(false);
-  });
 });

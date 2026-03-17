@@ -26,7 +26,7 @@ export const createAuthMiddleware = (auth: ConfluentAuth): Middleware => ({
       "Authorization",
       `Basic ${Buffer.from(`${auth.apiKey}:${auth.apiSecret}`).toString("base64")}`,
     );
-    request.headers.set("User-Agent", `mcp-confluent/${pkg.version}`);
+    request.headers.set("User-Agent", `mcp-confluent-local/${pkg.version}`);
     return request;
   },
 });

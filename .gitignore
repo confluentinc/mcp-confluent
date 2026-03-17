@@ -136,3 +136,6 @@ dist
 .continue
 *.txt
 connector-config.json
+
+# GSD planning directory
+.planning

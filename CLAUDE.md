@@ -4,168 +4,67 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an MCP (Model Context Protocol) server that exposes Confluent Cloud REST APIs to AI assistants like Claude Desktop and Goose CLI. It enables natural language interactions with Kafka topics, Flink SQL statements, connectors, schemas, and other Confluent Cloud resources.
+MCP (Model Context Protocol) server that exposes Confluent Cloud resources (Kafka, Flink, Schema Registry, Connectors, Tableflow, Billing) as tools for AI assistants. Built with TypeScript, Node.js ≥22, and the `@modelcontextprotocol/sdk`.
 
-## Development Commands
-
-### Building and Running
+## Build & Development Commands
 
 ```bash
-# Build the project (TypeScript compilation + path alias resolution)
-npm run build
-
-# Watch mode for development
-npm run dev
-
-# Type checking without emitting files
-npm run test:ts
-
-# Run with different transports
-npm start                    # stdio transport (default for Claude Desktop)
-npm start:http               # HTTP transport
-npm start:sse                # SSE transport
-npm start:all                # All transports simultaneously
-
-# Debug with MCP Inspector
-npm run inspector
+npm run build          # tsc && tsc-alias (compile + resolve path aliases)
+npm run dev            # watch mode: tsc + tsc-alias in parallel
+npm run lint           # eslint
+npm run lint:fix       # eslint --fix
+npm run format         # prettier --write
+npm run test:ts        # tsc --noEmit (type-check only, no tests exist yet)
+npm run start          # node dist/index.js --env-file .env (stdio transport)
+npm run start:http     # HTTP transport
+npm run start:all      # all transports (http, sse, stdio)
+npm run inspector      # launch MCP inspector for manual testing
+npm run print:schema   # print tool schemas as markdown
 ```
 
-### Code Quality
-
-```bash
-# Lint code
-npm run lint
-
-# Auto-fix linting issues
-npm run lint:fix
-
-# Format code with Prettier
-npm run format
-```
-
-### Utilities
-
-```bash
-# Generate API key for HTTP/SSE auth
-npx @confluentinc/mcp-confluent --generate-key
-
-# Print tool schema documentation
-npm run print:schema
-
-# List available tools
-node dist/index.js --list-tools
-```
+Pre-commit hook runs `npm run format && npm run lint` automatically via Husky.
 
 ## Architecture
 
-### Tool-Based Architecture
+### Entry Point & Startup Flow
 
-The server uses a **tool-handler pattern** where each Confluent Cloud capability is exposed as an MCP tool:
+`src/index.ts` → `parseCliArgs()` → `initEnv()` (Zod-validated env vars) → creates `DefaultClientManager` → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
 
-- **Tool Factory** (`src/confluent/tools/tool-factory.ts`): Central registry that maps tool names to handler instances
-- **Base Tool Handler** (`src/confluent/tools/base-tools.ts`): Abstract base class defining the handler interface
-- **Tool Handlers** (`src/confluent/tools/handlers/`): Implementations organized by domain
+Tools are **auto-enabled/disabled** based on which environment variables are present. Each handler declares its requirements via `getRequiredEnvVars()`. Cloud-only tools can be disabled with `--disable-confluent-cloud-tools`.
 
-### Handler Organization
+### Key Layers
 
-Handlers are grouped by Confluent Cloud service domain:
+- **`src/confluent/tools/`** — Tool system core:
+  - `tool-name.ts` — `ToolName` enum; add new entries here when creating tools.
+  - `base-tools.ts` — `BaseToolHandler` abstract class all handlers extend.
+  - `tool-factory.ts` — Static registry mapping `ToolName` → handler instance. Wire new tools here.
+  - `handlers/<domain>/` — Organized by Confluent service (kafka, flink, connect, catalog, schema, tableflow, billing, search).
 
-```
-src/confluent/tools/handlers/
-├── kafka/              # Kafka operations (topics, produce, consume, config)
-├── flink/              # Flink SQL statements and catalog operations
-│   ├── catalog/        # Catalog metadata (databases, tables, schemas)
-│   └── diagnostics/    # Statement health checks and profiling
-├── schema/             # Schema Registry operations
-├── connect/            # Kafka Connect connector management
-├── catalog/            # Data Catalog tagging operations
-├── tableflow/          # Tableflow (preview) topic and catalog integrations
-├── search/             # Topic search by name or tags
-├── environments/       # Environment and cluster management
-├── clusters/           # Cluster operations
-└── billing/            # Billing cost queries
-```
+- **`src/confluent/client-manager.ts`** — `DefaultClientManager` holds lazily-initialized Kafka clients (admin, producer, consumer via `@confluentinc/kafka-javascript`) and typed REST clients (`openapi-fetch`) for each Confluent Cloud API surface.
 
-### Transport Layer
+- **`src/confluent/openapi-schema.d.ts`** — Generated types from `openapi.json` using `openapi-typescript`. Provides type-safe REST calls throughout the codebase.
 
-MCP server supports three transport mechanisms (`src/mcp/transports/`):
+- **`src/mcp/transports/`** — Transport layer supporting stdio, HTTP (Streamable HTTP), and SSE. `TransportManager` orchestrates startup/shutdown. HTTP/SSE transports use Fastify and support API key auth + DNS rebinding protection.
 
-- **stdio**: Default for Claude Desktop integration (stdin/stdout)
-- **HTTP**: REST API with authentication
-- **SSE**: Server-Sent Events for streaming
+- **`src/env-schema.ts`** — Zod schema defining all environment variables with defaults and validation. Merged from required (`envSchema`) and optional (`configSchema`) sections.
 
-All transports are managed by `TransportManager` and share the same tool registry.
-
-### Client Management
-
-`ClientManager` (`src/confluent/client-manager.ts`) centralizes API client instantiation and configuration:
-
-- Manages separate clients for Confluent Cloud, Flink, Schema Registry, Kafka REST, and Tableflow
-- Handles authentication credentials per service
-- Uses lazy initialization to only create clients when needed
-- Supports session-based client isolation (e.g., separate consumer groups per session)
+- **`src/confluent/middleware.ts`** — Auth middleware injected into `openapi-fetch` clients for Confluent Cloud API authentication.
 
 ### Path Aliases
 
-The codebase uses TypeScript path aliases for cleaner imports:
+`@src/*` maps to `src/*` (configured in `tsconfig.json`, resolved at build time by `tsc-alias`). Always use `@src/` imports for internal modules.
 
-- `@src/*` maps to `src/*`
-- Compilation requires both `tsc` and `tsc-alias` (run via `npm run build`)
+## Adding a New Tool
 
-### Environment Configuration
+1. Add entry to `ToolName` enum in `src/confluent/tools/tool-name.ts`.
+2. Create handler class extending `BaseToolHandler` in `src/confluent/tools/handlers/<domain>/`.
+3. Implement `getToolConfig()` (name, description, Zod input schema), `handle()`, and `getRequiredEnvVars()`.
+4. Register the handler in `ToolFactory.handlers` map in `src/confluent/tools/tool-factory.ts`.
+5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `openapi-typescript` (`npx openapi-typescript openapi.json -o src/confluent/openapi-schema.d.ts`).
 
-The server is highly configurable via environment variables (see `.env.example`). Required variables depend on which tools are enabled:
+## Code Conventions
 
-- **Kafka tools**: `BOOTSTRAP_SERVERS`, `KAFKA_API_KEY`, `KAFKA_API_SECRET`
-- **Flink tools**: `FLINK_REST_ENDPOINT`, `FLINK_API_KEY`, `FLINK_API_SECRET`, `FLINK_COMPUTE_POOL_ID`
-- **Schema Registry tools**: `SCHEMA_REGISTRY_ENDPOINT`, `SCHEMA_REGISTRY_API_KEY`, `SCHEMA_REGISTRY_API_SECRET`
-- **Cloud management tools**: `CONFLUENT_CLOUD_API_KEY`, `CONFLUENT_CLOUD_API_SECRET`
-
-Tools are automatically disabled if their required environment variables are not set.
-
-### Tool Filtering
-
-The CLI supports selective tool enabling/disabling:
-
-```bash
-# Allow only specific tools
-node dist/index.js --allow-tools "list_topics,create_topics"
-
-# Block specific tools
-node dist/index.js --block-tools "delete_topics,delete_flink_statements"
-
-# Disable all Confluent Cloud management tools
-node dist/index.js --disable-confluent-cloud-tools
-```
-
-## Adding New Tools
-
-To add a new MCP tool:
-
-1. **Create handler**: Add new handler class in `src/confluent/tools/handlers/<domain>/`
-   - Extend `BaseToolHandler`
-   - Implement `handle()`, `getToolConfig()`, and optionally `getRequiredEnvVars()` and `isConfluentCloudOnly()`
-
-2. **Register tool name**: Add enum entry to `ToolName` in `src/confluent/tools/tool-name.ts`
-
-3. **Register in factory**: Add handler instance to `ToolFactory.handlers` map in `src/confluent/tools/tool-factory.ts`
-
-4. **Add OpenAPI types** (if using Confluent Cloud REST API): Update `openapi.json` and regenerate types with `openapi-typescript`
-
-## Key Dependencies
-
-- `@modelcontextprotocol/sdk`: MCP protocol implementation
-- `@confluentinc/kafka-javascript`: Confluent's Kafka client for Node.js
-- `@confluentinc/schemaregistry`: Schema Registry client
-- `openapi-fetch`: Type-safe OpenAPI client generation
-- `fastify`: HTTP/SSE server framework
-- `commander`: CLI argument parsing
-- `zod`: Schema validation (via MCP SDK)
-
-## Testing
-
-Currently, there are no automated tests in this repository. Type checking is performed via `npm run test:ts`.
-
-## Node Version Requirement
-
-This project requires **Node.js >= 22** due to dependency requirements.
+- ESM modules (`"type": "module"` in package.json); use `.js` extensions in import paths.
+- Prettier + ESLint enforced; `src/ccloud/**` and `dist/**` are excluded from linting.
+- `noImplicitAny` is disabled in tsconfig due to OpenAPI type resolution issues.
+- REST API calls use `openapi-fetch` with typed paths from the generated schema — prefer this over raw fetch.

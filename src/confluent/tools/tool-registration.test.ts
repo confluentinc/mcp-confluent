@@ -1,8 +1,7 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { createTestServer, TestServerContext } from "@src/test-utils/server.js";
-import sinon from "sinon";
+import { createStubClientManager } from "@src/test-utils/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
@@ -29,8 +28,7 @@ describe("tool registration", () => {
     let ctx: TestServerContext;
 
     beforeEach(async () => {
-      const stub = sinon.createStubInstance(DefaultClientManager);
-      ctx = await createTestServer(stub);
+      ctx = await createTestServer(createStubClientManager());
     });
 
     afterEach(async () => {

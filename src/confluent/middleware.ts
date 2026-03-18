@@ -12,8 +12,8 @@ export interface ConfluentEndpoints {
 }
 
 export interface ConfluentAuth {
-  apiKey: string;
-  apiSecret: string;
+  apiKey?: string;
+  apiSecret?: string;
 }
 
 /**
@@ -22,10 +22,12 @@ export interface ConfluentAuth {
 export const createAuthMiddleware = (auth: ConfluentAuth): Middleware => ({
   async onRequest({ request }) {
     logger.debug({ request }, "Processing request");
-    request.headers.set(
-      "Authorization",
-      `Basic ${Buffer.from(`${auth.apiKey}:${auth.apiSecret}`).toString("base64")}`,
-    );
+    if (auth.apiKey && auth.apiSecret) {
+      request.headers.set(
+        "Authorization",
+        `Basic ${Buffer.from(`${auth.apiKey}:${auth.apiSecret}`).toString("base64")}`,
+      );
+    }
     request.headers.set("User-Agent", `mcp-confluent-local/${pkg.version}`);
     return request;
   },

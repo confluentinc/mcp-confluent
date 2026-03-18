@@ -3,7 +3,10 @@
  */
 
 import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
-import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
+import {
+  ClientConfig,
+  SchemaRegistryClient,
+} from "@confluentinc/schemaregistry";
 import {
   ConfluentAuth,
   ConfluentEndpoints,
@@ -258,13 +261,16 @@ export class DefaultClientManager
         throw new Error("Schema Registry endpoint not configured");
       }
       const { apiKey, apiSecret } = config.auth.schemaRegistry;
-      return new SchemaRegistryClient({
+      const clientConfig: ClientConfig = {
         baseURLs: [this.confluentCloudSchemaRegistryBaseUrl],
-        basicAuthCredentials: {
+      };
+      if (apiKey && apiSecret) {
+        clientConfig.basicAuthCredentials = {
           credentialsSource: "USER_INFO",
           userInfo: `${apiKey}:${apiSecret}`,
-        },
-      });
+        };
+      }
+      return new SchemaRegistryClient(clientConfig);
     });
   }
 

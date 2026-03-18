@@ -1,5 +1,5 @@
 version: v1.0
-name: build
+name: CI
 agent:
   machine:
     type: s1-prod-ubuntu24-04-amd64-2
@@ -15,16 +15,41 @@ queue:
   - when: "branch != 'main'"
     processing: parallel
 
+global_job_config:
+  prologue:
+    commands:
+      - sem-version node 22
+      - checkout
+      - cache restore npm-cache-
+      - npm ci --prefer-offline
+  epilogue:
+    commands:
+      - cache store npm-cache-$(checksum package-lock.json) ~/.npm
+
 blocks:
-  - name: "resolve dependencies and build"
+  - name: "Static Analysis"
     dependencies: []
     task:
-      prologue:
-        commands:
-          - sem-version node 22
-          - checkout
       jobs:
-        - name: "build"
+        - name: "ESLint"
           commands:
-            - npm ci 
+            - npm run lint
+        - name: "TypeScript"
+          commands:
+            - npm run test:ts
+
+  - name: "Build"
+    dependencies: ["Static Analysis"]
+    task:
+      jobs:
+        - name: "Build"
+          commands:
             - npm run build
+
+  - name: "Test"
+    dependencies: ["Build"]
+    task:
+      jobs:
+        - name: "Test"
+          commands:
+            - echo "No tests configured yet"

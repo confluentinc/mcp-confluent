@@ -47,4 +47,14 @@ export enum ToolName {
   UPDATE_TABLEFLOW_CATALOG_INTEGRATION = "update-tableflow-catalog-integration",
   DELETE_TABLEFLOW_CATALOG_INTEGRATION = "delete-tableflow-catalog-integration",
   LIST_BILLING_COSTS = "list-billing-costs",
+
+  // Observability & Metrics Tools
+  GET_CLUSTER_METRICS = "get-cluster-metrics",
+  // TODO: Add as we implement each handler
+  // GET_TOPIC_METRICS = "get-topic-metrics",
+  // GET_PARTITION_METRICS = "get-partition-metrics",
+  // CHECK_CONSUMER_LAG = "check-consumer-lag",
+  // CHECK_CLIENT_QUOTAS = "check-client-quotas",
+  // GET_SCHEMA_REGISTRY_STATUS = "get-schema-registry-status",
+  // STREAM_AUDIT_LOGS = "stream-audit-logs",
 }

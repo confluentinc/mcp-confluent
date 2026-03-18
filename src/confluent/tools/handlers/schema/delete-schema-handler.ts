@@ -121,10 +121,6 @@ export class DeleteSchemaHandler extends BaseToolHandler {
   }
 
   getRequiredEnvVars(): EnvVar[] {
-    return [
-      "SCHEMA_REGISTRY_ENDPOINT",
-      "SCHEMA_REGISTRY_API_KEY",
-      "SCHEMA_REGISTRY_API_SECRET",
-    ];
+    return ["SCHEMA_REGISTRY_ENDPOINT"];
   }
 }

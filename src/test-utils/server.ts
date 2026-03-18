@@ -30,10 +30,9 @@ export async function createTestServer(
   for (const toolName of names) {
     const handler = ToolFactory.createToolHandler(toolName);
     const config = handler.getToolConfig();
-    server.tool(
+    server.registerTool(
       toolName as string,
-      config.description,
-      config.inputSchema,
+      { description: config.description, inputSchema: config.inputSchema },
       async (args, context) => {
         return await handler.handle(clientManager, args, context?.sessionId);
       },

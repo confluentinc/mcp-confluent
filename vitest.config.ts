@@ -9,7 +9,7 @@ export default defineConfig({
     globals: false,
     restoreMocks: true,
     testTimeout: 10_000,
-    reporters: ["default", "junit"],
+    reporters: ["verbose", "junit"],
     outputFile: {
       junit: "TEST-result.xml",
     },

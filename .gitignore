@@ -130,6 +130,9 @@ dist
 .pnp.*
 
 
+# test results
+TEST-result*.xml
+
 # vscode
 .vscode
 .idea

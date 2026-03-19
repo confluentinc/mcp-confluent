@@ -3,22 +3,18 @@ import { TextContent } from "@modelcontextprotocol/sdk/types.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  createStubAdmin,
-  createStubClientManager,
-  StubbedAdmin,
-} from "@src/test-utils/stubs/index.js";
-import { SinonStubbedInstance } from "sinon";
+import { createStubAdmin, StubbedAdmin } from "@src/test-utils/stubs/index.js";
+import sinon from "sinon";
 import { beforeEach, describe, expect, it } from "vitest";
 
 describe("ListTopicsHandler", () => {
   const handler = new ListTopicsHandler();
-  let clientManager: SinonStubbedInstance<DefaultClientManager>;
+  let clientManager: sinon.SinonStubbedInstance<DefaultClientManager>;
   let admin: StubbedAdmin;
 
   beforeEach(() => {
     admin = createStubAdmin();
-    clientManager = createStubClientManager();
+    clientManager = sinon.createStubInstance(DefaultClientManager);
     clientManager.getAdminClient.resolves(admin as KafkaJS.Admin);
   });
 

@@ -1,9 +1,9 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import sinon, { SinonStub } from "sinon";
+import sinon from "sinon";
 
 /** {@link KafkaJS.Admin} with all methods replaced by {@link stubs}. */
 export type StubbedAdmin = {
-  [K in keyof KafkaJS.Admin]: SinonStub;
+  [K in keyof KafkaJS.Admin]: sinon.SinonStub;
 };
 
 /**

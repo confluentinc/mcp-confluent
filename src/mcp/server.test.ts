@@ -1,6 +1,7 @@
+import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { createTestServer, TestServerContext } from "@src/test-utils/server.js";
-import { createStubClientManager } from "@src/test-utils/stubs/index.js";
+import sinon from "sinon";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("MCP server startup", () => {
@@ -8,9 +9,10 @@ describe("MCP server startup", () => {
 
   // register a single lightweight tool to keep setup fast
   beforeEach(async () => {
-    ctx = await createTestServer(createStubClientManager(), [
-      ToolName.LIST_TOPICS,
-    ]);
+    ctx = await createTestServer(
+      sinon.createStubInstance(DefaultClientManager),
+      [ToolName.LIST_TOPICS],
+    );
   });
 
   afterEach(async () => {

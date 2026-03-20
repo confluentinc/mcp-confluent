@@ -24,7 +24,7 @@
   },
   "homepage": "https://www.confluent.io/blog/ai-agents-using-anthropic-mcp/",
   "scripts": {
-    "dev": "concurrently \"tsc --watch\" \"tsc-alias --watch\"",
+    "dev": "concurrently \"tsc -p tsconfig.build.json --watch\" \"tsc-alias -p tsconfig.build.json --watch\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ts": "tsc --noEmit",
@@ -36,7 +36,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.+(js|ts|json)\"",
-    "build": "tsc && tsc-alias",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "print:schema": "node dist/print-md-schema.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js --env-file .env",
     "prepare": "husky"

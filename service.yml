@@ -6,9 +6,7 @@ git:
 codeowners:
   enable: true
 renovatebot:
-  enable: true
-  automerge:
-    enable: true
+  enable: false
 semaphore:
   enable: true
   pipeline_enable: false

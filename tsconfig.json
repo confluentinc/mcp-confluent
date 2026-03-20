@@ -7,7 +7,6 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
@@ -21,8 +20,10 @@
     "skipLibCheck": true,
     "baseUrl": "./",
     "paths": {
-      "@src/*": ["src/*"]
+      "@src/*": ["src/*"],
+      "@tests/*": ["tests/*"]
     }
   },
-  "exclude": ["node_modules", "dist"]
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist", "vitest.config.ts"]
 }

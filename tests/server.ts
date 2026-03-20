@@ -11,8 +11,19 @@ export interface TestServerContext {
   client: Client;
   clientTransport: InMemoryTransport;
   serverTransport: InMemoryTransport;
+  /** Closes the client and server transports. Call in {@linkcode afterEach}. */
+  shutdown: () => Promise<void>;
 }
 
+/**
+ * Spins up an {@link McpServer} and {@link Client} connected via
+ * {@link InMemoryTransport} for protocol-level integration tests.
+ *
+ * @param clientManager - (Stubbed) {@link ClientManager} injected into every
+ *   tool handler
+ * @param toolNames - (Optional) Subset of tools to register (defaults to all
+ *   {@link ToolName} values)
+ */
 export async function createTestServer(
   clientManager: ClientManager,
   toolNames?: ToolName[],
@@ -25,8 +36,8 @@ export async function createTestServer(
     name: "confluent-test",
     version: "0.0.0-test",
   });
-  const names = toolNames ?? Object.values(ToolName);
 
+  const names = toolNames ?? Object.values(ToolName);
   for (const toolName of names) {
     const handler = ToolFactory.createToolHandler(toolName);
     const config = handler.getToolConfig();
@@ -45,5 +56,10 @@ export async function createTestServer(
   await server.connect(serverTransport);
   await client.connect(clientTransport);
 
-  return { server, client, clientTransport, serverTransport };
+  const shutdown = async () => {
+    await client.close();
+    await server.close();
+  };
+
+  return { server, client, clientTransport, serverTransport, shutdown };
 }

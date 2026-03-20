@@ -152,10 +152,9 @@ async function main() {
     toolHandlers.forEach((handler, name) => {
       const config = handler.getToolConfig();
 
-      server.tool(
+      server.registerTool(
         name as string,
-        config.description,
-        config.inputSchema,
+        { description: config.description, inputSchema: config.inputSchema },
         async (args, context) => {
           const sessionId = context?.sessionId;
           return await handler.handle(clientManager, args, sessionId);

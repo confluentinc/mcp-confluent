@@ -57,6 +57,7 @@ An MCP server implementation that enables AI assistants to interact with Conflue
       - [MCP Inspector](#mcp-inspector)
     - [Adding a New Tool](#adding-a-new-tool)
     - [Generating Types](#generating-types)
+    - [Publishing npm Package](#publishing-npm-package)
     - [Contributing](#contributing)
 
 ## User Guide
@@ -943,6 +944,25 @@ npx @modelcontextprotocol/inspector node  $PATH_TO_PROJECT/dist/index.js --env-f
 # as of v7.5.2 there is a bug when using allOf w/ required https://github.com/openapi-ts/openapi-typescript/issues/1474. need --empty-objects-unknown flag to avoid it
 npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --empty-objects-unknown
 ```
+
+### Publishing npm Package
+
+1. **Create a tag and trigger the CI build:**
+   - Create a new Git tag for the release version.
+   - Go to the [Semaphore scheduler](https://semaphore.ci.confluent.io/projects/mcp-confluent/schedulers/f32e1114-f05f-4b4b-a863-b4547850ad66), click **Run Now**, set the tag name, and run.
+
+2. **Login to npm and publish:**
+
+   ```bash
+   # Login to npm with Confluent credentials
+   npm login --registry=https://registry.npmjs.org/
+
+   # Verify the package contents before publishing
+   npm publish --dry-run
+
+   # Publish the package
+   npm publish --registry=https://registry.npmjs.org/
+   ```
 
 ### Contributing
 

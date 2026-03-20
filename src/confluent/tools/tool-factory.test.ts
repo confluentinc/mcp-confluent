@@ -7,7 +7,7 @@ const ALL_TOOL_NAMES = Object.values(ToolName);
 describe("tool-factory.ts", () => {
   describe("ToolFactory", () => {
     describe("createToolHandler()", () => {
-      it("should have a handler registered for every ToolName enum value", () => {
+      it("should have a handler for every tool", () => {
         for (const name of ALL_TOOL_NAMES) {
           expect(() => ToolFactory.createToolHandler(name)).not.toThrow();
         }

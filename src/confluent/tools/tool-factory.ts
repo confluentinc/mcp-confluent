@@ -48,6 +48,7 @@ import { ReadTableFlowTopicHandler } from "@src/confluent/tools/handlers/tablefl
 import { UpdateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/update-tableflow-topic-handler.js";
 import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
 import { GetClusterMetricsHandler } from "@src/confluent/tools/handlers/metrics/get-cluster-metrics-handler.js";
+import { CheckConsumerLagHandler } from "@src/confluent/tools/handlers/metrics/check-consumer-lag-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 
 export class ToolFactory {
@@ -118,6 +119,7 @@ export class ToolFactory {
 
     // Observability & Metrics Tools
     [ToolName.GET_CLUSTER_METRICS, new GetClusterMetricsHandler()],
+    [ToolName.CHECK_CONSUMER_LAG, new CheckConsumerLagHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

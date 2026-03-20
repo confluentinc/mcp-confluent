@@ -50,10 +50,10 @@ export enum ToolName {
 
   // Observability & Metrics Tools
   GET_CLUSTER_METRICS = "get-cluster-metrics",
+  CHECK_CONSUMER_LAG = "check-consumer-lag",
   // TODO: Add as we implement each handler
   // GET_TOPIC_METRICS = "get-topic-metrics",
   // GET_PARTITION_METRICS = "get-partition-metrics",
-  // CHECK_CONSUMER_LAG = "check-consumer-lag",
   // CHECK_CLIENT_QUOTAS = "check-client-quotas",
   // GET_SCHEMA_REGISTRY_STATUS = "get-schema-registry-status",
   // STREAM_AUDIT_LOGS = "stream-audit-logs",

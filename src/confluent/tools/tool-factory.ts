@@ -48,6 +48,8 @@ import { ReadTableFlowTopicHandler } from "@src/confluent/tools/handlers/tablefl
 import { UpdateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/update-tableflow-topic-handler.js";
 import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { VerifyTlsProtocolsHandler } from "@src/confluent/tools/handlers/kafka/verify-tls-protocol-handler.js";
+import { UpdateTlsProtocolsHandler } from "@src/confluent/tools/handlers/kafka/update-tls-protocols-handler.js";
 
 export class ToolFactory {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
@@ -113,6 +115,8 @@ export class ToolFactory {
       ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
       new DeleteTableFlowCatalogIntegrationHandler(),
     ],
+    [ToolName.VERIFY_TLS_PROTOCOLS, new VerifyTlsProtocolsHandler()],
+    [ToolName.UPDATE_TLS_PROTOCOLS, new UpdateTlsProtocolsHandler()],
     [ToolName.LIST_BILLING_COSTS, new ListBillingCostsHandler()],
   ]);
 

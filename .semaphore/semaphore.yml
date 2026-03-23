@@ -52,7 +52,7 @@ blocks:
       jobs:
         - name: "Test"
           commands:
-            - npm run test
+            - npm run test:coverage
       epilogue:
         always:
           commands:
@@ -60,6 +60,8 @@ blocks:
               if [ -f TEST-result.xml ]; then
                 test-results publish TEST-result.xml --force;
               fi
+            - sem-version java 17
+            - emit-sonarqube-data --run_only_sonar_scan --enable_sonarqube_enterprise
 
 after_pipeline:
   task:

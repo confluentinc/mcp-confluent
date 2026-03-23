@@ -26,6 +26,7 @@
   "scripts": {
     "dev": "concurrently \"tsc -p tsconfig.build.json --watch\" \"tsc-alias -p tsconfig.build.json --watch\"",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:ts": "tsc --noEmit",
     "start": "node dist/index.js --env-file .env",
@@ -50,6 +51,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.35.0",
     "@typescript-eslint/parser": "^8.35.0",
+    "@vitest/coverage-v8": "^4.1.0",
     "concurrently": "^9.2.0",
     "eslint": "^9.29.0",
     "eslint-config-prettier": "^10.1.5",

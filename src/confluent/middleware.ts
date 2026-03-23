@@ -27,6 +27,12 @@ export const createAuthMiddleware = (auth: ConfluentAuth): Middleware => ({
         "Authorization",
         `Basic ${Buffer.from(`${auth.apiKey}:${auth.apiSecret}`).toString("base64")}`,
       );
+    } else if (auth.apiKey || auth.apiSecret) {
+      const missing = auth.apiKey ? "apiSecret" : "apiKey";
+      logger.warn(
+        { provided: auth.apiKey ? "apiKey" : "apiSecret", missing },
+        `Partial credentials: ${missing} not set. Skipping authentication.`,
+      );
     }
     request.headers.set("User-Agent", `mcp-confluent-local/${pkg.version}`);
     return request;

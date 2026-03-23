@@ -18,12 +18,10 @@ describe("list-topics-handler.ts", () => {
     });
 
     describe("getRequiredEnvVars()", () => {
-      it("should require Kafka credentials and bootstrap servers", () => {
+      it("should only require bootstrap servers", () => {
         const vars = handler.getRequiredEnvVars();
 
-        expect(vars).toContain("KAFKA_API_KEY");
-        expect(vars).toContain("KAFKA_API_SECRET");
-        expect(vars).toContain("BOOTSTRAP_SERVERS");
+        expect(vars).toEqual(["BOOTSTRAP_SERVERS"]);
       });
     });
 

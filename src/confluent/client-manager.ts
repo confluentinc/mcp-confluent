@@ -3,6 +3,7 @@
  */
 
 import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
+import type { ClientConfig } from "@confluentinc/schemaregistry";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   ConfluentAuth,
@@ -258,13 +259,23 @@ export class DefaultClientManager
         throw new Error("Schema Registry endpoint not configured");
       }
       const { apiKey, apiSecret } = config.auth.schemaRegistry;
-      return new SchemaRegistryClient({
+      const clientConfig: ClientConfig = {
         baseURLs: [this.confluentCloudSchemaRegistryBaseUrl],
-        basicAuthCredentials: {
+      };
+      if (apiKey && apiSecret) {
+        clientConfig.basicAuthCredentials = {
           credentialsSource: "USER_INFO",
           userInfo: `${apiKey}:${apiSecret}`,
-        },
-      });
+        };
+      } else if (apiKey || apiSecret) {
+        const missing = apiKey
+          ? "SCHEMA_REGISTRY_API_SECRET"
+          : "SCHEMA_REGISTRY_API_KEY";
+        throw new Error(
+          `Partial credentials: ${missing} not set. Both SCHEMA_REGISTRY_API_KEY and SCHEMA_REGISTRY_API_SECRET are required for Schema Registry authentication.`,
+        );
+      }
+      return new SchemaRegistryClient(clientConfig);
     });
   }
 

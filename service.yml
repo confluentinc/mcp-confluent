@@ -7,8 +7,6 @@ codeowners:
   enable: true
 renovatebot:
   enable: false
-  automerge:
-    enable: true
 sonarqube:
   enable: true
   languages:

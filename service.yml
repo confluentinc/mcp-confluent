@@ -1,17 +1,29 @@
 name: mcp-confluent
-lang: unknown
-lang_version: unknown
+lang: node
+lang_version: "22"
 git:
   enable: true
 codeowners:
   enable: true
 renovatebot:
+  enable: false
+sonarqube:
   enable: true
-  automerge:
-    enable: true
+  languages:
+    - javascript
+    - typescript
+  coverage_sources:
+    - "src"
+  coverage_exclusions:
+    - "src/**/*.test.ts"
+    - "src/**/*.d.ts"
+  coverage_reports:
+    - "coverage/lcov.info"
+  main_branch: main
 semaphore:
   enable: true
   pipeline_enable: false
+  status_level: block
   tasks:
     - name: create-github-tag
       branch: main

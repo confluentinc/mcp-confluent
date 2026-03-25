@@ -1,5 +1,6 @@
 import { logger } from "@src/logger.js";
 import { Middleware } from "openapi-fetch";
+import pkg from "../../package.json" with { type: "json" };
 
 export interface ConfluentEndpoints {
   cloud?: string;
@@ -11,8 +12,8 @@ export interface ConfluentEndpoints {
 }
 
 export interface ConfluentAuth {
-  apiKey: string;
-  apiSecret: string;
+  apiKey?: string;
+  apiSecret?: string;
 }
 
 /**
@@ -21,11 +22,19 @@ export interface ConfluentAuth {
 export const createAuthMiddleware = (auth: ConfluentAuth): Middleware => ({
   async onRequest({ request }) {
     logger.debug({ request }, "Processing request");
-    request.headers.set(
-      "Authorization",
-      `Basic ${Buffer.from(`${auth.apiKey}:${auth.apiSecret}`).toString("base64")}`,
-    );
-    request.headers.set("User-Agent", "mcp-confluent");
+    if (auth.apiKey && auth.apiSecret) {
+      request.headers.set(
+        "Authorization",
+        `Basic ${Buffer.from(`${auth.apiKey}:${auth.apiSecret}`).toString("base64")}`,
+      );
+    } else if (auth.apiKey || auth.apiSecret) {
+      const missing = auth.apiKey ? "apiSecret" : "apiKey";
+      logger.warn(
+        { provided: auth.apiKey ? "apiKey" : "apiSecret", missing },
+        `Partial credentials: ${missing} not set. Skipping authentication.`,
+      );
+    }
+    request.headers.set("User-Agent", `mcp-confluent-local/${pkg.version}`);
     return request;
   },
 });

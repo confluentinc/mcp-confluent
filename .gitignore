@@ -130,9 +130,15 @@ dist
 .pnp.*
 
 
+# test results
+TEST-result*.xml
+
 # vscode
 .vscode
 .idea
 .continue
 *.txt
 connector-config.json
+
+# GSD planning directory
+.planning

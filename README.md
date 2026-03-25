@@ -1,6 +1,9 @@
 # mcp-confluent
 
-An MCP server implementation that enables AI assistants to interact with Confluent Cloud REST APIs. This server allows AI tools like Claude Desktop and Goose CLI to manage Kafka topics, connectors, and Flink SQL statements through natural language interactions.
+[![npm version](https://img.shields.io/npm/v/@confluentinc/mcp-confluent.svg)](https://www.npmjs.com/package/@confluentinc/mcp-confluent)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+An [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud through natural language. It provides 37+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
 
 <a href="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent/badge" alt="mcp-confluent MCP server" />
@@ -18,64 +21,77 @@ An MCP server implementation that enables AI assistants to interact with Conflue
 
 ![Claude Desktop Demo](assets/claude-desktop-demo.gif)
 
+## Quick Start
+
+> **Prerequisites:** [Node.js 22+](https://nodejs.org/) and a [Confluent Cloud](https://confluent.cloud/) account.
+
+```bash
+# Install and run
+npx -y @confluentinc/mcp-confluent -e /path/to/.env
+```
+
+Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-confluent) directly. See [Getting Started](#getting-started) for full setup instructions and [Configuring MCP Clients](#configuring-claude-desktop) for integration with your preferred AI tool.
+
 ## Table of Contents
 
-- [mcp-confluent](#mcp-confluent)
-  - [Demo](#demo)
-    - [Goose CLI](#goose-cli)
-    - [Claude Desktop](#claude-desktop)
-  - [Table of Contents](#table-of-contents)
-  - [User Guide](#user-guide)
-    - [Getting Started](#getting-started)
-    - [Configuration](#configuration)
-      - [Prerequisites \& Setup for Tableflow Commands](#prerequisites--setup-for-tableflow-commands)
-    - [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports)
-    - [Environment Variables Reference](#environment-variables-reference)
-    - [Usage](#usage)
-    - [Configuring Claude Desktop](#configuring-claude-desktop)
-    - [Configuring Goose CLI](#configuring-goose-cli)
-    - [Configuring Gemini CLI](#configuring-gemini-cli)
-    - [mcp-confluent CLI Usage](#mcp-confluent-cli-usage)
-      - [Basic Usage](#basic-usage)
-      - [Example: Deploy using all transports](#example-deploy-using-all-transports)
-      - [Example: Allow Only Specific Tools](#example-allow-only-specific-tools)
-      - [Example: Block Certain Tools](#example-block-certain-tools)
-      - [Example: Use Tool Lists from Files](#example-use-tool-lists-from-files)
-      - [Example: List All Available Tools](#example-list-all-available-tools)
-  - [Flink Catalog and Diagnostics](#flink-catalog-and-diagnostics)
-    - [Flink Tools](#flink-tools)
-    - [Example Workflows](#example-workflows)
-  - [Developer Guide](#developer-guide)
-    - [Project Structure](#project-structure)
-    - [Building and Running](#building-and-running)
-    - [Docker](#docker)
-      - [Prerequisites](#prerequisites)
-        - [Environment Variables](#environment-variables)
-      - [Building and Running with Docker](#building-and-running-with-docker)
-      - [Building and Running with Docker Compose](#building-and-running-with-docker-compose)
-    - [Testing](#testing)
-      - [MCP Inspector](#mcp-inspector)
-    - [Adding a New Tool](#adding-a-new-tool)
-    - [Generating Types](#generating-types)
-    - [Contributing](#contributing)
+- [Quick Start](#quick-start)
+- [Available Tools](#available-tools)
+- [User Guide](#user-guide)
+  - [Getting Started](#getting-started)
+  - [Configuration](#configuration)
+  - [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports)
+  - [Environment Variables Reference](#environment-variables-reference)
+  - [Usage](#usage)
+  - [Configuring MCP Clients](#configuring-claude-desktop)
+  - [CLI Usage](#mcp-confluent-cli-usage)
+- [Flink Example Workflows](#flink-example-workflows)
+- [Developer Guide](#developer-guide)
+- [Troubleshooting](#troubleshooting)
+
+## Available Tools
+
+The server provides 37+ tools organized by category. Only the tools whose required environment variables are configured will be enabled.
+
+| Category                    | Tools                                                                                                                                                                                               | Description                                                       |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **Kafka**                   | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `alter-topic-config`, `get-topic-config`                                                                    | Manage topics, produce/consume messages, configure topic settings |
+| **Flink SQL**               | `create-flink-statement`, `list-flink-statements`, `read-flink-statement`, `delete-flink-statements`, `get-flink-statement-exceptions`                                                              | Create and manage Flink SQL statements                            |
+| **Flink Catalog**           | `list-flink-catalogs`, `list-flink-databases`, `list-flink-tables`, `describe-flink-table`, `get-flink-table-info`                                                                                  | Explore Flink catalogs, databases, and table schemas              |
+| **Flink Diagnostics**       | `check-flink-statement-health`, `detect-flink-statement-issues`, `get-flink-statement-profile`                                                                                                      | Health checks, issue detection, and query profiling               |
+| **Connectors**              | `list-connectors`, `read-connector`, `create-connector`, `delete-connector`                                                                                                                         | Manage Kafka Connect connectors                                   |
+| **Schema Registry**         | `list-schemas`                                                                                                                                                                                      | List and inspect data schemas                                     |
+| **Catalog & Tags**          | `search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`                                                      | Organize and search topics using tags                             |
+| **Environments & Clusters** | `list-environments`, `read-environment`, `list-clusters`                                                                                                                                            | Discover Confluent Cloud resources                                |
+| **Tableflow**               | `create-tableflow-topic`, `list-tableflow-topics`, `read-tableflow-topic`, `update-tableflow-topic`, `delete-tableflow-topic`, `list-tableflow-regions`                                             | Manage Tableflow-enabled topics                                   |
+| **Tableflow Catalog**       | `create-tableflow-catalog-integration`, `list-tableflow-catalog-integrations`, `read-tableflow-catalog-integration`, `update-tableflow-catalog-integration`, `delete-tableflow-catalog-integration` | Manage Tableflow catalog integrations (e.g., AWS Glue)            |
+| **Billing**                 | `list-billing-costs`                                                                                                                                                                                | Query billing and cost data                                       |
+
+You can also list all available tools via the CLI:
+
+```bash
+npx -y @confluentinc/mcp-confluent --list-tools
+```
 
 ## User Guide
 
 ### Getting Started
 
-1. **Create a `.env` file:**  Copy the provided `.env.example` file to `.env` in the root of your project:
+#### Prerequisites
+
+- **Node.js 22 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
+  ```bash
+  nvm install 22
+  nvm use 22
+  ```
+- A **Confluent Cloud** account with appropriate API keys
+
+#### Setup
+
+1. **Create a `.env` file:** Copy the provided `.env.example` file to `.env` in the root of your project:
    ```bash
    cp .env.example .env
    ```
-2. **Populate the `.env` file:** Fill in the necessary values for your Confluent Cloud environment.  See the [Configuration](#configuration) section for details on each variable.
-3. **Install Node.js** (if not already installed)
-   - We recommend using [NVM](https://github.com/nvm-sh/nvm) (Node Version Manager) to manage Node.js versions
-   - Install and use Node.js:
-
-    ```bash
-    nvm install 22
-    nvm use 22
-    ```
+2. **Populate the `.env` file:** Fill in the necessary values for your Confluent Cloud environment. See the [Configuration](#configuration) section for details on each variable.
 
 ### Configuration
 
@@ -121,7 +137,7 @@ It is crucial to set up the necessary roles and policies in your cloud environme
 Please refer to the following Confluent Cloud documentation for detailed instructions on setting up these permissions and integrating with custom storage and Glue:
 
 - **Confluent Cloud Tableflow Quick Start with Custom Storage & Glue:**
-    [https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html)
+  [https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html)
 
 Ensuring these prerequisites are met will prevent authorization errors when the `mcp-server` attempts to provision or manage Tableflow-enabled tables.
 
@@ -197,43 +213,43 @@ MCP_AUTH_DISABLED=true
 
 ### Environment Variables Reference
 
-| Variable                      | Description                                                                                                                               | Default Value             | Required |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | -------- |
-| HTTP_HOST                     | Host to bind for HTTP transport. Defaults to localhost only for security.                                                                  | "127.0.0.1"               | Yes      |
-| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp') (string)                                                                              | "/mcp"                    | Yes      |
-| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 8080                      | Yes      |
-| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal)                                                                | "info"                    | Yes      |
-| MCP_API_KEY                   | API key for HTTP/SSE authentication. Generate using `--generate-key`. Required when auth is enabled.                                       |                           | No*      |
-| MCP_AUTH_DISABLED             | Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.                                             | false                     | No       |
-| MCP_ALLOWED_HOSTS             | Comma-separated list of allowed Host header values for DNS rebinding protection.                                                           | "localhost,127.0.0.1"     | No       |
-| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                     | "/sse"                    | Yes      |
-| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                         | "/messages"               | Yes      |
-| BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)   |                           | No       |
-| CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))   |               | No       |
-| CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))         |               | No       |
-| CONFLUENT_CLOUD_REST_ENDPOINT | Base URL for Confluent Cloud's REST API services (default)                                                                                |               | No       |
-| FLINK_API_KEY                 | Authentication key for accessing Confluent Cloud's Flink services, including compute pools and SQL statement management (string (min: 1)) |               | No       |
-| FLINK_API_SECRET              | Secret token paired with FLINK_API_KEY for authenticated access to Confluent Cloud's Flink services (string (min: 1))                     |               | No       |
-| FLINK_COMPUTE_POOL_ID         | Unique identifier for the Flink compute pool, must start with 'lfcp-' prefix (string)                                                     |               | No       |
-| FLINK_DATABASE_NAME           | Name of the associated Kafka cluster used as a database reference in Flink SQL operations (string (min: 1))                               |               | No       |
-| FLINK_ENV_ID                  | Unique identifier for the Flink environment, must start with 'env-' prefix (string)                                                       |               | No       |
-| FLINK_ENV_NAME                | Human-readable name for the Flink environment used for identification and display purposes (string (min: 1))                              |               | No       |
-| FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                            |               | No       |
-| FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                       |               | No       |
-| KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                     |               | No       |
-| KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                          |               | No       |
-| KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                |               | No       |
-| KAFKA_ENV_ID                  | Environment identifier for Kafka cluster, must start with 'env-' prefix (string)                                                          |               | No       |
-| KAFKA_REST_ENDPOINT           | REST API endpoint for Kafka cluster management and administration (string)                                                                |               | No       |
-| SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                           |               | No       |
-| SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                             |               | No       |
-| SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                       |               | No       |
-| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                   |               | No       |
-| TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                         |               | No       |
+| Variable                      | Description                                                                                                                               | Default Value         | Required |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------- |
+| HTTP_HOST                     | Host to bind for HTTP transport. Defaults to localhost only for security.                                                                 | "127.0.0.1"           | Yes      |
+| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp') (string)                                                                              | "/mcp"                | Yes      |
+| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 8080                  | Yes      |
+| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal)                                                                | "info"                | Yes      |
+| MCP_API_KEY                   | API key for HTTP/SSE authentication. Generate using `--generate-key`. Required when auth is enabled.                                      |                       | No\*     |
+| MCP_AUTH_DISABLED             | Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.                                            | false                 | No       |
+| MCP_ALLOWED_HOSTS             | Comma-separated list of allowed Host header values for DNS rebinding protection.                                                          | "localhost,127.0.0.1" | No       |
+| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                     | "/sse"                | Yes      |
+| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                         | "/messages"           | Yes      |
+| BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)   |                       | No       |
+| CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))   |                       | No       |
+| CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))         |                       | No       |
+| CONFLUENT_CLOUD_REST_ENDPOINT | Base URL for Confluent Cloud's REST API services (default)                                                                                |                       | No       |
+| FLINK_API_KEY                 | Authentication key for accessing Confluent Cloud's Flink services, including compute pools and SQL statement management (string (min: 1)) |                       | No       |
+| FLINK_API_SECRET              | Secret token paired with FLINK_API_KEY for authenticated access to Confluent Cloud's Flink services (string (min: 1))                     |                       | No       |
+| FLINK_COMPUTE_POOL_ID         | Unique identifier for the Flink compute pool, must start with 'lfcp-' prefix (string)                                                     |                       | No       |
+| FLINK_DATABASE_NAME           | Name of the associated Kafka cluster used as a database reference in Flink SQL operations (string (min: 1))                               |                       | No       |
+| FLINK_ENV_ID                  | Unique identifier for the Flink environment, must start with 'env-' prefix (string)                                                       |                       | No       |
+| FLINK_ENV_NAME                | Human-readable name for the Flink environment used for identification and display purposes (string (min: 1))                              |                       | No       |
+| FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                            |                       | No       |
+| FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                       |                       | No       |
+| KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                     |                       | No       |
+| KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                          |                       | No       |
+| KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                |                       | No       |
+| KAFKA_ENV_ID                  | Environment identifier for Kafka cluster, must start with 'env-' prefix (string)                                                          |                       | No       |
+| KAFKA_REST_ENDPOINT           | REST API endpoint for Kafka cluster management and administration (string)                                                                |                       | No       |
+| SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                           |                       | No       |
+| SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                             |                       | No       |
+| SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                       |                       | No       |
+| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                   |                       | No       |
+| TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                         |                       | No       |
 
 ### Usage
 
-This MCP server is designed to be used with various MCP clients, such as Claude Desktop or Goose CLI/Desktop.  The specific configuration and interaction will depend on the client you are using.  However, the general steps are:
+This MCP server is designed to be used with various MCP clients, such as Claude Desktop or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using. However, the general steps are:
 
 1. **Start the Server:** You can run the MCP server in one of two ways:
    - **From source:** Follow the instructions in the [Developer Guide](#developer-guide) to build and run the server from source. This typically involves:
@@ -245,11 +261,11 @@ This MCP server is designed to be used with various MCP clients, such as Claude 
      npx -y @confluentinc/mcp-confluent -e /path/to/confluent-mcp-server/.env
      ```
 
-2. **Configure your MCP Client:**  Each client will have its own way of specifying the MCP server's address and any required credentials.  You'll need to configure your client (e.g., Claude, Goose) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on may be configured by an environment variable.
+2. **Configure your MCP Client:** Each client will have its own way of specifying the MCP server's address and any required credentials. You'll need to configure your client (e.g., Claude, Goose) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on may be configured by an environment variable.
 
-3. **Start the MCP Client:**  Once your client is configured to connect to the MCP server, you can start your mcp client and on startup - it will stand up an instance of this MCP server locally.  This instance will be responsible for managing data schemas and interacting with Confluent Cloud on your behalf.
+3. **Start the MCP Client:** Once your client is configured to connect to the MCP server, you can start your mcp client and on startup - it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with Confluent Cloud on your behalf.
 
-4. **Interact with Confluent through the Client:** Once the client is connected, you can use the client's interface to interact with Confluent Cloud resources.  The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
+4. **Interact with Confluent through the Client:** Once the client is connected, you can use the client's interface to interact with Confluent Cloud resources. The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
 
 ### Configuring Claude Desktop
 
@@ -275,7 +291,7 @@ To configure Claude Desktop to use this MCP server:
          "command": "node",
          "args": [
            "/path/to/confluent-mcp-server/dist/index.js",
-            "--env-file",
+           "--env-file",
            "/path/to/confluent-mcp-server/.env"
          ]
        }
@@ -366,62 +382,135 @@ For detailed information about Gemini CLI extensions and MCP servers, please ref
 Here's how to get `mcp-confluent` running with Gemini CLI:
 
 1. **Install Gemini CLI:**
-    If you haven't already, install the Gemini CLI. You can find installation instructions on the [official GitHub repository](https://github.com/google-gemini/gemini-cli).
+   If you haven't already, install the Gemini CLI. You can find installation instructions on the [official GitHub repository](https://github.com/google-gemini/gemini-cli).
 
 2. **Install the `mcp-confluent` Extension:**
 
-    ```bash
-    gemini extensions install https://github.com/confluentinc/mcp-confluent 
-    # Navigate to the root directory of this project (where `gemini-extension.json` is located) and run:
-    # gemini extensions install .
-    ```
+   ```bash
+   gemini extensions install https://github.com/confluentinc/mcp-confluent
+   # Navigate to the root directory of this project (where `gemini-extension.json` is located) and run:
+   # gemini extensions install .
+   ```
 
-    This command registers the `mcp-confluent` server with Gemini CLI and creates a dedicated directory for it under `~/.gemini/extensions/mcp-confluent`.
+   This command registers the `mcp-confluent` server with Gemini CLI and creates a dedicated directory for it under `~/.gemini/extensions/mcp-confluent`.
 
 3. **Provide Environment Variables:**
-    The extension requires your Confluent Cloud credentials and configuration to be available in a `.env` file.
+   The extension requires your Confluent Cloud credentials and configuration to be available in a `.env` file.
+   - First, ensure you have a correctly populated `.env` file in the root of this project. For instructions, see the [Configuration](#configuration) section.
+   - Next, copy your `.env` file into the extension's directory so Gemini CLI can access it (the Gemini extension expects the `.env` file at `${extensionPath}${pathSeparator}.env`; see [the variables documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md#variables) for details):
 
-    - First, ensure you have a correctly populated `.env` file in the root of this project. For instructions, see the [Configuration](#configuration) section.
-    - Next, copy your `.env` file into the extension's directory so Gemini CLI can access it (the Gemini extension expects the `.env` file at `${extensionPath}${pathSeparator}.env`; see [the variables documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md#variables) for details):
-
-    ```bash
-    cp .env ~/.gemini/extensions/mcp-confluent/.env
-    ```
+   ```bash
+   cp .env ~/.gemini/extensions/mcp-confluent/.env
+   ```
 
 4. **Verify and Use:**
-    You can now start using the Confluent tools via Gemini CLI. To verify that the tools are available, you can list them:
+   You can now start using the Confluent tools via Gemini CLI. To verify that the tools are available, you can list them:
 
-    ```bash
-    gemini -l
-    # or `gemini extensions list`
-    ```
+   ```bash
+   gemini -l
+   # or `gemini extensions list`
+   ```
 
-    And here's an example of invoking a tool:
+   And here's an example of invoking a tool:
 
-    ```bash
-    
-    gemini
-    ....
+   ```bash
 
-    🟢 mcp-confluent (from mcp-confluent) - Ready (24 tools)
-    ....
-    
-    Using: 1 MCP server (ctrl+t to toggle)
-    ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-    │ > list topics                                                                                                                                             │
-    ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+   gemini
+   ....
 
-    ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-    │ ✓  list-topics (mcp-confluent MCP Server) {}                                                                                                       │
-    │                                                                                                                                                    │
-    │    Kafka topics:                                                                                                                                   │
-    │    products_summarized,products,topic_8,products_summarized_with_embeddings,elastic_minimized,user_message_related_products,user_message_embeddin  │
-    │    gs,dlq-lcc-d3738o,user_message,elastic                                                                                          │
-    ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-    ✦ Okay, I see the following topics: products_summarized, products, topic_8, products_summarized_with_embeddings, elastic_minimized,
-      user_message_related_products, user_message_embeddings, dlq-lcc-d3738o, user_message, and elastic.
+   🟢 mcp-confluent (from mcp-confluent) - Ready (24 tools)
+   ....
 
-    ```
+   Using: 1 MCP server (ctrl+t to toggle)
+   ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+   │ > list topics                                                                                                                                             │
+   ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+   ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+   │ ✓  list-topics (mcp-confluent MCP Server) {}                                                                                                       │
+   │                                                                                                                                                    │
+   │    Kafka topics:                                                                                                                                   │
+   │    products_summarized,products,topic_8,products_summarized_with_embeddings,elastic_minimized,user_message_related_products,user_message_embeddin  │
+   │    gs,dlq-lcc-d3738o,user_message,elastic                                                                                          │
+   ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+   ✦ Okay, I see the following topics: products_summarized, products, topic_8, products_summarized_with_embeddings, elastic_minimized,
+     user_message_related_products, user_message_embeddings, dlq-lcc-d3738o, user_message, and elastic.
+
+   ```
+
+### Configuring Claude Code
+
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) supports MCP servers natively. Add the server to your project configuration:
+
+```bash
+claude mcp add confluent -- npx -y @confluentinc/mcp-confluent -e /path/to/.env
+```
+
+Or add it to your `.mcp.json` file directly:
+
+```json
+{
+  "mcpServers": {
+    "confluent": {
+      "command": "npx",
+      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
+    }
+  }
+}
+```
+
+### Configuring Cursor
+
+Add the MCP server to your Cursor configuration at `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "confluent": {
+      "command": "npx",
+      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
+    }
+  }
+}
+```
+
+See the [Cursor MCP documentation](https://docs.cursor.com/context/model-context-protocol) for more details.
+
+### Configuring VS Code
+
+Add the MCP server to your VS Code user settings (`settings.json`) or workspace `.vscode/mcp.json`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "confluent": {
+        "command": "npx",
+        "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
+      }
+    }
+  }
+}
+```
+
+See the [VS Code MCP documentation](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) for more details.
+
+### Configuring Windsurf
+
+Add the MCP server to your Windsurf configuration at `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "confluent": {
+      "command": "npx",
+      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
+    }
+  }
+}
+```
+
+See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/mcp) for more details.
 
 ### mcp-confluent CLI Usage
 
@@ -432,7 +521,7 @@ The MCP server provides a flexible command line interface (CLI) for advanced con
 You can view all CLI options and help with:
 
 ```bash
-npx @confluentinc/mcp-confluent --help 
+npx @confluentinc/mcp-confluent --help
 ```
 
 <details>
@@ -490,53 +579,7 @@ npx @confluentinc/mcp-confluent -e .env --transport http,sse,stdio
 npx @confluentinc/mcp-confluent -e .env --allow-tools produce-message,consume-messages
 ```
 
-<details>
-<summary>Show output</summary>
-
-```json
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-topics disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topics disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-topics disabled due to allow/block list rules"}
-{"level":"info","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool produce-message enabled"}
-{"level":"info","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool consume-messages enabled"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-flink-statements disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-flink-statement disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-flink-statement disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-flink-statements disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-connectors disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-connector disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-connector disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-connector disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-tag disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-name disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topic-tags disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tag disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool remove-tag-from-entity disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool add-tags-to-topic disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tags disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool alter-topic-config disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-clusters disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-environments disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool create-tableflow-topic disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool list-tableflow-regions disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool list-tableflow-topics disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool read-tableflow-topic disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool update-tableflow-topic disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool delete-tableflow-topic disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool create-tableflow-catalog-integration disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool list-tableflow-catalog-integrations disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool read-tableflow-catalog-integration disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool update-tableflow-catalog-integration disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:52:34.923Z","pid":53394,"hostname":"YXR2D4NCM9","name":"mcp-confluent","msg":"Tool delete-tableflow-catalog-integration disabled due to allow/block list rules"}
-{"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio on localhost:3000"}
-{"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
-{"level":"info","time":"2025-05-14T16:52:34.924Z","pid":46818,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
-```
-
-</details>
+Only the specified tools will be enabled; all others will be disabled.
 
 #### Example: Block Certain Tools
 
@@ -544,107 +587,15 @@ npx @confluentinc/mcp-confluent -e .env --allow-tools produce-message,consume-me
 npx @confluentinc/mcp-confluent -e .env --block-tools produce-message,consume-messages
 ```
 
-<details>
-<summary>Show output</summary>
-
-```json
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-topics enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topics enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-topics enabled"}
-{"level":"warn","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool produce-message disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool consume-messages disabled due to allow/block list rules"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-flink-statements enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-flink-statement enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-flink-statement enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-flink-statements enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-connectors enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-connector enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-connector enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-connector enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-tag enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-name enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topic-tags enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tag enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool remove-tag-from-entity enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool add-tags-to-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tags enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool alter-topic-config enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-clusters enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-environments enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-regions enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-topics enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-catalog-integration enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-catalog-integrations enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-catalog-integration enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-catalog-integration enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-catalog-integration enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
-```
-
-</details>
+All tools except the specified ones will be enabled.
 
 #### Example: Use Tool Lists from Files
+
+You can also maintain allow/block lists in files (one tool name per line):
 
 ```bash
 npx -y @confluentinc/mcp-confluent -e .env --allow-tools-file allow.txt --block-tools-file block.txt
 ```
-
-<details>
-<summary>Show output</summary>
-
-```json
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-topics enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topics enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-topics enabled"}
-{"level":"warn","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool produce-message disabled due to allow/block list rules"}
-{"level":"warn","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool consume-messages disabled due to allow/block list rules"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-flink-statements enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-flink-statement enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-flink-statement enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-flink-statements enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-connectors enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-connector enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-connector enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-connector enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-tag enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.910Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool search-topics-by-name enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-topic-tags enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tag enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool remove-tag-from-entity enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool add-tags-to-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tags enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool alter-topic-config enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-clusters enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-environments enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-environment enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-schemas enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool get-topic-config enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-regions enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-topics enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-topic enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool create-tableflow-catalog-integration enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool list-tableflow-catalog-integrations enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool read-tableflow-catalog-integration enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool update-tableflow-catalog-integration enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Tool delete-tableflow-catalog-integration enabled"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"Starting transports: stdio"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"STDIO transport connected"}
-{"level":"info","time":"2025-05-14T16:55:45.911Z","pid":47344,"hostname":"G9PW1FJH64","name":"mcp-confluent","msg":"All transports started successfully"}
-```
-
-</details>
 
 #### Example: List All Available Tools
 
@@ -708,29 +659,9 @@ delete-tableflow-catalog-integration: Make a request to delete a tableflow catal
 
 > **Tip:** The allow-list is applied before the block-list. If neither is provided, all tools are enabled by default.
 
-## Flink Catalog and Diagnostics
+## Flink Example Workflows
 
-Tools for Flink SQL catalog introspection and statement diagnostics.
-
-### Flink Tools
-
-| Tool | Description |
-|------|-------------|
-| `create-flink-statement` | Create and execute a Flink SQL statement |
-| `list-flink-statements` | List all Flink SQL statements with filtering |
-| `read-flink-statement` | Read statement results with pagination |
-| `delete-flink-statements` | Delete a Flink SQL statement |
-| `get-flink-statement-exceptions` | Retrieve recent exceptions for a statement |
-| `list-flink-catalogs` | List catalogs via INFORMATION_SCHEMA |
-| `list-flink-databases` | List databases via INFORMATION_SCHEMA |
-| `list-flink-tables` | List tables in a database |
-| `describe-flink-table` | Get full table schema including $rowtime, types, nullability |
-| `get-flink-table-info` | Get table metadata (watermarks, distribution) |
-| `check-flink-statement-health` | Aggregate health check with status (healthy/warning/critical) |
-| `detect-flink-statement-issues` | Detect issues from status, exceptions, and metrics |
-| `get-flink-statement-profile` | Query Profiler with task graph, metrics, and issue detection |
-
-### Example Workflows
+Examples of how the Flink tools (see [Available Tools](#available-tools)) work together in practice.
 
 #### Deduplication Workflow
 
@@ -814,29 +745,29 @@ Claude: "The statement has high backpressure on task 'Sink'. Try increasing para
 
 1. **Install Dependencies:**
 
-    ```bash
-    npm install
-    ```
+   ```bash
+   npm install
+   ```
 
 2. **Development Mode (watch for changes):**
 
-    ```bash
-    npm run dev
-    ```
+   ```bash
+   npm run dev
+   ```
 
-    This command compiles the TypeScript code to JavaScript and automatically rebuilds when changes are detected in the `src/` directory.
+   This command compiles the TypeScript code to JavaScript and automatically rebuilds when changes are detected in the `src/` directory.
 
 3. **Production Build (one-time compilation):**
 
-    ```bash
-    npm run build
-    ```
+   ```bash
+   npm run build
+   ```
 
 4. **Start the Server:**
 
-    ```bash
-    npm run start
-    ```
+   ```bash
+   npm run start
+   ```
 
 ### Docker
 
@@ -856,66 +787,65 @@ Here's how to build your Docker image and run it in different modes.
 
 1. **Navigate to your project directory.** Open your terminal or command prompt and change to the directory containing the `Dockerfile`.
 
-    ```bash
-    cd /path/to/repo/mcp-confluent
-    ```
+   ```bash
+   cd /path/to/repo/mcp-confluent
+   ```
 
 2. **Build the Docker image.**
 
-    This command creates the `mcp-server` image based on the `Dockerfile` in the current directory.
+   This command creates the `mcp-server` image based on the `Dockerfile` in the current directory.
 
-    ```bash
-    docker build -t mcp-server .
-    ```
+   ```bash
+   docker build -t mcp-server .
+   ```
 
 3. **Run the container**
+   - `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
+   - `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
+   - `-d`: Runs the container in **detached mode** (in the background).
+   - `-p 8080:8080`: **Maps port 8080** on your host machine to port 8080 inside the container. The default HTTP_PORT is 8080; adjust if you've configured a different port.
 
-    - `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
-    - `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
-    - `-d`: Runs the container in **detached mode** (in the background).
-    - `-p 8080:8080`: **Maps port 8080** on your host machine to port 8080 inside the container. The default HTTP_PORT is 8080; adjust if you've configured a different port.
+   ```bash
+   docker run --rm -i -d -p 8080:8080 mcp-server
+   ```
 
-    ```bash
-    docker run --rm -i -d -p 8080:8080 mcp-server
-    ```
+   (Optional)
+   - `-t` **Transport Mode** to enable http transport
 
-    (Optional)
-    - `-t` **Transport Mode** to enable http transport
-
-    ```bash
-    docker run --rm -d -p 8080:8080 mcp-server -t http
-    ```
+   ```bash
+   docker run --rm -d -p 8080:8080 mcp-server -t http
+   ```
 
 #### Building and Running with Docker Compose
 
 1. **Navigate to the project root:**
-    Open your terminal or command prompt and change to the directory containing Dockerfile and docker-compose.yml.
+   Open your terminal or command prompt and change to the directory containing Dockerfile and docker-compose.yml.
 
-    ```bash
-    cd /path/to/repo/mcp-confluent
-    ```
+   ```bash
+   cd /path/to/repo/mcp-confluent
+   ```
 
 2. **Build and run the service:**
-    Docker Compose will build the Docker image (if not already built) and start the mcp-server service.
+   Docker Compose will build the Docker image (if not already built) and start the mcp-server service.
 
-    ```bash
-    docker compose up --build
-    ```
+   ```bash
+   docker compose up --build
+   ```
 
-    The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
+   The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
 
-    The server will be accessible on <http://localhost:8080> (or the port specified in HTTP_PORT in your .env file).
+   The server will be accessible on <http://localhost:8080> (or the port specified in HTTP_PORT in your .env file).
 
 3. **Stopping the Server**
-    To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
+   To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
 
-    Alternatively, in a new terminal from the project root, you can run:
+   Alternatively, in a new terminal from the project root, you can run:
 
-    ```bash
-    docker compose down
-    ```
+   ```bash
+   docker compose down
+   ```
 
-    This command stops and removes the containers, networks, and volumes created by docker compose up.
+   This command stops and removes the containers, networks, and volumes created by docker compose up.
 
 ### Testing
 
@@ -933,8 +863,8 @@ npx @modelcontextprotocol/inspector node  $PATH_TO_PROJECT/dist/index.js --env-f
 1. Add a new enum to the enum class `ToolName`.
 2. Add your new tool to the handlers map in the `ToolFactory` class.
 3. Create a new file, exporting the class that extends `BaseToolHandler`.
-    1. Implement the `handle` method of the base class.
-    2. Implement the `getToolConfig` method of the base class.
+   1. Implement the `handle` method of the base class.
+   2. Implement the `getToolConfig` method of the base class.
 4. Once satisfied, add it to the set of `enabledTools` in `index.ts`.
 
 ### Generating Types
@@ -943,6 +873,18 @@ npx @modelcontextprotocol/inspector node  $PATH_TO_PROJECT/dist/index.js --env-f
 # as of v7.5.2 there is a bug when using allOf w/ required https://github.com/openapi-ts/openapi-typescript/issues/1474. need --empty-objects-unknown flag to avoid it
 npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --empty-objects-unknown
 ```
+
+## Troubleshooting
+
+**"Node.js version not supported"** -- This project requires Node.js 22 or later. Check your version with `node -v` and upgrade if needed.
+
+**Tools not appearing** -- Ensure the required environment variables for those tools are set in your `.env` file. Tools are only enabled when their dependencies are configured. Run `--list-tools` to see which tools are active.
+
+**Authentication errors on HTTP/SSE** -- Generate an API key with `npx @confluentinc/mcp-confluent --generate-key` and add it to your `.env` file as `MCP_API_KEY`. See [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports).
+
+**Connection refused / port conflicts** -- The default HTTP port is 8080. If it's already in use, set a different port via `HTTP_PORT` in your `.env` file.
+
+**Tableflow authorization errors** -- Tableflow tools require specific IAM permissions in your cloud environment. See [Prerequisites & Setup for Tableflow Commands](#prerequisites--setup-for-tableflow-commands).
 
 ### Contributing
 

@@ -59,6 +59,10 @@ const envSchema = z.object({
       "Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.",
     )
     .default(false),
+  SEGMENT_DISABLED: z
+    .preprocess((val) => val === "true" || val === "1", z.boolean())
+    .describe("Disable telemetry analytics.")
+    .default(false),
   MCP_ALLOWED_HOSTS: z
     .string()
     .describe(

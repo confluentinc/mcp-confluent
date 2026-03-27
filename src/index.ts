@@ -11,6 +11,7 @@ import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
@@ -157,7 +158,29 @@ async function main() {
         { description: config.description, inputSchema: config.inputSchema },
         async (args, context) => {
           const sessionId = context?.sessionId;
-          return await handler.handle(clientManager, args, sessionId);
+          const startTime = Date.now();
+          try {
+            const result = await handler.handle(clientManager, args, sessionId);
+            TelemetryService.getInstance().track(
+              TelemetryEvent.TOOL_CALL_COMPLETED,
+              {
+                toolName: name,
+                durationMs: Date.now() - startTime,
+                isError: result.isError ?? false,
+              },
+            );
+            return result;
+          } catch (error) {
+            TelemetryService.getInstance().track(
+              TelemetryEvent.TOOL_CALL_FAILED,
+              {
+                toolName: name,
+                durationMs: Date.now() - startTime,
+                isError: true,
+              },
+            );
+            throw error;
+          }
         },
       );
     });
@@ -192,9 +215,16 @@ async function main() {
       env.SSE_MCP_MESSAGE_ENDPOINT_PATH,
     );
 
+    TelemetryService.getInstance().track(TelemetryEvent.SERVER_STARTED, {
+      transports: cliOptions.transports,
+      toolCount: toolHandlers.size,
+    });
+
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
+      TelemetryService.getInstance().track(TelemetryEvent.SERVER_STOPPED, {});
+      await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
       await clientManager.disconnect();
       await server.close();

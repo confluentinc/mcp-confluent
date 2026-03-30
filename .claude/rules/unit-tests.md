@@ -1,7 +1,7 @@
 ---
 paths:
   - src/**/*.test.ts
-  - src/test-utils/**/*
+  - tests/**/*
 ---
 
 # Unit Testing (Vitest + Sinon)
@@ -10,7 +10,7 @@ paths:
 
 - Co-located `.test.ts` files alongside source code using Vitest + Sinon
 - Run with `npm run test` (single run) or `npm run test:watch` (watch mode)
-- Config in `vitest.config.ts`; `@src/*` aliases resolved via `vite-tsconfig-paths`
+- Config in `vitest.config.ts`; `@src/*` aliases resolved via `resolve.tsconfigPaths` in Vitest config
 
 ## Test Naming
 
@@ -21,7 +21,7 @@ paths:
 
 - Use `sinon.createStubInstance(DefaultClientManager)` directly for type-safe stubs — don't wrap
   simple one-liners in helper functions
-- Use `createTestServer()` from `src/test-utils/server.ts` for integration-style tests that need a
+- Use `createTestServer()` from `@tests/server` for integration-style tests that need a
   full MCP server + client connected via `InMemoryTransport`
 - Focus on isolated behavior, mocking external dependencies
 - Do not test side effects like logging

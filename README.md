@@ -46,6 +46,7 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
   - [CLI Usage](#mcp-confluent-cli-usage)
 - [Flink Example Workflows](#flink-example-workflows)
 - [Developer Guide](#developer-guide)
+  - [Local Development with an AI Coding Assistant](#local-development-with-an-ai-coding-assistant)
 - [Troubleshooting](#troubleshooting)
 
 ## Available Tools
@@ -856,6 +857,54 @@ For testing MCP servers, you can use [MCP Inspector](https://modelcontextprotoco
 ```bash
 # make sure you've already built the project either in dev mode or by running npm run build
 npx @modelcontextprotocol/inspector node  $PATH_TO_PROJECT/dist/index.js --env-file $PATH_TO_PROJECT/.env
+```
+
+### Local Development with an AI Coding Assistant
+
+When developing with an AI coding assistant (Claude Code, Cursor, etc.) that connects to this MCP server, you can run the server in HTTP mode for full log visibility. By default, AI coding assistants spawn the server as a child process using stdio transport, which makes server logs difficult to observe.
+
+After building the project (see [Building and Running](#building-and-running)):
+
+#### 1. Start the server in HTTP mode
+
+```bash
+MCP_AUTH_DISABLED=true npm run start:http
+```
+
+This starts the server on `http://127.0.0.1:8080/mcp` with authentication disabled for local development.
+
+#### 2. Point your AI coding assistant at the running server
+
+Instead of the default stdio configuration, configure your assistant's MCP settings to connect via HTTP. For example, in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "confluent-dev": {
+      "type": "http",
+      "url": "http://127.0.0.1:8080/mcp"
+    }
+  }
+}
+```
+
+This replaces the typical `command`/`args` config that spawns a stdio child process.
+
+> [!IMPORTANT]
+> After restarting the MCP server, you may also need to restart or reconnect your AI coding assistant so it picks up the new server process. For example, in Claude Code use the `/mcp` command to reconnect.
+
+#### 3. Observe server logs
+
+All server logs (including tool call telemetry) are written to stderr via pino and will appear directly in the terminal where you started the server. To capture logs to a file instead:
+
+```bash
+MCP_AUTH_DISABLED=true npm run start:http 2>server.log
+```
+
+Then tail in a separate terminal:
+
+```bash
+tail -f server.log
 ```
 
 ### Adding a New Tool

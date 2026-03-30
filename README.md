@@ -21,6 +21,10 @@ An [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to 
 
 ![Claude Desktop Demo](assets/claude-desktop-demo.gif)
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/confluentinc-mcp-confluent).
+
 ## Quick Start
 
 > **Prerequisites:** [Node.js 22+](https://nodejs.org/) and a [Confluent Cloud](https://confluent.cloud/) account.

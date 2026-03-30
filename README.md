@@ -50,7 +50,7 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
 
 ## Available Tools
 
-The server provides 37+ tools organized by category. Only the tools whose required environment variables are configured will be enabled.
+The server provides 39+ tools organized by category. Only the tools whose required environment variables are configured will be enabled.
 
 | Category                    | Tools                                                                                                                                                                                               | Description                                                       |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -64,6 +64,7 @@ The server provides 37+ tools organized by category. Only the tools whose requir
 | **Environments & Clusters** | `list-environments`, `read-environment`, `list-clusters`                                                                                                                                            | Discover Confluent Cloud resources                                |
 | **Tableflow**               | `create-tableflow-topic`, `list-tableflow-topics`, `read-tableflow-topic`, `update-tableflow-topic`, `delete-tableflow-topic`, `list-tableflow-regions`                                             | Manage Tableflow-enabled topics                                   |
 | **Tableflow Catalog**       | `create-tableflow-catalog-integration`, `list-tableflow-catalog-integrations`, `read-tableflow-catalog-integration`, `update-tableflow-catalog-integration`, `delete-tableflow-catalog-integration` | Manage Tableflow catalog integrations (e.g., AWS Glue)            |
+| **Metrics**                 | `list-available-metrics`, `query-metrics`                                                                                                                                                           | Discover and query Confluent Cloud operational metrics            |
 | **Billing**                 | `list-billing-costs`                                                                                                                                                                                | Query billing and cost data                                       |
 
 You can also list all available tools via the CLI:
@@ -246,6 +247,9 @@ MCP_AUTH_DISABLED=true
 | SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                       |                       | No       |
 | TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                   |                       | No       |
 | TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                         |                       | No       |
+| TELEMETRY_ENDPOINT            | Base URL for Confluent Cloud Telemetry API (metrics)                                                                                      | "https://api.telemetry.confluent.cloud" | No |
+| TELEMETRY_API_KEY             | Optional API key for telemetry access. Falls back to CONFLUENT_CLOUD_API_KEY if not set.                                                  |                       | No       |
+| TELEMETRY_API_SECRET          | Optional API secret for telemetry access. Falls back to CONFLUENT_CLOUD_API_SECRET if not set.                                            |                       | No       |
 
 ### Usage
 
@@ -697,6 +701,51 @@ Claude: Uses get-flink-statement-profile → gets task-level metrics
 Claude: "The statement has high backpressure on task 'Sink'. Try increasing parallelism..."
 ```
 
+## Metrics Example Workflows
+
+The `list-available-metrics` and `query-metrics` tools work together to let AI assistants monitor your Confluent Cloud resources. The discovery tool ensures the assistant uses valid metric names and filter fields rather than guessing.
+
+#### Kafka Topic Throughput
+
+```
+User: "What's the throughput on topic sensor-readings over the last hour?"
+        ↓
+Claude: Uses list-available-metrics(resource_type: "kafka") → discovers metric names & filters
+        ↓
+Claude: Uses query-metrics(metric: "io.confluent.kafka.server/received_bytes",
+        filter: {"metric.topic": "sensor-readings"}) → gets time-series data
+        ↓
+Claude: "sensor-readings is receiving ~14.3 KB/min steadily over the last hour."
+```
+
+#### Flink Compute Pool Utilization
+
+```
+User: "How many CFUs is my Flink compute pool using?"
+        ↓
+Claude: Uses list-available-metrics(resource_type: "compute_pool") → discovers CFU metrics
+        ↓
+Claude: Uses query-metrics(metric: "io.confluent.flink/compute_pool_utilization/current_cfus",
+        filter: {"resource.compute_pool.id": "lfcp-..."}, granularity: "PT1H",
+        interval: "<7-day range>") → gets usage trend
+        ↓
+Claude: "Your compute pool is using 1 CFU consistently."
+```
+
+#### Consumer Lag Monitoring
+
+```
+User: "Is there any consumer lag on the sensor-readings topic?"
+        ↓
+Claude: Uses query-metrics(metric: "io.confluent.kafka.server/consumer_lag_offsets",
+        filter: {"metric.topic": "sensor-readings"},
+        group_by: ["metric.consumer_group_id"]) → gets lag per consumer group
+        ↓
+Claude: "Consumer group 'analytics' has 1,200 offsets of lag."
+```
+
+> **Note:** Kafka server metrics (e.g., `io.confluent.kafka.server/received_bytes`) require `CONFLUENT_CLOUD_API_KEY` and `CONFLUENT_CLOUD_API_SECRET`. The `KAFKA_CLUSTER_ID` environment variable is auto-injected as a filter when querying Kafka metrics. Flink compute pool metrics report at hourly granularity, so queries may need a wider time window than the default 1 hour.
+
 ## Developer Guide
 
 ### Project Structure
@@ -724,6 +773,7 @@ Claude: "The statement has high backpressure on task 'Sink'. Try increasing para
 │   │           ├── environments/    # Environment tools
 │   │           ├── flink/           # Flink SQL, catalog & diagnostics tools
 │   │           ├── kafka/           # Kafka topic & message tools
+│   │           ├── metrics/         # Telemetry API metrics tools
 │   │           ├── schema/          # Schema Registry tools
 │   │           ├── search/          # Search tools
 │   │           └── tableflow/       # Tableflow topic & catalog tools

@@ -293,10 +293,10 @@ describe("TelemetryService", () => {
         isError: false,
       });
 
-      const props = mockTrack.mock.calls[0][0].properties;
-      expect(props.isError).toBe(false);
-      expect(props.errorType).toBeUndefined();
-      expect(props.errorMessage).toBeUndefined();
+      const props = mockTrack.mock.calls[0]?.[0]?.properties;
+      expect(props?.isError).toBe(false);
+      expect(props?.errorType).toBeUndefined();
+      expect(props?.errorMessage).toBeUndefined();
     });
   });
 

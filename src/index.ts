@@ -151,7 +151,10 @@ async function main() {
       version: serverVersion,
     });
 
-    TelemetryService.getInstance().setCommonProperties({ serverVersion });
+    TelemetryService.getInstance().setCommonProperties({
+      serverVersion,
+      transportType: cliOptions.transports.join(","),
+    });
 
     // Capture MCP client info when the handshake completes.
     server.server.oninitialized = () => {

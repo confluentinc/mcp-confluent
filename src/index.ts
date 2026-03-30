@@ -145,10 +145,22 @@ async function main() {
       }
     });
 
+    const serverVersion = getPackageVersion();
     const server = new McpServer({
       name: "confluent",
-      version: getPackageVersion(),
+      version: serverVersion,
     });
+
+    TelemetryService.getInstance().setCommonProperties({ serverVersion });
+
+    // Capture MCP client info when the handshake completes.
+    server.server.oninitialized = () => {
+      const clientInfo = server.server.getClientVersion();
+      TelemetryService.getInstance().setCommonProperties({
+        clientName: clientInfo?.name,
+        clientVersion: clientInfo?.version,
+      });
+    };
 
     toolHandlers.forEach((handler, name) => {
       const config = handler.getToolConfig();
@@ -161,13 +173,21 @@ async function main() {
           const startTime = Date.now();
           try {
             const result = await handler.handle(clientManager, args, sessionId);
+            const trackProps: Record<string, unknown> = {
+              toolName: name,
+              durationMs: Date.now() - startTime,
+              isError: result.isError ?? false,
+            };
+            if (result.isError && result.content) {
+              const text = result.content
+                .filter((c) => c.type === "text")
+                .map((c) => (c as { text: string }).text)
+                .join(" ");
+              trackProps.errorMessage = text.slice(0, 200);
+            }
             TelemetryService.getInstance().track(
               TelemetryEvent.TOOL_CALL_COMPLETED,
-              {
-                toolName: name,
-                durationMs: Date.now() - startTime,
-                isError: result.isError ?? false,
-              },
+              trackProps,
             );
             return result;
           } catch (error) {
@@ -177,6 +197,12 @@ async function main() {
                 toolName: name,
                 durationMs: Date.now() - startTime,
                 isError: true,
+                errorType:
+                  error instanceof Error
+                    ? error.constructor.name
+                    : typeof error,
+                errorMessage:
+                  error instanceof Error ? error.message : String(error),
               },
             );
             throw error;
@@ -215,15 +241,9 @@ async function main() {
       env.SSE_MCP_MESSAGE_ENDPOINT_PATH,
     );
 
-    TelemetryService.getInstance().track(TelemetryEvent.SERVER_STARTED, {
-      transports: cliOptions.transports,
-      toolCount: toolHandlers.size,
-    });
-
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
-      TelemetryService.getInstance().track(TelemetryEvent.SERVER_STOPPED, {});
       await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
       await clientManager.disconnect();

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { arch, homedir, platform, release } from "node:os";
 import { join } from "node:path";
 import { Analytics } from "@segment/analytics-node";
 import { TELEMETRY_WRITE_KEY } from "@src/confluent/telemetry-config.js";
@@ -10,8 +10,6 @@ import { logger } from "@src/logger.js";
 export enum TelemetryEvent {
   TOOL_CALL_COMPLETED = "Tool Call Completed",
   TOOL_CALL_FAILED = "Tool Call Failed",
-  SERVER_STARTED = "Server Started",
-  SERVER_STOPPED = "Server Stopped",
 }
 
 const FALLBACK_MACHINE_ID = "mcp-confluent-anonymous";
@@ -56,13 +54,23 @@ export class TelemetryService {
   private static instance: TelemetryService | undefined;
   private analytics: Analytics | null = null;
   private machineId: string;
+  private serverSessionId: string;
+  private commonProperties: Record<string, unknown>;
 
   private constructor() {
     const writeKey = process.env.TELEMETRY_WRITE_KEY ?? TELEMETRY_WRITE_KEY;
     const disabled = env.DO_NOT_TRACK;
-    const enabled = !disabled && !!writeKey && writeKey !== TELEMETRY_WRITE_KEY;
+    const enabled =
+      !disabled && !!writeKey && writeKey !== "__TELEMETRY_WRITE_KEY__";
 
     this.machineId = getOrCreateMachineId();
+    this.serverSessionId = randomUUID();
+    this.commonProperties = {
+      serverSessionId: this.serverSessionId,
+      osPlatform: platform(),
+      osVersion: release(),
+      osArch: arch(),
+    };
 
     if (enabled) {
       this.analytics = new Analytics({ writeKey });
@@ -84,11 +92,15 @@ export class TelemetryService {
     TelemetryService.instance = undefined;
   }
 
+  setCommonProperties(properties: Record<string, unknown>): void {
+    Object.assign(this.commonProperties, properties);
+  }
+
   track(event: TelemetryEvent, properties: Record<string, unknown>): void {
     if (!this.analytics) return;
     this.analytics.track({
       event,
-      properties,
+      properties: { ...this.commonProperties, ...properties },
       userId: this.machineId,
     });
   }

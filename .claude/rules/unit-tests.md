@@ -26,12 +26,17 @@ paths:
 
 ## Key Patterns
 
-- Use `sinon.createStubInstance(DefaultClientManager)` directly for type-safe stubs — don't wrap
-  simple one-liners in helper functions
+- Use `sinon.createStubInstance(DefaultClientManager)` for simple handler tests with one class dep
+- Use `sinon.createSandbox()` when a test needs many stubs with coordinated cleanup (call
+  `sandbox.restore()` in `afterEach`)
+- Don't wrap simple one-liners in helper functions
 - Use `createTestServer()` from `@tests/server` for integration-style tests that need a
   full MCP server + client connected via `InMemoryTransport`
 - Focus on isolated behavior, mocking external dependencies
 - Do not test or stub side effects like logging - no logger stubs or assertions needed
+- Only stub what affects behavior - pure-value functions like `os.platform()` don't need stubbing
+  when `sinon.match.string` suffices for assertions
+- Access private/protected members via bracket notation in tests: `obj["privateProp"]`
 - Set up common stubs in the top-level `describe` block so they apply to all tests
 
 ## Design for Stubbing
@@ -44,23 +49,28 @@ Sinon can only stub **module exports**, not internal calls within the same file.
 - Pass dependencies as parameters
 - Use dependency injection patterns
 
-### Node Builtins (`node:fs`, `node:os`, etc.)
+### ESM Live Bindings and `node-deps.ts`
 
-Sinon refuses to stub Node builtin ESM namespaces because they are sealed per the ES Module spec.
-Import from `@src/confluent/node-deps.js` instead of `node:*` directly - it re-exports builtins as
-plain objects that Sinon can stub:
+Sinon can't stub ESM live bindings at runtime - this affects Node builtins (sealed per spec) and
+Vite-transformed module exports alike. `@src/confluent/node-deps.js` re-exports these as plain
+objects whose properties Sinon can stub:
 
 ```typescript
 // source file
-import { fs, os, crypto, path } from "@src/confluent/node-deps.js";
+import { fs, os, segment, config } from "@src/confluent/node-deps.js";
+fs.readFileSync(path); // node builtins
+new segment.Analytics({ key }); // third-party constructors
+config.env.DO_NOT_TRACK; // env proxy
 
 // test file
 import * as nodeDeps from "@src/confluent/node-deps.js";
 sandbox.stub(nodeDeps.fs, "readFileSync").returns("content");
-sandbox.stub(nodeDeps.os, "homedir").returns("/tmp/test-home");
+sandbox.stub(nodeDeps.segment, "Analytics").returns({ track: trackStub });
+sandbox.stub(nodeDeps.config, "env").value({ DO_NOT_TRACK: false });
 ```
 
-Add new functions to `node-deps.ts` as needed.
+Add new deps to `node-deps.ts` as needed. For shared mutable objects like `logger`, stub methods
+directly on the object without a wrapper.
 
 ## Handler Tests
 

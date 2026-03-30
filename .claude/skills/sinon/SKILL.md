@@ -51,11 +51,13 @@ Before fetching external docs, review the project's test conventions:
   `telemetry.test.ts`). Call `sandbox.restore()` in `afterEach`
 - **Sinon assertions for stubs/spies** - prefer `sinon.assert` (not `expect().toBe(true)`) when
   verifying stub/spy call behavior; use Vitest `expect` for non-Sinon values (return data, errors)
-- **`sinon.createStubInstance()`** is the primary pattern for stubbing class dependencies (e.g.,
-  `sinon.createStubInstance(DefaultClientManager)`)
+- **ESM stubbing**: Sinon can't stub ESM live bindings (sealed Node builtins or Vite-transformed
+  exports). Source files import deps from `@src/confluent/node-deps.js`, which re-exports them as
+  plain objects Sinon can stub. See `.claude/rules/unit-tests.md` for details
 - Design for stubbing: avoid calling same-module functions you need to stub - Sinon can only stub
   module exports, not internal calls within the same file
 - Extract dependencies to separate modules or pass them as parameters
+- Don't stub side effects like logging - no logger stubs or assertions needed
 - Common stubs go in the top-level `describe` block's `beforeEach`
 - Factory functions in `tests/stubs/` for complex types that can't use `createStubInstance` (e.g.,
   `createStubAdmin()` for `KafkaJS.Admin` which is a type alias, not a class)
@@ -149,7 +151,7 @@ Stub an entire class with type-safe stubs - preferred for `DefaultClientManager`
 
 - **Create**: `const cm = sinon.createStubInstance(DefaultClientManager)`
 - **Configure**: `cm.getAdminClient.resolves(admin as KafkaJS.Admin)`
-- **Cleanup**: handled by Vitest's `restoreMocks: true` - no manual restore needed
+- **Cleanup**: recreated fresh in `beforeEach`, so no explicit restore needed
 
 ### Stub Factories (for non-class types)
 
@@ -164,6 +166,8 @@ For type aliases or interfaces that can't use `createStubInstance`, create facto
 
 - **Behavior**: `stub.returns(val)`, `stub.resolves(val)`, `stub.rejects(err)`,
   `stub.callsFake(fn)`, `stub.throws(err)`
+- **Non-function properties**: `stub.value(val)` - replaces the property value directly (used for
+  non-callable exports like `config.env` or constant values)
 - **Conditional**: `stub.withArgs(arg).returns(val)`, `stub.onFirstCall().returns(val)`
 - **Reset**: `stub.reset()`, `stub.resetBehavior()`, `stub.resetHistory()`
 

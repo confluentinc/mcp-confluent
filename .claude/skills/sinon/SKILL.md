@@ -48,8 +48,8 @@ Before fetching external docs, review the project's test conventions:
 
 - **No sandboxes** - use `sinon.createStubInstance(ClassName)` for class stubs and bare
   `sinon.stub()` for standalone stubs. Vitest's `restoreMocks: true` handles cleanup automatically
-- **Vitest + expect** - the project uses Vitest (not Mocha), with `expect` for assertions (not
-  Node.js `assert` or Chai)
+- **Sinon assertions for stubs/spies** - prefer `sinon.assert` (not `expect().toBe(true)`) when
+  verifying stub/spy call behavior; use Vitest `expect` for non-Sinon values (return data, errors)
 - **`sinon.createStubInstance()`** is the primary pattern for stubbing class dependencies (e.g.,
   `sinon.createStubInstance(DefaultClientManager)`)
 - Design for stubbing: avoid calling same-module functions you need to stub - Sinon can only stub
@@ -171,21 +171,23 @@ For type aliases or interfaces that can't use `createStubInstance`, create facto
 - **Inspect**: `spy.calledOnce`, `spy.calledWith(arg)`, `spy.returnValues`, `spy.args`
 - **Count**: `spy.callCount`, `spy.firstCall`, `spy.secondCall`, `spy.lastCall`
 
-### Assertions (Vitest `expect` preferred)
+### Assertions (`sinon.assert` preferred for stubs/spies)
 
-Prefer Vitest's `expect` over `sinon.assert` for consistency:
-
-- `expect(stub.calledOnce).toBe(true)`
-- `expect(stub.calledWith(arg)).toBe(true)`
-- `expect(stub.callCount).toBe(2)`
-
-Sinon assertions are still available when convenient:
+Prefer `sinon.assert` over `expect()` when asserting on stubs and spies - it produces descriptive
+failure messages (e.g., "expected stub to be called once but was called 0 times") instead of bare
+"expected false to be true":
 
 - `sinon.assert.calledOnce(spy)`
 - `sinon.assert.calledWith(spy, arg1, arg2)`
 - `sinon.assert.calledOnceWithExactly(spy, arg1)`
 - `sinon.assert.notCalled(spy)`
 - `sinon.assert.callOrder(spy1, spy2)`
+- `sinon.assert.callCount(spy, n)`
+
+Use Vitest `expect` for non-Sinon assertions (return values, thrown errors, data structures):
+
+- `expect(result).toEqual(expected)`
+- `expect(result.topics).toHaveLength(3)`
 
 ### Fake Timers
 
@@ -212,8 +214,8 @@ Sinon assertions are still available when convenient:
   API details
 - When the user asks "how do I stub X", first check whether the function is an export from another
   module (stubbable) vs. an internal call within the same file (needs restructuring)
-- The project uses Vitest `expect` (not Chai or Node.js `assert`) - adapt any Chai-based examples
-  from docs accordingly
+- Prefer `sinon.assert` for stub/spy assertions (better failure messages); use Vitest `expect` for
+  non-Sinon values. Adapt any Chai-based examples from docs accordingly
 - `stub.resolves()` / `stub.rejects()` are the async-friendly counterparts to `stub.returns()` /
   `stub.throws()` - use these for Promise-based code
 - For integration-style tests, use `createTestServer()` from `tests/server.ts` which provides an

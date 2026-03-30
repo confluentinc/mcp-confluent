@@ -874,6 +874,10 @@ npx @modelcontextprotocol/inspector node  $PATH_TO_PROJECT/dist/index.js --env-f
 npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --empty-objects-unknown
 ```
 
+## Telemetry
+
+This MCP server collects anonymous usage data to help make improvements. No personally identifiable information is collected. You can opt out by setting `DO_NOT_TRACK=true` in your environment. See [telemetry.md](telemetry.md) for full details on what is collected.
+
 ## Troubleshooting
 
 **"Node.js version not supported"** -- This project requires Node.js 22 or later. Check your version with `node -v` and upgrade if needed.

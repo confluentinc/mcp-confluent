@@ -59,7 +59,7 @@ const envSchema = z.object({
       "Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.",
     )
     .default(false),
-  SEGMENT_DISABLED: z
+  DO_NOT_TRACK: z
     .preprocess((val) => val === "true" || val === "1", z.boolean())
     .describe("Disable telemetry analytics.")
     .default(false),

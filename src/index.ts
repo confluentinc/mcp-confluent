@@ -11,6 +11,7 @@ import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
@@ -144,10 +145,22 @@ async function main() {
       }
     });
 
+    const serverVersion = getPackageVersion();
     const server = new McpServer({
       name: "confluent",
-      version: getPackageVersion(),
+      version: serverVersion,
     });
+
+    TelemetryService.getInstance().setCommonProperties({ serverVersion });
+
+    // Capture MCP client info when the handshake completes.
+    server.server.oninitialized = () => {
+      const clientInfo = server.server.getClientVersion();
+      TelemetryService.getInstance().setCommonProperties({
+        clientName: clientInfo?.name,
+        clientVersion: clientInfo?.version,
+      });
+    };
 
     toolHandlers.forEach((handler, name) => {
       const config = handler.getToolConfig();
@@ -157,7 +170,43 @@ async function main() {
         { description: config.description, inputSchema: config.inputSchema },
         async (args, context) => {
           const sessionId = context?.sessionId;
-          return await handler.handle(clientManager, args, sessionId);
+          const startTime = Date.now();
+          try {
+            const result = await handler.handle(clientManager, args, sessionId);
+            const trackProps: Record<string, unknown> = {
+              toolName: name,
+              durationMs: Date.now() - startTime,
+              isError: result.isError ?? false,
+            };
+            if (result.isError && result.content) {
+              const text = result.content
+                .filter((c) => c.type === "text")
+                .map((c) => (c as { text: string }).text)
+                .join(" ");
+              trackProps.errorMessage = text.slice(0, 200);
+            }
+            TelemetryService.getInstance().track(
+              TelemetryEvent.TOOL_CALL_COMPLETED,
+              trackProps,
+            );
+            return result;
+          } catch (error) {
+            TelemetryService.getInstance().track(
+              TelemetryEvent.TOOL_CALL_FAILED,
+              {
+                toolName: name,
+                durationMs: Date.now() - startTime,
+                isError: true,
+                errorType:
+                  error instanceof Error
+                    ? error.constructor.name
+                    : typeof error,
+                errorMessage:
+                  error instanceof Error ? error.message : String(error),
+              },
+            );
+            throw error;
+          }
         },
       );
     });
@@ -195,6 +244,7 @@ async function main() {
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
+      await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
       await clientManager.disconnect();
       await server.close();

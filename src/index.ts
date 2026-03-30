@@ -11,6 +11,7 @@ import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
@@ -144,10 +145,25 @@ async function main() {
       }
     });
 
+    const serverVersion = getPackageVersion();
     const server = new McpServer({
       name: "confluent",
-      version: getPackageVersion(),
+      version: serverVersion,
     });
+
+    TelemetryService.getInstance().setCommonProperties({
+      serverVersion,
+      transportType: cliOptions.transports.join(","),
+    });
+
+    // Capture MCP client info when the handshake completes.
+    server.server.oninitialized = () => {
+      const clientInfo = server.server.getClientVersion();
+      TelemetryService.getInstance().setCommonProperties({
+        clientName: clientInfo?.name,
+        clientVersion: clientInfo?.version,
+      });
+    };
 
     toolHandlers.forEach((handler, name) => {
       const config = handler.getToolConfig();
@@ -157,7 +173,23 @@ async function main() {
         { description: config.description, inputSchema: config.inputSchema },
         async (args, context) => {
           const sessionId = context?.sessionId;
-          return await handler.handle(clientManager, args, sessionId);
+          const startTime = Date.now();
+          try {
+            const result = await handler.handle(clientManager, args, sessionId);
+            TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
+              toolName: name,
+              durationMs: Date.now() - startTime,
+              status: result.isError ? "error" : "success",
+            });
+            return result;
+          } catch (error) {
+            TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
+              toolName: name,
+              durationMs: Date.now() - startTime,
+              status: "error",
+            });
+            throw error;
+          }
         },
       );
     });
@@ -195,6 +227,7 @@ async function main() {
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
+      await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
       await clientManager.disconnect();
       await server.close();

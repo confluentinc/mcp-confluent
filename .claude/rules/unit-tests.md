@@ -17,6 +17,13 @@ paths:
 - Use the "should ..." convention: `it("should return a list of topics", ...)`
 - Group related tests with `describe` blocks named after the unit under test
 
+## Assertions
+
+- Prefer `sinon.assert` for stub/spy call verification (e.g., `sinon.assert.calledOnce(stub)`,
+  `sinon.assert.calledWith(stub, arg)`) - produces descriptive failure messages instead of bare
+  "expected false to be true"
+- Use Vitest `expect` for non-Sinon values (return data, thrown errors, data structures)
+
 ## Key Patterns
 
 - Use `sinon.createStubInstance(DefaultClientManager)` directly for type-safe stubs — don't wrap

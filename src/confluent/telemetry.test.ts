@@ -48,7 +48,7 @@ function createService(opts: { writeKey?: string; doNotTrack?: boolean } = {}) {
 
 describe("TelemetryService", () => {
   beforeEach(() => {
-    TelemetryService.resetInstance();
+    TelemetryService["instance"] = undefined;
     vi.clearAllMocks();
     // Default: no existing machine-id file on disk
     vi.mocked(readFileSync).mockImplementation(() => {
@@ -119,7 +119,7 @@ describe("TelemetryService", () => {
     });
 
     it("is stopped for identify when disabled", () => {
-      TelemetryService.resetInstance();
+      TelemetryService["instance"] = undefined;
       const disabled = createService({ doNotTrack: true });
       disabled.identify("user-123", { org: "acme" });
       expect(mockIdentify).not.toHaveBeenCalled();

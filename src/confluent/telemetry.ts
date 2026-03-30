@@ -84,11 +84,6 @@ export class TelemetryService {
     return TelemetryService.instance;
   }
 
-  // For testing only
-  static resetInstance(): void {
-    TelemetryService.instance = undefined;
-  }
-
   setCommonProperties(properties: Record<string, unknown>): void {
     Object.assign(this.commonProperties, properties);
   }

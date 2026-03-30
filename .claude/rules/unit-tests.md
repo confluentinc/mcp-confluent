@@ -44,6 +44,24 @@ Sinon can only stub **module exports**, not internal calls within the same file.
 - Pass dependencies as parameters
 - Use dependency injection patterns
 
+### Node Builtins (`node:fs`, `node:os`, etc.)
+
+Sinon refuses to stub Node builtin ESM namespaces because they are sealed per the ES Module spec.
+Import from `@src/confluent/node-deps.js` instead of `node:*` directly - it re-exports builtins as
+plain objects that Sinon can stub:
+
+```typescript
+// source file
+import { fs, os, crypto, path } from "@src/confluent/node-deps.js";
+
+// test file
+import * as nodeDeps from "@src/confluent/node-deps.js";
+sandbox.stub(nodeDeps.fs, "readFileSync").returns("content");
+sandbox.stub(nodeDeps.os, "homedir").returns("/tmp/test-home");
+```
+
+Add new functions to `node-deps.ts` as needed.
+
 ## Handler Tests
 
 - Test config (`getToolConfig()`), required env vars (`getRequiredEnvVars()`), and behavior (`handle()`)

@@ -59,7 +59,7 @@ export class TelemetryService {
 
   private constructor() {
     const writeKey = process.env.TELEMETRY_WRITE_KEY ?? TELEMETRY_WRITE_KEY;
-    const disabled = env.SEGMENT_DISABLED;
+    const disabled = env.DO_NOT_TRACK;
     const enabled = !disabled && !!writeKey && writeKey !== TELEMETRY_WRITE_KEY;
 
     this.machineId = getOrCreateMachineId();

@@ -79,6 +79,7 @@ export class TelemetryService {
     return TelemetryService.instance;
   }
 
+  // For testing only
   static resetInstance(): void {
     TelemetryService.instance = undefined;
   }

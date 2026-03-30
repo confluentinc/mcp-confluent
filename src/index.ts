@@ -189,7 +189,9 @@ async function main() {
               trackProps.errorMessage = text.slice(0, 200);
             }
             TelemetryService.getInstance().track(
-              TelemetryEvent.TOOL_CALL_COMPLETED,
+              result.isError
+                ? TelemetryEvent.TOOL_CALL_FAILED
+                : TelemetryEvent.TOOL_CALL_COMPLETED,
               trackProps,
             );
             return result;

@@ -46,8 +46,9 @@ Determine whether the user needs:
 
 Before fetching external docs, review the project's test conventions:
 
-- **No sandboxes** - use `sinon.createStubInstance(ClassName)` for class stubs and bare
-  `sinon.stub()` for standalone stubs. Vitest's `restoreMocks: true` handles cleanup automatically
+- **`sinon.createStubInstance()`** for simple handler tests that only need a stubbed class instance
+- **`sinon.createSandbox()`** for tests with many stubs needing coordinated cleanup (e.g.,
+  `telemetry.test.ts`). Call `sandbox.restore()` in `afterEach`
 - **Sinon assertions for stubs/spies** - prefer `sinon.assert` (not `expect().toBe(true)`) when
   verifying stub/spy call behavior; use Vitest `expect` for non-Sinon values (return data, errors)
 - **`sinon.createStubInstance()`** is the primary pattern for stubbing class dependencies (e.g.,
@@ -203,11 +204,9 @@ Use Vitest `expect` for non-Sinon assertions (return values, thrown errors, data
 
 ## Tips
 
-- **No sandboxes** - this project does not use `sinon.createSandbox()`. Use
-  `sinon.createStubInstance()` for class stubs and bare `sinon.stub()` for standalone stubs.
-  Vitest's `restoreMocks: true` handles cleanup
-- **Use `createStubInstance`** for class dependencies like `DefaultClientManager` - don't wrap
-  simple one-liners in helper functions
+- **Use `createStubInstance`** for simple tests with one class dependency (e.g.,
+  `DefaultClientManager`), **`createSandbox()`** when multiple stubs need coordinated cleanup.
+  Call `sandbox.restore()` in `afterEach`. Don't wrap simple one-liners in helper functions
 - Only create stub factory functions (in `tests/stubs/`) for types that can't use
   `createStubInstance` (e.g., type aliases like `KafkaJS.Admin`)
 - Sinon docs are organized by feature - fetch the specific section page rather than the overview for

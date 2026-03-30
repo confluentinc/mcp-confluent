@@ -31,7 +31,7 @@ paths:
 - Use `createTestServer()` from `@tests/server` for integration-style tests that need a
   full MCP server + client connected via `InMemoryTransport`
 - Focus on isolated behavior, mocking external dependencies
-- Do not test side effects like logging
+- Do not test or stub side effects like logging - no logger stubs or assertions needed
 - Set up common stubs in the top-level `describe` block so they apply to all tests
 
 ## Design for Stubbing

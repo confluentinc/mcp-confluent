@@ -73,6 +73,7 @@
     "@fastify/swagger": "^9.5.1",
     "@fastify/swagger-ui": "^5.2.3",
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@segment/analytics-node": "^3.0.0",
     "commander": "^14.0.0",
     "dotenv": "^16.5.0",
     "fastify": "^5.7.3",

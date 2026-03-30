@@ -176,40 +176,18 @@ async function main() {
           const startTime = Date.now();
           try {
             const result = await handler.handle(clientManager, args, sessionId);
-            const trackProps: Record<string, unknown> = {
+            TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
               toolName: name,
               durationMs: Date.now() - startTime,
-              isError: result.isError ?? false,
-            };
-            if (result.isError && result.content) {
-              const text = result.content
-                .filter((c) => c.type === "text")
-                .map((c) => (c as { text: string }).text)
-                .join(" ");
-              trackProps.errorMessage = text.slice(0, 200);
-            }
-            TelemetryService.getInstance().track(
-              result.isError
-                ? TelemetryEvent.TOOL_CALL_FAILED
-                : TelemetryEvent.TOOL_CALL_COMPLETED,
-              trackProps,
-            );
+              status: result.isError ? "error" : "success",
+            });
             return result;
           } catch (error) {
-            TelemetryService.getInstance().track(
-              TelemetryEvent.TOOL_CALL_FAILED,
-              {
-                toolName: name,
-                durationMs: Date.now() - startTime,
-                isError: true,
-                errorType:
-                  error instanceof Error
-                    ? error.constructor.name
-                    : typeof error,
-                errorMessage:
-                  error instanceof Error ? error.message : String(error),
-              },
-            );
+            TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
+              toolName: name,
+              durationMs: Date.now() - startTime,
+              status: "error",
+            });
             throw error;
           }
         },

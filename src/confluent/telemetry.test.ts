@@ -32,9 +32,6 @@ vi.mock("node:fs");
 vi.mock("@src/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-vi.mock("@src/confluent/telemetry-config.js", () => ({
-  TELEMETRY_WRITE_KEY: "__TELEMETRY_WRITE_KEY__",
-}));
 vi.mock("node:crypto", () => ({ randomUUID: () => "generated-uuid" }));
 vi.mock("node:os", () => ({
   homedir: () => "/tmp/test-home",
@@ -65,15 +62,14 @@ describe("TelemetryService", () => {
 
   describe("activation", () => {
     it("enables when env TELEMETRY_WRITE_KEY is a real key", () => {
-      createService({ writeKey: "real-key" }).track(
-        TelemetryEvent.TOOL_CALL_COMPLETED,
-        { toolName: "list_topics" },
-      );
+      createService({ writeKey: "real-key" }).track(TelemetryEvent.TOOL_CALL, {
+        toolName: "list_topics",
+      });
       expect(mockTrack).toHaveBeenCalledOnce();
     });
 
     it("disables when TELEMETRY_WRITE_KEY is the unreplaced placeholder", () => {
-      createService().track(TelemetryEvent.TOOL_CALL_COMPLETED, {
+      createService().track(TelemetryEvent.TOOL_CALL, {
         toolName: "list_topics",
       });
       expect(mockTrack).not.toHaveBeenCalled();
@@ -81,7 +77,7 @@ describe("TelemetryService", () => {
 
     it("disables when DO_NOT_TRACK is true, even with a real write key", () => {
       createService({ writeKey: "real-key", doNotTrack: true }).track(
-        TelemetryEvent.TOOL_CALL_COMPLETED,
+        TelemetryEvent.TOOL_CALL,
         { toolName: "list_topics" },
       );
       expect(mockTrack).not.toHaveBeenCalled();
@@ -95,13 +91,13 @@ describe("TelemetryService", () => {
     });
 
     it("sends event with properties and machine ID as userId", () => {
-      service.track(TelemetryEvent.TOOL_CALL_COMPLETED, {
+      service.track(TelemetryEvent.TOOL_CALL, {
         toolName: "describe_topic",
         durationMs: 42,
       });
 
       expect(mockTrack).toHaveBeenCalledWith({
-        event: TelemetryEvent.TOOL_CALL_COMPLETED,
+        event: TelemetryEvent.TOOL_CALL,
         properties: expect.objectContaining({
           toolName: "describe_topic",
           durationMs: 42,
@@ -143,7 +139,7 @@ describe("TelemetryService", () => {
     it("reuses an existing UUID from the file", () => {
       vi.mocked(readFileSync).mockReturnValue("existing-uuid");
       createService({ writeKey: "real-key" }).track(
-        TelemetryEvent.TOOL_CALL_COMPLETED,
+        TelemetryEvent.TOOL_CALL,
         {},
       );
       expect(mockTrack).toHaveBeenCalledWith(
@@ -156,7 +152,7 @@ describe("TelemetryService", () => {
         throw new Error("EACCES");
       });
       createService({ writeKey: "real-key" }).track(
-        TelemetryEvent.TOOL_CALL_COMPLETED,
+        TelemetryEvent.TOOL_CALL,
         {},
       );
       expect(mockTrack).toHaveBeenCalledWith(
@@ -184,7 +180,7 @@ describe("TelemetryService", () => {
     });
 
     it("includes OS info in every track call", () => {
-      service.track(TelemetryEvent.TOOL_CALL_COMPLETED, { toolName: "test" });
+      service.track(TelemetryEvent.TOOL_CALL, { toolName: "test" });
 
       expect(mockTrack).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -204,7 +200,7 @@ describe("TelemetryService", () => {
         clientVersion: "2.1.87",
       });
 
-      service.track(TelemetryEvent.TOOL_CALL_COMPLETED, { toolName: "test" });
+      service.track(TelemetryEvent.TOOL_CALL, { toolName: "test" });
 
       expect(mockTrack).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -222,7 +218,7 @@ describe("TelemetryService", () => {
     it("per-event properties override common properties", () => {
       service.setCommonProperties({ serverVersion: "1.0.0" });
 
-      service.track(TelemetryEvent.TOOL_CALL_COMPLETED, {
+      service.track(TelemetryEvent.TOOL_CALL, {
         serverVersion: "override",
       });
 
@@ -233,70 +229,6 @@ describe("TelemetryService", () => {
           }),
         }),
       );
-    });
-  });
-
-  describe("error tracking", () => {
-    let service: TelemetryService;
-    beforeEach(() => {
-      service = createService({ writeKey: "real-key" });
-    });
-
-    it("tracks tool call failure with error type and message", () => {
-      service.track(TelemetryEvent.TOOL_CALL_FAILED, {
-        toolName: "list_schemas",
-        durationMs: 150,
-        isError: true,
-        errorType: "TypeError",
-        errorMessage: "Cannot read properties of undefined",
-      });
-
-      expect(mockTrack).toHaveBeenCalledWith(
-        expect.objectContaining({
-          event: TelemetryEvent.TOOL_CALL_FAILED,
-          properties: expect.objectContaining({
-            toolName: "list_schemas",
-            durationMs: 150,
-            isError: true,
-            errorType: "TypeError",
-            errorMessage: "Cannot read properties of undefined",
-          }),
-        }),
-      );
-    });
-
-    it("tracks completed call with isError and errorMessage for API failures", () => {
-      service.track(TelemetryEvent.TOOL_CALL_COMPLETED, {
-        toolName: "list_schemas",
-        durationMs: 200,
-        isError: true,
-        errorMessage: "Failed to list schemas: Request failed with status 401",
-      });
-
-      expect(mockTrack).toHaveBeenCalledWith(
-        expect.objectContaining({
-          event: TelemetryEvent.TOOL_CALL_COMPLETED,
-          properties: expect.objectContaining({
-            toolName: "list_schemas",
-            isError: true,
-            errorMessage:
-              "Failed to list schemas: Request failed with status 401",
-          }),
-        }),
-      );
-    });
-
-    it("tracks successful call without error fields", () => {
-      service.track(TelemetryEvent.TOOL_CALL_COMPLETED, {
-        toolName: "list_topics",
-        durationMs: 50,
-        isError: false,
-      });
-
-      const props = mockTrack.mock.calls[0]?.[0]?.properties;
-      expect(props?.isError).toBe(false);
-      expect(props?.errorType).toBeUndefined();
-      expect(props?.errorMessage).toBeUndefined();
     });
   });
 

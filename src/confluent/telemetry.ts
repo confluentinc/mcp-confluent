@@ -1,11 +1,4 @@
-import {
-  crypto,
-  env,
-  fs,
-  os,
-  path,
-  segment,
-} from "@src/confluent/node-deps.js";
+import { crypto, fs, os, path, segment } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
 
 export enum TelemetryEvent {

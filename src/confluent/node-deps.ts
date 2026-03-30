@@ -11,4 +11,4 @@ export const os = { homedir, platform, release, arch };
 export const crypto = { randomUUID };
 export const path = { join };
 export const segment = { Analytics };
-export const env = { current: envProxy };
+export const config = { env: envProxy };

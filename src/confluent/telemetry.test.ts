@@ -1,4 +1,8 @@
-import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
+import {
+  TelemetryEvent,
+  TelemetryService,
+  FALLBACK_MACHINE_ID,
+} from "@src/confluent/telemetry.js";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -156,7 +160,7 @@ describe("TelemetryService", () => {
         {},
       );
       expect(mockTrack).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: "mcp-confluent-anonymous" }),
+        expect.objectContaining({ userId: FALLBACK_MACHINE_ID }),
       );
     });
   });

@@ -10,7 +10,7 @@ export enum TelemetryEvent {
   TOOL_CALL = "Tool Call",
 }
 
-const FALLBACK_MACHINE_ID = "mcp-confluent-anonymous";
+export const FALLBACK_MACHINE_ID = "00000000-0000-0000-0000-000000000000";
 const CONFIG_DIR = ".mcp-confluent";
 const MACHINE_ID_FILE = "machine-id";
 

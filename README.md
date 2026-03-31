@@ -46,6 +46,7 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
   - [CLI Usage](#mcp-confluent-cli-usage)
 - [Flink Example Workflows](#flink-example-workflows)
 - [Developer Guide](#developer-guide)
+  - [Local Development with an MCP Client](#local-development-with-an-mcp-client)
 - [Troubleshooting](#troubleshooting)
 
 ## Available Tools
@@ -856,6 +857,54 @@ For testing MCP servers, you can use [MCP Inspector](https://modelcontextprotoco
 ```bash
 # make sure you've already built the project either in dev mode or by running npm run build
 npx @modelcontextprotocol/inspector node  $PATH_TO_PROJECT/dist/index.js --env-file $PATH_TO_PROJECT/.env
+```
+
+### Local Development with an MCP Client
+
+While the [MCP Inspector](#mcp-inspector) is useful for ad-hoc tool testing, this setup lets you develop against a real MCP client (Claude Code, Cursor, etc.) with full server log visibility. By default, MCP clients spawn the server as a child process using stdio transport, which makes server logs difficult to observe. Running the server in HTTP mode gives you direct access to logs while the client interacts with it normally.
+
+After building the project (see [Building and Running](#building-and-running)):
+
+#### 1. Start the server in HTTP mode
+
+```bash
+MCP_AUTH_DISABLED=true npm run start:http
+```
+
+This starts the server on `http://127.0.0.1:8080/mcp` with authentication disabled for local development. Only use `MCP_AUTH_DISABLED=true` in local development environments.
+
+#### 2. Point your MCP client at the running server
+
+Instead of the default stdio configuration, configure your assistant's MCP settings to connect via HTTP. For example, in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "confluent-dev": {
+      "type": "http",
+      "url": "http://127.0.0.1:8080/mcp"
+    }
+  }
+}
+```
+
+This replaces the typical `command`/`args` config that spawns a stdio child process.
+
+> [!IMPORTANT]
+> After restarting the MCP server, you may also need to restart or reconnect your MCP client so it picks up the new server process. For example, in Claude Code use the `/mcp` command to reconnect.
+
+#### 3. Observe server logs
+
+All server logs are written to stderr via pino and will appear directly in the terminal where you started the server. Set `LOG_LEVEL=debug` for more verbose output. To capture logs to a file instead:
+
+```bash
+MCP_AUTH_DISABLED=true npm run start:http 2>server.log
+```
+
+Then tail in a separate terminal:
+
+```bash
+tail -f server.log
 ```
 
 ### Adding a New Tool

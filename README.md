@@ -36,6 +36,8 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
 
 - [Quick Start](#quick-start)
 - [Available Tools](#available-tools)
+  - [Confluent Cloud](#available-tools-for-confluent-cloud)
+  - [Local Confluent](#available-tools-for-local-confluent)
 - [User Guide](#user-guide)
   - [Getting Started](#getting-started)
   - [Configuration](#configuration)
@@ -51,7 +53,15 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
 
 ## Available Tools
 
-The server provides 39+ tools organized by category. Only the tools whose required environment variables are configured will be enabled.
+Only the tools whose required environment variables are configured will be enabled. You can also list all available tools via the CLI:
+
+```bash
+npx -y @confluentinc/mcp-confluent --list-tools
+```
+
+### Available Tools for Confluent Cloud
+
+These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`.env.example`](.env.example) for the full set of configuration variables.
 
 | Category                    | Tools                                                                                                                                                                                               | Description                                                       |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -60,7 +70,7 @@ The server provides 39+ tools organized by category. Only the tools whose requir
 | **Flink Catalog**           | `list-flink-catalogs`, `list-flink-databases`, `list-flink-tables`, `describe-flink-table`, `get-flink-table-info`                                                                                  | Explore Flink catalogs, databases, and table schemas              |
 | **Flink Diagnostics**       | `check-flink-statement-health`, `detect-flink-statement-issues`, `get-flink-statement-profile`                                                                                                      | Health checks, issue detection, and query profiling               |
 | **Connectors**              | `list-connectors`, `read-connector`, `create-connector`, `delete-connector`                                                                                                                         | Manage Kafka Connect connectors                                   |
-| **Schema Registry**         | `list-schemas`                                                                                                                                                                                      | List and inspect data schemas                                     |
+| **Schema Registry**         | `list-schemas`, `delete-schema`                                                                                                                                                                     | List, inspect, and delete data schemas                            |
 | **Catalog & Tags**          | `search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`                                                      | Organize and search topics using tags                             |
 | **Environments & Clusters** | `list-environments`, `read-environment`, `list-clusters`                                                                                                                                            | Discover Confluent Cloud resources                                |
 | **Tableflow**               | `create-tableflow-topic`, `list-tableflow-topics`, `read-tableflow-topic`, `update-tableflow-topic`, `delete-tableflow-topic`, `list-tableflow-regions`                                             | Manage Tableflow-enabled topics                                   |
@@ -68,11 +78,20 @@ The server provides 39+ tools organized by category. Only the tools whose requir
 | **Metrics**                 | `list-available-metrics`, `query-metrics`                                                                                                                                                           | Discover and query Confluent Cloud operational metrics            |
 | **Billing**                 | `list-billing-costs`                                                                                                                                                                                | Query billing and cost data                                       |
 
-You can also list all available tools via the CLI:
+### Available Tools for Local Confluent
 
-```bash
-npx -y @confluentinc/mcp-confluent --list-tools
+These tools only require Kafka or Schema Registry endpoints. No authentication is required, making them ideal for local development with Docker Compose or self-managed clusters.
+
+```properties
+# minimal .env for local development
+BOOTSTRAP_SERVERS="localhost:9092"
+SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 ```
+
+| Category            | Tools                                                                                  | Description                             |
+| ------------------- | -------------------------------------------------------------------------------------- | --------------------------------------- |
+| **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Manage topics, produce/consume messages |
+| **Schema Registry** | `list-schemas`, `delete-schema`                                                        | List, inspect, and delete data schemas  |
 
 ## User Guide
 
@@ -216,42 +235,42 @@ MCP_AUTH_DISABLED=true
 
 ### Environment Variables Reference
 
-| Variable                      | Description                                                                                                                               | Default Value         | Required |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------- |
-| HTTP_HOST                     | Host to bind for HTTP transport. Defaults to localhost only for security.                                                                 | "127.0.0.1"           | Yes      |
-| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp') (string)                                                                              | "/mcp"                | Yes      |
-| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 8080                  | Yes      |
-| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal)                                                                | "info"                | Yes      |
-| MCP_API_KEY                   | API key for HTTP/SSE authentication. Generate using `--generate-key`. Required when auth is enabled.                                      |                       | No\*     |
-| MCP_AUTH_DISABLED             | Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.                                            | false                 | No       |
-| MCP_ALLOWED_HOSTS             | Comma-separated list of allowed Host header values for DNS rebinding protection.                                                          | "localhost,127.0.0.1" | No       |
-| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                     | "/sse"                | Yes      |
-| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                         | "/messages"           | Yes      |
-| BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)   |                       | No       |
-| CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))   |                       | No       |
-| CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))         |                       | No       |
-| CONFLUENT_CLOUD_REST_ENDPOINT | Base URL for Confluent Cloud's REST API services (default)                                                                                |                       | No       |
-| FLINK_API_KEY                 | Authentication key for accessing Confluent Cloud's Flink services, including compute pools and SQL statement management (string (min: 1)) |                       | No       |
-| FLINK_API_SECRET              | Secret token paired with FLINK_API_KEY for authenticated access to Confluent Cloud's Flink services (string (min: 1))                     |                       | No       |
-| FLINK_COMPUTE_POOL_ID         | Unique identifier for the Flink compute pool, must start with 'lfcp-' prefix (string)                                                     |                       | No       |
-| FLINK_DATABASE_NAME           | Name of the associated Kafka cluster used as a database reference in Flink SQL operations (string (min: 1))                               |                       | No       |
-| FLINK_ENV_ID                  | Unique identifier for the Flink environment, must start with 'env-' prefix (string)                                                       |                       | No       |
-| FLINK_ENV_NAME                | Human-readable name for the Flink environment used for identification and display purposes (string (min: 1))                              |                       | No       |
-| FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                            |                       | No       |
-| FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                       |                       | No       |
-| KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                     |                       | No       |
-| KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                          |                       | No       |
-| KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                |                       | No       |
-| KAFKA_ENV_ID                  | Environment identifier for Kafka cluster, must start with 'env-' prefix (string)                                                          |                       | No       |
-| KAFKA_REST_ENDPOINT           | REST API endpoint for Kafka cluster management and administration (string)                                                                |                       | No       |
-| SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                           |                       | No       |
-| SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                             |                       | No       |
-| SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                       |                       | No       |
-| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                   |                       | No       |
-| TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                         |                       | No       |
-| TELEMETRY_ENDPOINT            | Base URL for Confluent Cloud Telemetry API (metrics)                                                                                      | "https://api.telemetry.confluent.cloud" | No |
-| TELEMETRY_API_KEY             | Optional API key for telemetry access. Falls back to CONFLUENT_CLOUD_API_KEY if not set.                                                  |                       | No       |
-| TELEMETRY_API_SECRET          | Optional API secret for telemetry access. Falls back to CONFLUENT_CLOUD_API_SECRET if not set.                                            |                       | No       |
+| Variable                      | Description                                                                                                                               | Default Value                           | Required |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------- |
+| HTTP_HOST                     | Host to bind for HTTP transport. Defaults to localhost only for security.                                                                 | "127.0.0.1"                             | Yes      |
+| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp') (string)                                                                              | "/mcp"                                  | Yes      |
+| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                          | 8080                                    | Yes      |
+| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal)                                                                | "info"                                  | Yes      |
+| MCP_API_KEY                   | API key for HTTP/SSE authentication. Generate using `--generate-key`. Required when auth is enabled.                                      |                                         | No\*     |
+| MCP_AUTH_DISABLED             | Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.                                            | false                                   | No       |
+| MCP_ALLOWED_HOSTS             | Comma-separated list of allowed Host header values for DNS rebinding protection.                                                          | "localhost,127.0.0.1"                   | No       |
+| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                     | "/sse"                                  | Yes      |
+| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                         | "/messages"                             | Yes      |
+| BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)   |                                         | No       |
+| CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))   |                                         | No       |
+| CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))         |                                         | No       |
+| CONFLUENT_CLOUD_REST_ENDPOINT | Base URL for Confluent Cloud's REST API services (default)                                                                                |                                         | No       |
+| FLINK_API_KEY                 | Authentication key for accessing Confluent Cloud's Flink services, including compute pools and SQL statement management (string (min: 1)) |                                         | No       |
+| FLINK_API_SECRET              | Secret token paired with FLINK_API_KEY for authenticated access to Confluent Cloud's Flink services (string (min: 1))                     |                                         | No       |
+| FLINK_COMPUTE_POOL_ID         | Unique identifier for the Flink compute pool, must start with 'lfcp-' prefix (string)                                                     |                                         | No       |
+| FLINK_DATABASE_NAME           | Name of the associated Kafka cluster used as a database reference in Flink SQL operations (string (min: 1))                               |                                         | No       |
+| FLINK_ENV_ID                  | Unique identifier for the Flink environment, must start with 'env-' prefix (string)                                                       |                                         | No       |
+| FLINK_ENV_NAME                | Human-readable name for the Flink environment used for identification and display purposes (string (min: 1))                              |                                         | No       |
+| FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                            |                                         | No       |
+| FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                       |                                         | No       |
+| KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                     |                                         | No       |
+| KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                          |                                         | No       |
+| KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                |                                         | No       |
+| KAFKA_ENV_ID                  | Environment identifier for Kafka cluster, must start with 'env-' prefix (string)                                                          |                                         | No       |
+| KAFKA_REST_ENDPOINT           | REST API endpoint for Kafka cluster management and administration (string)                                                                |                                         | No       |
+| SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                           |                                         | No       |
+| SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                             |                                         | No       |
+| SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                       |                                         | No       |
+| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                   |                                         | No       |
+| TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                         |                                         | No       |
+| TELEMETRY_ENDPOINT            | Base URL for Confluent Cloud Telemetry API (metrics)                                                                                      | "https://api.telemetry.confluent.cloud" | No       |
+| TELEMETRY_API_KEY             | Optional API key for telemetry access. Falls back to CONFLUENT_CLOUD_API_KEY if not set.                                                  |                                         | No       |
+| TELEMETRY_API_SECRET          | Optional API secret for telemetry access. Falls back to CONFLUENT_CLOUD_API_SECRET if not set.                                            |                                         | No       |
 
 ### Usage
 

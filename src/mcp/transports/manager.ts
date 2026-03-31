@@ -26,6 +26,7 @@ export class TransportManager {
   constructor(
     private readonly server: McpServer,
     private readonly config?: TransportManagerConfig,
+    private readonly serverFactory?: () => McpServer,
   ) {}
 
   async start(
@@ -141,7 +142,7 @@ export class TransportManager {
           throw new Error("HTTP server not initialized");
         }
         return new HttpTransport(
-          this.server,
+          this.serverFactory ?? (() => this.server),
           this.httpServer,
           httpMcpEndpointPath,
         );

@@ -31,9 +31,10 @@ const mcpErrorSchema = {
 
 export class HttpTransport implements Transport {
   private sessions: Record<string, StreamableHTTPServerTransport> = {};
+  private sessionServers: Record<string, McpServer> = {};
 
   constructor(
-    private server: McpServer,
+    private serverFactory: () => McpServer,
     private httpServer: HttpServer,
     private httpMcpEndpointPath: string = "/mcp",
   ) {}
@@ -70,14 +71,18 @@ export class HttpTransport implements Transport {
         if (sessionId && this.sessions[sessionId]) {
           transport = this.sessions[sessionId];
         } else {
+          // create the per-session server first so the onsessioninitialized
+          // callback below doesn't reference a TDZ binding.
+          const perSessionServer = this.serverFactory();
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (sid: string) => {
               this.sessions[sid] = transport;
+              this.sessionServers[sid] = perSessionServer;
             },
           });
 
-          await this.server.connect(transport);
+          await perSessionServer.connect(transport);
         }
 
         await transport.handleRequest(request.raw, reply.raw, request.body);
@@ -151,8 +156,14 @@ export class HttpTransport implements Transport {
 
         const transport = this.sessions[sessionId];
         await transport.handleRequest(request.raw, reply.raw);
-        // Clean up the session
+        // clean up session transport and its server
         delete this.sessions[sessionId];
+        transport.close();
+        const server = this.sessionServers[sessionId];
+        if (server) {
+          await server.close();
+          delete this.sessionServers[sessionId];
+        }
       },
     );
 
@@ -177,13 +188,15 @@ export class HttpTransport implements Transport {
 
   async disconnect(): Promise<void> {
     logger.info("Cleaning up HTTP transport sessions...");
-    // Clean up all active sessions
-    Object.values(this.sessions).forEach((transport) => {
-      const sessionId = transport.sessionId;
-      if (sessionId) {
-        delete this.sessions[sessionId];
-      }
+    // close all per-session servers
+    for (const server of Object.values(this.sessionServers)) {
+      await server.close();
+    }
+    this.sessionServers = {};
+    // close all transports
+    for (const transport of Object.values(this.sessions)) {
       transport.close();
-    });
+    }
+    this.sessions = {};
   }
 }

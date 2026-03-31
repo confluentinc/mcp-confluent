@@ -868,7 +868,7 @@ After building the project (see [Building and Running](#building-and-running)):
 #### 1. Start the server in HTTP mode
 
 ```bash
-MCP_AUTH_DISABLED=true npm run start:http
+npm run start:http -- --disable-auth
 ```
 
 This starts the server on `http://127.0.0.1:8080/mcp` with authentication disabled for local development. Only use `MCP_AUTH_DISABLED=true` in local development environments.
@@ -898,7 +898,7 @@ This replaces the typical `command`/`args` config that spawns a stdio child proc
 All server logs are written to stderr via pino and will appear directly in the terminal where you started the server. Set `LOG_LEVEL=debug` for more verbose output. To capture logs to a file instead:
 
 ```bash
-MCP_AUTH_DISABLED=true npm run start:http 2>server.log
+npm run start:http -- --disable-auth 2>server.log
 ```
 
 Then tail in a separate terminal:

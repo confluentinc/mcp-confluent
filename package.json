@@ -32,6 +32,7 @@
     "test:integration:kafka": "vitest run --config vitest.integration.config.ts tests/integration/kafka.integration.test.ts",
     "test:integration:schema": "vitest run --config vitest.integration.config.ts tests/integration/schema-registry.integration.test.ts",
     "test:integration:cloud": "vitest run --config vitest.integration.config.ts tests/integration/cloud.integration.test.ts",
+    "test:integration:flink": "vitest run --config vitest.integration.config.ts tests/integration/flink.integration.test.ts",
     "test:ts": "tsc --noEmit",
     "start": "node dist/index.js --env-file .env",
     "start:http": "node dist/index.js --env-file .env --transport http",

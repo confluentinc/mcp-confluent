@@ -29,6 +29,7 @@ cross-check results against the Confluent Cloud REST API.
    | `SCHEMA_REGISTRY_ENDPOINT`, `SCHEMA_REGISTRY_API_KEY`, `SCHEMA_REGISTRY_API_SECRET` | Kafka tests (1-21), Schema Registry tests (16-30), Catalog/Search tests (37-43) |
    | `CONFLUENT_CLOUD_API_KEY`, `CONFLUENT_CLOUD_API_SECRET` | Cloud infra tests (31-34), Connect tests (35-36) |
    | `KAFKA_ENV_ID` | Connect tests (35-36), Catalog tests (37-43) |
+   | `FLINK_API_KEY`, `FLINK_API_SECRET`, `FLINK_ORG_ID`, `FLINK_ENV_ID`, `FLINK_COMPUTE_POOL_ID`, `FLINK_REST_ENDPOINT`, `FLINK_ENV_NAME`, `FLINK_DATABASE_NAME` | Flink SQL tests (44-53) |
 
    If env vars for a group are missing, those test suites will skip
    with an error message indicating which variables are needed.
@@ -47,6 +48,9 @@ cross-check results against the Confluent Cloud REST API.
 
    # Run only Cloud/Connect/Catalog/Search tests
    npm run test:integration:cloud
+
+   # Run only Flink SQL tests
+   npm run test:integration:flink
    ```
 
 ### What the tests do
@@ -67,6 +71,7 @@ tests/integration/
   kafka.integration.test.ts             # Tests 1-21
   schema-registry.integration.test.ts   # Tests 22-30
   cloud.integration.test.ts             # Tests 31-43
+  flink.integration.test.ts             # Tests 44-53
 ```
 
 ---
@@ -168,7 +173,7 @@ tests/integration/
 
 ---
 
-### 6. Flink SQL Tools (manual)
+### 6. Flink SQL Tools
 
 | # | Test Case | Tool | Input | Expected Result |
 |---|-----------|------|-------|-----------------|

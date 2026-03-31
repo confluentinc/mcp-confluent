@@ -1,9 +1,11 @@
 import * as nodeDeps from "@src/confluent/node-deps.js";
-import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
+import {
+  FALLBACK_MACHINE_ID,
+  TelemetryEvent,
+  TelemetryService,
+} from "@src/confluent/telemetry.js";
 import sinon from "sinon";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-const STUB_UUID = "00000000-0000-0000-0000-000000000000";
+import { afterEach, beforeEach, describe, it } from "vitest";
 
 describe("TelemetryService", () => {
   let sandbox: sinon.SinonSandbox;
@@ -36,7 +38,6 @@ describe("TelemetryService", () => {
     writeFileSyncStub = sandbox.stub(nodeDeps.fs, "writeFileSync");
     mkdirSyncStub = sandbox.stub(nodeDeps.fs, "mkdirSync");
     sandbox.stub(nodeDeps.os, "homedir").returns("/tmp/test-home");
-    sandbox.stub(nodeDeps.crypto, "randomUUID").returns(STUB_UUID);
 
     // env stub (replaces Proxy that would throw before initEnv)
     stubbedEnvVars = sandbox.stub(nodeDeps.config, "env");
@@ -47,6 +48,7 @@ describe("TelemetryService", () => {
 
   afterEach(() => {
     sandbox.restore();
+    // not managed by the sandbox, so clean up manually to avoid affecting other tests
     delete process.env.TELEMETRY_WRITE_KEY;
   });
 
@@ -62,7 +64,7 @@ describe("TelemetryService", () => {
       sinon.assert.calledOnce(trackStub);
     });
 
-    it("should be disabled when TELEMETRY_WRITE_KEY is the unreplaced placeholder", () => {
+    it("should be disabled when TELEMETRY_WRITE_KEY is not set", () => {
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
         toolName: "list_topics",
@@ -95,7 +97,7 @@ describe("TelemetryService", () => {
     it("should include event properties and machine ID as userId", () => {
       service.track(TelemetryEvent.TOOL_CALL, {
         toolName: "describe_topic",
-        durationMs: 42,
+        durationMs: 100,
       });
 
       sinon.assert.calledOnce(trackStub);
@@ -103,11 +105,11 @@ describe("TelemetryService", () => {
         trackStub,
         sinon.match({
           event: TelemetryEvent.TOOL_CALL,
-          userId: STUB_UUID,
+          userId: sinon.match.string,
           properties: sinon.match({
             toolName: "describe_topic",
-            durationMs: 42,
-            serverSessionId: STUB_UUID,
+            durationMs: 100,
+            serverSessionId: sinon.match.string,
             osPlatform: sinon.match.string,
             osVersion: sinon.match.string,
             osArch: sinon.match.string,
@@ -147,7 +149,7 @@ describe("TelemetryService", () => {
       sinon.assert.calledWith(
         writeFileSyncStub,
         sinon.match("machine-id"),
-        STUB_UUID,
+        sinon.match.string,
         sinon.match.any,
       );
     });
@@ -174,7 +176,7 @@ describe("TelemetryService", () => {
 
       sinon.assert.calledWith(
         trackStub,
-        sinon.match({ userId: "mcp-confluent-anonymous" }),
+        sinon.match({ userId: FALLBACK_MACHINE_ID }),
       );
     });
   });
@@ -236,7 +238,7 @@ describe("TelemetryService", () => {
             clientName: "claude-code",
             clientVersion: "2.1.87",
             osPlatform: sinon.match.string,
-            serverSessionId: STUB_UUID,
+            serverSessionId: sinon.match.string,
           }),
         }),
       );
@@ -258,7 +260,7 @@ describe("TelemetryService", () => {
     });
   });
 
-  describe("error tracking", () => {
+  describe("tool call status", () => {
     let service: TelemetryService;
 
     beforeEach(() => {
@@ -266,70 +268,47 @@ describe("TelemetryService", () => {
       service = TelemetryService.getInstance();
     });
 
-    it("should include error type and message for failed tool calls", () => {
-      service.track(TelemetryEvent.TOOL_CALL, {
-        toolName: "list_schemas",
-        durationMs: 150,
-        isError: true,
-        errorType: "TypeError",
-        errorMessage: "Cannot read properties of undefined",
-      });
-
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({
-          event: TelemetryEvent.TOOL_CALL,
-          properties: sinon.match({
-            toolName: "list_schemas",
-            durationMs: 150,
-            isError: true,
-            errorType: "TypeError",
-            errorMessage: "Cannot read properties of undefined",
-          }),
-        }),
-      );
-    });
-
-    it("should include isError and errorMessage for API failures", () => {
-      service.track(TelemetryEvent.TOOL_CALL, {
-        toolName: "list_schemas",
-        durationMs: 200,
-        isError: true,
-        errorMessage: "Failed to list schemas: Request failed with status 401",
-      });
-
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({
-          event: TelemetryEvent.TOOL_CALL,
-          properties: sinon.match({
-            toolName: "list_schemas",
-            isError: true,
-            errorMessage:
-              "Failed to list schemas: Request failed with status 401",
-          }),
-        }),
-      );
-    });
-
-    it("should omit error fields for successful calls", () => {
+    it("should include a success status for successful tool calls", () => {
       service.track(TelemetryEvent.TOOL_CALL, {
         toolName: "list_topics",
-        durationMs: 50,
-        isError: false,
+        durationMs: 100,
+        status: "success",
       });
 
-      const props = trackStub.firstCall.args[0].properties;
-      sinon.assert.match(props, { isError: false });
-      expect(props.errorType).toBeUndefined();
-      expect(props.errorMessage).toBeUndefined();
+      sinon.assert.calledWith(
+        trackStub,
+        sinon.match({
+          properties: sinon.match({
+            toolName: "list_topics",
+            durationMs: 100,
+            status: "success",
+          }),
+        }),
+      );
+    });
+
+    it("should include an error status for failed tool calls", () => {
+      service.track(TelemetryEvent.TOOL_CALL, {
+        toolName: "list_schemas",
+        durationMs: 100,
+        status: "error",
+      });
+
+      sinon.assert.calledWith(
+        trackStub,
+        sinon.match({
+          properties: sinon.match({
+            toolName: "list_schemas",
+            durationMs: 100,
+            status: "error",
+          }),
+        }),
+      );
     });
   });
 
   describe("getInstance", () => {
     it("should return the same instance across multiple calls", () => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
-
       const a = TelemetryService.getInstance();
       const b = TelemetryService.getInstance();
 

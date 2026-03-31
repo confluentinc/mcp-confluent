@@ -221,5 +221,3 @@ Use Vitest `expect` for non-Sinon assertions (return values, thrown errors, data
   non-Sinon values. Adapt any Chai-based examples from docs accordingly
 - `stub.resolves()` / `stub.rejects()` are the async-friendly counterparts to `stub.returns()` /
   `stub.throws()` - use these for Promise-based code
-- For integration-style tests, use `createTestServer()` from `tests/server.ts` which provides an
-  MCP server + client connected via `InMemoryTransport`

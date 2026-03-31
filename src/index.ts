@@ -146,53 +146,66 @@ async function main() {
     });
 
     const serverVersion = getPackageVersion();
-    const server = new McpServer({
-      name: "confluent",
-      version: serverVersion,
-    });
 
     TelemetryService.getInstance().setCommonProperties({
       serverVersion,
       transportType: cliOptions.transports.join(","),
     });
 
-    // Capture MCP client info when the handshake completes.
-    server.server.oninitialized = () => {
-      const clientInfo = server.server.getClientVersion();
-      TelemetryService.getInstance().setCommonProperties({
-        clientName: clientInfo?.name,
-        clientVersion: clientInfo?.version,
+    // factory that creates a fresh McpServer with all tools registered
+    // (needed for HTTP transport which creates per-session server instances)
+    function createMcpServer(): McpServer {
+      const srv = new McpServer({
+        name: "confluent",
+        version: serverVersion,
       });
-    };
 
-    toolHandlers.forEach((handler, name) => {
-      const config = handler.getToolConfig();
+      srv.server.oninitialized = () => {
+        const clientInfo = srv.server.getClientVersion();
+        TelemetryService.getInstance().setCommonProperties({
+          clientName: clientInfo?.name,
+          clientVersion: clientInfo?.version,
+        });
+      };
 
-      server.registerTool(
-        name as string,
-        { description: config.description, inputSchema: config.inputSchema },
-        async (args, context) => {
-          const sessionId = context?.sessionId;
-          const startTime = Date.now();
-          try {
-            const result = await handler.handle(clientManager, args, sessionId);
-            TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
-              toolName: name,
-              durationMs: Date.now() - startTime,
-              status: result.isError ? "error" : "success",
-            });
-            return result;
-          } catch (error) {
-            TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
-              toolName: name,
-              durationMs: Date.now() - startTime,
-              status: "error",
-            });
-            throw error;
-          }
-        },
-      );
-    });
+      toolHandlers.forEach((handler, name) => {
+        const config = handler.getToolConfig();
+
+        srv.registerTool(
+          name as string,
+          { description: config.description, inputSchema: config.inputSchema },
+          async (args, context) => {
+            const sessionId = context?.sessionId;
+            const startTime = Date.now();
+            try {
+              const result = await handler.handle(
+                clientManager,
+                args,
+                sessionId,
+              );
+              TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
+                toolName: name,
+                durationMs: Date.now() - startTime,
+                status: result.isError ? "error" : "success",
+              });
+              return result;
+            } catch (error) {
+              TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
+                toolName: name,
+                durationMs: Date.now() - startTime,
+                status: "error",
+              });
+              throw error;
+            }
+          },
+        );
+      });
+
+      return srv;
+    }
+
+    // primary server instance (used for stdio/sse transports)
+    const server = createMcpServer();
 
     // Prepare auth configuration
     const disableAuth = cliOptions.disableAuth || env.MCP_AUTH_DISABLED;
@@ -207,11 +220,11 @@ async function main() {
       );
     }
 
-    const transportManager = new TransportManager(server, {
-      disableAuth,
-      allowedHosts,
-      apiKey,
-    });
+    const transportManager = new TransportManager(
+      server,
+      { disableAuth, allowedHosts, apiKey },
+      createMcpServer,
+    );
 
     // Start all transports with a single call
     logger.info(`Starting transports: ${cliOptions.transports.join(", ")}`);

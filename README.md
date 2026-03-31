@@ -210,7 +210,8 @@ npx @confluentinc/mcp-confluent -e .env --transport http --disable-auth
 MCP_AUTH_DISABLED=true
 ```
 
-> **Warning:** Never disable authentication in production or when the server is network-accessible.
+> [!WARNING]
+> Never disable authentication in production or when the server is network-accessible.
 
 ### Environment Variables Reference
 
@@ -871,7 +872,10 @@ After building the project (see [Building and Running](#building-and-running)):
 npm run start:http -- --disable-auth
 ```
 
-This starts the server on `http://127.0.0.1:8080/mcp` with authentication disabled for local development. Only use `MCP_AUTH_DISABLED=true` in local development environments.
+> [!WARNING]
+> Never disable authentication in production or when the server is network-accessible.
+
+This starts the server on `http://127.0.0.1:8080/mcp` (the defaults for `HTTP_HOST`, `HTTP_PORT`, and `HTTP_MCP_ENDPOINT_PATH`) with authentication disabled for local development.
 
 #### 2. Point your MCP client at the running server
 

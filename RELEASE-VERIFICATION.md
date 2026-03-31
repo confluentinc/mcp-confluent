@@ -3,7 +3,7 @@
 ## Running the Automated Integration Tests
 
 The test cases below (1-43) are implemented as automated integration tests
-in `src/integration/`. They call each MCP tool via the protocol and
+in `tests/integration/`. They call each MCP tool via the protocol and
 cross-check results against the Confluent Cloud REST API.
 
 ### Setup

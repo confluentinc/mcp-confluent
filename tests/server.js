@@ -44,4 +44,3 @@ export async function createTestServer(clientManager, toolNames) {
   };
   return { server, client, clientTransport, serverTransport, shutdown };
 }
-//# sourceMappingURL=server.js.map

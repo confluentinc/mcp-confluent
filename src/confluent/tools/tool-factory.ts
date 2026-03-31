@@ -47,6 +47,8 @@ import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tablef
 import { ReadTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/read-tableflow-topic-handler.js";
 import { UpdateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/update-tableflow-topic-handler.js";
 import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
+import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
+import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 
 export class ToolFactory {
@@ -114,6 +116,8 @@ export class ToolFactory {
       new DeleteTableFlowCatalogIntegrationHandler(),
     ],
     [ToolName.LIST_BILLING_COSTS, new ListBillingCostsHandler()],
+    [ToolName.QUERY_METRICS, new QueryMetricsHandler()],
+    [ToolName.LIST_METRICS, new ListMetricsHandler()],
   ]);
 
   static createToolHandler(toolName: ToolName): ToolHandler {

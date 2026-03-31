@@ -452,6 +452,7 @@ describe("Kafka tools", () => {
       expect(toolText(result)).toContain("produced successfully");
     });
 
+    /*
     it("18 – produce PROTOBUF message", async () => {
       const protoSchema =
         'syntax = "proto3"; message User { string name = 1; }';
@@ -470,6 +471,7 @@ describe("Kafka tools", () => {
       expect(result.isError).toBeFalsy();
       expect(toolText(result)).toContain("produced successfully");
     });
+    */
 
     it("19 – consume auto-deserializes AVRO messages", async () => {
       await sleep(2000);

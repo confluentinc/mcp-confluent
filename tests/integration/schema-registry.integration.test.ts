@@ -62,6 +62,8 @@ describe("Schema Registry tools", () => {
   beforeAll(async () => {
     requireEnvVars(
       "BOOTSTRAP_SERVERS",
+      "KAFKA_API_KEY",
+      "KAFKA_API_SECRET",
       "SCHEMA_REGISTRY_ENDPOINT",
       "SCHEMA_REGISTRY_API_KEY",
       "SCHEMA_REGISTRY_API_SECRET",

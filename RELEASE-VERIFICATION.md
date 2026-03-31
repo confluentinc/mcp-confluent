@@ -25,8 +25,8 @@ cross-check results against the Confluent Cloud REST API.
 
    | Variable group | Required for |
    |---|---|
-   | `BOOTSTRAP_SERVERS`, `KAFKA_API_KEY`, `KAFKA_API_SECRET`, `KAFKA_REST_ENDPOINT`, `KAFKA_CLUSTER_ID` | Kafka tests (1-21) |
-   | `SCHEMA_REGISTRY_ENDPOINT`, `SCHEMA_REGISTRY_API_KEY`, `SCHEMA_REGISTRY_API_SECRET` | Schema Registry tests (16-30), Catalog/Search tests (37-43) |
+   | `BOOTSTRAP_SERVERS`, `KAFKA_API_KEY`, `KAFKA_API_SECRET`, `KAFKA_REST_ENDPOINT`, `KAFKA_CLUSTER_ID` | Kafka tests (1-21), Schema Registry tests (16-30) |
+   | `SCHEMA_REGISTRY_ENDPOINT`, `SCHEMA_REGISTRY_API_KEY`, `SCHEMA_REGISTRY_API_SECRET` | Kafka tests (1-21), Schema Registry tests (16-30), Catalog/Search tests (37-43) |
    | `CONFLUENT_CLOUD_API_KEY`, `CONFLUENT_CLOUD_API_SECRET` | Cloud infra tests (31-34), Connect tests (35-36) |
    | `KAFKA_ENV_ID` | Connect tests (35-36), Catalog tests (37-43) |
 

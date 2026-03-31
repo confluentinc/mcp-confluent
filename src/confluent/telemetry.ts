@@ -1,4 +1,11 @@
-import { crypto, fs, os, path, segment } from "@src/confluent/node-deps.js";
+import {
+  config,
+  crypto,
+  fs,
+  os,
+  path,
+  segment,
+} from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
 
 export enum TelemetryEvent {
@@ -52,7 +59,7 @@ export class TelemetryService {
 
   private constructor() {
     const writeKey = process.env.TELEMETRY_WRITE_KEY;
-    const disabled = env.DO_NOT_TRACK;
+    const disabled = config.env.DO_NOT_TRACK;
     const enabled = !disabled && !!writeKey;
 
     this.machineId = getOrCreateMachineId();

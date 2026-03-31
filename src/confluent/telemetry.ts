@@ -1,11 +1,5 @@
-import {
-  config,
-  crypto,
-  fs,
-  os,
-  path,
-  segment,
-} from "@src/confluent/node-deps.js";
+import { config, fs, os, path, segment } from "@src/confluent/node-deps.js";
+import { randomUUID } from "node:crypto";
 import { logger } from "@src/logger.js";
 
 export enum TelemetryEvent {
@@ -44,7 +38,7 @@ function getOrCreateMachineId(): string {
   const existingId = readPersistedMachineId();
   if (existingId) return existingId;
 
-  const newId = crypto.randomUUID();
+  const newId = randomUUID();
   if (persistMachineId(newId)) return newId;
 
   return FALLBACK_MACHINE_ID;
@@ -63,7 +57,7 @@ export class TelemetryService {
     const enabled = !disabled && !!writeKey;
 
     this.machineId = getOrCreateMachineId();
-    this.serverSessionId = crypto.randomUUID();
+    this.serverSessionId = randomUUID();
     this.commonProperties = {
       serverSessionId: this.serverSessionId,
       osPlatform: os.platform(),

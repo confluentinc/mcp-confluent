@@ -80,7 +80,7 @@ These tools require endpoints and authentication against specific Confluent Clou
 
 ### Available Tools for Local Confluent
 
-These tools only require Kafka or Schema Registry endpoints. No authentication is required, making them ideal for local development with Docker Compose or self-managed clusters.
+These tools only require Kafka or Schema Registry endpoints - no Confluent Cloud API key/secret is needed. Ideal for local development with Docker Compose or self-managed clusters.
 
 ```properties
 # minimal .env for local development

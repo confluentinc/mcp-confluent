@@ -3,27 +3,11 @@
 [![npm version](https://img.shields.io/npm/v/@confluentinc/mcp-confluent.svg)](https://www.npmjs.com/package/@confluentinc/mcp-confluent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud through natural language. It provides 37+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
-
-<a href="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent/badge" alt="mcp-confluent MCP server" />
-</a>
-
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/confluentinc/mcp-confluent)
-
-## Demo
-
-### Goose CLI
-
-![Goose CLI Demo](assets/goose-cli-demo.gif)
-
-### Claude Desktop
-
-![Claude Desktop Demo](assets/claude-desktop-demo.gif)
+An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud and Confluent Local through natural language. It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
 
 ## Quick Start
 
-> **Prerequisites:** [Node.js 22+](https://nodejs.org/) and a [Confluent Cloud](https://confluent.cloud/) account.
+> **Prerequisites:** [Node.js 22+](https://nodejs.org/). If you want to interact with [Confluent Cloud](https://confluent.cloud/), you need to create an account first.
 
 ```bash
 # Install and run
@@ -37,7 +21,7 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
 - [Quick Start](#quick-start)
 - [Available Tools](#available-tools)
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
-  - [Local Confluent](#available-tools-for-local-confluent)
+  - [Confluent Local](#available-tools-for-confluent-local)
 - [User Guide](#user-guide)
   - [Getting Started](#getting-started)
   - [Configuration](#configuration)
@@ -76,7 +60,7 @@ These tools require endpoints and authentication against specific Confluent Clou
 | **Metrics**                 | `list-available-metrics`, `query-metrics`                                                                                                                                                           | Discover and query Confluent Cloud operational metrics            |
 | **Billing**                 | `list-billing-costs`                                                                                                                                                                                | Query billing and cost data                                       |
 
-### Available Tools for Local Confluent
+### Available Tools for Confluent Local
 
 These tools only require Kafka or Schema Registry endpoints - no Confluent Cloud API key/secret is needed. Ideal for local development with Docker Compose or self-managed clusters.
 

@@ -13,6 +13,7 @@ describe("TelemetryService", () => {
   let trackStub: sinon.SinonStub;
   let identifyStub: sinon.SinonStub;
   let closeAndFlushStub: sinon.SinonStub;
+  let analyticsConstructorStub: sinon.SinonStub;
   let readFileSyncStub: sinon.SinonStub;
   let writeFileSyncStub: sinon.SinonStub;
   let mkdirSyncStub: sinon.SinonStub;
@@ -26,11 +27,13 @@ describe("TelemetryService", () => {
     trackStub = sandbox.stub();
     identifyStub = sandbox.stub();
     closeAndFlushStub = sandbox.stub().resolves(undefined);
-    sandbox.stub(nodeDeps.segment, "Analytics").returns({
-      track: trackStub,
-      identify: identifyStub,
-      closeAndFlush: closeAndFlushStub,
-    });
+    analyticsConstructorStub = sandbox
+      .stub(nodeDeps.segment, "Analytics")
+      .returns({
+        track: trackStub,
+        identify: identifyStub,
+        closeAndFlush: closeAndFlushStub,
+      });
 
     // node builtin stubs (via wrapper for ESM compatibility)
     readFileSyncStub = sandbox
@@ -81,6 +84,10 @@ describe("TelemetryService", () => {
       });
 
       sinon.assert.calledOnce(trackStub);
+      sinon.assert.calledWith(
+        analyticsConstructorStub,
+        sinon.match({ writeKey: "packed-key" }),
+      );
     });
 
     it("should prefer the env var over the built-in key", () => {
@@ -93,6 +100,10 @@ describe("TelemetryService", () => {
       });
 
       sinon.assert.calledOnce(trackStub);
+      sinon.assert.calledWith(
+        analyticsConstructorStub,
+        sinon.match({ writeKey: "env-key" }),
+      );
     });
 
     it("should be disabled when neither env var nor built-in key is set", () => {

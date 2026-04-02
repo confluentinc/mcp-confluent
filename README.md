@@ -27,7 +27,7 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
   - [Configuration](#configuration)
   - [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports)
   - [Usage](#usage)
-  - [Configuring MCP Clients](#configuring-claude-desktop)
+  - [Configuring MCP Clients](#configuring-mcp-clients)
   - [CLI Usage](#mcp-confluent-cli-usage)
 - [Telemetry](#telemetry)
 - [Troubleshooting](#troubleshooting)
@@ -241,252 +241,7 @@ This MCP server is designed to be used with various MCP clients, such as Claude 
 
 4. **Interact with Confluent through the Client:** Once the client is connected, you can use the client's interface to interact with Confluent Cloud resources. The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
 
-### Configuring Claude Desktop
-
-See [here](https://modelcontextprotocol.io/quickstart/user) for more details about installing Claude Desktop and MCP servers.
-
-To configure Claude Desktop to use this MCP server:
-
-1. **Open Claude Desktop Configuration**
-   - On Mac: `~/Library/Application\ Support/Claude/claude_desktop_config.json`
-   - On Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. **Edit Configuration File**
-   - Open the config file in your preferred text editor
-   - Add or modify the configuration using one of the following methods:
-
-   <details>
-   <summary>Option 1: Run from source</summary>
-
-   ```json
-   {
-     "mcpServers": {
-       "confluent": {
-         "command": "node",
-         "args": [
-           "/path/to/confluent-mcp-server/dist/index.js",
-           "--env-file",
-           "/path/to/confluent-mcp-server/.env"
-         ]
-       }
-     }
-   }
-   ```
-
-   </details>
-
-   <details>
-   <summary>Option 2: Run from npx</summary>
-
-   ```json
-   {
-     "mcpServers": {
-       "confluent": {
-         "command": "npx",
-         "args": [
-           "-y",
-           "@confluentinc/mcp-confluent",
-           "-e",
-           "/path/to/confluent-mcp-server/.env"
-         ]
-       }
-     }
-   }
-   ```
-
-   </details>
-
-   Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
-
-3. **Restart Claude Desktop**
-   - Close and reopen Claude Desktop for the changes to take effect
-   - The MCP server will automatically start when Claude Desktop launches
-
-Now Claude Desktop will be configured to use your local MCP server for Confluent interactions.
-
-![Claude Tools](assets/claude-tools.png)
-
-### Configuring Goose CLI
-
-See [here](https://block.github.io/goose/docs/quickstart#install-an-extension) for detailed instructions on how to install the Goose CLI.
-
-Once installed, follow these steps:
-
-1. **Run the Configuration Command:**
-
-   ```bash
-   goose configure
-   ```
-
-2. **Follow the Interactive Prompts:**
-   - Select `Add extension`
-   - Choose `Command-line Extension`
-   - Enter `mcp-confluent` as the extension name
-   - Choose one of the following configuration methods:
-
-   <details>
-   <summary>Option 1: Run from source</summary>
-
-   ```bash
-   node /path/to/confluent-mcp-server/dist/index.js --env-file /path/to/confluent-mcp-server/.env
-   ```
-
-   </details>
-
-   <details>
-   <summary>Option 2: Run from npx</summary>
-
-   ```bash
-   npx -y @confluentinc/mcp-confluent -e /path/to/confluent-mcp-server/.env
-   ```
-
-   </details>
-
-Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
-
-![Goose Configure](assets/goose-configure.png)
-
-### Configuring Gemini CLI
-
-For detailed information about Gemini CLI extensions and MCP servers, please refer to the official documentation:
-
-- [Gemini CLI Extensions](https://github.com/google-gemini/gemini-cli/blob/main/docs/extension.md)
-- [Gemini CLI MCP Server Tools](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
-
-Here's how to get `mcp-confluent` running with Gemini CLI:
-
-1. **Install Gemini CLI:**
-   If you haven't already, install the Gemini CLI. You can find installation instructions on the [official GitHub repository](https://github.com/google-gemini/gemini-cli).
-
-2. **Install the `mcp-confluent` Extension:**
-
-   ```bash
-   gemini extensions install https://github.com/confluentinc/mcp-confluent
-   # Navigate to the root directory of this project (where `gemini-extension.json` is located) and run:
-   # gemini extensions install .
-   ```
-
-   This command registers the `mcp-confluent` server with Gemini CLI and creates a dedicated directory for it under `~/.gemini/extensions/mcp-confluent`.
-
-3. **Provide Environment Variables:**
-   The extension requires your Confluent Cloud credentials and configuration to be available in a `.env` file.
-   - First, ensure you have a correctly populated `.env` file in the root of this project. For instructions, see the [Configuration](#configuration) section.
-   - Next, copy your `.env` file into the extension's directory so Gemini CLI can access it (the Gemini extension expects the `.env` file at `${extensionPath}${pathSeparator}.env`; see [the variables documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md#variables) for details):
-
-   ```bash
-   cp .env ~/.gemini/extensions/mcp-confluent/.env
-   ```
-
-4. **Verify and Use:**
-   You can now start using the Confluent tools via Gemini CLI. To verify that the tools are available, you can list them:
-
-   ```bash
-   gemini -l
-   # or `gemini extensions list`
-   ```
-
-   And here's an example of invoking a tool:
-
-   ```bash
-
-   gemini
-   ....
-
-   🟢 mcp-confluent (from mcp-confluent) - Ready (24 tools)
-   ....
-
-   Using: 1 MCP server (ctrl+t to toggle)
-   ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-   │ > list topics                                                                                                                                             │
-   ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-   ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-   │ ✓  list-topics (mcp-confluent MCP Server) {}                                                                                                       │
-   │                                                                                                                                                    │
-   │    Kafka topics:                                                                                                                                   │
-   │    products_summarized,products,topic_8,products_summarized_with_embeddings,elastic_minimized,user_message_related_products,user_message_embeddin  │
-   │    gs,dlq-lcc-d3738o,user_message,elastic                                                                                          │
-   ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-   ✦ Okay, I see the following topics: products_summarized, products, topic_8, products_summarized_with_embeddings, elastic_minimized,
-     user_message_related_products, user_message_embeddings, dlq-lcc-d3738o, user_message, and elastic.
-
-   ```
-
-### Configuring Claude Code
-
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) supports MCP servers natively. Add the server to your project configuration:
-
-```bash
-claude mcp add confluent -- npx -y @confluentinc/mcp-confluent -e /path/to/.env
-```
-
-Or add it to your `.mcp.json` file directly:
-
-```json
-{
-  "mcpServers": {
-    "confluent": {
-      "command": "npx",
-      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
-    }
-  }
-}
-```
-
-### Configuring Cursor
-
-Add the MCP server to your Cursor configuration at `~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "confluent": {
-      "command": "npx",
-      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
-    }
-  }
-}
-```
-
-See the [Cursor MCP documentation](https://docs.cursor.com/context/model-context-protocol) for more details.
-
-### Configuring VS Code
-
-Add the MCP server to your VS Code user settings (`settings.json`) or workspace `.vscode/mcp.json`:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "confluent": {
-        "command": "npx",
-        "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
-      }
-    }
-  }
-}
-```
-
-See the [VS Code MCP documentation](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) for more details.
-
-### Configuring Windsurf
-
-Add the MCP server to your Windsurf configuration at `~/.codeium/windsurf/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "confluent": {
-      "command": "npx",
-      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
-    }
-  }
-}
-```
-
-See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/mcp) for more details.
-
-### mcp-confluent CLI Usage
+### CLI Usage
 
 The MCP server provides a flexible command line interface (CLI) for advanced configuration and control. The CLI allows you to specify environment files, transports, and fine-tune which tools are enabled or blocked.
 
@@ -632,6 +387,18 @@ delete-tableflow-catalog-integration: Make a request to delete a tableflow catal
 </details>
 
 > **Tip:** The allow-list is applied before the block-list. If neither is provided, all tools are enabled by default.
+
+### Configuring MCP Clients
+
+Please refer to the following guides for step-by-step instructions on setting up and using this MCP server with your preferred client:
+
+- [Claude Desktop](docs/configuring-claude-desktop.md)
+- [Goose CLI](docs/configuring-goose-cli.md)
+- [Gemini CLI](docs/configuring-gemini-cli.md)
+- [Claude Code](docs/configuring-claude-code.md)
+- [Cursor](docs/configuring-cursor.md)
+- [VS Code](docs/configuring-vs-code.md)
+- [Windsurf](docs/configuring-windsurf.md)
 
 ## Telemetry
 

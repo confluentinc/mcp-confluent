@@ -416,6 +416,6 @@ This MCP server collects anonymous usage data to help make improvements. No pers
 
 **Tableflow authorization errors** -- Tableflow tools require specific IAM permissions in your cloud environment. See [Prerequisites & Setup for Tableflow Commands](#prerequisites--setup-for-tableflow-commands).
 
-### Contributing
+## Contributing
 
 Bug reports and feedback is appreciated in the form of Github Issues. For guidelines on contributing please see [CONTRIBUTING.md](CONTRIBUTING.md)

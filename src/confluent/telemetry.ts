@@ -1,6 +1,13 @@
-import { config, fs, os, path, segment } from "@src/confluent/node-deps.js";
-import { randomUUID } from "node:crypto";
+import {
+  buildConfig,
+  config,
+  fs,
+  os,
+  path,
+  segment,
+} from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
+import { randomUUID } from "node:crypto";
 
 export enum TelemetryEvent {
   TOOL_CALL = "Tool Call",
@@ -52,7 +59,9 @@ export class TelemetryService {
   private commonProperties: Record<string, unknown>;
 
   private constructor() {
-    const writeKey = process.env.TELEMETRY_WRITE_KEY;
+    // runtime env var can override the build-time value for local dev/testing
+    const writeKey =
+      process.env.TELEMETRY_WRITE_KEY || buildConfig.TELEMETRY_WRITE_KEY;
     const disabled = config.env.DO_NOT_TRACK;
     const enabled = !disabled && !!writeKey;
 

@@ -17,6 +17,7 @@ describe("TelemetryService", () => {
   let writeFileSyncStub: sinon.SinonStub;
   let mkdirSyncStub: sinon.SinonStub;
   let stubbedEnvVars: sinon.SinonStub;
+  let stubbedBuildConfig: sinon.SinonStub;
 
   beforeEach(() => {
     sandbox = sinon.createSandbox();
@@ -43,6 +44,13 @@ describe("TelemetryService", () => {
     stubbedEnvVars = sandbox.stub(nodeDeps.config, "env");
     stubbedEnvVars.value({ DO_NOT_TRACK: false });
 
+    // default: no built-in write key (simulates unpacked/dev build)
+    stubbedBuildConfig = sandbox.stub(
+      nodeDeps.buildConfig,
+      "TELEMETRY_WRITE_KEY",
+    );
+    stubbedBuildConfig.value("");
+
     TelemetryService["instance"] = undefined;
   });
 
@@ -64,7 +72,30 @@ describe("TelemetryService", () => {
       sinon.assert.calledOnce(trackStub);
     });
 
-    it("should be disabled when TELEMETRY_WRITE_KEY is not set", () => {
+    it("should be enabled when the built-in write key is present (no env var)", () => {
+      stubbedBuildConfig.value("packed-key");
+
+      const service = TelemetryService.getInstance();
+      service.track(TelemetryEvent.TOOL_CALL, {
+        toolName: "list_topics",
+      });
+
+      sinon.assert.calledOnce(trackStub);
+    });
+
+    it("should prefer the env var over the built-in key", () => {
+      process.env.TELEMETRY_WRITE_KEY = "env-key";
+      stubbedBuildConfig.value("packed-key");
+
+      const service = TelemetryService.getInstance();
+      service.track(TelemetryEvent.TOOL_CALL, {
+        toolName: "list_topics",
+      });
+
+      sinon.assert.calledOnce(trackStub);
+    });
+
+    it("should be disabled when neither env var nor built-in key is set", () => {
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
         toolName: "list_topics",

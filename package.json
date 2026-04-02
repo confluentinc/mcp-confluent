@@ -1,7 +1,7 @@
 {
   "name": "@confluentinc/mcp-confluent",
   "description": "Confluent MCP Server",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Confluent Inc.",
   "license": "MIT",
   "repository": {
@@ -38,6 +38,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.+(js|ts|json)\"",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "prepack": "node scripts/inject-build-config.mjs",
     "print:schema": "node dist/print-md-schema.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js --env-file .env",
     "prepare": "husky"

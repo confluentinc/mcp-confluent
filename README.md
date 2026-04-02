@@ -14,7 +14,7 @@ An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI as
 npx -y @confluentinc/mcp-confluent -e /path/to/.env
 ```
 
-Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-confluent) directly. See [Getting Started](#getting-started) for full setup instructions and [Configuring MCP Clients](#configuring-claude-desktop) for integration with your preferred AI tool.
+Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-confluent) directly. See [Getting Started](#getting-started) for full setup instructions and [Configuring MCP Clients](#configuring-mcp-clients) for integration with your preferred AI tool.
 
 ## Table of Contents
 
@@ -226,7 +226,7 @@ MCP_AUTH_DISABLED=true
 This MCP server is designed to be used with various MCP clients, such as Claude Desktop or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using. However, the general steps are:
 
 1. **Start the Server:** You can run the MCP server in one of two ways:
-   - **From source:** Follow the instructions in the [Developer Guide](#developer-guide) to build and run the server from source. This typically involves:
+   - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source. This typically involves:
      - Installing dependencies (`npm install`)
      - Building the project (`npm run build` or `npm run dev`)
    - **With npx:** You can start the server directly using npx (no build required):

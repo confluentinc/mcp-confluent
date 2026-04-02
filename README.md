@@ -1,55 +1,37 @@
-# mcp-confluent
+# Confluent MCP Server
 
 [![npm version](https://img.shields.io/npm/v/@confluentinc/mcp-confluent.svg)](https://www.npmjs.com/package/@confluentinc/mcp-confluent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud through natural language. It provides 37+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
-
-<a href="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@confluentinc/mcp-confluent/badge" alt="mcp-confluent MCP server" />
-</a>
-
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/confluentinc/mcp-confluent)
-
-## Demo
-
-### Goose CLI
-
-![Goose CLI Demo](assets/goose-cli-demo.gif)
-
-### Claude Desktop
-
-![Claude Desktop Demo](assets/claude-desktop-demo.gif)
+An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud and Confluent Local through natural language. It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
 
 ## Quick Start
 
-> **Prerequisites:** [Node.js 22+](https://nodejs.org/) and a [Confluent Cloud](https://confluent.cloud/) account.
+> **Prerequisites:** [Node.js 22+](https://nodejs.org/). If you want to interact with [Confluent Cloud](https://confluent.cloud/), you need to create an account first.
 
 ```bash
 # Install and run
 npx -y @confluentinc/mcp-confluent -e /path/to/.env
 ```
 
-Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-confluent) directly. See [Getting Started](#getting-started) for full setup instructions and [Configuring MCP Clients](#configuring-claude-desktop) for integration with your preferred AI tool.
+Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-confluent) directly. See [Getting Started](#getting-started) for full setup instructions and [Configuring MCP Clients](#configuring-mcp-clients) for integration with your preferred AI tool.
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
 - [Available Tools](#available-tools)
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
-  - [Local Confluent](#available-tools-for-local-confluent)
+  - [Confluent Local](#available-tools-for-confluent-local)
 - [User Guide](#user-guide)
   - [Getting Started](#getting-started)
   - [Configuration](#configuration)
   - [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports)
-  - [Environment Variables Reference](#environment-variables-reference)
   - [Usage](#usage)
-  - [Configuring MCP Clients](#configuring-claude-desktop)
-  - [CLI Usage](#mcp-confluent-cli-usage)
-- [Flink Example Workflows](#flink-example-workflows)
-- [Developer Guide](#developer-guide)
-  - [Local Development with an MCP Client](#local-development-with-an-mcp-client)
+  - [CLI Usage](#cli-usage)
+  - [Configuring MCP Clients](#configuring-mcp-clients)
+- [Telemetry](#telemetry)
 - [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 
 ## Available Tools
 
@@ -78,7 +60,7 @@ These tools require endpoints and authentication against specific Confluent Clou
 | **Metrics**                 | `list-available-metrics`, `query-metrics`                                                                                                                                                           | Discover and query Confluent Cloud operational metrics            |
 | **Billing**                 | `list-billing-costs`                                                                                                                                                                                | Query billing and cost data                                       |
 
-### Available Tools for Local Confluent
+### Available Tools for Confluent Local
 
 These tools only require Kafka or Schema Registry endpoints - no Confluent Cloud API key/secret is needed. Ideal for local development with Docker Compose or self-managed clusters.
 
@@ -116,38 +98,44 @@ SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 
 ### Configuration
 
-Copy `.env.example` to `.env` in the root directory and fill in your values. See the example structure below:
+You can configure the MCP server using the following environment variables:
 
-<details>
-<summary>Example .env file structure</summary>
-
-```properties
-# .env file
-BOOTSTRAP_SERVERS="pkc-v12gj.us-east4.gcp.confluent.cloud:9092"
-KAFKA_API_KEY="..."
-KAFKA_API_SECRET="..."
-KAFKA_REST_ENDPOINT="https://pkc-v12gj.us-east4.gcp.confluent.cloud:443"
-KAFKA_CLUSTER_ID=""
-KAFKA_ENV_ID="env-..."
-FLINK_ENV_ID="env-..."
-FLINK_ORG_ID=""
-FLINK_REST_ENDPOINT="https://flink.us-east4.gcp.confluent.cloud"
-FLINK_ENV_NAME=""
-FLINK_DATABASE_NAME=""
-FLINK_API_KEY=""
-FLINK_API_SECRET=""
-FLINK_COMPUTE_POOL_ID="lfcp-..."
-TABLEFLOW_API_KEY=""
-TABLEFLOW_API_SECRET=""
-CONFLUENT_CLOUD_API_KEY=""
-CONFLUENT_CLOUD_API_SECRET=""
-CONFLUENT_CLOUD_REST_ENDPOINT="https://api.confluent.cloud"
-SCHEMA_REGISTRY_API_KEY="..."
-SCHEMA_REGISTRY_API_SECRET="..."
-SCHEMA_REGISTRY_ENDPOINT="https://psrc-zv01y.northamerica-northeast2.gcp.confluent.cloud"
-```
-
-</details>
+| Variable                      | Description                                                                                                                                                                                                                                                       | Default Value                           | Required |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------- |
+| HTTP_HOST                     | Host to bind for HTTP transport. Defaults to localhost only for security.                                                                                                                                                                                         | "127.0.0.1"                             | Yes      |
+| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp') (string)                                                                                                                                                                                                      | "/mcp"                                  | Yes      |
+| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                                                                                                                                                  | 8080                                    | Yes      |
+| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal)                                                                                                                                                                                        | "info"                                  | Yes      |
+| MCP_API_KEY                   | API key for HTTP/SSE authentication. Generate using `--generate-key`. Required when auth is enabled.                                                                                                                                                              |                                         | No\*     |
+| MCP_AUTH_DISABLED             | Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.                                                                                                                                                                    | false                                   | No       |
+| MCP_ALLOWED_HOSTS             | Comma-separated list of allowed Host header values for DNS rebinding protection.                                                                                                                                                                                  | "localhost,127.0.0.1"                   | No       |
+| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                                                                                                                                             | "/sse"                                  | Yes      |
+| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                                                                                                                                                 | "/messages"                             | Yes      |
+| BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)                                                                                                                           |                                         | No       |
+| CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))                                                                                                                           |                                         | No       |
+| CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))                                                                                                                                 |                                         | No       |
+| CONFLUENT_CLOUD_REST_ENDPOINT | Base URL for Confluent Cloud's REST API services (default)                                                                                                                                                                                                        |                                         | No       |
+| FLINK_API_KEY                 | Authentication key for accessing Confluent Cloud's Flink services, including compute pools and SQL statement management (string (min: 1))                                                                                                                         |                                         | No       |
+| FLINK_API_SECRET              | Secret token paired with FLINK_API_KEY for authenticated access to Confluent Cloud's Flink services (string (min: 1))                                                                                                                                             |                                         | No       |
+| FLINK_COMPUTE_POOL_ID         | Unique identifier for the Flink compute pool, must start with 'lfcp-' prefix (string)                                                                                                                                                                             |                                         | No       |
+| FLINK_DATABASE_NAME           | Name of the associated Kafka cluster used as a database reference in Flink SQL operations (string (min: 1))                                                                                                                                                       |                                         | No       |
+| FLINK_ENV_ID                  | Unique identifier for the Flink environment, must start with 'env-' prefix (string)                                                                                                                                                                               |                                         | No       |
+| FLINK_ENV_NAME                | Human-readable name for the Flink environment used for identification and display purposes (string (min: 1))                                                                                                                                                      |                                         | No       |
+| FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                                                                                                                                                    |                                         | No       |
+| FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                                                                                                                                               |                                         | No       |
+| KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                                                                                                                                             |                                         | No       |
+| KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                                                                                                                                                  |                                         | No       |
+| KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                                                                                                                                        |                                         | No       |
+| KAFKA_ENV_ID                  | Environment identifier for Kafka cluster, must start with 'env-' prefix (string)                                                                                                                                                                                  |                                         | No       |
+| KAFKA_REST_ENDPOINT           | REST API endpoint for Kafka cluster management and administration (string)                                                                                                                                                                                        |                                         | No       |
+| SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                                                                                                                                                   |                                         | No       |
+| SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                                                                                                                                                     |                                         | No       |
+| SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                                                                                                                                               |                                         | No       |
+| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                                                                                                                                           |                                         | No       |
+| TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                                                                                                                                                 |                                         | No       |
+| TELEMETRY_ENDPOINT            | Base URL for Confluent Cloud Telemetry API (metrics)                                                                                                                                                                                                              | "https://api.telemetry.confluent.cloud" | No       |
+| TELEMETRY_API_KEY             | Optional API key for telemetry access. Falls back to CONFLUENT_CLOUD_API_KEY if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).)       |                                         | No       |
+| TELEMETRY_API_SECRET          | Optional API secret for telemetry access. Falls back to CONFLUENT_CLOUD_API_SECRET if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).) |                                         | No       |
 
 #### Prerequisites & Setup for Tableflow Commands
 
@@ -195,10 +183,10 @@ MCP_API_KEY=your-generated-64-char-key-here
 
 #### Making Authenticated Requests
 
-Include the API key in the `cflt-mcp-api-Key` header for all HTTP/SSE requests:
+Include the API key in the `cflt-mcp-api-key` header for all HTTP/SSE requests:
 
 ```bash
-curl -H "cflt-mcp-api-Key: your-api-key" http://localhost:8080/mcp
+curl -H "cflt-mcp-api-key: your-api-key" http://localhost:8080/mcp
 ```
 
 #### DNS Rebinding Protection
@@ -233,51 +221,12 @@ MCP_AUTH_DISABLED=true
 > [!WARNING]
 > Never disable authentication in production or when the server is network-accessible.
 
-### Environment Variables Reference
-
-| Variable                      | Description                                                                                                                                                                                                                                                       | Default Value                           | Required |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------- |
-| HTTP_HOST                     | Host to bind for HTTP transport. Defaults to localhost only for security.                                                                                                                                                                                         | "127.0.0.1"                             | Yes      |
-| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp') (string)                                                                                                                                                                                                      | "/mcp"                                  | Yes      |
-| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                                                                                                                                                  | 8080                                    | Yes      |
-| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal)                                                                                                                                                                                        | "info"                                  | Yes      |
-| MCP_API_KEY                   | API key for HTTP/SSE authentication. Generate using `--generate-key`. Required when auth is enabled.                                                                                                                                                              |                                         | No\*     |
-| MCP_AUTH_DISABLED             | Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.                                                                                                                                                                    | false                                   | No       |
-| MCP_ALLOWED_HOSTS             | Comma-separated list of allowed Host header values for DNS rebinding protection.                                                                                                                                                                                  | "localhost,127.0.0.1"                   | No       |
-| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                                                                                                                                             | "/sse"                                  | Yes      |
-| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                                                                                                                                                 | "/messages"                             | Yes      |
-| BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)                                                                                                                           |                                         | No       |
-| CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))                                                                                                                           |                                         | No       |
-| CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))                                                                                                                                 |                                         | No       |
-| CONFLUENT_CLOUD_REST_ENDPOINT | Base URL for Confluent Cloud's REST API services (default)                                                                                                                                                                                                        |                                         | No       |
-| FLINK_API_KEY                 | Authentication key for accessing Confluent Cloud's Flink services, including compute pools and SQL statement management (string (min: 1))                                                                                                                         |                                         | No       |
-| FLINK_API_SECRET              | Secret token paired with FLINK_API_KEY for authenticated access to Confluent Cloud's Flink services (string (min: 1))                                                                                                                                             |                                         | No       |
-| FLINK_COMPUTE_POOL_ID         | Unique identifier for the Flink compute pool, must start with 'lfcp-' prefix (string)                                                                                                                                                                             |                                         | No       |
-| FLINK_DATABASE_NAME           | Name of the associated Kafka cluster used as a database reference in Flink SQL operations (string (min: 1))                                                                                                                                                       |                                         | No       |
-| FLINK_ENV_ID                  | Unique identifier for the Flink environment, must start with 'env-' prefix (string)                                                                                                                                                                               |                                         | No       |
-| FLINK_ENV_NAME                | Human-readable name for the Flink environment used for identification and display purposes (string (min: 1))                                                                                                                                                      |                                         | No       |
-| FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                                                                                                                                                    |                                         | No       |
-| FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                                                                                                                                               |                                         | No       |
-| KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                                                                                                                                             |                                         | No       |
-| KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                                                                                                                                                  |                                         | No       |
-| KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                                                                                                                                        |                                         | No       |
-| KAFKA_ENV_ID                  | Environment identifier for Kafka cluster, must start with 'env-' prefix (string)                                                                                                                                                                                  |                                         | No       |
-| KAFKA_REST_ENDPOINT           | REST API endpoint for Kafka cluster management and administration (string)                                                                                                                                                                                        |                                         | No       |
-| SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                                                                                                                                                   |                                         | No       |
-| SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                                                                                                                                                     |                                         | No       |
-| SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                                                                                                                                               |                                         | No       |
-| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                                                                                                                                           |                                         | No       |
-| TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                                                                                                                                                 |                                         | No       |
-| TELEMETRY_ENDPOINT            | Base URL for Confluent Cloud Telemetry API (metrics)                                                                                                                                                                                                              | "https://api.telemetry.confluent.cloud" | No       |
-| TELEMETRY_API_KEY             | Optional API key for telemetry access. Falls back to CONFLUENT_CLOUD_API_KEY if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).)       |                                         | No       |
-| TELEMETRY_API_SECRET          | Optional API secret for telemetry access. Falls back to CONFLUENT_CLOUD_API_SECRET if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).) |                                         | No       |
-
 ### Usage
 
 This MCP server is designed to be used with various MCP clients, such as Claude Desktop or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using. However, the general steps are:
 
 1. **Start the Server:** You can run the MCP server in one of two ways:
-   - **From source:** Follow the instructions in the [Developer Guide](#developer-guide) to build and run the server from source. This typically involves:
+   - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source. This typically involves:
      - Installing dependencies (`npm install`)
      - Building the project (`npm run build` or `npm run dev`)
    - **With npx:** You can start the server directly using npx (no build required):
@@ -292,252 +241,7 @@ This MCP server is designed to be used with various MCP clients, such as Claude 
 
 4. **Interact with Confluent through the Client:** Once the client is connected, you can use the client's interface to interact with Confluent Cloud resources. The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
 
-### Configuring Claude Desktop
-
-See [here](https://modelcontextprotocol.io/quickstart/user) for more details about installing Claude Desktop and MCP servers.
-
-To configure Claude Desktop to use this MCP server:
-
-1. **Open Claude Desktop Configuration**
-   - On Mac: `~/Library/Application\ Support/Claude/claude_desktop_config.json`
-   - On Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. **Edit Configuration File**
-   - Open the config file in your preferred text editor
-   - Add or modify the configuration using one of the following methods:
-
-   <details>
-   <summary>Option 1: Run from source</summary>
-
-   ```json
-   {
-     "mcpServers": {
-       "confluent": {
-         "command": "node",
-         "args": [
-           "/path/to/confluent-mcp-server/dist/index.js",
-           "--env-file",
-           "/path/to/confluent-mcp-server/.env"
-         ]
-       }
-     }
-   }
-   ```
-
-   </details>
-
-   <details>
-   <summary>Option 2: Run from npx</summary>
-
-   ```json
-   {
-     "mcpServers": {
-       "confluent": {
-         "command": "npx",
-         "args": [
-           "-y",
-           "@confluentinc/mcp-confluent",
-           "-e",
-           "/path/to/confluent-mcp-server/.env"
-         ]
-       }
-     }
-   }
-   ```
-
-   </details>
-
-   Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
-
-3. **Restart Claude Desktop**
-   - Close and reopen Claude Desktop for the changes to take effect
-   - The MCP server will automatically start when Claude Desktop launches
-
-Now Claude Desktop will be configured to use your local MCP server for Confluent interactions.
-
-![Claude Tools](assets/claude-tools.png)
-
-### Configuring Goose CLI
-
-See [here](https://block.github.io/goose/docs/quickstart#install-an-extension) for detailed instructions on how to install the Goose CLI.
-
-Once installed, follow these steps:
-
-1. **Run the Configuration Command:**
-
-   ```bash
-   goose configure
-   ```
-
-2. **Follow the Interactive Prompts:**
-   - Select `Add extension`
-   - Choose `Command-line Extension`
-   - Enter `mcp-confluent` as the extension name
-   - Choose one of the following configuration methods:
-
-   <details>
-   <summary>Option 1: Run from source</summary>
-
-   ```bash
-   node /path/to/confluent-mcp-server/dist/index.js --env-file /path/to/confluent-mcp-server/.env
-   ```
-
-   </details>
-
-   <details>
-   <summary>Option 2: Run from npx</summary>
-
-   ```bash
-   npx -y @confluentinc/mcp-confluent -e /path/to/confluent-mcp-server/.env
-   ```
-
-   </details>
-
-Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
-
-![Goose Configure](assets/goose-configure.png)
-
-### Configuring Gemini CLI
-
-For detailed information about Gemini CLI extensions and MCP servers, please refer to the official documentation:
-
-- [Gemini CLI Extensions](https://github.com/google-gemini/gemini-cli/blob/main/docs/extension.md)
-- [Gemini CLI MCP Server Tools](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
-
-Here's how to get `mcp-confluent` running with Gemini CLI:
-
-1. **Install Gemini CLI:**
-   If you haven't already, install the Gemini CLI. You can find installation instructions on the [official GitHub repository](https://github.com/google-gemini/gemini-cli).
-
-2. **Install the `mcp-confluent` Extension:**
-
-   ```bash
-   gemini extensions install https://github.com/confluentinc/mcp-confluent
-   # Navigate to the root directory of this project (where `gemini-extension.json` is located) and run:
-   # gemini extensions install .
-   ```
-
-   This command registers the `mcp-confluent` server with Gemini CLI and creates a dedicated directory for it under `~/.gemini/extensions/mcp-confluent`.
-
-3. **Provide Environment Variables:**
-   The extension requires your Confluent Cloud credentials and configuration to be available in a `.env` file.
-   - First, ensure you have a correctly populated `.env` file in the root of this project. For instructions, see the [Configuration](#configuration) section.
-   - Next, copy your `.env` file into the extension's directory so Gemini CLI can access it (the Gemini extension expects the `.env` file at `${extensionPath}${pathSeparator}.env`; see [the variables documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md#variables) for details):
-
-   ```bash
-   cp .env ~/.gemini/extensions/mcp-confluent/.env
-   ```
-
-4. **Verify and Use:**
-   You can now start using the Confluent tools via Gemini CLI. To verify that the tools are available, you can list them:
-
-   ```bash
-   gemini -l
-   # or `gemini extensions list`
-   ```
-
-   And here's an example of invoking a tool:
-
-   ```bash
-
-   gemini
-   ....
-
-   🟢 mcp-confluent (from mcp-confluent) - Ready (24 tools)
-   ....
-
-   Using: 1 MCP server (ctrl+t to toggle)
-   ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-   │ > list topics                                                                                                                                             │
-   ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-   ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-   │ ✓  list-topics (mcp-confluent MCP Server) {}                                                                                                       │
-   │                                                                                                                                                    │
-   │    Kafka topics:                                                                                                                                   │
-   │    products_summarized,products,topic_8,products_summarized_with_embeddings,elastic_minimized,user_message_related_products,user_message_embeddin  │
-   │    gs,dlq-lcc-d3738o,user_message,elastic                                                                                          │
-   ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-   ✦ Okay, I see the following topics: products_summarized, products, topic_8, products_summarized_with_embeddings, elastic_minimized,
-     user_message_related_products, user_message_embeddings, dlq-lcc-d3738o, user_message, and elastic.
-
-   ```
-
-### Configuring Claude Code
-
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) supports MCP servers natively. Add the server to your project configuration:
-
-```bash
-claude mcp add confluent -- npx -y @confluentinc/mcp-confluent -e /path/to/.env
-```
-
-Or add it to your `.mcp.json` file directly:
-
-```json
-{
-  "mcpServers": {
-    "confluent": {
-      "command": "npx",
-      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
-    }
-  }
-}
-```
-
-### Configuring Cursor
-
-Add the MCP server to your Cursor configuration at `~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "confluent": {
-      "command": "npx",
-      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
-    }
-  }
-}
-```
-
-See the [Cursor MCP documentation](https://docs.cursor.com/context/model-context-protocol) for more details.
-
-### Configuring VS Code
-
-Add the MCP server to your VS Code user settings (`settings.json`) or workspace `.vscode/mcp.json`:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "confluent": {
-        "command": "npx",
-        "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
-      }
-    }
-  }
-}
-```
-
-See the [VS Code MCP documentation](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) for more details.
-
-### Configuring Windsurf
-
-Add the MCP server to your Windsurf configuration at `~/.codeium/windsurf/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "confluent": {
-      "command": "npx",
-      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
-    }
-  }
-}
-```
-
-See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/mcp) for more details.
-
-### mcp-confluent CLI Usage
+### CLI Usage
 
 The MCP server provides a flexible command line interface (CLI) for advanced configuration and control. The CLI allows you to specify environment files, transports, and fine-tune which tools are enabled or blocked.
 
@@ -684,317 +388,17 @@ delete-tableflow-catalog-integration: Make a request to delete a tableflow catal
 
 > **Tip:** The allow-list is applied before the block-list. If neither is provided, all tools are enabled by default.
 
-## Flink Example Workflows
-
-Examples of how the Flink tools (see [Available Tools](#available-tools)) work together in practice.
-
-#### Deduplication Workflow
-
-```
-User: "I want to deduplicate events from my_topic"
-        ↓
-Claude: Uses describe-flink-table → gets schema (event_id, user_id, ...)
-        ↓
-Claude: "Which field should I deduplicate on?"
-        ↓
-User: "event_id"
-        ↓
-Claude: Generates SQL using ROW_NUMBER() pattern
-        ↓
-Claude: Uses create-flink-statement → submits query
-        ↓
-Claude: Uses check-flink-statement-health → monitors status
-        ↓
-Claude: "Running successfully!"
-```
-
-#### Debugging a Failed Statement
-
-```
-User: "My statement xyz is failing. What's wrong?"
-        ↓
-Claude: Uses get-flink-statement-exceptions → gets error details
-        ↓
-Claude: Uses detect-flink-statement-issues → analyzes status, exceptions, metrics
-        ↓
-Claude: Uses get-flink-statement-profile → gets task-level metrics
-        ↓
-Claude: "The statement has high backpressure on task 'Sink'. Try increasing parallelism..."
-```
-
-## Metrics Example Workflows
-
-The `list-available-metrics` and `query-metrics` tools work together to let AI assistants monitor your Confluent Cloud resources. The discovery tool ensures the assistant uses valid metric names and filter fields rather than guessing.
-
-#### Kafka Topic Throughput
-
-```
-User: "What's the throughput on topic sensor-readings over the last hour?"
-        ↓
-Claude: Uses list-available-metrics(resource_type: "kafka") → discovers metric names & filters
-        ↓
-Claude: Uses query-metrics(metric: "io.confluent.kafka.server/received_bytes",
-        filter: {"metric.topic": "sensor-readings"}) → gets time-series data
-        ↓
-Claude: "sensor-readings is receiving ~14.3 KB/min steadily over the last hour."
-```
-
-#### Flink Compute Pool Utilization
-
-```
-User: "How many CFUs is my Flink compute pool using?"
-        ↓
-Claude: Uses list-available-metrics(resource_type: "compute_pool") → discovers CFU metrics
-        ↓
-Claude: Uses query-metrics(metric: "io.confluent.flink/compute_pool_utilization/current_cfus",
-        filter: {"resource.compute_pool.id": "lfcp-..."}, granularity: "PT1H",
-        interval: "<7-day range>") → gets usage trend
-        ↓
-Claude: "Your compute pool is using 1 CFU consistently."
-```
-
-#### Consumer Lag Monitoring
-
-```
-User: "Is there any consumer lag on the sensor-readings topic?"
-        ↓
-Claude: Uses query-metrics(metric: "io.confluent.kafka.server/consumer_lag_offsets",
-        filter: {"metric.topic": "sensor-readings"},
-        group_by: ["metric.consumer_group_id"]) → gets lag per consumer group
-        ↓
-Claude: "Consumer group 'analytics' has 1,200 offsets of lag."
-```
-
-> **Note:** Kafka server metrics (e.g., `io.confluent.kafka.server/received_bytes`) require `CONFLUENT_CLOUD_API_KEY` and `CONFLUENT_CLOUD_API_SECRET`. The `KAFKA_CLUSTER_ID` environment variable is auto-injected as a filter when querying Kafka metrics. Flink compute pool metrics report at hourly granularity, so queries may need a wider time window than the default 1 hour.
-
-## Developer Guide
-
-### Project Structure
-
-```sh
-/
-├── src/                    # Source code
-│   ├── index.ts                # Main entry point
-│   ├── cli.ts                  # CLI argument parsing
-│   ├── env.ts                  # Environment initialization
-│   ├── env-schema.ts           # Environment variable schema (Zod)
-│   ├── logger.ts               # Logger configuration
-│   ├── confluent/              # Confluent integration
-│   │   ├── client-manager.ts       # API client management
-│   │   ├── schema-registry-helper.ts
-│   │   └── tools/
-│   │       ├── base-tools.ts        # Base handler class
-│   │       ├── tool-factory.ts      # Tool registry
-│   │       ├── tool-name.ts         # Tool name enum
-│   │       └── handlers/
-│   │           ├── billing/         # Billing tools
-│   │           ├── catalog/         # Catalog & tag tools
-│   │           ├── clusters/        # Cluster tools
-│   │           ├── connect/         # Connector tools
-│   │           ├── environments/    # Environment tools
-│   │           ├── flink/           # Flink SQL, catalog & diagnostics tools
-│   │           ├── kafka/           # Kafka topic & message tools
-│   │           ├── metrics/         # Telemetry API metrics tools
-│   │           ├── schema/          # Schema Registry tools
-│   │           ├── search/          # Search tools
-│   │           └── tableflow/       # Tableflow topic & catalog tools
-│   └── mcp/                    # MCP protocol and transport logic
-│       └── transports/
-│           ├── http.ts              # HTTP transport
-│           ├── sse.ts               # SSE transport
-│           ├── stdio.ts             # STDIO transport
-│           ├── auth.ts              # Authentication middleware
-│           └── manager.ts           # Transport manager
-├── dist/                   # Compiled output
-├── openapi.json            # OpenAPI specification for Confluent Cloud
-├── .env.example            # Example environment variables
-├── README.md               # This file
-└── package.json            # Node.js project metadata and dependencies
-```
-
-### Building and Running
-
-1. **Install Dependencies:**
-
-   ```bash
-   npm install
-   ```
-
-2. **Development Mode (watch for changes):**
-
-   ```bash
-   npm run dev
-   ```
-
-   This command compiles the TypeScript code to JavaScript and automatically rebuilds when changes are detected in the `src/` directory.
-
-3. **Production Build (one-time compilation):**
-
-   ```bash
-   npm run build
-   ```
-
-4. **Start the Server:**
-
-   ```bash
-   npm run start
-   ```
-
-### Docker
-
-#### Prerequisites
-
-Before you begin, ensure you have the following installed on your system:
-
-Docker Desktop (or Docker Engine and Docker Compose): <https://www.docker.com/products/docker-desktop>
-
-##### Environment Variables
-
-The MCP server requires several environment variables to connect to Confluent Cloud and other relevant services. These should be provided in the `.env` file in the root directory of this project. Or you can add them directly in the `docker-compose.yml`
-
-#### Building and Running with Docker
-
-Here's how to build your Docker image and run it in different modes.
-
-1. **Navigate to your project directory.** Open your terminal or command prompt and change to the directory containing the `Dockerfile`.
-
-   ```bash
-   cd /path/to/repo/mcp-confluent
-   ```
-
-2. **Build the Docker image.**
-
-   This command creates the `mcp-server` image based on the `Dockerfile` in the current directory.
-
-   ```bash
-   docker build -t mcp-server .
-   ```
-
-3. **Run the container**
-   - `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
-   - `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
-   - `-d`: Runs the container in **detached mode** (in the background).
-   - `-p 8080:8080`: **Maps port 8080** on your host machine to port 8080 inside the container. The default HTTP_PORT is 8080; adjust if you've configured a different port.
-
-   ```bash
-   docker run --rm -i -d -p 8080:8080 mcp-server
-   ```
-
-   (Optional)
-   - `-t` **Transport Mode** to enable http transport
-
-   ```bash
-   docker run --rm -d -p 8080:8080 mcp-server -t http
-   ```
-
-#### Building and Running with Docker Compose
-
-1. **Navigate to the project root:**
-   Open your terminal or command prompt and change to the directory containing Dockerfile and docker-compose.yml.
-
-   ```bash
-   cd /path/to/repo/mcp-confluent
-   ```
-
-2. **Build and run the service:**
-   Docker Compose will build the Docker image (if not already built) and start the mcp-server service.
-
-   ```bash
-   docker compose up --build
-   ```
-
-   The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
-
-   The server will be accessible on <http://localhost:8080> (or the port specified in HTTP_PORT in your .env file).
-
-3. **Stopping the Server**
-   To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
-
-   Alternatively, in a new terminal from the project root, you can run:
-
-   ```bash
-   docker compose down
-   ```
-
-   This command stops and removes the containers, networks, and volumes created by docker compose up.
-
-### Testing
-
-#### MCP Inspector
-
-For testing MCP servers, you can use [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) which is an interactive developer tool for testing and debugging MCP servers.
-
-```bash
-# make sure you've already built the project either in dev mode or by running npm run build
-npx @modelcontextprotocol/inspector node  $PATH_TO_PROJECT/dist/index.js --env-file $PATH_TO_PROJECT/.env
-```
-
-### Local Development with an MCP Client
-
-While the [MCP Inspector](#mcp-inspector) is useful for ad-hoc tool testing, this setup lets you develop against a real MCP client (Claude Code, Cursor, etc.) with full server log visibility. By default, MCP clients spawn the server as a child process using stdio transport, which makes server logs difficult to observe. Running the server in HTTP mode gives you direct access to logs while the client interacts with it normally.
-
-After building the project (see [Building and Running](#building-and-running)):
-
-#### 1. Start the server in HTTP mode
-
-```bash
-npm run start:http -- --disable-auth
-```
-
-> [!WARNING]
-> Never disable authentication in production or when the server is network-accessible.
-
-This starts the server on `http://127.0.0.1:8080/mcp` (the defaults for `HTTP_HOST`, `HTTP_PORT`, and `HTTP_MCP_ENDPOINT_PATH`) with authentication disabled for local development.
-
-#### 2. Point your MCP client at the running server
-
-Instead of the default stdio configuration, configure your assistant's MCP settings to connect via HTTP. For example, in `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "confluent-dev": {
-      "type": "http",
-      "url": "http://127.0.0.1:8080/mcp"
-    }
-  }
-}
-```
-
-This replaces the typical `command`/`args` config that spawns a stdio child process.
-
-> [!IMPORTANT]
-> After restarting the MCP server, you may also need to restart or reconnect your MCP client so it picks up the new server process. For example, in Claude Code use the `/mcp` command to reconnect.
-
-#### 3. Observe server logs
-
-All server logs are written to stderr via pino and will appear directly in the terminal where you started the server. Set `LOG_LEVEL=debug` for more verbose output. To capture logs to a file instead:
-
-```bash
-npm run start:http -- --disable-auth 2>server.log
-```
-
-Then tail in a separate terminal:
-
-```bash
-tail -f server.log
-```
-
-### Adding a New Tool
-
-1. Add a new enum to the enum class `ToolName`.
-2. Add your new tool to the handlers map in the `ToolFactory` class.
-3. Create a new file, exporting the class that extends `BaseToolHandler`.
-   1. Implement the `handle` method of the base class.
-   2. Implement the `getToolConfig` method of the base class.
-4. Once satisfied, add it to the set of `enabledTools` in `index.ts`.
-
-### Generating Types
-
-```bash
-# as of v7.5.2 there is a bug when using allOf w/ required https://github.com/openapi-ts/openapi-typescript/issues/1474. need --empty-objects-unknown flag to avoid it
-npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --empty-objects-unknown
-```
+### Configuring MCP Clients
+
+Please refer to the following guides for step-by-step instructions on setting up and using this MCP server with your preferred client:
+
+- [Claude Desktop](docs/configuring-claude-desktop.md)
+- [Goose CLI](docs/configuring-goose-cli.md)
+- [Gemini CLI](docs/configuring-gemini-cli.md)
+- [Claude Code](docs/configuring-claude-code.md)
+- [Cursor](docs/configuring-cursor.md)
+- [VS Code](docs/configuring-vs-code.md)
+- [Windsurf](docs/configuring-windsurf.md)
 
 ## Telemetry
 

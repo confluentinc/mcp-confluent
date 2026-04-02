@@ -2,8 +2,6 @@
 
 All notable changes to this MCP server will be documented in this file.
 
-## Unreleased
-
 ## 1.2.0
 
 ### Added

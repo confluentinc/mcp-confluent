@@ -46,8 +46,6 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
   - [Usage](#usage)
   - [Configuring MCP Clients](#configuring-claude-desktop)
   - [CLI Usage](#mcp-confluent-cli-usage)
-- [Flink Example Workflows](#flink-example-workflows)
-- [Metrics Example Workflows](#metrics-example-workflows)
 - [Telemetry](#telemetry)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -196,10 +194,10 @@ MCP_API_KEY=your-generated-64-char-key-here
 
 #### Making Authenticated Requests
 
-Include the API key in the `cflt-mcp-api-Key` header for all HTTP/SSE requests:
+Include the API key in the `cflt-mcp-api-key` header for all HTTP/SSE requests:
 
 ```bash
-curl -H "cflt-mcp-api-Key: your-api-key" http://localhost:8080/mcp
+curl -H "cflt-mcp-api-key: your-api-key" http://localhost:8080/mcp
 ```
 
 #### DNS Rebinding Protection
@@ -684,89 +682,6 @@ delete-tableflow-catalog-integration: Make a request to delete a tableflow catal
 </details>
 
 > **Tip:** The allow-list is applied before the block-list. If neither is provided, all tools are enabled by default.
-
-## Flink Example Workflows
-
-Examples of how the Flink tools (see [Available Tools](#available-tools)) work together in practice.
-
-#### Deduplication Workflow
-
-```
-User: "I want to deduplicate events from my_topic"
-        ↓
-Claude: Uses describe-flink-table → gets schema (event_id, user_id, ...)
-        ↓
-Claude: "Which field should I deduplicate on?"
-        ↓
-User: "event_id"
-        ↓
-Claude: Generates SQL using ROW_NUMBER() pattern
-        ↓
-Claude: Uses create-flink-statement → submits query
-        ↓
-Claude: Uses check-flink-statement-health → monitors status
-        ↓
-Claude: "Running successfully!"
-```
-
-#### Debugging a Failed Statement
-
-```
-User: "My statement xyz is failing. What's wrong?"
-        ↓
-Claude: Uses get-flink-statement-exceptions → gets error details
-        ↓
-Claude: Uses detect-flink-statement-issues → analyzes status, exceptions, metrics
-        ↓
-Claude: Uses get-flink-statement-profile → gets task-level metrics
-        ↓
-Claude: "The statement has high backpressure on task 'Sink'. Try increasing parallelism..."
-```
-
-## Metrics Example Workflows
-
-The `list-available-metrics` and `query-metrics` tools work together to let AI assistants monitor your Confluent Cloud resources. The discovery tool ensures the assistant uses valid metric names and filter fields rather than guessing.
-
-#### Kafka Topic Throughput
-
-```
-User: "What's the throughput on topic sensor-readings over the last hour?"
-        ↓
-Claude: Uses list-available-metrics(resource_type: "kafka") → discovers metric names & filters
-        ↓
-Claude: Uses query-metrics(metric: "io.confluent.kafka.server/received_bytes",
-        filter: {"metric.topic": "sensor-readings"}) → gets time-series data
-        ↓
-Claude: "sensor-readings is receiving ~14.3 KB/min steadily over the last hour."
-```
-
-#### Flink Compute Pool Utilization
-
-```
-User: "How many CFUs is my Flink compute pool using?"
-        ↓
-Claude: Uses list-available-metrics(resource_type: "compute_pool") → discovers CFU metrics
-        ↓
-Claude: Uses query-metrics(metric: "io.confluent.flink/compute_pool_utilization/current_cfus",
-        filter: {"resource.compute_pool.id": "lfcp-..."}, granularity: "PT1H",
-        interval: "<7-day range>") → gets usage trend
-        ↓
-Claude: "Your compute pool is using 1 CFU consistently."
-```
-
-#### Consumer Lag Monitoring
-
-```
-User: "Is there any consumer lag on the sensor-readings topic?"
-        ↓
-Claude: Uses query-metrics(metric: "io.confluent.kafka.server/consumer_lag_offsets",
-        filter: {"metric.topic": "sensor-readings"},
-        group_by: ["metric.consumer_group_id"]) → gets lag per consumer group
-        ↓
-Claude: "Consumer group 'analytics' has 1,200 offsets of lag."
-```
-
-> **Note:** Kafka server metrics (e.g., `io.confluent.kafka.server/received_bytes`) require `CONFLUENT_CLOUD_API_KEY` and `CONFLUENT_CLOUD_API_SECRET`. The `KAFKA_CLUSTER_ID` environment variable is auto-injected as a filter when querying Kafka metrics. Flink compute pool metrics report at hourly granularity, so queries may need a wider time window than the default 1 hour.
 
 ## Telemetry
 

@@ -47,7 +47,10 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
   - [Configuring MCP Clients](#configuring-claude-desktop)
   - [CLI Usage](#mcp-confluent-cli-usage)
 - [Flink Example Workflows](#flink-example-workflows)
+- [Metrics Example Workflows](#metrics-example-workflows)
+- [Telemetry](#telemetry)
 - [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 
 ## Available Tools
 

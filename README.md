@@ -183,10 +183,10 @@ MCP_API_KEY=your-generated-64-char-key-here
 
 #### Making Authenticated Requests
 
-Include the API key in the `cflt-mcp-api-key` header for all HTTP/SSE requests:
+Include the API key in the `cflt-mcp-api-Key` header for all HTTP/SSE requests:
 
 ```bash
-curl -H "cflt-mcp-api-key: your-api-key" http://localhost:8080/mcp
+curl -H "cflt-mcp-api-Key: your-api-key" http://localhost:8080/mcp
 ```
 
 #### DNS Rebinding Protection

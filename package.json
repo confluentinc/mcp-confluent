@@ -38,6 +38,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.+(js|ts|json)\"",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "prepack": "node scripts/inject-build-config.mjs",
     "print:schema": "node dist/print-md-schema.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js --env-file .env",
     "prepare": "husky"

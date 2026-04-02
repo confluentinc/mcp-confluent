@@ -392,11 +392,11 @@ delete-tableflow-catalog-integration: Make a request to delete a tableflow catal
 
 Please refer to the following guides for step-by-step instructions on setting up and using this MCP server with your preferred client:
 
-- [Claude Desktop](docs/configuring-claude-desktop.md)
-- [Goose CLI](docs/configuring-goose-cli.md)
-- [Gemini CLI](docs/configuring-gemini-cli.md)
 - [Claude Code](docs/configuring-claude-code.md)
+- [Claude Desktop](docs/configuring-claude-desktop.md)
 - [Cursor](docs/configuring-cursor.md)
+- [Gemini CLI](docs/configuring-gemini-cli.md)
+- [Goose CLI](docs/configuring-goose-cli.md)
 - [VS Code](docs/configuring-vs-code.md)
 - [Windsurf](docs/configuring-windsurf.md)
 

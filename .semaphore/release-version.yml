@@ -1,0 +1,141 @@
+version: v1.0
+name: release-version
+agent:
+  machine:
+    type: s1-prod-ubuntu24-04-amd64-1
+
+auto_cancel:
+  running:
+    when: "branch != 'main'"
+
+execution_time_limit:
+  hours: 1
+
+queue:
+  - when: "branch != 'main'"
+    processing: parallel
+
+global_job_config:
+  prologue:
+    commands:
+      - sem-version node 22
+      - checkout
+      - |
+        if [ -n "$TARGET_BRANCH" ]; then
+          git fetch origin "$TARGET_BRANCH:$TARGET_BRANCH"
+          git checkout "$TARGET_BRANCH"
+        else
+          git fetch --all
+        fi
+        if [ -z "$COMMIT_SHA" ]; then
+          COMMIT_SHA=$(git rev-parse HEAD)
+        fi
+        git checkout "$COMMIT_SHA"
+      - . vault-setup --version v3 --role mcp-confluent
+
+blocks:
+  - name: "Parameter Verification"
+    dependencies: []
+    task:
+      jobs:
+        - name: "Parameter Verification"
+          commands:
+            - |
+              if [ -n "$RELEASE_NAME" ] && [ "$RELEASE_NAME" != "RELEASE_NAME" ]; then
+                echo "Using provided RELEASE_NAME: $RELEASE_NAME"
+              else
+                VERSION=$(jq -r '.version' package.json)
+                RELEASE_NAME="v$VERSION"
+              fi
+              if [ "$IS_PRERELEASE" = "true" ]; then
+                if [[ "$RELEASE_NAME" != *"-pre"* ]]; then
+                  RELEASE_NAME="${RELEASE_NAME}-pre"
+                fi
+              fi
+            - echo "$RELEASE_NAME" > RELEASE_NAME.txt
+            - artifact push workflow RELEASE_NAME.txt --force
+
+  - name: "Delete GitHub Release and Tag"
+    dependencies: ["Parameter Verification"]
+    task:
+      jobs:
+        - name: "Delete GitHub Release and Tag"
+          commands:
+            - artifact pull workflow RELEASE_NAME.txt
+            - RELEASE_NAME=$(cat RELEASE_NAME.txt)
+            - gh release delete "$RELEASE_NAME" --yes || true
+            - git tag -d "$RELEASE_NAME" || true
+            - git push origin --delete "$RELEASE_NAME" || true
+
+  - name: "Create GitHub Release and Tag"
+    dependencies: ["Delete GitHub Release and Tag"]
+    task:
+      jobs:
+        - name: "Create GitHub Release and Tag"
+          commands:
+            - artifact pull workflow RELEASE_NAME.txt
+            - RELEASE_NAME=$(cat RELEASE_NAME.txt)
+            # determine previous release tag for generating release notes
+            - |
+              if [ -n "$PREVIOUS_RELEASE_TAG" ] && [ "$PREVIOUS_RELEASE_TAG" != "PREVIOUS_RELEASE_TAG" ]; then
+                PREV_TAG="$PREVIOUS_RELEASE_TAG"
+                echo "Using provided PREVIOUS_RELEASE_TAG: $PREV_TAG"
+                NOTES_FLAGS="--generate-notes --notes-start-tag $PREV_TAG"
+              else
+                echo "Looking up the latest non-prerelease GitHub release tag..."
+                RELEASES_URL="https://api.github.com/repos/confluentinc/mcp-confluent/releases"
+                PREV_TAG=$(curl -s ${RELEASES_URL} | jq -r '.[] | select(.prerelease == false) | .tag_name' | head -n 1)
+                if [ -z "$PREV_TAG" ]; then
+                  echo "No previous non-prerelease tag found. Skipping automatic release notes generation."
+                  NOTES_FLAGS=""
+                else
+                  echo "Found previous release tag: $PREV_TAG"
+                  NOTES_FLAGS="--generate-notes --notes-start-tag $PREV_TAG"
+                fi
+              fi
+            - |
+              if [ "$IS_PRERELEASE" = "true" ]; then
+                PRE_RELEASE_FLAG="--prerelease"
+              else
+                PRE_RELEASE_FLAG=""
+              fi
+            - |
+              gh release create "$RELEASE_NAME" \
+                $PRE_RELEASE_FLAG \
+                --target "$COMMIT_SHA" \
+                --title "$RELEASE_NAME" \
+                $NOTES_FLAGS
+
+  - name: "Build Release"
+    dependencies: ["Create GitHub Release and Tag"]
+    task:
+      prologue:
+        commands:
+          - cache restore npm-cache-$(checksum package-lock.json)
+          - npm ci --prefer-offline
+      epilogue:
+        commands:
+          - cache store npm-cache-$(checksum package-lock.json) ~/.npm
+      jobs:
+        - name: "Build"
+          commands:
+            - npm run build
+            - npm pack
+            - artifact push workflow *.tgz --destination release-assets/ --force
+
+  - name: "Upload to GitHub Release"
+    dependencies: ["Build Release"]
+    task:
+      jobs:
+        - name: "Upload to GitHub Release"
+          commands:
+            - artifact pull workflow RELEASE_NAME.txt
+            - RELEASE_NAME=$(cat RELEASE_NAME.txt)
+            - artifact pull workflow release-assets/
+            - TGZ_FILE=$(find release-assets/ -name "*.tgz" | head -1)
+            - |
+              if [ -z "$TGZ_FILE" ]; then
+                echo "Error: No .tgz file found in release-assets/"
+                exit 1
+              fi
+            - gh release upload "$RELEASE_NAME" "$TGZ_FILE" --clobber

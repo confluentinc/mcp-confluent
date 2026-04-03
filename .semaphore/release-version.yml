@@ -132,7 +132,10 @@ blocks:
             - artifact pull workflow RELEASE_NAME.txt
             - RELEASE_NAME=$(cat RELEASE_NAME.txt)
             - artifact pull workflow release-assets/
+            - TGZ_FILE=$(find release-assets/ -name "*.tgz" | head -1)
             - |
-              for tgz in release-assets/*.tgz; do
-                gh release upload "$RELEASE_NAME" "$tgz" --clobber
-              done
+              if [ -z "$TGZ_FILE" ]; then
+                echo "Error: No .tgz file found in release-assets/"
+                exit 1
+              fi
+            - gh release upload "$RELEASE_NAME" "$TGZ_FILE" --clobber

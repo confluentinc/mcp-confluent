@@ -65,6 +65,6 @@ Tools are **auto-enabled/disabled** based on which environment variables are pre
 ## Code Conventions
 
 - ESM modules (`"type": "module"` in package.json); use `.js` extensions in import paths.
-- Prettier + ESLint enforced; `src/ccloud/**` and `dist/**` are excluded from linting.
+- Prettier + ESLint enforced; pre-commit hook runs both automatically via Husky.
 - `noImplicitAny` is disabled in tsconfig due to OpenAPI type resolution issues.
 - REST API calls use `openapi-fetch` with typed paths from the generated schema — prefer this over raw fetch.

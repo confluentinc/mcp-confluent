@@ -8,7 +8,9 @@ import tseslint from "typescript-eslint";
 export default [
   { files: ["**/*.{js,mjs,cjs,ts}"] },
   { languageOptions: { globals: globals.browser } },
-  { ignores: ["src/ccloud/**", "dist/**"] },
+  {
+    ignores: ["dist/**", "src/confluent/openapi-schema.d.ts", "coverage/**"],
+  },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   eslintConfigPrettier,

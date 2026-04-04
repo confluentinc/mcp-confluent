@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+
 # format staged files (extensions match "format" script glob in package.json)
 STAGED_FORMAT=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|js|json)$' | sed 's| |\\ |g')
 if [ -n "$STAGED_FORMAT" ]; then

@@ -121,7 +121,8 @@ blocks:
           commands:
             - npm run build
             - npm pack
-            - artifact push workflow *.tgz --destination release-assets/ --force
+            - TGZ_FILE=$(ls *.tgz)
+            - artifact push workflow ${TGZ_FILE} --destination release-assets/${TGZ_FILE} --force
 
   - name: "Upload to GitHub Release"
     dependencies: ["Build Release"]
@@ -135,7 +136,8 @@ blocks:
             - TGZ_FILE=$(find release-assets/ -name "*.tgz" | head -1)
             - |
               if [ -z "$TGZ_FILE" ]; then
-                echo "Error: No .tgz file found in release-assets/"
+                echo "Error: no .tgz file found in release-assets/"
+                ls -la release-assets/ 2>&1 || echo "release-assets/ directory does not exist"
                 exit 1
               fi
             - gh release upload "$RELEASE_NAME" "$TGZ_FILE" --clobber

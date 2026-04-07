@@ -9,7 +9,9 @@ export default [
   { files: ["**/*.{js,mjs,cjs,ts}"] },
   { languageOptions: { globals: globals.browser } },
   { files: ["scripts/**"], languageOptions: { globals: globals.node } },
-  { ignores: ["src/ccloud/**", "dist/**"] },
+  {
+    ignores: ["dist/**", "src/confluent/openapi-schema.d.ts", "coverage/**"],
+  },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   eslintConfigPrettier,

@@ -13,4 +13,4 @@ Add the MCP server to your Cursor configuration at `~/.cursor/mcp.json`:
 }
 ```
 
-See the [Cursor MCP documentation](https://docs.cursor.com/context/model-context-protocol) for more details.
+See the [Cursor MCP documentation](https://cursor.com/docs/mcp) for more details.

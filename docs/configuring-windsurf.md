@@ -13,4 +13,4 @@ Add the MCP server to your Windsurf configuration at `~/.codeium/windsurf/mcp_co
 }
 ```
 
-See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/mcp) for more details.
+See the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/cascade/mcp) for more details.

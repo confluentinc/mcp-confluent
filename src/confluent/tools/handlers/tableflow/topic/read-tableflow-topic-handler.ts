@@ -7,18 +7,10 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const readTableflowTopicArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base url of the Tableflow REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   display_name: z
     .string()
     .describe("The name of the Kafka topic for which Tableflow is enabled."),
@@ -39,7 +31,7 @@ export class ReadTableFlowTopicHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { display_name, environmentId, clusterId, baseUrl } =
+    const { display_name, environmentId, clusterId } =
       readTableflowTopicArguments.parse(toolArguments);
 
     const environment_id = getEnsuredParam(
@@ -53,10 +45,6 @@ export class ReadTableFlowTopicHandler extends BaseToolHandler {
       "Kafka Cluster ID is required",
       clusterId,
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudTableflowRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

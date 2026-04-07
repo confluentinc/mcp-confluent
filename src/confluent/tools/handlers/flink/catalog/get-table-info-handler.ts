@@ -6,24 +6,17 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
+  getSchemaMapping,
   resolveCatalogName,
   resolveDatabaseName,
-  getSchemaMapping,
   resolveToSchemaName,
 } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { z } from "zod";
 
 const getTableInfoArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Flink REST API.")
-    .url()
-    .default(() => env.FLINK_REST_ENDPOINT ?? "")
-    .optional(),
   organizationId: z
     .string()
     .trim()
@@ -72,7 +65,6 @@ export class GetTableInfoHandler extends BaseToolHandler {
       catalogName,
       databaseName,
       tableName,
-      baseUrl,
     } = getTableInfoArguments.parse(toolArguments);
 
     const organization_id = getEnsuredParam(
@@ -100,10 +92,6 @@ export class GetTableInfoHandler extends BaseToolHandler {
     }
     // Database name is optional - if provided, resolve it to friendly SCHEMA_NAME
     const database_input = resolveDatabaseName(databaseName);
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
-    }
 
     // If a database was specified, resolve cluster ID to friendly name
     let schema_name: string | undefined;

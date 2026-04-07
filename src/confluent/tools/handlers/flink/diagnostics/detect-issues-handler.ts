@@ -16,12 +16,6 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const detectIssuesArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Flink REST API.")
-    .url()
-    .default(() => env.FLINK_REST_ENDPOINT ?? "")
-    .optional(),
   organizationId: z
     .string()
     .trim()
@@ -72,7 +66,6 @@ export class DetectIssuesHandler extends BaseToolHandler {
       environmentId,
       organizationId,
       computePoolId,
-      baseUrl,
       includeMetrics,
     } = detectIssuesArguments.parse(toolArguments);
 
@@ -87,10 +80,6 @@ export class DetectIssuesHandler extends BaseToolHandler {
       environmentId,
     );
     const compute_pool_id = computePoolId || env.FLINK_COMPUTE_POOL_ID;
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),

@@ -40,7 +40,8 @@
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "print:schema": "node dist/print-md-schema.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js --env-file .env",
-    "prepare": "husky"
+    "prepare": "husky",
+    "prepack": "npm run build && node scripts/inject-build-config.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",

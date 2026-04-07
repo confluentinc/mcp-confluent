@@ -11,6 +11,7 @@ export default [
   {
     ignores: ["dist/**", "src/confluent/openapi-schema.d.ts", "coverage/**"],
   },
+  { files: ["scripts/**"], languageOptions: { globals: globals.node } },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   eslintConfigPrettier,

@@ -12,11 +12,6 @@ import { EnvVar } from "@src/env-schema.js";
 import { z } from "zod";
 
 const listCatalogsArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Flink REST API.")
-    .url()
-    .optional(),
   organizationId: z
     .string()
     .trim()
@@ -39,7 +34,7 @@ export class ListCatalogsHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { organizationId, environmentId, computePoolId, baseUrl } =
+    const { organizationId, environmentId, computePoolId } =
       listCatalogsArguments.parse(toolArguments);
 
     const organization_id = getEnsuredParam(
@@ -64,10 +59,6 @@ export class ListCatalogsHandler extends BaseToolHandler {
         "Catalog name could not be resolved. Set FLINK_ENV_ID.",
         true,
       );
-    }
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
     }
 
     // Query INFORMATION_SCHEMA.CATALOGS for all available catalogs

@@ -7,17 +7,10 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const queryProfilerArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Flink REST API.")
-    .url()
-    .default(() => env.FLINK_REST_ENDPOINT ?? "")
-    .optional(),
   organizationId: z
     .string()
     .trim()
@@ -125,7 +118,6 @@ export class QueryProfilerHandler extends BaseToolHandler {
       environmentId,
       organizationId,
       computePoolId,
-      baseUrl,
       intervalMinutes,
       includeAnalysis,
     } = queryProfilerArguments.parse(toolArguments);
@@ -145,10 +137,6 @@ export class QueryProfilerHandler extends BaseToolHandler {
       "Compute Pool ID is required",
       computePoolId,
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
-    }
 
     // Step 1: Fetch the task graph to get human-readable task/operator names
     const pathBasedClient = wrapAsPathBasedClient(

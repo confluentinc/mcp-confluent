@@ -25,11 +25,27 @@ semaphore:
   pipeline_enable: false
   status_level: block
   tasks:
-    - name: create-github-tag
+    - name: release-version
       branch: main
-      pipeline_file: .semaphore/create-github-tag.yml
+      pipeline_file: .semaphore/release-version.yml
       parameters:
-        - name: TAG_NAME
+        - name: IS_PRERELEASE
           required: true
-          description: The name of the tag to be created.
-          default_value: "X.Y.Z"
+          options:
+            - "true"
+            - "false"
+          default_value: "true"
+          description: 'Whether the release is a pre-release (true/false).'
+        - name: TARGET_BRANCH
+          required: true
+          default_value: "main"
+          description: 'The target branch to create the release from, must be a valid branch.'
+        - name: RELEASE_NAME
+          required: true
+          description: 'The name of the GitHub Release (and tag) to create (e.g., v1.2.0). Do not include -pre suffixes for prereleases; set IS_PRERELEASE to true instead.'
+        - name: COMMIT_SHA
+          required: true
+          description: 'The commit SHA to create the release and tag from, must be a valid SHA/tag/branch.'
+        - name: PREVIOUS_RELEASE_TAG
+          required: false
+          description: 'The previous release tag for generating release notes. If not provided, will use the latest (non-prerelease) GitHub Release.'

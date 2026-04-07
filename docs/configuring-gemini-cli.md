@@ -2,8 +2,8 @@
 
 For detailed information about Gemini CLI extensions and MCP servers, please refer to the official documentation:
 
-- [Gemini CLI Extensions](https://github.com/google-gemini/gemini-cli/blob/main/docs/extension.md)
-- [Gemini CLI MCP Server Tools](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
+- [Gemini CLI Extensions](https://geminicli.com/docs/extensions/)
+- [Gemini CLI MCP Server Tools](https://geminicli.com/docs/cli/tutorials/mcp-setup/#how-to-configure-gemini-cli)
 
 Here's how to get `mcp-confluent` running with Gemini CLI:
 

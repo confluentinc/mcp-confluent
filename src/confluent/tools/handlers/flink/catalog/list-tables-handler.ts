@@ -9,16 +9,9 @@ import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { z } from "zod";
 
 const listTablesArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Flink REST API.")
-    .url()
-    .default(() => env.FLINK_REST_ENDPOINT ?? "")
-    .optional(),
   organizationId: z
     .string()
     .trim()
@@ -61,7 +54,6 @@ export class ListTablesHandler extends BaseToolHandler {
       computePoolId,
       catalogName,
       databaseName,
-      baseUrl,
     } = listTablesArguments.parse(toolArguments);
 
     const organization_id = getEnsuredParam(
@@ -90,10 +82,6 @@ export class ListTablesHandler extends BaseToolHandler {
     // Note: databaseName parameter is currently unused - we fetch all tables and let the client filter
     // This is because TABLE_SCHEMA may contain friendly names, not cluster IDs
     void databaseName;
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
-    }
 
     // Query INFORMATION_SCHEMA.TABLES for all tables
     // Must fully qualify with catalog and use backticks per Confluent Cloud requirements

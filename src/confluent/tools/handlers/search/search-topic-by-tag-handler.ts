@@ -6,17 +6,10 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const searchTopicsByTagArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Schema Registry REST API.")
-    .url()
-    .default(() => env.SCHEMA_REGISTRY_ENDPOINT ?? "")
-    .optional(),
   topicTag: z.string().optional().describe("The tag we wish to search for"),
   limit: z
     .number()
@@ -34,11 +27,8 @@ export class SearchTopicsByTagHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { topicTag, limit, offset, baseUrl } =
+    const { topicTag, limit, offset } =
       searchTopicsByTagArguments.parse(toolArguments);
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudSchemaRegistryEndpoint(baseUrl);
-    }
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );

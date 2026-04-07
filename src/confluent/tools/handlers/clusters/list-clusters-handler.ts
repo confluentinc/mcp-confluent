@@ -12,13 +12,6 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listClustersArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base URL of the Confluent Cloud REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   environmentId: z
     .string()
     .optional()
@@ -71,14 +64,9 @@ export class ListClustersHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { environmentId, baseUrl } =
-      listClustersArguments.parse(toolArguments);
+    const { environmentId } = listClustersArguments.parse(toolArguments);
 
     try {
-      if (baseUrl !== undefined && baseUrl !== "") {
-        clientManager.setConfluentCloudRestEndpoint(baseUrl);
-      }
-
       const pathBasedClient = wrapAsPathBasedClient(
         clientManager.getConfluentCloudRestClient(),
       );

@@ -6,7 +6,11 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import {
+  EnvVar,
+  FLINK_REQUIRED_ENV_VARS,
+  TELEMETRY_REQUIRED_ENV_VARS,
+} from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -538,13 +542,11 @@ export class QueryProfilerHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return [
-      "FLINK_API_KEY",
-      "FLINK_API_SECRET",
-      "CONFLUENT_CLOUD_API_KEY",
-      "CONFLUENT_CLOUD_API_SECRET",
-    ];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    // Hits both Flink REST API and Telemetry APIs, so include all required env vars for both
+    const vars = [] as EnvVar[];
+    vars.push(...FLINK_REQUIRED_ENV_VARS, ...TELEMETRY_REQUIRED_ENV_VARS);
+    return vars;
   }
 
   isConfluentCloudOnly(): boolean {

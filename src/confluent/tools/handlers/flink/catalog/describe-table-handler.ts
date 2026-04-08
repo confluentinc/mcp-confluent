@@ -13,7 +13,7 @@ import {
 } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { z } from "zod";
 
 const describeTableArguments = z.object({
@@ -151,8 +151,8 @@ export class DescribeTableHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["FLINK_API_KEY", "FLINK_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return FLINK_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

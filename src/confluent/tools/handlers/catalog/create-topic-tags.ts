@@ -5,7 +5,10 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import {
+  CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -66,8 +69,8 @@ export class CreateTopicTagsHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

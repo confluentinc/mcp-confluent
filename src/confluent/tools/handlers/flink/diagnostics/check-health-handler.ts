@@ -6,7 +6,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -176,8 +176,8 @@ export class CheckHealthHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["FLINK_API_KEY", "FLINK_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return FLINK_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

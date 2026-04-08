@@ -6,7 +6,7 @@ All notable changes to this MCP server will be documented in this file.
 
 ### Changed
 
-- Removed `baseUrl` invocation parameter from all tool definitions. Now any API endpoint URLs must be provided through environment variable configuration prior to MCP server startup.
+- Removed `baseUrl` invocation parameter from all tool definitions. Now any API non-defaulting endpoint URLs must be provided through environment variable configuration prior to MCP server startup.
 
 ## 1.2.1
 

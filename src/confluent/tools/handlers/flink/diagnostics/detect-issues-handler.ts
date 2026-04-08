@@ -6,22 +6,16 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
-  getStatementMetrics,
   analyzeMetrics,
+  getStatementMetrics,
 } from "@src/confluent/tools/handlers/flink/diagnostics/metrics-helper.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const detectIssuesArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Flink REST API.")
-    .url()
-    .default(() => env.FLINK_REST_ENDPOINT ?? "")
-    .optional(),
   organizationId: z
     .string()
     .trim()
@@ -72,7 +66,6 @@ export class DetectIssuesHandler extends BaseToolHandler {
       environmentId,
       organizationId,
       computePoolId,
-      baseUrl,
       includeMetrics,
     } = detectIssuesArguments.parse(toolArguments);
 
@@ -87,10 +80,6 @@ export class DetectIssuesHandler extends BaseToolHandler {
       environmentId,
     );
     const compute_pool_id = computePoolId || env.FLINK_COMPUTE_POOL_ID;
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),
@@ -340,8 +329,8 @@ export class DetectIssuesHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["FLINK_API_KEY", "FLINK_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return FLINK_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

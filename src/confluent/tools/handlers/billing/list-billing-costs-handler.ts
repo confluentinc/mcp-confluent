@@ -5,19 +5,15 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import {
+  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listBillingCostsArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Confluent Cloud REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   startDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
@@ -81,14 +77,10 @@ export class ListBillingCostsHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { baseUrl, startDate, endDate, pageSize, pageToken } =
+    const { startDate, endDate, pageSize, pageToken } =
       listBillingCostsArguments.parse(toolArguments);
 
     try {
-      if (baseUrl !== undefined && baseUrl !== "") {
-        clientManager.setConfluentCloudRestEndpoint(baseUrl);
-      }
-
       const pathBasedClient = wrapAsPathBasedClient(
         clientManager.getConfluentCloudRestClient(),
       );
@@ -219,8 +211,8 @@ Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : "
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

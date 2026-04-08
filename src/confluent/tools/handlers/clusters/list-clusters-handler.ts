@@ -5,20 +5,16 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import {
+  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
 import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listClustersArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base URL of the Confluent Cloud REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   environmentId: z
     .string()
     .optional()
@@ -71,14 +67,9 @@ export class ListClustersHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { environmentId, baseUrl } =
-      listClustersArguments.parse(toolArguments);
+    const { environmentId } = listClustersArguments.parse(toolArguments);
 
     try {
-      if (baseUrl !== undefined && baseUrl !== "") {
-        clientManager.setConfluentCloudRestEndpoint(baseUrl);
-      }
-
       const pathBasedClient = wrapAsPathBasedClient(
         clientManager.getConfluentCloudRestClient(),
       );
@@ -197,8 +188,8 @@ Cluster: ${cluster.name}
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

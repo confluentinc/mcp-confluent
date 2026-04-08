@@ -5,7 +5,10 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import {
+  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -208,8 +211,8 @@ Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : "
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

@@ -275,7 +275,7 @@ export const TELEMETRY_REQUIRED_ENV_VARS = [
   // in DefaultClientManager indicates that the entire concept
   // of BaseToolHandler.getRequiredEnvVars() is ill designed, and that tool enablement
   // needs to be made more flexible, which should happen in conjunction with
-  // migrating configuration to primarily be be YAML based, not env var based.
+  // migrating configuration to primarily be YAML based, not env var based.
 
   // For now, though, we describe the truly required env vars for telemetry as
   // just the Confluent Cloud API key/secret, for better or worse.

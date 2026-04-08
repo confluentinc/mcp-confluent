@@ -18,19 +18,7 @@ export interface ToolHandler {
    *
    * This method is used to conditionally enable/disable tools based on the availability
    * of required environment variables. Tools will be disabled if any of their required
-   * environment variables are not set.
-   *
-   *
-   * Example:
-   * ```typescript
-   * getRequiredEnvVars(): EnvVar[] {
-   *   return [
-   *     "KAFKA_API_KEY",
-   *     "KAFKA_API_SECRET",
-   *     "BOOTSTRAP_SERVERS"
-   *   ];
-   * }
-   * ```
+   * environment variables are not set at process startup time.
    *
    * @returns Array of environment variable names required by this tool
    */
@@ -64,8 +52,8 @@ export abstract class BaseToolHandler implements ToolHandler {
    * Preferable to return a constant array of EnvVars defined in src/env-schema.ts for easier determination
    * of which tools require which subset of env vars.
    *
-   * If any required environment variables are not set at invocation time,
-   * the tool will be disabled and not returned by the tool loader.
+   * If any of the required environment variables are not set at process
+   * startup time, the tool will be disabled and not returned by the tool loader.
    */
   abstract getRequiredEnvVars(): readonly EnvVar[];
 

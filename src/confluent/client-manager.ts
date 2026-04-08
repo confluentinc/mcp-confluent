@@ -50,13 +50,6 @@ export interface ConfluentCloudRestClientManager {
   getConfluentCloudKafkaRestClient(): Client<paths, `${string}/${string}`>;
   /** Gets a configured REST client for Confluent Cloud Telemetry/Metrics API */
   getConfluentCloudTelemetryRestClient(): Client<paths, `${string}/${string}`>;
-
-  setConfluentCloudRestEndpoint(endpoint: string): void;
-  setConfluentCloudFlinkEndpoint(endpoint: string): void;
-  setConfluentCloudSchemaRegistryEndpoint(endpoint: string): void;
-  setConfluentCloudKafkaRestEndpoint(endpoint: string): void;
-  setConfluentCloudTableflowRestEndpoint(endpoint: string): void;
-  setConfluentCloudTelemetryEndpoint(endpoint: string): void;
 }
 
 /**
@@ -296,39 +289,6 @@ export class DefaultClientManager
       "enable.auto.commit": this.kafkaConfig["enable.auto.commit"] || false,
     };
     return this.kafkaClient.get().consumer(consumerConfig);
-  }
-
-  /**
-   * a function that sets a new confluent cloud rest endpoint.
-   * Closes the current client first.
-   * @param endpoint the endpoint to set
-   */
-  setConfluentCloudRestEndpoint(endpoint: string): void {
-    this.confluentCloudRestClient.close();
-    this.confluentCloudBaseUrl = endpoint;
-  }
-
-  setConfluentCloudTableflowRestEndpoint(endpoint: string): void {
-    this.confluentCloudTableflowRestClient.close();
-    this.confluentCloudTableflowBaseUrl = endpoint;
-  }
-
-  setConfluentCloudFlinkEndpoint(endpoint: string): void {
-    this.confluentCloudFlinkRestClient.close();
-    this.confluentCloudFlinkBaseUrl = endpoint;
-  }
-  setConfluentCloudSchemaRegistryEndpoint(endpoint: string): void {
-    this.confluentCloudSchemaRegistryRestClient.close();
-    this.confluentCloudSchemaRegistryBaseUrl = endpoint;
-  }
-  setConfluentCloudKafkaRestEndpoint(endpoint: string): void {
-    this.confluentCloudKafkaRestClient.close();
-    this.confluentCloudKafkaRestBaseUrl = endpoint;
-  }
-
-  setConfluentCloudTelemetryEndpoint(endpoint: string): void {
-    this.confluentCloudTelemetryRestClient.close();
-    this.confluentCloudTelemetryBaseUrl = endpoint;
   }
 
   /** @inheritdoc */

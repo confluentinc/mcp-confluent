@@ -61,7 +61,7 @@ export abstract class BaseToolHandler implements ToolHandler {
   /**
    * Return an array of environment variable names required for the operation of this tool.
    *
-   * Preferrable to return a constant array of EnvVars defined in src/env-schema.ts for easier determination
+   * Preferable to return a constant array of EnvVars defined in src/env-schema.ts for easier determination
    * of which tools require which subset of env vars.
    *
    * If any required environment variables are not set at invocation time,

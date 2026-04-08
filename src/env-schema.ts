@@ -270,6 +270,16 @@ export const TELEMETRY_REQUIRED_ENV_VARS = [
   // Configuring the telemetry client will first look for TELEMETRY_API_KEY/SECRET, then fall back to CONFLUENT_CLOUD_API_KEY/SECRET, so
   // the only absolute required env vars for telemetry are the Confluent Cloud API key/secret.
   // Likewise, TELEMETRY_ENDPOINT has a default value, so it's not strictly required either.
+
+  // The fallback behavior for the configuration of telemetry
+  // in DefaultClientManager indicates that the entire concept
+  // of BaseToolHandler.getRequiredEnvVars() is ill designed, and that tool enablement
+  // needs to be made more flexible, which should happen in conjunction with
+  // migrating configuration to primarily be be YAML based, not env var based.
+
+  // For now, though, we describe the truly required env vars for telemetry as
+  // just the Confluent Cloud API key/secret, for better or worse.
+
   "CONFLUENT_CLOUD_API_KEY",
   "CONFLUENT_CLOUD_API_SECRET",
 ] as const;
@@ -284,7 +294,6 @@ export const KAFKA_REST_REQUIRED_ENV_VARS = [
   "KAFKA_REST_ENDPOINT",
   "KAFKA_API_KEY",
   "KAFKA_API_SECRET",
-  "BOOTSTRAP_SERVERS",
 ] as const;
 
 export const FLINK_REQUIRED_ENV_VARS = [

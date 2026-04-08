@@ -59,15 +59,15 @@ export abstract class BaseToolHandler implements ToolHandler {
   abstract getToolConfig(): ToolConfig;
 
   /**
-   * Default implementation that returns an empty array, indicating no environment
-   * variables are required. Override this method in your tool handler if the tool
-   * requires specific environment variables to function.
+   * Return an array of environment variable names required for the operation of this tool.
    *
-   * @returns Empty array by default
+   * Preferrable to return a constant array of EnvVars defined in src/env-schema.ts for easier determination
+   * of which tools require which subset of env vars.
+   *
+   * If any required environment variables are not set at invocation time,
+   * the tool will be disabled and not returned by the tool loader.
    */
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return [];
-  }
+  abstract getRequiredEnvVars(): readonly EnvVar[];
 
   /**
    * Default implementation returns false, indicating the tool is not Confluent Cloud only.

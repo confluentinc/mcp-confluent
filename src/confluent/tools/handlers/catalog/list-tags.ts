@@ -12,15 +12,12 @@ import {
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
-const listTagsArguments = z.object({});
+const listTagsArguments = z
+  .object({})
+  .describe("No input required for listing tags");
 
 export class ListTagsHandler extends BaseToolHandler {
-  async handle(
-    clientManager: ClientManager,
-    toolArguments: Record<string, unknown>,
-  ): Promise<CallToolResult> {
-    listTagsArguments.parse(toolArguments);
-
+  async handle(clientManager: ClientManager): Promise<CallToolResult> {
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );

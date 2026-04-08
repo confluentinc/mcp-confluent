@@ -8,17 +8,10 @@ import {
 import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { z } from "zod";
 
 const listDatabasesArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Flink REST API.")
-    .url()
-    .default(() => env.FLINK_REST_ENDPOINT ?? "")
-    .optional(),
   organizationId: z
     .string()
     .trim()
@@ -48,13 +41,8 @@ export class ListDatabasesHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const {
-      organizationId,
-      environmentId,
-      computePoolId,
-      catalogName,
-      baseUrl,
-    } = listDatabasesArguments.parse(toolArguments);
+    const { organizationId, environmentId, computePoolId, catalogName } =
+      listDatabasesArguments.parse(toolArguments);
 
     const organization_id = getEnsuredParam(
       "FLINK_ORG_ID",
@@ -78,10 +66,6 @@ export class ListDatabasesHandler extends BaseToolHandler {
         "Catalog name could not be resolved. Set FLINK_ENV_ID or provide a valid environment ID (env-xxxxx).",
         true,
       );
-    }
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
     }
 
     // Build SQL query for INFORMATION_SCHEMA.SCHEMATA
@@ -120,8 +104,8 @@ export class ListDatabasesHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["FLINK_API_KEY", "FLINK_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return FLINK_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

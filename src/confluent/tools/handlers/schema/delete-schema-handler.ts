@@ -6,18 +6,11 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const deleteSchemaArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Schema Registry REST API.")
-    .url()
-    .default(() => env.SCHEMA_REGISTRY_ENDPOINT ?? "")
-    .optional(),
   subject: z.string().describe("Name of the subject to delete.").nonempty(),
   version: z
     .string()
@@ -39,17 +32,13 @@ export class DeleteSchemaHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { subject, version, permanent, baseUrl } =
+    const { subject, version, permanent } =
       deleteSchemaArguments.parse(toolArguments);
 
     logger.debug(
       { subject, version, permanent },
       "DeleteSchemaHandler.handle called with arguments",
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudSchemaRegistryEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),

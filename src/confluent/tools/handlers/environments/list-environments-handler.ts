@@ -5,19 +5,15 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import {
+  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listEnvironmentsArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Confluent Cloud REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   pageToken: z
     .string()
     .optional()
@@ -69,14 +65,9 @@ export class ListEnvironmentsHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { baseUrl, pageToken } =
-      listEnvironmentsArguments.parse(toolArguments);
+    const { pageToken } = listEnvironmentsArguments.parse(toolArguments);
 
     try {
-      if (baseUrl !== undefined && baseUrl !== "") {
-        clientManager.setConfluentCloudRestEndpoint(baseUrl);
-      }
-
       const pathBasedClient = wrapAsPathBasedClient(
         clientManager.getConfluentCloudRestClient(),
       );
@@ -180,8 +171,8 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

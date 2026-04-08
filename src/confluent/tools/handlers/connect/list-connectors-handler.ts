@@ -7,18 +7,10 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listConnectorArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base URL of the Kafka Connect REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   environmentId: z
     .string()
     .trim()
@@ -38,7 +30,7 @@ export class ListConnectorsHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { clusterId, environmentId, baseUrl } =
+    const { clusterId, environmentId } =
       listConnectorArguments.parse(toolArguments);
 
     const environment_id = getEnsuredParam(
@@ -51,10 +43,6 @@ export class ListConnectorsHandler extends BaseToolHandler {
       "Kafka Cluster ID is required",
       clusterId,
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudRestClient(),

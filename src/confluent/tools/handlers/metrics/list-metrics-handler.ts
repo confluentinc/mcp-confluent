@@ -5,7 +5,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { EnvVar, TELEMETRY_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
 import { z } from "zod";
 
@@ -259,8 +259,8 @@ export class ListMetricsHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return TELEMETRY_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

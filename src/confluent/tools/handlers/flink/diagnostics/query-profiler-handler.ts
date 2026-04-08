@@ -6,18 +6,15 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import {
+  EnvVar,
+  FLINK_REQUIRED_ENV_VARS,
+  TELEMETRY_REQUIRED_ENV_VARS,
+} from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const queryProfilerArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Flink REST API.")
-    .url()
-    .default(() => env.FLINK_REST_ENDPOINT ?? "")
-    .optional(),
   organizationId: z
     .string()
     .trim()
@@ -125,7 +122,6 @@ export class QueryProfilerHandler extends BaseToolHandler {
       environmentId,
       organizationId,
       computePoolId,
-      baseUrl,
       intervalMinutes,
       includeAnalysis,
     } = queryProfilerArguments.parse(toolArguments);
@@ -145,10 +141,6 @@ export class QueryProfilerHandler extends BaseToolHandler {
       "Compute Pool ID is required",
       computePoolId,
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
-    }
 
     // Step 1: Fetch the task graph to get human-readable task/operator names
     const pathBasedClient = wrapAsPathBasedClient(
@@ -550,13 +542,11 @@ export class QueryProfilerHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return [
-      "FLINK_API_KEY",
-      "FLINK_API_SECRET",
-      "CONFLUENT_CLOUD_API_KEY",
-      "CONFLUENT_CLOUD_API_SECRET",
-    ];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    // Hits both Flink REST API and Telemetry APIs, so include all required env vars for both
+    const vars = [] as EnvVar[];
+    vars.push(...FLINK_REQUIRED_ENV_VARS, ...TELEMETRY_REQUIRED_ENV_VARS);
+    return vars;
   }
 
   isConfluentCloudOnly(): boolean {

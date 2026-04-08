@@ -10,11 +10,6 @@ import {
   EnvVar,
 } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
-import { z } from "zod";
-
-const listTagsArguments = z
-  .object({})
-  .describe("No input required for listing tags");
 
 export class ListTagsHandler extends BaseToolHandler {
   async handle(clientManager: ClientManager): Promise<CallToolResult> {
@@ -40,7 +35,7 @@ export class ListTagsHandler extends BaseToolHandler {
       name: ToolName.LIST_TAGS,
       description:
         "Retrieve all tags with definitions from Confluent Cloud Schema Registry.",
-      inputSchema: listTagsArguments.shape,
+      inputSchema: {},
     };
   }
 

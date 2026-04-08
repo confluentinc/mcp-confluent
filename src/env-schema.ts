@@ -265,3 +265,30 @@ export const combinedSchema = envSchema.merge(configSchema);
 
 // Export type for environment variable names
 export type EnvVar = keyof z.infer<typeof combinedSchema>;
+
+export const TELEMETRY_REQUIRED_ENV_VARS = [
+  // Configuring the telemetry client will first look for TELEMETRY_API_KEY/SECRET, then fall back to CONFLUENT_CLOUD_API_KEY/SECRET, so
+  // the only absolute required env vars for telemetry are the Confluent Cloud API key/secret.
+  // Likewise, TELEMETRY_ENDPOINT has a default value, so it's not strictly required either.
+  "CONFLUENT_CLOUD_API_KEY",
+  "CONFLUENT_CLOUD_API_SECRET",
+] as const;
+
+export const CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS = [
+  "SCHEMA_REGISTRY_ENDPOINT",
+  "SCHEMA_REGISTRY_API_KEY",
+  "SCHEMA_REGISTRY_API_SECRET",
+] as const;
+
+export const KAFKA_REST_REQUIRED_ENV_VARS = [
+  "KAFKA_REST_ENDPOINT",
+  "KAFKA_API_KEY",
+  "KAFKA_API_SECRET",
+  "BOOTSTRAP_SERVERS",
+] as const;
+
+export const FLINK_REQUIRED_ENV_VARS = [
+  "FLINK_REST_ENDPOINT",
+  "FLINK_API_KEY",
+  "FLINK_API_SECRET",
+] as const;

@@ -6,18 +6,10 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const updateTableflowCatalogIntegrationArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base url of the Tableflow REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   tableflowCatalogIntegrationConfig: z.object({
     // Required fields
     display_name: z
@@ -58,12 +50,8 @@ export class UpdateTableFlowCatalogIntegrationHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { baseUrl, tableflowCatalogIntegrationConfig } =
+    const { tableflowCatalogIntegrationConfig } =
       updateTableflowCatalogIntegrationArguments.parse(toolArguments);
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudTableflowRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

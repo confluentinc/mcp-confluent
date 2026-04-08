@@ -7,18 +7,10 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const createTableflowCatalogIntegrationArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base url of the Tableflow REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   tableflowCatalogIntegrationConfig: z.object({
     // Required fields
     display_name: z
@@ -49,7 +41,7 @@ export class CreateTableFlowCatalogIntegrationHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { baseUrl, tableflowCatalogIntegrationConfig } =
+    const { tableflowCatalogIntegrationConfig } =
       createTableflowCatalogIntegrationArguments.parse(toolArguments);
 
     const environment_id = getEnsuredParam(
@@ -61,10 +53,6 @@ export class CreateTableFlowCatalogIntegrationHandler extends BaseToolHandler {
       "KAFKA_CLUSTER_ID",
       "Kafka Cluster ID is required",
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudTableflowRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

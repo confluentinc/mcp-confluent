@@ -5,18 +5,14 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import {
+  CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const addTagToTopicArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Schema Registry REST API.")
-    .url()
-    .default(() => env.SCHEMA_REGISTRY_ENDPOINT ?? "")
-    .optional(),
   tagAssignments: z
     .array(
       z.object({
@@ -38,12 +34,7 @@ export class AddTagToTopicHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { tagAssignments, baseUrl } =
-      addTagToTopicArguments.parse(toolArguments);
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudSchemaRegistryEndpoint(baseUrl);
-    }
+    const { tagAssignments } = addTagToTopicArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
@@ -74,8 +65,8 @@ export class AddTagToTopicHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

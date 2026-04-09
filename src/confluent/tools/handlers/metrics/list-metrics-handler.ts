@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -256,6 +257,7 @@ export class ListMetricsHandler extends BaseToolHandler {
       description:
         "List available Confluent Cloud metrics and their filter fields from the Telemetry API. Use this tool BEFORE query-metrics to discover valid metric names, resource filter fields, and grouping labels. This avoids guessing metric names.",
       inputSchema: listMetricsArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

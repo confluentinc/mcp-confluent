@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -36,6 +37,7 @@ export class ListTagsHandler extends BaseToolHandler {
       description:
         "Retrieve all tags with definitions from Confluent Cloud Schema Registry.",
       inputSchema: {},
+      annotations: READ_ONLY,
     };
   }
 

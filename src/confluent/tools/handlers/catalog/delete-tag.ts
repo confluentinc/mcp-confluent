@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  DESTRUCTIVE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -53,6 +54,7 @@ export class DeleteTagHandler extends BaseToolHandler {
       name: ToolName.DELETE_TAG,
       description: "Delete a tag definition from Confluent Cloud.",
       inputSchema: deleteTagArguments.shape,
+      annotations: DESTRUCTIVE,
     };
   }
 

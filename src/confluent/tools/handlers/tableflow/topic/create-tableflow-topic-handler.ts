@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
@@ -112,6 +113,7 @@ export class CreateTableFlowTopicHandler extends BaseToolHandler {
       name: ToolName.CREATE_TABLEFLOW_TOPIC,
       description: `Make a request to create a tableflow topic.`,
       inputSchema: createTableflowTopicArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -62,6 +63,7 @@ export class AddTagToTopicHandler extends BaseToolHandler {
       name: ToolName.ADD_TAGS_TO_TOPIC,
       description: "Assign existing tags to Kafka topics in Confluent Cloud.",
       inputSchema: addTagToTopicArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

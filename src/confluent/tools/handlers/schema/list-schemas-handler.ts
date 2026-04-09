@@ -3,6 +3,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -161,6 +162,7 @@ export class ListSchemasHandler extends BaseToolHandler {
       name: ToolName.LIST_SCHEMAS,
       description: "List all schemas in the Schema Registry.",
       inputSchema: listSchemasArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

@@ -1,8 +1,27 @@
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
 import { ZodRawShape } from "zod";
+
+/**
+ * Standard MCP tool annotations.
+ * Tools should reference these constants rather than creating ad-hoc instances.
+ */
+export const READ_ONLY: ToolAnnotations = {
+  readOnlyHint: true,
+} as const;
+
+export const CREATE_UPDATE: ToolAnnotations = {
+  destructiveHint: false,
+  readOnlyHint: false,
+} as const;
+
+export const DESTRUCTIVE: ToolAnnotations = {
+  destructiveHint: true,
+  readOnlyHint: false,
+} as const;
 
 export interface ToolHandler {
   handle(
@@ -35,6 +54,7 @@ export interface ToolConfig {
   name: ToolName;
   description: string;
   inputSchema: ZodRawShape;
+  annotations: ToolAnnotations;
 }
 
 export abstract class BaseToolHandler implements ToolHandler {

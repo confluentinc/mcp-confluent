@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -93,6 +94,7 @@ export class GetFlinkExceptionsHandler extends BaseToolHandler {
       description:
         "Retrieve the 10 most recent exceptions for a Flink SQL statement. Useful for diagnosing failed or failing statements.",
       inputSchema: getFlinkExceptionsArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

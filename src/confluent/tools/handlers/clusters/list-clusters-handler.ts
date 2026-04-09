@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -185,6 +186,7 @@ Cluster: ${cluster.name}
       name: ToolName.LIST_CLUSTERS,
       description: "Get all clusters in the Confluent Cloud environment",
       inputSchema: listClustersArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

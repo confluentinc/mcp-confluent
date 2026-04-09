@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  DESTRUCTIVE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -75,6 +76,7 @@ export class DeleteTableFlowCatalogIntegrationHandler extends BaseToolHandler {
       name: ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
       description: `Make a request to delete a tableflow catalog integration.`,
       inputSchema: deleteTableflowCatalogIntegrationArguments.shape,
+      annotations: DESTRUCTIVE,
     };
   }
 

@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -77,6 +78,7 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
       name: ToolName.ALTER_TOPIC_CONFIG,
       description: "Alter topic configuration in Confluent Cloud.",
       inputSchema: alterTopicConfigArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

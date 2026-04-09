@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
@@ -144,6 +145,7 @@ export class GetTableInfoHandler extends BaseToolHandler {
       description:
         "Get table metadata via INFORMATION_SCHEMA.TABLES. Returns watermark configuration, distribution info, and table type.",
       inputSchema: getTableInfoArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

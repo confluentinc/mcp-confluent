@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
@@ -148,6 +149,7 @@ export class DescribeTableHandler extends BaseToolHandler {
       description:
         "Get full schema details for a Flink table via INFORMATION_SCHEMA.COLUMNS. Returns column names, data types (including $rowtime), nullability, and metadata column info.",
       inputSchema: describeTableArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

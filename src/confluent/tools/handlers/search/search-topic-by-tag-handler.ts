@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -61,6 +62,7 @@ export class SearchTopicsByTagHandler extends BaseToolHandler {
       description:
         "List all topics in the Kafka cluster with the specified tag.",
       inputSchema: searchTopicsByTagArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -168,6 +169,7 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
       description:
         "Get all environments in Confluent Cloud with pagination support",
       inputSchema: listEnvironmentsArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

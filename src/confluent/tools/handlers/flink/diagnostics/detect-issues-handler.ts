@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
@@ -326,6 +327,7 @@ export class DetectIssuesHandler extends BaseToolHandler {
       description:
         "Detect issues for a Flink SQL statement by analyzing status, exceptions, and performance metrics. Identifies problems like failures, backpressure, consumer lag, late data, memory issues, and provides suggested fixes.",
       inputSchema: detectIssuesArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

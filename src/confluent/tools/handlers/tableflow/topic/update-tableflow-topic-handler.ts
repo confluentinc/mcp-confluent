@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -115,6 +116,7 @@ export class UpdateTableFlowTopicHandler extends BaseToolHandler {
       name: ToolName.UPDATE_TABLEFLOW_TOPIC,
       description: `Make a request to update a tableflow topic.`,
       inputSchema: updateTableflowTopicArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

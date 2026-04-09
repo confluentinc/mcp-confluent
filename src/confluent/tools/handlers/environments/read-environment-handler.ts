@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
@@ -117,6 +118,7 @@ Environment: ${environmentDetails.name}
       name: ToolName.READ_ENVIRONMENT,
       description: "Get details of a specific environment by ID",
       inputSchema: readEnvironmentArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

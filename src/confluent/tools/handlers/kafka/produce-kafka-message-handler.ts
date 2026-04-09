@@ -10,6 +10,7 @@ import {
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -207,6 +208,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       name: ToolName.PRODUCE_MESSAGE,
       description: `Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value.\n\nBefore producing, check if the topic has a registered schema for <topicName>-value and <topicName>-key. If a schema exists, set useSchemaRegistry to true and specify the appropriate schemaType. If the topic does not exist, it can be created via the ${ToolName.CREATE_TOPICS} tool.`,
       inputSchema: produceKafkaMessageArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

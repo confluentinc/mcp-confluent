@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -75,6 +76,7 @@ export class ReadTableFlowTopicHandler extends BaseToolHandler {
       name: ToolName.READ_TABLEFLOW_TOPIC,
       description: `Make a request to read a tableflow topic.`,
       inputSchema: readTableflowTopicArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

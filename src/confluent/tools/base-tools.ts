@@ -1,8 +1,8 @@
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { ZodRawShape } from "zod";
 
 /**
@@ -15,10 +15,12 @@ export const READ_ONLY: ToolAnnotations = {
 
 export const CREATE_UPDATE: ToolAnnotations = {
   destructiveHint: false,
+  readOnlyHint: false,
 } as const;
 
 export const DESTRUCTIVE: ToolAnnotations = {
   destructiveHint: true,
+  readOnlyHint: false,
 } as const;
 
 export interface ToolHandler {

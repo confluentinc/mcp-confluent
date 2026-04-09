@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -76,6 +77,7 @@ export class ListConnectorsHandler extends BaseToolHandler {
       description:
         'Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.',
       inputSchema: listConnectorArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

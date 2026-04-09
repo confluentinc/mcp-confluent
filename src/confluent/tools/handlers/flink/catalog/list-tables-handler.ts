@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
@@ -119,6 +120,7 @@ export class ListTablesHandler extends BaseToolHandler {
       description:
         "List all tables in a Flink database via INFORMATION_SCHEMA.TABLES. Returns table names and types.",
       inputSchema: listTablesArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

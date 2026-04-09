@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -115,6 +116,7 @@ export class ReadFlinkStatementHandler extends BaseToolHandler {
       name: ToolName.READ_FLINK_STATEMENT,
       description: "Make a request to read a statement and its results",
       inputSchema: readFlinkStatementArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

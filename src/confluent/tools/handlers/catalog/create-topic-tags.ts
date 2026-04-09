@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -66,6 +67,7 @@ export class CreateTopicTagsHandler extends BaseToolHandler {
       name: ToolName.CREATE_TOPIC_TAGS,
       description: "Create new tag definitions in Confluent Cloud.",
       inputSchema: createTagsArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

@@ -9,6 +9,7 @@ import {
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -258,6 +259,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       description:
         "Consumes messages from one or more Kafka topics. Supports automatic deserialization of Schema Registry encoded messages (AVRO, JSON, PROTOBUF).",
       inputSchema: consumeKafkaMessagesArgs.shape,
+      annotations: READ_ONLY,
     };
   }
 

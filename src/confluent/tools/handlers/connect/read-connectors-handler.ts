@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -80,6 +81,7 @@ export class ReadConnectorHandler extends BaseToolHandler {
       name: ToolName.READ_CONNECTOR,
       description: "Get information about the connector.",
       inputSchema: readConnectorArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

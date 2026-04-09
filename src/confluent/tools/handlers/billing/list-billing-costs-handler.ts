@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -208,6 +209,7 @@ Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : "
       description:
         "Retrieve billing cost data for a Confluent Cloud organization within a specified date range with pagination support",
       inputSchema: listBillingCostsArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

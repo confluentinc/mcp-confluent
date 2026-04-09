@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -38,6 +39,7 @@ export class CreateTopicsHandler extends BaseToolHandler {
       name: ToolName.CREATE_TOPICS,
       description: "Create one or more Kafka topics.",
       inputSchema: createTopicArgs.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

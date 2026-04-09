@@ -3,6 +3,7 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -128,6 +129,7 @@ export class CreateConnectorHandler extends BaseToolHandler {
       description:
         "Create a new connector. Returns the new connector information if successful.",
       inputSchema: createConnectorArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

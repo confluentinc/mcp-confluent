@@ -170,7 +170,11 @@ async function main() {
 
       server.registerTool(
         name as string,
-        { description: config.description, inputSchema: config.inputSchema },
+        {
+          description: config.description,
+          inputSchema: config.inputSchema,
+          annotations: config.annotations,
+        },
         async (args, context) => {
           const sessionId = context?.sessionId;
           const startTime = Date.now();

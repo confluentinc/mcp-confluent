@@ -4,8 +4,6 @@ FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 
-# Update npm to the latest version to fix CVE-2024-21626 (brace-expansion vulnerability)
-RUN npm install -g npm@latest
 
 COPY package.json package-lock.json ./
 

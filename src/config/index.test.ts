@@ -77,6 +77,18 @@ describe("config/index.ts", () => {
       );
     });
 
+    it("should throw error when root is not an object", () => {
+      const yamlContent = `"just a string"`;
+
+      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+        /Configuration validation failed/,
+      );
+      // Should not have empty path prefix like "- :"
+      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+        /- Invalid input: expected object, received string/,
+      );
+    });
+
     it("should throw error when connections field is missing", () => {
       const yamlContent = `some_other_field: "value"
 `;

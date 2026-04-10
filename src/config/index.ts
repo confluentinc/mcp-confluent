@@ -70,7 +70,10 @@ export function parseYamlConfiguration(
 
   if (!validationResult.success) {
     const errors = validationResult.error.issues
-      .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
+      .map((issue) => {
+        const path = issue.path.join(".");
+        return path ? `  - ${path}: ${issue.message}` : `  - ${issue.message}`;
+      })
       .join("\n");
     throw new Error(`Configuration validation failed:\n${errors}`);
   }

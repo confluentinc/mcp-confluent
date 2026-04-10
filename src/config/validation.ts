@@ -10,13 +10,17 @@ export function validateBootstrapServers(value: string): void {
     throw new Error("Value must be a non-empty string");
   }
 
-  const servers = value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const servers = value.split(",").map((s) => s.trim());
 
   if (servers.length === 0) {
     throw new Error("Must contain at least one server");
+  }
+
+  // Check for empty entries (trailing/consecutive commas)
+  if (servers.includes("")) {
+    throw new Error(
+      "Invalid format: empty server entries (check for trailing or consecutive commas)",
+    );
   }
 
   for (const server of servers) {

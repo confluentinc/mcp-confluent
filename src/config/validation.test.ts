@@ -88,6 +88,24 @@ describe("config/validation.ts", () => {
       );
     });
 
+    it("should reject servers with trailing comma", () => {
+      expect(() => validateBootstrapServers("localhost:9092,")).toThrow(
+        "Invalid format: empty server entries (check for trailing or consecutive commas)",
+      );
+    });
+
+    it("should reject servers with consecutive commas", () => {
+      expect(() => validateBootstrapServers("host1:9092,,host2:9093")).toThrow(
+        "Invalid format: empty server entries (check for trailing or consecutive commas)",
+      );
+    });
+
+    it("should reject servers with leading comma", () => {
+      expect(() => validateBootstrapServers(",localhost:9092")).toThrow(
+        "Invalid format: empty server entries (check for trailing or consecutive commas)",
+      );
+    });
+
     it("should reject servers with multiple colons", () => {
       expect(() => validateBootstrapServers("host:9092:extra")).toThrow(
         "Invalid format 'host:9092:extra': must be host:port",

@@ -25,6 +25,9 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules/
 
+# run as non-root (node user is built into node:alpine images)
+USER node
+
 ENV NODE_ENV=production
 EXPOSE 8080
 ENTRYPOINT ["node", "dist/index.js"]

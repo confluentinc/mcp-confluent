@@ -1,5 +1,14 @@
 #!/usr/bin/env sh
 
+# reject internal registry URLs in package-lock.json
+if git diff --cached --name-only | grep -q 'package-lock.json'; then
+  if git show :package-lock.json | grep -q 'codeartifact\..*\.amazonaws\.com'; then
+    echo "ERROR: package-lock.json contains internal CodeArtifact registry URLs."
+    echo "Regenerate it with: npm install --registry https://registry.npmjs.org"
+    exit 1
+  fi
+fi
+
 # format staged files (extensions match "format" script glob in package.json)
 STAGED_FORMAT=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|js|json)$' | sed 's| |\\ |g')
 if [ -n "$STAGED_FORMAT" ]; then

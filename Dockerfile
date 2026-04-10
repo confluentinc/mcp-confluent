@@ -21,16 +21,8 @@ RUN npm prune --omit=dev
 FROM ${NODE_IMAGE}
 WORKDIR /app
 
-# Update npm to the latest version in production stage as well
-RUN npm install -g npm@latest
-
-# Explicitly copy package.json and package-lock.json to the root of /app
-COPY package.json package-lock.json ./
-
-# Copy the compiled application files
+COPY --from=builder /app/package.json ./
 COPY --from=builder /app/dist ./dist
-
-# Copy the node_modules from the builder
 COPY --from=builder /app/node_modules ./node_modules/
 
 ENV NODE_ENV=production

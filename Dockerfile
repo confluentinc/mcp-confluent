@@ -14,6 +14,9 @@ COPY src/ ./src/
 
 RUN npm run build
 
+# remove dev dependencies, keeping compiled native modules intact
+RUN npm prune --omit=dev
+
 # Production stage
 FROM ${NODE_IMAGE}
 WORKDIR /app

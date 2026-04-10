@@ -1,4 +1,6 @@
-FROM node:22-alpine AS builder
+# https://hub.docker.com/layers/library/node/22-alpine
+ARG NODE_IMAGE=node:22-alpine@sha256:4d64b49e6c891c8fc821007cb1cdc6c0db7773110ac2c34bf2e6960adef62ed3
+FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 
@@ -15,7 +17,7 @@ COPY src/ ./src/
 RUN npm run build
 
 # Production stage
-FROM node:22-alpine
+FROM ${NODE_IMAGE}
 WORKDIR /app
 
 # Update npm to the latest version in production stage as well

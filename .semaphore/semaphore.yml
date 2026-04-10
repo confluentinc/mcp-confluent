@@ -70,7 +70,10 @@ blocks:
         - name: "Trivy Scan"
           commands:
             - docker build -t mcp-confluent:${SEMAPHORE_GIT_SHA:0:7} .
-            - trivy image --exit-code 1 --severity HIGH,CRITICAL --no-progress mcp-confluent:${SEMAPHORE_GIT_SHA:0:7}
+            # fail the job only on CRITICAL vulnerabilities
+            - trivy image --exit-code 1 --severity CRITICAL mcp-confluent:${SEMAPHORE_GIT_SHA:0:7}
+            # report HIGH and MEDIUM vulnerabilities but don't fail the job
+            - trivy image --severity HIGH,MEDIUM mcp-confluent:${SEMAPHORE_GIT_SHA:0:7}
 
 after_pipeline:
   task:

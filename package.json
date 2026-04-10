@@ -80,7 +80,8 @@
     "fastify": "^5.7.3",
     "openapi-fetch": "^0.14.0",
     "pino": "^10.1.0",
-    "properties-file": "^3.5.12"
+    "properties-file": "^3.5.12",
+    "yaml": "^2.8.3"
   },
   "overrides": {
     "zod": "^4.0"

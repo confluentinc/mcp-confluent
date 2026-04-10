@@ -1,0 +1,8 @@
+# Example MCP Confluent Server Configuration
+# This demonstrates a single direct (local/Docker) connection w/o local SR.
+
+connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "localhost:9092"

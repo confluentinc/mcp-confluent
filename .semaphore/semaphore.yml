@@ -63,6 +63,15 @@ blocks:
             - sem-version java 17
             - emit-sonarqube-data --run_only_sonar_scan --enable_sonarqube_enterprise
 
+  - name: "Docker Image Scan"
+    dependencies: ["Static Analysis"]
+    task:
+      jobs:
+        - name: "Trivy Scan"
+          commands:
+            - docker build -t mcp-confluent:${SEMAPHORE_GIT_SHA:0:7} .
+            - trivy image --exit-code 1 --severity HIGH,CRITICAL --no-progress mcp-confluent:${SEMAPHORE_GIT_SHA:0:7}
+
 after_pipeline:
   task:
     jobs:

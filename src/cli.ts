@@ -11,6 +11,7 @@ import pkg from "../package.json" with { type: "json" };
 // Define the interface for our CLI options
 export interface CLIOptions {
   envFile?: string;
+  config?: string;
   transports: TransportType[];
   allowTools?: string[];
   blockTools?: string[];
@@ -106,6 +107,10 @@ export function parseCliArgs(): CLIOptions {
     .version(getPackageVersion())
     .option("-e, --env-file <path>", "Load environment variables from file")
     .option(
+      "-c, --config <path>",
+      "EXPERIMENTAL: Path to YAML configuration file describing connection settings (work in progress, not fully functional yet)",
+    )
+    .option(
       "-k, --kafka-config-file <file>",
       "Path to a properties file for configuring kafka clients",
     )
@@ -181,6 +186,7 @@ export function parseCliArgs(): CLIOptions {
     }
     return {
       envFile: opts.envFile,
+      config: opts.config,
       transports: Array.isArray(opts.transport)
         ? opts.transport
         : [opts.transport],

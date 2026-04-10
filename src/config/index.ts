@@ -1,8 +1,4 @@
-import {
-  ConnectionConfig,
-  MCPServerConfiguration,
-  mcpConfigSchema,
-} from "@src/config/models.js";
+import { MCPServerConfiguration, mcpConfigSchema } from "@src/config/models.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -79,19 +75,5 @@ export function parseYamlConfiguration(
     throw new Error(`Configuration validation failed:\n${errors}`);
   }
 
-  const validated = validationResult.data;
-
-  // Inject connectionId from YAML map key into each connection object
-  const connections: Record<string, ConnectionConfig> = {};
-  for (const [connectionId, connection] of Object.entries(
-    validated.connections,
-  )) {
-    connections[connectionId] = {
-      ...connection,
-      connectionId,
-    };
-  }
-
-  // Return as MCPServerConfiguration.
-  return { connections };
+  return validationResult.data;
 }

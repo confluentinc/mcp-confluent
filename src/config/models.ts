@@ -7,7 +7,6 @@ import { validateBootstrapServers } from "@src/config/validation.js";
  */
 export interface DirectConnectionConfig {
   type: "direct";
-  connectionId: string;
   kafka: {
     bootstrap_servers: string;
   };
@@ -67,7 +66,7 @@ const connectionConfigSchema = z.discriminatedUnion("type", [
 export const mcpConfigSchema = z.object({
   connections: z
     .record(
-      z.string().min(1, "Connection name cannot be empty"),
+      z.string().trim().min(1, "Connection name cannot be empty"),
       connectionConfigSchema,
     )
     .refine(

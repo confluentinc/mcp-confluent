@@ -26,7 +26,6 @@ describe("config/index.ts", () => {
       expect(Object.keys(config.connections)).toHaveLength(1);
       expect(config.connections.local).toBeDefined();
       expect(config.connections.local!.type).toBe("direct");
-      expect(config.connections.local!.connectionId).toBe("local");
       expect(config.connections.local!.kafka.bootstrap_servers).toBe(
         "localhost:9092",
       );
@@ -64,21 +63,6 @@ describe("config/index.ts", () => {
       expect(config.connections.cluster!.kafka.bootstrap_servers).toBe(
         "broker1:9092,broker2:9092,broker3:9092",
       );
-    });
-
-    it("should inject connectionId from YAML key", () => {
-      const yamlContent = `connections:
-  my-custom-connection-name:
-    type: "direct"
-    kafka:
-      bootstrap_servers: "localhost:9092"
-`;
-
-      const config = parseYamlConfiguration(yamlContent);
-
-      expect(
-        config.connections["my-custom-connection-name"]!.connectionId,
-      ).toBe("my-custom-connection-name");
     });
 
     it("should throw error on invalid YAML syntax", () => {
@@ -242,6 +226,22 @@ describe("config/index.ts", () => {
       );
       expect(() => parseYamlConfiguration(yamlContent)).toThrow(
         /Exactly one connection must be defined/,
+      );
+    });
+
+    it("should throw error when connection name is whitespace-only", () => {
+      const yamlContent = `connections:
+  " ":
+    type: "direct"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+`;
+
+      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+        /Configuration validation failed/,
+      );
+      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+        /Invalid key in record/,
       );
     });
 

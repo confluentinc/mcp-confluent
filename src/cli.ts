@@ -108,7 +108,7 @@ export function parseCliArgs(): CLIOptions {
     .option("-e, --env-file <path>", "Load environment variables from file")
     .option(
       "-c, --config <path>",
-      "Path to YAML configuration file describing connection settings",
+      "EXPERIMENTAL: Path to YAML configuration file describing connection settings (work in progress, not fully functional yet)",
     )
     .option(
       "-k, --kafka-config-file <file>",

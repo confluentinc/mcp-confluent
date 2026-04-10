@@ -43,7 +43,10 @@ async function main() {
     if (cliOptions.config) {
       loadConfigFromYaml(cliOptions.config);
       // TODO(issue #151): Use config to construct connection manager instead of env vars
-      logger.info("Configuration file parsed and validated successfully");
+      logger.warn(
+        "Configuration file parsed and validated successfully, but it is not applied yet; startup still uses" +
+          " environment variables and CLI Kafka properties",
+      );
     }
 
     // Merge environment variables with kafka config from CLI

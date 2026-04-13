@@ -146,7 +146,7 @@ async function main() {
     });
 
     logger.info(
-      [...toolHandlers.keys()],
+      { enabledTools: [...toolHandlers.keys()] },
       `${toolHandlers.size} tool(s) enabled`,
     );
 

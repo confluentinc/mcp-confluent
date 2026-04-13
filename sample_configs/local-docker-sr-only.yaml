@@ -1,0 +1,8 @@
+# Example MCP Confluent Server Configuration
+# This demonstrates a single direct (local/Docker) connection with only a local Schema Registry.
+
+connections:
+  local:
+    type: "direct"
+    schema_registry:
+      endpoint: "http://localhost:8081"

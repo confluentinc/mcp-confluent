@@ -7,11 +7,12 @@ import {
   getPackageVersion,
   parseCliArgs,
 } from "@src/cli.js";
+import { loadConfigFromYaml } from "@src/config/index.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
@@ -37,6 +38,16 @@ async function main() {
     // Initialize environment after CLI args are processed
     const env = await initEnv();
     setLogLevel(env.LOG_LEVEL);
+
+    // Load and validate YAML configuration if --config is provided
+    if (cliOptions.config) {
+      loadConfigFromYaml(cliOptions.config);
+      // TODO(issue #151): Use config to construct connection manager instead of env vars
+      logger.warn(
+        "Configuration file parsed and validated successfully, but it is not applied yet; startup still uses" +
+          " environment variables and CLI Kafka properties",
+      );
+    }
 
     // Merge environment variables with kafka config from CLI
     // some additional configurations could be set in the client manager

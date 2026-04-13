@@ -14,7 +14,9 @@ npm run dev            # watch mode: tsc + tsc-alias in parallel
 npm run lint           # eslint
 npm run lint:fix       # eslint --fix
 npm run format         # prettier --write
-npm run test:ts        # tsc --noEmit (type-check only, no tests exist yet)
+npm run test           # vitest run
+npm run test:coverage  # vitest run --coverage
+npm run test:ts        # "tsc --noEmit", also includes type checking the test suite.
 npm run start          # node dist/index.js --env-file .env (stdio transport)
 npm run start:http     # HTTP transport
 npm run start:all      # all transports (http, sse, stdio)
@@ -68,3 +70,14 @@ Tools are **auto-enabled/disabled** based on which environment variables are pre
 - Prettier + ESLint enforced; pre-commit hook runs both automatically via Husky.
 - `noImplicitAny` is disabled in tsconfig due to OpenAPI type resolution issues.
 - REST API calls use `openapi-fetch` with typed paths from the generated schema — prefer this over raw fetch.
+
+## Unit Test Conventions
+
+- Write unit tests using vitest package and its `describe()`, `it()`, and `expect()`.
+- Test modules are stored beside the files they test, using `.test.ts` file extensions.
+- Use an outermost `describe()` block for the file, then inner `describe()` blocks for each item being tested.
+- Testing classes are done with a `describe()` block for the entire class, then individual `describe()` blocks for each method, with it() blocks for each aspect of the method.
+- External system interactions (including filesystem and environment variables) should be stubbed, primarily using `sinon` sandboxes.
+- Install and remove sinon sandboxes within `beforeEach()` and `afterEach()` at the widest appropriate scope in a test suite module.
+- Writing test suite utilities to install common blocks of stubs is a good technique to reduce test suite bloat. Those utilities should reside within the `tests/stubs` subtree.
+- Some node modules cannot be stubbed due to being implemented in C. The codebase should only use those indirectly, going through a stubbable js layer in `src/confluent/node-deps.js`. Look there and possibly add to it before making new parts of the codebase interact directly with the filesystem, etc.

@@ -54,7 +54,7 @@ export class CreateTopicsHandler extends BaseToolHandler {
     return {
       name: ToolName.CREATE_TOPICS,
       description:
-        "Create one or more Kafka topics with optional partition count and replication factor.",
+        "Create one or more Kafka topics with an optional partition count.",
       inputSchema: createTopicArgs.shape,
       annotations: CREATE_UPDATE,
     };

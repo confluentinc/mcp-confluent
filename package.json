@@ -28,7 +28,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:ts": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js --env-file .env",
     "start:http": "node dist/index.js --env-file .env --transport http",
     "start:sse": "node dist/index.js --env-file .env --transport sse",
@@ -80,7 +80,8 @@
     "fastify": "^5.7.3",
     "openapi-fetch": "^0.14.0",
     "pino": "^10.1.0",
-    "properties-file": "^3.5.12"
+    "properties-file": "^3.5.12",
+    "yaml": "^2.8.3"
   },
   "overrides": {
     "zod": "^4.0"

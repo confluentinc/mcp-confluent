@@ -8,10 +8,10 @@ import {
   parseCliArgs,
 } from "@src/cli.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
@@ -144,6 +144,11 @@ async function main() {
         );
       }
     });
+
+    logger.info(
+      [...toolHandlers.keys()],
+      `${toolHandlers.size} tool(s) enabled`,
+    );
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({

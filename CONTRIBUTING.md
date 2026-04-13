@@ -252,6 +252,27 @@ Then tail in a separate terminal:
 tail -f server.log
 ```
 
+### IDE Configuration for Development
+
+The repository includes checked-in configs for debugging the MCP server and connecting MCP clients (Claude Code, GitHub Copilot) to a local dev instance.
+
+**Prerequisites:** `npm install`, a `.env` file populated from `.env.example`.
+
+#### Starting the Dev Server
+
+Press **F5** in VS Code to build and start the server in HTTP mode with auth disabled. The launch config (`.vscode/launch.json`) automatically runs `npm run build`, enables pretty logging (`LOG_PRETTY=true`, `LOG_LEVEL=debug`), and attaches the debugger. The server starts on `http://127.0.0.1:18080/mcp` (port 18080 is used to avoid conflicts with the default 8080).
+
+#### Connecting MCP Clients
+
+Two project-level MCP configs register a `confluent-dev` server (distinct from the published `confluent` package that end users configure). Both connect to the locally running HTTP server started by F5:
+
+| File               | Client         |
+| ------------------ | -------------- |
+| `.mcp.json`        | Claude Code    |
+| `.vscode/mcp.json` | GitHub Copilot |
+
+After pressing F5, your MCP client should automatically discover the `confluent-dev` server. If you change `.env` or source code, restart the debug session (Ctrl+Shift+F5 or stop + F5) and reconnect the MCP client.
+
 ### Adding a New Tool
 
 1. Add a new enum to the enum class `ToolName`.

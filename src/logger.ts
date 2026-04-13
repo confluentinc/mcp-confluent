@@ -3,7 +3,16 @@ import pino from "pino";
 
 const logLevel = process.env.LOG_LEVEL || "info";
 
-// Create logger with stderr destination
+const STDERR = 2;
+// when LOG_PRETTY=true, pipe through pino-pretty for human-readable dev output
+const destination =
+  process.env.LOG_PRETTY === "true"
+    ? pino.transport({
+        target: "pino-pretty",
+        options: { destination: STDERR },
+      })
+    : pino.destination(STDERR);
+
 export const logger = pino(
   {
     level: logLevel,
@@ -17,7 +26,7 @@ export const logger = pino(
       },
     },
   },
-  pino.destination(2),
+  destination,
 );
 
 // Map Kafka log levels to Pino levels

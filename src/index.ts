@@ -156,6 +156,11 @@ async function main() {
       }
     });
 
+    logger.info(
+      [...toolHandlers.keys()],
+      `${toolHandlers.size} tool(s) enabled`,
+    );
+
     const serverVersion = getPackageVersion();
     const server = new McpServer({
       name: "confluent",

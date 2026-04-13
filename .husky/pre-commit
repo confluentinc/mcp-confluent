@@ -1,3 +1,15 @@
-npm run format
-npm run lint
-git update-index --again
+#!/usr/bin/env sh
+
+# format staged files (extensions match "format" script glob in package.json)
+STAGED_FORMAT=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|js|json)$' | sed 's| |\\ |g')
+if [ -n "$STAGED_FORMAT" ]; then
+  npx prettier --write $STAGED_FORMAT
+  git update-index --again
+fi
+
+# lint staged files (extensions match "files" glob in eslint.config.mjs)
+STAGED_LINT=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|js|mjs|cjs)$' | sed 's| |\\ |g')
+if [ -n "$STAGED_LINT" ]; then
+  npx eslint --no-warn-ignored --fix $STAGED_LINT
+  git update-index --again
+fi

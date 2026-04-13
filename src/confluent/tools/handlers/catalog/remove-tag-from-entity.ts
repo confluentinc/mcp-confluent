@@ -2,21 +2,18 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  DESTRUCTIVE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import {
+  CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const removeTagFromEntityArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Schema Registry REST API.")
-    .url()
-    .default(() => env.SCHEMA_REGISTRY_ENDPOINT ?? "")
-    .optional(),
   tagName: z
     .string()
     .describe("Name of the tag to remove from the entity.")
@@ -39,12 +36,8 @@ export class RemoveTagFromEntityHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { tagName, typeName, qualifiedName, baseUrl } =
+    const { tagName, typeName, qualifiedName } =
       removeTagFromEntityArguments.parse(toolArguments);
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudSchemaRegistryEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
@@ -78,11 +71,12 @@ export class RemoveTagFromEntityHandler extends BaseToolHandler {
       name: ToolName.REMOVE_TAG_FROM_ENTITY,
       description: "Remove tag from an entity in Confluent Cloud.",
       inputSchema: removeTagFromEntityArguments.shape,
+      annotations: DESTRUCTIVE,
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

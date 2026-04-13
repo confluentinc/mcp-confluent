@@ -3,22 +3,15 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const readTableflowCatalogIntegrationArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base url of the Tableflow REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   id: z.string().describe("The unique identifier for the catalog integration."),
   environmentId: z
     .string()
@@ -37,7 +30,7 @@ export class ReadTableFlowCatalogIntegrationHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { id, environmentId, clusterId, baseUrl } =
+    const { id, environmentId, clusterId } =
       readTableflowCatalogIntegrationArguments.parse(toolArguments);
 
     const environment_id = getEnsuredParam(
@@ -51,10 +44,6 @@ export class ReadTableFlowCatalogIntegrationHandler extends BaseToolHandler {
       "Kafka Cluster ID is required",
       clusterId,
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudTableflowRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),
@@ -87,6 +76,7 @@ export class ReadTableFlowCatalogIntegrationHandler extends BaseToolHandler {
       name: ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
       description: `Make a request to read a catalog integration.`,
       inputSchema: readTableflowCatalogIntegrationArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

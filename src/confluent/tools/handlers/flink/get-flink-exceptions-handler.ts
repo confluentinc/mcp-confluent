@@ -3,21 +3,15 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const getFlinkExceptionsArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Flink REST API.")
-    .url()
-    .default(() => env.FLINK_REST_ENDPOINT ?? "")
-    .optional(),
   organizationId: z
     .string()
     .trim()
@@ -45,7 +39,7 @@ export class GetFlinkExceptionsHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { statementName, environmentId, organizationId, baseUrl } =
+    const { statementName, environmentId, organizationId } =
       getFlinkExceptionsArguments.parse(toolArguments);
 
     const organization_id = getEnsuredParam(
@@ -58,10 +52,6 @@ export class GetFlinkExceptionsHandler extends BaseToolHandler {
       "Environment ID is required",
       environmentId,
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudFlinkEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),
@@ -104,11 +94,12 @@ export class GetFlinkExceptionsHandler extends BaseToolHandler {
       description:
         "Retrieve the 10 most recent exceptions for a Flink SQL statement. Useful for diagnosing failed or failing statements.",
       inputSchema: getFlinkExceptionsArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["FLINK_API_KEY", "FLINK_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return FLINK_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

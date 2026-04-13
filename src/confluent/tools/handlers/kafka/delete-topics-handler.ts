@@ -2,6 +2,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  DESTRUCTIVE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -30,6 +31,7 @@ export class DeleteTopicsHandler extends BaseToolHandler {
       name: ToolName.DELETE_TOPICS,
       description: "Delete the topic with the given names.",
       inputSchema: deleteKafkaTopicsArguments.shape,
+      annotations: DESTRUCTIVE,
     };
   }
 

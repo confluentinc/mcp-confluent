@@ -36,7 +36,7 @@ blocks:
             - npm run lint
         - name: "TypeScript"
           commands:
-            - npm run test:ts
+            - npm run typecheck
 
   - name: "Build"
     dependencies: ["Static Analysis"]

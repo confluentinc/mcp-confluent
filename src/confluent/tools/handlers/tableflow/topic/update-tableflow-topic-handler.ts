@@ -2,22 +2,15 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const updateTableflowTopicArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base url of the Tableflow REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   display_name: z
     .string()
     .describe("The name of the Kafka topic for which Tableflow is enabled."),
@@ -82,12 +75,8 @@ export class UpdateTableFlowTopicHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { baseUrl, display_name, tableflowTopicConfig } =
+    const { display_name, tableflowTopicConfig } =
       updateTableflowTopicArguments.parse(toolArguments);
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudTableflowRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),
@@ -127,6 +116,7 @@ export class UpdateTableFlowTopicHandler extends BaseToolHandler {
       name: ToolName.UPDATE_TABLEFLOW_TOPIC,
       description: `Make a request to update a tableflow topic.`,
       inputSchema: updateTableflowTopicArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

@@ -3,21 +3,15 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import { EnvVar, KAFKA_REST_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const alterTopicConfigArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Confluent Cloud Kafka REST API.")
-    .url()
-    .default(() => env.KAFKA_REST_ENDPOINT ?? "")
-    .optional(),
   clusterId: z
     .string()
     .optional()
@@ -46,17 +40,13 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { clusterId, topicName, topicConfigs, validateOnly, baseUrl } =
+    const { clusterId, topicName, topicConfigs, validateOnly } =
       alterTopicConfigArguments.parse(toolArguments);
     const kafka_cluster_id = getEnsuredParam(
       "KAFKA_CLUSTER_ID",
       "Kafka Cluster ID is required",
       clusterId,
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudKafkaRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudKafkaRestClient(),
@@ -88,11 +78,12 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
       name: ToolName.ALTER_TOPIC_CONFIG,
       description: "Alter topic configuration in Confluent Cloud.",
       inputSchema: alterTopicConfigArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["KAFKA_API_KEY", "KAFKA_API_SECRET", "BOOTSTRAP_SERVERS"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return KAFKA_REST_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

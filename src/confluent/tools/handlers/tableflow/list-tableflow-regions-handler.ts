@@ -2,22 +2,15 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listTableFlowRegionsArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base url of the Tableflow REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   cloud: z
     .string()
     .trim()
@@ -42,12 +35,7 @@ export class ListTableFlowRegionsHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { cloud, baseUrl } =
-      listTableFlowRegionsArguments.parse(toolArguments);
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudTableflowRestEndpoint(baseUrl);
-    }
+    const { cloud } = listTableFlowRegionsArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),
@@ -77,6 +65,7 @@ export class ListTableFlowRegionsHandler extends BaseToolHandler {
       name: ToolName.LIST_TABLEFLOW_REGIONS,
       description: `Retrieve a sorted, filtered, paginated list of all tableflow regions.`,
       inputSchema: listTableFlowRegionsArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 

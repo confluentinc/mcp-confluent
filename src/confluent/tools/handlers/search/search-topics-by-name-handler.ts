@@ -2,21 +2,18 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import {
+  CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const searchTopicsByNameArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Schema Registry REST API.")
-    .url()
-    .default(() => env.SCHEMA_REGISTRY_ENDPOINT ?? "")
-    .optional(),
   topicName: z.string().describe("The topic name to search for"),
 });
 
@@ -25,11 +22,7 @@ export class SearchTopicsByNameHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { topicName, baseUrl } =
-      searchTopicsByNameArguments.parse(toolArguments);
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudSchemaRegistryEndpoint(baseUrl);
-    }
+    const { topicName } = searchTopicsByNameArguments.parse(toolArguments);
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
@@ -61,11 +54,12 @@ export class SearchTopicsByNameHandler extends BaseToolHandler {
       description:
         "List all topics in the Kafka cluster matching the specified name.",
       inputSchema: searchTopicsByNameArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["SCHEMA_REGISTRY_API_KEY", "SCHEMA_REGISTRY_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

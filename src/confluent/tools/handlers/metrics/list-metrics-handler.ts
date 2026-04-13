@@ -2,10 +2,11 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { EnvVar, TELEMETRY_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
 import { z } from "zod";
 
@@ -256,11 +257,12 @@ export class ListMetricsHandler extends BaseToolHandler {
       description:
         "List available Confluent Cloud metrics and their filter fields from the Telemetry API. Use this tool BEFORE query-metrics to discover valid metric names, resource filter fields, and grouping labels. This avoids guessing metric names.",
       inputSchema: listMetricsArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return TELEMETRY_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

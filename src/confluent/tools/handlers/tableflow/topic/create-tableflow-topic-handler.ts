@@ -2,23 +2,16 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const createTableflowTopicArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base url of the Tableflow REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   tableflowTopicConfig: z.object({
     // Required fields
     display_name: z
@@ -70,7 +63,7 @@ export class CreateTableFlowTopicHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { baseUrl, tableflowTopicConfig } =
+    const { tableflowTopicConfig } =
       createTableflowTopicArguments.parse(toolArguments);
 
     const environment_id = getEnsuredParam(
@@ -82,10 +75,6 @@ export class CreateTableFlowTopicHandler extends BaseToolHandler {
       "KAFKA_CLUSTER_ID",
       "Kafka Cluster ID is required",
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudTableflowRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),
@@ -124,6 +113,7 @@ export class CreateTableFlowTopicHandler extends BaseToolHandler {
       name: ToolName.CREATE_TABLEFLOW_TOPIC,
       description: `Make a request to create a tableflow topic.`,
       inputSchema: createTableflowTopicArguments.shape,
+      annotations: CREATE_UPDATE,
     };
   }
 

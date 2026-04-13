@@ -3,22 +3,18 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import {
+  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const readConnectorArguments = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .describe("The base URL of the Kafka Connect REST API.")
-    .url()
-    .default(() => env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "")
-    .optional(),
   environmentId: z
     .string()
     .trim()
@@ -43,7 +39,7 @@ export class ReadConnectorHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { clusterId, environmentId, connectorName, baseUrl } =
+    const { clusterId, environmentId, connectorName } =
       readConnectorArguments.parse(toolArguments);
     const environment_id = getEnsuredParam(
       "KAFKA_ENV_ID",
@@ -55,9 +51,6 @@ export class ReadConnectorHandler extends BaseToolHandler {
       "Kafka Cluster ID is required",
       clusterId,
     );
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudRestClient(),
@@ -88,11 +81,12 @@ export class ReadConnectorHandler extends BaseToolHandler {
       name: ToolName.READ_CONNECTOR,
       description: "Get information about the connector.",
       inputSchema: readConnectorArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

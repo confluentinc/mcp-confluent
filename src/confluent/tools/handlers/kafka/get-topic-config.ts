@@ -3,21 +3,15 @@ import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
+  READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
-import env from "@src/env.js";
+import { EnvVar, KAFKA_REST_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const getTopicConfigArguments = z.object({
-  baseUrl: z
-    .string()
-    .describe("The base URL of the Confluent Cloud Kafka REST API.")
-    .url()
-    .default(() => env.KAFKA_REST_ENDPOINT ?? "")
-    .optional(),
   clusterId: z
     .string()
     .optional()
@@ -38,17 +32,13 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { clusterId, topicName, baseUrl } =
+    const { clusterId, topicName } =
       getTopicConfigArguments.parse(toolArguments);
     const kafka_cluster_id = getEnsuredParam(
       "KAFKA_CLUSTER_ID",
       "Kafka Cluster ID is required",
       clusterId,
     );
-
-    if (baseUrl !== undefined && baseUrl !== "") {
-      clientManager.setConfluentCloudKafkaRestEndpoint(baseUrl);
-    }
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudKafkaRestClient(),
@@ -96,11 +86,12 @@ export class GetTopicConfigHandler extends BaseToolHandler {
       name: ToolName.GET_TOPIC_CONFIG,
       description: "Retrieve configuration details for a specific Kafka topic.",
       inputSchema: getTopicConfigArguments.shape,
+      annotations: READ_ONLY,
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["KAFKA_API_KEY", "KAFKA_API_SECRET", "BOOTSTRAP_SERVERS"];
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return KAFKA_REST_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

@@ -10,8 +10,20 @@ import { EnvVar } from "@src/env-schema.js";
 import { z } from "zod";
 
 const createTopicArgs = z.object({
-  topicNames: z
-    .array(z.string().describe("Names of kafka topics to create"))
+  topics: z
+    .array(
+      z.object({
+        topic: z.string().describe("Name of the Kafka topic to create"),
+        numPartitions: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            "Number of partitions for the topic. If not specified, the broker default is used.",
+          ),
+      }),
+    )
     .nonempty(),
 });
 export class CreateTopicsHandler extends BaseToolHandler {
@@ -19,25 +31,30 @@ export class CreateTopicsHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { topicNames } = createTopicArgs.parse(toolArguments);
+    const { topics } = createTopicArgs.parse(toolArguments);
     const success = await (
       await clientManager.getAdminClient()
     ).createTopics({
-      topics: topicNames.map((name) => ({ topic: name })),
+      topics: topics.map(({ topic, numPartitions }) => ({
+        topic,
+        numPartitions,
+      })),
     });
+    const topicNames = topics.map((t) => t.topic).join(",");
     if (!success) {
       return this.createResponse(
-        `Failed to create Kafka topics: ${topicNames.join(",")}`,
+        `Failed to create Kafka topics: ${topicNames}`,
         true,
       );
     }
-    return this.createResponse(`Created Kafka topics: ${topicNames.join(",")}`);
+    return this.createResponse(`Created Kafka topics: ${topicNames}`);
   }
 
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.CREATE_TOPICS,
-      description: "Create one or more Kafka topics.",
+      description:
+        "Create one or more Kafka topics with optional partition count and replication factor.",
       inputSchema: createTopicArgs.shape,
       annotations: CREATE_UPDATE,
     };

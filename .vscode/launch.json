@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug MCP Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/dist/index.js",
+      "args": ["--env-file", ".env", "--transport", "http", "--disable-auth"],
+      "env": {
+        "HTTP_PORT": "18080",
+        "LOG_PRETTY": "true",
+        "LOG_LEVEL": "debug"
+      },
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "console": "integratedTerminal",
+      "preLaunchTask": "build",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    }
+  ]
+}

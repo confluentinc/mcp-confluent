@@ -16,7 +16,7 @@ npm run lint:fix       # eslint --fix
 npm run format         # prettier --write
 npm run test           # vitest run
 npm run test:coverage  # vitest run --coverage
-npm run typecheck      # "tsc --noEmit", also includes type checking the test suite.
+npm run test:ts        # "tsc --noEmit", also includes type checking the test suite.
 npm run start          # node dist/index.js --env-file .env (stdio transport)
 npm run start:http     # HTTP transport
 npm run start:all      # all transports (http, sse, stdio)

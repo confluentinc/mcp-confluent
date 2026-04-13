@@ -133,8 +133,11 @@ dist
 # test results
 TEST-result*.xml
 
-# vscode
-.vscode
+# vscode (ignore everything except local dev configs)
+.vscode/*
+!.vscode/launch.json
+!.vscode/mcp.json
+!.vscode/tasks.json
 .idea
 .continue
 *.txt

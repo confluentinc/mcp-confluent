@@ -123,7 +123,7 @@ describe("config/index.ts", () => {
       );
     });
 
-    it("should throw error when kafka field is missing", () => {
+    it("should throw error when neither kafka nor schema_registry is defined", () => {
       const yamlContent = `connections:
   local:
     type: "direct"
@@ -131,6 +131,9 @@ describe("config/index.ts", () => {
 
       expect(() => parseYamlConfiguration(yamlContent)).toThrow(
         /Configuration validation failed/,
+      );
+      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+        /At least one of 'kafka' or 'schema_registry' must be defined/,
       );
     });
 
@@ -273,6 +276,22 @@ describe("config/index.ts", () => {
         "https://schema-registry.example.com:8081",
       );
     });
+
+    it("should successfully parse config with schema_registry only (no kafka)", () => {
+      const yamlContent = `connections:
+  local:
+    type: "direct"
+    schema_registry:
+      endpoint: "http://localhost:8081"
+`;
+
+      const config = parseYamlConfiguration(yamlContent);
+
+      expect(config.connections.local!.schema_registry?.endpoint).toBe(
+        "http://localhost:8081",
+      );
+      expect(config.connections.local!.kafka).toBeUndefined();
+    });
   });
 
   describe("loadConfigFromYaml", () => {
@@ -326,7 +345,7 @@ describe("config/index.ts", () => {
       const invalidYaml = `connections:
   local:
     type: "direct"
-    # missing required kafka field
+    # missing both kafka and schema_registry
 `;
       fsStubs.existsSync.returns(true);
       fsStubs.readFileSync.returns(invalidYaml);

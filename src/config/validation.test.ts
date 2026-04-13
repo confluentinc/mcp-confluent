@@ -64,6 +64,15 @@ describe("config/validation.ts", () => {
       );
     });
 
+    it("should reject servers with empty port", () => {
+      expect(() => validateBootstrapServers("localhost:")).toThrow(
+        "Invalid server 'localhost:': port cannot be empty",
+      );
+      expect(() => validateBootstrapServers("host1:9092,host2:")).toThrow(
+        "Invalid server 'host2:': port cannot be empty",
+      );
+    });
+
     it("should reject servers with invalid port (non-numeric)", () => {
       expect(() => validateBootstrapServers("localhost:abc")).toThrow(
         "Invalid server 'localhost:abc': port 'abc' is not numeric",

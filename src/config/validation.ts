@@ -12,10 +12,6 @@ export function validateBootstrapServers(value: string): void {
 
   const servers = value.split(",").map((s) => s.trim());
 
-  if (servers.length === 0) {
-    throw new Error("Must contain at least one server");
-  }
-
   // Check for empty entries (trailing/consecutive commas)
   if (servers.includes("")) {
     throw new Error(

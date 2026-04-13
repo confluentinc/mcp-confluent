@@ -9,7 +9,7 @@ const destination =
   process.env.LOG_PRETTY === "true"
     ? pino.transport({
         target: "pino-pretty",
-        options: { destination: STDERR },
+        options: { destination: STDERR, singleLine: true },
       })
     : pino.destination(STDERR);
 

@@ -1,34 +1,32 @@
-FROM node:22-alpine AS builder
+# https://hub.docker.com/layers/library/node/22-alpine
+ARG NODE_IMAGE=node:22-alpine@sha256:4d64b49e6c891c8fc821007cb1cdc6c0db7773110ac2c34bf2e6960adef62ed3
+FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 
-# Update npm to the latest version to fix CVE-2024-21626 (brace-expansion vulnerability)
-RUN npm install -g npm@latest
 
 COPY package.json package-lock.json ./
 
 RUN npm ci
 
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.build.json ./
 COPY src/ ./src/
 
 RUN npm run build
 
+# remove dev dependencies, keeping compiled native modules intact
+RUN npm prune --omit=dev
+
 # Production stage
-FROM node:22-alpine
+FROM ${NODE_IMAGE}
 WORKDIR /app
 
-# Update npm to the latest version in production stage as well
-RUN npm install -g npm@latest
-
-# Explicitly copy package.json and package-lock.json to the root of /app
-COPY package.json package-lock.json ./
-
-# Copy the compiled application files
+COPY --from=builder /app/package.json ./
 COPY --from=builder /app/dist ./dist
-
-# Copy the node_modules from the builder
 COPY --from=builder /app/node_modules ./node_modules/
+
+# run as non-root (node user is built into node:alpine images)
+USER node
 
 ENV NODE_ENV=production
 EXPOSE 8080

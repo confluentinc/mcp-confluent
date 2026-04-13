@@ -26,7 +26,7 @@ describe("config/index.ts", () => {
       expect(Object.keys(config.connections)).toHaveLength(1);
       expect(config.connections.local).toBeDefined();
       expect(config.connections.local!.type).toBe("direct");
-      expect(config.connections.local!.kafka.bootstrap_servers).toBe(
+      expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
         "localhost:9092",
       );
       expect(config.connections.local!.schema_registry).toBeUndefined();
@@ -60,7 +60,7 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent);
 
-      expect(config.connections.cluster!.kafka.bootstrap_servers).toBe(
+      expect(config.connections.cluster!.kafka!.bootstrap_servers).toBe(
         "broker1:9092,broker2:9092,broker3:9092",
       );
     });
@@ -319,7 +319,7 @@ describe("config/index.ts", () => {
       const config = loadConfigFromYaml("/path/to/config.yaml");
 
       expect(config.connections.local).toBeDefined();
-      expect(config.connections.local!.kafka.bootstrap_servers).toBe(
+      expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
         "localhost:9092",
       );
     });

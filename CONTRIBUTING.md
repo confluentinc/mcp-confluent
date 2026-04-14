@@ -17,14 +17,14 @@ Required (please follow instructions after making any Pull Requests).
 
 ### Reporting Bugs
 
-Please use __Github Issues__ to report bugs. When filling out an issue report,
+Please use **Github Issues** to report bugs. When filling out an issue report,
 make sure to copy any related code and stack traces so we can properly debug.
 We need to be able to reproduce a failing test to be able to fix your issue
 most of the time, so a custom written failing test is very helpful.
 
 ### Suggesting Enhancements
 
-Please use __Github Issues__ to suggest enhancements. We are happy to consider
+Please use **Github Issues** to suggest enhancements. We are happy to consider
 any extra functionality or features to the library, as long as they add real
 and related value to users. Describing your use case and why such an addition
 helps the user base can help guide the decision to implement it into the
@@ -32,12 +32,12 @@ library's core.
 
 ### Pull Requests
 
-* Include new test cases (either end-to-end or unit tests) with your change.
-* Follow our style guides.
-* Make sure all tests are still passing and the linter does not report any issues.
-* End files with a new line.
-* Make sure your branch is up to date and rebased.
-* Squash extraneous commits unless their history truly adds value to the library.
+- Include new test cases (either end-to-end or unit tests) with your change.
+- Follow our style guides.
+- Make sure all tests are still passing and the linter does not report any issues.
+- End files with a new line.
+- Make sure your branch is up to date and rebased.
+- Squash extraneous commits unless their history truly adds value to the library.
 
 ## Developer Guide
 
@@ -143,17 +143,17 @@ Here's how to build your Docker image and run it in different modes.
    ```
 
 3. **Run the container**
-    - `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
-    - `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
-    - `-d`: Runs the container in **detached mode** (in the background).
-    - `-p 8080:8080`: **Maps port 8080** on your host machine to port 8080 inside the container. The default HTTP_PORT is 8080; adjust if you've configured a different port.
+   - `--rm`: **Automatically removes the container** when it exits. This helps keep your system clean.
+   - `-i`: Keeps **STDIN open** (runs the server using stdio transport by default).
+   - `-d`: Runs the container in **detached mode** (in the background).
+   - `-p 8080:8080`: **Maps port 8080** on your host machine to port 8080 inside the container. The default HTTP_PORT is 8080; adjust if you've configured a different port.
 
    ```bash
    docker run --rm -i -d -p 8080:8080 mcp-server
    ```
 
    (Optional)
-    - `-t` **Transport Mode** to enable http transport
+   - `-t` **Transport Mode** to enable http transport
 
    ```bash
    docker run --rm -d -p 8080:8080 mcp-server -t http
@@ -271,15 +271,18 @@ Two project-level MCP configs register a `confluent-dev` server (distinct from t
 | `.mcp.json`        | Claude Code    |
 | `.vscode/mcp.json` | GitHub Copilot |
 
-After pressing F5, your MCP client should automatically discover the `confluent-dev` server. If you change `.env` or source code, restart the debug session (Ctrl+Shift+F5 or stop + F5) and reconnect the MCP client.
+After pressing F5, your MCP client should automatically discover the `confluent-dev` server. If you change `.env` or source code, restart the debug session (Ctrl+Shift+F5 or stop + F5) and reconnect the MCP client:
+
+- **Claude Code:** Restart the session or use `/mcp` to reconnect. Tool changes are picked up automatically.
+- **GitHub Copilot:** Open `.vscode/mcp.json` and click **Start** or **Restart** in the code lens above `confluent-dev` to reconnect Copilot to the server. The code lens shows **Running** once Copilot is connected and has fetched the current tool list. (Copilot does not automatically detect when an HTTP server restarts.)
 
 ### Adding a New Tool
 
 1. Add a new enum to the enum class `ToolName`.
 2. Add your new tool to the handlers map in the `ToolFactory` class.
 3. Create a new file, exporting the class that extends `BaseToolHandler`.
-    1. Implement the `handle` method of the base class.
-    2. Implement the `getToolConfig` method of the base class.
+   1. Implement the `handle` method of the base class.
+   2. Implement the `getToolConfig` method of the base class.
 4. Once satisfied, add it to the set of `enabledTools` in `index.ts`.
 
 ### Generating Types

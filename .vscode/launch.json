@@ -5,6 +5,7 @@
       "name": "Debug MCP Server",
       "type": "node",
       "request": "launch",
+      "runtimeVersion": "22",
       "program": "${workspaceFolder}/dist/index.js",
       "args": ["--env-file", ".env", "--transport", "http", "--disable-auth"],
       "env": {

@@ -1,4 +1,5 @@
 import { ToolConfig, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
 import { AddTagToTopicHandler } from "@src/confluent/tools/handlers/catalog/add-tags-to-topic.js";
 import { CreateTopicTagsHandler } from "@src/confluent/tools/handlers/catalog/create-topic-tags.js";
 import { DeleteTagHandler } from "@src/confluent/tools/handlers/catalog/delete-tag.js";
@@ -11,13 +12,13 @@ import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/lis
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
-import { CreateFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/create-flink-statement-handler.js";
-import { DeleteFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/delete-flink-statement-handler.js";
 import { DescribeTableHandler } from "@src/confluent/tools/handlers/flink/catalog/describe-table-handler.js";
 import { GetTableInfoHandler } from "@src/confluent/tools/handlers/flink/catalog/get-table-info-handler.js";
 import { ListCatalogsHandler } from "@src/confluent/tools/handlers/flink/catalog/list-catalogs-handler.js";
 import { ListDatabasesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-databases-handler.js";
 import { ListTablesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-tables-handler.js";
+import { CreateFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/create-flink-statement-handler.js";
+import { DeleteFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/delete-flink-statement-handler.js";
 import { CheckHealthHandler } from "@src/confluent/tools/handlers/flink/diagnostics/check-health-handler.js";
 import { DetectIssuesHandler } from "@src/confluent/tools/handlers/flink/diagnostics/detect-issues-handler.js";
 import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
@@ -31,6 +32,8 @@ import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-
 import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
+import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
+import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { DeleteSchemaHandler } from "@src/confluent/tools/handlers/schema/delete-schema-handler.js";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
@@ -46,12 +49,12 @@ import { DeleteTableFlowTopicHandler } from "@src/confluent/tools/handlers/table
 import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tableflow/topic/list-tableflow-topics-handler.js";
 import { ReadTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/read-tableflow-topic-handler.js";
 import { UpdateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/update-tableflow-topic-handler.js";
-import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
-import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
-import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 
-export class ToolFactory {
+/**
+ * Central registry for all tool call handlers.
+ */
+export class ToolHandlerRegistry {
   private static handlers: Map<ToolName, ToolHandler> = new Map([
     [ToolName.LIST_TOPICS, new ListTopicsHandler()],
     [ToolName.CREATE_TOPICS, new CreateTopicsHandler()],
@@ -120,24 +123,11 @@ export class ToolFactory {
     [ToolName.LIST_METRICS, new ListMetricsHandler()],
   ]);
 
-  static createToolHandler(toolName: ToolName): ToolHandler {
-    if (!this.handlers.has(toolName)) {
-      throw new Error(`Unknown tool name: ${toolName}`);
-    }
+  static getToolHandler(toolName: ToolName): ToolHandler {
     return this.handlers.get(toolName)!;
   }
 
-  static getToolConfigs(): ToolConfig[] {
-    // iterate through all the handlers and collect their configurations
-    return Array.from(this.handlers.values()).map((handler) =>
-      handler.getToolConfig(),
-    );
-  }
-
   static getToolConfig(toolName: ToolName): ToolConfig {
-    if (!this.handlers.has(toolName)) {
-      throw new Error(`Unknown tool name: ${toolName}`);
-    }
-    return this.handlers.get(toolName)!.getToolConfig();
+    return this.getToolHandler(toolName).getToolConfig();
   }
 }

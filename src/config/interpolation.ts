@@ -12,7 +12,7 @@ function interpolateString(
   return value.replaceAll(
     INTERPOLATION_RE,
     (
-      match,
+      _match,
       escaped: string | undefined,
       varName: string | undefined,
       defaultValue: string | undefined,

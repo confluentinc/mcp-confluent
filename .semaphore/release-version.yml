@@ -120,6 +120,13 @@ blocks:
         - name: "Build"
           commands:
             - npm run build
+            - |
+              if [ "$IS_PRERELEASE" = "false" ]; then
+                VAULT_FIELD=TELEMETRY_WRITE_KEY
+              else
+                VAULT_FIELD=TELEMETRY_WRITE_KEY_DEV
+              fi
+              . vault-get-secret --vault-role=mcp-confluent --secret-key="$VAULT_FIELD" --export-as=TELEMETRY_WRITE_KEY mcpconfluent/telemetry
             - npm pack
             - TGZ_FILE=$(ls *.tgz)
             - artifact push workflow ${TGZ_FILE} --destination release-assets/${TGZ_FILE} --force

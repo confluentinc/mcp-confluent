@@ -195,11 +195,6 @@ async function main() {
 
     const clientManager = constructDefaultClientManager(env, cliOptions);
 
-    logger.info(
-      { enabledTools: [...toolHandlers.keys()] },
-      `${toolHandlers.size} tool(s) enabled`,
-    );
-
     const serverVersion = getPackageVersion();
     const server = new McpServer({
       name: "confluent",
@@ -224,6 +219,11 @@ async function main() {
       filteredToolNames,
       cliOptions.disableConfluentCloudTools ?? false,
       env,
+    );
+
+    logger.info(
+      { enabledTools: [...toolHandlers.keys()] },
+      `${toolHandlers.size} tool(s) enabled`,
     );
 
     toolHandlers.forEach((handler, name) => {

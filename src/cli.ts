@@ -254,20 +254,20 @@ export function loadEnvironmentVariables(envFile: string): void {
  *
  * This function determines which tools should be enabled for the server by applying
  * the following logic:
- *   1. If an allow list (`allowTools`) is provided and non-empty, only those
+ *   1. If allow list (`allowTools`) is non-empty, only those
  *      tool names present in the allow list (and valid) will be enabled. Any invalid
  *      tool names in the allow list are ignored and a warning is logged.
- *   2. If a block list (`blockTools`) is provided and non-empty, any tool
+ *   2. If block list (`blockTools`) is non-empty, any tool
  *      names present in the block list (and valid) will be removed from the enabled
  *      set. Any invalid tool names in the block list are ignored and a warning is logged.
- *   3. If neither allow nor block lists are provided, all available tools are enabled.
+ *   3. If both lists are empty, all available tools are enabled.
  *
  * The returned list is always sorted alphabetically.
  *
- * @param allowTools - Optional array of tool names to allow/enable. If provided, only these tools will possibly
+ * @param allowTools - Array of tool names to explicitly allow/enable. If nonempty, only these tools will possibly
  *                    be enabled (subject to block list). If not provided or empty, all tools are initially
  *                    considered for enabling.
- * @param blockTools - Optional array of tool names to block. If provided, these tools will be disabled (even if
+ * @param blockTools - Array of tool names to block. If nonempty, these tools will be disabled (even if
  *                      they are in the allow list).
  *
  * @returns An alphabetically sorted array of enabled ToolNames.

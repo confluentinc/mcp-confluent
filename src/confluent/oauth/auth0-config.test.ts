@@ -12,7 +12,7 @@ describe("oauth/auth0-config.ts", () => {
       const config = getAuth0Config("devel");
 
       expect(config.clientId).toBe("D8DV9ee7XrKX4ncAc6vJtBFgIzTMNgoY");
-      expect(config.domain).toBe("login.confluent.io");
+      expect(config.domain).toBe("login.confluent-dev.io");
       expect(config.apiUrl).toBe("https://devel.cpdev.cloud");
       expect(config.callbackUrl).toBe(
         "http://127.0.0.1:26640/gateway/v1/callback-local-mcp-docs",
@@ -24,6 +24,7 @@ describe("oauth/auth0-config.ts", () => {
       const config = getAuth0Config("stag");
 
       expect(config.clientId).toBe("adtjckxmHbjddhNK36PvcXIDDbrJUMDH");
+      expect(config.domain).toBe("login-stag.confluent-dev.io");
       expect(config.apiUrl).toBe("https://stag.cpdev.cloud");
     });
 

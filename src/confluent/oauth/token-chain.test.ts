@@ -52,7 +52,7 @@ describe("oauth/token-chain.ts", () => {
 
       sinon.assert.calledOnce(fetchStub);
       const [url, options] = fetchStub.firstCall.args;
-      expect(url).toBe("https://login.confluent.io/oauth/token");
+      expect(url).toBe("https://login.confluent-dev.io/oauth/token");
       expect(options.method).toBe("POST");
 
       const body = new URLSearchParams(options.body);

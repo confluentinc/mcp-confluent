@@ -185,7 +185,7 @@ async function main() {
 
     // Load and validate YAML configuration if --config is provided
     if (cliOptions.config) {
-      loadConfigFromYaml(cliOptions.config);
+      loadConfigFromYaml(cliOptions.config, process.env);
       // TODO(issue #151): Use config to construct connection manager instead of env vars
       logger.warn(
         "Configuration file parsed and validated successfully, but it is not applied yet; startup still uses" +
@@ -194,11 +194,6 @@ async function main() {
     }
 
     const clientManager = constructDefaultClientManager(env, cliOptions);
-
-    logger.info(
-      { enabledTools: [...toolHandlers.keys()] },
-      `${toolHandlers.size} tool(s) enabled`,
-    );
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({
@@ -224,6 +219,11 @@ async function main() {
       filteredToolNames,
       cliOptions.disableConfluentCloudTools ?? false,
       env,
+    );
+
+    logger.info(
+      { enabledTools: [...toolHandlers.keys()] },
+      `${toolHandlers.size} tool(s) enabled`,
     );
 
     toolHandlers.forEach((handler, name) => {

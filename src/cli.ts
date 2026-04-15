@@ -254,64 +254,71 @@ export function loadEnvironmentVariables(envFile: string): void {
  *
  * This function determines which tools should be enabled for the server by applying
  * the following logic:
- *   1. If an allow list (`cliOptions.allowTools`) is provided and non-empty, only those
+ *   1. If allow list (`allowTools`) is non-empty, only those
  *      tool names present in the allow list (and valid) will be enabled. Any invalid
  *      tool names in the allow list are ignored and a warning is logged.
- *   2. If a block list (`cliOptions.blockTools`) is provided and non-empty, any tool
+ *   2. If block list (`blockTools`) is non-empty, any tool
  *      names present in the block list (and valid) will be removed from the enabled
  *      set. Any invalid tool names in the block list are ignored and a warning is logged.
- *   3. If neither allow nor block lists are provided, all available tools are enabled.
+ *   3. If both lists are empty, all available tools are enabled.
  *
  * The returned list is always sorted alphabetically.
  *
- * @param cliOptions - The parsed CLI options containing allow/block tool lists.
+ * @param allowTools - Array of tool names to explicitly allow/enable. If nonempty, only these tools will possibly
+ *                    be enabled (subject to block list). If not provided or empty, all tools are initially
+ *                    considered for enabling.
+ * @param blockTools - Array of tool names to block. If nonempty, these tools will be disabled (even if
+ *                      they are in the allow list).
+ *
  * @returns An alphabetically sorted array of enabled ToolNames.
  */
-export function getFilteredToolNames(cliOptions: CLIOptions): ToolName[] {
-  let filteredToolNames: ToolName[] = Object.values(ToolName);
+export function getFilteredToolNames(
+  allowTools: string[],
+  blockTools: string[],
+): ToolName[] {
+  let filteredToolNames: Set<ToolName> = new Set(Object.values(ToolName));
   const validToolNames = new Set(Object.values(ToolName));
 
-  if (cliOptions.allowTools && cliOptions.allowTools.length > 0) {
-    const valid = cliOptions.allowTools.filter((t) =>
-      validToolNames.has(t as ToolName),
-    );
-    const invalid = cliOptions.allowTools.filter(
-      (t) => !validToolNames.has(t as ToolName),
-    );
-    if (invalid.length > 0) {
-      logger.warn(
-        `Ignoring invalid tool names in allow list: ${invalid.join(", ")}`,
-      );
-    }
-    filteredToolNames = valid.map((t) => t as ToolName);
-  }
-  if (cliOptions.blockTools && cliOptions.blockTools.length > 0) {
-    const validBlock = cliOptions.blockTools.filter((t) =>
-      validToolNames.has(t as ToolName),
-    );
-    const invalidBlock = cliOptions.blockTools.filter(
-      (t) => !validToolNames.has(t as ToolName),
-    );
-    if (invalidBlock.length > 0) {
-      logger.warn(
-        `Ignoring invalid tool names in block list: ${invalidBlock.join(", ")}`,
-      );
-    }
-    filteredToolNames = filteredToolNames.filter(
-      (t) => !validBlock.includes(t),
-    );
-  }
-  // Deduplicate and sort
-  const deduped = Array.from(new Set(filteredToolNames)).sort();
   if (
-    (!cliOptions.allowTools || cliOptions.allowTools.length === 0) &&
-    (!cliOptions.blockTools || cliOptions.blockTools.length === 0)
+    (!allowTools || allowTools.length === 0) &&
+    (!blockTools || blockTools.length === 0)
   ) {
     logger.info(
       "No allow/block tool lists provided; all tools are enabled by default.",
     );
+  } else {
+    if (allowTools.length > 0) {
+      const valid = allowTools.filter((t) => validToolNames.has(t as ToolName));
+      const invalid = allowTools.filter(
+        (t) => !validToolNames.has(t as ToolName),
+      );
+      if (invalid.length > 0) {
+        logger.warn(
+          `Ignoring invalid tool names in allow list: ${invalid.join(", ")}`,
+        );
+      }
+      filteredToolNames = new Set(valid.map((t) => t as ToolName));
+    }
+    if (blockTools.length > 0) {
+      const validBlock = new Set(
+        blockTools.filter((t) => validToolNames.has(t as ToolName)),
+      );
+      const invalidBlock = blockTools.filter(
+        (t) => !validToolNames.has(t as ToolName),
+      );
+      if (invalidBlock.length > 0) {
+        logger.warn(
+          `Ignoring invalid tool names in block list: ${invalidBlock.join(", ")}`,
+        );
+      }
+      for (const tool of validBlock) {
+        filteredToolNames.delete(tool as ToolName);
+      }
+    }
   }
-  return deduped;
+
+  // Convert to array, sort, return.
+  return Array.from(filteredToolNames).sort();
 }
 
 /**

@@ -3,6 +3,7 @@
 import { GlobalConfig } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
+  CLIOptions,
   getFilteredToolNames,
   getPackageVersion,
   parseCliArgs,
@@ -11,18 +12,67 @@ import { loadConfigFromYaml } from "@src/config/index.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
-import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { EnvVar } from "@src/env-schema.js";
+import type { Environment } from "@src/env.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
 import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
 
-// Parse command line arguments and load environment variables if --env-file is specified
-const cliOptions = parseCliArgs();
+/**
+ * Determine the subset of ToolHandlers to register based on the filtered tool names,
+ * cloud tool settings, and environment variables
+ **/
+export function getToolHandlersToRegister(
+  filteredToolNames: ToolName[],
+  disableConfluentCloudTools: boolean,
+  env: Environment,
+): Map<ToolName, ToolHandler> {
+  const toolHandlers = new Map<ToolName, ToolHandler>();
 
-// Handle --generate-key early (before any other initialization)
-if (cliOptions.generateKey) {
+  Object.values(ToolName).forEach((toolName) => {
+    // Skip names that are not in the filtered list of tool names provided.
+    if (!filteredToolNames.includes(toolName)) {
+      logger.warn(`Tool ${toolName} disabled due to allow/block list rules`);
+      return;
+    }
+
+    const handler = ToolHandlerRegistry.getToolHandler(toolName);
+
+    // Skip cloud-only tools if disabled by CLI/env
+    if (disableConfluentCloudTools && handler.isConfluentCloudOnly()) {
+      logger.warn(
+        `Tool ${toolName} disabled due to --disable-confluent-cloud-tools flag or DISABLE_CONFLUENT_CLOUD_TOOLS env var`,
+      );
+      return;
+    }
+
+    const missingVars = handler
+      .getRequiredEnvVars()
+      .filter((varName: EnvVar) => !env[varName]);
+
+    if (missingVars.length === 0) {
+      toolHandlers.set(toolName, handler);
+      logger.info(`Tool ${toolName} enabled`);
+    } else {
+      logger.warn(
+        `Tool ${toolName} disabled due to missing environment variables: ${missingVars.join(", ")}`,
+      );
+    }
+  });
+
+  // Raise an error if no tools are enabled, as the server would be non-functional without any tools.
+  if (toolHandlers.size === 0) {
+    throw new Error(
+      "No tools enabled. Please check your configuration and environment variables.",
+    );
+  }
+
+  return toolHandlers;
+}
+
+export function outputApiKey(): void {
   const apiKey = generateApiKey();
   console.log("\nGenerated MCP API Key:");
   console.log("=".repeat(64));
@@ -30,12 +80,106 @@ if (cliOptions.generateKey) {
   console.log("=".repeat(64));
   console.log("\nAdd this to your .env file:");
   console.log(`MCP_API_KEY=${apiKey}\n`);
-  process.exit(0);
+}
+
+export function outputToolList(filteredToolNames: ToolName[]): void {
+  const MAX_DESC_LENGTH = 120;
+  filteredToolNames.forEach((toolName) => {
+    const config = ToolHandlerRegistry.getToolConfig(toolName);
+    let desc = config.description.replaceAll(/\s+/g, " ").trim();
+    if (desc.length > MAX_DESC_LENGTH) {
+      desc = desc.slice(0, MAX_DESC_LENGTH - 3) + "...";
+    }
+    console.log(`\x1b[32m${config.name}\x1b[0m: ${desc}`);
+  });
+}
+
+export function constructDefaultClientManager(
+  env: Environment,
+  cliOptions: CLIOptions,
+): DefaultClientManager {
+  // Merge environment variables with kafka config from CLI
+  // some additional configurations could be set in the client manager
+  // like separating groupIds by sessionId
+  const kafkaClientConfig: GlobalConfig = {
+    // Base configuration from environment variables
+    "bootstrap.servers": env.BOOTSTRAP_SERVERS,
+    "client.id": "mcp-confluent",
+    ...(env.KAFKA_API_KEY && env.KAFKA_API_SECRET
+      ? {
+          "security.protocol": "sasl_ssl",
+          "sasl.mechanisms": "PLAIN",
+          "sasl.username": env.KAFKA_API_KEY,
+          "sasl.password": env.KAFKA_API_SECRET,
+        }
+      : {}),
+    // Merge any additional properties from the kafka config file
+    ...cliOptions.kafkaConfig,
+  };
+
+  return new DefaultClientManager({
+    kafka: kafkaClientConfig,
+    endpoints: {
+      cloud: env.CONFLUENT_CLOUD_REST_ENDPOINT,
+      flink: env.FLINK_REST_ENDPOINT,
+      schemaRegistry: env.SCHEMA_REGISTRY_ENDPOINT,
+      kafka: env.KAFKA_REST_ENDPOINT,
+      telemetry:
+        env.TELEMETRY_ENDPOINT ?? "https://api.telemetry.confluent.cloud",
+    },
+    auth: {
+      cloud: {
+        apiKey: env.CONFLUENT_CLOUD_API_KEY!,
+        apiSecret: env.CONFLUENT_CLOUD_API_SECRET!,
+      },
+      tableflow: {
+        apiKey: env.TABLEFLOW_API_KEY!,
+        apiSecret: env.TABLEFLOW_API_SECRET!,
+      },
+      flink: {
+        apiKey: env.FLINK_API_KEY!,
+        apiSecret: env.FLINK_API_SECRET!,
+      },
+      schemaRegistry: {
+        apiKey: env.SCHEMA_REGISTRY_API_KEY!,
+        apiSecret: env.SCHEMA_REGISTRY_API_SECRET!,
+      },
+      kafka: {
+        apiKey: env.KAFKA_API_KEY!,
+        apiSecret: env.KAFKA_API_SECRET!,
+      },
+      telemetry: {
+        apiKey: (env.TELEMETRY_API_KEY ?? env.CONFLUENT_CLOUD_API_KEY)!,
+        apiSecret: (env.TELEMETRY_API_SECRET ??
+          env.CONFLUENT_CLOUD_API_SECRET)!,
+      },
+    },
+  });
 }
 
 async function main() {
   try {
-    // Initialize environment after CLI args are processed
+    // Parse command line arguments and load environment variables if --env-file is specified
+    const cliOptions = parseCliArgs();
+
+    // Handle early-exit modes as requested by CLI args before initializing the server.
+    if (cliOptions.generateKey) {
+      outputApiKey();
+      process.exit(0);
+    }
+
+    const filteredToolNames = getFilteredToolNames(
+      cliOptions.allowTools ?? [],
+      cliOptions.blockTools ?? [],
+    );
+
+    // If --list-tools is set, print the filtered tool names with descriptions and exit.
+    if (cliOptions.listTools) {
+      outputToolList(filteredToolNames);
+      process.exit(0);
+    }
+
+    // Load environment variables and set log level before doing anything else.
     const env = await initEnv();
     setLogLevel(env.LOG_LEVEL);
 
@@ -49,112 +193,7 @@ async function main() {
       );
     }
 
-    // Merge environment variables with kafka config from CLI
-    // some additional configurations could be set in the client manager
-    // like separating groupIds by sessionId
-    const kafkaClientConfig: GlobalConfig = {
-      // Base configuration from environment variables
-      "bootstrap.servers": env.BOOTSTRAP_SERVERS!,
-      "client.id": "mcp-confluent",
-      ...(env.KAFKA_API_KEY && env.KAFKA_API_SECRET
-        ? {
-            "security.protocol": "sasl_ssl",
-            "sasl.mechanisms": "PLAIN",
-            "sasl.username": env.KAFKA_API_KEY!,
-            "sasl.password": env.KAFKA_API_SECRET!,
-          }
-        : {}),
-      // Merge any additional properties from the kafka config file
-      ...cliOptions.kafkaConfig,
-    };
-
-    const clientManager = new DefaultClientManager({
-      kafka: kafkaClientConfig,
-      endpoints: {
-        cloud: env.CONFLUENT_CLOUD_REST_ENDPOINT,
-        flink: env.FLINK_REST_ENDPOINT,
-        schemaRegistry: env.SCHEMA_REGISTRY_ENDPOINT,
-        kafka: env.KAFKA_REST_ENDPOINT,
-        telemetry:
-          env.TELEMETRY_ENDPOINT ?? "https://api.telemetry.confluent.cloud",
-      },
-      auth: {
-        cloud: {
-          apiKey: env.CONFLUENT_CLOUD_API_KEY!,
-          apiSecret: env.CONFLUENT_CLOUD_API_SECRET!,
-        },
-        tableflow: {
-          apiKey: env.TABLEFLOW_API_KEY!,
-          apiSecret: env.TABLEFLOW_API_SECRET!,
-        },
-        flink: {
-          apiKey: env.FLINK_API_KEY!,
-          apiSecret: env.FLINK_API_SECRET!,
-        },
-        schemaRegistry: {
-          apiKey: env.SCHEMA_REGISTRY_API_KEY!,
-          apiSecret: env.SCHEMA_REGISTRY_API_SECRET!,
-        },
-        kafka: {
-          apiKey: env.KAFKA_API_KEY!,
-          apiSecret: env.KAFKA_API_SECRET!,
-        },
-        telemetry: {
-          apiKey: (env.TELEMETRY_API_KEY ?? env.CONFLUENT_CLOUD_API_KEY)!,
-          apiSecret: (env.TELEMETRY_API_SECRET ??
-            env.CONFLUENT_CLOUD_API_SECRET)!,
-        },
-      },
-    });
-
-    const filteredToolNames = getFilteredToolNames(cliOptions);
-
-    // If --list-tools is set, print tool names with descriptions and exit
-    if (cliOptions.listTools) {
-      const MAX_DESC_LENGTH = 120;
-      filteredToolNames.forEach((toolName) => {
-        const config = ToolFactory.getToolConfig(toolName);
-        let desc = config.description.replace(/\s+/g, " ").trim();
-        if (desc.length > MAX_DESC_LENGTH) {
-          desc = desc.slice(0, MAX_DESC_LENGTH - 3) + "...";
-        }
-        console.log(`\x1b[32m${config.name}\x1b[0m: ${desc}`);
-      });
-      process.exit(0);
-    }
-
-    const toolHandlers = new Map<ToolName, ToolHandler>();
-
-    // Initialize tools and check their requirements
-    Object.values(ToolName).forEach((toolName) => {
-      if (!filteredToolNames.includes(toolName)) {
-        logger.warn(`Tool ${toolName} disabled due to allow/block list rules`);
-        return;
-      }
-      const handler = ToolFactory.createToolHandler(toolName);
-      // Skip cloud-only tools if disabled by CLI/env
-      if (
-        cliOptions.disableConfluentCloudTools &&
-        handler.isConfluentCloudOnly()
-      ) {
-        logger.warn(
-          `Tool ${toolName} disabled due to --disable-confluent-cloud-tools flag or DISABLE_CONFLUENT_CLOUD_TOOLS env var`,
-        );
-        return;
-      }
-      const missingVars = handler
-        .getRequiredEnvVars()
-        .filter((varName: EnvVar) => !env[varName]);
-
-      if (missingVars.length === 0) {
-        toolHandlers.set(toolName, handler);
-        logger.info(`Tool ${toolName} enabled`);
-      } else {
-        logger.warn(
-          `Tool ${toolName} disabled due to missing environment variables: ${missingVars.join(", ")}`,
-        );
-      }
-    });
+    const clientManager = constructDefaultClientManager(env, cliOptions);
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({
@@ -175,6 +214,12 @@ async function main() {
         clientVersion: clientInfo?.version,
       });
     };
+
+    const toolHandlers = getToolHandlersToRegister(
+      filteredToolNames,
+      cliOptions.disableConfluentCloudTools ?? false,
+      env,
+    );
 
     toolHandlers.forEach((handler, name) => {
       const config = handler.getToolConfig();
@@ -259,7 +304,6 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  logger.error({ error }, "Error starting server");
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== "test") {
+  await main();
+}

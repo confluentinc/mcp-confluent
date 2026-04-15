@@ -3,8 +3,8 @@ import {
   DESTRUCTIVE,
   READ_ONLY,
 } from "@src/confluent/tools/base-tools.js";
-import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { describe, expect, it } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
@@ -14,13 +14,13 @@ describe("tool-factory.ts", () => {
     describe("createToolHandler()", () => {
       it("should have a handler for every tool", () => {
         for (const name of ALL_TOOL_NAMES) {
-          expect(() => ToolFactory.createToolHandler(name)).not.toThrow();
+          expect(() => ToolHandlerRegistry.getToolHandler(name)).not.toThrow();
         }
       });
 
       it("should return valid ToolConfig for every registered tool", () => {
         for (const name of ALL_TOOL_NAMES) {
-          const handler = ToolFactory.createToolHandler(name);
+          const handler = ToolHandlerRegistry.getToolHandler(name);
           const config = handler.getToolConfig();
 
           expect(config.name).toBe(name);
@@ -31,7 +31,7 @@ describe("tool-factory.ts", () => {
 
       it("should have a valid annotation (READ_ONLY, CREATE_UPDATE, or DESTRUCTIVE) for every tool", () => {
         for (const name of ALL_TOOL_NAMES) {
-          const handler = ToolFactory.createToolHandler(name);
+          const handler = ToolHandlerRegistry.getToolHandler(name);
           const config = handler.getToolConfig();
 
           expect(config.annotations).toBeDefined();
@@ -82,7 +82,7 @@ describe("tool-factory.ts", () => {
         ).toBe(allPrefixes.length);
 
         for (const name of ALL_TOOL_NAMES) {
-          const handler = ToolFactory.createToolHandler(name);
+          const handler = ToolHandlerRegistry.getToolHandler(name);
           const config = handler.getToolConfig();
 
           const prefix = name.split("-")[0]!;

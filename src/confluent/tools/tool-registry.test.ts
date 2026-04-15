@@ -9,9 +9,9 @@ import { describe, expect, it } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
 
-describe("tool-factory.ts", () => {
-  describe("ToolFactory", () => {
-    describe("createToolHandler()", () => {
+describe("tool-registry.ts", () => {
+  describe("ToolHandlerRegistry", () => {
+    describe("getToolHandler()", () => {
       it("should have a handler for every tool", () => {
         for (const name of ALL_TOOL_NAMES) {
           expect(() => ToolHandlerRegistry.getToolHandler(name)).not.toThrow();

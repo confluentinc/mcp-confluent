@@ -2,8 +2,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ClientManager } from "@src/confluent/client-manager.js";
-import { ToolFactory } from "@src/confluent/tools/tool-factory.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
 
 export interface TestServerContext {
@@ -39,7 +39,7 @@ export async function createTestServer(
 
   const names = toolNames ?? Object.values(ToolName);
   for (const toolName of names) {
-    const handler = ToolFactory.createToolHandler(toolName);
+    const handler = ToolHandlerRegistry.getToolHandler(toolName);
     const config = handler.getToolConfig();
     server.registerTool(
       toolName as string,

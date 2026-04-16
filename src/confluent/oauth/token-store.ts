@@ -3,7 +3,7 @@ import { logger } from "@src/logger.js";
 
 interface TokenUpdateFields {
   refreshToken: string;
-  refreshTokenExpiresAt?: number;
+  refreshTokenIdleExpiresAt: number;
   controlPlaneToken: string;
   controlPlaneExpiresAt: number;
   dataPlaneToken: string;
@@ -47,9 +47,7 @@ export class TokenStore {
     }
 
     existing.refreshToken = fields.refreshToken;
-    if (fields.refreshTokenExpiresAt !== undefined) {
-      existing.refreshTokenExpiresAt = fields.refreshTokenExpiresAt;
-    }
+    existing.refreshTokenIdleExpiresAt = fields.refreshTokenIdleExpiresAt;
     existing.controlPlaneToken = fields.controlPlaneToken;
     existing.controlPlaneExpiresAt = fields.controlPlaneExpiresAt;
     existing.dataPlaneToken = fields.dataPlaneToken;

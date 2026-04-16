@@ -3,6 +3,11 @@ import sinon from "sinon";
 import { TokenStore } from "@src/confluent/oauth/token-store.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
 
+const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
+const TEN_MINUTES_MS = 10 * 60 * 1000;
+
 describe("oauth/token-store.ts", () => {
   describe("TokenStore", () => {
     let store: TokenStore;
@@ -20,11 +25,12 @@ describe("oauth/token-store.ts", () => {
     ): ConfluentTokenSet {
       return {
         refreshToken: "refresh-token",
-        refreshTokenExpiresAt: Date.now() + 8 * 60 * 60 * 1000,
+        refreshTokenAbsoluteExpiresAt: Date.now() + EIGHT_HOURS_MS,
+        refreshTokenIdleExpiresAt: Date.now() + FOUR_HOURS_MS,
         controlPlaneToken: "cp-token",
-        controlPlaneExpiresAt: Date.now() + 5 * 60 * 1000,
+        controlPlaneExpiresAt: Date.now() + FIVE_MINUTES_MS,
         dataPlaneToken: "dp-token",
-        dataPlaneExpiresAt: Date.now() + 10 * 60 * 1000,
+        dataPlaneExpiresAt: Date.now() + TEN_MINUTES_MS,
         accessToken: "opaque-access-token",
         ...overrides,
       };
@@ -67,10 +73,11 @@ describe("oauth/token-store.ts", () => {
 
         store.update("opaque-access-token", {
           refreshToken: "new-refresh",
+          refreshTokenIdleExpiresAt: Date.now() + FOUR_HOURS_MS,
           controlPlaneToken: "new-cp",
           dataPlaneToken: "new-dp",
-          controlPlaneExpiresAt: Date.now() + 5 * 60 * 1000,
-          dataPlaneExpiresAt: Date.now() + 10 * 60 * 1000,
+          controlPlaneExpiresAt: Date.now() + FIVE_MINUTES_MS,
+          dataPlaneExpiresAt: Date.now() + TEN_MINUTES_MS,
         });
 
         const updated = store.get("opaque-access-token");
@@ -84,6 +91,7 @@ describe("oauth/token-store.ts", () => {
       it("should return false when updating nonexistent token", () => {
         const result = store.update("nonexistent", {
           refreshToken: "r",
+          refreshTokenIdleExpiresAt: 0,
           controlPlaneToken: "c",
           dataPlaneToken: "d",
           controlPlaneExpiresAt: 0,

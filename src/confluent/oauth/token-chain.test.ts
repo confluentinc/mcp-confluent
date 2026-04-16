@@ -77,6 +77,16 @@ describe("oauth/token-chain.ts", () => {
         exchangeAuthCodeForTokens(auth0Config, "bad-code", "verifier"),
       ).rejects.toThrow(/Auth0 token exchange failed/);
     });
+
+    it("should throw a timeout error when the fetch aborts", async () => {
+      const timeoutError = new Error("The operation was aborted");
+      timeoutError.name = "TimeoutError";
+      fetchStub.rejects(timeoutError);
+
+      await expect(
+        exchangeAuthCodeForTokens(auth0Config, "code", "verifier"),
+      ).rejects.toThrow(/Auth0 token exchange timed out/);
+    });
   });
 
   describe("exchangeIdTokenForControlPlaneToken", () => {

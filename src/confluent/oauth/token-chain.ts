@@ -19,6 +19,9 @@ const REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS = 8 * 60 * 60 * 1000;
 /** 4 hours in milliseconds — refresh token idle timeout, resets on each rotation */
 const REFRESH_TOKEN_IDLE_LIFETIME_MS = 4 * 60 * 60 * 1000;
 
+/** Per-request timeout bounding each Auth0/Confluent HTTP call. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 /**
  * Result of a single token-chain execution — either the initial login
  * ({@link executeFullTokenChain}) or a subsequent refresh ({@link refreshTokenChain}).
@@ -39,14 +42,28 @@ export interface TokenChainResult {
 
 /**
  * POSTs to the OAuth/Confluent endpoint and returns the decoded JSON body,
- * throwing a labeled error when the response is not OK.
+ * throwing a labeled error when the response is not OK. Each request is bounded
+ * by {@link REQUEST_TIMEOUT_MS} so a hung Auth0/Confluent call can't stall the
+ * refresh loop.
  */
 async function postJson<T>(
   url: string,
   init: RequestInit,
   operation: string,
 ): Promise<T> {
-  const response = await nodeFetch.fetch(url, init);
+  let response: Response;
+  try {
+    response = await nodeFetch.fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      logger.error(`${operation} timed out`);
+      throw new Error(`${operation} timed out after ${REQUEST_TIMEOUT_MS}ms`);
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const errorText = await response.text();

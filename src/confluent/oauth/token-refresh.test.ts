@@ -8,6 +8,13 @@ import {
   startAutoRefresh,
 } from "@src/confluent/oauth/token-refresh.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
+import {
+  CONTROL_PLANE_TOKEN_LIFETIME_MS,
+  DATA_PLANE_TOKEN_LIFETIME_MS,
+  DEFAULT_REFRESH_INTERVAL_MS,
+  REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+  REFRESH_TOKEN_IDLE_LIFETIME_MS,
+} from "@src/confluent/oauth/token-lifetimes.js";
 
 describe("oauth/token-refresh.ts", () => {
   const sandbox = sinon.createSandbox();
@@ -30,11 +37,13 @@ describe("oauth/token-refresh.ts", () => {
   ): ConfluentTokenSet {
     return {
       refreshToken: "refresh-token",
-      refreshTokenExpiresAt: Date.now() + 8 * 60 * 60 * 1000,
+      refreshTokenAbsoluteExpiresAt:
+        Date.now() + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+      refreshTokenIdleExpiresAt: Date.now() + REFRESH_TOKEN_IDLE_LIFETIME_MS,
       controlPlaneToken: "cp-token",
-      controlPlaneExpiresAt: Date.now() + 5 * 60 * 1000,
+      controlPlaneExpiresAt: Date.now() + CONTROL_PLANE_TOKEN_LIFETIME_MS,
       dataPlaneToken: "dp-token",
-      dataPlaneExpiresAt: Date.now() + 15 * 60 * 1000,
+      dataPlaneExpiresAt: Date.now() + DATA_PLANE_TOKEN_LIFETIME_MS,
       accessToken: "opaque-access-token",
       ...overrides,
     };
@@ -123,11 +132,27 @@ describe("oauth/token-refresh.ts", () => {
       );
     });
 
-    it("should remove token set when refresh token has expired", async () => {
+    it("should remove token set when absolute expiry has passed", async () => {
       const callback = createRefreshCallback(auth0Config);
       store.store(
         createTokenSet({
-          refreshTokenExpiresAt: Date.now() - 1000,
+          refreshTokenAbsoluteExpiresAt: Date.now() - 1000,
+          controlPlaneExpiresAt: Date.now() - 1000,
+        }),
+      );
+
+      await callback(store);
+
+      sinon.assert.notCalled(fetchStub);
+      expect(store.get("opaque-access-token")).toBeUndefined();
+      expect(store.size).toBe(0);
+    });
+
+    it("should remove token set when idle expiry has passed", async () => {
+      const callback = createRefreshCallback(auth0Config);
+      store.store(
+        createTokenSet({
+          refreshTokenIdleExpiresAt: Date.now() - 1000,
           controlPlaneExpiresAt: Date.now() - 1000,
         }),
       );
@@ -265,7 +290,7 @@ describe("oauth/token-refresh.ts", () => {
 
       sinon.assert.calledOnce(startSpy);
       const [intervalMs, callback] = startSpy.firstCall.args;
-      expect(intervalMs).toBe(4 * 60 * 1000);
+      expect(intervalMs).toBe(DEFAULT_REFRESH_INTERVAL_MS);
       expect(typeof callback).toBe("function");
     });
 

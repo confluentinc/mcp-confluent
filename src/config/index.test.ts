@@ -3,12 +3,12 @@ import {
   loadConfigFromYaml,
   parseYamlConfiguration,
 } from "@src/config/index.js";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import sinon from "sinon";
 import {
   createFsWrappers,
   type StubbedFsWrappers,
 } from "@tests/stubs/node-deps.js";
+import sinon from "sinon";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("config/index.ts", () => {
   describe("parseYamlConfiguration", () => {
@@ -20,7 +20,7 @@ describe("config/index.ts", () => {
       bootstrap_servers: "localhost:9092"
 `;
 
-      const config = parseYamlConfiguration(yamlContent);
+      const config = parseYamlConfiguration(yamlContent, {});
 
       expect(config.connections).toBeDefined();
       expect(Object.keys(config.connections)).toHaveLength(1);
@@ -42,7 +42,7 @@ describe("config/index.ts", () => {
       endpoint: "http://localhost:8081"
 `;
 
-      const config = parseYamlConfiguration(yamlContent);
+      const config = parseYamlConfiguration(yamlContent, {});
 
       expect(config.connections.local!.schema_registry).toBeDefined();
       expect(config.connections.local!.schema_registry?.endpoint).toBe(
@@ -58,7 +58,7 @@ describe("config/index.ts", () => {
       bootstrap_servers: "broker1:9092,broker2:9092,broker3:9092"
 `;
 
-      const config = parseYamlConfiguration(yamlContent);
+      const config = parseYamlConfiguration(yamlContent, {});
 
       expect(config.connections.cluster!.kafka!.bootstrap_servers).toBe(
         "broker1:9092,broker2:9092,broker3:9092",
@@ -72,7 +72,7 @@ describe("config/index.ts", () => {
     kafka: [unmatched bracket
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Failed to parse YAML/,
       );
     });
@@ -80,11 +80,11 @@ describe("config/index.ts", () => {
     it("should throw error when root is not an object", () => {
       const yamlContent = `"just a string"`;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
       // Should not have empty path prefix like "- :"
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /- Invalid input: expected object, received string/,
       );
     });
@@ -93,7 +93,7 @@ describe("config/index.ts", () => {
       const yamlContent = `some_other_field: "value"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
     });
@@ -105,7 +105,7 @@ describe("config/index.ts", () => {
       bootstrap_servers: "localhost:9092"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
     });
@@ -118,7 +118,7 @@ describe("config/index.ts", () => {
       bootstrap_servers: "localhost:9092"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
     });
@@ -129,10 +129,10 @@ describe("config/index.ts", () => {
     type: "direct"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /At least one of 'kafka' or 'schema_registry' must be defined/,
       );
     });
@@ -145,7 +145,7 @@ describe("config/index.ts", () => {
       some_other_field: "value"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
     });
@@ -158,7 +158,7 @@ describe("config/index.ts", () => {
       bootstrap_servers: ""
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
     });
@@ -171,10 +171,10 @@ describe("config/index.ts", () => {
       bootstrap_servers: "invalid-no-port"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Invalid format 'invalid-no-port': must be host:port/,
       );
     });
@@ -189,10 +189,10 @@ describe("config/index.ts", () => {
       endpoint: "not-a-url"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /must be a valid URL/,
       );
     });
@@ -207,7 +207,7 @@ describe("config/index.ts", () => {
       some_other_field: "value"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
     });
@@ -216,10 +216,10 @@ describe("config/index.ts", () => {
       const yamlContent = `connections: {}
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Exactly one connection must be defined/,
       );
     });
@@ -236,10 +236,10 @@ describe("config/index.ts", () => {
       bootstrap_servers: "staging:9092"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Exactly one connection must be defined/,
       );
     });
@@ -252,10 +252,10 @@ describe("config/index.ts", () => {
       bootstrap_servers: "localhost:9092"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Configuration validation failed/,
       );
-      expect(() => parseYamlConfiguration(yamlContent)).toThrow(
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /Invalid key in record/,
       );
     });
@@ -270,7 +270,7 @@ describe("config/index.ts", () => {
       endpoint: "https://schema-registry.example.com:8081"
 `;
 
-      const config = parseYamlConfiguration(yamlContent);
+      const config = parseYamlConfiguration(yamlContent, {});
 
       expect(config.connections.local!.schema_registry?.endpoint).toBe(
         "https://schema-registry.example.com:8081",
@@ -285,12 +285,71 @@ describe("config/index.ts", () => {
       endpoint: "http://localhost:8081"
 `;
 
-      const config = parseYamlConfiguration(yamlContent);
+      const config = parseYamlConfiguration(yamlContent, {});
 
       expect(config.connections.local!.schema_registry?.endpoint).toBe(
         "http://localhost:8081",
       );
       expect(config.connections.local!.kafka).toBeUndefined();
+    });
+
+    it("should interpolate ${VAR} references using provided env before Zod validation", () => {
+      const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "\${BOOTSTRAP}"
+    schema_registry:
+      endpoint: "\${SR_URL}"
+`;
+
+      const config = parseYamlConfiguration(yamlContent, {
+        BOOTSTRAP: "broker1:9092",
+        SR_URL: "http://localhost:8081",
+      });
+
+      expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
+        "broker1:9092",
+      );
+      expect(config.connections.local!.schema_registry!.endpoint).toBe(
+        "http://localhost:8081",
+      );
+    });
+
+    it("should raise a Zod validation error when an interpolated env var fails schema validation", () => {
+      const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "\${BOOTSTRAP}"
+`;
+
+      expect(() =>
+        parseYamlConfiguration(yamlContent, {
+          BOOTSTRAP: "not-a-valid-host-port",
+        }),
+      ).toThrow(/Configuration validation failed/);
+      expect(() =>
+        parseYamlConfiguration(yamlContent, {
+          BOOTSTRAP: "not-a-valid-host-port",
+        }),
+      ).toThrow(/Invalid format 'not-a-valid-host-port': must be host:port/);
+    });
+
+    it("should throw when a referenced variable is missing from env", () => {
+      const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "\${MISSING_VAR}"
+`;
+
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+        /Failed to interpolate configuration values/,
+      );
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+        /MISSING_VAR/,
+      );
     });
   });
 
@@ -316,7 +375,7 @@ describe("config/index.ts", () => {
       fsStubs.existsSync.returns(true);
       fsStubs.readFileSync.returns(yamlContent);
 
-      const config = loadConfigFromYaml("/path/to/config.yaml");
+      const config = loadConfigFromYaml("/path/to/config.yaml", {});
 
       expect(config.connections.local).toBeDefined();
       expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
@@ -327,7 +386,7 @@ describe("config/index.ts", () => {
     it("should throw error when file does not exist", () => {
       fsStubs.existsSync.returns(false);
 
-      expect(() => loadConfigFromYaml("/nonexistent.yaml")).toThrow(
+      expect(() => loadConfigFromYaml("/nonexistent.yaml", {})).toThrow(
         /Configuration file not found/,
       );
     });
@@ -336,7 +395,7 @@ describe("config/index.ts", () => {
       fsStubs.existsSync.returns(true);
       fsStubs.readFileSync.returns("invalid: [yaml");
 
-      expect(() => loadConfigFromYaml("/path/to/config.yaml")).toThrow(
+      expect(() => loadConfigFromYaml("/path/to/config.yaml", {})).toThrow(
         /Failed to parse YAML/,
       );
     });
@@ -350,7 +409,7 @@ describe("config/index.ts", () => {
       fsStubs.existsSync.returns(true);
       fsStubs.readFileSync.returns(invalidYaml);
 
-      expect(() => loadConfigFromYaml("/path/to/config.yaml")).toThrow(
+      expect(() => loadConfigFromYaml("/path/to/config.yaml", {})).toThrow(
         /Configuration validation failed/,
       );
     });

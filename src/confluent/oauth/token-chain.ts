@@ -19,6 +19,12 @@ const REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS = 8 * 60 * 60 * 1000;
 /** 4 hours in milliseconds — refresh token idle timeout, resets on each rotation */
 const REFRESH_TOKEN_IDLE_LIFETIME_MS = 4 * 60 * 60 * 1000;
 
+/**
+ * Result of a single token-chain execution — either the initial login
+ * ({@link executeFullTokenChain}) or a subsequent refresh ({@link refreshTokenChain}).
+ * Callers persist this into the token store so downstream CP/DP requests can
+ * retrieve still-valid credentials.
+ */
 export interface TokenChainResult {
   refreshToken: string;
   /** Only set on initial login. Absent on refresh — callers must preserve the original value. */
@@ -32,6 +38,26 @@ export interface TokenChainResult {
 }
 
 /**
+ * POSTs to the OAuth/Confluent endpoint and returns the decoded JSON body,
+ * throwing a labeled error when the response is not OK.
+ */
+async function postJson<T>(
+  url: string,
+  init: RequestInit,
+  operation: string,
+): Promise<T> {
+  const response = await nodeFetch.fetch(url, init);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    logger.error({ status: response.status }, `${operation} failed`);
+    throw new Error(`${operation} failed (${response.status}): ${errorText}`);
+  }
+
+  return (await response.json()) as T;
+}
+
+/**
  * Exchanges an authorization code for Auth0 tokens (ID token + refresh token).
  * This is the first step in the Confluent token chain.
  */
@@ -40,8 +66,6 @@ export async function exchangeAuthCodeForTokens(
   authCode: string,
   codeVerifier: string,
 ): Promise<Auth0TokenResponse> {
-  const tokenUrl = `https://${auth0Config.domain}/oauth/token`;
-
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     client_id: auth0Config.clientId,
@@ -50,21 +74,15 @@ export async function exchangeAuthCodeForTokens(
     redirect_uri: auth0Config.callbackUrl,
   });
 
-  const response = await nodeFetch.fetch(tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    logger.error({ status: response.status }, "Auth0 token exchange failed");
-    throw new Error(
-      `Auth0 token exchange failed (${response.status}): ${errorText}`,
-    );
-  }
-
-  return (await response.json()) as Auth0TokenResponse;
+  return postJson<Auth0TokenResponse>(
+    `https://${auth0Config.domain}/oauth/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    },
+    "Auth0 token exchange",
+  );
 }
 
 /**
@@ -75,26 +93,15 @@ export async function exchangeIdTokenForControlPlaneToken(
   apiUrl: string,
   idToken: string,
 ): Promise<ControlPlaneTokenResponse> {
-  const url = `${apiUrl}/api/sessions`;
-
-  const response = await nodeFetch.fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id_token: idToken }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    logger.error(
-      { status: response.status },
-      "Control plane token exchange failed",
-    );
-    throw new Error(
-      `Control plane token exchange failed (${response.status}): ${errorText}`,
-    );
-  }
-
-  return (await response.json()) as ControlPlaneTokenResponse;
+  return postJson<ControlPlaneTokenResponse>(
+    `${apiUrl}/api/sessions`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id_token: idToken }),
+    },
+    "Control plane token exchange",
+  );
 }
 
 /**
@@ -105,29 +112,18 @@ export async function exchangeControlPlaneForDataPlaneToken(
   apiUrl: string,
   controlPlaneToken: string,
 ): Promise<DataPlaneTokenResponse> {
-  const url = `${apiUrl}/api/access_tokens`;
-
-  const response = await nodeFetch.fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${controlPlaneToken}`,
+  return postJson<DataPlaneTokenResponse>(
+    `${apiUrl}/api/access_tokens`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${controlPlaneToken}`,
+      },
+      body: JSON.stringify({}),
     },
-    body: JSON.stringify({}),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    logger.error(
-      { status: response.status },
-      "Data plane token exchange failed",
-    );
-    throw new Error(
-      `Data plane token exchange failed (${response.status}): ${errorText}`,
-    );
-  }
-
-  return (await response.json()) as DataPlaneTokenResponse;
+    "Data plane token exchange",
+  );
 }
 
 /**
@@ -138,29 +134,21 @@ export async function refreshTokenChain(
   auth0Config: Auth0Config,
   refreshToken: string,
 ): Promise<TokenChainResult> {
-  const tokenUrl = `https://${auth0Config.domain}/oauth/token`;
-
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     client_id: auth0Config.clientId,
     refresh_token: refreshToken,
   });
 
-  const response = await nodeFetch.fetch(tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    logger.error({ status: response.status }, "Auth0 token refresh failed");
-    throw new Error(
-      `Auth0 token refresh failed (${response.status}): ${errorText}`,
-    );
-  }
-
-  const auth0Response = (await response.json()) as Auth0TokenResponse;
+  const auth0Response = await postJson<Auth0TokenResponse>(
+    `https://${auth0Config.domain}/oauth/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    },
+    "Auth0 token refresh",
+  );
 
   return deriveConfluentTokens(auth0Config, auth0Response);
 }

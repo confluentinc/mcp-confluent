@@ -1,6 +1,8 @@
-import { getFilteredToolNames } from "@src/cli.js";
+import { getFilteredToolNames, loadDotEnv } from "@src/cli.js";
+import * as nodeDeps from "@src/confluent/node-deps.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { describe, expect, it } from "vitest";
+import sinon from "sinon";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("cli.ts", () => {
   const ALL_TOOL_NAMES = Object.values(ToolName).sort();
@@ -83,6 +85,83 @@ describe("cli.ts", () => {
       );
       const sorted = [...result].sort();
       expect(result).toEqual(sorted);
+    });
+  });
+
+  describe("loadDotEnv()", () => {
+    let sandbox: sinon.SinonSandbox;
+    let existsSyncStub: sinon.SinonStub;
+    let resolveStub: sinon.SinonStub;
+    let dotenvConfigStub: sinon.SinonStub;
+
+    beforeEach(() => {
+      sandbox = sinon.createSandbox();
+      existsSyncStub = sandbox.stub(nodeDeps.fs, "existsSync");
+      resolveStub = sandbox.stub(nodeDeps.path, "resolve");
+      dotenvConfigStub = sandbox.stub(nodeDeps.dotenvLib, "config");
+    });
+
+    afterEach(() => {
+      sandbox.restore();
+    });
+
+    it("should throw when the env file does not exist", () => {
+      resolveStub.returns("/resolved/.env");
+      existsSyncStub.returns(false);
+
+      expect(() => loadDotEnv(".env")).toThrow(
+        "Environment file not found: /resolved/.env",
+      );
+    });
+
+    it("should resolve the path and pass it to existsSync", () => {
+      resolveStub.returns("/abs/path/.env");
+      existsSyncStub.returns(false);
+
+      expect(() => loadDotEnv("relative/.env")).toThrow();
+
+      sinon.assert.calledWith(resolveStub, "relative/.env");
+      sinon.assert.calledWith(existsSyncStub, "/abs/path/.env");
+    });
+
+    it("should throw when dotenv.config returns an error", () => {
+      resolveStub.returns("/resolved/.env");
+      existsSyncStub.returns(true);
+      dotenvConfigStub.returns({ error: new Error("parse error") });
+
+      expect(() => loadDotEnv(".env")).toThrow(
+        "Error loading environment variables:",
+      );
+    });
+
+    it("should call dotenv.config with the resolved path", () => {
+      resolveStub.returns("/abs/path/.env");
+      existsSyncStub.returns(true);
+      dotenvConfigStub.returns({ parsed: {} });
+
+      loadDotEnv("relative/.env");
+
+      sinon.assert.calledWith(dotenvConfigStub, { path: "/abs/path/.env" });
+    });
+
+    it("should return the parsed variables on success", () => {
+      resolveStub.returns("/resolved/.env");
+      existsSyncStub.returns(true);
+      dotenvConfigStub.returns({ parsed: { FOO: "bar", BAZ: "qux" } });
+
+      const result = loadDotEnv(".env");
+
+      expect(result).toEqual({ FOO: "bar", BAZ: "qux" });
+    });
+
+    it("should return empty object when dotenv yields no parsed variables", () => {
+      resolveStub.returns("/resolved/.env");
+      existsSyncStub.returns(true);
+      dotenvConfigStub.returns({ parsed: undefined });
+
+      const result = loadDotEnv(".env");
+
+      expect(result).toEqual({});
     });
   });
 });

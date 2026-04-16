@@ -1,10 +1,9 @@
 import { Command, CommanderError, Option } from "@commander-js/extra-typings";
+import { dotenvLib, fs, path } from "@src/confluent/node-deps.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { TransportType } from "@src/mcp/transports/types.js";
-import * as dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
+
 import { getProperties, KeyValuePairObject } from "properties-file";
 import pkg from "../package.json" with { type: "json" };
 
@@ -164,8 +163,11 @@ export function parseCliArgs(): CLIOptions {
 
   try {
     const opts = program.parse().opts();
+
+    // Issue #186 (in due time): Stop doing this here. We should only be
+    // parsing the CLI arguments, not perfoming side effects.
     if (opts.envFile) {
-      loadEnvironmentVariables(opts.envFile);
+      loadDotEnv(opts.envFile);
     }
     // Precedence: CLI > file > undefined
     let allowTools: string[] | undefined = undefined;
@@ -228,10 +230,12 @@ export function parseCliArgs(): CLIOptions {
 }
 
 /**
- * Load environment variables from file
+ * Load dotenv keys/values from file.
+ * At this time, will also set the process.env variables as a side effect.
  * @param envFile Path to the environment file
+ * @return Object containing the variables loaded from the file
  */
-export function loadEnvironmentVariables(envFile: string): void {
+export function loadDotEnv(envFile: string): Record<string, string> {
   const envPath = path.resolve(envFile);
 
   // Check if file exists
@@ -240,13 +244,19 @@ export function loadEnvironmentVariables(envFile: string): void {
   }
 
   // Load environment variables from file
-  const result = dotenv.config({ path: envPath });
+  // Issue #186: To have it not actually set the env vars (one day soon),
+  // pass `processEnv: {}` as an option.
+  const result = dotenvLib.config({ path: envPath });
 
   if (result.error) {
     throw new Error(`Error loading environment variables: ${result.error}`);
   }
 
   logger.info(`Loaded environment variables from ${envPath}`);
+
+  // Return the parsed variables (note: these are CURRENTLY also set in
+  // process.env as a side effect)
+  return result.parsed || {};
 }
 
 /**

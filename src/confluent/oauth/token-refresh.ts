@@ -1,10 +1,8 @@
 import type { Auth0Config } from "@src/confluent/oauth/types.js";
 import type { TokenStore } from "@src/confluent/oauth/token-store.js";
 import { refreshTokenChain } from "@src/confluent/oauth/token-chain.js";
+import { DEFAULT_REFRESH_INTERVAL_MS } from "@src/confluent/oauth/token-lifetimes.js";
 import { logger } from "@src/logger.js";
-
-/** Refresh tokens 1 minute before CP expiry (4 min interval for 5 min CP TTL) */
-const DEFAULT_REFRESH_INTERVAL_MS = 4 * 60 * 1000;
 
 /**
  * Creates the refresh callback that iterates all stored token sets
@@ -37,8 +35,11 @@ export function createRefreshCallback(
 
       const now = Date.now();
 
-      // Remove if the refresh token has expired (8hr absolute lifetime)
-      if (now >= tokenSet.refreshTokenExpiresAt) {
+      // Remove if the refresh token has expired (8hr absolute or 4hr idle)
+      if (
+        now >= tokenSet.refreshTokenAbsoluteExpiresAt ||
+        now >= tokenSet.refreshTokenIdleExpiresAt
+      ) {
         logger.info("Refresh token expired, removing token set");
         store.remove(accessToken);
         continue;
@@ -58,6 +59,7 @@ export function createRefreshCallback(
 
         store.update(accessToken, {
           refreshToken: result.refreshToken,
+          refreshTokenIdleExpiresAt: result.refreshTokenIdleExpiresAt,
           controlPlaneToken: result.controlPlaneToken,
           controlPlaneExpiresAt: result.controlPlaneExpiresAt,
           dataPlaneToken: result.dataPlaneToken,

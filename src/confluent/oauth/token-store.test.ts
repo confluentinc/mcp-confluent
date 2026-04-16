@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import sinon from "sinon";
 import { TokenStore } from "@src/confluent/oauth/token-store.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
-
-const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
-const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
-const TEN_MINUTES_MS = 10 * 60 * 1000;
+import {
+  CONTROL_PLANE_TOKEN_LIFETIME_MS,
+  DATA_PLANE_TOKEN_LIFETIME_MS,
+  REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+  REFRESH_TOKEN_IDLE_LIFETIME_MS,
+} from "@src/confluent/oauth/token-lifetimes.js";
 
 describe("oauth/token-store.ts", () => {
   describe("TokenStore", () => {
@@ -25,12 +26,13 @@ describe("oauth/token-store.ts", () => {
     ): ConfluentTokenSet {
       return {
         refreshToken: "refresh-token",
-        refreshTokenAbsoluteExpiresAt: Date.now() + EIGHT_HOURS_MS,
-        refreshTokenIdleExpiresAt: Date.now() + FOUR_HOURS_MS,
+        refreshTokenAbsoluteExpiresAt:
+          Date.now() + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+        refreshTokenIdleExpiresAt: Date.now() + REFRESH_TOKEN_IDLE_LIFETIME_MS,
         controlPlaneToken: "cp-token",
-        controlPlaneExpiresAt: Date.now() + FIVE_MINUTES_MS,
+        controlPlaneExpiresAt: Date.now() + CONTROL_PLANE_TOKEN_LIFETIME_MS,
         dataPlaneToken: "dp-token",
-        dataPlaneExpiresAt: Date.now() + TEN_MINUTES_MS,
+        dataPlaneExpiresAt: Date.now() + DATA_PLANE_TOKEN_LIFETIME_MS,
         accessToken: "opaque-access-token",
         ...overrides,
       };
@@ -73,11 +75,12 @@ describe("oauth/token-store.ts", () => {
 
         store.update("opaque-access-token", {
           refreshToken: "new-refresh",
-          refreshTokenIdleExpiresAt: Date.now() + FOUR_HOURS_MS,
+          refreshTokenIdleExpiresAt:
+            Date.now() + REFRESH_TOKEN_IDLE_LIFETIME_MS,
           controlPlaneToken: "new-cp",
           dataPlaneToken: "new-dp",
-          controlPlaneExpiresAt: Date.now() + FIVE_MINUTES_MS,
-          dataPlaneExpiresAt: Date.now() + TEN_MINUTES_MS,
+          controlPlaneExpiresAt: Date.now() + CONTROL_PLANE_TOKEN_LIFETIME_MS,
+          dataPlaneExpiresAt: Date.now() + DATA_PLANE_TOKEN_LIFETIME_MS,
         });
 
         const updated = store.get("opaque-access-token");

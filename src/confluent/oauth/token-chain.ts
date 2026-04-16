@@ -6,18 +6,12 @@ import type {
 } from "@src/confluent/oauth/types.js";
 import { nodeFetch } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
-
-/** 5 minutes in milliseconds — control plane token lifetime */
-const CONTROL_PLANE_TOKEN_LIFETIME_MS = 5 * 60 * 1000;
-
-/** 10 minutes in milliseconds — data plane token lifetime */
-const DATA_PLANE_TOKEN_LIFETIME_MS = 10 * 60 * 1000;
-
-/** 8 hours in milliseconds — refresh token absolute lifetime from original login */
-const REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS = 8 * 60 * 60 * 1000;
-
-/** 4 hours in milliseconds — refresh token idle timeout, resets on each rotation */
-const REFRESH_TOKEN_IDLE_LIFETIME_MS = 4 * 60 * 60 * 1000;
+import {
+  CONTROL_PLANE_TOKEN_LIFETIME_MS,
+  DATA_PLANE_TOKEN_LIFETIME_MS,
+  REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+  REFRESH_TOKEN_IDLE_LIFETIME_MS,
+} from "@src/confluent/oauth/token-lifetimes.js";
 
 /** Per-request timeout bounding each Auth0/Confluent HTTP call. */
 const REQUEST_TIMEOUT_MS = 30_000;

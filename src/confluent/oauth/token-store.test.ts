@@ -189,6 +189,33 @@ describe("oauth/token-store.ts", () => {
         await clock.tickAsync(240_000);
         sinon.assert.calledTwice(callback);
       });
+
+      it("should skip a tick when the previous tick is still running", async () => {
+        // Callback that never resolves on the first call, resolves on later calls
+        let resolveFirst: () => void = () => {};
+        const firstCall = new Promise<void>((r) => {
+          resolveFirst = r;
+        });
+        const callback = sinon.stub();
+        callback.onCall(0).returns(firstCall);
+        callback.onCall(1).resolves();
+        callback.onCall(2).resolves();
+
+        store.startRefreshLoop(240_000, callback);
+
+        // First tick starts and hangs
+        await clock.tickAsync(240_000);
+        sinon.assert.calledOnce(callback);
+
+        // Second tick fires while first is still in flight — should be skipped
+        await clock.tickAsync(240_000);
+        sinon.assert.calledOnce(callback);
+
+        // Let the first tick finish, then the next tick should run
+        resolveFirst();
+        await clock.tickAsync(240_000);
+        sinon.assert.calledTwice(callback);
+      });
     });
   });
 });

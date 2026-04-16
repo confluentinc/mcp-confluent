@@ -73,6 +73,10 @@ export class TokenStore {
   /**
    * Start a background refresh loop that calls the provided callback every intervalMs.
    * The callback receives this store instance.
+   *
+   * Ticks are single-flighted: if a previous tick is still running when the
+   * interval fires, the new tick is skipped. This prevents two callbacks from
+   * concurrently refreshing the same single-use refresh token and burning it.
    */
   startRefreshLoop(
     intervalMs: number,
@@ -83,11 +87,19 @@ export class TokenStore {
       return;
     }
 
+    let tickInProgress = false;
     this.refreshInterval = setInterval(async () => {
+      if (tickInProgress) {
+        logger.debug("Previous refresh tick still running, skipping");
+        return;
+      }
+      tickInProgress = true;
       try {
         await refreshCallback(this);
       } catch (error) {
         logger.error({ error }, "Token refresh loop error");
+      } finally {
+        tickInProgress = false;
       }
     }, intervalMs);
 

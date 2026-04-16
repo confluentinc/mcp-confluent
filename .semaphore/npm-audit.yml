@@ -1,0 +1,66 @@
+version: v1.0
+name: npm-audit
+agent:
+  machine:
+    type: s1-prod-ubuntu24-04-amd64-1
+
+execution_time_limit:
+  hours: 1
+
+global_job_config:
+  prologue:
+    commands:
+      - sem-version node 22
+      - checkout
+      - . vault-setup --version v3 --role mcp-confluent
+      - |
+        TARGET_BRANCH="${TARGET_BRANCH:-main}"
+        if [ "$TARGET_BRANCH" != "$SEMAPHORE_GIT_BRANCH" ]; then
+          git fetch origin "$TARGET_BRANCH:$TARGET_BRANCH"
+          git checkout "$TARGET_BRANCH"
+        fi
+      # fuzzy-match since package-lock.json will change
+      - cache restore npm-cache-
+  epilogue:
+    commands:
+      - cache store npm-cache-$(checksum package-lock.json) ~/.npm
+
+blocks:
+  - name: "npm audit fix"
+    dependencies: []
+    task:
+      jobs:
+        - name: "Run audit and create/update PR"
+          commands:
+            - npm ci --prefer-offline
+            # `npm audit fix` applies non-breaking security fixes; including `--force` should only
+            # be done manually on local branches and include evaluating any breaking changes
+            - npm audit fix
+            - |
+              if git diff --quiet -- package.json package-lock.json; then
+                echo "No changes after npm audit fix; nothing to do."
+                exit 0
+              fi
+            # parameterize the head branch by TARGET_BRANCH so a single
+            # long-lived PR accumulates weekly audit updates per base branch.
+            # running against v1.2.x auto-gets chore/npm-audit-fix-v1.2.x.
+            - |
+              set -e
+              TARGET_BRANCH="${TARGET_BRANCH:-main}"
+              BRANCH="chore/npm-audit-fix-${TARGET_BRANCH}"
+              TITLE="[${TARGET_BRANCH}] chore(deps): npm audit fix"
+
+              git checkout -b "$BRANCH"
+              git add package.json package-lock.json
+              git commit -m "$TITLE"
+              git push --force -u origin "$BRANCH"
+
+              if [ -n "$(gh pr list --head "$BRANCH" --state open --json number -q '.[].number')" ]; then
+                echo "PR already open for $BRANCH; the force-push updated it in place."
+              else
+                gh pr create \
+                  --base "$TARGET_BRANCH" \
+                  --head "$BRANCH" \
+                  --title "$TITLE" \
+                  --body "Automated weekly security update produced by \`npm audit fix\` on \`${TARGET_BRANCH}\`. Please review changes to \`package.json\` and \`package-lock.json\` before merging. Breaking fixes that require \`--force\` are intentionally excluded and must be handled manually. This PR is created/updated weekly via the [\`scheduled-npm-audit\`](https://github.com/confluentinc/mcp-confluent/blob/${TARGET_BRANCH}/.semaphore/npm-audit.yml) Semaphore task."
+              fi

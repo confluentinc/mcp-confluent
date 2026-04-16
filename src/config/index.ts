@@ -1,3 +1,4 @@
+import { interpolateValues } from "@src/config/interpolation.js";
 import { MCPServerConfiguration, mcpConfigSchema } from "@src/config/models.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import path from "node:path";
@@ -9,12 +10,16 @@ export type { MCPServerConfiguration } from "@src/config/models.js";
  * Loads and validates an MCP server configuration from a YAML file.
  *
  * @param filePath - Path to the YAML configuration file
+ * @param env      - Environment variables used for ${VAR} interpolation
  * @returns Validated MCPServerConfiguration object
- * @throws Error if file doesn't exist, YAML is invalid, or validation fails
+ * @throws Error if file doesn't exist, YAML is invalid, interpolation fails, or validation fails
  */
-export function loadConfigFromYaml(filePath: string): MCPServerConfiguration {
+export function loadConfigFromYaml(
+  filePath: string,
+  env: Record<string, string | undefined>,
+): MCPServerConfiguration {
   const yamlContent = loadConfigFileContents(filePath);
-  return parseYamlConfiguration(yamlContent);
+  return parseYamlConfiguration(yamlContent, env);
 }
 
 /* All the rest of the functions in this file are internal helpers for loading and validating the configuration, only exported for
@@ -47,13 +52,16 @@ export function loadConfigFileContents(filePath: string): string {
 
 /**
  * Parses and validates YAML configuration content.
+ * Always performs ${VAR} and ${VAR:-default} interpolation before Zod validation.
  *
  * @param yamlContent - YAML string content
+ * @param env         - Environment variables used for ${VAR} interpolation
  * @returns Validated MCPServerConfiguration object
- * @throws Error if YAML is invalid or validation fails
+ * @throws Error if YAML is invalid, interpolation fails, or validation fails
  */
 export function parseYamlConfiguration(
   yamlContent: string,
+  env: Record<string, string | undefined>,
 ): MCPServerConfiguration {
   // Parse YAML
   let parsedYaml: unknown;
@@ -62,6 +70,15 @@ export function parseYamlConfiguration(
   } catch (error) {
     throw new Error(
       `Failed to parse YAML: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  // Interpolate environment variables (before Zod sees the values)
+  try {
+    parsedYaml = interpolateValues(parsedYaml, env);
+  } catch (error) {
+    throw new Error(
+      `Failed to interpolate configuration values: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 

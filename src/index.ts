@@ -6,6 +6,7 @@ import {
   CLIOptions,
   getFilteredToolNames,
   getPackageVersion,
+  loadDotEnv,
   parseCliArgs,
 } from "@src/cli.js";
 import { loadConfigFromYaml } from "@src/config/index.js";
@@ -180,12 +181,21 @@ async function main() {
     }
 
     // Load environment variables and set log level before doing anything else.
-    const env = await initEnv();
+    const env = initEnv();
     setLogLevel(env.LOG_LEVEL);
 
     // Load and validate YAML configuration if --config is provided
     if (cliOptions.config) {
-      loadConfigFromYaml(cliOptions.config, process.env);
+      let varExpansionSource: Record<string, string | undefined>;
+      if (cliOptions.envFile) {
+        varExpansionSource = loadDotEnv(cliOptions.envFile);
+      } else {
+        // No env file provided, use actual in situ environment variables for interpolation-into-yaml fodder.
+        varExpansionSource = process.env;
+      }
+
+      loadConfigFromYaml(cliOptions.config, varExpansionSource);
+
       // TODO(issue #151): Use config to construct connection manager instead of env vars
       logger.warn(
         "Configuration file parsed and validated successfully, but it is not applied yet; startup still uses" +

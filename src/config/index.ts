@@ -4,7 +4,7 @@ import * as nodeDeps from "@src/confluent/node-deps.js";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
-export type { MCPServerConfiguration } from "@src/config/models.js";
+export { MCPServerConfiguration } from "@src/config/models.js";
 
 /**
  * Loads and validates an MCP server configuration from a YAML file.
@@ -95,5 +95,6 @@ export function parseYamlConfiguration(
     throw new Error(`Configuration validation failed:\n${errors}`);
   }
 
-  return validationResult.data;
+  // Promote from raw parsed object to MCPServerConfiguration instance.
+  return new MCPServerConfiguration(validationResult.data);
 }

@@ -186,15 +186,16 @@ async function main() {
 
     // Load and validate YAML configuration if --config is provided
     if (cliOptions.config) {
-      let envVars: Record<string, string | undefined>;
+      let varExpansionSource: Record<string, string | undefined>;
       if (cliOptions.envFile) {
-        envVars = loadDotEnv(cliOptions.envFile);
+        varExpansionSource = loadDotEnv(cliOptions.envFile);
       } else {
-        // No env file provided, use actual environment variables for interpolation
-        envVars = process.env;
+        // No env file provided, use actual in situ environment variables for interpolation-into-yaml fodder.
+        varExpansionSource = process.env;
       }
 
-      loadConfigFromYaml(cliOptions.config, envVars);
+      loadConfigFromYaml(cliOptions.config, varExpansionSource);
+
       // TODO(issue #151): Use config to construct connection manager instead of env vars
       logger.warn(
         "Configuration file parsed and validated successfully, but it is not applied yet; startup still uses" +

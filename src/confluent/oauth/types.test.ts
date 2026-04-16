@@ -13,7 +13,8 @@ describe("oauth/types.ts", () => {
     it("should be constructable with all required fields", () => {
       const tokenSet: ConfluentTokenSet = {
         refreshToken: "refresh-abc",
-        refreshTokenExpiresAt: Date.now() + 8 * 60 * 60 * 1000,
+        refreshTokenAbsoluteExpiresAt: Date.now() + 8 * 60 * 60 * 1000,
+        refreshTokenIdleExpiresAt: Date.now() + 4 * 60 * 60 * 1000,
         controlPlaneToken: "cp-token",
         controlPlaneExpiresAt: Date.now() + 5 * 60 * 1000,
         dataPlaneToken: "dp-token",

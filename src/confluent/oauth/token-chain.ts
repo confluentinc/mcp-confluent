@@ -13,12 +13,18 @@ const CONTROL_PLANE_TOKEN_LIFETIME_MS = 5 * 60 * 1000;
 /** 10 minutes in milliseconds — data plane token lifetime */
 const DATA_PLANE_TOKEN_LIFETIME_MS = 10 * 60 * 1000;
 
-/** 8 hours in milliseconds — refresh token absolute lifetime */
+/** 8 hours in milliseconds — refresh token absolute lifetime from original login */
 const REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS = 8 * 60 * 60 * 1000;
+
+/** 4 hours in milliseconds — refresh token idle timeout, resets on each rotation */
+const REFRESH_TOKEN_IDLE_LIFETIME_MS = 4 * 60 * 60 * 1000;
 
 export interface TokenChainResult {
   refreshToken: string;
-  refreshTokenExpiresAt: number;
+  /** Only set on initial login. Absent on refresh — callers must preserve the original value. */
+  refreshTokenAbsoluteExpiresAt?: number;
+  /** Reset on every rotation (initial login and refresh). */
+  refreshTokenIdleExpiresAt: number;
   controlPlaneToken: string;
   controlPlaneExpiresAt: number;
   dataPlaneToken: string;
@@ -162,6 +168,8 @@ export async function refreshTokenChain(
 /**
  * Runs the full token chain from an authorization code.
  * auth code → ID token + refresh token → control plane → data plane
+ *
+ * Sets both absolute (8hr) and idle (4hr) refresh token expiry.
  */
 export async function executeFullTokenChain(
   auth0Config: Auth0Config,
@@ -174,12 +182,20 @@ export async function executeFullTokenChain(
     codeVerifier,
   );
 
-  return deriveConfluentTokens(auth0Config, auth0Response);
+  const result = await deriveConfluentTokens(auth0Config, auth0Response);
+
+  return {
+    ...result,
+    refreshTokenAbsoluteExpiresAt:
+      Date.now() + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+  };
 }
 
 /**
  * Given Auth0 tokens, derives Confluent control plane and data plane tokens.
  * Expiration times are computed client-side using fixed durations.
+ *
+ * Does NOT set refreshTokenAbsoluteExpiresAt — that is only set on initial login.
  */
 async function deriveConfluentTokens(
   auth0Config: Auth0Config,
@@ -199,7 +215,7 @@ async function deriveConfluentTokens(
 
   return {
     refreshToken: auth0Response.refresh_token,
-    refreshTokenExpiresAt: now + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+    refreshTokenIdleExpiresAt: now + REFRESH_TOKEN_IDLE_LIFETIME_MS,
     controlPlaneToken: cpResponse.token,
     controlPlaneExpiresAt: now + CONTROL_PLANE_TOKEN_LIFETIME_MS,
     dataPlaneToken: dpResponse.token,

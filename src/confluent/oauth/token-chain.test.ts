@@ -10,6 +10,9 @@ import {
 } from "@src/confluent/oauth/token-chain.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 
+const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
+
 describe("oauth/token-chain.ts", () => {
   const sandbox = sinon.createSandbox();
   let fetchStub: sinon.SinonStub;
@@ -205,6 +208,14 @@ describe("oauth/token-chain.ts", () => {
       expect(result.refreshToken).toBe("new-refresh-token");
       expect(result.controlPlaneToken).toBe("new-cp-token");
       expect(result.dataPlaneToken).toBe("new-dp-token");
+      // Refresh should reset idle (4hr) but NOT set absolute (8hr)
+      expect(result.refreshTokenIdleExpiresAt).toBeGreaterThan(
+        Date.now() + FOUR_HOURS_MS - 5000,
+      );
+      expect(result.refreshTokenIdleExpiresAt).toBeLessThanOrEqual(
+        Date.now() + FOUR_HOURS_MS,
+      );
+      expect(result.refreshTokenAbsoluteExpiresAt).toBeUndefined();
 
       sinon.assert.calledThrice(fetchStub);
 
@@ -265,7 +276,13 @@ describe("oauth/token-chain.ts", () => {
       expect(result.dataPlaneToken).toBe("dp-token");
       expect(result.controlPlaneExpiresAt).toBeGreaterThan(0);
       expect(result.dataPlaneExpiresAt).toBeGreaterThan(0);
-      expect(result.refreshTokenExpiresAt).toBeGreaterThan(0);
+      // Initial login sets both absolute (8hr) and idle (4hr)
+      expect(result.refreshTokenAbsoluteExpiresAt).toBeGreaterThan(
+        Date.now() + EIGHT_HOURS_MS - 5000,
+      );
+      expect(result.refreshTokenIdleExpiresAt).toBeGreaterThan(
+        Date.now() + FOUR_HOURS_MS - 5000,
+      );
     });
   });
 });

@@ -3,7 +3,7 @@
 //   ${VAR}          — basic substitution (group 2 = var name, group 3 = undefined)
 //   ${VAR:-default} — substitution with default (group 2 = var name, group 3 = default)
 const INTERPOLATION_RE =
-  /\$\$\{([^}]*)\}|\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([\s\S]*?))?\}/g;
+  /\$\$\{([^}]*)\}|\$\{([A-Za-z_]\w*)(?::-([\s\S]*?))?\}/g;
 
 function interpolateString(
   value: string,

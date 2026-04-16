@@ -5,6 +5,7 @@ describe("config/interpolation.ts", () => {
   describe("interpolateValues", () => {
     const env = {
       MY_VAR: "hello",
+      MY_VAR_99: "99",
       EMPTY_VAR: "",
       MULTI: "a,b,c",
     };
@@ -12,6 +13,10 @@ describe("config/interpolation.ts", () => {
     describe("basic ${VAR} substitution", () => {
       it("should replace a known variable", () => {
         expect(interpolateValues("${MY_VAR}", env)).toBe("hello");
+      });
+
+      it("should replace a variable with a numeric suffix", () => {
+        expect(interpolateValues("${MY_VAR_99}", env)).toBe("99");
       });
 
       it("should replace a variable embedded in a larger string", () => {

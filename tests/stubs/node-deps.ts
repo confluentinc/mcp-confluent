@@ -36,3 +36,35 @@ export function createFsWrappers(
     mkdirSync: sandbox.stub(nodeDeps.fs, "mkdirSync"),
   };
 }
+
+/** Stubbed fetch wrapper from {@link nodeDeps.nodeFetch}. */
+export type StubbedFetchWrapper = {
+  fetch: sinon.SinonStub;
+};
+
+/**
+ * Stubs the fetch wrapper in {@link nodeDeps.nodeFetch} using the provided sandbox.
+ */
+export function createFetchWrapper(
+  sandbox: sinon.SinonSandbox,
+): StubbedFetchWrapper {
+  return {
+    fetch: sandbox.stub(nodeDeps.nodeFetch, "fetch"),
+  };
+}
+
+/** Stubbed crypto wrapper from {@link nodeDeps.nodeCrypto}. */
+export type StubbedCryptoWrapper = {
+  randomBytes: sinon.SinonStub;
+};
+
+/**
+ * Stubs the crypto wrapper in {@link nodeDeps.nodeCrypto} using the provided sandbox.
+ */
+export function createCryptoWrapper(
+  sandbox: sinon.SinonSandbox,
+): StubbedCryptoWrapper {
+  return {
+    randomBytes: sandbox.stub(nodeDeps.nodeCrypto, "randomBytes"),
+  };
+}

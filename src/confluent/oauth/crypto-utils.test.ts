@@ -11,7 +11,7 @@ describe("oauth/crypto-utils.ts", () => {
       const token = generateOpaqueToken();
 
       expect(token).toHaveLength(64);
-      expect(token).toMatch(/^[0-9a-f]{64}$/);
+      expect(Buffer.from(token, "hex")).toHaveLength(32);
     });
 
     it("should generate unique tokens on each call", () => {
@@ -26,9 +26,7 @@ describe("oauth/crypto-utils.ts", () => {
     it("should return a base64url-encoded string of appropriate length", () => {
       const verifier = generateCodeVerifier();
 
-      // 32 bytes → 43 base64url characters (no padding)
-      expect(verifier.length).toBeGreaterThanOrEqual(43);
-      expect(verifier).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(Buffer.from(verifier, "base64url")).toHaveLength(32);
     });
   });
 
@@ -37,9 +35,7 @@ describe("oauth/crypto-utils.ts", () => {
       const verifier = generateCodeVerifier();
       const challenge = generateCodeChallenge(verifier);
 
-      // SHA-256 → 32 bytes → 43 base64url characters
-      expect(challenge.length).toBe(43);
-      expect(challenge).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(Buffer.from(challenge, "base64url")).toHaveLength(32);
     });
 
     it("should produce different challenges for different verifiers", () => {

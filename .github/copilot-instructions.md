@@ -131,9 +131,9 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
 ### 6. Transport and auth changes
 
 - Anything under `src/mcp/transports/` is security-sensitive. For the HTTP-based transports,
-  verify all three Streamable-HTTP mitigations still apply to every endpoint: `Origin` header
-  validation (to prevent DNS rebinding attacks), localhost-only binding in local dev, and
-  authentication on all requests (enforced by `src/mcp/transports/auth.ts`). The `--disable-auth`
+  verify all three DNS-rebinding and auth mitigations still apply to every endpoint: `Host`
+  header allowlisting (via `MCP_ALLOWED_HOSTS`, enforced by `src/mcp/transports/auth.ts`),
+  localhost-only binding in local dev, and authentication on all requests. The `--disable-auth`
   flag is for local dev only — guard the README/CONTRIBUTING wording if it's touched.
 - Long-running resources (listeners, intervals, streams) added to transport code need explicit
   teardown in the `TransportManager` shutdown path.

@@ -287,7 +287,14 @@ After pressing F5, your MCP client should automatically discover the `confluent-
 
 ### Generating Types
 
+`openapi.json` is a vendored snapshot of the public Confluent Cloud API spec. It drives the typed `openapi-fetch` clients in `src/confluent/client-manager.ts`, and only needs changes when a new handler calls a Confluent Cloud REST endpoint whose path or response shape isn't already described there (for example, a preview API the snapshot predates). Handlers that wrap existing typed endpoints, or that go through the Kafka / Schema Registry SDKs, don't require a spec edit.
+
+If you edit `openapi.json`, regenerate `src/confluent/openapi-schema.d.ts`:
+
 ```bash
-# as of v7.5.2 there is a bug when using allOf w/ required https://github.com/openapi-ts/openapi-typescript/issues/1474. need --empty-objects-unknown flag to avoid it
-npx openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --empty-objects-unknown
+npm run generate:openapi-types
 ```
+
+Commit both files together so downstream contributors see the same types the vendored spec describes.
+
+> The script passes `--empty-objects-unknown` to work around [openapi-typescript#1474](https://github.com/openapi-ts/openapi-typescript/issues/1474) (a bug since v7.5.2 with `allOf` + `required`).

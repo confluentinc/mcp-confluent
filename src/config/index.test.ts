@@ -11,7 +11,11 @@ import sinon from "sinon";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("config/index.ts", () => {
-  const sandbox = sinon.createSandbox();
+  let sandbox: sinon.SinonSandbox;
+
+  beforeEach(() => {
+    sandbox = sinon.createSandbox();
+  });
 
   afterEach(() => {
     sandbox.restore();

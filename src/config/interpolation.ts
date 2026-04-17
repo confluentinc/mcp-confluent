@@ -7,7 +7,7 @@ const INTERPOLATION_RE =
 
 function interpolateString(
   value: string,
-  env: Record<string, string | undefined>,
+  environ: Record<string, string | undefined>,
 ): string {
   return value.replaceAll(
     INTERPOLATION_RE,
@@ -23,12 +23,12 @@ function interpolateString(
       }
 
       // ${VAR} or ${VAR:-default}
-      const resolved = varName ? env[varName] : undefined;
+      const resolved = varName ? environ[varName] : undefined;
       if (resolved !== undefined) {
         return resolved;
       }
 
-      // Variable is absent from env — use default if provided
+      // Variable is absent from env — use default found in the template, if any.
       if (defaultValue !== undefined) {
         return defaultValue;
       }
@@ -49,11 +49,11 @@ function interpolateString(
  */
 export function interpolateValues(
   obj: unknown,
-  env: Record<string, string | undefined>,
+  environ: Record<string, string | undefined>,
 ): unknown {
   function walk(value: unknown): unknown {
     if (typeof value === "string") {
-      return interpolateString(value, env);
+      return interpolateString(value, environ);
     }
     if (Array.isArray(value)) {
       return value.map(walk);

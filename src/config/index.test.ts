@@ -11,6 +11,12 @@ import sinon from "sinon";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("config/index.ts", () => {
+  const sandbox = sinon.createSandbox();
+
+  afterEach(() => {
+    sandbox.restore();
+  });
+
   describe("parseYamlConfiguration", () => {
     it("should successfully parse minimal valid config (kafka only)", () => {
       const yamlContent = `connections:
@@ -354,15 +360,10 @@ describe("config/index.ts", () => {
   });
 
   describe("loadConfigFromYaml", () => {
-    const sandbox = sinon.createSandbox();
     let fsStubs: StubbedFsWrappers;
 
     beforeEach(() => {
       fsStubs = createFsWrappers(sandbox);
-    });
-
-    afterEach(() => {
-      sandbox.restore();
     });
 
     it("should successfully load and parse a valid config file", () => {
@@ -380,6 +381,25 @@ describe("config/index.ts", () => {
       expect(config.connections.local).toBeDefined();
       expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
         "localhost:9092",
+      );
+    });
+
+    it("should pass env argument to parseYamlConfiguration for variable interpolation", () => {
+      const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "\${BOOTSTRAP_SERVERS}"
+`;
+      fsStubs.existsSync.returns(true);
+      fsStubs.readFileSync.returns(yamlContent);
+
+      const config = loadConfigFromYaml("/path/to/config.yaml", {
+        BOOTSTRAP_SERVERS: "broker1:9092",
+      });
+
+      expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
+        "broker1:9092",
       );
     });
 
@@ -416,15 +436,10 @@ describe("config/index.ts", () => {
   });
 
   describe("loadConfigFileContents", () => {
-    const sandbox = sinon.createSandbox();
     let fsStubs: StubbedFsWrappers;
 
     beforeEach(() => {
       fsStubs = createFsWrappers(sandbox);
-    });
-
-    afterEach(() => {
-      sandbox.restore();
     });
 
     it("should read file contents successfully", () => {

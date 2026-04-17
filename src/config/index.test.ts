@@ -26,16 +26,11 @@ describe("config/index.ts", () => {
       bootstrap_servers: "localhost:9092"
 `;
 
-      const config = parseYamlConfiguration(yamlContent, {});
+      const conn = parseYamlConfiguration(yamlContent, {}).getSoleConnection();
 
-      expect(config.connections).toBeDefined();
-      expect(Object.keys(config.connections)).toHaveLength(1);
-      expect(config.connections.local).toBeDefined();
-      expect(config.connections.local!.type).toBe("direct");
-      expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
-        "localhost:9092",
-      );
-      expect(config.connections.local!.schema_registry).toBeUndefined();
+      expect(conn.type).toBe("direct");
+      expect(conn.kafka!.bootstrap_servers).toBe("localhost:9092");
+      expect(conn.schema_registry).toBeUndefined();
     });
 
     it("should successfully parse full valid config (kafka + schema_registry)", () => {
@@ -48,12 +43,10 @@ describe("config/index.ts", () => {
       endpoint: "http://localhost:8081"
 `;
 
-      const config = parseYamlConfiguration(yamlContent, {});
+      const conn = parseYamlConfiguration(yamlContent, {}).getSoleConnection();
 
-      expect(config.connections.local!.schema_registry).toBeDefined();
-      expect(config.connections.local!.schema_registry?.endpoint).toBe(
-        "http://localhost:8081",
-      );
+      expect(conn.schema_registry).toBeDefined();
+      expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
     });
 
     it("should accept multiple bootstrap servers", () => {
@@ -64,9 +57,9 @@ describe("config/index.ts", () => {
       bootstrap_servers: "broker1:9092,broker2:9092,broker3:9092"
 `;
 
-      const config = parseYamlConfiguration(yamlContent, {});
+      const conn = parseYamlConfiguration(yamlContent, {}).getSoleConnection();
 
-      expect(config.connections.cluster!.kafka!.bootstrap_servers).toBe(
+      expect(conn.kafka!.bootstrap_servers).toBe(
         "broker1:9092,broker2:9092,broker3:9092",
       );
     });
@@ -278,7 +271,7 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      expect(config.connections.local!.schema_registry?.endpoint).toBe(
+      expect(config.getSoleConnection().schema_registry?.endpoint).toBe(
         "https://schema-registry.example.com:8081",
       );
     });
@@ -293,10 +286,9 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      expect(config.connections.local!.schema_registry?.endpoint).toBe(
-        "http://localhost:8081",
-      );
-      expect(config.connections.local!.kafka).toBeUndefined();
+      const conn = config.getSoleConnection();
+      expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
+      expect(conn.kafka).toBeUndefined();
     });
 
     it("should interpolate ${VAR} references using provided env before Zod validation", () => {
@@ -314,12 +306,9 @@ describe("config/index.ts", () => {
         SR_URL: "http://localhost:8081",
       });
 
-      expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
-        "broker1:9092",
-      );
-      expect(config.connections.local!.schema_registry!.endpoint).toBe(
-        "http://localhost:8081",
-      );
+      const conn = config.getSoleConnection();
+      expect(conn.kafka!.bootstrap_servers).toBe("broker1:9092");
+      expect(conn.schema_registry!.endpoint).toBe("http://localhost:8081");
     });
 
     it("should raise a Zod validation error when an interpolated env var fails schema validation", () => {
@@ -378,8 +367,7 @@ describe("config/index.ts", () => {
 
       const config = loadConfigFromYaml("/path/to/config.yaml", {});
 
-      expect(config.connections.local).toBeDefined();
-      expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
+      expect(config.getSoleConnection().kafka!.bootstrap_servers).toBe(
         "localhost:9092",
       );
     });
@@ -398,7 +386,7 @@ describe("config/index.ts", () => {
         BOOTSTRAP_SERVERS: "broker1:9092",
       });
 
-      expect(config.connections.local!.kafka!.bootstrap_servers).toBe(
+      expect(config.getSoleConnection().kafka!.bootstrap_servers).toBe(
         "broker1:9092",
       );
     });

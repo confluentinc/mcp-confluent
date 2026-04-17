@@ -4,9 +4,10 @@ import { GlobalConfig } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   CLIOptions,
+  DisplayedCommandLineUsageError,
   getFilteredToolNames,
   getPackageVersion,
-  loadDotEnv,
+  loadDotEnvIntoProcessEnv,
   parseCliArgs,
 } from "@src/cli.js";
 import { loadConfigFromYaml } from "@src/config/index.js";
@@ -160,8 +161,8 @@ export function constructDefaultClientManager(
 
 async function main() {
   try {
-    // Parse command line arguments and load environment variables if --env-file is specified
-    const cliOptions = parseCliArgs();
+    // Parse command line arguments.(NO LONGER LOADS ENV VARS FROM -e file!)
+    const cliOptions = parseCliArgs(process.argv);
 
     // Handle early-exit modes as requested by CLI args before initializing the server.
     if (cliOptions.generateKey) {
@@ -180,21 +181,18 @@ async function main() {
       process.exit(0);
     }
 
-    // Load environment variables and set log level before doing anything else.
+    if (cliOptions.envFile) {
+      // NOW load env vars into process.env!
+      loadDotEnvIntoProcessEnv(cliOptions.envFile);
+    }
+
+    // Convert our known env vars into a typed Environment obj.
     const env = initEnv();
     setLogLevel(env.LOG_LEVEL);
 
     // Load and validate YAML configuration if --config is provided
     if (cliOptions.config) {
-      let varExpansionSource: Record<string, string | undefined>;
-      if (cliOptions.envFile) {
-        varExpansionSource = loadDotEnv(cliOptions.envFile);
-      } else {
-        // No env file provided, use actual in situ environment variables for interpolation-into-yaml fodder.
-        varExpansionSource = process.env;
-      }
-
-      loadConfigFromYaml(cliOptions.config, varExpansionSource);
+      loadConfigFromYaml(cliOptions.config, process.env);
 
       // TODO(issue #151): Use config to construct connection manager instead of env vars
       logger.warn(
@@ -203,6 +201,9 @@ async function main() {
       );
     }
 
+    // TODO #162, #165, #174: do this from the obj tree constructed from the
+    // config file (or equiv obj built from legacy env vars) instead of DIRECTLY from
+    // env vars and CLI options!
     const clientManager = constructDefaultClientManager(env, cliOptions);
 
     const serverVersion = getPackageVersion();
@@ -314,6 +315,9 @@ async function main() {
     process.on("SIGQUIT", performCleanup);
     process.on("SIGUSR2", performCleanup);
   } catch (error) {
+    if (error instanceof DisplayedCommandLineUsageError) {
+      process.exit(0);
+    }
     logger.error({ err: error }, "Error starting server");
     process.exit(1);
   }

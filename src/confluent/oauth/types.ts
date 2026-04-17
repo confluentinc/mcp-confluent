@@ -11,8 +11,10 @@ export interface Auth0Config {
 export interface ConfluentTokenSet {
   /** Auth0 refresh token — single-use, rotated each refresh cycle */
   refreshToken: string;
-  /** Absolute expiration of the refresh token (epoch ms). 8hr from original login. */
-  refreshTokenExpiresAt: number;
+  /** Absolute expiration of the refresh token family (epoch ms). 8hr from original login. */
+  refreshTokenAbsoluteExpiresAt: number;
+  /** Idle expiration of the current refresh token (epoch ms). 4hr from last rotation. */
+  refreshTokenIdleExpiresAt: number;
 
   /** Confluent Cloud control plane token (Bearer token for api.confluent.cloud) */
   controlPlaneToken: string;

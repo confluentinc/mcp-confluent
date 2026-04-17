@@ -61,6 +61,7 @@
     "husky": "^9.1.7",
     "openapi-typescript": "^7.8.0",
     "prettier": "3.6.1",
+    "prettier-plugin-organize-imports": "^4.3.0",
     "sinon": "^21.0.2",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.8.3",

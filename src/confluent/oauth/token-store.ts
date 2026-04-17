@@ -1,14 +1,16 @@
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
 import { logger } from "@src/logger.js";
 
-interface TokenUpdateFields {
-  refreshToken: string;
-  refreshTokenIdleExpiresAt: number;
-  controlPlaneToken: string;
-  controlPlaneExpiresAt: number;
-  dataPlaneToken: string;
-  dataPlaneExpiresAt: number;
-}
+/** Refreshable subset of {@link ConfluentTokenSet}; all fields required. */
+type TokenUpdateFields = Pick<
+  ConfluentTokenSet,
+  | "refreshToken"
+  | "refreshTokenIdleExpiresAt"
+  | "controlPlaneToken"
+  | "controlPlaneExpiresAt"
+  | "dataPlaneToken"
+  | "dataPlaneExpiresAt"
+>;
 
 export class TokenStore {
   private tokens = new Map<string, ConfluentTokenSet>();
@@ -82,6 +84,10 @@ export class TokenStore {
     intervalMs: number,
     refreshCallback: (store: TokenStore) => Promise<void>,
   ): void {
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+      throw new RangeError("intervalMs must be a finite number greater than 0");
+    }
+
     if (this.refreshInterval) {
       logger.warn("Refresh loop already running, skipping");
       return;

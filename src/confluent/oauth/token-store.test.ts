@@ -133,6 +133,19 @@ describe("oauth/token-store.ts", () => {
       });
     });
 
+    describe("shutdown", () => {
+      it("should clear all stored token sets", () => {
+        store.store(createTokenSet({ accessToken: "a" }));
+        store.store(createTokenSet({ accessToken: "b" }));
+        expect(store.size).toBe(2);
+
+        store.shutdown();
+
+        expect(store.size).toBe(0);
+        expect(store.get("a")).toBeUndefined();
+      });
+    });
+
     describe("startRefreshLoop", () => {
       let clock: sinon.SinonFakeTimers;
 
@@ -175,6 +188,16 @@ describe("oauth/token-store.ts", () => {
 
         await clock.tickAsync(240_000);
         sinon.assert.notCalled(callback);
+      });
+
+      it("should throw if intervalMs is not a finite positive number", () => {
+        const callback = sinon.stub().resolves();
+        expect(() => store.startRefreshLoop(0, callback)).toThrow(RangeError);
+        expect(() => store.startRefreshLoop(-1, callback)).toThrow(RangeError);
+        expect(() => store.startRefreshLoop(NaN, callback)).toThrow(RangeError);
+        expect(() => store.startRefreshLoop(Infinity, callback)).toThrow(
+          RangeError,
+        );
       });
 
       it("should not throw if refresh callback throws", async () => {

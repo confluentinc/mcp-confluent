@@ -8,6 +8,16 @@ const directConnection = {
 
 describe("config/models.ts", () => {
   describe("MCPServerConfiguration", () => {
+    describe("getConnectionNames", () => {
+      it("should return connection names sorted alphabetically", () => {
+        const config = new MCPServerConfiguration({
+          connections: { staging: directConnection, local: directConnection },
+        });
+
+        expect(config.getConnectionNames()).toEqual(["local", "staging"]);
+      });
+    });
+
     describe("getSoleConnection", () => {
       it("should return the single defined connection", () => {
         const config = new MCPServerConfiguration({

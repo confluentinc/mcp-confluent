@@ -55,7 +55,7 @@ export class MCPServerConfiguration {
 
   /** Returns the names of all defined connections. */
   getConnectionNames(): string[] {
-    return Object.keys(this.connections);
+    return Object.keys(this.connections).sort((a, b) => a.localeCompare(b));
   }
 }
 

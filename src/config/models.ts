@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { validateBootstrapServers } from "@src/config/validation.js";
+import { z } from "zod";
 
 /**
  * Connection configuration for a direct (local/Docker) Kafka cluster.
@@ -23,9 +23,35 @@ export type ConnectionConfig = DirectConnectionConfig;
 
 /**
  * Root configuration object representing the entire MCP server configuration.
+ * Validated and constructed from parsed YAML via {@link mcpConfigSchema}.
  */
-export interface MCPServerConfiguration {
+export class MCPServerConfiguration {
   connections: Record<string, ConnectionConfig>;
+
+  constructor(data: { connections: Record<string, ConnectionConfig> }) {
+    this.connections = data.connections;
+  }
+
+  /**
+   * Returns the single defined connection in the configuration.
+   *
+   * @returns the single defined connection
+   * @throws Error if 0 or more than 1 connection is defined.
+   */
+  getSoleConnection(): ConnectionConfig {
+    const connectionNames = Object.keys(this.connections);
+    if (connectionNames.length === 0) {
+      throw new Error("No connections defined in configuration");
+    }
+    if (connectionNames.length > 1) {
+      throw new Error(
+        "Multiple connections defined in configuration; only one is supported currently",
+      );
+    }
+
+    // must be exactly one connection at this point, so return it.
+    return this.connections[connectionNames[0]!]!;
+  }
 }
 
 // Zod schema for direct connection type
@@ -73,7 +99,12 @@ const connectionConfigSchema = z
     }
   });
 
-// Root configuration schema
+/**
+ * Root configuration schema.
+ *
+ * Parsed output is wrapped in {@link MCPServerConfiguration} by
+ * parseYamlConfiguration().
+ */
 export const mcpConfigSchema = z.object({
   connections: z
     .record(

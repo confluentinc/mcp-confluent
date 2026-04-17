@@ -1,7 +1,10 @@
 import type { Auth0Config } from "@src/confluent/oauth/types.js";
 import type { TokenStore } from "@src/confluent/oauth/token-store.js";
 import { refreshTokenChain } from "@src/confluent/oauth/token-chain.js";
-import { DEFAULT_REFRESH_INTERVAL_MS } from "@src/confluent/oauth/token-lifetimes.js";
+import {
+  CONTROL_PLANE_REFRESH_WINDOW_MS,
+  DEFAULT_REFRESH_INTERVAL_MS,
+} from "@src/confluent/oauth/token-lifetimes.js";
 import { logger } from "@src/logger.js";
 
 /**
@@ -45,9 +48,9 @@ export function createRefreshCallback(
         continue;
       }
 
-      // Skip if CP token still has more than 1 minute remaining
+      // Skip if CP token still has more than the refresh window remaining
       const cpTimeRemaining = tokenSet.controlPlaneExpiresAt - now;
-      if (cpTimeRemaining > 60_000) {
+      if (cpTimeRemaining > CONTROL_PLANE_REFRESH_WINDOW_MS) {
         continue;
       }
 

@@ -8,8 +8,7 @@ assistants. The tool surface splits into two groups:
 - **Kafka-protocol tools** that work against any Apache Kafka®-compatible cluster or Schema
   Registry (e.g., topic CRUD, producing and consuming messages, schema management).
 - **Confluent Cloud-specific tools** that wrap CCloud REST APIs (e.g., Flink, Tableflow,
-  billing), gated by the handler's `isConfluentCloudOnly()` flag and the
-  `--disable-confluent-cloud-tools` CLI switch.
+  billing), collectively disable-able via the `--disable-confluent-cloud-tools` CLI switch.
 
 Built with TypeScript, Node.js ≥22, and the `@modelcontextprotocol/sdk`. Ships as an npm package
 and a Docker image; supports stdio, Streamable HTTP, and (for backwards compatibility with older
@@ -78,8 +77,7 @@ either doesn't exist or doesn't run:
 
 1. `src/confluent/tools/tool-name.ts` — new `ToolName` enum entry.
 2. `src/confluent/tools/handlers/<domain>/<name>-handler.ts` — handler class extending
-   `BaseToolHandler` and implementing its abstract methods (`getToolConfig()`, `handle()`,
-   config-dependency declaration, and optionally `isConfluentCloudOnly()`).
+   `BaseToolHandler` and implementing its abstract methods.
 3. `src/confluent/tools/tool-registry.ts` — import + entry in the `ToolHandlerRegistry.handlers`
    Map.
 

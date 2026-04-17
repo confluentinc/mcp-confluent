@@ -16,8 +16,7 @@ MCP clients) the legacy HTTP+SSE transport.
 
 These instructions exist to keep GitHub Copilot PR reviews focused on the invariants that matter in
 this codebase. Author-facing guidance (how to scaffold a tool, run the inspector, etc.) lives in
-`CONTRIBUTING.md`, `CLAUDE.md`, and `.claude/rules/tool-handlers.md` — refer to those rather than
-repeating them here.
+`CONTRIBUTING.md` and `CLAUDE.md` — refer to those rather than repeating them here.
 
 ## Architecture (what reviewers need to know)
 
@@ -80,8 +79,6 @@ either doesn't exist or doesn't run:
    `BaseToolHandler` and implementing its abstract methods.
 3. `src/confluent/tools/tool-registry.ts` — import + entry in the `ToolHandlerRegistry.handlers`
    Map.
-
-See `.claude/rules/tool-handlers.md` for full conventions.
 
 ### 2. Handler declarations are correct
 

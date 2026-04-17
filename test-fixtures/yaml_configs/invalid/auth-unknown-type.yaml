@@ -1,0 +1,8 @@
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "broker.confluent.cloud:9092"
+      auth:
+        type: oauth2
+        token: "sometoken"

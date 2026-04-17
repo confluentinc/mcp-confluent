@@ -1,14 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import sinon from "sinon";
 import { nodeFetch } from "@src/confluent/node-deps.js";
+import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
   exchangeAuthCodeForTokens,
-  exchangeIdTokenForControlPlaneToken,
   exchangeControlPlaneForDataPlaneToken,
-  refreshTokenChain,
+  exchangeIdTokenForControlPlaneToken,
   executeFullTokenChain,
+  refreshTokenChain,
 } from "@src/confluent/oauth/token-chain.js";
-import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
+import sinon from "sinon";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;

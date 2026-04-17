@@ -1,10 +1,10 @@
+import { nodeFetch } from "@src/confluent/node-deps.js";
 import type {
   Auth0Config,
   Auth0TokenResponse,
   ControlPlaneTokenResponse,
   DataPlaneTokenResponse,
 } from "@src/confluent/oauth/types.js";
-import { nodeFetch } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
 
 /** 5 minutes in milliseconds — control plane token lifetime */

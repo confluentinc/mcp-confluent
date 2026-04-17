@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import sinon from "sinon";
 import { TokenStore } from "@src/confluent/oauth/token-store.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
+import sinon from "sinon";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;

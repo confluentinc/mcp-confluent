@@ -10,7 +10,11 @@ import {
   loadDotEnvIntoProcessEnv,
   parseCliArgs,
 } from "@src/cli.js";
-import { consConfigFromEnv, loadConfigFromYaml } from "@src/config/index.js";
+import {
+  consConfigFromEnv,
+  loadConfigFromYaml,
+  MCPServerConfiguration,
+} from "@src/config/index.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
@@ -190,17 +194,17 @@ async function main() {
     const env = initEnv();
     setLogLevel(env.LOG_LEVEL);
 
+    let mcpConfig: MCPServerConfiguration;
     // Load and validate configuration — from YAML file if --config provided, else from env vars.
     if (cliOptions.config) {
-      loadConfigFromYaml(cliOptions.config, process.env);
+      mcpConfig = loadConfigFromYaml(cliOptions.config, process.env);
 
-      // TODO(issue #151): Use config to construct connection manager instead of env vars
       logger.warn(
         "Configuration file parsed and validated successfully, but it is not applied yet; startup still uses" +
           " environment variables and CLI Kafka properties",
       );
     } else {
-      consConfigFromEnv(env);
+      mcpConfig = consConfigFromEnv(env);
 
       // TODO(issue #151): Use config to construct connection manager instead of env vars
       logger.warn(
@@ -209,9 +213,12 @@ async function main() {
       );
     }
 
-    // TODO #162, #165, #174: do this from the obj tree constructed from the
-    // config file (or equiv obj built from legacy env vars) instead of DIRECTLY from
-    // env vars and CLI options!
+    logger.info(
+      `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
+    );
+
+    // TODO #162, #165, #174: construct the DefaultClientManager from mcpConfig
+    // instead of directly from env vars and CLI args!
     const clientManager = constructDefaultClientManager(env, cliOptions);
 
     const serverVersion = getPackageVersion();

@@ -52,9 +52,15 @@ export class MCPServerConfiguration {
     // must be exactly one connection at this point, so return it.
     return this.connections[connectionNames[0]!]!;
   }
+
+  getConnectionNames(): string[] {
+    return Object.keys(this.connections).sort((a, b) => a.localeCompare(b));
+  }
 }
 
-// Zod schema for direct connection type
+/* And now, Zod schemas for validation of MCPServerConfiguration and contained objects. */
+
+/** Zod schema for direct connection type */
 const directConnectionSchema = z.object({
   type: z.literal("direct"),
   kafka: z
@@ -85,11 +91,13 @@ const directConnectionSchema = z.object({
     .optional(),
 });
 
-// Discriminated union of all connection types (currently just direct).
-// superRefine is placed here (after the union) rather than on directConnectionSchema
-// because wrapping a ZodObject in ZodEffects breaks z.discriminatedUnion's discriminant lookup.
+/**
+ * Discriminated union of all connection types (currently just direct).
+ */
 const connectionConfigSchema = z
   .discriminatedUnion("type", [directConnectionSchema])
+  // superRefine is placed here (after the union) rather than on directConnectionSchema
+  // because wrapping a ZodObject in ZodEffects breaks z.discriminatedUnion's discriminant lookup.
   .superRefine((data, ctx) => {
     if (data.type === "direct" && !data.kafka && !data.schema_registry) {
       ctx.addIssue({
@@ -116,3 +124,13 @@ export const mcpConfigSchema = z.object({
       "Exactly one connection must be defined (multiple connections not yet supported)",
     ),
 });
+
+/** Format Zod issues into a human-readable string */
+export function formatZodIssues(issues: z.ZodError["issues"]): string {
+  return issues
+    .map((issue) => {
+      const path = issue.path.join(".");
+      return path ? `  - ${path}: ${issue.message}` : `  - ${issue.message}`;
+    })
+    .join("\n");
+}

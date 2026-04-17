@@ -75,7 +75,7 @@ A new tool requires edits in **exactly three places**. Missing any one of these 
 either doesn't exist or doesn't run:
 
 1. `src/confluent/tools/tool-name.ts` — new `ToolName` enum entry.
-2. `src/confluent/tools/handlers/<domain>/<name>-handler.ts` — handler class extending
+2. A new handler file under `src/confluent/tools/handlers/<domain>/` — handler class extending
    `BaseToolHandler` and implementing its abstract methods.
 3. `src/confluent/tools/tool-registry.ts` — import + entry in the `ToolHandlerRegistry.handlers`
    Map.

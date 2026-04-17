@@ -35,7 +35,9 @@ blocks:
             - npm ci --prefer-offline
             # `npm audit fix` applies non-breaking security fixes; including `--force` should only
             # be done manually on local branches and include evaluating any breaking changes
-            - npm audit fix
+            # ( || true to avoid exiting with non-zero if there are unfixable vulnerabilities that
+            # require manual possibly-breaking changes to package.json)
+            - npm audit fix || true
             - |
               if git diff --quiet -- package.json package-lock.json; then
                 echo "No changes after npm audit fix; nothing to do."

@@ -89,10 +89,10 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
   client-side UX hints (used for things like confirmation prompts), **not** server-side
   enforcement. Pick the one that matches the tool's actual behavior, but don't treat `READ_ONLY`
   as a safety guarantee — the implementation still has to avoid mutations.
-- **Input schema** is a Zod schema passed via `.shape` to `getToolConfig()`. Each field needs a
-  `.describe()` call (the descriptions surface to the AI assistant as parameter docs). Tools
-  with no parameters should still provide a valid object schema (`z.object({}).shape`), not omit
-  the field.
+- **Input schema** should always be provided to `getToolConfig()`. For tools with parameters,
+  use a Zod object schema's `.shape` and make sure each field has a `.describe()` call (those
+  descriptions surface to the AI assistant as parameter docs). For tools with no parameters,
+  provide an empty object (`inputSchema: {}`), not omit the field.
 - **Config dependencies** drive auto-enablement: each handler declares what configuration it
   needs, and the server skips exposing tools whose requirements aren't satisfied. A missing
   declaration silently breaks the tool on servers where that config isn't set — it registers,

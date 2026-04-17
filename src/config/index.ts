@@ -4,22 +4,22 @@ import * as nodeDeps from "@src/confluent/node-deps.js";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
-export type { MCPServerConfiguration } from "@src/config/models.js";
+export { MCPServerConfiguration } from "@src/config/models.js";
 
 /**
  * Loads and validates an MCP server configuration from a YAML file.
  *
  * @param filePath - Path to the YAML configuration file
- * @param env      - Environment variables used for ${VAR} interpolation
+ * @param environ      - Environment variables used for ${VAR} interpolation
  * @returns Validated MCPServerConfiguration object
  * @throws Error if file doesn't exist, YAML is invalid, interpolation fails, or validation fails
  */
 export function loadConfigFromYaml(
   filePath: string,
-  env: Record<string, string | undefined>,
+  environ: Record<string, string | undefined>,
 ): MCPServerConfiguration {
   const yamlContent = loadConfigFileContents(filePath);
-  return parseYamlConfiguration(yamlContent, env);
+  return parseYamlConfiguration(yamlContent, environ);
 }
 
 /* All the rest of the functions in this file are internal helpers for loading and validating the configuration, only exported for
@@ -61,7 +61,7 @@ export function loadConfigFileContents(filePath: string): string {
  */
 export function parseYamlConfiguration(
   yamlContent: string,
-  env: Record<string, string | undefined>,
+  environ: Record<string, string | undefined>,
 ): MCPServerConfiguration {
   // Parse YAML
   let parsedYaml: unknown;
@@ -75,7 +75,7 @@ export function parseYamlConfiguration(
 
   // Interpolate environment variables (before Zod sees the values)
   try {
-    parsedYaml = interpolateValues(parsedYaml, env);
+    parsedYaml = interpolateValues(parsedYaml, environ);
   } catch (error) {
     throw new Error(
       `Failed to interpolate configuration values: ${error instanceof Error ? error.message : String(error)}`,
@@ -95,5 +95,6 @@ export function parseYamlConfiguration(
     throw new Error(`Configuration validation failed:\n${errors}`);
   }
 
-  return validationResult.data;
+  // Promote from raw parsed object to MCPServerConfiguration instance.
+  return new MCPServerConfiguration(validationResult.data);
 }

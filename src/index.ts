@@ -10,7 +10,7 @@ import {
   loadDotEnvIntoProcessEnv,
   parseCliArgs,
 } from "@src/cli.js";
-import { loadConfigFromYaml } from "@src/config/index.js";
+import { consConfigFromEnv, loadConfigFromYaml } from "@src/config/index.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
@@ -190,13 +190,21 @@ async function main() {
     const env = initEnv();
     setLogLevel(env.LOG_LEVEL);
 
-    // Load and validate YAML configuration if --config is provided
+    // Load and validate configuration — from YAML file if --config provided, else from env vars.
     if (cliOptions.config) {
       loadConfigFromYaml(cliOptions.config, process.env);
 
       // TODO(issue #151): Use config to construct connection manager instead of env vars
       logger.warn(
         "Configuration file parsed and validated successfully, but it is not applied yet; startup still uses" +
+          " environment variables and CLI Kafka properties",
+      );
+    } else {
+      consConfigFromEnv(env);
+
+      // TODO(issue #151): Use config to construct connection manager instead of env vars
+      logger.warn(
+        "MCPServerConfiguration constructed from environment variables, but it is not applied yet; startup still uses" +
           " environment variables and CLI Kafka properties",
       );
     }

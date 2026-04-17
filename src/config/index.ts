@@ -1,8 +1,8 @@
 import { interpolateValues } from "@src/config/interpolation.js";
 import {
   formatZodIssues,
-  MCPServerConfiguration,
   mcpConfigSchema,
+  MCPServerConfiguration,
 } from "@src/config/models.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import path from "node:path";

@@ -1,7 +1,7 @@
 import {
   formatZodIssues,
-  MCPServerConfiguration,
   mcpConfigSchema,
+  MCPServerConfiguration,
 } from "@src/config/models.js";
 import type { Environment } from "@src/env.js";
 

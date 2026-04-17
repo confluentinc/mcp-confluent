@@ -1,4 +1,8 @@
-import { MCPServerConfiguration, mcpConfigSchema } from "@src/config/models.js";
+import {
+  formatZodIssues,
+  MCPServerConfiguration,
+  mcpConfigSchema,
+} from "@src/config/models.js";
 import type { Environment } from "@src/env.js";
 
 const ENV_CONNECTION_NAME = "env-connection";
@@ -31,14 +35,8 @@ export function consConfigFromEnv(
   });
 
   if (!result.success) {
-    const errors = result.error.issues
-      .map((issue) => {
-        const path = issue.path.join(".");
-        return path ? `  - ${path}: ${issue.message}` : `  - ${issue.message}`;
-      })
-      .join("\n");
     throw new Error(
-      `Failed to construct MCPServerConfiguration from environment variables:\n${errors}`,
+      `Failed to construct MCPServerConfiguration from environment variables:\n${formatZodIssues(result.error.issues)}`,
     );
   }
 

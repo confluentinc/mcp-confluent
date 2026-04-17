@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 describe("config/env-config.ts", () => {
   describe("consConfigFromEnv", () => {
-    describe("most minimal configurations --- only BOOTSTRAP_SERVERS or SCHEMA_REGISTRY_ENDPOINT set", () => {
+    describe("most minimal configurations --- only (BOOTSTRAP_SERVERS and/or SCHEMA_REGISTRY_ENDPOINT) set", () => {
       it("should build a config with both kafka and schema_registry when both env vars are set", () => {
         const config = consConfigFromEnv({
           BOOTSTRAP_SERVERS: "localhost:9092",

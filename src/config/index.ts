@@ -1,5 +1,9 @@
 import { interpolateValues } from "@src/config/interpolation.js";
-import { MCPServerConfiguration, mcpConfigSchema } from "@src/config/models.js";
+import {
+  formatZodIssues,
+  MCPServerConfiguration,
+  mcpConfigSchema,
+} from "@src/config/models.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -87,13 +91,9 @@ export function parseYamlConfiguration(
   const validationResult = mcpConfigSchema.safeParse(parsedYaml);
 
   if (!validationResult.success) {
-    const errors = validationResult.error.issues
-      .map((issue) => {
-        const path = issue.path.join(".");
-        return path ? `  - ${path}: ${issue.message}` : `  - ${issue.message}`;
-      })
-      .join("\n");
-    throw new Error(`Configuration validation failed:\n${errors}`);
+    throw new Error(
+      `Configuration validation failed:\n${formatZodIssues(validationResult.error.issues)}`,
+    );
   }
 
   // Promote from raw parsed object to MCPServerConfiguration instance.

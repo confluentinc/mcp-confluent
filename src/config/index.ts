@@ -4,6 +4,7 @@ import * as nodeDeps from "@src/confluent/node-deps.js";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
+export { consConfigFromEnv } from "@src/config/env-config.js";
 export { MCPServerConfiguration } from "@src/config/models.js";
 
 /**

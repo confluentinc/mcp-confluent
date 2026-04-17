@@ -52,6 +52,11 @@ export class MCPServerConfiguration {
     // must be exactly one connection at this point, so return it.
     return this.connections[connectionNames[0]!]!;
   }
+
+  /** Returns the names of all defined connections. */
+  getConnectionNames(): string[] {
+    return Object.keys(this.connections).sort((a, b) => a.localeCompare(b));
+  }
 }
 
 // Zod schema for direct connection type

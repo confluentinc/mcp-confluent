@@ -137,6 +137,7 @@ TEST-result*.xml
 .vscode/*
 !.vscode/launch.json
 !.vscode/mcp.json
+!.vscode/settings.json
 !.vscode/tasks.json
 .idea
 .continue

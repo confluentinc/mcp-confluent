@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import {
-  generateOpaqueToken,
-  generateCodeVerifier,
   generateCodeChallenge,
+  generateCodeVerifier,
+  generateOpaqueToken,
 } from "@src/confluent/oauth/crypto-utils.js";
+import { describe, expect, it } from "vitest";
 
 describe("oauth/crypto-utils.ts", () => {
   describe("generateOpaqueToken", () => {

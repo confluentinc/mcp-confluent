@@ -1,9 +1,9 @@
 export { createStubAdmin, type StubbedAdmin } from "./admin.js";
 export {
-  createFsWrappers,
-  type StubbedFsWrappers,
-  createFetchWrapper,
-  type StubbedFetchWrapper,
   createCryptoWrapper,
+  createFetchWrapper,
+  createFsWrappers,
   type StubbedCryptoWrapper,
+  type StubbedFetchWrapper,
+  type StubbedFsWrappers,
 } from "./node-deps.js";

@@ -146,17 +146,20 @@ describe("cli.ts", () => {
       );
     });
 
-    it("should call dotenv.config ONLY with the resolved path", () => {
+    it("should call dotenv.config with the resolved path and override option", () => {
       resolveStub.returns("/abs/path/.env");
       existsSyncStub.returns(true);
       dotenvConfigStub.returns({ parsed: {} });
 
       loadDotEnvIntoProcessEnv("relative/.env");
 
-      // Calling ONLY with {path} will also cause dotEnv to
-      // do its default behavior of loading into process.env,
-      // which is a side effect we rely on due to history of this codebase.
-      sinon.assert.calledWith(dotenvConfigStub, { path: "/abs/path/.env" });
+      // Should call with the resolved absolute path and override: true
+      // to ensure CLI env vars take precedence over existing ones in process.env
+      // (and that the call will definitely mutate process.env)
+      sinon.assert.calledWith(dotenvConfigStub, {
+        path: "/abs/path/.env",
+        override: true,
+      });
     });
 
     it("should return the parsed variables on success", () => {

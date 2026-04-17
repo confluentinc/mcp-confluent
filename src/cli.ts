@@ -114,9 +114,9 @@ function readFileLines(filePath: string): string[] {
  * Does NOT load environment variables from the env file, nor does it load or
  * validate the YAML configuration file.
  *
- * @param argv - Array of command line arguments (e.g., process.argv.slice(2))
+ * @param argv - Array of command line arguments (e.g., process.argv)
  * @returns Structured CLIOptions object with parsed and validated values.
- * @throws Exits the process with an error message if parsing fails or if invalid options are provided.
+ * @throws Error if CLI arguments are invalid, if specified files cannot be read, or if file contents are malformed.
  */
 export function parseCliArgs(argv: string[]): CLIOptions {
   const program = new Command()
@@ -230,18 +230,7 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       // Help or version was displayed, signal to main() to exit(0).
       throw new DisplayedCommandLineUsageError();
     }
-    if (error instanceof Error) {
-      logger.error(
-        {
-          error,
-          errorString: error.toString(),
-          errorMessage: error.message,
-        },
-        "Error parsing CLI options",
-      );
-    } else {
-      logger.error({ error: String(error) }, "Error parsing CLI options");
-    }
+    // throw anything else as back to main() unchanged.
     throw error;
   }
 }
@@ -265,7 +254,7 @@ export function loadDotEnvIntoProcessEnv(
   }
 
   // Load environment variables from file
-  const result = dotenvLib.config({ path: envPath });
+  const result = dotenvLib.config({ path: envPath, override: true });
 
   if (result.error) {
     throw new Error(`Error loading environment variables: ${result.error}`);

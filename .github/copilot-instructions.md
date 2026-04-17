@@ -106,8 +106,7 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
 - Prefer the `openapi-fetch` typed clients over raw `fetch`; the types in `openapi-schema.d.ts`
   are the source of truth for Confluent Cloud request/response shapes.
 - Prefer `enum` over string union types for constants with semantic meaning (see `ToolName`).
-- New public classes and exported functions get JSDoc. Follow the existing style: `{@link Foo}`
-  for classes/types/interfaces, `{@linkcode foo}` for methods/functions/properties.
+- New public classes and exported functions get JSDoc.
 
 ### 4. Error handling
 

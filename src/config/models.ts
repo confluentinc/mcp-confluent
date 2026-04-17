@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { validateBootstrapServers } from "@src/config/validation.js";
+import { z } from "zod";
 
 /**
  * Connection configuration for a direct (local/Docker) Kafka cluster.

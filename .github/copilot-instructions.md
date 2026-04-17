@@ -61,8 +61,9 @@ are satisfied. Cloud-only tools can be disabled with `--disable-confluent-cloud-
 
 - ESM modules (`"type": "module"`). **Always use `.js` extensions in import paths**, even when
   importing `.ts` files.
-- `@src/*` maps to `src/*` (resolved by `tsc-alias` at build time). Always use `@src/` for internal
-  imports; never relative paths that escape the current directory.
+- `@src/*` maps to `src/*` and `@tests/*` maps to `tests/*` (both resolved by `tsc-alias` at
+  build time). Prefer the path aliases for internal imports. Relative paths are acceptable for
+  root-level artifacts like `package.json`, or in other cases where the aliases don't apply.
 
 ## Code Review Guidelines (GitHub PR Reviews)
 

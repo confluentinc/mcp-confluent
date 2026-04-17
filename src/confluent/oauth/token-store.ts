@@ -76,7 +76,7 @@ export class TokenStore {
    * Start a background refresh loop that calls the provided callback every intervalMs.
    * The callback receives this store instance.
    *
-   * Ticks are single-flighted: if a previous tick is still running when the
+   * Ticks are single-flight enforced: if a previous tick is still running when the
    * interval fires, the new tick is skipped. This prevents two callbacks from
    * concurrently refreshing the same single-use refresh token and burning it.
    */

@@ -171,13 +171,17 @@ describe("oauth/token-store.ts", () => {
         sinon.assert.calledTwice(callback);
       });
 
-      it("should not start a second loop if already running", () => {
+      it("should not start a second loop if already running", async () => {
         const callback = sinon.stub().resolves();
         store.startRefreshLoop(240_000, callback);
         store.startRefreshLoop(240_000, callback); // second call should be no-op
 
-        // Only one interval should be active — verified by shutdown not throwing
-        store.shutdown();
+        // Only one interval should be active — a single tick fires the callback once, not twice.
+        await clock.tickAsync(240_000);
+        sinon.assert.calledOnce(callback);
+
+        await clock.tickAsync(240_000);
+        sinon.assert.calledTwice(callback);
       });
 
       it("should stop the loop on shutdown", async () => {

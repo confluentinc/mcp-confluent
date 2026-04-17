@@ -62,7 +62,7 @@ Tools are **auto-enabled/disabled** based on which environment variables are pre
 2. Create handler class extending `BaseToolHandler` in `src/confluent/tools/handlers/<domain>/`.
 3. Implement `getToolConfig()` (name, description, Zod input schema), `handle()`, and `getRequiredEnvVars()`.
 4. Register the handler in `ToolFactory.handlers` map in `src/confluent/tools/tool-factory.ts`.
-5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `openapi-typescript` (`npx openapi-typescript openapi.json -o src/confluent/openapi-schema.d.ts`).
+5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `npm run generate:openapi-types`. Commit the updated `src/confluent/openapi-schema.d.ts` alongside the `openapi.json` change.
 
 ## Code Conventions
 

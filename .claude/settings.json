@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path' | { read -r f; [ -n \"$f\" ] && npx prettier --write --ignore-unknown \"$f\"; } 2>/dev/null || true"
+            "command": "command -v jq >/dev/null 2>&1 && jq -r '.tool_input.file_path' | xargs npx prettier --write --ignore-unknown 2>/dev/null || true"
           }
         ]
       }

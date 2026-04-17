@@ -12,7 +12,7 @@ let envValues: Environment = {} as Environment;
  * Loads and validates environment variables
  * @returns Validated environment object
  */
-export async function loadEnv(): Promise<Environment> {
+function loadEnv(): Environment {
   try {
     // Load and validate environment variables with automatic type conversion
     return combinedSchema.parse(process.env);
@@ -25,9 +25,9 @@ export async function loadEnv(): Promise<Environment> {
 /**
  * Initialize environment and save the values
  */
-export async function initEnv(): Promise<Environment> {
+export function initEnv(): Environment {
   if (!isInitialized) {
-    envValues = await loadEnv();
+    envValues = loadEnv();
     isInitialized = true;
   }
   return envValues;

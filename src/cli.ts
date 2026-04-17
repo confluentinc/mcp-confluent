@@ -1,12 +1,23 @@
 import { Command, CommanderError, Option } from "@commander-js/extra-typings";
+import { dotenvLib, fs, path } from "@src/confluent/node-deps.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { TransportType } from "@src/mcp/transports/types.js";
-import * as dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
+
 import { getProperties, KeyValuePairObject } from "properties-file";
 import pkg from "../package.json" with { type: "json" };
+
+/**
+ * Thrown when Commander has already printed help or version text and the process
+ * should exit cleanly (code 0). Callers catch this to call process.exit(0)
+ * without conflating it with a real error.
+ */
+export class DisplayedCommandLineUsageError extends Error {
+  constructor() {
+    super("Help or version displayed");
+    this.name = "DisplayedCommandLineUsageError";
+  }
+}
 
 // Define the interface for our CLI options
 export interface CLIOptions {
@@ -57,7 +68,6 @@ function parseTransportList(value: string): TransportType[] {
 /**
  * Parses a comma-separated list of tool names and returns an array of valid tool names.
  * Trims whitespace from each tool name.
- * Exits the process with an error if any invalid tool names are provided.
  *
  * @param value - Comma-separated list of tool names
  * @returns Array of valid tool names
@@ -95,10 +105,20 @@ function readFileLines(filePath: string): string[] {
 }
 
 /**
- * Parse command line arguments with strong typing
- * @returns Parsed CLI options
+ * Parse command line arguments into a structured CLIOptions object.
+ *
+ * Only minimally interprets the raw CLI input in order to populate CLIOptions:
+ *  1. Will dereference and parse named files for tool allow/block lists.
+ *  2. Will parse the kafka config properties file into an object.
+ *
+ * Does NOT load environment variables from the env file, nor does it load or
+ * validate the YAML configuration file.
+ *
+ * @param argv - Array of command line arguments (e.g., process.argv.slice(2))
+ * @returns Structured CLIOptions object with parsed and validated values.
+ * @throws Exits the process with an error message if parsing fails or if invalid options are provided.
  */
-export function parseCliArgs(): CLIOptions {
+export function parseCliArgs(argv: string[]): CLIOptions {
   const program = new Command()
     .name("mcp-confluent")
     .description(
@@ -163,10 +183,8 @@ export function parseCliArgs(): CLIOptions {
     .exitOverride();
 
   try {
-    const opts = program.parse().opts();
-    if (opts.envFile) {
-      loadEnvironmentVariables(opts.envFile);
-    }
+    const opts = program.parse(argv).opts();
+
     // Precedence: CLI > file > undefined
     let allowTools: string[] | undefined = undefined;
     let blockTools: string[] | undefined = undefined;
@@ -209,7 +227,8 @@ export function parseCliArgs(): CLIOptions {
       (error.code === "commander.helpDisplayed" ||
         error.code === "commander.version")
     ) {
-      process.exit(0);
+      // Help or version was displayed, signal to main() to exit(0).
+      throw new DisplayedCommandLineUsageError();
     }
     if (error instanceof Error) {
       logger.error(
@@ -223,15 +242,21 @@ export function parseCliArgs(): CLIOptions {
     } else {
       logger.error({ error: String(error) }, "Error parsing CLI options");
     }
-    process.exit(1);
+    throw error;
   }
 }
 
 /**
- * Load environment variables from file
+ * Load dotenv keys/values from file into process.env.
+ * Throws if file not found or if dotenv returns an error.
+ * Overwrites preexisting keys in process.env as a side effect.
  * @param envFile Path to the environment file
+ * @returns Object containing the parsed key-value pairs from the environment file
+ *          (primarily for test purposes, but updates process.env as a side effect)
  */
-export function loadEnvironmentVariables(envFile: string): void {
+export function loadDotEnvIntoProcessEnv(
+  envFile: string,
+): Record<string, string> {
   const envPath = path.resolve(envFile);
 
   // Check if file exists
@@ -240,13 +265,16 @@ export function loadEnvironmentVariables(envFile: string): void {
   }
 
   // Load environment variables from file
-  const result = dotenv.config({ path: envPath });
+  const result = dotenvLib.config({ path: envPath });
 
   if (result.error) {
     throw new Error(`Error loading environment variables: ${result.error}`);
   }
 
   logger.info(`Loaded environment variables from ${envPath}`);
+
+  // Return the parsed variables that are also now in process.env.
+  return result.parsed || {};
 }
 
 /**

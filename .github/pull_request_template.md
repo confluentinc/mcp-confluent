@@ -26,11 +26,6 @@ Please check if your PR fulfills the following (if applicable):
 - [ ] Updated existing
 - [ ] Deleted existing
 
-#### OpenAPI types
-
-<!-- prettier-ignore -->
-- [ ] If this PR introduces calls to a new Confluent Cloud REST endpoint, have you updated `openapi.json` and regenerated `src/confluent/openapi-schema.d.ts`?
-
 #### Release notes
 
 <!-- prettier-ignore -->

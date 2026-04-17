@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import type {
   Auth0Environment,
   Auth0TokenResponse,
@@ -7,6 +6,7 @@ import type {
   DataPlaneTokenResponse,
   OAuthConfig,
 } from "@src/confluent/oauth/types.js";
+import { describe, expect, it } from "vitest";
 
 describe("oauth/types.ts", () => {
   describe("ConfluentTokenSet", () => {

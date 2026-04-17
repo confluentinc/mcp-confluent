@@ -1,6 +1,6 @@
+import { logger } from "@src/logger.js";
 import { randomBytes, timingSafeEqual } from "crypto";
 import { FastifyReply, FastifyRequest } from "fastify";
-import { logger } from "@src/logger.js";
 
 /**
  * Configuration for MCP server authentication

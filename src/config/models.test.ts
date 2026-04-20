@@ -1,4 +1,4 @@
-import { MCPServerConfiguration } from "@src/config/models.js";
+import { MCPServerConfiguration, mcpConfigSchema } from "@src/config/models.js";
 import { describe, expect, it } from "vitest";
 
 const directConnection = {
@@ -7,6 +7,16 @@ const directConnection = {
 };
 
 describe("config/models.ts", () => {
+  describe("mcpConfigSchema", () => {
+    it("should reject unknown keys at the document root", () => {
+      const result = mcpConfigSchema.safeParse({
+        conenctions: { local: directConnection },
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe("MCPServerConfiguration", () => {
     describe("getConnectionNames", () => {
       it("should return connection names sorted alphabetically", () => {

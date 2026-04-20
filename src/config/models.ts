@@ -141,17 +141,19 @@ const connectionConfigSchema = z
  * Parsed output is wrapped in {@link MCPServerConfiguration} by
  * parseYamlConfiguration().
  */
-export const mcpConfigSchema = z.object({
-  connections: z
-    .record(
-      z.string().trim().min(1, "Connection name cannot be empty"),
-      connectionConfigSchema,
-    )
-    .refine(
-      (connections) => Object.keys(connections).length === 1,
-      "Exactly one connection must be defined (multiple connections not yet supported)",
-    ),
-});
+export const mcpConfigSchema = z
+  .object({
+    connections: z
+      .record(
+        z.string().trim().min(1, "Connection name cannot be empty"),
+        connectionConfigSchema,
+      )
+      .refine(
+        (connections) => Object.keys(connections).length === 1,
+        "Exactly one connection must be defined (multiple connections not yet supported)",
+      ),
+  })
+  .strict();
 
 /** Format Zod issues into a human-readable string */
 export function formatZodIssues(issues: z.ZodError["issues"]): string {

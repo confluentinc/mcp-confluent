@@ -1,17 +1,27 @@
 import { validateBootstrapServers } from "@src/config/validation.js";
 import { z } from "zod";
 
+export interface ApiKeyAuthConfig {
+  type: "api_key";
+  key: string;
+  secret: string;
+}
+
+export type AuthConfig = ApiKeyAuthConfig;
+
 /**
  * Connection configuration for a direct (local/Docker) Kafka cluster.
- * No authentication required. At least one of kafka or schema_registry must be present.
+ * At least one of kafka or schema_registry must be present.
  */
 export interface DirectConnectionConfig {
   type: "direct";
   kafka?: {
     bootstrap_servers: string;
+    auth?: AuthConfig;
   };
   schema_registry?: {
     endpoint: string;
+    auth?: AuthConfig;
   };
 }
 
@@ -60,36 +70,54 @@ export class MCPServerConfiguration {
 
 /* And now, Zod schemas for validation of MCPServerConfiguration and contained objects. */
 
+const apiKeyAuthSchema = z
+  .object({
+    type: z.literal("api_key"),
+    key: z.string().trim().min(1, "auth.key cannot be empty"),
+    secret: z.string().trim().min(1, "auth.secret cannot be empty"),
+  })
+  .strict();
+
+const authConfigSchema = z.discriminatedUnion("type", [apiKeyAuthSchema]);
+
 /** Zod schema for direct connection type */
-const directConnectionSchema = z.object({
-  type: z.literal("direct"),
-  kafka: z
-    .object({
-      bootstrap_servers: z
-        .string()
-        .trim()
-        .min(1, "bootstrap_servers cannot be empty")
-        .superRefine((value, ctx) => {
-          try {
-            validateBootstrapServers(value);
-          } catch (error) {
-            ctx.addIssue({
-              code: "custom",
-              message: error instanceof Error ? error.message : String(error),
-            });
-          }
-        }),
-    })
-    .optional(),
-  schema_registry: z
-    .object({
-      endpoint: z
-        .string()
-        .trim()
-        .url("schema_registry.endpoint must be a valid URL"),
-    })
-    .optional(),
-});
+const directConnectionSchema = z
+  .object({
+    type: z.literal("direct"),
+    kafka: z
+      .object({
+        bootstrap_servers: z
+          .string()
+          .trim()
+          .min(1, "bootstrap_servers cannot be empty")
+          .superRefine((value, ctx) => {
+            try {
+              validateBootstrapServers(value);
+            } catch (error) {
+              ctx.addIssue({
+                code: "custom",
+                message: error instanceof Error ? error.message : String(error),
+              });
+            }
+          }),
+        auth: authConfigSchema.optional(),
+      })
+      .strict()
+      .optional(),
+    schema_registry: z
+      .object({
+        endpoint: z
+          .string()
+          .trim()
+          .check(
+            z.url({ error: "schema_registry.endpoint must be a valid URL" }),
+          ),
+        auth: authConfigSchema.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * Discriminated union of all connection types (currently just direct).

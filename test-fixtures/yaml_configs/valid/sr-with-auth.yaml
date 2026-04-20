@@ -1,0 +1,9 @@
+connections:
+  production:
+    type: direct
+    schema_registry:
+      endpoint: "https://sr.confluent.cloud"
+      auth:
+        type: api_key
+        key: "mysrkey"
+        secret: "mysrsecret"

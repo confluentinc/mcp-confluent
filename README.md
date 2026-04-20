@@ -25,6 +25,7 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
 - [User Guide](#user-guide)
   - [Getting Started](#getting-started)
   - [Configuration](#configuration)
+    - [YAML Configuration](#yaml-configuration)
   - [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports)
   - [Usage](#usage)
   - [CLI Usage](#cli-usage)
@@ -136,7 +137,41 @@ You can configure the MCP server using the following environment variables:
 | TELEMETRY_ENDPOINT            | Base URL for Confluent Cloud Telemetry API (metrics)                                                                                                                                                                                                              | "https://api.telemetry.confluent.cloud" | No       |
 | TELEMETRY_API_KEY             | Optional API key for telemetry access. Falls back to CONFLUENT_CLOUD_API_KEY if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).)       |                                         | No       |
 | TELEMETRY_API_SECRET          | Optional API secret for telemetry access. Falls back to CONFLUENT_CLOUD_API_SECRET if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).) |                                         | No       |
-| DO_NOT_TRACK                  | Set to `true` to opt out of anonymous telemetry data collection. See [Telemetry](#telemetry) for details.                                                                                                                                                        |                                         | No       |
+| DO_NOT_TRACK                  | Set to `true` to opt out of anonymous telemetry data collection. See [Telemetry](#telemetry) for details.                                                                                                                                                         |                                         | No       |
+
+### YAML Configuration
+
+> **Note:** YAML-based configuration is actively being built out as the replacement for env-var-only startup. The two modes coexist during the transition — the server accepts both.
+
+Pass a YAML config file at startup with the `--config` flag:
+
+```bash
+npx @confluentinc/mcp-confluent --config /path/to/myconfig.yaml
+```
+
+#### Why YAML over environment variables
+
+Flat environment variables can only express a single implicit connection. A YAML file can define multiple named connections, which is necessary for real-world workflows — for example, a `local-dev` connection pointing at a local Docker Kafka alongside a `staging` connection to a Confluent Cloud cluster, all in one file.
+
+#### Configuration examples
+
+Browse [test-fixtures/yaml_configs/valid/](test-fixtures/yaml_configs/valid/) for working examples covering a range of configurations. These files are executed as part of the test suite on every CI run, so they are always valid and current — use them as your starting point.
+
+#### Env-var interpolation in YAML
+
+`${VAR}` and `${VAR:-default}` syntax is supported anywhere in a config file, so secrets can stay in environment variables while structure lives in the YAML:
+
+```yaml
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "broker.confluent.cloud:9092"
+      auth:
+        type: api_key
+        key: "${KAFKA_API_KEY}"
+        secret: "${KAFKA_API_SECRET}"
+```
 
 #### Prerequisites & Setup for Tableflow Commands
 

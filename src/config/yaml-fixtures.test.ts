@@ -183,6 +183,71 @@ describe("config/yaml-fixtures.test.ts", () => {
     });
   });
 
+  describe("flink fixtures", () => {
+    it("should load flink-with-required-fields with auth and required context fields", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/flink-with-required-fields.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.flink?.auth).toEqual({
+        type: "api_key",
+        key: "myflinkkey",
+        secret: "myflinksecret",
+      });
+      expect(conn.flink?.endpoint).toBe(
+        "https://flink.us-east-1.aws.confluent.cloud",
+      );
+      expect(conn.flink?.environment_id).toBe("env-abc123");
+      expect(conn.flink?.organization_id).toBe("org-xyz789");
+      expect(conn.flink?.compute_pool_id).toBe("lfcp-pool01");
+      expect(conn.flink?.environment_name).toBeUndefined();
+      expect(conn.flink?.database_name).toBeUndefined();
+      expect(conn.kafka).toBeUndefined();
+      expect(conn.schema_registry).toBeUndefined();
+      expect(conn.confluent_cloud).toBeUndefined();
+      expect(conn.tableflow).toBeUndefined();
+    });
+
+    it("should load flink-with-all-fields with every field populated", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/flink-with-all-fields.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.flink?.endpoint).toBe("https://flink.confluent.cloud");
+      expect(conn.flink?.auth).toEqual({
+        type: "api_key",
+        key: "myflinkkey",
+        secret: "myflinksecret",
+      });
+      expect(conn.flink?.environment_id).toBe("env-abc123");
+      expect(conn.flink?.organization_id).toBe("org-xyz789");
+      expect(conn.flink?.compute_pool_id).toBe("lfcp-pool01");
+      expect(conn.flink?.environment_name).toBe("my-environment");
+      expect(conn.flink?.database_name).toBe("my-kafka-cluster");
+    });
+
+    it("should load ccloud-and-flink-with-auth with both blocks populated", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/ccloud-and-flink-with-auth.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.confluent_cloud?.auth).toEqual({
+        type: "api_key",
+        key: "mycloudkey",
+        secret: "mycloudsecret",
+      });
+      expect(conn.flink?.auth).toEqual({
+        type: "api_key",
+        key: "myflinkkey",
+        secret: "myflinksecret",
+      });
+      expect(conn.flink?.environment_id).toBe("env-abc123");
+    });
+  });
+
   describe("invalid fixtures", () => {
     it("should reject auth block missing secret", () => {
       expect(() =>
@@ -244,6 +309,27 @@ describe("config/yaml-fixtures.test.ts", () => {
       expect(() =>
         loadConfigFromYaml(fixtureFile("invalid/auth-empty-key.yaml"), NO_ENV),
       ).toThrow(/auth\.key cannot be empty/);
+    });
+
+    it("should reject a flink block with no fields", () => {
+      expect(() =>
+        loadConfigFromYaml(fixtureFile("invalid/flink-empty.yaml"), NO_ENV),
+      ).toThrow(/flink\.auth/);
+    });
+
+    it("should reject a flink block that has endpoint but is missing other required fields", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/flink-missing-required-fields.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/flink\.auth/);
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/flink-missing-required-fields.yaml"),
+          NO_ENV,
+        ),
+      ).not.toThrow(/flink\.endpoint/);
     });
   });
 });

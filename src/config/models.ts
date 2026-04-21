@@ -11,7 +11,7 @@ export type AuthConfig = ApiKeyAuthConfig;
 
 /**
  * Connection configuration for a direct (local/Docker) Kafka cluster.
- * At least one of kafka, schema_registry, confluent_cloud, or tableflow must be present.
+ * At least one of kafka, schema_registry, confluent_cloud, tableflow, or flink must be present.
  */
 export interface DirectConnectionConfig {
   type: "direct";
@@ -29,6 +29,15 @@ export interface DirectConnectionConfig {
   };
   tableflow?: {
     auth?: AuthConfig;
+  };
+  flink?: {
+    endpoint: string;
+    auth: AuthConfig;
+    environment_id: string;
+    organization_id: string;
+    compute_pool_id: string;
+    environment_name?: string;
+    database_name?: string;
   };
 }
 
@@ -149,6 +158,38 @@ const directConnectionSchema = z
         message: "tableflow block must contain 'auth'",
       })
       .optional(),
+    flink: z
+      .object({
+        endpoint: z
+          .string()
+          .trim()
+          .check(z.url({ error: "flink.endpoint must be a valid URL" })),
+        auth: authConfigSchema,
+        environment_id: z
+          .string()
+          .trim()
+          .startsWith("env-", "flink.environment_id must start with 'env-'"),
+        organization_id: z
+          .string()
+          .trim()
+          .min(1, "flink.organization_id cannot be empty"),
+        compute_pool_id: z
+          .string()
+          .trim()
+          .startsWith("lfcp-", "flink.compute_pool_id must start with 'lfcp-'"),
+        environment_name: z
+          .string()
+          .trim()
+          .min(1, "flink.environment_name cannot be empty")
+          .optional(),
+        database_name: z
+          .string()
+          .trim()
+          .min(1, "flink.database_name cannot be empty")
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -165,12 +206,13 @@ const connectionConfigSchema = z
       !data.kafka &&
       !data.schema_registry &&
       !data.confluent_cloud &&
-      !data.tableflow
+      !data.tableflow &&
+      !data.flink
     ) {
       ctx.addIssue({
         code: "custom",
         message:
-          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', or 'tableflow' must be defined",
+          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', or 'flink' must be defined",
       });
     }
   });

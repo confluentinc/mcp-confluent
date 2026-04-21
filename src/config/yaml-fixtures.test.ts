@@ -246,21 +246,6 @@ describe("config/yaml-fixtures.test.ts", () => {
       });
       expect(conn.flink?.environment_id).toBe("env-abc123");
     });
-
-    it("should reject a flink block with no fields", () => {
-      expect(() =>
-        loadConfigFromYaml(fixtureFile("invalid/flink-empty.yaml"), NO_ENV),
-      ).toThrow(/Configuration validation failed/);
-    });
-
-    it("should reject a flink block missing required fields", () => {
-      expect(() =>
-        loadConfigFromYaml(
-          fixtureFile("invalid/flink-missing-required-fields.yaml"),
-          NO_ENV,
-        ),
-      ).toThrow(/Configuration validation failed/);
-    });
   });
 
   describe("invalid fixtures", () => {
@@ -324,6 +309,27 @@ describe("config/yaml-fixtures.test.ts", () => {
       expect(() =>
         loadConfigFromYaml(fixtureFile("invalid/auth-empty-key.yaml"), NO_ENV),
       ).toThrow(/auth\.key cannot be empty/);
+    });
+
+    it("should reject a flink block with no fields", () => {
+      expect(() =>
+        loadConfigFromYaml(fixtureFile("invalid/flink-empty.yaml"), NO_ENV),
+      ).toThrow(/flink\.auth/);
+    });
+
+    it("should reject a flink block that has endpoint but is missing other required fields", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/flink-missing-required-fields.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/flink\.auth/);
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/flink-missing-required-fields.yaml"),
+          NO_ENV,
+        ),
+      ).not.toThrow(/flink\.endpoint/);
     });
   });
 });

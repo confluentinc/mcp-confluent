@@ -378,17 +378,19 @@ describe("config/env-config.ts", () => {
         TABLEFLOW_API_SECRET: undefined,
       };
 
+      const allRequiredFlinkEnvVars = {
+        FLINK_REST_ENDPOINT: "https://flink.us-east-1.aws.confluent.cloud",
+        FLINK_API_KEY: "flinkkey",
+        FLINK_API_SECRET: "flinksecret",
+        FLINK_ENV_ID: "env-abc123",
+        FLINK_ORG_ID: "org-xyz789",
+        FLINK_COMPUTE_POOL_ID: "lfcp-pool01",
+      } as const;
+
       it("should populate flink block when all required fields are set", () => {
         const config = consConfigFromEnv({
           ...baseFlinkEnv,
-          FLINK_REST_ENDPOINT: "https://flink.us-east-1.aws.confluent.cloud",
-          FLINK_API_KEY: "flinkkey",
-          FLINK_API_SECRET: "flinksecret",
-          FLINK_ENV_ID: "env-abc123",
-          FLINK_ORG_ID: "org-xyz789",
-          FLINK_COMPUTE_POOL_ID: "lfcp-pool01",
-          FLINK_ENV_NAME: undefined,
-          FLINK_DATABASE_NAME: undefined,
+          ...allRequiredFlinkEnvVars,
         });
         const conn = config.getSoleConnection();
         expect(conn.flink?.endpoint).toBe(
@@ -407,11 +409,7 @@ describe("config/env-config.ts", () => {
       it("should populate all optional fields when provided", () => {
         const config = consConfigFromEnv({
           ...baseFlinkEnv,
-          FLINK_API_KEY: "flinkkey",
-          FLINK_API_SECRET: "flinksecret",
-          FLINK_ENV_ID: "env-abc123",
-          FLINK_ORG_ID: "org-xyz789",
-          FLINK_COMPUTE_POOL_ID: "lfcp-pool01",
+          ...allRequiredFlinkEnvVars,
           FLINK_REST_ENDPOINT: "https://flink.confluent.cloud",
           FLINK_ENV_NAME: "my-environment",
           FLINK_DATABASE_NAME: "my-cluster",
@@ -425,14 +423,7 @@ describe("config/env-config.ts", () => {
       it("should be valid as a standalone block (no kafka, sr, confluent_cloud, or tableflow)", () => {
         const config = consConfigFromEnv({
           ...baseFlinkEnv,
-          FLINK_REST_ENDPOINT: "https://flink.us-east-1.aws.confluent.cloud",
-          FLINK_API_KEY: "flinkkey",
-          FLINK_API_SECRET: "flinksecret",
-          FLINK_ENV_ID: "env-abc123",
-          FLINK_ORG_ID: "org-xyz789",
-          FLINK_COMPUTE_POOL_ID: "lfcp-pool01",
-          FLINK_ENV_NAME: undefined,
-          FLINK_DATABASE_NAME: undefined,
+          ...allRequiredFlinkEnvVars,
         });
         const conn = config.getSoleConnection();
         expect(conn.flink).toBeDefined();
@@ -446,14 +437,8 @@ describe("config/env-config.ts", () => {
         expect(() =>
           consConfigFromEnv({
             ...baseFlinkEnv,
-            FLINK_REST_ENDPOINT: "https://flink.us-east-1.aws.confluent.cloud",
-            FLINK_API_KEY: "flinkkey",
+            ...allRequiredFlinkEnvVars,
             FLINK_API_SECRET: undefined,
-            FLINK_ENV_ID: "env-abc123",
-            FLINK_ORG_ID: "org-xyz789",
-            FLINK_COMPUTE_POOL_ID: "lfcp-pool01",
-            FLINK_ENV_NAME: undefined,
-            FLINK_DATABASE_NAME: undefined,
           }),
         ).toThrow(/FLINK_API_SECRET/);
       });
@@ -462,14 +447,8 @@ describe("config/env-config.ts", () => {
         expect(() =>
           consConfigFromEnv({
             ...baseFlinkEnv,
-            FLINK_REST_ENDPOINT: "https://flink.us-east-1.aws.confluent.cloud",
+            ...allRequiredFlinkEnvVars,
             FLINK_API_KEY: undefined,
-            FLINK_API_SECRET: "flinksecret",
-            FLINK_ENV_ID: "env-abc123",
-            FLINK_ORG_ID: "org-xyz789",
-            FLINK_COMPUTE_POOL_ID: "lfcp-pool01",
-            FLINK_ENV_NAME: undefined,
-            FLINK_DATABASE_NAME: undefined,
           }),
         ).toThrow(/FLINK_API_KEY/);
       });
@@ -478,14 +457,12 @@ describe("config/env-config.ts", () => {
         expect(() =>
           consConfigFromEnv({
             ...baseFlinkEnv,
-            FLINK_REST_ENDPOINT: "https://flink.confluent.cloud",
+            ...allRequiredFlinkEnvVars,
             FLINK_API_KEY: undefined,
             FLINK_API_SECRET: undefined,
             FLINK_ENV_ID: undefined,
             FLINK_ORG_ID: undefined,
             FLINK_COMPUTE_POOL_ID: undefined,
-            FLINK_ENV_NAME: undefined,
-            FLINK_DATABASE_NAME: undefined,
           }),
         ).toThrow(/FLINK_ENV_ID/);
       });

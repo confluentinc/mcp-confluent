@@ -1,20 +1,19 @@
 import { MCPServerConfiguration, mcpConfigSchema } from "@src/config/models.js";
 import { describe, expect, it } from "vitest";
 
-const validFlinkBlock = {
-  endpoint: "https://flink.us-east-1.aws.confluent.cloud",
-  auth: { type: "api_key" as const, key: "flinkkey", secret: "flinksecret" },
-  environment_id: "env-abc123",
-  organization_id: "org-xyz789",
-  compute_pool_id: "lfcp-pool01",
-};
-
-const directConnection = {
-  type: "direct" as const,
-  kafka: { bootstrap_servers: "localhost:9092" },
-};
-
 describe("config/models.ts", () => {
+  const validFlinkBlock = {
+    endpoint: "https://flink.us-east-1.aws.confluent.cloud",
+    auth: { type: "api_key" as const, key: "flinkkey", secret: "flinksecret" },
+    environment_id: "env-abc123",
+    organization_id: "org-xyz789",
+    compute_pool_id: "lfcp-pool01",
+  };
+
+  const directConnection = {
+    type: "direct" as const,
+    kafka: { bootstrap_servers: "localhost:9092" },
+  };
   describe("mcpConfigSchema", () => {
     it("should reject unknown keys at the document root", () => {
       const result = mcpConfigSchema.safeParse({

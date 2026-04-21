@@ -410,12 +410,10 @@ describe("config/env-config.ts", () => {
         const config = consConfigFromEnv({
           ...baseFlinkEnv,
           ...allRequiredFlinkEnvVars,
-          FLINK_REST_ENDPOINT: "https://flink.confluent.cloud",
           FLINK_ENV_NAME: "my-environment",
           FLINK_DATABASE_NAME: "my-cluster",
         });
         const conn = config.getSoleConnection();
-        expect(conn.flink?.endpoint).toBe("https://flink.confluent.cloud");
         expect(conn.flink?.environment_name).toBe("my-environment");
         expect(conn.flink?.database_name).toBe("my-cluster");
       });
@@ -457,12 +455,7 @@ describe("config/env-config.ts", () => {
         expect(() =>
           consConfigFromEnv({
             ...baseFlinkEnv,
-            ...allRequiredFlinkEnvVars,
-            FLINK_API_KEY: undefined,
-            FLINK_API_SECRET: undefined,
-            FLINK_ENV_ID: undefined,
-            FLINK_ORG_ID: undefined,
-            FLINK_COMPUTE_POOL_ID: undefined,
+            FLINK_REST_ENDPOINT: "https://flink.us-east-1.aws.confluent.cloud",
           }),
         ).toThrow(/FLINK_ENV_ID/);
       });

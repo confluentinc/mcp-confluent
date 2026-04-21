@@ -111,6 +111,78 @@ describe("config/yaml-fixtures.test.ts", () => {
     });
   });
 
+  describe("confluent_cloud and tableflow fixtures", () => {
+    it("should load ccloud-with-auth with auth and no endpoint", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/ccloud-with-auth.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.confluent_cloud?.auth).toEqual({
+        type: "api_key",
+        key: "mycloudkey",
+        secret: "mycloudsecret",
+      });
+      expect(conn.confluent_cloud?.endpoint).toBeUndefined();
+      expect(conn.kafka).toBeUndefined();
+      expect(conn.schema_registry).toBeUndefined();
+      expect(conn.tableflow).toBeUndefined();
+    });
+
+    it("should load ccloud-with-endpoint-and-auth with both fields populated", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/ccloud-with-endpoint-and-auth.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.confluent_cloud?.endpoint).toBe(
+        "https://custom.confluent.cloud",
+      );
+      expect(conn.confluent_cloud?.auth).toEqual({
+        type: "api_key",
+        key: "mycloudkey",
+        secret: "mycloudsecret",
+      });
+    });
+
+    it("should load tableflow-with-auth with auth block", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/tableflow-with-auth.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.tableflow?.auth).toEqual({
+        type: "api_key",
+        key: "mytableflowkey",
+        secret: "mytableflowsecret",
+      });
+      expect(conn.kafka).toBeUndefined();
+      expect(conn.schema_registry).toBeUndefined();
+      expect(conn.confluent_cloud).toBeUndefined();
+    });
+
+    it("should load ccloud-and-tableflow-with-auth with both blocks populated", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/ccloud-and-tableflow-with-auth.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.confluent_cloud?.endpoint).toBe(
+        "https://api.confluent.cloud",
+      );
+      expect(conn.confluent_cloud?.auth).toEqual({
+        type: "api_key",
+        key: "mycloudkey",
+        secret: "mycloudsecret",
+      });
+      expect(conn.tableflow?.auth).toEqual({
+        type: "api_key",
+        key: "mytableflowkey",
+        secret: "mytableflowsecret",
+      });
+    });
+  });
+
   describe("invalid fixtures", () => {
     it("should reject auth block missing secret", () => {
       expect(() =>
@@ -152,6 +224,20 @@ describe("config/yaml-fixtures.test.ts", () => {
           NO_ENV,
         ),
       ).toThrow(/auth/);
+    });
+
+    it("should reject a tableflow block with no auth", () => {
+      expect(() =>
+        loadConfigFromYaml(fixtureFile("invalid/tableflow-empty.yaml"), NO_ENV),
+      ).toThrow(/tableflow block must contain 'auth'/);
+    });
+
+    it("should reject a confluent_cloud block with neither endpoint nor auth", () => {
+      expect(() =>
+        loadConfigFromYaml(fixtureFile("invalid/ccloud-empty.yaml"), NO_ENV),
+      ).toThrow(
+        /confluent_cloud block must contain at least 'endpoint' or 'auth'/,
+      );
     });
 
     it("should include a descriptive field path in error messages for empty key", () => {

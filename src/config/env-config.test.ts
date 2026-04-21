@@ -64,7 +64,7 @@ describe("config/env-config.ts", () => {
             SCHEMA_REGISTRY_ENDPOINT: undefined,
           }),
         ).toThrow(
-          /At least one of 'kafka', 'schema_registry', 'confluent_cloud', or 'tableflow' must be defined/,
+          /At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', or 'flink' must be defined/,
         );
       });
 
@@ -360,6 +360,104 @@ describe("config/env-config.ts", () => {
             TABLEFLOW_API_SECRET: undefined,
           }),
         ).toThrow(/CONFLUENT_CLOUD_API_KEY/);
+      });
+    });
+
+    describe("flink env vars", () => {
+      const baseFlinkEnv = {
+        BOOTSTRAP_SERVERS: undefined,
+        SCHEMA_REGISTRY_ENDPOINT: undefined,
+        KAFKA_API_KEY: undefined,
+        KAFKA_API_SECRET: undefined,
+        SCHEMA_REGISTRY_API_KEY: undefined,
+        SCHEMA_REGISTRY_API_SECRET: undefined,
+        CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+        CONFLUENT_CLOUD_API_KEY: undefined,
+        CONFLUENT_CLOUD_API_SECRET: undefined,
+        TABLEFLOW_API_KEY: undefined,
+        TABLEFLOW_API_SECRET: undefined,
+      };
+
+      const allRequiredFlinkEnvVars = {
+        FLINK_REST_ENDPOINT: "https://flink.us-east-1.aws.confluent.cloud",
+        FLINK_API_KEY: "flinkkey",
+        FLINK_API_SECRET: "flinksecret",
+        FLINK_ENV_ID: "env-abc123",
+        FLINK_ORG_ID: "org-xyz789",
+        FLINK_COMPUTE_POOL_ID: "lfcp-pool01",
+      } as const;
+
+      it("should populate flink block when all required fields are set", () => {
+        const config = consConfigFromEnv({
+          ...baseFlinkEnv,
+          ...allRequiredFlinkEnvVars,
+        });
+        const conn = config.getSoleConnection();
+        expect(conn.flink?.endpoint).toBe(
+          "https://flink.us-east-1.aws.confluent.cloud",
+        );
+        expect(conn.flink?.auth).toEqual({
+          type: "api_key",
+          key: "flinkkey",
+          secret: "flinksecret",
+        });
+        expect(conn.flink?.environment_id).toBe("env-abc123");
+        expect(conn.flink?.organization_id).toBe("org-xyz789");
+        expect(conn.flink?.compute_pool_id).toBe("lfcp-pool01");
+      });
+
+      it("should populate all optional fields when provided", () => {
+        const config = consConfigFromEnv({
+          ...baseFlinkEnv,
+          ...allRequiredFlinkEnvVars,
+          FLINK_ENV_NAME: "my-environment",
+          FLINK_DATABASE_NAME: "my-cluster",
+        });
+        const conn = config.getSoleConnection();
+        expect(conn.flink?.environment_name).toBe("my-environment");
+        expect(conn.flink?.database_name).toBe("my-cluster");
+      });
+
+      it("should be valid as a standalone block (no kafka, sr, confluent_cloud, or tableflow)", () => {
+        const config = consConfigFromEnv({
+          ...baseFlinkEnv,
+          ...allRequiredFlinkEnvVars,
+        });
+        const conn = config.getSoleConnection();
+        expect(conn.flink).toBeDefined();
+        expect(conn.kafka).toBeUndefined();
+        expect(conn.schema_registry).toBeUndefined();
+        expect(conn.confluent_cloud).toBeUndefined();
+        expect(conn.tableflow).toBeUndefined();
+      });
+
+      it("should throw when FLINK_API_KEY is set but FLINK_API_SECRET is missing", () => {
+        expect(() =>
+          consConfigFromEnv({
+            ...baseFlinkEnv,
+            ...allRequiredFlinkEnvVars,
+            FLINK_API_SECRET: undefined,
+          }),
+        ).toThrow(/FLINK_API_SECRET/);
+      });
+
+      it("should throw when FLINK_API_SECRET is set but FLINK_API_KEY is missing", () => {
+        expect(() =>
+          consConfigFromEnv({
+            ...baseFlinkEnv,
+            ...allRequiredFlinkEnvVars,
+            FLINK_API_KEY: undefined,
+          }),
+        ).toThrow(/FLINK_API_KEY/);
+      });
+
+      it("should throw when flink block is triggered but required fields are missing", () => {
+        expect(() =>
+          consConfigFromEnv({
+            ...baseFlinkEnv,
+            FLINK_REST_ENDPOINT: "https://flink.us-east-1.aws.confluent.cloud",
+          }),
+        ).toThrow(/FLINK_ENV_ID/);
       });
     });
 

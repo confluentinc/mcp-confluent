@@ -11,7 +11,7 @@ export type AuthConfig = ApiKeyAuthConfig;
 
 /**
  * Connection configuration for a direct (local/Docker) Kafka cluster.
- * At least one of kafka, schema_registry, confluent_cloud, or tableflow must be present.
+ * At least one of kafka, schema_registry, confluent_cloud, tableflow, or flink must be present.
  */
 export interface DirectConnectionConfig {
   type: "direct";
@@ -168,7 +168,7 @@ const directConnectionSchema = z
         environment_id: z
           .string()
           .trim()
-          .min(1, "flink.environment_id cannot be empty"),
+          .startsWith("env-", "flink.environment_id must start with 'env-'"),
         organization_id: z
           .string()
           .trim()
@@ -176,9 +176,17 @@ const directConnectionSchema = z
         compute_pool_id: z
           .string()
           .trim()
-          .min(1, "flink.compute_pool_id cannot be empty"),
-        environment_name: z.string().trim().optional(),
-        database_name: z.string().trim().optional(),
+          .startsWith("lfcp-", "flink.compute_pool_id must start with 'lfcp-'"),
+        environment_name: z
+          .string()
+          .trim()
+          .min(1, "flink.environment_name cannot be empty")
+          .optional(),
+        database_name: z
+          .string()
+          .trim()
+          .min(1, "flink.database_name cannot be empty")
+          .optional(),
       })
       .strict()
       .optional(),

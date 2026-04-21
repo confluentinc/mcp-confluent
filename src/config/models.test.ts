@@ -58,6 +58,31 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it.each(["environment_name", "database_name"])(
+      "should reject flink block with empty string for optional field '%s'",
+      (field) => {
+        const flink = { ...validFlinkBlock, [field]: "" };
+        const result = mcpConfigSchema.safeParse({
+          connections: { production: { type: "direct", flink } },
+        });
+        expect(result.success).toBe(false);
+      },
+    );
+
+    it.each([
+      ["environment_id", "bad-id"],
+      ["compute_pool_id", "bad-id"],
+    ])(
+      "should reject flink block with invalid prefix for '%s'",
+      (field, value) => {
+        const flink = { ...validFlinkBlock, [field]: value };
+        const result = mcpConfigSchema.safeParse({
+          connections: { production: { type: "direct", flink } },
+        });
+        expect(result.success).toBe(false);
+      },
+    );
   });
 
   describe("MCPServerConfiguration", () => {

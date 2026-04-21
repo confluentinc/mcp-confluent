@@ -15,16 +15,16 @@ export type AuthConfig = ApiKeyAuthConfig;
  */
 export interface DirectConnectionConfig {
   type: "direct";
+  confluent_cloud?: {
+    endpoint?: string;
+    auth?: AuthConfig;
+  };
   kafka?: {
     bootstrap_servers: string;
     auth?: AuthConfig;
   };
   schema_registry?: {
     endpoint: string;
-    auth?: AuthConfig;
-  };
-  confluent_cloud?: {
-    endpoint?: string;
     auth?: AuthConfig;
   };
   tableflow?: {
@@ -91,6 +91,19 @@ const authConfigSchema = z.discriminatedUnion("type", [apiKeyAuthSchema]);
 const directConnectionSchema = z
   .object({
     type: z.literal("direct"),
+    confluent_cloud: z
+      .object({
+        endpoint: z
+          .string()
+          .trim()
+          .check(
+            z.url({ error: "confluent_cloud.endpoint must be a valid URL" }),
+          )
+          .optional(),
+        auth: authConfigSchema.optional(),
+      })
+      .strict()
+      .optional(),
     kafka: z
       .object({
         bootstrap_servers: z
@@ -119,19 +132,6 @@ const directConnectionSchema = z
           .check(
             z.url({ error: "schema_registry.endpoint must be a valid URL" }),
           ),
-        auth: authConfigSchema.optional(),
-      })
-      .strict()
-      .optional(),
-    confluent_cloud: z
-      .object({
-        endpoint: z
-          .string()
-          .trim()
-          .check(
-            z.url({ error: "confluent_cloud.endpoint must be a valid URL" }),
-          )
-          .optional(),
         auth: authConfigSchema.optional(),
       })
       .strict()

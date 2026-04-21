@@ -103,6 +103,10 @@ const directConnectionSchema = z
         auth: authConfigSchema.optional(),
       })
       .strict()
+      .refine((cc) => cc.endpoint !== undefined || cc.auth !== undefined, {
+        message:
+          "confluent_cloud block must contain at least 'endpoint' or 'auth'",
+      })
       .optional(),
     kafka: z
       .object({
@@ -141,6 +145,9 @@ const directConnectionSchema = z
         auth: authConfigSchema.optional(),
       })
       .strict()
+      .refine((tf) => tf.auth !== undefined, {
+        message: "tableflow block must contain 'auth'",
+      })
       .optional(),
   })
   .strict();

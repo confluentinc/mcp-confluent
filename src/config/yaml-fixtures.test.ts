@@ -226,6 +226,20 @@ describe("config/yaml-fixtures.test.ts", () => {
       ).toThrow(/auth/);
     });
 
+    it("should reject a tableflow block with no auth", () => {
+      expect(() =>
+        loadConfigFromYaml(fixtureFile("invalid/tableflow-empty.yaml"), NO_ENV),
+      ).toThrow(/tableflow block must contain 'auth'/);
+    });
+
+    it("should reject a confluent_cloud block with neither endpoint nor auth", () => {
+      expect(() =>
+        loadConfigFromYaml(fixtureFile("invalid/ccloud-empty.yaml"), NO_ENV),
+      ).toThrow(
+        /confluent_cloud block must contain at least 'endpoint' or 'auth'/,
+      );
+    });
+
     it("should include a descriptive field path in error messages for empty key", () => {
       expect(() =>
         loadConfigFromYaml(fixtureFile("invalid/auth-empty-key.yaml"), NO_ENV),

@@ -25,6 +25,13 @@ const ENV_VAR_TO_ZPATH = {
   SCHEMA_REGISTRY_ENDPOINT: `${CONN}.schema_registry.endpoint`,
   SCHEMA_REGISTRY_API_KEY: `${CONN}.schema_registry.auth.key`,
   SCHEMA_REGISTRY_API_SECRET: `${CONN}.schema_registry.auth.secret`,
+  // Confluent Cloud control plane parameters
+  CONFLUENT_CLOUD_REST_ENDPOINT: `${CONN}.confluent_cloud.endpoint`,
+  CONFLUENT_CLOUD_API_KEY: `${CONN}.confluent_cloud.auth.key`,
+  CONFLUENT_CLOUD_API_SECRET: `${CONN}.confluent_cloud.auth.secret`,
+  // Tableflow parameters
+  TABLEFLOW_API_KEY: `${CONN}.tableflow.auth.key`,
+  TABLEFLOW_API_SECRET: `${CONN}.tableflow.auth.secret`,
 } satisfies Partial<Record<keyof Environment, string>>;
 
 /**
@@ -43,16 +50,12 @@ export function consConfigFromEnv(
   const connection: Record<string, unknown> = { type: "direct" };
 
   if (env.BOOTSTRAP_SERVERS || env.KAFKA_API_KEY || env.KAFKA_API_SECRET) {
-    const kafka: Record<string, unknown> = {};
-    if (env.BOOTSTRAP_SERVERS) kafka.bootstrap_servers = env.BOOTSTRAP_SERVERS;
-    if (env.KAFKA_API_KEY || env.KAFKA_API_SECRET) {
-      kafka.auth = {
-        type: "api_key",
-        key: env.KAFKA_API_KEY,
-        secret: env.KAFKA_API_SECRET,
-      };
-    }
-    connection.kafka = kafka;
+    connection.kafka = {
+      ...(env.BOOTSTRAP_SERVERS && {
+        bootstrap_servers: env.BOOTSTRAP_SERVERS,
+      }),
+      ...apiKeyAuth(env.KAFKA_API_KEY, env.KAFKA_API_SECRET),
+    };
   }
 
   if (
@@ -60,17 +63,38 @@ export function consConfigFromEnv(
     env.SCHEMA_REGISTRY_API_KEY ||
     env.SCHEMA_REGISTRY_API_SECRET
   ) {
-    const sr: Record<string, unknown> = {};
-    if (env.SCHEMA_REGISTRY_ENDPOINT)
-      sr.endpoint = env.SCHEMA_REGISTRY_ENDPOINT;
-    if (env.SCHEMA_REGISTRY_API_KEY || env.SCHEMA_REGISTRY_API_SECRET) {
-      sr.auth = {
-        type: "api_key",
-        key: env.SCHEMA_REGISTRY_API_KEY,
-        secret: env.SCHEMA_REGISTRY_API_SECRET,
-      };
-    }
-    connection.schema_registry = sr;
+    connection.schema_registry = {
+      ...(env.SCHEMA_REGISTRY_ENDPOINT && {
+        endpoint: env.SCHEMA_REGISTRY_ENDPOINT,
+      }),
+      ...apiKeyAuth(
+        env.SCHEMA_REGISTRY_API_KEY,
+        env.SCHEMA_REGISTRY_API_SECRET,
+      ),
+    };
+  }
+
+  if (
+    env.CONFLUENT_CLOUD_REST_ENDPOINT ||
+    env.CONFLUENT_CLOUD_API_KEY ||
+    env.CONFLUENT_CLOUD_API_SECRET
+  ) {
+    connection.confluent_cloud = {
+      ...(env.CONFLUENT_CLOUD_REST_ENDPOINT && {
+        endpoint: env.CONFLUENT_CLOUD_REST_ENDPOINT,
+      }),
+      ...apiKeyAuth(
+        env.CONFLUENT_CLOUD_API_KEY,
+        env.CONFLUENT_CLOUD_API_SECRET,
+      ),
+    };
+  }
+
+  if (env.TABLEFLOW_API_KEY || env.TABLEFLOW_API_SECRET) {
+    connection.tableflow = apiKeyAuth(
+      env.TABLEFLOW_API_KEY,
+      env.TABLEFLOW_API_SECRET,
+    );
   }
 
   const result = mcpConfigSchema.safeParse({
@@ -87,6 +111,15 @@ export function consConfigFromEnv(
   }
 
   return new MCPServerConfiguration(result.data);
+}
+
+/** Returns an `{ auth: ... }` spread object when either credential is present, empty object otherwise. */
+function apiKeyAuth(
+  key: string | undefined,
+  secret: string | undefined,
+): Record<string, unknown> {
+  if (!key && !secret) return {};
+  return { auth: { type: "api_key", key, secret } };
 }
 
 /**

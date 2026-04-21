@@ -11,7 +11,7 @@ export type AuthConfig = ApiKeyAuthConfig;
 
 /**
  * Connection configuration for a direct (local/Docker) Kafka cluster.
- * At least one of kafka or schema_registry must be present.
+ * At least one of kafka, schema_registry, confluent_cloud, or tableflow must be present.
  */
 export interface DirectConnectionConfig {
   type: "direct";
@@ -21,6 +21,13 @@ export interface DirectConnectionConfig {
   };
   schema_registry?: {
     endpoint: string;
+    auth?: AuthConfig;
+  };
+  confluent_cloud?: {
+    endpoint?: string;
+    auth?: AuthConfig;
+  };
+  tableflow?: {
     auth?: AuthConfig;
   };
 }
@@ -116,6 +123,25 @@ const directConnectionSchema = z
       })
       .strict()
       .optional(),
+    confluent_cloud: z
+      .object({
+        endpoint: z
+          .string()
+          .trim()
+          .check(
+            z.url({ error: "confluent_cloud.endpoint must be a valid URL" }),
+          )
+          .optional(),
+        auth: authConfigSchema.optional(),
+      })
+      .strict()
+      .optional(),
+    tableflow: z
+      .object({
+        auth: authConfigSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -127,10 +153,17 @@ const connectionConfigSchema = z
   // superRefine is placed here (after the union) rather than on directConnectionSchema
   // because wrapping a ZodObject in ZodEffects breaks z.discriminatedUnion's discriminant lookup.
   .superRefine((data, ctx) => {
-    if (data.type === "direct" && !data.kafka && !data.schema_registry) {
+    if (
+      data.type === "direct" &&
+      !data.kafka &&
+      !data.schema_registry &&
+      !data.confluent_cloud &&
+      !data.tableflow
+    ) {
       ctx.addIssue({
         code: "custom",
-        message: "At least one of 'kafka' or 'schema_registry' must be defined",
+        message:
+          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', or 'tableflow' must be defined",
       });
     }
   });

@@ -64,7 +64,7 @@ describe("config/env-config.ts", () => {
             SCHEMA_REGISTRY_ENDPOINT: undefined,
           }),
         ).toThrow(
-          /At least one of 'kafka' or 'schema_registry' must be defined/,
+          /At least one of 'kafka', 'schema_registry', 'confluent_cloud', or 'tableflow' must be defined/,
         );
       });
 
@@ -208,6 +208,11 @@ describe("config/env-config.ts", () => {
             KAFKA_API_SECRET: "mysecret",
             SCHEMA_REGISTRY_API_KEY: undefined,
             SCHEMA_REGISTRY_API_SECRET: undefined,
+            CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+            CONFLUENT_CLOUD_API_KEY: undefined,
+            CONFLUENT_CLOUD_API_SECRET: undefined,
+            TABLEFLOW_API_KEY: undefined,
+            TABLEFLOW_API_SECRET: undefined,
           }),
         ).toThrow(/BOOTSTRAP_SERVERS/);
       });
@@ -221,8 +226,221 @@ describe("config/env-config.ts", () => {
             KAFKA_API_SECRET: undefined,
             SCHEMA_REGISTRY_API_KEY: "srkey",
             SCHEMA_REGISTRY_API_SECRET: "srsecret",
+            CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+            CONFLUENT_CLOUD_API_KEY: undefined,
+            CONFLUENT_CLOUD_API_SECRET: undefined,
+            TABLEFLOW_API_KEY: undefined,
+            TABLEFLOW_API_SECRET: undefined,
           }),
         ).toThrow(/SCHEMA_REGISTRY_ENDPOINT/);
+      });
+    });
+
+    describe("confluent_cloud env vars", () => {
+      it("should populate confluent_cloud auth when key and secret are set", () => {
+        const config = consConfigFromEnv({
+          BOOTSTRAP_SERVERS: undefined,
+          SCHEMA_REGISTRY_ENDPOINT: undefined,
+          KAFKA_API_KEY: undefined,
+          KAFKA_API_SECRET: undefined,
+          SCHEMA_REGISTRY_API_KEY: undefined,
+          SCHEMA_REGISTRY_API_SECRET: undefined,
+          CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+          CONFLUENT_CLOUD_API_KEY: "cckey",
+          CONFLUENT_CLOUD_API_SECRET: "ccsecret",
+          TABLEFLOW_API_KEY: undefined,
+          TABLEFLOW_API_SECRET: undefined,
+        });
+        const conn = config.getSoleConnection();
+        expect(conn.confluent_cloud?.auth).toEqual({
+          type: "api_key",
+          key: "cckey",
+          secret: "ccsecret",
+        });
+        expect(conn.confluent_cloud?.endpoint).toBeUndefined();
+      });
+
+      it("should populate confluent_cloud endpoint when only CONFLUENT_CLOUD_REST_ENDPOINT is set", () => {
+        const config = consConfigFromEnv({
+          BOOTSTRAP_SERVERS: undefined,
+          SCHEMA_REGISTRY_ENDPOINT: undefined,
+          KAFKA_API_KEY: undefined,
+          KAFKA_API_SECRET: undefined,
+          SCHEMA_REGISTRY_API_KEY: undefined,
+          SCHEMA_REGISTRY_API_SECRET: undefined,
+          CONFLUENT_CLOUD_REST_ENDPOINT: "https://custom.confluent.cloud",
+          CONFLUENT_CLOUD_API_KEY: undefined,
+          CONFLUENT_CLOUD_API_SECRET: undefined,
+          TABLEFLOW_API_KEY: undefined,
+          TABLEFLOW_API_SECRET: undefined,
+        });
+        const conn = config.getSoleConnection();
+        expect(conn.confluent_cloud?.endpoint).toBe(
+          "https://custom.confluent.cloud",
+        );
+        expect(conn.confluent_cloud?.auth).toBeUndefined();
+      });
+
+      it("should populate both endpoint and auth when all three CCloud vars are set", () => {
+        const config = consConfigFromEnv({
+          BOOTSTRAP_SERVERS: undefined,
+          SCHEMA_REGISTRY_ENDPOINT: undefined,
+          KAFKA_API_KEY: undefined,
+          KAFKA_API_SECRET: undefined,
+          SCHEMA_REGISTRY_API_KEY: undefined,
+          SCHEMA_REGISTRY_API_SECRET: undefined,
+          CONFLUENT_CLOUD_REST_ENDPOINT: "https://custom.confluent.cloud",
+          CONFLUENT_CLOUD_API_KEY: "cckey",
+          CONFLUENT_CLOUD_API_SECRET: "ccsecret",
+          TABLEFLOW_API_KEY: undefined,
+          TABLEFLOW_API_SECRET: undefined,
+        });
+        const conn = config.getSoleConnection();
+        expect(conn.confluent_cloud?.endpoint).toBe(
+          "https://custom.confluent.cloud",
+        );
+        expect(conn.confluent_cloud?.auth).toEqual({
+          type: "api_key",
+          key: "cckey",
+          secret: "ccsecret",
+        });
+      });
+
+      it("should be valid as a standalone block (no kafka or schema_registry)", () => {
+        const config = consConfigFromEnv({
+          BOOTSTRAP_SERVERS: undefined,
+          SCHEMA_REGISTRY_ENDPOINT: undefined,
+          KAFKA_API_KEY: undefined,
+          KAFKA_API_SECRET: undefined,
+          SCHEMA_REGISTRY_API_KEY: undefined,
+          SCHEMA_REGISTRY_API_SECRET: undefined,
+          CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+          CONFLUENT_CLOUD_API_KEY: "cckey",
+          CONFLUENT_CLOUD_API_SECRET: "ccsecret",
+          TABLEFLOW_API_KEY: undefined,
+          TABLEFLOW_API_SECRET: undefined,
+        });
+        const conn = config.getSoleConnection();
+        expect(conn.confluent_cloud?.auth).toBeDefined();
+        expect(conn.kafka).toBeUndefined();
+        expect(conn.schema_registry).toBeUndefined();
+      });
+
+      it("should throw when CONFLUENT_CLOUD_API_KEY is set but CONFLUENT_CLOUD_API_SECRET is missing", () => {
+        expect(() =>
+          consConfigFromEnv({
+            BOOTSTRAP_SERVERS: undefined,
+            SCHEMA_REGISTRY_ENDPOINT: undefined,
+            KAFKA_API_KEY: undefined,
+            KAFKA_API_SECRET: undefined,
+            SCHEMA_REGISTRY_API_KEY: undefined,
+            SCHEMA_REGISTRY_API_SECRET: undefined,
+            CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+            CONFLUENT_CLOUD_API_KEY: "cckey",
+            CONFLUENT_CLOUD_API_SECRET: undefined,
+            TABLEFLOW_API_KEY: undefined,
+            TABLEFLOW_API_SECRET: undefined,
+          }),
+        ).toThrow(/CONFLUENT_CLOUD_API_SECRET/);
+      });
+
+      it("should throw when CONFLUENT_CLOUD_API_SECRET is set but CONFLUENT_CLOUD_API_KEY is missing", () => {
+        expect(() =>
+          consConfigFromEnv({
+            BOOTSTRAP_SERVERS: undefined,
+            SCHEMA_REGISTRY_ENDPOINT: undefined,
+            KAFKA_API_KEY: undefined,
+            KAFKA_API_SECRET: undefined,
+            SCHEMA_REGISTRY_API_KEY: undefined,
+            SCHEMA_REGISTRY_API_SECRET: undefined,
+            CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+            CONFLUENT_CLOUD_API_KEY: undefined,
+            CONFLUENT_CLOUD_API_SECRET: "ccsecret",
+            TABLEFLOW_API_KEY: undefined,
+            TABLEFLOW_API_SECRET: undefined,
+          }),
+        ).toThrow(/CONFLUENT_CLOUD_API_KEY/);
+      });
+    });
+
+    describe("tableflow env vars", () => {
+      it("should populate tableflow auth when key and secret are set", () => {
+        const config = consConfigFromEnv({
+          BOOTSTRAP_SERVERS: undefined,
+          SCHEMA_REGISTRY_ENDPOINT: undefined,
+          KAFKA_API_KEY: undefined,
+          KAFKA_API_SECRET: undefined,
+          SCHEMA_REGISTRY_API_KEY: undefined,
+          SCHEMA_REGISTRY_API_SECRET: undefined,
+          CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+          CONFLUENT_CLOUD_API_KEY: undefined,
+          CONFLUENT_CLOUD_API_SECRET: undefined,
+          TABLEFLOW_API_KEY: "tfkey",
+          TABLEFLOW_API_SECRET: "tfsecret",
+        });
+        const conn = config.getSoleConnection();
+        expect(conn.tableflow?.auth).toEqual({
+          type: "api_key",
+          key: "tfkey",
+          secret: "tfsecret",
+        });
+      });
+
+      it("should be valid as a standalone block (no kafka, sr, or confluent_cloud)", () => {
+        const config = consConfigFromEnv({
+          BOOTSTRAP_SERVERS: undefined,
+          SCHEMA_REGISTRY_ENDPOINT: undefined,
+          KAFKA_API_KEY: undefined,
+          KAFKA_API_SECRET: undefined,
+          SCHEMA_REGISTRY_API_KEY: undefined,
+          SCHEMA_REGISTRY_API_SECRET: undefined,
+          CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+          CONFLUENT_CLOUD_API_KEY: undefined,
+          CONFLUENT_CLOUD_API_SECRET: undefined,
+          TABLEFLOW_API_KEY: "tfkey",
+          TABLEFLOW_API_SECRET: "tfsecret",
+        });
+        const conn = config.getSoleConnection();
+        expect(conn.tableflow?.auth).toBeDefined();
+        expect(conn.kafka).toBeUndefined();
+        expect(conn.schema_registry).toBeUndefined();
+        expect(conn.confluent_cloud).toBeUndefined();
+      });
+
+      it("should throw when TABLEFLOW_API_KEY is set but TABLEFLOW_API_SECRET is missing", () => {
+        expect(() =>
+          consConfigFromEnv({
+            BOOTSTRAP_SERVERS: undefined,
+            SCHEMA_REGISTRY_ENDPOINT: undefined,
+            KAFKA_API_KEY: undefined,
+            KAFKA_API_SECRET: undefined,
+            SCHEMA_REGISTRY_API_KEY: undefined,
+            SCHEMA_REGISTRY_API_SECRET: undefined,
+            CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+            CONFLUENT_CLOUD_API_KEY: undefined,
+            CONFLUENT_CLOUD_API_SECRET: undefined,
+            TABLEFLOW_API_KEY: "tfkey",
+            TABLEFLOW_API_SECRET: undefined,
+          }),
+        ).toThrow(/TABLEFLOW_API_SECRET/);
+      });
+
+      it("should throw when TABLEFLOW_API_SECRET is set but TABLEFLOW_API_KEY is missing", () => {
+        expect(() =>
+          consConfigFromEnv({
+            BOOTSTRAP_SERVERS: undefined,
+            SCHEMA_REGISTRY_ENDPOINT: undefined,
+            KAFKA_API_KEY: undefined,
+            KAFKA_API_SECRET: undefined,
+            SCHEMA_REGISTRY_API_KEY: undefined,
+            SCHEMA_REGISTRY_API_SECRET: undefined,
+            CONFLUENT_CLOUD_REST_ENDPOINT: undefined,
+            CONFLUENT_CLOUD_API_KEY: undefined,
+            CONFLUENT_CLOUD_API_SECRET: undefined,
+            TABLEFLOW_API_KEY: undefined,
+            TABLEFLOW_API_SECRET: "tfsecret",
+          }),
+        ).toThrow(/TABLEFLOW_API_KEY/);
       });
     });
   });

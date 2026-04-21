@@ -136,7 +136,7 @@ describe("config/index.ts", () => {
         /Configuration validation failed/,
       );
       expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /At least one of 'kafka' or 'schema_registry' must be defined/,
+        /At least one of 'kafka', 'schema_registry', 'confluent_cloud', or 'tableflow' must be defined/,
       );
     });
 

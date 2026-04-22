@@ -436,6 +436,23 @@ describe("config/models.ts", () => {
       });
 
       it.each([
+        ["bootstrap.servers", { "bootstrap.servers": "" }],
+        ["sasl.username", { "sasl.username": "" }],
+        ["sasl.password", { "sasl.password": "" }],
+      ])(
+        "should throw when protected key '%s' is present but empty",
+        (key, props) => {
+          const config = new MCPServerConfiguration({
+            connections: {
+              local: { type: "direct", kafka: { bootstrap_servers: "b:9092" } },
+            },
+          });
+
+          expect(() => config.setKafkaExtraProperties(props)).toThrow(key);
+        },
+      );
+
+      it.each([
         [{ "sasl.username": "k-key" }, "sasl.password"],
         [{ "sasl.password": "k-secret" }, "sasl.username"],
       ])(

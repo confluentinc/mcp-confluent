@@ -133,8 +133,16 @@ export class MCPServerConfiguration {
   setKafkaExtraProperties(props: Record<string, string>): void {
     const conn = this.getSoleConnection();
 
+    for (const key of KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS) {
+      if (Object.hasOwn(props, key) && props[key] === "") {
+        throw new Error(
+          `--kafka-config-file: ${key} is present but empty — provide a non-empty value or omit the key`,
+        );
+      }
+    }
+
     if (!conn.kafka) {
-      if (!props["bootstrap.servers"]) {
+      if (!Object.hasOwn(props, "bootstrap.servers")) {
         throw new Error(
           "--kafka-config-file: no kafka block is configured and props do not include bootstrap.servers — cannot establish a Kafka connection",
         );
@@ -148,8 +156,8 @@ export class MCPServerConfiguration {
       );
     }
 
-    const hasSaslUser = !!props["sasl.username"];
-    const hasSaslPass = !!props["sasl.password"];
+    const hasSaslUser = Object.hasOwn(props, "sasl.username");
+    const hasSaslPass = Object.hasOwn(props, "sasl.password");
     if (hasSaslUser !== hasSaslPass) {
       throw new Error(
         "--kafka-config-file: sasl.username and sasl.password must both be present or both be absent",
@@ -158,14 +166,14 @@ export class MCPServerConfiguration {
 
     const protectedSet = new Set<string>(KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS);
 
-    if (props["bootstrap.servers"]) {
+    if (Object.hasOwn(props, "bootstrap.servers")) {
       conn.kafka.bootstrap_servers = props["bootstrap.servers"];
     }
-    if (props["sasl.username"] && props["sasl.password"]) {
+    if (hasSaslUser && hasSaslPass) {
       conn.kafka.auth = {
         type: "api_key",
-        key: props["sasl.username"],
-        secret: props["sasl.password"],
+        key: props["sasl.username"]!,
+        secret: props["sasl.password"]!,
       };
     }
 

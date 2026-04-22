@@ -103,6 +103,32 @@ describe("oauth/token-store.ts", () => {
 
         expect(result).toBe(false);
       });
+
+      it("should leave omitted fields unchanged when given a partial update", () => {
+        const tokenSet = createTokenSet();
+        store.store(tokenSet);
+
+        store.update("opaque-access-token", {
+          refreshToken: "new-refresh",
+        });
+
+        const updated = store.get("opaque-access-token")!;
+        expect(updated.refreshToken).toBe("new-refresh");
+        // Every other field preserved from the original
+        expect(updated.refreshTokenAbsoluteExpiresAt).toBe(
+          tokenSet.refreshTokenAbsoluteExpiresAt,
+        );
+        expect(updated.refreshTokenIdleExpiresAt).toBe(
+          tokenSet.refreshTokenIdleExpiresAt,
+        );
+        expect(updated.controlPlaneToken).toBe("cp-token");
+        expect(updated.controlPlaneExpiresAt).toBe(
+          tokenSet.controlPlaneExpiresAt,
+        );
+        expect(updated.dataPlaneToken).toBe("dp-token");
+        expect(updated.dataPlaneExpiresAt).toBe(tokenSet.dataPlaneExpiresAt);
+        expect(updated.accessToken).toBe("opaque-access-token");
+      });
     });
 
     describe("getAllAccessTokens", () => {

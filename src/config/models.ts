@@ -270,8 +270,8 @@ const directConnectionSchema = z
         extra_properties: z
           .record(z.string(), z.string())
           .superRefine((props, ctx) => {
-            const found = KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS.filter(
-              (k) => k in props,
+            const found = KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS.filter((k) =>
+              Object.hasOwn(props, k),
             );
             if (found.length > 0) {
               ctx.addIssue({

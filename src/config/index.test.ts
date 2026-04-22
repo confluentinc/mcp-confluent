@@ -136,7 +136,7 @@ describe("config/index.ts", () => {
         /Configuration validation failed/,
       );
       expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /At least one of 'kafka' or 'schema_registry' must be defined/,
+        /At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', or 'flink' must be defined/,
       );
     });
 
@@ -333,6 +333,64 @@ describe("config/index.ts", () => {
           BOOTSTRAP: "not-a-valid-host-port",
         }),
       ).toThrow(/Invalid format 'not-a-valid-host-port': must be host:port/);
+    });
+
+    describe("unknown key rejection", () => {
+      it("should reject an unknown key at the connection level", () => {
+        const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+    typo_field: "oops"
+`;
+        expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+          /Configuration validation failed/,
+        );
+      });
+
+      it("should reject an unknown key inside the kafka sub-object", () => {
+        const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+      boostrap_servers: "typo"
+`;
+        expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+          /Configuration validation failed/,
+        );
+      });
+
+      it("should reject an unknown key inside the schema_registry sub-object", () => {
+        const yamlContent = `connections:
+  local:
+    type: "direct"
+    schema_registry:
+      endpoint: "http://localhost:8081"
+      endpint: "typo"
+`;
+        expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+          /Configuration validation failed/,
+        );
+      });
+
+      it("should reject an unknown key inside the auth block", () => {
+        const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+      auth:
+        type: api_key
+        key: "mykey"
+        secret: "mysecret"
+        extra_field: "oops"
+`;
+        expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+          /Configuration validation failed/,
+        );
+      });
     });
 
     it("should throw when a referenced variable is missing from env", () => {

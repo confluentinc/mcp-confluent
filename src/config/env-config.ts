@@ -1,0 +1,169 @@
+import {
+  formatZodIssues,
+  mcpConfigSchema,
+  MCPServerConfiguration,
+} from "@src/config/models.js";
+import type { Environment } from "@src/env.js";
+
+const ENV_CONNECTION_NAME = "env-connection";
+
+/** The manufactured document path prefix for the single connection configured from env vars. */
+const CONN = `connections.${ENV_CONNECTION_NAME}`;
+
+/**
+ * Maps each environment variable name handled by consConfigFromEnv to its
+ * corresponding Zod document path in the manufactured MCPServerConfiguration.
+ * The keys drive the Pick<Environment, ...> type of consConfigFromEnv, so every
+ * env var the function touches must have an entry here.
+ */
+const ENV_VAR_TO_ZPATH = {
+  // Kafka connection parameters
+  BOOTSTRAP_SERVERS: `${CONN}.kafka.bootstrap_servers`,
+  KAFKA_API_KEY: `${CONN}.kafka.auth.key`,
+  KAFKA_API_SECRET: `${CONN}.kafka.auth.secret`,
+  // Schema Registry connection parameters
+  SCHEMA_REGISTRY_ENDPOINT: `${CONN}.schema_registry.endpoint`,
+  SCHEMA_REGISTRY_API_KEY: `${CONN}.schema_registry.auth.key`,
+  SCHEMA_REGISTRY_API_SECRET: `${CONN}.schema_registry.auth.secret`,
+  // Confluent Cloud control plane parameters
+  CONFLUENT_CLOUD_REST_ENDPOINT: `${CONN}.confluent_cloud.endpoint`,
+  CONFLUENT_CLOUD_API_KEY: `${CONN}.confluent_cloud.auth.key`,
+  CONFLUENT_CLOUD_API_SECRET: `${CONN}.confluent_cloud.auth.secret`,
+  // Tableflow parameters
+  TABLEFLOW_API_KEY: `${CONN}.tableflow.auth.key`,
+  TABLEFLOW_API_SECRET: `${CONN}.tableflow.auth.secret`,
+  // Flink parameters
+  FLINK_REST_ENDPOINT: `${CONN}.flink.endpoint`,
+  FLINK_API_KEY: `${CONN}.flink.auth.key`,
+  FLINK_API_SECRET: `${CONN}.flink.auth.secret`,
+  FLINK_ENV_ID: `${CONN}.flink.environment_id`,
+  FLINK_ORG_ID: `${CONN}.flink.organization_id`,
+  FLINK_COMPUTE_POOL_ID: `${CONN}.flink.compute_pool_id`,
+  FLINK_ENV_NAME: `${CONN}.flink.environment_name`,
+  FLINK_DATABASE_NAME: `${CONN}.flink.database_name`,
+} satisfies Partial<Record<keyof Environment, string>>;
+
+/**
+ * Constructs a single-direct-connection MCPServerConfiguration from environment variables.
+ *
+ * This is peer to the functionality provided by loadConfigFromYaml(), but for users
+ * who want to configure the server solely via (legacy) environment variables. Called when
+ * no YAML config file is provided via CLI args.
+ *
+ * @returns MCPServerConfiguration with a single connection constructed from an Environment object
+ * @throws Error if required environment variables are missing or if validation fails
+ */
+export function consConfigFromEnv(
+  env: Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>,
+): MCPServerConfiguration {
+  const connection: Record<string, unknown> = { type: "direct" };
+
+  if (env.BOOTSTRAP_SERVERS || env.KAFKA_API_KEY || env.KAFKA_API_SECRET) {
+    connection.kafka = {
+      ...(env.BOOTSTRAP_SERVERS && {
+        bootstrap_servers: env.BOOTSTRAP_SERVERS,
+      }),
+      ...apiKeyAuth(env.KAFKA_API_KEY, env.KAFKA_API_SECRET),
+    };
+  }
+
+  if (
+    env.SCHEMA_REGISTRY_ENDPOINT ||
+    env.SCHEMA_REGISTRY_API_KEY ||
+    env.SCHEMA_REGISTRY_API_SECRET
+  ) {
+    connection.schema_registry = {
+      ...(env.SCHEMA_REGISTRY_ENDPOINT && {
+        endpoint: env.SCHEMA_REGISTRY_ENDPOINT,
+      }),
+      ...apiKeyAuth(
+        env.SCHEMA_REGISTRY_API_KEY,
+        env.SCHEMA_REGISTRY_API_SECRET,
+      ),
+    };
+  }
+
+  if (
+    env.CONFLUENT_CLOUD_REST_ENDPOINT ||
+    env.CONFLUENT_CLOUD_API_KEY ||
+    env.CONFLUENT_CLOUD_API_SECRET
+  ) {
+    connection.confluent_cloud = {
+      ...(env.CONFLUENT_CLOUD_REST_ENDPOINT && {
+        endpoint: env.CONFLUENT_CLOUD_REST_ENDPOINT,
+      }),
+      ...apiKeyAuth(
+        env.CONFLUENT_CLOUD_API_KEY,
+        env.CONFLUENT_CLOUD_API_SECRET,
+      ),
+    };
+  }
+
+  if (env.TABLEFLOW_API_KEY || env.TABLEFLOW_API_SECRET) {
+    connection.tableflow = apiKeyAuth(
+      env.TABLEFLOW_API_KEY,
+      env.TABLEFLOW_API_SECRET,
+    );
+  }
+
+  if (
+    env.FLINK_REST_ENDPOINT ||
+    env.FLINK_API_KEY ||
+    env.FLINK_API_SECRET ||
+    env.FLINK_ENV_ID ||
+    env.FLINK_ORG_ID ||
+    env.FLINK_COMPUTE_POOL_ID ||
+    env.FLINK_ENV_NAME ||
+    env.FLINK_DATABASE_NAME
+  ) {
+    connection.flink = {
+      ...(env.FLINK_REST_ENDPOINT && { endpoint: env.FLINK_REST_ENDPOINT }),
+      ...apiKeyAuth(env.FLINK_API_KEY, env.FLINK_API_SECRET),
+      ...(env.FLINK_ENV_ID && { environment_id: env.FLINK_ENV_ID }),
+      ...(env.FLINK_ORG_ID && { organization_id: env.FLINK_ORG_ID }),
+      ...(env.FLINK_COMPUTE_POOL_ID && {
+        compute_pool_id: env.FLINK_COMPUTE_POOL_ID,
+      }),
+      ...(env.FLINK_ENV_NAME && { environment_name: env.FLINK_ENV_NAME }),
+      ...(env.FLINK_DATABASE_NAME && {
+        database_name: env.FLINK_DATABASE_NAME,
+      }),
+    };
+  }
+
+  const result = mcpConfigSchema.safeParse({
+    connections: { [ENV_CONNECTION_NAME]: connection },
+  });
+
+  if (!result.success) {
+    const formattedIssues = humanizeEnvConfigPaths(
+      formatZodIssues(result.error.issues),
+    );
+    throw new Error(
+      `Failed to construct MCPServerConfiguration from environment variables:\n${formattedIssues}`,
+    );
+  }
+
+  return new MCPServerConfiguration(result.data);
+}
+
+/** Returns an `{ auth: ... }` spread object when either credential is present, empty object otherwise. */
+function apiKeyAuth(
+  key: string | undefined,
+  secret: string | undefined,
+): Record<string, unknown> {
+  if (!key && !secret) return {};
+  return { auth: { type: "api_key", key, secret } };
+}
+
+/**
+ * Replaces Zod document path segments in a formatted error string with their
+ * corresponding environment variable names, translating schema-space errors
+ * back into the env-var space the user configured.
+ */
+function humanizeEnvConfigPaths(message: string): string {
+  return Object.entries(ENV_VAR_TO_ZPATH).reduce(
+    (msg, [envVar, zodPath]) => msg.replaceAll(zodPath, envVar),
+    message,
+  );
+}

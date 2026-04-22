@@ -1,4 +1,8 @@
-import { MCPServerConfiguration, mcpConfigSchema } from "@src/config/models.js";
+import {
+  KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
+  MCPServerConfiguration,
+  mcpConfigSchema,
+} from "@src/config/models.js";
 import { describe, expect, it } from "vitest";
 
 describe("config/models.ts", () => {
@@ -149,6 +153,43 @@ describe("config/models.ts", () => {
     });
   });
 
+  describe("kafka extra_properties", () => {
+    const baseKafka = { bootstrap_servers: "broker:9092" };
+
+    it("should accept extra_properties with non-protected keys", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            kafka: {
+              ...baseKafka,
+              extra_properties: {
+                "socket.timeout.ms": "30000",
+                debug: "broker",
+              },
+            },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it.each([...KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS])(
+      "should reject extra_properties containing protected key '%s'",
+      (key) => {
+        const result = mcpConfigSchema.safeParse({
+          connections: {
+            production: {
+              type: "direct",
+              kafka: { ...baseKafka, extra_properties: { [key]: "value" } },
+            },
+          },
+        });
+        expect(result.success).toBe(false);
+      },
+    );
+  });
+
   describe("telemetry block", () => {
     it("should accept telemetry block with auth only", () => {
       const result = mcpConfigSchema.safeParse({
@@ -231,6 +272,219 @@ describe("config/models.ts", () => {
         });
 
         expect(config.getConnectionNames()).toEqual(["local", "staging"]);
+      });
+    });
+
+    describe("setKafkaExtraProperties", () => {
+      it("should set extra_properties on an existing kafka block", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              kafka: { bootstrap_servers: "broker:9092" },
+            },
+          },
+        });
+
+        config.setKafkaExtraProperties({ "socket.timeout.ms": "5000" });
+
+        expect(config.getSoleConnection().kafka?.extra_properties).toEqual({
+          "socket.timeout.ms": "5000",
+        });
+      });
+
+      it("should throw when extra_properties is already defined in configuration", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              kafka: {
+                bootstrap_servers: "broker:9092",
+                extra_properties: { debug: "all" },
+              },
+            },
+          },
+        });
+
+        expect(() =>
+          config.setKafkaExtraProperties({ "socket.timeout.ms": "5000" }),
+        ).toThrow(/already defined/);
+      });
+
+      it("should construct a kafka block with bootstrap_servers when none existed", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              confluent_cloud: {
+                auth: { type: "api_key", key: "k", secret: "s" },
+              },
+            },
+          },
+        });
+
+        config.setKafkaExtraProperties({ "bootstrap.servers": "broker:9092" });
+
+        expect(config.getSoleConnection().kafka?.bootstrap_servers).toBe(
+          "broker:9092",
+        );
+        expect(
+          config.getSoleConnection().kafka?.extra_properties,
+        ).toBeUndefined();
+      });
+
+      it("should construct a kafka block with auth when sasl.username and sasl.password are both present", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              confluent_cloud: {
+                auth: { type: "api_key", key: "k", secret: "s" },
+              },
+            },
+          },
+        });
+
+        config.setKafkaExtraProperties({
+          "bootstrap.servers": "broker:9092",
+          "sasl.username": "mykey",
+          "sasl.password": "mysecret",
+        });
+
+        const kafka = config.getSoleConnection().kafka;
+        expect(kafka?.bootstrap_servers).toBe("broker:9092");
+        expect(kafka?.auth).toEqual({
+          type: "api_key",
+          key: "mykey",
+          secret: "mysecret",
+        });
+        expect(kafka?.extra_properties).toBeUndefined();
+      });
+
+      it("should put non-protected keys into extra_properties when constructing a kafka block from scratch", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              confluent_cloud: {
+                auth: { type: "api_key", key: "k", secret: "s" },
+              },
+            },
+          },
+        });
+
+        config.setKafkaExtraProperties({
+          "bootstrap.servers": "broker:9092",
+          "socket.timeout.ms": "30000",
+        });
+
+        const kafka = config.getSoleConnection().kafka;
+        expect(kafka?.bootstrap_servers).toBe("broker:9092");
+        expect(kafka?.extra_properties).toEqual({
+          "socket.timeout.ms": "30000",
+        });
+      });
+
+      it("should override bootstrap_servers from env vars when -k provides bootstrap.servers", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              kafka: { bootstrap_servers: "env-broker:9092" },
+            },
+          },
+        });
+
+        config.setKafkaExtraProperties({
+          "bootstrap.servers": "k-broker:9092",
+        });
+
+        expect(config.getSoleConnection().kafka?.bootstrap_servers).toBe(
+          "k-broker:9092",
+        );
+        expect(
+          config.getSoleConnection().kafka?.extra_properties,
+        ).toBeUndefined();
+      });
+
+      it("should override auth from env vars when -k provides sasl credentials", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              kafka: {
+                bootstrap_servers: "broker:9092",
+                auth: { type: "api_key", key: "env-key", secret: "env-secret" },
+              },
+            },
+          },
+        });
+
+        config.setKafkaExtraProperties({
+          "sasl.username": "k-key",
+          "sasl.password": "k-secret",
+        });
+
+        expect(config.getSoleConnection().kafka?.auth).toEqual({
+          type: "api_key",
+          key: "k-key",
+          secret: "k-secret",
+        });
+        expect(
+          config.getSoleConnection().kafka?.extra_properties,
+        ).toBeUndefined();
+      });
+
+      it.each([
+        [{ "sasl.username": "k-key" }, "sasl.password"],
+        [{ "sasl.password": "k-secret" }, "sasl.username"],
+      ])(
+        "should throw when only one SASL credential is present",
+        (props, missingKey) => {
+          const config = new MCPServerConfiguration({
+            connections: {
+              local: { type: "direct", kafka: { bootstrap_servers: "b:9092" } },
+            },
+          });
+
+          expect(() => config.setKafkaExtraProperties(props)).toThrow(
+            missingKey,
+          );
+        },
+      );
+
+      it("should throw when no kafka block exists and props contain no connectivity field", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              confluent_cloud: {
+                auth: { type: "api_key", key: "k", secret: "s" },
+              },
+            },
+          },
+        });
+
+        expect(() =>
+          config.setKafkaExtraProperties({ "socket.timeout.ms": "5000" }),
+        ).toThrow("bootstrap.servers");
+      });
+
+      it("should throw when no kafka block exists and props are empty", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              confluent_cloud: {
+                auth: { type: "api_key", key: "k", secret: "s" },
+              },
+            },
+          },
+        });
+
+        expect(() => config.setKafkaExtraProperties({})).toThrow(
+          "bootstrap.servers",
+        );
       });
     });
 

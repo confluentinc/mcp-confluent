@@ -352,6 +352,17 @@ describe("cli.ts", () => {
       ]);
     });
 
+    it("should throw when both --config and --kafka-config-file are supplied", () => {
+      resolveStub.returns("/abs/kafka.properties");
+      fsStubs.existsSync.returns(true);
+
+      expect(() =>
+        parseCliArgs(
+          makeArgs(["--config", "server.yaml", "-k", "kafka.properties"]),
+        ),
+      ).toThrow(/mutually exclusive/);
+    });
+
     it("should throw when -k file does not exist", () => {
       resolveStub.returns("/abs/kafka.properties");
       fsStubs.existsSync.returns(false);

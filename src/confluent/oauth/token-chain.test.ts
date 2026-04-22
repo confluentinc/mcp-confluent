@@ -14,6 +14,13 @@ import {
 import sinon from "sinon";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+function jsonResponse(body: object, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 describe("oauth/token-chain.ts", () => {
   const sandbox = sinon.createSandbox();
   let fetchStub: sinon.SinonStub;
@@ -30,18 +37,13 @@ describe("oauth/token-chain.ts", () => {
     const auth0Config = getAuth0Config("devel");
 
     it("should exchange auth code for ID token and refresh token", async () => {
-      const mockResponse = {
-        id_token: "mock-id-token",
-        refresh_token: "mock-refresh-token",
-        access_token: "mock-access-token",
-        token_type: "Bearer",
-        expires_in: 60,
-      };
-
       fetchStub.resolves(
-        new Response(JSON.stringify(mockResponse), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
+        jsonResponse({
+          id_token: "mock-id-token",
+          refresh_token: "mock-refresh-token",
+          access_token: "mock-access-token",
+          token_type: "Bearer",
+          expires_in: 60,
         }),
       );
 
@@ -68,11 +70,7 @@ describe("oauth/token-chain.ts", () => {
     });
 
     it("should throw on non-200 response", async () => {
-      fetchStub.resolves(
-        new Response(JSON.stringify({ error: "invalid_grant" }), {
-          status: 400,
-        }),
-      );
+      fetchStub.resolves(jsonResponse({ error: "invalid_grant" }, 400));
 
       await expect(
         exchangeAuthCodeForTokens(auth0Config, "bad-code", "verifier"),
@@ -91,15 +89,12 @@ describe("oauth/token-chain.ts", () => {
 
     it("should throw when the response is missing refresh_token", async () => {
       fetchStub.resolves(
-        new Response(
-          JSON.stringify({
-            id_token: "id",
-            access_token: "a",
-            token_type: "Bearer",
-            expires_in: 60,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+        jsonResponse({
+          id_token: "id",
+          access_token: "a",
+          token_type: "Bearer",
+          expires_in: 60,
+        }),
       );
 
       await expect(
@@ -109,15 +104,12 @@ describe("oauth/token-chain.ts", () => {
 
     it("should throw when the response is missing id_token", async () => {
       fetchStub.resolves(
-        new Response(
-          JSON.stringify({
-            refresh_token: "r",
-            access_token: "a",
-            token_type: "Bearer",
-            expires_in: 60,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+        jsonResponse({
+          refresh_token: "r",
+          access_token: "a",
+          token_type: "Bearer",
+          expires_in: 60,
+        }),
       );
 
       await expect(
@@ -128,16 +120,7 @@ describe("oauth/token-chain.ts", () => {
 
   describe("exchangeIdTokenForControlPlaneToken", () => {
     it("should exchange ID token for control plane token", async () => {
-      const mockResponse = {
-        token: "cp-bearer-token-123",
-      };
-
-      fetchStub.resolves(
-        new Response(JSON.stringify(mockResponse), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+      fetchStub.resolves(jsonResponse({ token: "cp-bearer-token-123" }));
 
       const result = await exchangeIdTokenForControlPlaneToken(
         "https://devel.cpdev.cloud",
@@ -168,12 +151,7 @@ describe("oauth/token-chain.ts", () => {
     });
 
     it("should throw when the response is missing token", async () => {
-      fetchStub.resolves(
-        new Response(JSON.stringify({}), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+      fetchStub.resolves(jsonResponse({}));
 
       await expect(
         exchangeIdTokenForControlPlaneToken(
@@ -186,16 +164,7 @@ describe("oauth/token-chain.ts", () => {
 
   describe("exchangeControlPlaneForDataPlaneToken", () => {
     it("should exchange control plane token for data plane token", async () => {
-      const mockResponse = {
-        token: "dp-bearer-token-456",
-      };
-
-      fetchStub.resolves(
-        new Response(JSON.stringify(mockResponse), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+      fetchStub.resolves(jsonResponse({ token: "dp-bearer-token-456" }));
 
       const result = await exchangeControlPlaneForDataPlaneToken(
         "https://devel.cpdev.cloud",
@@ -228,12 +197,7 @@ describe("oauth/token-chain.ts", () => {
     });
 
     it("should throw when the response is missing token", async () => {
-      fetchStub.resolves(
-        new Response(JSON.stringify({}), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+      fetchStub.resolves(jsonResponse({}));
 
       await expect(
         exchangeControlPlaneForDataPlaneToken(
@@ -248,21 +212,16 @@ describe("oauth/token-chain.ts", () => {
     const auth0Config = getAuth0Config("devel");
 
     it("should POST grant_type=refresh_token and return the Auth0 response", async () => {
-      // First call: refresh token → Auth0 token endpoint
       fetchStub.resolves(
-        new Response(
-          JSON.stringify({
-            id_token: "new-id-token",
-            refresh_token: "rotated-refresh-token",
-            access_token: "new-access",
-            token_type: "Bearer",
-            expires_in: 60,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+        jsonResponse({
+          id_token: "new-id-token",
+          refresh_token: "rotated-refresh-token",
+          access_token: "new-access",
+          token_type: "Bearer",
+          expires_in: 60,
+        }),
       );
 
-      // Second call: ID token → control plane
       const result = await exchangeRefreshTokenForAuth0Tokens(
         auth0Config,
         "old-refresh-token",
@@ -283,11 +242,7 @@ describe("oauth/token-chain.ts", () => {
     });
 
     it("should throw on non-200 response", async () => {
-      fetchStub.resolves(
-        new Response(JSON.stringify({ error: "invalid_grant" }), {
-          status: 400,
-        }),
-      );
+      fetchStub.resolves(jsonResponse({ error: "invalid_grant" }, 400));
 
       await expect(
         exchangeRefreshTokenForAuth0Tokens(auth0Config, "bad-refresh"),
@@ -296,15 +251,12 @@ describe("oauth/token-chain.ts", () => {
 
     it("should throw when the response is missing refresh_token", async () => {
       fetchStub.resolves(
-        new Response(
-          JSON.stringify({
-            id_token: "id",
-            access_token: "a",
-            token_type: "Bearer",
-            expires_in: 60,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+        jsonResponse({
+          id_token: "id",
+          access_token: "a",
+          token_type: "Bearer",
+          expires_in: 60,
+        }),
       );
 
       await expect(
@@ -314,15 +266,12 @@ describe("oauth/token-chain.ts", () => {
 
     it("should throw when the response is missing id_token", async () => {
       fetchStub.resolves(
-        new Response(
-          JSON.stringify({
-            refresh_token: "rotated",
-            access_token: "a",
-            token_type: "Bearer",
-            expires_in: 60,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+        jsonResponse({
+          refresh_token: "rotated",
+          access_token: "a",
+          token_type: "Bearer",
+          expires_in: 60,
+        }),
       );
 
       await expect(
@@ -335,39 +284,17 @@ describe("oauth/token-chain.ts", () => {
     const auth0Config = getAuth0Config("devel");
 
     it("should run auth code → ID → CP → DP chain", async () => {
-      // First call: auth code → Auth0 tokens
       fetchStub.onCall(0).resolves(
-        new Response(
-          JSON.stringify({
-            id_token: "id-token",
-            refresh_token: "refresh-token",
-            access_token: "access",
-            token_type: "Bearer",
-            expires_in: 60,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+        jsonResponse({
+          id_token: "id-token",
+          refresh_token: "refresh-token",
+          access_token: "access",
+          token_type: "Bearer",
+          expires_in: 60,
+        }),
       );
-
-      // Second call: ID → CP
-      fetchStub.onCall(1).resolves(
-        new Response(
-          JSON.stringify({
-            token: "cp-token",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      );
-
-      // Third call: CP → DP
-      fetchStub.onCall(2).resolves(
-        new Response(
-          JSON.stringify({
-            token: "dp-token",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      );
+      fetchStub.onCall(1).resolves(jsonResponse({ token: "cp-token" }));
+      fetchStub.onCall(2).resolves(jsonResponse({ token: "dp-token" }));
 
       const result = await executeFullTokenChain(
         auth0Config,

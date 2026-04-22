@@ -1,0 +1,8 @@
+connections:
+  production:
+    type: direct
+    telemetry:
+      auth:
+        type: api_key
+        key: "mytelemetrykey"
+        secret: "mytelemetrysecret"

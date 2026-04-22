@@ -1,0 +1,6 @@
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "broker.confluent.cloud:9092"
+      env_id: "bad-no-env-prefix"

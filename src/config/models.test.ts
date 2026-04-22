@@ -452,6 +452,40 @@ describe("config/models.ts", () => {
           );
         },
       );
+
+      it("should throw when no kafka block exists and props contain no connectivity field", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              confluent_cloud: {
+                auth: { type: "api_key", key: "k", secret: "s" },
+              },
+            },
+          },
+        });
+
+        expect(() =>
+          config.setKafkaExtraProperties({ "socket.timeout.ms": "5000" }),
+        ).toThrow("bootstrap.servers");
+      });
+
+      it("should throw when no kafka block exists and props are empty", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            local: {
+              type: "direct",
+              confluent_cloud: {
+                auth: { type: "api_key", key: "k", secret: "s" },
+              },
+            },
+          },
+        });
+
+        expect(() => config.setKafkaExtraProperties({})).toThrow(
+          "bootstrap.servers",
+        );
+      });
     });
 
     describe("getSoleConnection", () => {

@@ -134,6 +134,11 @@ export class MCPServerConfiguration {
     const conn = this.getSoleConnection();
 
     if (!conn.kafka) {
+      if (!props["bootstrap.servers"]) {
+        throw new Error(
+          "--kafka-config-file: no kafka block is configured and props do not include bootstrap.servers — cannot establish a Kafka connection",
+        );
+      }
       conn.kafka = {};
     }
 

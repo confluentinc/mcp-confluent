@@ -8,11 +8,18 @@ import {
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { TransportType } from "@src/mcp/transports/types.js";
-import sinon from "sinon";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  type MockInstance,
+  vi,
+} from "vitest";
 import {
   createFsWrappers,
-  StubbedFsWrappers,
+  type MockedFsWrappers,
 } from "../tests/stubs/node-deps.js";
 
 describe("cli.ts", () => {
@@ -101,25 +108,19 @@ describe("cli.ts", () => {
   });
 
   describe("loadDotEnvIntoProcessEnv()", () => {
-    let sandbox: sinon.SinonSandbox;
-    let existsSyncStub: sinon.SinonStub;
-    let resolveStub: sinon.SinonStub;
-    let dotenvConfigStub: sinon.SinonStub;
+    let existsSyncSpy: MockInstance<typeof nodeDeps.fs.existsSync>;
+    let resolveSpy: MockInstance<typeof nodeDeps.path.resolve>;
+    let dotenvConfigSpy: MockInstance<typeof nodeDeps.dotenvLib.config>;
 
     beforeEach(() => {
-      sandbox = sinon.createSandbox();
-      existsSyncStub = sandbox.stub(nodeDeps.fs, "existsSync");
-      resolveStub = sandbox.stub(nodeDeps.path, "resolve");
-      dotenvConfigStub = sandbox.stub(nodeDeps.dotenvLib, "config");
-    });
-
-    afterEach(() => {
-      sandbox.restore();
+      existsSyncSpy = vi.spyOn(nodeDeps.fs, "existsSync");
+      resolveSpy = vi.spyOn(nodeDeps.path, "resolve");
+      dotenvConfigSpy = vi.spyOn(nodeDeps.dotenvLib, "config");
     });
 
     it("should throw when the env file does not exist", () => {
-      resolveStub.returns("/resolved/.env");
-      existsSyncStub.returns(false);
+      resolveSpy.mockReturnValue("/resolved/.env");
+      existsSyncSpy.mockReturnValue(false);
 
       expect(() => loadDotEnvIntoProcessEnv(".env")).toThrow(
         "Environment file not found: /resolved/.env",
@@ -127,19 +128,19 @@ describe("cli.ts", () => {
     });
 
     it("should resolve the path and pass it to existsSync", () => {
-      resolveStub.returns("/abs/path/.env");
-      existsSyncStub.returns(false);
+      resolveSpy.mockReturnValue("/abs/path/.env");
+      existsSyncSpy.mockReturnValue(false);
 
       expect(() => loadDotEnvIntoProcessEnv("relative/.env")).toThrow();
 
-      sinon.assert.calledWith(resolveStub, "relative/.env");
-      sinon.assert.calledWith(existsSyncStub, "/abs/path/.env");
+      expect(resolveSpy).toHaveBeenCalledWith("relative/.env");
+      expect(existsSyncSpy).toHaveBeenCalledWith("/abs/path/.env");
     });
 
     it("should throw when dotenv.config returns an error", () => {
-      resolveStub.returns("/resolved/.env");
-      existsSyncStub.returns(true);
-      dotenvConfigStub.returns({ error: new Error("parse error") });
+      resolveSpy.mockReturnValue("/resolved/.env");
+      existsSyncSpy.mockReturnValue(true);
+      dotenvConfigSpy.mockReturnValue({ error: new Error("parse error") });
 
       expect(() => loadDotEnvIntoProcessEnv(".env")).toThrow(
         "Error loading environment variables:",
@@ -147,25 +148,25 @@ describe("cli.ts", () => {
     });
 
     it("should call dotenv.config with the resolved path and override option", () => {
-      resolveStub.returns("/abs/path/.env");
-      existsSyncStub.returns(true);
-      dotenvConfigStub.returns({ parsed: {} });
+      resolveSpy.mockReturnValue("/abs/path/.env");
+      existsSyncSpy.mockReturnValue(true);
+      dotenvConfigSpy.mockReturnValue({ parsed: {} });
 
       loadDotEnvIntoProcessEnv("relative/.env");
 
       // Should call with the resolved absolute path and override: true
       // to ensure CLI env vars take precedence over existing ones in process.env
       // (and that the call will definitely mutate process.env)
-      sinon.assert.calledWith(dotenvConfigStub, {
+      expect(dotenvConfigSpy).toHaveBeenCalledWith({
         path: "/abs/path/.env",
         override: true,
       });
     });
 
     it("should return the parsed variables on success", () => {
-      resolveStub.returns("/resolved/.env");
-      existsSyncStub.returns(true);
-      dotenvConfigStub.returns({ parsed: { FOO: "bar", BAZ: "qux" } });
+      resolveSpy.mockReturnValue("/resolved/.env");
+      existsSyncSpy.mockReturnValue(true);
+      dotenvConfigSpy.mockReturnValue({ parsed: { FOO: "bar", BAZ: "qux" } });
 
       const result = loadDotEnvIntoProcessEnv(".env");
 
@@ -173,9 +174,9 @@ describe("cli.ts", () => {
     });
 
     it("should return empty object when dotenv yields no parsed variables", () => {
-      resolveStub.returns("/resolved/.env");
-      existsSyncStub.returns(true);
-      dotenvConfigStub.returns({ parsed: undefined });
+      resolveSpy.mockReturnValue("/resolved/.env");
+      existsSyncSpy.mockReturnValue(true);
+      dotenvConfigSpy.mockReturnValue({ parsed: undefined });
 
       const result = loadDotEnvIntoProcessEnv(".env");
 
@@ -188,18 +189,12 @@ describe("cli.ts", () => {
       return ["node", "mcp-confluent", ...trailingArgs];
     }
 
-    let sandbox: sinon.SinonSandbox;
-    let fsStubs: StubbedFsWrappers;
-    let resolveStub: sinon.SinonStub;
+    let fsMocks: MockedFsWrappers;
+    let resolveSpy: Mock;
 
     beforeEach(() => {
-      sandbox = sinon.createSandbox();
-      fsStubs = createFsWrappers(sandbox);
-      resolveStub = sandbox.stub(nodeDeps.path, "resolve");
-    });
-
-    afterEach(() => {
-      sandbox.restore();
+      fsMocks = createFsWrappers();
+      resolveSpy = vi.spyOn(nodeDeps.path, "resolve") as unknown as Mock;
     });
 
     describe("error handling", () => {
@@ -275,9 +270,11 @@ describe("cli.ts", () => {
       });
 
       it("should parse --allow-tools-file into allowTools by reading file lines", () => {
-        resolveStub.returns("/abs/allow.txt");
-        fsStubs.existsSync.returns(true);
-        fsStubs.readFileSync.returns("tool-a\ntool-b\n# comment\n\ntool-c");
+        resolveSpy.mockReturnValue("/abs/allow.txt");
+        fsMocks.existsSync.mockReturnValue(true);
+        fsMocks.readFileSync.mockReturnValue(
+          "tool-a\ntool-b\n# comment\n\ntool-c",
+        );
 
         const result = parseCliArgs(
           makeArgs(["--allow-tools-file", "allow.txt"]),
@@ -294,9 +291,9 @@ describe("cli.ts", () => {
       });
 
       it("should parse --block-tools-file into blockTools by reading file lines", () => {
-        resolveStub.returns("/abs/block.txt");
-        fsStubs.existsSync.returns(true);
-        fsStubs.readFileSync.returns("tool-x\ntool-y");
+        resolveSpy.mockReturnValue("/abs/block.txt");
+        fsMocks.existsSync.mockReturnValue(true);
+        fsMocks.readFileSync.mockReturnValue("tool-x\ntool-y");
 
         const result = parseCliArgs(
           makeArgs(["--block-tools-file", "block.txt"]),
@@ -318,8 +315,8 @@ describe("cli.ts", () => {
       });
 
       it("should throw when --allow-tools-file does not exist", () => {
-        resolveStub.returns("/abs/allow.txt");
-        fsStubs.existsSync.returns(false);
+        resolveSpy.mockReturnValue("/abs/allow.txt");
+        fsMocks.existsSync.mockReturnValue(false);
 
         expect(() =>
           parseCliArgs(makeArgs(["--allow-tools-file", "allow.txt"])),
@@ -364,8 +361,8 @@ describe("cli.ts", () => {
     });
 
     it("should throw when -k file does not exist", () => {
-      resolveStub.returns("/abs/kafka.properties");
-      fsStubs.existsSync.returns(false);
+      resolveSpy.mockReturnValue("/abs/kafka.properties");
+      fsMocks.existsSync.mockReturnValue(false);
 
       expect(() => parseCliArgs(makeArgs(["-k", "kafka.properties"]))).toThrow(
         "Properties file not found: /abs/kafka.properties",
@@ -373,9 +370,11 @@ describe("cli.ts", () => {
     });
 
     it("should throw when -k file cannot be parsed", () => {
-      resolveStub.returns("/abs/kafka.properties");
-      fsStubs.existsSync.returns(true);
-      fsStubs.readFileSync.throws(new Error("disk error"));
+      resolveSpy.mockReturnValue("/abs/kafka.properties");
+      fsMocks.existsSync.mockReturnValue(true);
+      fsMocks.readFileSync.mockImplementation(() => {
+        throw new Error("disk error");
+      });
 
       expect(() => parseCliArgs(makeArgs(["-k", "kafka.properties"]))).toThrow(
         "Failed to parse properties file: disk error",
@@ -385,15 +384,15 @@ describe("cli.ts", () => {
     it.each(["-k", "--kafka-config-file"])(
       "should parse %s <path> into kafkaConfig by reading and parsing the file",
       (flag) => {
-        resolveStub.returns("/abs/kafka.properties");
-        fsStubs.existsSync.returns(true);
-        fsStubs.readFileSync.returns(
+        resolveSpy.mockReturnValue("/abs/kafka.properties");
+        fsMocks.existsSync.mockReturnValue(true);
+        fsMocks.readFileSync.mockReturnValue(
           "bootstrap.servers=localhost:9092\nsasl.username=mykey",
         );
 
         const result = parseCliArgs(makeArgs([flag, "kafka.properties"]));
 
-        sinon.assert.calledWith(resolveStub, "kafka.properties");
+        expect(resolveSpy).toHaveBeenCalledWith("kafka.properties");
         expect(result.kafkaConfig).toEqual({
           "bootstrap.servers": "localhost:9092",
           "sasl.username": "mykey",

@@ -434,6 +434,24 @@ describe("config/models.ts", () => {
           config.getSoleConnection().kafka?.extra_properties,
         ).toBeUndefined();
       });
+
+      it.each([
+        [{ "sasl.username": "k-key" }, "sasl.password"],
+        [{ "sasl.password": "k-secret" }, "sasl.username"],
+      ])(
+        "should throw when only one SASL credential is present",
+        (props, missingKey) => {
+          const config = new MCPServerConfiguration({
+            connections: {
+              local: { type: "direct", kafka: { bootstrap_servers: "b:9092" } },
+            },
+          });
+
+          expect(() => config.setKafkaExtraProperties(props)).toThrow(
+            missingKey,
+          );
+        },
+      );
     });
 
     describe("getSoleConnection", () => {

@@ -143,6 +143,14 @@ export class MCPServerConfiguration {
       );
     }
 
+    const hasSaslUser = !!props["sasl.username"];
+    const hasSaslPass = !!props["sasl.password"];
+    if (hasSaslUser !== hasSaslPass) {
+      throw new Error(
+        "--kafka-config-file: sasl.username and sasl.password must both be present or both be absent",
+      );
+    }
+
     const protectedSet = new Set<string>(KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS);
 
     if (props["bootstrap.servers"]) {

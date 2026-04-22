@@ -39,22 +39,16 @@ export class TokenStore {
   }
 
   /**
-   * Update the refreshable fields of an existing token set.
+   * Update a subset of the refreshable fields of an existing token set.
    * Returns false if the access token is not found.
    */
-  update(accessToken: string, fields: TokenUpdateFields): boolean {
+  update(accessToken: string, fields: Partial<TokenUpdateFields>): boolean {
     const existing = this.tokens.get(accessToken);
     if (!existing) {
       return false;
     }
 
-    existing.refreshToken = fields.refreshToken;
-    existing.refreshTokenIdleExpiresAt = fields.refreshTokenIdleExpiresAt;
-    existing.controlPlaneToken = fields.controlPlaneToken;
-    existing.controlPlaneExpiresAt = fields.controlPlaneExpiresAt;
-    existing.dataPlaneToken = fields.dataPlaneToken;
-    existing.dataPlaneExpiresAt = fields.dataPlaneExpiresAt;
-
+    Object.assign(existing, fields);
     return true;
   }
 

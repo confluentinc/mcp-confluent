@@ -1,9 +1,10 @@
-export { createStubAdmin, type StubbedAdmin } from "./admin.js";
+export { createMockAdmin, type MockedAdmin } from "./admin.js";
+export { createMockInstance } from "./mock-instance.js";
 export {
   createCryptoWrapper,
   createFetchWrapper,
   createFsWrappers,
-  type StubbedCryptoWrapper,
-  type StubbedFetchWrapper,
-  type StubbedFsWrappers,
+  type MockedCryptoWrapper,
+  type MockedFetchWrapper,
+  type MockedFsWrappers,
 } from "./node-deps.js";

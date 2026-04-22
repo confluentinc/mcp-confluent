@@ -1,70 +1,64 @@
 import * as nodeDeps from "@src/confluent/node-deps.js";
-import sinon from "sinon";
+import { type Mock, vi } from "vitest";
 
-/** Stubbed fs wrapper methods from {@link nodeDeps.fs}. */
-export type StubbedFsWrappers = {
-  existsSync: sinon.SinonStub;
-  readFileSync: sinon.SinonStub;
-  writeFileSync: sinon.SinonStub;
-  mkdirSync: sinon.SinonStub;
+/**
+ * Mocked {@link nodeDeps.fs} wrapper methods. Spies are auto-restored by
+ * the `restoreMocks: true` setting in `vitest.config.ts`.
+ */
+export type MockedFsWrappers = {
+  existsSync: Mock;
+  readFileSync: Mock;
+  writeFileSync: Mock;
+  mkdirSync: Mock;
 };
 
 /**
- * Stubs all fs wrapper methods in {@link nodeDeps.fs} using the provided sandbox.
- * The stubs are automatically restored when the sandbox is restored.
- *
- * @param sandbox - Sinon sandbox to use for stubbing
- * @returns Object containing all installed stubs
+ * Replaces all fs wrapper methods in {@linkcode nodeDeps.fs} with
+ * {@linkcode vi.fn} spies. Tests can tune each spy's behavior with
+ * `mockReturnValue`, `mockImplementation`, etc.
  *
  * @example
- * ```typescript
- * const sandbox = sinon.createSandbox();
- * const fsStubs = createFsWrappers(sandbox);
- * fsStubs.existsSync.returns(true);
- * fsStubs.readFileSync.returns("file contents");
- * // ... run tests ...
- * sandbox.restore(); // automatically restores all stubs
+ * ```ts
+ * const fsMocks = createFsWrappers();
+ * fsMocks.existsSync.mockReturnValue(true);
+ * fsMocks.readFileSync.mockReturnValue("file contents");
  * ```
  */
-export function createFsWrappers(
-  sandbox: sinon.SinonSandbox,
-): StubbedFsWrappers {
+export function createFsWrappers(): MockedFsWrappers {
   return {
-    existsSync: sandbox.stub(nodeDeps.fs, "existsSync"),
-    readFileSync: sandbox.stub(nodeDeps.fs, "readFileSync"),
-    writeFileSync: sandbox.stub(nodeDeps.fs, "writeFileSync"),
-    mkdirSync: sandbox.stub(nodeDeps.fs, "mkdirSync"),
-  };
+    existsSync: vi.spyOn(nodeDeps.fs, "existsSync"),
+    readFileSync: vi.spyOn(nodeDeps.fs, "readFileSync"),
+    writeFileSync: vi.spyOn(nodeDeps.fs, "writeFileSync"),
+    mkdirSync: vi.spyOn(nodeDeps.fs, "mkdirSync"),
+  } as MockedFsWrappers;
 }
 
-/** Stubbed fetch wrapper from {@link nodeDeps.nodeFetch}. */
-export type StubbedFetchWrapper = {
-  fetch: sinon.SinonStub;
+/** Mocked {@linkcode nodeDeps.nodeFetch} wrapper. */
+export type MockedFetchWrapper = {
+  fetch: Mock;
 };
 
 /**
- * Stubs the fetch wrapper in {@link nodeDeps.nodeFetch} using the provided sandbox.
+ * Replaces the fetch wrapper in {@linkcode nodeDeps.nodeFetch} with a
+ * {@linkcode vi.fn} spy.
  */
-export function createFetchWrapper(
-  sandbox: sinon.SinonSandbox,
-): StubbedFetchWrapper {
+export function createFetchWrapper(): MockedFetchWrapper {
   return {
-    fetch: sandbox.stub(nodeDeps.nodeFetch, "fetch"),
-  };
+    fetch: vi.spyOn(nodeDeps.nodeFetch, "fetch"),
+  } as MockedFetchWrapper;
 }
 
-/** Stubbed crypto wrapper from {@link nodeDeps.nodeCrypto}. */
-export type StubbedCryptoWrapper = {
-  randomBytes: sinon.SinonStub;
+/** Mocked {@linkcode nodeDeps.nodeCrypto} wrapper. */
+export type MockedCryptoWrapper = {
+  randomBytes: Mock;
 };
 
 /**
- * Stubs the crypto wrapper in {@link nodeDeps.nodeCrypto} using the provided sandbox.
+ * Replaces the crypto wrapper in {@linkcode nodeDeps.nodeCrypto} with a
+ * {@linkcode vi.fn} spy.
  */
-export function createCryptoWrapper(
-  sandbox: sinon.SinonSandbox,
-): StubbedCryptoWrapper {
+export function createCryptoWrapper(): MockedCryptoWrapper {
   return {
-    randomBytes: sandbox.stub(nodeDeps.nodeCrypto, "randomBytes"),
-  };
+    randomBytes: vi.spyOn(nodeDeps.nodeCrypto, "randomBytes"),
+  } as MockedCryptoWrapper;
 }

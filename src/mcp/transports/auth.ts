@@ -15,12 +15,19 @@ export interface AuthConfig {
 }
 
 /**
- * Generates a cryptographically secure random API key
- * @returns 64-character hex string
+ * Auth utilities exposed through a namespace object so tests can stub
+ * individual members via {@linkcode vi.spyOn} — a free-function export
+ * would be an ESM live binding that can't be stubbed after import.
  */
-export function generateApiKey(): string {
-  return randomBytes(32).toString("hex");
-}
+export const authUtils = {
+  /**
+   * Generates a cryptographically secure random API key.
+   * @returns 64-character hex string
+   */
+  generateApiKey(): string {
+    return randomBytes(32).toString("hex");
+  },
+};
 
 /**
  * Timing-safe comparison of API keys to prevent timing attacks

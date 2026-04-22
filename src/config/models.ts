@@ -1,6 +1,21 @@
 import { validateBootstrapServers } from "@src/config/validation.js";
 import { z } from "zod";
 
+/**
+ * Connection configuration for a direct (local/Docker) Kafka cluster.
+ * At least one of kafka, schema_registry, confluent_cloud, tableflow, flink, or telemetry must be present.
+ */
+export interface DirectConnectionConfig {
+  type: "direct";
+  kafka?: KafkaDirectConfig;
+  schema_registry?: SchemaRegistryDirectConfig;
+  confluent_cloud?: ConfluentCloudDirectConfig;
+  tableflow?: TableflowDirectConfig;
+  telemetry?: TelemetryDirectConfig;
+  flink?: FlinkDirectConfig;
+}
+
+/** Subcomponent of various parts of DirectConnectionConfig */
 export interface ApiKeyAuthConfig {
   type: "api_key";
   key: string;
@@ -9,36 +24,47 @@ export interface ApiKeyAuthConfig {
 
 export type AuthConfig = ApiKeyAuthConfig;
 
-/**
- * Connection configuration for a direct (local/Docker) Kafka cluster.
- * At least one of kafka, schema_registry, confluent_cloud, tableflow, or flink must be present.
- */
-export interface DirectConnectionConfig {
-  type: "direct";
-  confluent_cloud?: {
-    endpoint?: string;
-    auth?: AuthConfig;
-  };
-  kafka?: {
-    bootstrap_servers: string;
-    auth?: AuthConfig;
-  };
-  schema_registry?: {
-    endpoint: string;
-    auth?: AuthConfig;
-  };
-  tableflow?: {
-    auth?: AuthConfig;
-  };
-  flink?: {
-    endpoint: string;
-    auth: AuthConfig;
-    environment_id: string;
-    organization_id: string;
-    compute_pool_id: string;
-    environment_name?: string;
-    database_name?: string;
-  };
+/** Subcomponent of DirectConnectionConfig describing Kafka connection parameters */
+export interface KafkaDirectConfig {
+  bootstrap_servers?: string;
+  auth?: AuthConfig;
+  rest_endpoint?: string;
+  cluster_id?: string;
+  env_id?: string;
+}
+
+/** Subcomponent of DirectConnectionConfig describing Schema Registry connection parameters */
+export interface SchemaRegistryDirectConfig {
+  endpoint: string;
+  auth?: AuthConfig;
+}
+
+/** Subcomponent of DirectConnectionConfig describing Confluent Cloud connection parameters */
+export interface ConfluentCloudDirectConfig {
+  endpoint?: string;
+  auth?: AuthConfig;
+}
+
+/** Subcomponent of DirectConnectionConfig describing Tableflow connection parameters */
+export interface TableflowDirectConfig {
+  auth?: AuthConfig;
+}
+
+/** Subcomponent of DirectConnectionConfig describing Telemetry connection parameters */
+export interface TelemetryDirectConfig {
+  endpoint?: string;
+  auth?: AuthConfig;
+}
+
+/** Subcomponent of DirectConnectionConfig describing Flink connection parameters */
+export interface FlinkDirectConfig {
+  endpoint: string;
+  auth: AuthConfig;
+  environment_id: string;
+  organization_id: string;
+  compute_pool_id: string;
+  environment_name?: string;
+  database_name?: string;
 }
 
 /**
@@ -132,10 +158,37 @@ const directConnectionSchema = z
                 message: error instanceof Error ? error.message : String(error),
               });
             }
-          }),
+          })
+          .optional(),
         auth: authConfigSchema.optional(),
+        rest_endpoint: z
+          .string()
+          .trim()
+          .check(z.url({ error: "kafka.rest_endpoint must be a valid URL" }))
+          .optional(),
+        cluster_id: z
+          .string()
+          .trim()
+          .min(1, "kafka.cluster_id cannot be empty")
+          .optional(),
+        env_id: z
+          .string()
+          .trim()
+          .startsWith("env-", "kafka.env_id must start with 'env-'")
+          .optional(),
       })
       .strict()
+      .refine(
+        (k) =>
+          k.bootstrap_servers !== undefined ||
+          k.rest_endpoint !== undefined ||
+          k.cluster_id !== undefined ||
+          k.env_id !== undefined,
+        {
+          message:
+            "kafka block must contain at least one of 'bootstrap_servers', 'rest_endpoint', 'cluster_id', or 'env_id'",
+        },
+      )
       .optional(),
     schema_registry: z
       .object({
@@ -156,6 +209,20 @@ const directConnectionSchema = z
       .strict()
       .refine((tf) => tf.auth !== undefined, {
         message: "tableflow block must contain 'auth'",
+      })
+      .optional(),
+    telemetry: z
+      .object({
+        endpoint: z
+          .string()
+          .trim()
+          .check(z.url({ error: "telemetry.endpoint must be a valid URL" }))
+          .optional(),
+        auth: authConfigSchema.optional(),
+      })
+      .strict()
+      .refine((t) => t.endpoint !== undefined || t.auth !== undefined, {
+        message: "telemetry block must contain at least 'endpoint' or 'auth'",
       })
       .optional(),
     flink: z
@@ -207,12 +274,13 @@ const connectionConfigSchema = z
       !data.schema_registry &&
       !data.confluent_cloud &&
       !data.tableflow &&
-      !data.flink
+      !data.flink &&
+      !data.telemetry
     ) {
       ctx.addIssue({
         code: "custom",
         message:
-          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', or 'flink' must be defined",
+          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined",
       });
     }
   });

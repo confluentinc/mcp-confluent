@@ -222,8 +222,7 @@ const configSchema = z
       .string()
       .describe("Base URL for Confluent Cloud's REST API services")
       .trim()
-      .url()
-      .default("https://api.confluent.cloud"),
+      .url(),
     SCHEMA_REGISTRY_ENDPOINT: z
       .string()
       .describe(
@@ -242,8 +241,7 @@ const configSchema = z
       .string()
       .describe("Base URL for Confluent Cloud Telemetry API (metrics)")
       .trim()
-      .url()
-      .default("https://api.telemetry.confluent.cloud"),
+      .url(),
     TELEMETRY_API_KEY: z
       .string()
       .describe(
@@ -269,7 +267,7 @@ export type EnvVar = keyof z.infer<typeof combinedSchema>;
 export const TELEMETRY_REQUIRED_ENV_VARS = [
   // Configuring the telemetry client will first look for TELEMETRY_API_KEY/SECRET, then fall back to CONFLUENT_CLOUD_API_KEY/SECRET, so
   // the only absolute required env vars for telemetry are the Confluent Cloud API key/secret.
-  // Likewise, TELEMETRY_ENDPOINT has a default value, so it's not strictly required either.
+  // Likewise, TELEMETRY_ENDPOINT is optional (no default — the fallback is applied in constructDefaultClientManager()).
 
   // The fallback behavior for the configuration of telemetry
   // in DefaultClientManager indicates that the entire concept

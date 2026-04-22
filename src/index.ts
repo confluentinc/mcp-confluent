@@ -126,7 +126,7 @@ export function constructDefaultClientManager(
   return new DefaultClientManager({
     kafka: kafkaClientConfig,
     endpoints: {
-      cloud: env.CONFLUENT_CLOUD_REST_ENDPOINT,
+      cloud: env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "https://api.confluent.cloud",
       flink: env.FLINK_REST_ENDPOINT,
       schemaRegistry: env.SCHEMA_REGISTRY_ENDPOINT,
       kafka: env.KAFKA_REST_ENDPOINT,

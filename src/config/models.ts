@@ -31,6 +31,7 @@ export interface KafkaDirectConfig {
   rest_endpoint?: string;
   cluster_id?: string;
   env_id?: string;
+  extra_properties?: Record<string, string>;
 }
 
 /** Subcomponent of DirectConnectionConfig describing Schema Registry connection parameters */
@@ -108,9 +109,99 @@ export class MCPServerConfiguration {
   getConnectionNames(): string[] {
     return Object.keys(this.connections).sort((a, b) => a.localeCompare(b));
   }
+
+  /**
+   * Absorbs `-k` / `--kafka-config-file` properties into the kafka block so that all
+   * config is consolidated in MCPServerConfiguration before client construction.
+   *
+   * Only valid in the legacy env-var codepath (`consConfigFromEnv`). YAML-configured
+   * connections must not use this method — the `--config` and `--kafka-config-file` flags
+   * are mutually exclusive and enforced at CLI parse time.
+   *
+   * Protected keys (`bootstrap.servers`, `sasl.username`, `sasl.password`) are always
+   * promoted into their corresponding named fields, overriding any env-var-derived values
+   * already present. All other keys go into `extra_properties`. This ensures the resulting
+   * MCPServerConfiguration is self-consistent: named fields hold the authoritative values
+   * with CLI arguments taking precedence over environment variables, matching the intended
+   * precedence order.
+   *
+   * Creates a kafka block if none exists, so that `-k` alone (without any Kafka env vars)
+   * is sufficient to configure the client.
+   *
+   * Throws if `extra_properties` is already set — guards against double-application.
+   */
+  setKafkaExtraProperties(props: Record<string, string>): void {
+    const conn = this.getSoleConnection();
+
+    for (const key of KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS) {
+      if (Object.hasOwn(props, key) && props[key] === "") {
+        throw new Error(
+          `--kafka-config-file: ${key} is present but empty — provide a non-empty value or omit the key`,
+        );
+      }
+    }
+
+    if (!conn.kafka) {
+      if (!Object.hasOwn(props, "bootstrap.servers")) {
+        throw new Error(
+          "--kafka-config-file: no kafka block is configured and props do not include bootstrap.servers — cannot establish a Kafka connection",
+        );
+      }
+      conn.kafka = {};
+    }
+
+    if (conn.kafka.extra_properties !== undefined) {
+      throw new Error(
+        "Cannot apply --kafka-config-file: kafka.extra_properties is already defined in configuration",
+      );
+    }
+
+    const hasSaslUser = Object.hasOwn(props, "sasl.username");
+    const hasSaslPass = Object.hasOwn(props, "sasl.password");
+    if (hasSaslUser !== hasSaslPass) {
+      throw new Error(
+        "--kafka-config-file: sasl.username and sasl.password must both be present or both be absent",
+      );
+    }
+
+    const protectedSet = new Set<string>(KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS);
+
+    if (Object.hasOwn(props, "bootstrap.servers")) {
+      conn.kafka.bootstrap_servers = props["bootstrap.servers"];
+    }
+    if (hasSaslUser && hasSaslPass) {
+      conn.kafka.auth = {
+        type: "api_key",
+        key: props["sasl.username"]!,
+        secret: props["sasl.password"]!,
+      };
+    }
+
+    const remaining = Object.fromEntries(
+      Object.entries(props).filter(([k]) => !protectedSet.has(k)),
+    );
+    if (Object.keys(remaining).length > 0) {
+      conn.kafka.extra_properties = remaining;
+    }
+  }
 }
 
 /* And now, Zod schemas for validation of MCPServerConfiguration and contained objects. */
+
+/**
+ * librdkafka property keys that have named YAML equivalents and must not appear in
+ * `extra_properties`. Authoring them there is an error in YAML-configured connections;
+ * use `bootstrap_servers` or the `auth` block instead.
+ *
+ * Note: this restriction applies only to YAML-authored configs. The `-k` /
+ * `--kafka-config-file` CLI flag is a higher-precedence override mechanism and is
+ * permitted to supply these keys (env vars are always lowest precedence).
+ */
+export const KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS = [
+  "bootstrap.servers",
+  "sasl.username",
+  "sasl.password",
+] as const;
 
 const apiKeyAuthSchema = z
   .object({
@@ -175,6 +266,20 @@ const directConnectionSchema = z
           .string()
           .trim()
           .startsWith("env-", "kafka.env_id must start with 'env-'")
+          .optional(),
+        extra_properties: z
+          .record(z.string(), z.string())
+          .superRefine((props, ctx) => {
+            const found = KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS.filter((k) =>
+              Object.hasOwn(props, k),
+            );
+            if (found.length > 0) {
+              ctx.addIssue({
+                code: "custom",
+                message: `extra_properties must not include ${found.join(", ")} — use the named YAML fields (bootstrap_servers, auth) instead`,
+              });
+            }
+          })
           .optional(),
       })
       .strict()

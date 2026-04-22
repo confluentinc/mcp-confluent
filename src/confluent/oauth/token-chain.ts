@@ -19,8 +19,8 @@ const REQUEST_TIMEOUT_MS = 30_000;
 /** Result of a full initial-login token chain from {@link executeFullTokenChain}. */
 export interface TokenChainResult {
   refreshToken: string;
-  /** Only set on initial login. Absent on refresh — callers must preserve the original value. */
-  refreshTokenAbsoluteExpiresAt?: number;
+  /** Set once on initial login and preserved across subsequent refreshes. */
+  refreshTokenAbsoluteExpiresAt: number;
   /** Reset on every rotation (initial login and refresh). */
   refreshTokenIdleExpiresAt: number;
   controlPlaneToken: string;
@@ -177,25 +177,6 @@ export async function executeFullTokenChain(
     codeVerifier,
   );
 
-  const result = await deriveConfluentTokens(auth0Config, auth0Response);
-
-  return {
-    ...result,
-    refreshTokenAbsoluteExpiresAt:
-      Date.now() + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
-  };
-}
-
-/**
- * Given Auth0 tokens, derives Confluent control plane and data plane tokens.
- * Expiration times are computed client-side using fixed durations.
- *
- * Does NOT set refreshTokenAbsoluteExpiresAt — that is only set on initial login.
- */
-async function deriveConfluentTokens(
-  auth0Config: Auth0Config,
-  auth0Response: Auth0TokenResponse,
-): Promise<TokenChainResult> {
   const cpResponse = await exchangeIdTokenForControlPlaneToken(
     auth0Config.apiUrl,
     auth0Response.id_token,
@@ -210,6 +191,7 @@ async function deriveConfluentTokens(
 
   return {
     refreshToken: auth0Response.refresh_token,
+    refreshTokenAbsoluteExpiresAt: now + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
     refreshTokenIdleExpiresAt: now + REFRESH_TOKEN_IDLE_LIFETIME_MS,
     controlPlaneToken: cpResponse.token,
     controlPlaneExpiresAt: now + CONTROL_PLANE_TOKEN_LIFETIME_MS,

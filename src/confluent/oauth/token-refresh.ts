@@ -13,6 +13,7 @@ import {
 import type { TokenStore } from "@src/confluent/oauth/token-store.js";
 import type {
   Auth0Config,
+  Auth0TokenResponse,
   ConfluentTokenSet,
 } from "@src/confluent/oauth/types.js";
 import { logger } from "@src/logger.js";
@@ -28,7 +29,7 @@ export async function refreshTokenSet(
   // token on success, so we persist the rotated token IMMEDIATELY before
   // attempting CP/DP exchange — otherwise a CP/DP failure would leave the
   // store with an already-burned refresh token and brick the session.
-  let auth0Response;
+  let auth0Response: Auth0TokenResponse;
   try {
     auth0Response = await exchangeRefreshTokenForAuth0Tokens(
       auth0Config,
@@ -48,10 +49,6 @@ export async function refreshTokenSet(
   const rotationPersisted = store.update(accessToken, {
     refreshToken: auth0Response.refresh_token,
     refreshTokenIdleExpiresAt: rotatedIdleExpiresAt,
-    controlPlaneToken: tokenSet.controlPlaneToken,
-    controlPlaneExpiresAt: tokenSet.controlPlaneExpiresAt,
-    dataPlaneToken: tokenSet.dataPlaneToken,
-    dataPlaneExpiresAt: tokenSet.dataPlaneExpiresAt,
   });
 
   if (!rotationPersisted) {

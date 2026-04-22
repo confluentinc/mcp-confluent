@@ -222,8 +222,7 @@ const configSchema = z
       .string()
       .describe("Base URL for Confluent Cloud's REST API services")
       .trim()
-      .url()
-      .default("https://api.confluent.cloud"),
+      .url(),
     SCHEMA_REGISTRY_ENDPOINT: z
       .string()
       .describe(

@@ -5,7 +5,7 @@ import {
   exchangeAuthCodeForTokens,
   exchangeIdTokenForControlPlaneToken,
   exchangeControlPlaneForDataPlaneToken,
-  refreshTokenChain,
+  exchangeRefreshTokenForAuth0Tokens,
   executeFullTokenChain,
 } from "@src/confluent/oauth/token-chain.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
@@ -176,16 +176,16 @@ describe("oauth/token-chain.ts", () => {
     });
   });
 
-  describe("refreshTokenChain", () => {
+  describe("exchangeRefreshTokenForAuth0Tokens", () => {
     const auth0Config = getAuth0Config("devel");
 
-    it("should use refresh token to get new ID token and derive CP + DP tokens", async () => {
+    it("should POST grant_type=refresh_token and return the Auth0 response", async () => {
       // First call: refresh token → Auth0 token endpoint
-      fetchStub.onCall(0).resolves(
+      fetchStub.resolves(
         new Response(
           JSON.stringify({
             id_token: "new-id-token",
-            refresh_token: "new-refresh-token",
+            refresh_token: "rotated-refresh-token",
             access_token: "new-access",
             token_type: "Bearer",
             expires_in: 60,
@@ -195,46 +195,35 @@ describe("oauth/token-chain.ts", () => {
       );
 
       // Second call: ID token → control plane
-      fetchStub.onCall(1).resolves(
-        new Response(
-          JSON.stringify({
-            token: "new-cp-token",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+      const result = await exchangeRefreshTokenForAuth0Tokens(
+        auth0Config,
+        "old-refresh-token",
       );
 
-      // Third call: CP token → data plane
-      fetchStub.onCall(2).resolves(
-        new Response(
-          JSON.stringify({
-            token: "new-dp-token",
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+      expect(result.id_token).toBe("new-id-token");
+      expect(result.refresh_token).toBe("rotated-refresh-token");
+
+      sinon.assert.calledOnce(fetchStub);
+      const [url, options] = fetchStub.firstCall.args;
+      expect(url).toBe("https://login.confluent-dev.io/oauth/token");
+      expect(options.method).toBe("POST");
+
+      const body = new URLSearchParams(options.body);
+      expect(body.get("grant_type")).toBe("refresh_token");
+      expect(body.get("refresh_token")).toBe("old-refresh-token");
+      expect(body.get("client_id")).toBe(auth0Config.clientId);
+    });
+
+    it("should throw on non-200 response", async () => {
+      fetchStub.resolves(
+        new Response(JSON.stringify({ error: "invalid_grant" }), {
+          status: 400,
+        }),
       );
 
-      const result = await refreshTokenChain(auth0Config, "old-refresh-token");
-
-      expect(result.refreshToken).toBe("new-refresh-token");
-      expect(result.controlPlaneToken).toBe("new-cp-token");
-      expect(result.dataPlaneToken).toBe("new-dp-token");
-      // Refresh should reset idle (4hr) but NOT set absolute (8hr)
-      expect(result.refreshTokenIdleExpiresAt).toBeGreaterThan(
-        Date.now() + REFRESH_TOKEN_IDLE_LIFETIME_MS - 5000,
-      );
-      expect(result.refreshTokenIdleExpiresAt).toBeLessThanOrEqual(
-        Date.now() + REFRESH_TOKEN_IDLE_LIFETIME_MS,
-      );
-      expect(result.refreshTokenAbsoluteExpiresAt).toBeUndefined();
-
-      sinon.assert.calledThrice(fetchStub);
-
-      // Verify the refresh token call uses grant_type=refresh_token
-      const [, refreshOpts] = fetchStub.firstCall.args;
-      const refreshBody = new URLSearchParams(refreshOpts.body);
-      expect(refreshBody.get("grant_type")).toBe("refresh_token");
-      expect(refreshBody.get("refresh_token")).toBe("old-refresh-token");
+      await expect(
+        exchangeRefreshTokenForAuth0Tokens(auth0Config, "bad-refresh"),
+      ).rejects.toThrow(/Auth0 token refresh failed/);
     });
   });
 

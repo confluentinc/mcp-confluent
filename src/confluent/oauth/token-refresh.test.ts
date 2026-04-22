@@ -5,6 +5,7 @@ import { TokenStore } from "@src/confluent/oauth/token-store.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
   createRefreshCallback,
+  refreshTokenSet,
   startAutoRefresh,
 } from "@src/confluent/oauth/token-refresh.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
@@ -50,7 +51,6 @@ describe("oauth/token-refresh.ts", () => {
   }
 
   function stubSuccessfulRefreshChain() {
-    // Auth0 refresh → new tokens
     fetchStub.onCall(0).resolves(
       new Response(
         JSON.stringify({
@@ -63,14 +63,12 @@ describe("oauth/token-refresh.ts", () => {
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
     );
-    // ID → CP
     fetchStub.onCall(1).resolves(
       new Response(JSON.stringify({ token: "new-cp-token" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }),
     );
-    // CP → DP
     fetchStub.onCall(2).resolves(
       new Response(JSON.stringify({ token: "new-dp-token" }), {
         status: 200,
@@ -79,8 +77,219 @@ describe("oauth/token-refresh.ts", () => {
     );
   }
 
+  describe("refreshTokenSet", () => {
+    it("should rotate refresh + CP + DP on full success", async () => {
+      const tokenSet = createTokenSet({ refreshToken: "old-refresh" });
+      store.store(tokenSet);
+      stubSuccessfulRefreshChain();
+
+      const before = Date.now();
+      await refreshTokenSet(
+        auth0Config,
+        store,
+        "opaque-access-token",
+        tokenSet,
+      );
+      const after = Date.now();
+
+      const saved = store.get("opaque-access-token")!;
+      expect(saved.refreshToken).toBe("new-refresh-token");
+      expect(saved.controlPlaneToken).toBe("new-cp-token");
+      expect(saved.dataPlaneToken).toBe("new-dp-token");
+      // accessToken never mutates
+      expect(saved.accessToken).toBe("opaque-access-token");
+
+      // Expiry timestamps set from the post-Auth0 rotation time
+      expect(saved.refreshTokenIdleExpiresAt).toBeGreaterThanOrEqual(
+        before + REFRESH_TOKEN_IDLE_LIFETIME_MS,
+      );
+      expect(saved.refreshTokenIdleExpiresAt).toBeLessThanOrEqual(
+        after + REFRESH_TOKEN_IDLE_LIFETIME_MS,
+      );
+      expect(saved.controlPlaneExpiresAt).toBeGreaterThanOrEqual(
+        before + CONTROL_PLANE_TOKEN_LIFETIME_MS,
+      );
+      expect(saved.controlPlaneExpiresAt).toBeLessThanOrEqual(
+        after + CONTROL_PLANE_TOKEN_LIFETIME_MS,
+      );
+      expect(saved.dataPlaneExpiresAt).toBeGreaterThanOrEqual(
+        before + DATA_PLANE_TOKEN_LIFETIME_MS,
+      );
+      expect(saved.dataPlaneExpiresAt).toBeLessThanOrEqual(
+        after + DATA_PLANE_TOKEN_LIFETIME_MS,
+      );
+
+      sinon.assert.calledThrice(fetchStub);
+    });
+
+    it("should leave state unchanged when Auth0 refresh fails", async () => {
+      const tokenSet = createTokenSet({ refreshToken: "old-refresh" });
+      store.store(tokenSet);
+      fetchStub.resolves(new Response("server error", { status: 500 }));
+
+      await refreshTokenSet(
+        auth0Config,
+        store,
+        "opaque-access-token",
+        tokenSet,
+      );
+
+      const saved = store.get("opaque-access-token")!;
+      expect(saved.refreshToken).toBe("old-refresh");
+      expect(saved.controlPlaneToken).toBe("cp-token");
+      expect(saved.dataPlaneToken).toBe("dp-token");
+    });
+
+    it("should persist the rotated refresh token even if CP exchange fails", async () => {
+      const tokenSet = createTokenSet({
+        refreshToken: "old-refresh",
+        controlPlaneToken: "old-cp",
+        dataPlaneToken: "old-dp",
+      });
+      store.store(tokenSet);
+      fetchStub.onCall(0).resolves(
+        new Response(
+          JSON.stringify({
+            id_token: "new-id-token",
+            refresh_token: "rotated-refresh",
+            access_token: "new-access",
+            token_type: "Bearer",
+            expires_in: 60,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+      fetchStub
+        .onCall(1)
+        .resolves(new Response("bad gateway", { status: 502 }));
+
+      await refreshTokenSet(
+        auth0Config,
+        store,
+        "opaque-access-token",
+        tokenSet,
+      );
+
+      const saved = store.get("opaque-access-token")!;
+      // Critical invariant: rotated refresh is safe so next tick can retry
+      expect(saved.refreshToken).toBe("rotated-refresh");
+      expect(saved.controlPlaneToken).toBe("old-cp");
+      expect(saved.dataPlaneToken).toBe("old-dp");
+    });
+
+    it("should persist the rotated refresh token even if DP exchange fails", async () => {
+      const tokenSet = createTokenSet({
+        refreshToken: "old-refresh",
+        controlPlaneToken: "old-cp",
+        dataPlaneToken: "old-dp",
+      });
+      store.store(tokenSet);
+      fetchStub.onCall(0).resolves(
+        new Response(
+          JSON.stringify({
+            id_token: "new-id-token",
+            refresh_token: "rotated-refresh",
+            access_token: "new-access",
+            token_type: "Bearer",
+            expires_in: 60,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+      fetchStub.onCall(1).resolves(
+        new Response(JSON.stringify({ token: "new-cp" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+      fetchStub.onCall(2).resolves(new Response("forbidden", { status: 403 }));
+
+      await refreshTokenSet(
+        auth0Config,
+        store,
+        "opaque-access-token",
+        tokenSet,
+      );
+
+      const saved = store.get("opaque-access-token")!;
+      expect(saved.refreshToken).toBe("rotated-refresh");
+      // CP/DP only advance together via the final atomic update
+      expect(saved.controlPlaneToken).toBe("old-cp");
+      expect(saved.dataPlaneToken).toBe("old-dp");
+    });
+
+    it("should no-op if the token was removed between scan and refresh", async () => {
+      const tokenSet = createTokenSet();
+      // Don't store into `store` — simulates concurrent removal
+      stubSuccessfulRefreshChain();
+
+      await refreshTokenSet(
+        auth0Config,
+        store,
+        "opaque-access-token",
+        tokenSet,
+      );
+
+      expect(store.get("opaque-access-token")).toBeUndefined();
+      // Auth0 call fires (already in flight) but CP/DP should not
+      sinon.assert.calledOnce(fetchStub);
+    });
+
+    it("should discard phase-2 update when the token is removed after phase-1 persistence", async () => {
+      const tokenSet = createTokenSet({ refreshToken: "old-refresh" });
+      store.store(tokenSet);
+      fetchStub.onCall(0).resolves(
+        new Response(
+          JSON.stringify({
+            id_token: "new-id-token",
+            refresh_token: "rotated-refresh",
+            access_token: "new-access",
+            token_type: "Bearer",
+            expires_in: 60,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+      // Remove the token mid-flight, as CP is being fetched. Phase-2 will
+      // still succeed but the final store.update must be a no-op.
+      fetchStub.onCall(1).callsFake(async () => {
+        store.remove("opaque-access-token");
+        return new Response(JSON.stringify({ token: "new-cp-token" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+      fetchStub.onCall(2).resolves(
+        new Response(JSON.stringify({ token: "new-dp-token" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      await refreshTokenSet(
+        auth0Config,
+        store,
+        "opaque-access-token",
+        tokenSet,
+      );
+
+      expect(store.get("opaque-access-token")).toBeUndefined();
+      expect(store.size).toBe(0);
+      // All three phases ran even though the final update was a no-op.
+      expect(fetchStub.callCount).toBe(3);
+    });
+  });
+
   describe("createRefreshCallback", () => {
-    it("should skip tokens with CP expiry more than 1 minute away", async () => {
+    it("should do nothing when store is empty", async () => {
+      const callback = createRefreshCallback(auth0Config);
+
+      await callback(store);
+
+      sinon.assert.notCalled(fetchStub);
+    });
+
+    it("should skip tokens with CP fresher than the refresh window", async () => {
       const callback = createRefreshCallback(auth0Config);
       store.store(
         createTokenSet({
@@ -93,192 +302,73 @@ describe("oauth/token-refresh.ts", () => {
       sinon.assert.notCalled(fetchStub);
     });
 
-    it("should refresh tokens when CP expiry is within 1 minute", async () => {
-      const callback = createRefreshCallback(auth0Config);
-      store.store(
-        createTokenSet({
-          controlPlaneExpiresAt: Date.now() + 30_000,
-        }),
-      );
-
-      stubSuccessfulRefreshChain();
-
-      await callback(store);
-
-      sinon.assert.calledThrice(fetchStub);
-
-      const updated = store.get("opaque-access-token");
-      expect(updated!.controlPlaneToken).toBe("new-cp-token");
-      expect(updated!.dataPlaneToken).toBe("new-dp-token");
-      expect(updated!.refreshToken).toBe("new-refresh-token");
-      expect(updated!.accessToken).toBe("opaque-access-token");
-    });
-
-    it("should refresh tokens when CP is already expired", async () => {
-      const callback = createRefreshCallback(auth0Config);
-      store.store(
-        createTokenSet({
-          controlPlaneExpiresAt: Date.now() - 1000,
-        }),
-      );
-
-      stubSuccessfulRefreshChain();
-
-      await callback(store);
-
-      sinon.assert.calledThrice(fetchStub);
-      expect(store.get("opaque-access-token")!.controlPlaneToken).toBe(
-        "new-cp-token",
-      );
-    });
-
-    it("should remove token set when absolute expiry has passed", async () => {
+    it("should remove token sets with expired absolute refresh expiry", async () => {
       const callback = createRefreshCallback(auth0Config);
       store.store(
         createTokenSet({
           refreshTokenAbsoluteExpiresAt: Date.now() - 1000,
-          controlPlaneExpiresAt: Date.now() - 1000,
         }),
       );
 
       await callback(store);
 
       sinon.assert.notCalled(fetchStub);
-      expect(store.get("opaque-access-token")).toBeUndefined();
       expect(store.size).toBe(0);
     });
 
-    it("should remove token set when idle expiry has passed", async () => {
+    it("should remove token sets with expired idle refresh expiry", async () => {
       const callback = createRefreshCallback(auth0Config);
       store.store(
         createTokenSet({
           refreshTokenIdleExpiresAt: Date.now() - 1000,
-          controlPlaneExpiresAt: Date.now() - 1000,
         }),
       );
 
       await callback(store);
 
       sinon.assert.notCalled(fetchStub);
-      expect(store.get("opaque-access-token")).toBeUndefined();
       expect(store.size).toBe(0);
     });
 
-    it("should do nothing when store is empty", async () => {
+    it("should iterate every due token (no early exit after one refresh)", async () => {
       const callback = createRefreshCallback(auth0Config);
-
-      await callback(store);
-
-      sinon.assert.notCalled(fetchStub);
-    });
-
-    it("should continue to next token if one fails to refresh", async () => {
-      const callback = createRefreshCallback(auth0Config);
-
-      store.store(
-        createTokenSet({
-          accessToken: "token-a",
-          refreshToken: "refresh-a",
-          controlPlaneExpiresAt: Date.now() + 10_000,
-        }),
-      );
-      store.store(
-        createTokenSet({
-          accessToken: "token-b",
-          refreshToken: "refresh-b",
-          controlPlaneExpiresAt: Date.now() + 10_000,
-        }),
-      );
-
-      // First refresh (token-a): fails at Auth0
-      fetchStub
-        .onCall(0)
-        .resolves(new Response("bad request", { status: 400 }));
-      // Second refresh (token-b): succeeds
-      fetchStub.onCall(1).resolves(
-        new Response(
-          JSON.stringify({
-            id_token: "b-id",
-            refresh_token: "b-new-refresh",
-            access_token: "b-access",
-            token_type: "Bearer",
-            expires_in: 60,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      );
-      fetchStub.onCall(2).resolves(
-        new Response(JSON.stringify({ token: "b-new-cp" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-      fetchStub.onCall(3).resolves(
-        new Response(JSON.stringify({ token: "b-new-dp" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-
-      await callback(store);
-
-      // Token A should still have old values (refresh failed)
-      expect(store.get("token-a")!.controlPlaneToken).toBe("cp-token");
-      // Token B should be updated
-      expect(store.get("token-b")!.controlPlaneToken).toBe("b-new-cp");
-    });
-
-    it("should refresh multiple tokens that are all near expiry", async () => {
-      const callback = createRefreshCallback(auth0Config);
-
       store.store(
         createTokenSet({
           accessToken: "token-1",
-          refreshToken: "refresh-1",
           controlPlaneExpiresAt: Date.now() + 20_000,
         }),
       );
       store.store(
         createTokenSet({
           accessToken: "token-2",
-          refreshToken: "refresh-2",
           controlPlaneExpiresAt: Date.now() + 20_000,
         }),
       );
 
-      for (let i = 0; i < 2; i++) {
-        const base = i * 3;
-        fetchStub.onCall(base).resolves(
-          new Response(
-            JSON.stringify({
-              id_token: `id-${i}`,
-              refresh_token: `refresh-new-${i}`,
-              access_token: `access-${i}`,
-              token_type: "Bearer",
-              expires_in: 60,
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-        );
-        fetchStub.onCall(base + 1).resolves(
-          new Response(JSON.stringify({ token: `cp-new-${i}` }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-        fetchStub.onCall(base + 2).resolves(
-          new Response(JSON.stringify({ token: `dp-new-${i}` }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
+      // 2 tokens × 3 fetches each. callsFake builds a fresh Response per call
+      // (Response bodies are single-use, so .resolves(shared) would fail on reuse).
+      const auth0Body = JSON.stringify({
+        id_token: "id",
+        refresh_token: "rt",
+        access_token: "a",
+        token_type: "Bearer",
+        expires_in: 60,
+      });
+      const cpBody = JSON.stringify({ token: "cp" });
+      const dpBody = JSON.stringify({ token: "dp" });
+      const jsonHeaders = { "Content-Type": "application/json" };
+      fetchStub.callsFake(async () => {
+        const calls = fetchStub.callCount;
+        const phase = (calls - 1) % 3;
+        const body = phase === 0 ? auth0Body : phase === 1 ? cpBody : dpBody;
+        return new Response(body, { status: 200, headers: jsonHeaders });
+      });
 
       await callback(store);
 
       expect(fetchStub.callCount).toBe(6);
-      expect(store.get("token-1")!.controlPlaneToken).toBe("cp-new-0");
-      expect(store.get("token-2")!.controlPlaneToken).toBe("cp-new-1");
+      expect(store.get("token-1")!.controlPlaneToken).toBe("cp");
+      expect(store.get("token-2")!.controlPlaneToken).toBe("cp");
     });
   });
 

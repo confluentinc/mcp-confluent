@@ -16,12 +16,7 @@ import {
 /** Per-request timeout bounding each Auth0/Confluent HTTP call. */
 const REQUEST_TIMEOUT_MS = 30_000;
 
-/**
- * Result of a single token-chain execution — either the initial login
- * ({@link executeFullTokenChain}) or a subsequent refresh ({@link refreshTokenChain}).
- * Callers persist this into the token store so downstream CP/DP requests can
- * retrieve still-valid credentials.
- */
+/** Result of a full initial-login token chain from {@link executeFullTokenChain}. */
 export interface TokenChainResult {
   refreshToken: string;
   /** Only set on initial login. Absent on refresh — callers must preserve the original value. */
@@ -138,20 +133,23 @@ export async function exchangeControlPlaneForDataPlaneToken(
 }
 
 /**
- * Uses a refresh token to obtain new Auth0 tokens, then derives CP and DP tokens.
- * This is used by the background refresh loop.
+ * Exchanges a refresh token for a new Auth0 token set (ID token + rotated
+ * refresh token). This is a single-use destructive operation: on success the
+ * old refresh token is invalidated by Auth0. Callers that then derive CP/DP
+ * tokens should persist the new refresh token BEFORE the CP/DP calls so a
+ * failure there doesn't lose the rotated token.
  */
-export async function refreshTokenChain(
+export async function exchangeRefreshTokenForAuth0Tokens(
   auth0Config: Auth0Config,
   refreshToken: string,
-): Promise<TokenChainResult> {
+): Promise<Auth0TokenResponse> {
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     client_id: auth0Config.clientId,
     refresh_token: refreshToken,
   });
 
-  const auth0Response = await postJson<Auth0TokenResponse>(
+  return postJson<Auth0TokenResponse>(
     `https://${auth0Config.domain}/oauth/token`,
     {
       method: "POST",
@@ -160,8 +158,6 @@ export async function refreshTokenChain(
     },
     "Auth0 token refresh",
   );
-
-  return deriveConfluentTokens(auth0Config, auth0Response);
 }
 
 /**

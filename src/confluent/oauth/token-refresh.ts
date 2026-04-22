@@ -1,21 +1,106 @@
-import type { Auth0Config } from "@src/confluent/oauth/types.js";
+import type {
+  Auth0Config,
+  ConfluentTokenSet,
+} from "@src/confluent/oauth/types.js";
 import type { TokenStore } from "@src/confluent/oauth/token-store.js";
-import { refreshTokenChain } from "@src/confluent/oauth/token-chain.js";
+import {
+  exchangeControlPlaneForDataPlaneToken,
+  exchangeIdTokenForControlPlaneToken,
+  exchangeRefreshTokenForAuth0Tokens,
+} from "@src/confluent/oauth/token-chain.js";
 import {
   CONTROL_PLANE_REFRESH_WINDOW_MS,
+  CONTROL_PLANE_TOKEN_LIFETIME_MS,
+  DATA_PLANE_TOKEN_LIFETIME_MS,
   DEFAULT_REFRESH_INTERVAL_MS,
+  REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
 import { logger } from "@src/logger.js";
 
+/** Refreshes one token set, persisting to `store` at each phase boundary. */
+export async function refreshTokenSet(
+  auth0Config: Auth0Config,
+  store: TokenStore,
+  accessToken: string,
+  tokenSet: ConfluentTokenSet,
+): Promise<void> {
+  // Phase 1: rotate the refresh token with Auth0. Auth0 invalidates the old
+  // token on success, so we persist the rotated token IMMEDIATELY before
+  // attempting CP/DP exchange — otherwise a CP/DP failure would leave the
+  // store with an already-burned refresh token and brick the session.
+  let auth0Response;
+  try {
+    auth0Response = await exchangeRefreshTokenForAuth0Tokens(
+      auth0Config,
+      tokenSet.refreshToken,
+    );
+  } catch (error) {
+    logger.error(
+      { error },
+      "Auth0 refresh failed; keeping existing stored token set for next tick",
+    );
+    return;
+  }
+
+  const rotationTime = Date.now();
+  const rotatedIdleExpiresAt = rotationTime + REFRESH_TOKEN_IDLE_LIFETIME_MS;
+
+  const rotationPersisted = store.update(accessToken, {
+    refreshToken: auth0Response.refresh_token,
+    refreshTokenIdleExpiresAt: rotatedIdleExpiresAt,
+    controlPlaneToken: tokenSet.controlPlaneToken,
+    controlPlaneExpiresAt: tokenSet.controlPlaneExpiresAt,
+    dataPlaneToken: tokenSet.dataPlaneToken,
+    dataPlaneExpiresAt: tokenSet.dataPlaneExpiresAt,
+  });
+
+  if (!rotationPersisted) {
+    logger.debug(
+      "Token removed during refresh; discarding rotated credentials",
+    );
+    return;
+  }
+
+  // Phase 2: derive new CP and DP tokens. A single-attempt failure here
+  // leaves the rotated refresh token safely in the store; the next scheduler
+  // tick will re-rotate and retry. Smarter retry (transient-only, bounded
+  // attempts) lands in the transient/non-transient classification work.
+  try {
+    const cpResponse = await exchangeIdTokenForControlPlaneToken(
+      auth0Config.apiUrl,
+      auth0Response.id_token,
+    );
+    const dpResponse = await exchangeControlPlaneForDataPlaneToken(
+      auth0Config.apiUrl,
+      cpResponse.token,
+    );
+
+    const updated = store.update(accessToken, {
+      controlPlaneToken: cpResponse.token,
+      controlPlaneExpiresAt: rotationTime + CONTROL_PLANE_TOKEN_LIFETIME_MS,
+      dataPlaneToken: dpResponse.token,
+      dataPlaneExpiresAt: rotationTime + DATA_PLANE_TOKEN_LIFETIME_MS,
+    });
+
+    if (!updated) {
+      logger.debug(
+        "Token removed during refresh; discarding rotated credentials",
+      );
+    } else {
+      logger.debug("Token set refreshed successfully");
+    }
+  } catch (error) {
+    logger.error(
+      { error },
+      "CP/DP exchange failed; rotated refresh token preserved for next tick",
+    );
+  }
+}
+
 /**
- * Creates the refresh callback that iterates all stored token sets
- * and refreshes any whose control plane token is approaching expiry.
- *
- * For each token set:
- * - Skips if the refresh token itself has expired (removes the token set)
- * - Skips if the control plane token is still fresh (more than 1 min remaining)
- * - Calls refreshTokenChain to get new tokens and updates the store
- * - On failure, logs the error but continues to the next token set
+ * Creates the refresh callback: scans the store and for each token set either
+ * removes it (refresh token expired), skips it (CP still fresh), or delegates
+ * to {@link refreshTokenSet}.
  */
 export function createRefreshCallback(
   auth0Config: Auth0Config,
@@ -38,7 +123,6 @@ export function createRefreshCallback(
 
       const now = Date.now();
 
-      // Remove if the refresh token has expired (8hr absolute or 4hr idle)
       if (
         now >= tokenSet.refreshTokenAbsoluteExpiresAt ||
         now >= tokenSet.refreshTokenIdleExpiresAt
@@ -48,31 +132,14 @@ export function createRefreshCallback(
         continue;
       }
 
-      // Skip if CP token still has more than the refresh window remaining
-      const cpTimeRemaining = tokenSet.controlPlaneExpiresAt - now;
-      if (cpTimeRemaining > CONTROL_PLANE_REFRESH_WINDOW_MS) {
+      if (
+        tokenSet.controlPlaneExpiresAt - now >
+        CONTROL_PLANE_REFRESH_WINDOW_MS
+      ) {
         continue;
       }
 
-      try {
-        const result = await refreshTokenChain(
-          auth0Config,
-          tokenSet.refreshToken,
-        );
-
-        store.update(accessToken, {
-          refreshToken: result.refreshToken,
-          refreshTokenIdleExpiresAt: result.refreshTokenIdleExpiresAt,
-          controlPlaneToken: result.controlPlaneToken,
-          controlPlaneExpiresAt: result.controlPlaneExpiresAt,
-          dataPlaneToken: result.dataPlaneToken,
-          dataPlaneExpiresAt: result.dataPlaneExpiresAt,
-        });
-
-        logger.debug("Token set refreshed successfully");
-      } catch (error) {
-        logger.error({ error }, "Failed to refresh token set");
-      }
+      await refreshTokenSet(auth0Config, store, accessToken, tokenSet);
     }
   };
 }

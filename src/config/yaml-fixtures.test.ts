@@ -183,6 +183,22 @@ describe("config/yaml-fixtures.test.ts", () => {
     });
   });
 
+  describe("kafka REST metadata fixtures", () => {
+    it("should load kafka-with-rest-metadata with all three metadata fields", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/kafka-with-rest-metadata.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.kafka?.bootstrap_servers).toBe("broker.confluent.cloud:9092");
+      expect(conn.kafka?.rest_endpoint).toBe(
+        "https://pkc-abc123.us-east-1.aws.confluent.cloud:443",
+      );
+      expect(conn.kafka?.cluster_id).toBe("lkc-abc123");
+      expect(conn.kafka?.env_id).toBe("env-xyz789");
+    });
+  });
+
   describe("flink fixtures", () => {
     it("should load flink-with-required-fields with auth and required context fields", () => {
       const config = loadConfigFromYaml(
@@ -245,6 +261,52 @@ describe("config/yaml-fixtures.test.ts", () => {
         secret: "myflinksecret",
       });
       expect(conn.flink?.environment_id).toBe("env-abc123");
+    });
+  });
+
+  describe("telemetry fixtures", () => {
+    it("should load telemetry-with-auth with auth only", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/telemetry-with-auth.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.telemetry?.auth).toEqual({
+        type: "api_key",
+        key: "mytelemetrykey",
+        secret: "mytelemetrysecret",
+      });
+      expect(conn.telemetry?.endpoint).toBeUndefined();
+      expect(conn.kafka).toBeUndefined();
+      expect(conn.flink).toBeUndefined();
+    });
+
+    it("should load telemetry-with-endpoint-only with endpoint only", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/telemetry-with-endpoint-only.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.telemetry?.endpoint).toBe(
+        "https://api.telemetry.confluent.cloud",
+      );
+      expect(conn.telemetry?.auth).toBeUndefined();
+    });
+
+    it("should load telemetry-with-endpoint-and-auth with both fields populated", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/telemetry-with-endpoint-and-auth.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.telemetry?.endpoint).toBe(
+        "https://api.telemetry.confluent.cloud",
+      );
+      expect(conn.telemetry?.auth).toEqual({
+        type: "api_key",
+        key: "mytelemetrykey",
+        secret: "mytelemetrysecret",
+      });
     });
   });
 
@@ -315,6 +377,21 @@ describe("config/yaml-fixtures.test.ts", () => {
       expect(() =>
         loadConfigFromYaml(fixtureFile("invalid/flink-empty.yaml"), NO_ENV),
       ).toThrow(/flink\.auth/);
+    });
+
+    it("should reject a telemetry block with neither endpoint nor auth", () => {
+      expect(() =>
+        loadConfigFromYaml(fixtureFile("invalid/telemetry-empty.yaml"), NO_ENV),
+      ).toThrow(/telemetry block must contain at least 'endpoint' or 'auth'/);
+    });
+
+    it("should reject a kafka block with env_id lacking the env- prefix", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/kafka-invalid-env-id.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/kafka\.env_id must start with 'env-'/);
     });
 
     it("should reject a flink block that has endpoint but is missing other required fields", () => {

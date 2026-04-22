@@ -183,6 +183,22 @@ describe("config/yaml-fixtures.test.ts", () => {
     });
   });
 
+  describe("kafka extra_properties fixtures", () => {
+    it("should load kafka-with-extra-properties and parse the extra_properties block", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/kafka-with-extra-properties.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.kafka?.bootstrap_servers).toBe("broker.confluent.cloud:9092");
+      expect(conn.kafka?.extra_properties).toEqual({
+        "socket.timeout.ms": "30000",
+        "ssl.ca.location": "/etc/ssl/certs/ca-certificates.crt",
+        debug: "broker,topic",
+      });
+    });
+  });
+
   describe("kafka REST metadata fixtures", () => {
     it("should load kafka-with-rest-metadata with all three metadata fields", () => {
       const config = loadConfigFromYaml(
@@ -392,6 +408,26 @@ describe("config/yaml-fixtures.test.ts", () => {
           NO_ENV,
         ),
       ).toThrow(/kafka\.env_id must start with 'env-'/);
+    });
+
+    it("should reject kafka extra_properties containing a protected key", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/kafka-extra-properties-protected-key.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/bootstrap\.servers/);
+    });
+
+    it("should reject kafka extra_properties containing protected auth keys", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile(
+            "invalid/kafka-extra-properties-protected-auth-keys.yaml",
+          ),
+          NO_ENV,
+        ),
+      ).toThrow(/sasl\.(username|password)/);
     });
 
     it("should reject a flink block that has endpoint but is missing other required fields", () => {

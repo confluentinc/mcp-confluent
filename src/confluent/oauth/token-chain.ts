@@ -21,7 +21,7 @@ export interface TokenChainResult {
   refreshToken: string;
   /** Set once on initial login and preserved across subsequent refreshes. */
   refreshTokenAbsoluteExpiresAt: number;
-  /** Reset on every rotation (initial login and refresh). */
+  /** Set on initial login; subsequent refreshes bump this value in the store directly. */
   refreshTokenIdleExpiresAt: number;
   controlPlaneToken: string;
   controlPlaneExpiresAt: number;
@@ -80,7 +80,7 @@ export async function exchangeAuthCodeForTokens(
     redirect_uri: auth0Config.callbackUrl,
   });
 
-  return postJson<Auth0TokenResponse>(
+  const response = await postJson<Auth0TokenResponse>(
     `https://${auth0Config.domain}/oauth/token`,
     {
       method: "POST",
@@ -89,6 +89,13 @@ export async function exchangeAuthCodeForTokens(
     },
     "Auth0 token exchange",
   );
+  if (!response.id_token) {
+    throw new Error("Auth0 token exchange: missing id_token");
+  }
+  if (!response.refresh_token) {
+    throw new Error("Auth0 token exchange: missing refresh_token");
+  }
+  return response;
 }
 
 /**
@@ -99,7 +106,7 @@ export async function exchangeIdTokenForControlPlaneToken(
   apiUrl: string,
   idToken: string,
 ): Promise<ControlPlaneTokenResponse> {
-  return postJson<ControlPlaneTokenResponse>(
+  const response = await postJson<ControlPlaneTokenResponse>(
     `${apiUrl}/api/sessions`,
     {
       method: "POST",
@@ -108,6 +115,10 @@ export async function exchangeIdTokenForControlPlaneToken(
     },
     "Control plane token exchange",
   );
+  if (!response.token) {
+    throw new Error("Control plane token exchange: missing token");
+  }
+  return response;
 }
 
 /**
@@ -118,7 +129,7 @@ export async function exchangeControlPlaneForDataPlaneToken(
   apiUrl: string,
   controlPlaneToken: string,
 ): Promise<DataPlaneTokenResponse> {
-  return postJson<DataPlaneTokenResponse>(
+  const response = await postJson<DataPlaneTokenResponse>(
     `${apiUrl}/api/access_tokens`,
     {
       method: "POST",
@@ -130,6 +141,10 @@ export async function exchangeControlPlaneForDataPlaneToken(
     },
     "Data plane token exchange",
   );
+  if (!response.token) {
+    throw new Error("Data plane token exchange: missing token");
+  }
+  return response;
 }
 
 /**
@@ -149,7 +164,7 @@ export async function exchangeRefreshTokenForAuth0Tokens(
     refresh_token: refreshToken,
   });
 
-  return postJson<Auth0TokenResponse>(
+  const response = await postJson<Auth0TokenResponse>(
     `https://${auth0Config.domain}/oauth/token`,
     {
       method: "POST",
@@ -158,6 +173,13 @@ export async function exchangeRefreshTokenForAuth0Tokens(
     },
     "Auth0 token refresh",
   );
+  if (!response.id_token) {
+    throw new Error("Auth0 token refresh: missing id_token");
+  }
+  if (!response.refresh_token) {
+    throw new Error("Auth0 token refresh: missing refresh_token");
+  }
+  return response;
 }
 
 /**

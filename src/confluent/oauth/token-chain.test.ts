@@ -88,6 +88,42 @@ describe("oauth/token-chain.ts", () => {
         exchangeAuthCodeForTokens(auth0Config, "code", "verifier"),
       ).rejects.toThrow(/Auth0 token exchange timed out/);
     });
+
+    it("should throw when the response is missing refresh_token", async () => {
+      fetchStub.resolves(
+        new Response(
+          JSON.stringify({
+            id_token: "id",
+            access_token: "a",
+            token_type: "Bearer",
+            expires_in: 60,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      await expect(
+        exchangeAuthCodeForTokens(auth0Config, "code", "verifier"),
+      ).rejects.toThrow(/refresh_token/);
+    });
+
+    it("should throw when the response is missing id_token", async () => {
+      fetchStub.resolves(
+        new Response(
+          JSON.stringify({
+            refresh_token: "r",
+            access_token: "a",
+            token_type: "Bearer",
+            expires_in: 60,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      await expect(
+        exchangeAuthCodeForTokens(auth0Config, "code", "verifier"),
+      ).rejects.toThrow(/id_token/);
+    });
   });
 
   describe("exchangeIdTokenForControlPlaneToken", () => {
@@ -129,6 +165,22 @@ describe("oauth/token-chain.ts", () => {
           "bad-token",
         ),
       ).rejects.toThrow(/Control plane token exchange failed/);
+    });
+
+    it("should throw when the response is missing token", async () => {
+      fetchStub.resolves(
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      await expect(
+        exchangeIdTokenForControlPlaneToken(
+          "https://devel.cpdev.cloud",
+          "id-token",
+        ),
+      ).rejects.toThrow(/Control plane token exchange.*token/);
     });
   });
 
@@ -173,6 +225,22 @@ describe("oauth/token-chain.ts", () => {
           "bad-cp-token",
         ),
       ).rejects.toThrow(/Data plane token exchange failed/);
+    });
+
+    it("should throw when the response is missing token", async () => {
+      fetchStub.resolves(
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      await expect(
+        exchangeControlPlaneForDataPlaneToken(
+          "https://devel.cpdev.cloud",
+          "cp-token",
+        ),
+      ).rejects.toThrow(/Data plane token exchange.*token/);
     });
   });
 
@@ -224,6 +292,42 @@ describe("oauth/token-chain.ts", () => {
       await expect(
         exchangeRefreshTokenForAuth0Tokens(auth0Config, "bad-refresh"),
       ).rejects.toThrow(/Auth0 token refresh failed/);
+    });
+
+    it("should throw when the response is missing refresh_token", async () => {
+      fetchStub.resolves(
+        new Response(
+          JSON.stringify({
+            id_token: "id",
+            access_token: "a",
+            token_type: "Bearer",
+            expires_in: 60,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      await expect(
+        exchangeRefreshTokenForAuth0Tokens(auth0Config, "old-refresh"),
+      ).rejects.toThrow(/refresh_token/);
+    });
+
+    it("should throw when the response is missing id_token", async () => {
+      fetchStub.resolves(
+        new Response(
+          JSON.stringify({
+            refresh_token: "rotated",
+            access_token: "a",
+            token_type: "Bearer",
+            expires_in: 60,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      await expect(
+        exchangeRefreshTokenForAuth0Tokens(auth0Config, "old-refresh"),
+      ).rejects.toThrow(/id_token/);
     });
   });
 

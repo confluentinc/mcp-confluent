@@ -32,6 +32,15 @@ const ENV_VAR_TO_ZPATH = {
   // Tableflow parameters
   TABLEFLOW_API_KEY: `${CONN}.tableflow.auth.key`,
   TABLEFLOW_API_SECRET: `${CONN}.tableflow.auth.secret`,
+  // Flink parameters
+  FLINK_REST_ENDPOINT: `${CONN}.flink.endpoint`,
+  FLINK_API_KEY: `${CONN}.flink.auth.key`,
+  FLINK_API_SECRET: `${CONN}.flink.auth.secret`,
+  FLINK_ENV_ID: `${CONN}.flink.environment_id`,
+  FLINK_ORG_ID: `${CONN}.flink.organization_id`,
+  FLINK_COMPUTE_POOL_ID: `${CONN}.flink.compute_pool_id`,
+  FLINK_ENV_NAME: `${CONN}.flink.environment_name`,
+  FLINK_DATABASE_NAME: `${CONN}.flink.database_name`,
 } satisfies Partial<Record<keyof Environment, string>>;
 
 /**
@@ -95,6 +104,31 @@ export function consConfigFromEnv(
       env.TABLEFLOW_API_KEY,
       env.TABLEFLOW_API_SECRET,
     );
+  }
+
+  if (
+    env.FLINK_REST_ENDPOINT ||
+    env.FLINK_API_KEY ||
+    env.FLINK_API_SECRET ||
+    env.FLINK_ENV_ID ||
+    env.FLINK_ORG_ID ||
+    env.FLINK_COMPUTE_POOL_ID ||
+    env.FLINK_ENV_NAME ||
+    env.FLINK_DATABASE_NAME
+  ) {
+    connection.flink = {
+      ...(env.FLINK_REST_ENDPOINT && { endpoint: env.FLINK_REST_ENDPOINT }),
+      ...apiKeyAuth(env.FLINK_API_KEY, env.FLINK_API_SECRET),
+      ...(env.FLINK_ENV_ID && { environment_id: env.FLINK_ENV_ID }),
+      ...(env.FLINK_ORG_ID && { organization_id: env.FLINK_ORG_ID }),
+      ...(env.FLINK_COMPUTE_POOL_ID && {
+        compute_pool_id: env.FLINK_COMPUTE_POOL_ID,
+      }),
+      ...(env.FLINK_ENV_NAME && { environment_name: env.FLINK_ENV_NAME }),
+      ...(env.FLINK_DATABASE_NAME && {
+        database_name: env.FLINK_DATABASE_NAME,
+      }),
+    };
   }
 
   const result = mcpConfigSchema.safeParse({

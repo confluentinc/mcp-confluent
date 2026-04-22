@@ -1,8 +1,3 @@
-import type {
-  Auth0Config,
-  ConfluentTokenSet,
-} from "@src/confluent/oauth/types.js";
-import type { TokenStore } from "@src/confluent/oauth/token-store.js";
 import {
   exchangeControlPlaneForDataPlaneToken,
   exchangeIdTokenForControlPlaneToken,
@@ -15,6 +10,11 @@ import {
   DEFAULT_REFRESH_INTERVAL_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
+import type { TokenStore } from "@src/confluent/oauth/token-store.js";
+import type {
+  Auth0Config,
+  ConfluentTokenSet,
+} from "@src/confluent/oauth/types.js";
 import { logger } from "@src/logger.js";
 
 /** Refreshes one token set, persisting to `store` at each phase boundary. */

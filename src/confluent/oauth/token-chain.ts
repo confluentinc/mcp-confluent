@@ -1,17 +1,17 @@
-import type {
-  Auth0Config,
-  Auth0TokenResponse,
-  ControlPlaneTokenResponse,
-  DataPlaneTokenResponse,
-} from "@src/confluent/oauth/types.js";
 import { nodeFetch } from "@src/confluent/node-deps.js";
-import { logger } from "@src/logger.js";
 import {
   CONTROL_PLANE_TOKEN_LIFETIME_MS,
   DATA_PLANE_TOKEN_LIFETIME_MS,
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
+import type {
+  Auth0Config,
+  Auth0TokenResponse,
+  ControlPlaneTokenResponse,
+  DataPlaneTokenResponse,
+} from "@src/confluent/oauth/types.js";
+import { logger } from "@src/logger.js";
 
 /** Per-request timeout bounding each Auth0/Confluent HTTP call. */
 const REQUEST_TIMEOUT_MS = 30_000;

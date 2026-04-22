@@ -1,13 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import sinon from "sinon";
-import { TokenStore } from "@src/confluent/oauth/token-store.js";
-import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
 import {
   CONTROL_PLANE_TOKEN_LIFETIME_MS,
   DATA_PLANE_TOKEN_LIFETIME_MS,
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
+import { TokenStore } from "@src/confluent/oauth/token-store.js";
+import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
+import sinon from "sinon";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("oauth/token-store.ts", () => {
   describe("TokenStore", () => {

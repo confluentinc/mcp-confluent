@@ -1,14 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import sinon from "sinon";
 import { nodeFetch } from "@src/confluent/node-deps.js";
-import { TokenStore } from "@src/confluent/oauth/token-store.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
-import {
-  createRefreshCallback,
-  refreshTokenSet,
-  startAutoRefresh,
-} from "@src/confluent/oauth/token-refresh.js";
-import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
 import {
   CONTROL_PLANE_TOKEN_LIFETIME_MS,
   DATA_PLANE_TOKEN_LIFETIME_MS,
@@ -16,6 +7,15 @@ import {
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
+import {
+  createRefreshCallback,
+  refreshTokenSet,
+  startAutoRefresh,
+} from "@src/confluent/oauth/token-refresh.js";
+import { TokenStore } from "@src/confluent/oauth/token-store.js";
+import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
+import sinon from "sinon";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("oauth/token-refresh.ts", () => {
   const sandbox = sinon.createSandbox();

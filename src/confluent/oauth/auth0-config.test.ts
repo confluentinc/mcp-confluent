@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
 import {
   getAuth0Config,
-  OAUTH_CALLBACK_PORT,
   OAUTH_CALLBACK_PATH,
+  OAUTH_CALLBACK_PORT,
 } from "@src/confluent/oauth/auth0-config.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
+import { describe, expect, it } from "vitest";
 
 describe("oauth/auth0-config.ts", () => {
   describe("getAuth0Config", () => {

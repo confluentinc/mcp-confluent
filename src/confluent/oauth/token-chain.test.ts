@@ -1,18 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import sinon from "sinon";
 import { nodeFetch } from "@src/confluent/node-deps.js";
+import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
   exchangeAuthCodeForTokens,
-  exchangeIdTokenForControlPlaneToken,
   exchangeControlPlaneForDataPlaneToken,
+  exchangeIdTokenForControlPlaneToken,
   exchangeRefreshTokenForAuth0Tokens,
   executeFullTokenChain,
 } from "@src/confluent/oauth/token-chain.js";
-import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
+import sinon from "sinon";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("oauth/token-chain.ts", () => {
   const sandbox = sinon.createSandbox();

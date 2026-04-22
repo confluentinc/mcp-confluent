@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   CONTROL_PLANE_TOKEN_LIFETIME_MS,
   DATA_PLANE_TOKEN_LIFETIME_MS,
@@ -13,6 +12,7 @@ import type {
   DataPlaneTokenResponse,
   OAuthConfig,
 } from "@src/confluent/oauth/types.js";
+import { describe, expect, it } from "vitest";
 
 describe("oauth/types.ts", () => {
   describe("ConfluentTokenSet", () => {

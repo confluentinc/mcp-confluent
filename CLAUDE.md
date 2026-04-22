@@ -62,7 +62,7 @@ Tools are **auto-enabled/disabled** based on which environment variables are pre
 2. Create handler class extending `BaseToolHandler` in `src/confluent/tools/handlers/<domain>/`.
 3. Implement `getToolConfig()` (name, description, Zod input schema), `handle()`, and `getRequiredEnvVars()`.
 4. Register the handler in `ToolFactory.handlers` map in `src/confluent/tools/tool-factory.ts`.
-5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `openapi-typescript` (`npx openapi-typescript openapi.json -o src/confluent/openapi-schema.d.ts`).
+5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `npm run generate:openapi-types`. Commit the updated `src/confluent/openapi-schema.d.ts` alongside the `openapi.json` change.
 
 ## Code Conventions
 
@@ -78,6 +78,7 @@ Tools are **auto-enabled/disabled** based on which environment variables are pre
 - Use an outermost `describe()` block for the file, then inner `describe()` blocks for each item being tested.
 - Testing classes are done with a `describe()` block for the entire class, then individual `describe()` blocks for each method, with it() blocks for each aspect of the method.
 - External system interactions (including filesystem and environment variables) should be stubbed, primarily using `sinon` sandboxes.
+- Sinon sandboxes should be declared with a `let sandbox: sinon.SinonSandbox` statement at the most appropriate `describe()` block level to minimize declarations, be assigned to in that block's `beforeEach()`, and restored in that block's `afterEach()`. When adding test suites needing a sandbox to the same file, consider migrating any preexisting sandbox (and corresponding before/afterEach) to a broader scope.
 - Install and remove sinon sandboxes within `beforeEach()` and `afterEach()` at the widest appropriate scope in a test suite module.
 - Writing test suite utilities to install common blocks of stubs is a good technique to reduce test suite bloat. Those utilities should reside within the `tests/stubs` subtree.
 - Some node modules cannot be stubbed due to being implemented in C. The codebase should only use those indirectly, going through a stubbable js layer in `src/confluent/node-deps.js`. Look there and possibly add to it before making new parts of the codebase interact directly with the filesystem, etc.

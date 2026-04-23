@@ -403,7 +403,7 @@ const connectionConfigSchema = z
     ) {
       ctx.addIssue({
         code: "custom",
-        path: ["telemetry"],
+        path: ["telemetry", "endpoint"],
         message:
           "telemetry.endpoint is set but no auth is available — provide telemetry.auth or confluent_cloud.auth",
       });

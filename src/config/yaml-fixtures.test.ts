@@ -299,15 +299,6 @@ describe("config/yaml-fixtures.test.ts", () => {
       expect(conn.flink).toBeUndefined();
     });
 
-    it("should reject telemetry-with-endpoint-only when no auth is available", () => {
-      expect(() =>
-        loadConfigFromYaml(
-          fixtureFile("valid/telemetry-with-endpoint-only.yaml"),
-          NO_ENV,
-        ),
-      ).toThrow(/auth/);
-    });
-
     it("should load telemetry-with-endpoint-and-auth with both fields populated", () => {
       const config = loadConfigFromYaml(
         fixtureFile("valid/telemetry-with-endpoint-and-auth.yaml"),
@@ -442,6 +433,15 @@ describe("config/yaml-fixtures.test.ts", () => {
           NO_ENV,
         ),
       ).not.toThrow(/flink\.endpoint/);
+    });
+
+    it("should reject telemetry-with-endpoint-only when no confluent_cloud.auth is available", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/telemetry-with-endpoint-only.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/no auth is available/);
     });
   });
 });

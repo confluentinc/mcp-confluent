@@ -123,7 +123,9 @@ describe("config/yaml-fixtures.test.ts", () => {
         key: "mycloudkey",
         secret: "mycloudsecret",
       });
-      expect(conn.confluent_cloud?.endpoint).toBeUndefined();
+      expect(conn.confluent_cloud?.endpoint).toBe(
+        "https://api.confluent.cloud",
+      );
       expect(conn.kafka).toBeUndefined();
       expect(conn.schema_registry).toBeUndefined();
       expect(conn.tableflow).toBeUndefined();
@@ -365,12 +367,10 @@ describe("config/yaml-fixtures.test.ts", () => {
       ).toThrow(/tableflow block must contain 'auth'/);
     });
 
-    it("should reject a confluent_cloud block with neither endpoint nor auth", () => {
+    it("should reject a confluent_cloud block with no auth", () => {
       expect(() =>
         loadConfigFromYaml(fixtureFile("invalid/ccloud-empty.yaml"), NO_ENV),
-      ).toThrow(
-        /confluent_cloud block must contain at least 'endpoint' or 'auth'/,
-      );
+      ).toThrow(/confluent_cloud\.auth/);
     });
 
     it("should include a descriptive field path in error messages for empty key", () => {

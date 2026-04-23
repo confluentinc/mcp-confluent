@@ -1,6 +1,5 @@
 import {
   type AuthConfig,
-  type ConfluentCloudDirectConfig,
   type KafkaDirectConfig,
   type TableflowDirectConfig,
   formatZodIssues,
@@ -202,14 +201,8 @@ function buildSchemaRegistryBlock(
  *     key: "${CONFLUENT_CLOUD_API_KEY}"
  *     secret: "${CONFLUENT_CLOUD_API_SECRET}"
  */
-function buildConfluentCloudBlock(
-  env: EnvSubset,
-): { confluent_cloud: ConfluentCloudDirectConfig } | null {
-  if (
-    !env.CONFLUENT_CLOUD_REST_ENDPOINT &&
-    !env.CONFLUENT_CLOUD_API_KEY &&
-    !env.CONFLUENT_CLOUD_API_SECRET
-  )
+function buildConfluentCloudBlock(env: EnvSubset) {
+  if (!env.CONFLUENT_CLOUD_API_KEY && !env.CONFLUENT_CLOUD_API_SECRET)
     return null;
   return {
     confluent_cloud: {

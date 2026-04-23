@@ -42,8 +42,8 @@ export interface SchemaRegistryDirectConfig {
 
 /** Subcomponent of DirectConnectionConfig describing Confluent Cloud connection parameters */
 export interface ConfluentCloudDirectConfig {
-  endpoint?: string;
-  auth?: AuthConfig;
+  endpoint: string;
+  auth: AuthConfig;
 }
 
 /** Subcomponent of DirectConnectionConfig describing Tableflow connection parameters */
@@ -226,13 +226,9 @@ const directConnectionSchema = z
             z.url({ error: "confluent_cloud.endpoint must be a valid URL" }),
           )
           .optional(),
-        auth: authConfigSchema.optional(),
+        auth: authConfigSchema,
       })
       .strict()
-      .refine((cc) => cc.endpoint !== undefined || cc.auth !== undefined, {
-        message:
-          "confluent_cloud block must contain at least 'endpoint' or 'auth'",
-      })
       .optional(),
     kafka: z
       .object({
@@ -365,6 +361,7 @@ const directConnectionSchema = z
   })
   .strict();
 
+const CONFLUENT_CLOUD_DEFAULT_ENDPOINT = "https://api.confluent.cloud";
 const TELEMETRY_DEFAULT_ENDPOINT = "https://api.telemetry.confluent.cloud";
 
 /**
@@ -434,10 +431,22 @@ const connectionConfigSchema = z
       };
     }
 
-    // Cast required: TypeScript cannot verify that spreading `data` (whose `telemetry`
-    // field has the raw Zod-inferred optional-field type) and overriding with the fully
-    // resolved TelemetryDirectConfig satisfies ConnectionConfig.
-    return { ...data, telemetry: resolvedTelemetry } as ConnectionConfig;
+    const resolvedCC = data.confluent_cloud
+      ? {
+          ...data.confluent_cloud,
+          endpoint:
+            data.confluent_cloud.endpoint ?? CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
+        }
+      : undefined;
+
+    // Cast required: TypeScript cannot verify that spreading `data` (whose optional-field
+    // types for confluent_cloud and telemetry) and overriding with fully resolved types
+    // satisfies ConnectionConfig.
+    return {
+      ...data,
+      confluent_cloud: resolvedCC,
+      telemetry: resolvedTelemetry,
+    } as ConnectionConfig;
   });
 
 /**

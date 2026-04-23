@@ -279,7 +279,10 @@ describe("index.ts", () => {
     it("should omit SASL config when there is no kafka block", () => {
       const manager = constructDefaultClientManager(
         connWith({
-          confluent_cloud: { auth: { type: "api_key", key: "k", secret: "s" } },
+          confluent_cloud: {
+            endpoint: "https://api.confluent.cloud",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
         }),
       );
       expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
@@ -309,10 +312,13 @@ describe("index.ts", () => {
       expect(manager["confluentCloudBaseUrl"]).toBe("https://my.cloud.api");
     });
 
-    it("should default confluentCloudBaseUrl to https://api.confluent.cloud when the block has no endpoint", () => {
+    it("should set confluentCloudBaseUrl to https://api.confluent.cloud when the block uses the default endpoint", () => {
       const manager = constructDefaultClientManager(
         connWith({
-          confluent_cloud: { auth: { type: "api_key", key: "k", secret: "s" } },
+          confluent_cloud: {
+            endpoint: "https://api.confluent.cloud",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
         }),
       );
       expect(manager["confluentCloudBaseUrl"]).toBe(

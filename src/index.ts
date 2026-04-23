@@ -122,9 +122,7 @@ export function constructDefaultClientManager(
   return new DefaultClientManager({
     kafka: kafkaClientConfig,
     endpoints: {
-      cloud: conn.confluent_cloud
-        ? (conn.confluent_cloud.endpoint ?? "https://api.confluent.cloud")
-        : undefined,
+      cloud: conn.confluent_cloud?.endpoint,
       flink: conn.flink?.endpoint,
       schemaRegistry: conn.schema_registry?.endpoint,
       kafka: conn.kafka?.rest_endpoint,
@@ -132,8 +130,8 @@ export function constructDefaultClientManager(
     },
     auth: {
       cloud: {
-        apiKey: conn.confluent_cloud?.auth?.key,
-        apiSecret: conn.confluent_cloud?.auth?.secret,
+        apiKey: conn.confluent_cloud?.auth.key,
+        apiSecret: conn.confluent_cloud?.auth.secret,
       },
       tableflow: {
         apiKey: conn.tableflow?.auth?.key,

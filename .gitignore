@@ -78,6 +78,7 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
+.env.integration
 
 # project-root yaml/yml files are blanket-ignored as a guard against accidentally
 # committing a personal `config.yaml` (or similar) containing credentials. The

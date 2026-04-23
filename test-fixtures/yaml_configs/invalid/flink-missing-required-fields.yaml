@@ -1,0 +1,5 @@
+connections:
+  local:
+    type: direct
+    flink:
+      endpoint: "https://flink.confluent.cloud"

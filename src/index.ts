@@ -138,8 +138,8 @@ export function constructDefaultClientManager(
         apiSecret: conn.tableflow?.auth.secret,
       },
       flink: {
-        apiKey: conn.flink?.auth?.key,
-        apiSecret: conn.flink?.auth?.secret,
+        apiKey: conn.flink?.auth.key,
+        apiSecret: conn.flink?.auth.secret,
       },
       schemaRegistry: {
         apiKey: conn.schema_registry?.auth?.key,
@@ -150,8 +150,8 @@ export function constructDefaultClientManager(
         apiSecret: conn.kafka?.auth?.secret,
       },
       telemetry: {
-        apiKey: conn.telemetry?.auth?.key,
-        apiSecret: conn.telemetry?.auth?.secret,
+        apiKey: conn.telemetry?.auth.key,
+        apiSecret: conn.telemetry?.auth.secret,
       },
     },
   });

@@ -1,3 +1,9 @@
+import {
+  CONTROL_PLANE_TOKEN_LIFETIME_MS,
+  DATA_PLANE_TOKEN_LIFETIME_MS,
+  REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+  REFRESH_TOKEN_IDLE_LIFETIME_MS,
+} from "@src/confluent/oauth/token-lifetimes.js";
 import type {
   Auth0Environment,
   Auth0TokenResponse,
@@ -13,12 +19,13 @@ describe("oauth/types.ts", () => {
     it("should be constructable with all required fields", () => {
       const tokenSet: ConfluentTokenSet = {
         refreshToken: "refresh-abc",
-        refreshTokenAbsoluteExpiresAt: Date.now() + 8 * 60 * 60 * 1000,
-        refreshTokenIdleExpiresAt: Date.now() + 4 * 60 * 60 * 1000,
+        refreshTokenAbsoluteExpiresAt:
+          Date.now() + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+        refreshTokenIdleExpiresAt: Date.now() + REFRESH_TOKEN_IDLE_LIFETIME_MS,
         controlPlaneToken: "cp-token",
-        controlPlaneExpiresAt: Date.now() + 5 * 60 * 1000,
+        controlPlaneExpiresAt: Date.now() + CONTROL_PLANE_TOKEN_LIFETIME_MS,
         dataPlaneToken: "dp-token",
-        dataPlaneExpiresAt: Date.now() + 10 * 60 * 1000,
+        dataPlaneExpiresAt: Date.now() + DATA_PLANE_TOKEN_LIFETIME_MS,
         accessToken: "opaque-token",
       };
 

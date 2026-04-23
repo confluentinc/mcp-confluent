@@ -278,6 +278,29 @@ describe("oauth/token-refresh.ts", () => {
       // All three phases ran even though the final update was a no-op.
       expect(fetchStub.callCount).toBe(3);
     });
+
+    it("should cap the rotated idle expiry at the absolute lifetime", async () => {
+      // Absolute expires in 1 second; IDLE_LIFETIME is 4 hours — the bump
+      // must be clamped to the absolute expiry, not run past it.
+      const absoluteExpiry = Date.now() + 1000;
+      const tokenSet = createTokenSet({
+        refreshTokenAbsoluteExpiresAt: absoluteExpiry,
+      });
+      store.store(tokenSet);
+      stubSuccessfulRefreshChain();
+
+      await refreshTokenSet(
+        auth0Config,
+        store,
+        "opaque-access-token",
+        tokenSet,
+      );
+
+      const saved = store.get("opaque-access-token")!;
+      expect(saved.refreshTokenIdleExpiresAt).toBeLessThanOrEqual(
+        absoluteExpiry,
+      );
+    });
   });
 
   describe("createRefreshCallback", () => {

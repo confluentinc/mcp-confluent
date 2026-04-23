@@ -14,6 +14,7 @@ import {
 } from "@src/confluent/oauth/token-lifetimes.js";
 import type {
   Auth0Config,
+  Auth0TokenResponse,
   ConfluentTokenSet,
 } from "@src/confluent/oauth/types.js";
 import { logger } from "@src/logger.js";
@@ -93,13 +94,14 @@ export class AuthContext {
   /**
    * Rotate the refresh token, then derive new CP and DP tokens. The rotated
    * refresh token is persisted before the CP/DP leg so a phase-2 failure
-   * leaves the context with a valid (fresh) refresh token — the next
-   * scheduler tick can retry without an Auth0 re-rotation.
+   * leaves the context with a valid (fresh) refresh token. The next scheduler
+   * tick still re-rotates (we don't cache the id_token across ticks), but the
+   * session isn't bricked by a partial failure.
    */
   async refresh(): Promise<void> {
     if (this.cleared) return;
 
-    let auth0Response;
+    let auth0Response: Auth0TokenResponse;
     try {
       auth0Response = await exchangeRefreshTokenForAuth0Tokens(
         this.auth0Config,
@@ -152,12 +154,24 @@ export class AuthContext {
   }
 
   /**
-   * Mark this context as cleared — subsequent `refresh()` is a no-op and
-   * any running refresh loop is stopped.
+   * Mark this context as cleared — subsequent `refresh()` is a no-op, any
+   * running refresh loop is stopped, and the stored credentials are scrubbed
+   * so a caller that holds a stale reference to `tokens` after `clear()`
+   * can't exfiltrate the prior refresh/CP/DP material.
    */
   clear(): void {
     this.cleared = true;
     this.stopRefreshLoop();
+    this.internalTokens = {
+      ...this.internalTokens,
+      refreshToken: "",
+      refreshTokenAbsoluteExpiresAt: 0,
+      refreshTokenIdleExpiresAt: 0,
+      controlPlaneToken: "",
+      controlPlaneExpiresAt: 0,
+      dataPlaneToken: "",
+      dataPlaneExpiresAt: 0,
+    };
   }
 
   /**
@@ -170,6 +184,12 @@ export class AuthContext {
   startRefreshLoop(intervalMs: number = DEFAULT_REFRESH_INTERVAL_MS): void {
     if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
       throw new RangeError("intervalMs must be a finite number greater than 0");
+    }
+    if (this.cleared) {
+      // A cleared context is terminal. Starting a loop here would create a
+      // timer that can never do useful work — guard against the leak.
+      logger.warn("Refresh loop not started: context is cleared");
+      return;
     }
     if (this.refreshInterval) {
       logger.warn("Refresh loop already running, skipping");

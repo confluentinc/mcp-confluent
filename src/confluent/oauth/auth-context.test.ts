@@ -333,6 +333,20 @@ describe("oauth/auth-context.ts", () => {
         expect(ctx.refreshTokenExpired()).toBe(true);
         expect(ctx.shouldAttemptRefresh()).toBe(false);
       });
+
+      it("should scrub token material so stale references can't read credentials", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+
+        ctx.clear();
+
+        expect(ctx.tokens.refreshToken).toBe("");
+        expect(ctx.tokens.controlPlaneToken).toBe("");
+        expect(ctx.tokens.dataPlaneToken).toBe("");
+        expect(ctx.tokens.refreshTokenAbsoluteExpiresAt).toBe(0);
+        expect(ctx.tokens.refreshTokenIdleExpiresAt).toBe(0);
+        expect(ctx.tokens.controlPlaneExpiresAt).toBe(0);
+        expect(ctx.tokens.dataPlaneExpiresAt).toBe(0);
+      });
     });
   });
 
@@ -362,6 +376,17 @@ describe("oauth/auth-context.ts", () => {
     it("should warn and skip when already running", () => {
       ctx.startRefreshLoop(60_000);
       ctx.startRefreshLoop(60_000);
+    });
+
+    it("should be a no-op when the context is already cleared", async () => {
+      ctx.clear();
+      const refreshStub = sandbox.stub(ctx, "refresh").resolves();
+
+      ctx.startRefreshLoop(60_000);
+      await clock.tickAsync(60_000);
+
+      // No timer was ever created → no ticks fired.
+      sinon.assert.notCalled(refreshStub);
     });
 
     it("should call refresh when CP is inside the refresh window", async () => {

@@ -10,8 +10,8 @@ export const REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS = 8 * 60 * 60 * 1000;
 /** 4 hours in milliseconds — refresh token idle timeout, resets on each rotation */
 export const REFRESH_TOKEN_IDLE_LIFETIME_MS = 4 * 60 * 60 * 1000;
 
-/** 1 minute in milliseconds — refresh control plane token this much before expiry */
-export const CONTROL_PLANE_REFRESH_WINDOW_MS = 60 * 1000;
+/** 30 seconds in milliseconds — refresh control plane token this much before expiry */
+export const CONTROL_PLANE_REFRESH_WINDOW_MS = 30 * 1000;
 
 /** Default auto-refresh interval — CP lifetime minus the refresh window. */
 export const DEFAULT_REFRESH_INTERVAL_MS =

@@ -44,7 +44,12 @@ export async function refreshTokenSet(
   }
 
   const rotationTime = Date.now();
-  const rotatedIdleExpiresAt = rotationTime + REFRESH_TOKEN_IDLE_LIFETIME_MS;
+  // Idle expiry can't extend past the absolute lifetime — Auth0's absolute
+  // expiry is a hard ceiling that overrides idle timeout bumps.
+  const rotatedIdleExpiresAt = Math.min(
+    rotationTime + REFRESH_TOKEN_IDLE_LIFETIME_MS,
+    tokenSet.refreshTokenAbsoluteExpiresAt,
+  );
 
   const rotationPersisted = store.update(accessToken, {
     refreshToken: auth0Response.refresh_token,
@@ -83,9 +88,9 @@ export async function refreshTokenSet(
       logger.debug(
         "Token removed during refresh; discarding rotated credentials",
       );
-    } else {
-      logger.debug("Token set refreshed successfully");
+      return;
     }
+    logger.debug("Token set refreshed successfully");
   } catch (error) {
     logger.error(
       { error },

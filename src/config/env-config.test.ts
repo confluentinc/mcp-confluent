@@ -541,14 +541,14 @@ describe("config/env-config.ts", () => {
         });
       });
 
-      it("should throw when TELEMETRY_ENDPOINT is set but no auth is available", () => {
+      it("should throw when TELEMETRY_ENDPOINT is set but no auth is available, with error mentioning TELEMETRY_ENDPOINT", () => {
         expect(() =>
           consConfigFromEnv(
             envWith({
               TELEMETRY_ENDPOINT: "https://custom.telemetry.confluent.cloud",
             }),
           ),
-        ).toThrow(/auth/);
+        ).toThrow(/TELEMETRY_ENDPOINT.*no auth is available/);
       });
 
       it("should use confluent_cloud.auth when only TELEMETRY_ENDPOINT and cc credentials are set", () => {

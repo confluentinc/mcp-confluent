@@ -1,0 +1,14 @@
+connections:
+  production:
+    type: direct
+    confluent_cloud:
+      endpoint: "https://api.confluent.cloud"
+      auth:
+        type: api_key
+        key: "mycloudkey"
+        secret: "mycloudsecret"
+    tableflow:
+      auth:
+        type: api_key
+        key: "mytableflowkey"
+        secret: "mytableflowsecret"

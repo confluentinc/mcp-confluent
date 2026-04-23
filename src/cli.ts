@@ -28,7 +28,7 @@ export interface CLIOptions {
   blockTools?: string[];
   listTools?: boolean;
   disableConfluentCloudTools?: boolean;
-  kafkaConfig: KeyValuePairObject;
+  kafkaConfig?: KeyValuePairObject;
   disableAuth?: boolean;
   allowedHosts?: string[];
   generateKey?: boolean;
@@ -185,6 +185,13 @@ export function parseCliArgs(argv: string[]): CLIOptions {
   try {
     const opts = program.parse(argv).opts();
 
+    if (opts.config && opts.kafkaConfigFile) {
+      throw new Error(
+        "--config and --kafka-config-file are mutually exclusive: " +
+          "use kafka.extra_properties in the YAML file instead of -k",
+      );
+    }
+
     // Precedence: CLI > file > undefined
     let allowTools: string[] | undefined = undefined;
     let blockTools: string[] | undefined = undefined;
@@ -198,10 +205,6 @@ export function parseCliArgs(argv: string[]): CLIOptions {
     } else if (opts.blockToolsFile) {
       blockTools = readFileLines(opts.blockToolsFile);
     }
-    let kafkaConfig: KeyValuePairObject = {};
-    if (opts.kafkaConfigFile) {
-      kafkaConfig = parsePropertiesFile(opts.kafkaConfigFile);
-    }
     return {
       envFile: opts.envFile,
       config: opts.config,
@@ -212,7 +215,9 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       blockTools,
       listTools: !!opts.listTools,
       disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
-      kafkaConfig: kafkaConfig,
+      kafkaConfig: opts.kafkaConfigFile
+        ? parsePropertiesFile(opts.kafkaConfigFile)
+        : undefined,
       disableAuth: !!opts.disableAuth,
       allowedHosts: opts.allowedHosts
         ? opts.allowedHosts

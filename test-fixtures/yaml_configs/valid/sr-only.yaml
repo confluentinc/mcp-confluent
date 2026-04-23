@@ -1,0 +1,5 @@
+connections:
+  local:
+    type: direct
+    schema_registry:
+      endpoint: "http://localhost:8081"

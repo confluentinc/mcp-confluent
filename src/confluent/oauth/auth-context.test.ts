@@ -5,6 +5,7 @@ import {
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
+import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
 import sinon from "sinon";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -126,6 +127,17 @@ describe("oauth/auth-context.ts", () => {
       });
     });
 
+    describe("tokens", () => {
+      it("should return a defensive copy so callers can't mutate internal state", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+
+        const snapshot = ctx.tokens as ConfluentTokenSet;
+        snapshot.controlPlaneToken = "tampered";
+
+        expect(ctx.tokens.controlPlaneToken).toBe("cp-token");
+      });
+    });
+
     describe("hasValidControlPlaneToken", () => {
       it("should be true right after login", async () => {
         const ctx = await newLoggedInContext(fetchStub);
@@ -235,6 +247,20 @@ describe("oauth/auth-context.ts", () => {
         expect(ctx.tokens.refreshToken).toBe("new-refresh");
         expect(ctx.tokens.controlPlaneToken).toBe("new-cp");
         expect(ctx.tokens.dataPlaneToken).toBe("new-dp");
+      });
+
+      it("should coalesce concurrent callers into a single Auth0 rotation", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        stubSuccessfulChain(fetchStub, 3, "new-refresh");
+        const callsBeforeRefresh = fetchStub.callCount;
+
+        await Promise.all([ctx.refresh(), ctx.refresh(), ctx.refresh()]);
+
+        // Login consumed 3 fetches; refresh consumed 3 more (Auth0 + CP + DP).
+        // Without single-flight, 3 concurrent refresh() calls would burn the
+        // single-use refresh token 3 times.
+        expect(fetchStub.callCount).toBe(callsBeforeRefresh + 3);
+        expect(ctx.tokens.refreshToken).toBe("new-refresh");
       });
 
       it("should leave state unchanged when Auth0 refresh fails", async () => {

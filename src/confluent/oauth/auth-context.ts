@@ -29,6 +29,7 @@ export class AuthContext {
   private internalTokens: ConfluentTokenSet;
   private cleared = false;
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
+  private inflightRefresh: Promise<void> | null = null;
 
   private constructor(
     private readonly auth0Config: Auth0Config,
@@ -59,9 +60,14 @@ export class AuthContext {
     return this.internalTokens.accessToken;
   }
 
-  /** Readonly snapshot of the current token state. */
+  /**
+   * Defensive snapshot of the current token state. Each call returns a fresh
+   * object so callers can't mutate internal state via an `as any` cast. Pre-
+   * `clear()` snapshots are inherently JS values — `clear()` can't reach back
+   * and revoke them — so treat the return value as a read-only point-in-time.
+   */
   get tokens(): Readonly<ConfluentTokenSet> {
-    return this.internalTokens;
+    return { ...this.internalTokens };
   }
 
   /** True while the CP token is still valid at `now`. */
@@ -97,10 +103,23 @@ export class AuthContext {
    * leaves the context with a valid (fresh) refresh token. The next scheduler
    * tick still re-rotates (we don't cache the id_token across ticks), but the
    * session isn't bricked by a partial failure.
+   *
+   * Single-flight: concurrent callers (e.g., the refresh loop + an explicit
+   * tool-triggered call) await the same in-flight promise. Refresh tokens are
+   * single-use, so overlapping calls would burn the same token.
    */
   async refresh(): Promise<void> {
     if (this.cleared) return;
+    if (this.inflightRefresh) return this.inflightRefresh;
+    this.inflightRefresh = this.doRefresh();
+    try {
+      await this.inflightRefresh;
+    } finally {
+      this.inflightRefresh = null;
+    }
+  }
 
+  private async doRefresh(): Promise<void> {
     let auth0Response: Auth0TokenResponse;
     try {
       auth0Response = await exchangeRefreshTokenForAuth0Tokens(
@@ -155,23 +174,22 @@ export class AuthContext {
 
   /**
    * Mark this context as cleared — subsequent `refresh()` is a no-op, any
-   * running refresh loop is stopped, and the stored credentials are scrubbed
-   * so a caller that holds a stale reference to `tokens` after `clear()`
-   * can't exfiltrate the prior refresh/CP/DP material.
+   * running refresh loop is stopped, and stored credentials are scrubbed in
+   * place so any subsequent read of `tokens` sees empty strings / zeroed
+   * expiries. Snapshots captured before `clear()` are point-in-time JS
+   * values and can't be revoked — callers that cached `tokens` earlier still
+   * hold those captured credentials in their own variables.
    */
   clear(): void {
     this.cleared = true;
     this.stopRefreshLoop();
-    this.internalTokens = {
-      ...this.internalTokens,
-      refreshToken: "",
-      refreshTokenAbsoluteExpiresAt: 0,
-      refreshTokenIdleExpiresAt: 0,
-      controlPlaneToken: "",
-      controlPlaneExpiresAt: 0,
-      dataPlaneToken: "",
-      dataPlaneExpiresAt: 0,
-    };
+    this.internalTokens.refreshToken = "";
+    this.internalTokens.refreshTokenAbsoluteExpiresAt = 0;
+    this.internalTokens.refreshTokenIdleExpiresAt = 0;
+    this.internalTokens.controlPlaneToken = "";
+    this.internalTokens.controlPlaneExpiresAt = 0;
+    this.internalTokens.dataPlaneToken = "";
+    this.internalTokens.dataPlaneExpiresAt = 0;
   }
 
   /**

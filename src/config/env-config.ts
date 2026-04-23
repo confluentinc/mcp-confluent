@@ -188,8 +188,9 @@ function buildSchemaRegistryBlock(
 }
 
 /**
- * Builds the `confluent_cloud` connection block from env vars. Triggered when any
- * Confluent Cloud control-plane env var is set.
+ * Builds the `confluent_cloud` connection block from env vars. Triggered when at least
+ * one of CONFLUENT_CLOUD_API_KEY or CONFLUENT_CLOUD_API_SECRET is set. CONFLUENT_CLOUD_REST_ENDPOINT
+ * alone is not sufficient — an endpoint without credentials is ignored.
  *
  * Equivalent YAML:
  *

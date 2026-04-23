@@ -1,6 +1,7 @@
 import {
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
   MCPServerConfiguration,
+  formatZodIssues,
   mcpConfigSchema,
 } from "@src/config/models.js";
 import { describe, expect, it } from "vitest";
@@ -191,7 +192,7 @@ describe("config/models.ts", () => {
   });
 
   describe("telemetry block", () => {
-    it("should accept telemetry block with auth only", () => {
+    it("should accept telemetry block with auth only and resolve default endpoint", () => {
       const result = mcpConfigSchema.safeParse({
         connections: {
           production: {
@@ -201,9 +202,15 @@ describe("config/models.ts", () => {
         },
       });
       expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.connections["production"]?.telemetry).toEqual({
+          endpoint: "https://api.telemetry.confluent.cloud",
+          auth: { type: "api_key", key: "k", secret: "s" },
+        });
+      }
     });
 
-    it("should accept telemetry block with endpoint only", () => {
+    it("should reject telemetry block with endpoint only when no confluent_cloud.auth is available", () => {
       const result = mcpConfigSchema.safeParse({
         connections: {
           production: {
@@ -212,7 +219,33 @@ describe("config/models.ts", () => {
           },
         },
       });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatZodIssues(result.error.issues)).toMatch(
+          /no auth is available/,
+        );
+      }
+    });
+
+    it("should accept telemetry block with endpoint only when confluent_cloud.auth is available", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            confluent_cloud: {
+              auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
+            },
+            telemetry: { endpoint: "https://custom.telemetry.example.com" },
+          },
+        },
+      });
       expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.connections["production"]?.telemetry).toEqual({
+          endpoint: "https://custom.telemetry.example.com",
+          auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
+        });
+      }
     });
 
     it("should accept telemetry block with both endpoint and auth", () => {
@@ -228,6 +261,32 @@ describe("config/models.ts", () => {
         },
       });
       expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.connections["production"]?.telemetry).toEqual({
+          endpoint: "https://api.telemetry.confluent.cloud",
+          auth: { type: "api_key", key: "k", secret: "s" },
+        });
+      }
+    });
+
+    it("should synthesize telemetry from confluent_cloud.auth when no telemetry block is present", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            confluent_cloud: {
+              auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
+            },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.connections["production"]?.telemetry).toEqual({
+          endpoint: "https://api.telemetry.confluent.cloud",
+          auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
+        });
+      }
     });
 
     it("should reject empty telemetry block", () => {

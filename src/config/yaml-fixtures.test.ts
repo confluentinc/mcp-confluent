@@ -364,7 +364,7 @@ describe("config/yaml-fixtures.test.ts", () => {
     it("should reject a tableflow block with no auth", () => {
       expect(() =>
         loadConfigFromYaml(fixtureFile("invalid/tableflow-empty.yaml"), NO_ENV),
-      ).toThrow(/tableflow block must contain 'auth'/);
+      ).toThrow(/tableflow\.auth/);
     });
 
     it("should reject a confluent_cloud block with no auth", () => {

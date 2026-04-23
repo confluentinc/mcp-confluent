@@ -1,7 +1,6 @@
 import {
   type AuthConfig,
   type KafkaDirectConfig,
-  type TableflowDirectConfig,
   formatZodIssues,
   mcpConfigSchema,
   MCPServerConfiguration,
@@ -229,9 +228,7 @@ function buildConfluentCloudBlock(env: EnvSubset) {
  *     key: "${TABLEFLOW_API_KEY}"
  *     secret: "${TABLEFLOW_API_SECRET}"
  */
-function buildTableflowBlock(
-  env: EnvSubset,
-): { tableflow: TableflowDirectConfig } | null {
+function buildTableflowBlock(env: EnvSubset) {
   if (!env.TABLEFLOW_API_KEY && !env.TABLEFLOW_API_SECRET) return null;
   return {
     tableflow: apiKeyAuth(env.TABLEFLOW_API_KEY, env.TABLEFLOW_API_SECRET),

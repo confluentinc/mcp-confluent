@@ -134,8 +134,8 @@ export function constructDefaultClientManager(
         apiSecret: conn.confluent_cloud?.auth.secret,
       },
       tableflow: {
-        apiKey: conn.tableflow?.auth?.key,
-        apiSecret: conn.tableflow?.auth?.secret,
+        apiKey: conn.tableflow?.auth.key,
+        apiSecret: conn.tableflow?.auth.secret,
       },
       flink: {
         apiKey: conn.flink?.auth?.key,

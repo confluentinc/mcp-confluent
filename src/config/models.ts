@@ -48,7 +48,7 @@ export interface ConfluentCloudDirectConfig {
 
 /** Subcomponent of DirectConnectionConfig describing Tableflow connection parameters */
 export interface TableflowDirectConfig {
-  auth?: AuthConfig;
+  auth: AuthConfig;
 }
 
 /** Subcomponent of DirectConnectionConfig describing Telemetry connection parameters */
@@ -305,12 +305,9 @@ const directConnectionSchema = z
       .optional(),
     tableflow: z
       .object({
-        auth: authConfigSchema.optional(),
+        auth: authConfigSchema,
       })
       .strict()
-      .refine((tf) => tf.auth !== undefined, {
-        message: "tableflow block must contain 'auth'",
-      })
       .optional(),
     telemetry: z
       .object({

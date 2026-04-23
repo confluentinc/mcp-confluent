@@ -1,3 +1,4 @@
+import { type DirectConnectionConfig } from "@src/config/index.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import type {
   ToolConfig,
@@ -14,10 +15,15 @@ import {
   outputToolList,
 } from "@src/index.js";
 import { generateApiKey } from "@src/mcp/transports/index.js";
-import { cliOptionsFactory } from "@tests/factories/cli-options.js";
 import { envFactory } from "@tests/factories/env.js";
 import sinon from "sinon";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+function connWith(
+  fields: Omit<DirectConnectionConfig, "type">,
+): DirectConnectionConfig {
+  return { type: "direct", ...fields };
+}
 
 // generateApiKey is an ESM live binding — must be mocked at the module level
 // via vi.mock (hoisted by Vitest) so index.ts receives the mock on import.
@@ -228,93 +234,124 @@ describe("index.ts", () => {
   });
 
   describe("constructDefaultClientManager()", () => {
+    it("should return a DefaultClientManager instance", () => {
+      const manager = constructDefaultClientManager(
+        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
+      );
+      expect(manager).toBeInstanceOf(DefaultClientManager);
+    });
+
     it("should always set client.id to mcp-confluent", () => {
       const manager = constructDefaultClientManager(
-        envFactory(),
-        cliOptionsFactory(),
+        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
       );
       expect(manager["kafkaConfig"]["client.id"]).toBe("mcp-confluent");
     });
 
-    it("should set bootstrap.servers from env", () => {
+    it("should set bootstrap.servers from the kafka block", () => {
       const manager = constructDefaultClientManager(
-        envFactory({ BOOTSTRAP_SERVERS: "broker:9092" }),
-        cliOptionsFactory(),
+        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
       );
       expect(manager["kafkaConfig"]["bootstrap.servers"]).toBe("broker:9092");
     });
 
-    it("should include SASL config when both KAFKA_API_KEY and KAFKA_API_SECRET are present", () => {
+    it("should include SASL config when the kafka block has auth", () => {
       const manager = constructDefaultClientManager(
-        envFactory({
-          KAFKA_API_KEY: "the-key",
-          KAFKA_API_SECRET: "the-secret",
+        connWith({
+          kafka: {
+            bootstrap_servers: "broker:9092",
+            auth: { type: "api_key", key: "the-key", secret: "the-secret" },
+          },
         }),
-        cliOptionsFactory(),
       );
       expect(manager["kafkaConfig"]["security.protocol"]).toBe("sasl_ssl");
       expect(manager["kafkaConfig"]["sasl.username"]).toBe("the-key");
       expect(manager["kafkaConfig"]["sasl.password"]).toBe("the-secret");
     });
 
-    it("should omit SASL config when KAFKA_API_KEY is absent", () => {
+    it("should omit SASL config when the kafka block has no auth", () => {
       const manager = constructDefaultClientManager(
-        envFactory({ KAFKA_API_SECRET: "the-secret" }),
-        cliOptionsFactory(),
+        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
       );
       expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
     });
 
-    it("should omit SASL config when KAFKA_API_SECRET is absent", () => {
+    it("should omit SASL config when there is no kafka block", () => {
       const manager = constructDefaultClientManager(
-        envFactory({ KAFKA_API_KEY: "the-key" }),
-        cliOptionsFactory(),
-      );
-      expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
-    });
-
-    it("should omit SASL config when neither key nor secret is present", () => {
-      const manager = constructDefaultClientManager(
-        envFactory(),
-        cliOptionsFactory(),
-      );
-      expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
-    });
-
-    it("should merge cliOptions.kafkaConfig last, overriding env-derived values", () => {
-      const manager = constructDefaultClientManager(
-        envFactory({ BOOTSTRAP_SERVERS: "from-env:9092" }),
-        cliOptionsFactory({
-          kafkaConfig: { "bootstrap.servers": "override:9092" },
+        connWith({
+          confluent_cloud: {
+            endpoint: "https://api.confluent.cloud",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
         }),
       );
-      expect(manager["kafkaConfig"]["bootstrap.servers"]).toBe("override:9092");
+      expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
     });
 
-    it("should map the cloud endpoint to confluentCloudBaseUrl", () => {
+    it("should spread kafka extra_properties into the GlobalConfig", () => {
       const manager = constructDefaultClientManager(
-        envFactory({ CONFLUENT_CLOUD_REST_ENDPOINT: "https://my.cloud.api" }),
-        cliOptionsFactory(),
+        connWith({
+          kafka: {
+            bootstrap_servers: "broker:9092",
+            extra_properties: { "socket.timeout.ms": "5000" },
+          },
+        }),
+      );
+      expect(manager["kafkaConfig"]["socket.timeout.ms"]).toBe("5000");
+    });
+
+    it("should set confluentCloudBaseUrl from the confluent_cloud block endpoint", () => {
+      const manager = constructDefaultClientManager(
+        connWith({
+          confluent_cloud: {
+            endpoint: "https://my.cloud.api",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
+        }),
       );
       expect(manager["confluentCloudBaseUrl"]).toBe("https://my.cloud.api");
     });
 
-    it("should use the telemetry endpoint default from env", () => {
+    it("should set confluentCloudBaseUrl to https://api.confluent.cloud when the block uses the default endpoint", () => {
       const manager = constructDefaultClientManager(
-        envFactory(),
-        cliOptionsFactory(),
+        connWith({
+          confluent_cloud: {
+            endpoint: "https://api.confluent.cloud",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
+        }),
       );
-      expect(manager["confluentCloudTelemetryBaseUrl"]).toBe(
-        "https://api.telemetry.confluent.cloud",
+      expect(manager["confluentCloudBaseUrl"]).toBe(
+        "https://api.confluent.cloud",
       );
     });
 
-    it("should return a DefaultClientManager instance", () => {
+    it("should leave confluentCloudBaseUrl undefined when there is no confluent_cloud block", () => {
       const manager = constructDefaultClientManager(
-        envFactory(),
-        cliOptionsFactory(),
+        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
       );
-      expect(manager).toBeInstanceOf(DefaultClientManager);
+      expect(manager["confluentCloudBaseUrl"]).toBeUndefined();
+    });
+
+    it("should set confluentCloudTelemetryBaseUrl from the telemetry block", () => {
+      const manager = constructDefaultClientManager(
+        connWith({
+          telemetry: {
+            endpoint: "https://my.telemetry.api",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
+        }),
+      );
+      expect(manager["confluentCloudTelemetryBaseUrl"]).toBe(
+        "https://my.telemetry.api",
+      );
+    });
+
+    it("should leave confluentCloudTelemetryBaseUrl undefined when there is no telemetry block", () => {
+      const manager = constructDefaultClientManager(
+        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
+      );
+      expect(manager["confluentCloudTelemetryBaseUrl"]).toBeUndefined();
     });
   });
 

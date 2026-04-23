@@ -61,13 +61,24 @@ export class AuthContext {
   }
 
   /**
-   * Defensive snapshot of the current token state. Each call returns a fresh
-   * object so callers can't mutate internal state via an `as any` cast. Pre-
-   * `clear()` snapshots are inherently JS values — `clear()` can't reach back
-   * and revoke them — so treat the return value as a read-only point-in-time.
+   * Current control-plane bearer token, or `undefined` if the context is
+   * cleared or the CP token has expired. Call this immediately before each
+   * API request — don't cache the returned string across awaits.
    */
-  get tokens(): Readonly<ConfluentTokenSet> {
-    return { ...this.internalTokens };
+  getControlPlaneToken(now: number = Date.now()): string | undefined {
+    if (!this.hasValidControlPlaneToken(now)) return undefined;
+    return this.internalTokens.controlPlaneToken;
+  }
+
+  /**
+   * Current data-plane bearer token, or `undefined` if the context is
+   * cleared or the DP token has expired. Same usage guidance as
+   * {@link getControlPlaneToken}.
+   */
+  getDataPlaneToken(now: number = Date.now()): string | undefined {
+    if (this.cleared) return undefined;
+    if (this.internalTokens.dataPlaneExpiresAt <= now) return undefined;
+    return this.internalTokens.dataPlaneToken;
   }
 
   /** True while the CP token is still valid at `now`. */
@@ -133,6 +144,10 @@ export class AuthContext {
       );
       return;
     }
+    // clear() may have fired while the rotation was in flight — the refresh
+    // token Auth0 just gave us is already stale by intent, and there's no
+    // point issuing further API calls that would be discarded.
+    if (this.cleared) return;
 
     const rotationTime = Date.now();
     this.updateTokens((prev) => ({
@@ -151,10 +166,12 @@ export class AuthContext {
         this.auth0Config.apiUrl,
         auth0Response.id_token,
       );
+      if (this.cleared) return;
       const dpResponse = await exchangeControlPlaneForDataPlaneToken(
         this.auth0Config.apiUrl,
         cpResponse.token,
       );
+      if (this.cleared) return;
 
       this.updateTokens((prev) => ({
         ...prev,
@@ -174,22 +191,13 @@ export class AuthContext {
 
   /**
    * Mark this context as cleared — subsequent `refresh()` is a no-op, any
-   * running refresh loop is stopped, and stored credentials are scrubbed in
-   * place so any subsequent read of `tokens` sees empty strings / zeroed
-   * expiries. Snapshots captured before `clear()` are point-in-time JS
-   * values and can't be revoked — callers that cached `tokens` earlier still
-   * hold those captured credentials in their own variables.
+   * running refresh loop is stopped, and the accessors (`getControlPlaneToken`,
+   * `getDataPlaneToken`) return `undefined`. Internal state is not exposed to
+   * consumers, so no field scrubbing is needed.
    */
   clear(): void {
     this.cleared = true;
     this.stopRefreshLoop();
-    this.internalTokens.refreshToken = "";
-    this.internalTokens.refreshTokenAbsoluteExpiresAt = 0;
-    this.internalTokens.refreshTokenIdleExpiresAt = 0;
-    this.internalTokens.controlPlaneToken = "";
-    this.internalTokens.controlPlaneExpiresAt = 0;
-    this.internalTokens.dataPlaneToken = "";
-    this.internalTokens.dataPlaneExpiresAt = 0;
   }
 
   /**

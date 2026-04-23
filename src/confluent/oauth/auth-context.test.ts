@@ -16,6 +16,18 @@ function jsonResponse(body: object, status = 200): Response {
   });
 }
 
+/**
+ * Test-only access to the context's private token state. Production callers
+ * read tokens through {@link AuthContext.getControlPlaneToken} /
+ * {@link AuthContext.getDataPlaneToken}; tests occasionally need to assert on
+ * internal fields (raw refresh token value, expiry timestamps) that aren't
+ * exposed by accessors.
+ */
+function internals(ctx: AuthContext): ConfluentTokenSet {
+  return (ctx as unknown as { internalTokens: ConfluentTokenSet })
+    .internalTokens;
+}
+
 function stubAuth0OkAt(
   fetchStub: sinon.SinonStub,
   callIndex: number,
@@ -95,9 +107,9 @@ describe("oauth/auth-context.ts", () => {
           "verifier",
         );
 
-        expect(ctx.tokens.refreshToken).toBe("refresh-token");
-        expect(ctx.tokens.controlPlaneToken).toBe("cp-token");
-        expect(ctx.tokens.dataPlaneToken).toBe("dp-token");
+        expect(internals(ctx).refreshToken).toBe("refresh-token");
+        expect(ctx.getControlPlaneToken()).toBe("cp-token");
+        expect(ctx.getDataPlaneToken()).toBe("dp-token");
       });
 
       it("should generate an opaque accessToken that is stable across reads", async () => {
@@ -112,29 +124,53 @@ describe("oauth/auth-context.ts", () => {
         const ctx = await newLoggedInContext(fetchStub);
         const after = Date.now();
 
-        expect(ctx.tokens.refreshTokenAbsoluteExpiresAt).toBeGreaterThanOrEqual(
+        const tokens = internals(ctx);
+        expect(tokens.refreshTokenAbsoluteExpiresAt).toBeGreaterThanOrEqual(
           before + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
         );
-        expect(ctx.tokens.refreshTokenAbsoluteExpiresAt).toBeLessThanOrEqual(
+        expect(tokens.refreshTokenAbsoluteExpiresAt).toBeLessThanOrEqual(
           after + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
         );
-        expect(ctx.tokens.refreshTokenIdleExpiresAt).toBeGreaterThanOrEqual(
+        expect(tokens.refreshTokenIdleExpiresAt).toBeGreaterThanOrEqual(
           before + REFRESH_TOKEN_IDLE_LIFETIME_MS,
         );
-        expect(ctx.tokens.refreshTokenIdleExpiresAt).toBeLessThanOrEqual(
+        expect(tokens.refreshTokenIdleExpiresAt).toBeLessThanOrEqual(
           after + REFRESH_TOKEN_IDLE_LIFETIME_MS,
         );
       });
     });
 
-    describe("tokens", () => {
-      it("should return a defensive copy so callers can't mutate internal state", async () => {
+    describe("getControlPlaneToken / getDataPlaneToken", () => {
+      it("should return the current tokens right after login", async () => {
         const ctx = await newLoggedInContext(fetchStub);
 
-        const snapshot = ctx.tokens as ConfluentTokenSet;
-        snapshot.controlPlaneToken = "tampered";
+        expect(ctx.getControlPlaneToken()).toBe("cp-token");
+        expect(ctx.getDataPlaneToken()).toBe("dp-token");
+      });
 
-        expect(ctx.tokens.controlPlaneToken).toBe("cp-token");
+      it("should return undefined for CP once `now` is past CP expiry", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+
+        expect(
+          ctx.getControlPlaneToken(internals(ctx).controlPlaneExpiresAt + 1),
+        ).toBeUndefined();
+      });
+
+      it("should return undefined for DP once `now` is past DP expiry", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+
+        expect(
+          ctx.getDataPlaneToken(internals(ctx).dataPlaneExpiresAt + 1),
+        ).toBeUndefined();
+      });
+
+      it("should return undefined from both accessors after clear()", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+
+        ctx.clear();
+
+        expect(ctx.getControlPlaneToken()).toBeUndefined();
+        expect(ctx.getDataPlaneToken()).toBeUndefined();
       });
     });
 
@@ -149,7 +185,9 @@ describe("oauth/auth-context.ts", () => {
         const ctx = await newLoggedInContext(fetchStub);
 
         expect(
-          ctx.hasValidControlPlaneToken(ctx.tokens.controlPlaneExpiresAt + 1),
+          ctx.hasValidControlPlaneToken(
+            internals(ctx).controlPlaneExpiresAt + 1,
+          ),
         ).toBe(false);
       });
 
@@ -173,7 +211,9 @@ describe("oauth/auth-context.ts", () => {
         const ctx = await newLoggedInContext(fetchStub);
 
         expect(
-          ctx.refreshTokenExpired(ctx.tokens.refreshTokenAbsoluteExpiresAt + 1),
+          ctx.refreshTokenExpired(
+            internals(ctx).refreshTokenAbsoluteExpiresAt + 1,
+          ),
         ).toBe(true);
       });
 
@@ -181,7 +221,7 @@ describe("oauth/auth-context.ts", () => {
         const ctx = await newLoggedInContext(fetchStub);
 
         expect(
-          ctx.refreshTokenExpired(ctx.tokens.refreshTokenIdleExpiresAt + 1),
+          ctx.refreshTokenExpired(internals(ctx).refreshTokenIdleExpiresAt + 1),
         ).toBe(true);
       });
 
@@ -198,16 +238,18 @@ describe("oauth/auth-context.ts", () => {
       it("should be false when CP is fresher than the refresh window", async () => {
         const ctx = await newLoggedInContext(fetchStub);
 
-        // Just after login, CP has ~5 min remaining, window is 1 min — still fresh.
+        // Just after login, CP has ~5 min remaining, window is 30s — still fresh.
         expect(ctx.shouldAttemptRefresh()).toBe(false);
       });
 
       it("should be true once CP is inside the refresh window", async () => {
         const ctx = await newLoggedInContext(fetchStub);
 
-        // 30s before CP expiry → inside the 1min window.
+        // 10s before CP expiry → inside the 30s window.
         expect(
-          ctx.shouldAttemptRefresh(ctx.tokens.controlPlaneExpiresAt - 30_000),
+          ctx.shouldAttemptRefresh(
+            internals(ctx).controlPlaneExpiresAt - 10_000,
+          ),
         ).toBe(true);
       });
 
@@ -215,7 +257,9 @@ describe("oauth/auth-context.ts", () => {
         const ctx = await newLoggedInContext(fetchStub);
 
         expect(
-          ctx.shouldAttemptRefresh(ctx.tokens.refreshTokenIdleExpiresAt + 1),
+          ctx.shouldAttemptRefresh(
+            internals(ctx).refreshTokenIdleExpiresAt + 1,
+          ),
         ).toBe(false);
       });
 
@@ -225,7 +269,9 @@ describe("oauth/auth-context.ts", () => {
         ctx.clear();
 
         expect(
-          ctx.shouldAttemptRefresh(ctx.tokens.controlPlaneExpiresAt - 30_000),
+          ctx.shouldAttemptRefresh(
+            internals(ctx).controlPlaneExpiresAt - 10_000,
+          ),
         ).toBe(false);
       });
     });
@@ -244,9 +290,9 @@ describe("oauth/auth-context.ts", () => {
 
         await ctx.refresh();
 
-        expect(ctx.tokens.refreshToken).toBe("new-refresh");
-        expect(ctx.tokens.controlPlaneToken).toBe("new-cp");
-        expect(ctx.tokens.dataPlaneToken).toBe("new-dp");
+        expect(internals(ctx).refreshToken).toBe("new-refresh");
+        expect(ctx.getControlPlaneToken()).toBe("new-cp");
+        expect(ctx.getDataPlaneToken()).toBe("new-dp");
       });
 
       it("should coalesce concurrent callers into a single Auth0 rotation", async () => {
@@ -260,24 +306,24 @@ describe("oauth/auth-context.ts", () => {
         // Without single-flight, 3 concurrent refresh() calls would burn the
         // single-use refresh token 3 times.
         expect(fetchStub.callCount).toBe(callsBeforeRefresh + 3);
-        expect(ctx.tokens.refreshToken).toBe("new-refresh");
+        expect(internals(ctx).refreshToken).toBe("new-refresh");
       });
 
       it("should leave state unchanged when Auth0 refresh fails", async () => {
         const ctx = await newLoggedInContext(fetchStub);
-        const originalTokens = { ...ctx.tokens };
+        const originalTokens = { ...internals(ctx) };
         fetchStub
           .onCall(3)
           .resolves(new Response("server error", { status: 500 }));
 
         await ctx.refresh();
 
-        expect(ctx.tokens).toEqual(originalTokens);
+        expect(internals(ctx)).toEqual(originalTokens);
       });
 
       it("should persist the rotated refresh token even when CP exchange fails", async () => {
         const ctx = await newLoggedInContext(fetchStub);
-        const originalCp = ctx.tokens.controlPlaneToken;
+        const originalCp = internals(ctx).controlPlaneToken;
         stubAuth0OkAt(fetchStub, 3, "rotated-refresh", "new-id");
         fetchStub
           .onCall(4)
@@ -285,13 +331,13 @@ describe("oauth/auth-context.ts", () => {
 
         await ctx.refresh();
 
-        expect(ctx.tokens.refreshToken).toBe("rotated-refresh");
-        expect(ctx.tokens.controlPlaneToken).toBe(originalCp);
+        expect(internals(ctx).refreshToken).toBe("rotated-refresh");
+        expect(internals(ctx).controlPlaneToken).toBe(originalCp);
       });
 
       it("should persist the rotated refresh token even when DP exchange fails", async () => {
         const ctx = await newLoggedInContext(fetchStub);
-        const originalDp = ctx.tokens.dataPlaneToken;
+        const originalDp = internals(ctx).dataPlaneToken;
         stubAuth0OkAt(fetchStub, 3, "rotated-refresh", "new-id");
         stubCpOkAt(fetchStub, 4, "new-cp");
         fetchStub
@@ -300,18 +346,18 @@ describe("oauth/auth-context.ts", () => {
 
         await ctx.refresh();
 
-        expect(ctx.tokens.refreshToken).toBe("rotated-refresh");
-        expect(ctx.tokens.dataPlaneToken).toBe(originalDp);
+        expect(internals(ctx).refreshToken).toBe("rotated-refresh");
+        expect(internals(ctx).dataPlaneToken).toBe(originalDp);
       });
 
       it("should bump the idle expiry when the refresh token is rotated", async () => {
         const ctx = await newLoggedInContext(fetchStub);
-        const originalIdle = ctx.tokens.refreshTokenIdleExpiresAt;
+        const originalIdle = internals(ctx).refreshTokenIdleExpiresAt;
         stubSuccessfulChain(fetchStub, 3, "new-refresh");
 
         await ctx.refresh();
 
-        expect(ctx.tokens.refreshTokenIdleExpiresAt).toBeGreaterThanOrEqual(
+        expect(internals(ctx).refreshTokenIdleExpiresAt).toBeGreaterThanOrEqual(
           originalIdle,
         );
       });
@@ -321,21 +367,31 @@ describe("oauth/auth-context.ts", () => {
         // a naive `now + IDLE_LIFETIME` bump would blow past it.
         const ctx = await newLoggedInContext(fetchStub);
         const absoluteExpiry = Date.now() + 1000;
-        // Access the private state via bracket notation per project test
-        // convention; this lets us seed the edge case without waiting
-        // ~8 hours.
-        (
-          ctx as unknown as {
-            internalTokens: { refreshTokenAbsoluteExpiresAt: number };
-          }
-        ).internalTokens.refreshTokenAbsoluteExpiresAt = absoluteExpiry;
+        internals(ctx).refreshTokenAbsoluteExpiresAt = absoluteExpiry;
         stubSuccessfulChain(fetchStub, 3, "new-refresh");
 
         await ctx.refresh();
 
-        expect(ctx.tokens.refreshTokenIdleExpiresAt).toBeLessThanOrEqual(
+        expect(internals(ctx).refreshTokenIdleExpiresAt).toBeLessThanOrEqual(
           absoluteExpiry,
         );
+      });
+
+      it("should short-circuit after clear() fires mid-flight", async () => {
+        // clear() between phase-1 (Auth0) and phase-2 (CP) should abort the
+        // remaining exchanges so we don't burn API calls on a dead session.
+        const ctx = await newLoggedInContext(fetchStub);
+        const cpCallIndex = 4;
+        stubAuth0OkAt(fetchStub, 3, "rotated-refresh", "new-id");
+        fetchStub.onCall(cpCallIndex).callsFake(async () => {
+          ctx.clear();
+          return jsonResponse({ token: "late-cp-token" });
+        });
+
+        await ctx.refresh();
+
+        // Phase-2 aborted after the CP fetch returned — no DP call was made.
+        expect(fetchStub.callCount).toBe(cpCallIndex + 1);
       });
 
       it("should be a no-op after clear()", async () => {
@@ -360,18 +416,13 @@ describe("oauth/auth-context.ts", () => {
         expect(ctx.shouldAttemptRefresh()).toBe(false);
       });
 
-      it("should scrub token material so stale references can't read credentials", async () => {
+      it("should gate both token accessors", async () => {
         const ctx = await newLoggedInContext(fetchStub);
 
         ctx.clear();
 
-        expect(ctx.tokens.refreshToken).toBe("");
-        expect(ctx.tokens.controlPlaneToken).toBe("");
-        expect(ctx.tokens.dataPlaneToken).toBe("");
-        expect(ctx.tokens.refreshTokenAbsoluteExpiresAt).toBe(0);
-        expect(ctx.tokens.refreshTokenIdleExpiresAt).toBe(0);
-        expect(ctx.tokens.controlPlaneExpiresAt).toBe(0);
-        expect(ctx.tokens.dataPlaneExpiresAt).toBe(0);
+        expect(ctx.getControlPlaneToken()).toBeUndefined();
+        expect(ctx.getDataPlaneToken()).toBeUndefined();
       });
     });
   });

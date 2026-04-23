@@ -72,13 +72,11 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-.env.integration
+# dotenv environment variable files — catch all variants (incl. editor backups
+# like .env.integration~ or .env.bak) while keeping the checked-in examples.
+.env*
+!.env.example
+!.env.integration.example
 
 # project-root yaml/yml files are blanket-ignored as a guard against accidentally
 # committing a personal `config.yaml` (or similar) containing credentials. The

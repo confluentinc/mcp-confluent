@@ -53,8 +53,8 @@ export interface TableflowDirectConfig {
 
 /** Subcomponent of DirectConnectionConfig describing Telemetry connection parameters */
 export interface TelemetryDirectConfig {
-  endpoint?: string;
-  auth?: AuthConfig;
+  endpoint: string;
+  auth: AuthConfig;
 }
 
 /** Subcomponent of DirectConnectionConfig describing Flink connection parameters */
@@ -365,12 +365,14 @@ const directConnectionSchema = z
   })
   .strict();
 
+const TELEMETRY_DEFAULT_ENDPOINT = "https://api.telemetry.confluent.cloud";
+
 /**
  * Discriminated union of all connection types (currently just direct).
  */
 const connectionConfigSchema = z
   .discriminatedUnion("type", [directConnectionSchema])
-  // superRefine is placed here (after the union) rather than on directConnectionSchema
+  // superRefine calls are placed here (after the union) rather than on directConnectionSchema
   // because wrapping a ZodObject in ZodEffects breaks z.discriminatedUnion's discriminant lookup.
   .superRefine((data, ctx) => {
     if (
@@ -388,10 +390,61 @@ const connectionConfigSchema = z
           "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined",
       });
     }
+  })
+  .superRefine((data, ctx) => {
+    // Reject endpoint-only telemetry when there is no auth available from either
+    // telemetry.auth or the confluent_cloud.auth fallback. Without this check the
+    // transform below would produce a TelemetryDirectConfig with a null auth field.
+    if (
+      data.type === "direct" &&
+      data.telemetry?.endpoint !== undefined &&
+      data.telemetry?.auth === undefined &&
+      data.confluent_cloud?.auth === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["telemetry"],
+        message:
+          "telemetry.endpoint is set but no auth is available — provide telemetry.auth or confluent_cloud.auth",
+      });
+    }
+  })
+  .transform((data): ConnectionConfig => {
+    // Resolve the raw (optional-field) telemetry input into a fully-populated
+    // TelemetryDirectConfig or undefined, applying two normalisation rules:
+    //   1. If telemetry.auth is absent, fall back to confluent_cloud.auth.
+    //   2. If telemetry.endpoint is absent, default to TELEMETRY_DEFAULT_ENDPOINT.
+    // If no telemetry block exists but confluent_cloud.auth is present, synthesise
+    // a telemetry block from it so callers never need to repeat the fallback logic.
+    const rawTelemetry = data.telemetry;
+    const ccAuth = data.confluent_cloud?.auth;
+    let resolvedTelemetry: TelemetryDirectConfig | undefined;
+
+    if (rawTelemetry) {
+      // superRefine above guarantees auth is non-null: endpoint-only telemetry without
+      // any auth fallback is rejected before this transform runs.
+      const auth = (rawTelemetry.auth ?? ccAuth)!;
+      const endpoint = rawTelemetry.endpoint ?? TELEMETRY_DEFAULT_ENDPOINT;
+      resolvedTelemetry = { endpoint, auth };
+    } else if (ccAuth) {
+      resolvedTelemetry = {
+        endpoint: TELEMETRY_DEFAULT_ENDPOINT,
+        auth: ccAuth,
+      };
+    }
+
+    // Cast required: TypeScript cannot verify that spreading `data` (whose `telemetry`
+    // field has the raw Zod-inferred optional-field type) and overriding with the fully
+    // resolved TelemetryDirectConfig satisfies ConnectionConfig.
+    return { ...data, telemetry: resolvedTelemetry } as ConnectionConfig;
   });
 
 /**
- * Root configuration schema.
+ * Root configuration schema. This is the single validation and normalisation
+ * entry point shared by both configuration paths: YAML files (via
+ * {@link parseYamlConfiguration}) and environment variables (via
+ * {@link consConfigFromEnv}). Transforms and cross-field rules defined here
+ * therefore apply equally to both.
  *
  * Parsed output is wrapped in {@link MCPServerConfiguration} by
  * parseYamlConfiguration().

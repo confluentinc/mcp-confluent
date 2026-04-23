@@ -394,7 +394,8 @@ const connectionConfigSchema = z
   .superRefine((data, ctx) => {
     // Reject endpoint-only telemetry when there is no auth available from either
     // telemetry.auth or the confluent_cloud.auth fallback. Without this check the
-    // transform below would produce a TelemetryDirectConfig with a null auth field.
+    // transform below would pass undefined to the ! assertion on auth, producing a
+    // TelemetryDirectConfig with auth set to undefined at runtime despite the type.
     if (
       data.type === "direct" &&
       data.telemetry?.endpoint !== undefined &&

@@ -206,6 +206,10 @@ async function main() {
     } else {
       mcpConfig = consConfigFromEnv(env);
 
+      if (cliOptions.kafkaConfig) {
+        mcpConfig.setKafkaExtraProperties(cliOptions.kafkaConfig);
+      }
+
       // TODO(issue #151): Use config to construct connection manager instead of env vars
       logger.warn(
         "MCPServerConfiguration constructed from environment variables, but it is not applied yet; startup still uses" +

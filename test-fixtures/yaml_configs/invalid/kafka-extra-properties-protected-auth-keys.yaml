@@ -1,0 +1,8 @@
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "broker.confluent.cloud:9092"
+      extra_properties:
+        sasl.username: "myapikey"
+        sasl.password: "myapisecret"

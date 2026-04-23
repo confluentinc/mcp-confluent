@@ -244,20 +244,20 @@ describe("config/env-config.ts", () => {
           key: "cckey",
           secret: "ccsecret",
         });
-        expect(conn.confluent_cloud?.endpoint).toBeUndefined();
+        expect(conn.confluent_cloud?.endpoint).toBe(
+          "https://api.confluent.cloud",
+        );
       });
 
-      it("should populate confluent_cloud endpoint when only CONFLUENT_CLOUD_REST_ENDPOINT is set", () => {
+      it("should not create a confluent_cloud block when only CONFLUENT_CLOUD_REST_ENDPOINT is set (no credentials)", () => {
         const config = consConfigFromEnv(
           envWith({
+            BOOTSTRAP_SERVERS: "broker:9092",
             CONFLUENT_CLOUD_REST_ENDPOINT: "https://custom.confluent.cloud",
           }),
         );
         const conn = config.getSoleConnection();
-        expect(conn.confluent_cloud?.endpoint).toBe(
-          "https://custom.confluent.cloud",
-        );
-        expect(conn.confluent_cloud?.auth).toBeUndefined();
+        expect(conn.confluent_cloud).toBeUndefined();
       });
 
       it("should populate both endpoint and auth when all three CCloud vars are set", () => {

@@ -512,35 +512,6 @@ describe("config/env-config.ts", () => {
     });
 
     describe("telemetry env vars", () => {
-      it("should populate telemetry auth when key and secret are set", () => {
-        const config = consConfigFromEnv(
-          envWith({
-            TELEMETRY_API_KEY: "telkey",
-            TELEMETRY_API_SECRET: "telsecret",
-          }),
-        );
-        const conn = config.getSoleConnection();
-        expect(conn.telemetry?.auth).toEqual({
-          type: "api_key",
-          key: "telkey",
-          secret: "telsecret",
-        });
-        expect(conn.telemetry?.endpoint).toBeUndefined();
-      });
-
-      it("should populate telemetry endpoint when only TELEMETRY_ENDPOINT is set", () => {
-        const config = consConfigFromEnv(
-          envWith({
-            TELEMETRY_ENDPOINT: "https://custom.telemetry.confluent.cloud",
-          }),
-        );
-        const conn = config.getSoleConnection();
-        expect(conn.telemetry?.endpoint).toBe(
-          "https://custom.telemetry.confluent.cloud",
-        );
-        expect(conn.telemetry?.auth).toBeUndefined();
-      });
-
       it("should populate both endpoint and auth when all three telemetry vars are set", () => {
         const config = consConfigFromEnv(
           envWith({
@@ -550,13 +521,62 @@ describe("config/env-config.ts", () => {
           }),
         );
         const conn = config.getSoleConnection();
-        expect(conn.telemetry?.endpoint).toBe(
-          "https://custom.telemetry.confluent.cloud",
+        expect(conn.telemetry).toEqual({
+          endpoint: "https://custom.telemetry.confluent.cloud",
+          auth: { type: "api_key", key: "telkey", secret: "telsecret" },
+        });
+      });
+
+      it("should populate telemetry auth and resolve default endpoint when key and secret are set", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            TELEMETRY_API_KEY: "telkey",
+            TELEMETRY_API_SECRET: "telsecret",
+          }),
         );
-        expect(conn.telemetry?.auth).toEqual({
-          type: "api_key",
-          key: "telkey",
-          secret: "telsecret",
+        const conn = config.getSoleConnection();
+        expect(conn.telemetry).toEqual({
+          endpoint: "https://api.telemetry.confluent.cloud",
+          auth: { type: "api_key", key: "telkey", secret: "telsecret" },
+        });
+      });
+
+      it("should throw when TELEMETRY_ENDPOINT is set but no auth is available, with error mentioning TELEMETRY_ENDPOINT", () => {
+        expect(() =>
+          consConfigFromEnv(
+            envWith({
+              TELEMETRY_ENDPOINT: "https://custom.telemetry.confluent.cloud",
+            }),
+          ),
+        ).toThrow(/TELEMETRY_ENDPOINT.*no auth is available/);
+      });
+
+      it("should use confluent_cloud.auth when only TELEMETRY_ENDPOINT and cc credentials are set", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            TELEMETRY_ENDPOINT: "https://custom.telemetry.confluent.cloud",
+            CONFLUENT_CLOUD_API_KEY: "cckey",
+            CONFLUENT_CLOUD_API_SECRET: "ccsecret",
+          }),
+        );
+        const conn = config.getSoleConnection();
+        expect(conn.telemetry).toEqual({
+          endpoint: "https://custom.telemetry.confluent.cloud",
+          auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
+        });
+      });
+
+      it("should synthesize telemetry from confluent_cloud.auth when no TELEMETRY_* vars are set", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            CONFLUENT_CLOUD_API_KEY: "cckey",
+            CONFLUENT_CLOUD_API_SECRET: "ccsecret",
+          }),
+        );
+        const conn = config.getSoleConnection();
+        expect(conn.telemetry).toEqual({
+          endpoint: "https://api.telemetry.confluent.cloud",
+          auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
         });
       });
 
@@ -568,7 +588,14 @@ describe("config/env-config.ts", () => {
           }),
         );
         const conn = config.getSoleConnection();
-        expect(conn.telemetry?.auth).toBeDefined();
+        expect(conn.telemetry?.endpoint).toBe(
+          "https://api.telemetry.confluent.cloud",
+        );
+        expect(conn.telemetry?.auth).toEqual({
+          type: "api_key",
+          key: "telkey",
+          secret: "telsecret",
+        });
         expect(conn.kafka).toBeUndefined();
         expect(conn.schema_registry).toBeUndefined();
         expect(conn.confluent_cloud).toBeUndefined();

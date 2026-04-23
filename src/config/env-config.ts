@@ -3,7 +3,6 @@ import {
   type ConfluentCloudDirectConfig,
   type KafkaDirectConfig,
   type TableflowDirectConfig,
-  type TelemetryDirectConfig,
   formatZodIssues,
   mcpConfigSchema,
   MCPServerConfiguration,
@@ -248,7 +247,7 @@ function buildTableflowBlock(
 
 /**
  * Builds the `telemetry` connection block from env vars. Triggered when any telemetry
- * env var is set. Auth falls back to Confluent Cloud credentials at runtime if omitted.
+ * env var is set.
  *
  * Equivalent YAML:
  *
@@ -261,7 +260,7 @@ function buildTableflowBlock(
  */
 function buildTelemetryBlock(
   env: EnvSubset,
-): { telemetry: TelemetryDirectConfig } | null {
+): { telemetry: { endpoint?: string; auth?: AuthConfig } } | null {
   if (
     !env.TELEMETRY_ENDPOINT &&
     !env.TELEMETRY_API_KEY &&

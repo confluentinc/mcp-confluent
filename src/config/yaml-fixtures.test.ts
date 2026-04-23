@@ -281,32 +281,22 @@ describe("config/yaml-fixtures.test.ts", () => {
   });
 
   describe("telemetry fixtures", () => {
-    it("should load telemetry-with-auth with auth only", () => {
+    it("should load telemetry-with-auth with auth only and resolve default endpoint", () => {
       const config = loadConfigFromYaml(
         fixtureFile("valid/telemetry-with-auth.yaml"),
         NO_ENV,
       );
       const conn = config.getSoleConnection();
-      expect(conn.telemetry?.auth).toEqual({
-        type: "api_key",
-        key: "mytelemetrykey",
-        secret: "mytelemetrysecret",
+      expect(conn.telemetry).toEqual({
+        endpoint: "https://api.telemetry.confluent.cloud",
+        auth: {
+          type: "api_key",
+          key: "mytelemetrykey",
+          secret: "mytelemetrysecret",
+        },
       });
-      expect(conn.telemetry?.endpoint).toBeUndefined();
       expect(conn.kafka).toBeUndefined();
       expect(conn.flink).toBeUndefined();
-    });
-
-    it("should load telemetry-with-endpoint-only with endpoint only", () => {
-      const config = loadConfigFromYaml(
-        fixtureFile("valid/telemetry-with-endpoint-only.yaml"),
-        NO_ENV,
-      );
-      const conn = config.getSoleConnection();
-      expect(conn.telemetry?.endpoint).toBe(
-        "https://api.telemetry.confluent.cloud",
-      );
-      expect(conn.telemetry?.auth).toBeUndefined();
     });
 
     it("should load telemetry-with-endpoint-and-auth with both fields populated", () => {
@@ -443,6 +433,15 @@ describe("config/yaml-fixtures.test.ts", () => {
           NO_ENV,
         ),
       ).not.toThrow(/flink\.endpoint/);
+    });
+
+    it("should reject telemetry-with-endpoint-only when no confluent_cloud.auth is available", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/telemetry-with-endpoint-only.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/no auth is available/);
     });
   });
 });

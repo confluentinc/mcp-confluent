@@ -10,6 +10,7 @@ import { parse as parseYaml } from "yaml";
 
 export { consConfigFromEnv } from "@src/config/env-config.js";
 export {
+  CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
   MCPServerConfiguration,
   type DirectConnectionConfig,
 } from "@src/config/models.js";

@@ -358,7 +358,7 @@ const directConnectionSchema = z
   })
   .strict();
 
-const CONFLUENT_CLOUD_DEFAULT_ENDPOINT = "https://api.confluent.cloud";
+export const CONFLUENT_CLOUD_DEFAULT_ENDPOINT = "https://api.confluent.cloud";
 const TELEMETRY_DEFAULT_ENDPOINT = "https://api.telemetry.confluent.cloud";
 
 /**

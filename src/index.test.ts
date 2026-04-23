@@ -326,11 +326,24 @@ describe("index.ts", () => {
       );
     });
 
-    it("should leave confluentCloudBaseUrl undefined when there is no confluent_cloud block", () => {
+    it("should default confluentCloudBaseUrl to https://api.confluent.cloud when there is no confluent_cloud block", () => {
       const manager = constructDefaultClientManager(
         connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
       );
-      expect(manager["confluentCloudBaseUrl"]).toBeUndefined();
+      expect(manager["confluentCloudBaseUrl"]).toBe(
+        "https://api.confluent.cloud",
+      );
+    });
+
+    it("should set confluentCloudTableflowBaseUrl to https://api.confluent.cloud when only tableflow is configured", () => {
+      const manager = constructDefaultClientManager(
+        connWith({
+          tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
+        }),
+      );
+      expect(manager["confluentCloudTableflowBaseUrl"]).toBe(
+        "https://api.confluent.cloud",
+      );
     });
 
     it("should set confluentCloudTelemetryBaseUrl from the telemetry block", () => {

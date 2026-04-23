@@ -10,6 +10,7 @@ import {
   parseCliArgs,
 } from "@src/cli.js";
 import {
+  CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
   consConfigFromEnv,
   loadConfigFromYaml,
   MCPServerConfiguration,
@@ -122,7 +123,8 @@ export function constructDefaultClientManager(
   return new DefaultClientManager({
     kafka: kafkaClientConfig,
     endpoints: {
-      cloud: conn.confluent_cloud?.endpoint,
+      // DefaultClientManager uses this as the Tableflow base URL too (see client-manager.ts constructor), so always supply the default.
+      cloud: conn.confluent_cloud?.endpoint ?? CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
       flink: conn.flink?.endpoint,
       schemaRegistry: conn.schema_registry?.endpoint,
       kafka: conn.kafka?.rest_endpoint,

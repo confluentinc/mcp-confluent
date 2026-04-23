@@ -3,7 +3,6 @@
 import { GlobalConfig } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  CLIOptions,
   DisplayedCommandLineUsageError,
   getFilteredToolNames,
   getPackageVersion,
@@ -14,6 +13,7 @@ import {
   consConfigFromEnv,
   loadConfigFromYaml,
   MCPServerConfiguration,
+  type DirectConnectionConfig,
 } from "@src/config/index.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
@@ -101,63 +101,59 @@ export function outputToolList(filteredToolNames: ToolName[]): void {
 }
 
 export function constructDefaultClientManager(
-  env: Environment,
-  cliOptions: CLIOptions,
+  conn: DirectConnectionConfig,
 ): DefaultClientManager {
-  // Merge environment variables with kafka config from CLI
-  // some additional configurations could be set in the client manager
-  // like separating groupIds by sessionId
   const kafkaClientConfig: GlobalConfig = {
-    // Base configuration from environment variables
-    "bootstrap.servers": env.BOOTSTRAP_SERVERS,
     "client.id": "mcp-confluent",
-    ...(env.KAFKA_API_KEY && env.KAFKA_API_SECRET
+    ...(conn.kafka?.bootstrap_servers && {
+      "bootstrap.servers": conn.kafka.bootstrap_servers,
+    }),
+    ...(conn.kafka?.auth
       ? {
           "security.protocol": "sasl_ssl",
           "sasl.mechanisms": "PLAIN",
-          "sasl.username": env.KAFKA_API_KEY,
-          "sasl.password": env.KAFKA_API_SECRET,
+          "sasl.username": conn.kafka.auth.key,
+          "sasl.password": conn.kafka.auth.secret,
         }
       : {}),
-    // Merge any additional properties from the kafka config file
-    ...cliOptions.kafkaConfig,
+    ...(conn.kafka?.extra_properties ?? {}),
   };
 
   return new DefaultClientManager({
     kafka: kafkaClientConfig,
     endpoints: {
-      cloud: env.CONFLUENT_CLOUD_REST_ENDPOINT ?? "https://api.confluent.cloud",
-      flink: env.FLINK_REST_ENDPOINT,
-      schemaRegistry: env.SCHEMA_REGISTRY_ENDPOINT,
-      kafka: env.KAFKA_REST_ENDPOINT,
-      telemetry:
-        env.TELEMETRY_ENDPOINT ?? "https://api.telemetry.confluent.cloud",
+      cloud: conn.confluent_cloud
+        ? (conn.confluent_cloud.endpoint ?? "https://api.confluent.cloud")
+        : undefined,
+      flink: conn.flink?.endpoint,
+      schemaRegistry: conn.schema_registry?.endpoint,
+      kafka: conn.kafka?.rest_endpoint,
+      telemetry: conn.telemetry?.endpoint,
     },
     auth: {
       cloud: {
-        apiKey: env.CONFLUENT_CLOUD_API_KEY!,
-        apiSecret: env.CONFLUENT_CLOUD_API_SECRET!,
+        apiKey: conn.confluent_cloud?.auth?.key,
+        apiSecret: conn.confluent_cloud?.auth?.secret,
       },
       tableflow: {
-        apiKey: env.TABLEFLOW_API_KEY!,
-        apiSecret: env.TABLEFLOW_API_SECRET!,
+        apiKey: conn.tableflow?.auth?.key,
+        apiSecret: conn.tableflow?.auth?.secret,
       },
       flink: {
-        apiKey: env.FLINK_API_KEY!,
-        apiSecret: env.FLINK_API_SECRET!,
+        apiKey: conn.flink?.auth?.key,
+        apiSecret: conn.flink?.auth?.secret,
       },
       schemaRegistry: {
-        apiKey: env.SCHEMA_REGISTRY_API_KEY!,
-        apiSecret: env.SCHEMA_REGISTRY_API_SECRET!,
+        apiKey: conn.schema_registry?.auth?.key,
+        apiSecret: conn.schema_registry?.auth?.secret,
       },
       kafka: {
-        apiKey: env.KAFKA_API_KEY!,
-        apiSecret: env.KAFKA_API_SECRET!,
+        apiKey: conn.kafka?.auth?.key,
+        apiSecret: conn.kafka?.auth?.secret,
       },
       telemetry: {
-        apiKey: (env.TELEMETRY_API_KEY ?? env.CONFLUENT_CLOUD_API_KEY)!,
-        apiSecret: (env.TELEMETRY_API_SECRET ??
-          env.CONFLUENT_CLOUD_API_SECRET)!,
+        apiKey: conn.telemetry?.auth?.key,
+        apiSecret: conn.telemetry?.auth?.secret,
       },
     },
   });
@@ -198,32 +194,21 @@ async function main() {
     // Load and validate configuration — from YAML file if --config provided, else from env vars.
     if (cliOptions.config) {
       mcpConfig = loadConfigFromYaml(cliOptions.config, process.env);
-
-      logger.warn(
-        "Configuration file parsed and validated successfully, but it is not applied yet; startup still uses" +
-          " environment variables and CLI Kafka properties",
-      );
     } else {
       mcpConfig = consConfigFromEnv(env);
 
       if (cliOptions.kafkaConfig) {
         mcpConfig.setKafkaExtraProperties(cliOptions.kafkaConfig);
       }
-
-      // TODO(issue #151): Use config to construct connection manager instead of env vars
-      logger.warn(
-        "MCPServerConfiguration constructed from environment variables, but it is not applied yet; startup still uses" +
-          " environment variables and CLI Kafka properties",
-      );
     }
 
     logger.info(
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
 
-    // TODO #162, #165, #174: construct the DefaultClientManager from mcpConfig
-    // instead of directly from env vars and CLI args!
-    const clientManager = constructDefaultClientManager(env, cliOptions);
+    const clientManager = constructDefaultClientManager(
+      mcpConfig.getSoleConnection(),
+    );
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({

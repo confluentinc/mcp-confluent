@@ -116,7 +116,7 @@ export function constructDefaultClientManager(
           "sasl.password": conn.kafka.auth.secret,
         }
       : {}),
-    ...(conn.kafka?.extra_properties ?? {}),
+    ...conn.kafka?.extra_properties,
   };
 
   return new DefaultClientManager({

@@ -1,5 +1,9 @@
 import { generateOpaqueToken } from "@src/confluent/oauth/crypto-utils.js";
 import {
+  type AuthErrors,
+  hasNonTransientError,
+} from "@src/confluent/oauth/errors.js";
+import {
   exchangeControlPlaneForDataPlaneToken,
   exchangeIdTokenForControlPlaneToken,
   exchangeRefreshTokenForAuth0Tokens,
@@ -10,14 +14,31 @@ import {
   CONTROL_PLANE_TOKEN_LIFETIME_MS,
   DATA_PLANE_TOKEN_LIFETIME_MS,
   DEFAULT_REFRESH_INTERVAL_MS,
+  MAX_CONSECUTIVE_TRANSIENT_FAILURES,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
 import type {
   Auth0Config,
   Auth0TokenResponse,
   ConfluentTokenSet,
+  ControlPlaneTokenResponse,
 } from "@src/confluent/oauth/types.js";
 import { logger } from "@src/logger.js";
+
+/** Substrings that mark a refresh error as permanently non-recoverable. */
+const NON_TRANSIENT_ERROR_SIGNALS = [
+  "Unknown or invalid refresh token.",
+  '"error":"invalid_grant"',
+  '"error":"invalid_client"',
+  '"error":"unauthorized_client"',
+] as const;
+
+function isKnownNonTransient(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return NON_TRANSIENT_ERROR_SIGNALS.some((signal) =>
+    error.message.includes(signal),
+  );
+}
 
 /**
  * Owns one user's Confluent OAuth lifecycle — token state plus the
@@ -30,6 +51,8 @@ export class AuthContext {
   private cleared = false;
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
   private inflightRefresh: Promise<void> | null = null;
+  private errors: AuthErrors = {};
+  private failedRefreshAttempts = 0;
 
   private constructor(
     private readonly auth0Config: Auth0Config,
@@ -83,6 +106,14 @@ export class AuthContext {
     return this.internalTokens.dataPlaneToken;
   }
 
+  /**
+   * Snapshot of recorded auth-lifecycle errors. Consumers check this to decide
+   * whether to prompt re-auth (when a non-transient error has been flagged).
+   */
+  getErrors(): Readonly<AuthErrors> {
+    return this.errors;
+  }
+
   /** True when the refresh token is no longer usable (expired or cleared). */
   refreshTokenExpired(now: number = Date.now()): boolean {
     if (this.cleared) return true;
@@ -94,11 +125,12 @@ export class AuthContext {
 
   /**
    * Pure predicate: should the refresh loop call `refresh()` on this context
-   * right now? True when the refresh token is still live and the CP token is
-   * within the refresh window.
+   * right now? True when the refresh token is still live, no non-transient
+   * error has been recorded, and the CP token is within the refresh window.
    */
   shouldAttemptRefresh(now: number = Date.now()): boolean {
     if (this.refreshTokenExpired(now)) return false;
+    if (hasNonTransientError(this.errors)) return false;
     return (
       this.internalTokens.controlPlaneExpiresAt - now <=
       CONTROL_PLANE_REFRESH_WINDOW_MS
@@ -136,10 +168,7 @@ export class AuthContext {
         this.internalTokens.refreshToken,
       );
     } catch (error) {
-      logger.error(
-        { error },
-        "Auth0 refresh failed; keeping the context's current token state for next tick",
-      );
+      this.recordRefreshError(error);
       return;
     }
     // clear() may have fired while the rotation was in flight — the refresh
@@ -160,15 +189,38 @@ export class AuthContext {
     }));
 
     try {
-      const cpResponse = await exchangeIdTokenForControlPlaneToken(
-        this.auth0Config.apiUrl,
-        auth0Response.id_token,
-      );
+      // Phase 2 is safe to retry and both the CP and DP exchanges accept bearer
+      // tokens without marking them consumed. A retry after a transient 5xx just
+      // creates a fresh CP/DP session; any orphaned session from a lost-in-transit first
+      // response expires naturally within its short TTL.
+      let cpResponse: ControlPlaneTokenResponse;
+      try {
+        cpResponse = await exchangeIdTokenForControlPlaneToken(
+          this.auth0Config.apiUrl,
+          auth0Response.id_token,
+        );
+      } catch (error) {
+        if (isKnownNonTransient(error)) throw error;
+        cpResponse = await exchangeIdTokenForControlPlaneToken(
+          this.auth0Config.apiUrl,
+          auth0Response.id_token,
+        );
+      }
       if (this.cleared) return;
-      const dpResponse = await exchangeControlPlaneForDataPlaneToken(
-        this.auth0Config.apiUrl,
-        cpResponse.token,
-      );
+
+      let dpResponse;
+      try {
+        dpResponse = await exchangeControlPlaneForDataPlaneToken(
+          this.auth0Config.apiUrl,
+          cpResponse.token,
+        );
+      } catch (error) {
+        if (isKnownNonTransient(error)) throw error;
+        dpResponse = await exchangeControlPlaneForDataPlaneToken(
+          this.auth0Config.apiUrl,
+          cpResponse.token,
+        );
+      }
       if (this.cleared) return;
 
       this.updateTokens((prev) => ({
@@ -178,11 +230,41 @@ export class AuthContext {
         dataPlaneToken: dpResponse.token,
         dataPlaneExpiresAt: rotationTime + DATA_PLANE_TOKEN_LIFETIME_MS,
       }));
+      // Full success — clear any prior transient error state.
+      this.errors = { ...this.errors, tokenRefresh: undefined };
+      this.failedRefreshAttempts = 0;
       logger.debug("Token set refreshed successfully");
     } catch (error) {
+      this.recordRefreshError(error);
+    }
+  }
+
+  /**
+   * Records a refresh failure on the context. A failure is transient unless
+   * its message matches a known-permanent signal, or the consecutive failure
+   * counter hits {@link MAX_CONSECUTIVE_TRANSIENT_FAILURES}. A non-transient
+   * record flips `shouldAttemptRefresh` to `false` until the context is
+   * cleared / re-authenticated.
+   */
+  private recordRefreshError(error: unknown): void {
+    this.failedRefreshAttempts += 1;
+    const isTransient =
+      this.failedRefreshAttempts < MAX_CONSECUTIVE_TRANSIENT_FAILURES &&
+      !isKnownNonTransient(error);
+    const message = error instanceof Error ? error.message : String(error);
+    this.errors = {
+      ...this.errors,
+      tokenRefresh: { message, isTransient },
+    };
+    if (isTransient) {
+      logger.warn(
+        { error, attempts: this.failedRefreshAttempts },
+        "Transient refresh error; will retry next tick",
+      );
+    } else {
       logger.error(
-        { error },
-        "CP/DP exchange failed; rotated refresh token preserved for next tick",
+        { error, attempts: this.failedRefreshAttempts },
+        "Non-transient refresh error; scheduler will skip until re-auth",
       );
     }
   }

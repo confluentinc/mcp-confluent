@@ -18,6 +18,8 @@ import {
 } from "vitest";
 import {
   createFsWrappers,
+  mockDotenv,
+  type MockedDotenv,
   type MockedFsWrappers,
 } from "../tests/stubs/node-deps.js";
 
@@ -109,12 +111,12 @@ describe("cli.ts", () => {
   describe("loadDotEnvIntoProcessEnv()", () => {
     let existsSyncSpy: MockInstance<typeof nodeDeps.fs.existsSync>;
     let resolveSpy: MockInstance<typeof nodeDeps.path.resolve>;
-    let dotenvConfigSpy: MockInstance<typeof nodeDeps.dotenvLib.config>;
+    let dotenvConfigSpy: MockedDotenv;
 
     beforeEach(() => {
       existsSyncSpy = vi.spyOn(nodeDeps.fs, "existsSync");
       resolveSpy = vi.spyOn(nodeDeps.path, "resolve");
-      dotenvConfigSpy = vi.spyOn(nodeDeps.dotenvLib, "config");
+      dotenvConfigSpy = mockDotenv();
     });
 
     it("should throw when the env file does not exist", () => {

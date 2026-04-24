@@ -4,7 +4,7 @@ import { z } from "zod";
 
 // The following interfaces and types define subcomponents of class MCPServerConfiguration, which represents our entire server configuration.
 // Each interface corresponds to a specific section of a YAML configuration file, as indicated in the comments, or through
-// legacy environment variable or CLI arguments (see consConfigFromEnv in src/config/env-config.ts).
+// legacy environment variable or CLI arguments (see buildConfigFromEnvAndCli in src/config/env-config.ts).
 
 // Zod is used for validation and transformation of from-yaml or environment variables into these structured types, with the root schema
 // being mcpConfigSchema at the bottom of this file.
@@ -143,7 +143,9 @@ export interface ServerAuthConfig {
  * Validated and constructed from parsed YAML via {@link mcpConfigSchema}.
  */
 export class MCPServerConfiguration {
+  /** Named connection map. Corresponds to the `connections` block at the root of the YAML configuration. */
   readonly connections: Record<string, ConnectionConfig>;
+  /** MCP server operational settings. Corresponds to the `server` block at the root of the YAML configuration. */
   readonly server: ServerConfig;
 
   constructor(data: {
@@ -185,7 +187,7 @@ export class MCPServerConfiguration {
    * Absorbs `-k` / `--kafka-config-file` properties into the kafka block so that all
    * config is consolidated in MCPServerConfiguration before client construction.
    *
-   * Only valid in the legacy env-var codepath (`consConfigFromEnv`). YAML-configured
+   * Only valid in the legacy env-var codepath (`buildConfigFromEnvAndCli`). YAML-configured
    * connections must not use this method — the `--config` and `--kafka-config-file` flags
    * are mutually exclusive and enforced at CLI parse time.
    *
@@ -584,7 +586,7 @@ export const DEFAULT_SERVER_CONFIG: ServerConfig = serverConfigSchema.parse({});
  * Root configuration schema. This is the single validation and normalisation
  * entry point shared by both configuration paths: YAML files (via
  * {@link parseYamlConfiguration}) and environment variables (via
- * {@link consConfigFromEnv}). Transforms and cross-field rules defined here
+ * {@link buildConfigFromEnvAndCli}). Transforms and cross-field rules defined here
  * therefore apply equally to both.
  *
  * Parsed output is wrapped in {@link MCPServerConfiguration} by

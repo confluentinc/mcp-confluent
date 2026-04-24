@@ -10,8 +10,8 @@ import {
   parseCliArgs,
 } from "@src/cli.js";
 import {
+  buildConfigFromEnvAndCli,
   CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
-  consConfigFromEnv,
   loadConfigFromYaml,
   MCPServerConfiguration,
   type DirectConnectionConfig,
@@ -190,15 +190,15 @@ async function main() {
     const env = initEnv();
 
     let mcpConfig: MCPServerConfiguration;
-    // Load and validate configuration — from YAML file if --config provided, else from env vars.
+    // Load and validate configuration — from YAML file if --config provided, else from env vars + CLI overrides.
     if (cliOptions.config) {
       mcpConfig = loadConfigFromYaml(cliOptions.config, process.env);
     } else {
-      mcpConfig = consConfigFromEnv(env);
-
-      if (cliOptions.kafkaConfig) {
-        mcpConfig.setKafkaExtraProperties(cliOptions.kafkaConfig);
-      }
+      mcpConfig = buildConfigFromEnvAndCli(env, {
+        disableAuth: cliOptions.disableAuth,
+        allowedHosts: cliOptions.allowedHosts,
+        kafkaConfig: cliOptions.kafkaConfig,
+      });
     }
 
     setLogLevel(mcpConfig.server.log_level);
@@ -275,15 +275,8 @@ async function main() {
       );
     });
 
-    // Prepare auth configuration — CLI flags take precedence over config file.
-    const disableAuth =
-      cliOptions.disableAuth || mcpConfig.server.auth.disabled;
-    const allowedHosts =
-      cliOptions.allowedHosts ?? mcpConfig.server.auth.allowed_hosts;
-    const apiKey = mcpConfig.server.auth.api_key;
-
     // Warn if auth is disabled
-    if (disableAuth) {
+    if (mcpConfig.server.auth.disabled) {
       logger.warn(
         "Authentication is DISABLED for HTTP/SSE transports. " +
           "This should only be used in development environments.",
@@ -291,9 +284,9 @@ async function main() {
     }
 
     const transportManager = new TransportManager(server, {
-      disableAuth,
-      allowedHosts,
-      apiKey,
+      disableAuth: mcpConfig.server.auth.disabled,
+      allowedHosts: mcpConfig.server.auth.allowed_hosts,
+      apiKey: mcpConfig.server.auth.api_key,
     });
 
     // Start all transports with a single call

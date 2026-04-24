@@ -363,6 +363,20 @@ describe("cli.ts", () => {
       ).toThrow(/mutually exclusive/);
     });
 
+    it("should throw when both --config and --disable-auth are supplied", () => {
+      expect(() =>
+        parseCliArgs(makeArgs(["--config", "server.yaml", "--disable-auth"])),
+      ).toThrow(/mutually exclusive/);
+    });
+
+    it("should throw when both --config and --allowed-hosts are supplied", () => {
+      expect(() =>
+        parseCliArgs(
+          makeArgs(["--config", "server.yaml", "--allowed-hosts", "localhost"]),
+        ),
+      ).toThrow(/mutually exclusive/);
+    });
+
     it("should throw when -k file does not exist", () => {
       resolveStub.returns("/abs/kafka.properties");
       fsStubs.existsSync.returns(false);

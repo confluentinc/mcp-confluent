@@ -6,6 +6,7 @@ import {
   MCPServerConfiguration,
 } from "@src/config/models.js";
 import type { Environment } from "@src/env.js";
+import { type KeyValuePairObject } from "properties-file";
 
 const ENV_CONNECTION_NAME = "env-connection";
 
@@ -13,9 +14,9 @@ const ENV_CONNECTION_NAME = "env-connection";
 const CONN = `connections.${ENV_CONNECTION_NAME}`;
 
 /**
- * Maps each environment variable name handled by consConfigFromEnv to its
+ * Maps each environment variable name handled by buildConfigFromEnvAndCli to its
  * corresponding Zod document path in the manufactured MCPServerConfiguration.
- * The keys drive the Pick<Environment, ...> type of consConfigFromEnv, so every
+ * The keys drive the Pick<Environment, ...> type of buildConfigFromEnvAndCli, so every
  * env var the function touches must have an entry here.
  */
 const ENV_VAR_TO_ZPATH = {
@@ -72,8 +73,9 @@ const ENV_VAR_TO_ZPATH = {
  * @returns MCPServerConfiguration with a single connection constructed from an Environment object
  * @throws Error if required environment variables are missing or if validation fails
  */
-export function consConfigFromEnv(
+function buildConfigFromEnv(
   env: Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>,
+  authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
 ): MCPServerConfiguration {
   const connection: Record<string, unknown> = { type: "direct" };
 
@@ -94,9 +96,11 @@ export function consConfigFromEnv(
   }
 
   // Build root document with both the connection and the server block.
+  // authOverrides are folded in here so Zod validates the final combined state,
+  // including the disabled+api_key mutual exclusion refine.
   const rawDocument: Record<string, unknown> = {
     connections: { [ENV_CONNECTION_NAME]: connection },
-    ...buildServerBlock(env),
+    ...buildServerBlock(env, authOverrides),
   };
 
   // Validate the manufactured config object against the schema, as if it were loaded from a YAML file.
@@ -116,6 +120,35 @@ export function consConfigFromEnv(
   }
 
   return new MCPServerConfiguration(result.data);
+}
+
+/** CLI flags that may override values in the env-var config path. Mutually exclusive with --config (YAML path). */
+export interface EnvPathCliOverrides {
+  disableAuth?: boolean;
+  allowedHosts?: string[];
+  kafkaConfig?: KeyValuePairObject;
+}
+
+/**
+ * Constructs a fully-resolved MCPServerConfiguration from environment variables and optional
+ * CLI flag overrides. Extends {@link buildConfigFromEnvAndCli} by folding in the three CLI flags that
+ * are only valid on the env-var path (`--disable-auth`, `--allowed-hosts`, `--kafka-config-file`),
+ * so that the returned config needs no further patching by the caller.
+ *
+ * @param env - Environment variables (same contract as buildConfigFromEnvAndCli)
+ * @param overrides - CLI flag values to merge on top of the env-var-derived config
+ */
+export function buildConfigFromEnvAndCli(
+  env: Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>,
+  overrides: EnvPathCliOverrides = {},
+): MCPServerConfiguration {
+  const config = buildConfigFromEnv(env, {
+    disableAuth: overrides.disableAuth,
+    allowedHosts: overrides.allowedHosts,
+  });
+  if (overrides.kafkaConfig)
+    config.setKafkaExtraProperties(overrides.kafkaConfig);
+  return config;
 }
 
 type EnvSubset = Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>;
@@ -358,7 +391,10 @@ function buildFlinkBlock(env: EnvSubset): {
  *     disabled: ${MCP_AUTH_DISABLED}
  *     allowed_hosts: ${MCP_ALLOWED_HOSTS}
  */
-function buildServerBlock(env: EnvSubset): { server: Record<string, unknown> } {
+function buildServerBlock(
+  env: EnvSubset,
+  authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
+): { server: Record<string, unknown> } {
   return {
     server: {
       log_level: env.LOG_LEVEL,
@@ -371,8 +407,8 @@ function buildServerBlock(env: EnvSubset): { server: Record<string, unknown> } {
       },
       auth: {
         ...(env.MCP_API_KEY !== undefined && { api_key: env.MCP_API_KEY }),
-        disabled: env.MCP_AUTH_DISABLED,
-        allowed_hosts: env.MCP_ALLOWED_HOSTS,
+        disabled: authOverrides.disableAuth ?? env.MCP_AUTH_DISABLED,
+        allowed_hosts: authOverrides.allowedHosts ?? env.MCP_ALLOWED_HOSTS,
       },
     },
   };

@@ -89,6 +89,17 @@ the function.
 Add new deps to `node-deps.ts` as needed. For shared mutable objects like `logger`, spy methods
 directly on the object without a wrapper.
 
+### Spy helpers in `@tests/stubs`
+
+`vi.spyOn` is call-through by default, which is risky for I/O primitives - a missed mock can hit
+the real network or filesystem. Use the fail-loudly-by-default helpers in
+`@tests/stubs/index.js` (re-exports from `tests/stubs/node-deps.ts` and `tests/stubs/admin.ts`)
+instead of bare `vi.spyOn` for fetch, dotenv, fs writes, env, and the kafka admin client. Read
+each helper's JSDoc for its shape and usage.
+
+When stubbing a primitive that doesn't yet have a helper, follow the same fail-loudly pattern
+at the test site (see `mockFetch` in `tests/stubs/node-deps.ts` as the reference shape).
+
 ### When to extend `node-deps.ts` vs. stub one level deeper
 
 The general rule: wrap external I/O at the lowest stable boundary you control. If production code

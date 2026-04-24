@@ -1,20 +1,23 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
-import { createStubAdmin, StubbedAdmin } from "@tests/stubs/index.js";
-import sinon from "sinon";
-import { beforeEach, describe, expect, it } from "vitest";
+import {
+  createMockAdmin,
+  createMockInstance,
+  type MockedAdmin,
+} from "@tests/stubs/index.js";
+import { beforeEach, describe, expect, it, type Mocked } from "vitest";
 
 describe("list-topics-handler.ts", () => {
   describe("ListTopicsHandler", () => {
     const handler = new ListTopicsHandler();
-    let clientManager: sinon.SinonStubbedInstance<DefaultClientManager>;
-    let admin: StubbedAdmin;
+    let clientManager: Mocked<DefaultClientManager>;
+    let admin: MockedAdmin;
 
     beforeEach(() => {
-      admin = createStubAdmin();
-      clientManager = sinon.createStubInstance(DefaultClientManager);
-      clientManager.getAdminClient.resolves(admin as KafkaJS.Admin);
+      admin = createMockAdmin();
+      clientManager = createMockInstance(DefaultClientManager);
+      clientManager.getAdminClient.mockResolvedValue(admin as KafkaJS.Admin);
     });
 
     describe("getRequiredEnvVars()", () => {
@@ -27,7 +30,9 @@ describe("list-topics-handler.ts", () => {
 
     describe("handle()", () => {
       it("should propagate errors from the admin client", async () => {
-        clientManager.getAdminClient.rejects(new Error("connection refused"));
+        clientManager.getAdminClient.mockRejectedValue(
+          new Error("connection refused"),
+        );
 
         await expect(handler.handle(clientManager, {})).rejects.toThrow(
           "connection refused",

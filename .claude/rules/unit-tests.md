@@ -4,13 +4,15 @@ paths:
   - tests/**/*
 ---
 
-# Unit Testing (Vitest + Sinon)
+# Unit Testing (Vitest)
 
 ## Framework & Location
 
-- Co-located `.test.ts` files alongside source code using Vitest + Sinon
+- Co-located `.test.ts` files alongside source code using Vitest
 - Run with `npm run test` (single run) or `npm run test:watch` (watch mode)
-- Config in `vitest.config.ts`; `@src/*` aliases resolved via `resolve.tsconfigPaths` in Vitest config
+- Config in `vitest.config.ts`; `@src/*` aliases resolved via `resolve.tsconfigPaths`
+- `restoreMocks: true` is set project-wide, so every `vi.spyOn` call is automatically restored
+  after each test - no per-test restore hooks needed
 
 ## Test Naming
 
@@ -19,41 +21,48 @@ paths:
 
 ## Assertions
 
-- Prefer `sinon.assert` for stub/spy call verification (e.g., `sinon.assert.calledOnce(stub)`,
-  `sinon.assert.calledWith(stub, arg)`) - produces descriptive failure messages instead of bare
-  "expected false to be true"
-- Use Vitest `expect` for non-Sinon values (return data, thrown errors, data structures)
+- Use Vitest `expect(...)` for everything — values, thrown errors, and mock call verification
+- Common mock assertions:
+  - `expect(mock).toHaveBeenCalledOnce()`
+  - `expect(mock).toHaveBeenCalledWith(arg)`
+  - `expect(mock).toHaveBeenCalledTimes(n)`
+  - `expect(mock).not.toHaveBeenCalled()`
+- For argument matching inside calls: `expect.any(String)`, `expect.objectContaining({...})`,
+  `expect.stringContaining("...")`, `expect.anything()`
 
 ## Key Patterns
 
-- Use `sinon.createStubInstance(DefaultClientManager)` for simple handler tests with one class dep
-- Use `sinon.createSandbox()` when a test needs many stubs with coordinated cleanup (call
-  `sandbox.restore()` in `afterEach`)
+- Use `createMockInstance(DefaultClientManager)` (from `@tests/stubs/index.js`) for handler tests
+  with one class dependency. The returned object is typed as `Mocked<DefaultClientManager>` so
+  method-chain autocomplete works (`.mockResolvedValue`, etc.)
 - Don't wrap simple one-liners in helper functions
-- Use `createTestServer()` from `@tests/server` for integration-style tests that need a
-  full MCP server + client connected via `InMemoryTransport`
+- Use `createTestServer()` from `@tests/server` for integration-style tests that need a full MCP
+  server + client connected via `InMemoryTransport`
 - Focus on isolated behavior, mocking external dependencies
-- Do not test or stub side effects like logging - no logger stubs or assertions needed
-- Only stub what affects behavior - pure-value functions like `os.platform()` don't need stubbing
-  when `sinon.match.string` suffices for assertions
+- Do not test or stub side effects like logging — no logger stubs or assertions needed
+- Only stub what affects behavior — pure-value functions like `os.platform()` don't need stubbing
+  when `expect.any(String)` suffices for assertions
 - Access private/protected members via bracket notation in tests: `obj["privateProp"]`
 - Set up common stubs in the top-level `describe` block so they apply to all tests
 
 ## Design for Stubbing
 
-Sinon can only stub **module exports**, not internal calls within the same file.
+`vi.spyOn` mutates a property on a supplied object. It cannot retroactively intercept an ESM
+named import that another module already resolved: module namespaces are read-only from outside
+the defining module per the ECMAScript spec. This is a language-level constraint, not a Vitest
+limitation (Sinon had the same constraint).
 
-**Solutions:**
+**Solutions** (all of which make the dependency reachable via property lookup at call time):
 
-- Extract dependencies to separate modules
+- Extract dependencies to separate modules and export them as properties of a namespace object
 - Pass dependencies as parameters
-- Use dependency injection patterns
+- Use namespace objects (see `node-deps.ts`) so callers access via property lookup instead of a
+  bare named import
 
 ### ESM Live Bindings and `node-deps.ts`
 
-Sinon can't stub ESM live bindings at runtime - this affects Node builtins (sealed per spec) and
-Vite-transformed module exports alike. `@src/confluent/node-deps.js` re-exports these as plain
-objects whose properties Sinon can stub:
+`@src/confluent/node-deps.js` re-exports Node builtins, third-party constructors, and env access
+as plain objects whose properties Vitest can spy on:
 
 ```typescript
 // source file
@@ -64,24 +73,80 @@ config.env.DO_NOT_TRACK; // env proxy
 
 // test file
 import * as nodeDeps from "@src/confluent/node-deps.js";
-sandbox.stub(nodeDeps.fs, "readFileSync").returns("content");
-sandbox.stub(nodeDeps.segment, "Analytics").returns({ track: trackStub });
-sandbox.stub(nodeDeps.config, "env").value({ DO_NOT_TRACK: false });
+vi.spyOn(nodeDeps.fs, "readFileSync").mockReturnValue("content");
+vi.spyOn(nodeDeps.segment, "Analytics").mockImplementation(function () {
+  return { track: trackStub };
+} as any);
+vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue({
+  DO_NOT_TRACK: false,
+} as any);
 ```
 
-Add new deps to `node-deps.ts` as needed. For shared mutable objects like `logger`, stub methods
+**Constructor note**: `vi.spyOn` on a `new`-called function requires `mockImplementation` with a
+**regular function** (not arrow — arrows can't be constructors). Return the instance from inside
+the function.
+
+Add new deps to `node-deps.ts` as needed. For shared mutable objects like `logger`, spy methods
 directly on the object without a wrapper.
+
+### Spy helpers in `@tests/stubs`
+
+`vi.spyOn` is call-through by default, which is risky for I/O primitives - a missed mock can hit
+the real network or filesystem. Use the fail-loudly-by-default helpers in
+`@tests/stubs/index.js` (re-exports from `tests/stubs/node-deps.ts` and `tests/stubs/admin.ts`)
+instead of bare `vi.spyOn` for fetch, dotenv, fs writes, env, and the kafka admin client. Read
+each helper's JSDoc for its shape and usage.
+
+When stubbing a primitive that doesn't yet have a helper, follow the same fail-loudly pattern
+at the test site (see `mockFetch` in `tests/stubs/node-deps.ts` as the reference shape).
+
+### When to extend `node-deps.ts` vs. stub one level deeper
+
+The general rule: wrap external I/O at the lowest stable boundary you control. If production code
+calls a Node builtin or third-party primitive that isn't already in `node-deps.ts`, add it there
+and spy on the wrapper. If the primitive is already wrapped (like `nodeCrypto.randomBytes`) and a
+project-local function just composes around it, stub the primitive — there's no need to also wrap
+the composing function. `generateApiKey` in `src/mcp/transports/auth.ts` is an example: tests stub
+`nodeCrypto.randomBytes` rather than wrapping `generateApiKey` in its own namespace.
+
+### Why `vi.mock` is not used in this project
+
+`vi.spyOn` and `vi.mock` solve different problems. `vi.spyOn` is a runtime property mutation
+(the same class of operation as `sandbox.stub(obj, "method")` was under Sinon). `vi.mock`
+rewrites the module graph before imports resolve: it's hoisted above `import` statements,
+scoped to the file that calls it, and applies for the entire test file at once.
+
+The project settled on the `vi.spyOn` + namespace-object combination because it gives:
+
+- **Per-test granularity.** Each test installs exactly the spies it needs; `restoreMocks: true`
+  wipes them between tests. With `vi.mock`, mock identity is shared across the whole file and
+  per-test behavior changes still require `vi.mocked(fn).mockReturnValue(...)` calls anyway,
+  just with a file-header declaration on top.
+- **Type safety on the real boundary.** Spies land on the actual imported value, so if the
+  real module's API changes, TypeScript flags the test immediately. `vi.mock` factories drift
+  silently when the real module's shape changes.
+- **Accessor-mode spies for getters.** `vi.spyOn(obj, "prop", "get")` powers the `config.env`
+  and `buildConfig` patterns; there's no clean `vi.mock` equivalent for per-test value changes.
+- **No hoisting surprises.** Execution order in tests matches source order. `vi.mock` is
+  hoisted by the Vitest transformer, which can confuse readers trying to trace setup.
+- **Integration tests stay simple.** `*.integration.test.ts` files default to real I/O. A
+  file-scoped or setup-file `vi.mock` approach would invert that default, requiring explicit
+  `vi.unmock` calls in every integration test.
+
+Every dependency in this codebase that resists direct spying can be wrapped in a namespace
+object. **Do not reach for `vi.mock`** - if a new dependency seems to require it, wrap it in
+`node-deps.ts` or a similar namespace object and spy on the wrapper instead.
 
 ## Handler Tests
 
 - Test config (`getToolConfig()`), required env vars (`getRequiredEnvVars()`), and behavior (`handle()`)
-- Stub `ClientManager` methods with `sinon.createStubInstance(DefaultClientManager)`
-- Use `as any` only on partial mock return values (e.g., a mock admin client with only `listTopics`),
-  not on the `ClientManager` stub itself — add an eslint-disable comment when needed
+- Stub `ClientManager` methods with `createMockInstance(DefaultClientManager)`
+- Use `as any` only on partial mock return values (e.g., a mock admin client with only
+  `listTopics`), not on the `ClientManager` mock itself — add an eslint-disable comment when needed
 
 ## Environment Proxy
 
-- `createTestServer()` calls `initEnv()` automatically so Zod `.default()` callbacks in tool schemas
-  don't throw
-- For handler-only tests that don't use `createTestServer()`, call `initEnv()` in `beforeAll` if the
-  handler's Zod schema references `env.*` in `.default()` callbacks
+- `createTestServer()` calls `initEnv()` automatically so Zod `.default()` callbacks in tool
+  schemas don't throw
+- For handler-only tests that don't use `createTestServer()`, call `initEnv()` in `beforeAll` if
+  the handler's Zod schema references `env.*` in `.default()` callbacks

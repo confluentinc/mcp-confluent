@@ -1,4 +1,3 @@
-import { nodeFetch } from "@src/confluent/node-deps.js";
 import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
@@ -7,15 +6,8 @@ import {
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type MockInstance,
-  vi,
-} from "vitest";
+import { MockedFetch, mockFetch } from "@tests/stubs/index.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 function jsonResponse(body: object, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -36,10 +28,8 @@ function internals(ctx: AuthContext): ConfluentTokenSet {
     .internalTokens;
 }
 
-type FetchSpy = MockInstance<typeof nodeFetch.fetch>;
-
 function stubAuth0Ok(
-  fetchSpy: FetchSpy,
+  fetchSpy: MockedFetch,
   refreshToken: string,
   idToken: string,
 ): void {
@@ -54,16 +44,16 @@ function stubAuth0Ok(
   );
 }
 
-function stubCpOk(fetchSpy: FetchSpy, cpToken: string): void {
+function stubCpOk(fetchSpy: MockedFetch, cpToken: string): void {
   fetchSpy.mockResolvedValueOnce(jsonResponse({ token: cpToken }));
 }
 
-function stubDpOk(fetchSpy: FetchSpy, dpToken: string): void {
+function stubDpOk(fetchSpy: MockedFetch, dpToken: string): void {
   fetchSpy.mockResolvedValueOnce(jsonResponse({ token: dpToken }));
 }
 
 function stubSuccessfulChain(
-  fetchSpy: FetchSpy,
+  fetchSpy: MockedFetch,
   refreshToken = "refresh-token",
   idToken = "id-token",
   cpToken = "cp-token",
@@ -74,7 +64,7 @@ function stubSuccessfulChain(
   stubDpOk(fetchSpy, dpToken);
 }
 
-async function newLoggedInContext(fetchSpy: FetchSpy): Promise<AuthContext> {
+async function newLoggedInContext(fetchSpy: MockedFetch): Promise<AuthContext> {
   stubSuccessfulChain(fetchSpy);
   const auth0Config = getAuth0Config("devel");
   return AuthContext.newFromInitialLogin(auth0Config, "code", "verifier");
@@ -82,10 +72,10 @@ async function newLoggedInContext(fetchSpy: FetchSpy): Promise<AuthContext> {
 
 describe("oauth/auth-context.ts", () => {
   const auth0Config = getAuth0Config("devel");
-  let fetchSpy: FetchSpy;
+  let fetchSpy: MockedFetch;
 
   beforeEach(() => {
-    fetchSpy = vi.spyOn(nodeFetch, "fetch");
+    fetchSpy = mockFetch();
   });
 
   describe("AuthContext", () => {

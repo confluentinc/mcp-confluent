@@ -2,6 +2,7 @@ import { nodeFetch } from "@src/confluent/node-deps.js";
 import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
+  MAX_CONSECUTIVE_TRANSIENT_FAILURES,
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
@@ -411,6 +412,157 @@ describe("oauth/auth-context.ts", () => {
 
         expect(ctx.getControlPlaneToken()).toBeUndefined();
         expect(ctx.getDataPlaneToken()).toBeUndefined();
+      });
+    });
+
+    describe("error classification", () => {
+      it("should record a transient error on a generic phase-1 failure", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        fetchStub
+          .onCall(3)
+          .resolves(new Response("server error", { status: 500 }));
+
+        await ctx.refresh();
+
+        const err = ctx.getErrors().tokenRefresh;
+        expect(err).toBeDefined();
+        expect(err!.isTransient).toBe(true);
+        expect(
+          ctx.shouldAttemptRefresh(
+            internals(ctx).controlPlaneExpiresAt - 10_000,
+          ),
+        ).toBe(true);
+      });
+
+      it("should record a non-transient error when the refresh token is revoked", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        fetchStub
+          .onCall(3)
+          .resolves(
+            new Response(
+              '{"error":"invalid_grant","error_description":"Unknown or invalid refresh token."}',
+              { status: 400 },
+            ),
+          );
+
+        await ctx.refresh();
+
+        const err = ctx.getErrors().tokenRefresh;
+        expect(err).toBeDefined();
+        expect(err!.isTransient).toBe(false);
+        // Scheduler must now skip this context even when CP is due.
+        expect(
+          ctx.shouldAttemptRefresh(
+            internals(ctx).controlPlaneExpiresAt - 10_000,
+          ),
+        ).toBe(false);
+      });
+
+      it("should record a non-transient error on invalid_grant without the revoked-token message", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        fetchStub
+          .onCall(3)
+          .resolves(new Response('{"error":"invalid_grant"}', { status: 400 }));
+
+        await ctx.refresh();
+
+        expect(ctx.getErrors().tokenRefresh!.isTransient).toBe(false);
+      });
+
+      it("should promote to non-transient after MAX_CONSECUTIVE_TRANSIENT_FAILURES", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        // 50 generic 500s back-to-back. Each refresh() call consumes one fetch
+        // (phase 1 fails and we return before phase 2).
+        for (let i = 0; i < MAX_CONSECUTIVE_TRANSIENT_FAILURES; i++) {
+          fetchStub
+            .onCall(3 + i)
+            .resolves(new Response("server error", { status: 500 }));
+          await ctx.refresh();
+        }
+
+        const err = ctx.getErrors().tokenRefresh;
+        expect(err).toBeDefined();
+        expect(err!.isTransient).toBe(false);
+      });
+
+      it("should clear the recorded error and reset the counter on a successful refresh", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        // First refresh fails transiently.
+        fetchStub
+          .onCall(3)
+          .resolves(new Response("server error", { status: 500 }));
+        await ctx.refresh();
+        expect(ctx.getErrors().tokenRefresh!.isTransient).toBe(true);
+
+        // Next refresh succeeds.
+        stubSuccessfulChain(
+          fetchStub,
+          4,
+          "new-refresh",
+          "new-id",
+          "new-cp",
+          "new-dp",
+        );
+        await ctx.refresh();
+
+        expect(ctx.getErrors().tokenRefresh).toBeUndefined();
+        // Counter reset is observable via the classifier: a new generic failure
+        // should be classified transient, not cascade from the prior counter.
+        fetchStub
+          .onCall(7)
+          .resolves(new Response("server error", { status: 500 }));
+        await ctx.refresh();
+        expect(ctx.getErrors().tokenRefresh!.isTransient).toBe(true);
+      });
+
+      it("should retry CP once on transient failure and succeed", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        stubAuth0OkAt(fetchStub, 3, "new-refresh", "new-id");
+        fetchStub
+          .onCall(4)
+          .resolves(new Response("bad gateway", { status: 502 }));
+        stubCpOkAt(fetchStub, 5, "retry-cp");
+        stubDpOkAt(fetchStub, 6, "new-dp");
+
+        await ctx.refresh();
+
+        expect(ctx.getControlPlaneToken()).toBe("retry-cp");
+        expect(ctx.getDataPlaneToken()).toBe("new-dp");
+        expect(ctx.getErrors().tokenRefresh).toBeUndefined();
+      });
+
+      it("should retry DP once on transient failure and succeed", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        stubAuth0OkAt(fetchStub, 3, "new-refresh", "new-id");
+        stubCpOkAt(fetchStub, 4, "new-cp");
+        fetchStub
+          .onCall(5)
+          .resolves(new Response("bad gateway", { status: 502 }));
+        stubDpOkAt(fetchStub, 6, "retry-dp");
+
+        await ctx.refresh();
+
+        expect(ctx.getDataPlaneToken()).toBe("retry-dp");
+        expect(ctx.getErrors().tokenRefresh).toBeUndefined();
+      });
+
+      it("should not retry phase-2 when the error is a known non-transient signal", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        stubAuth0OkAt(fetchStub, 3, "new-refresh", "new-id");
+        fetchStub
+          .onCall(4)
+          .resolves(
+            new Response(
+              '{"error":"invalid_grant","error_description":"Unknown or invalid refresh token."}',
+              { status: 400 },
+            ),
+          );
+
+        await ctx.refresh();
+
+        // Only the first CP call should have fired — no retry.
+        expect(fetchStub.callCount).toBe(5);
+        expect(ctx.getErrors().tokenRefresh!.isTransient).toBe(false);
       });
     });
   });

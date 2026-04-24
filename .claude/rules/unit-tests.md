@@ -47,12 +47,14 @@ paths:
 
 ## Design for Stubbing
 
-Vitest can only spy on **module exports that resolve to object properties**, not on ESM live
-bindings at runtime. This is inherent to the ESM spec — imports are sealed after evaluation.
+`vi.spyOn` mutates a property on a supplied object. It cannot retroactively intercept an ESM
+named import that another module already resolved: module namespaces are read-only from outside
+the defining module per the ECMAScript spec. This is a language-level constraint, not a Vitest
+limitation (Sinon had the same constraint).
 
-**Solutions:**
+**Solutions** (all of which make the dependency reachable via property lookup at call time):
 
-- Extract dependencies to separate modules
+- Extract dependencies to separate modules and export them as properties of a namespace object
 - Pass dependencies as parameters
 - Use namespace objects (see `node-deps.ts`, `authUtils` pattern) so callers access via property
   lookup instead of a bare named import
@@ -89,12 +91,37 @@ directly on the object without a wrapper.
 
 ### Other namespace-object patterns
 
-The same idea applies outside `node-deps.ts` — any exported free function that callers want to
+The same idea applies outside `node-deps.ts`: any exported free function that callers want to
 stub should live inside a namespace object. Example: `authUtils.generateApiKey` in
 `src/mcp/transports/auth.ts`. Tests spy via `vi.spyOn(authUtils, "generateApiKey")`.
 
-**Do not use `vi.mock`** as an escape hatch. It hoists above imports, loses type safety, and
-splits the project's stubbing mental model. If something can't be stubbed, wrap it first.
+### Why `vi.mock` is not used in this project
+
+`vi.spyOn` and `vi.mock` solve different problems. `vi.spyOn` is a runtime property mutation
+(the same class of operation as `sandbox.stub(obj, "method")` was under Sinon). `vi.mock`
+rewrites the module graph before imports resolve: it's hoisted above `import` statements,
+scoped to the file that calls it, and applies for the entire test file at once.
+
+The project settled on the `vi.spyOn` + namespace-object combination because it gives:
+
+- **Per-test granularity.** Each test installs exactly the spies it needs; `restoreMocks: true`
+  wipes them between tests. With `vi.mock`, mock identity is shared across the whole file and
+  per-test behavior changes still require `vi.mocked(fn).mockReturnValue(...)` calls anyway,
+  just with a file-header declaration on top.
+- **Type safety on the real boundary.** Spies land on the actual imported value, so if the
+  real module's API changes, TypeScript flags the test immediately. `vi.mock` factories drift
+  silently when the real module's shape changes.
+- **Accessor-mode spies for getters.** `vi.spyOn(obj, "prop", "get")` powers the `config.env`
+  and `buildConfig` patterns; there's no clean `vi.mock` equivalent for per-test value changes.
+- **No hoisting surprises.** Execution order in tests matches source order. `vi.mock` is
+  hoisted by the Vitest transformer, which can confuse readers trying to trace setup.
+- **Integration tests stay simple.** `*.integration.test.ts` files default to real I/O. A
+  file-scoped or setup-file `vi.mock` approach would invert that default, requiring explicit
+  `vi.unmock` calls in every integration test.
+
+Every dependency in this codebase that resists direct spying can be wrapped in a namespace
+object. **Do not reach for `vi.mock`** - if a new dependency seems to require it, wrap it in
+`node-deps.ts` or a similar namespace object and spy on the wrapper instead.
 
 ## Handler Tests
 

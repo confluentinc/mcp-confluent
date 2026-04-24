@@ -54,8 +54,17 @@ describe("TelemetryService", () => {
       .mockImplementation(() => {
         throw new Error("ENOENT");
       });
-    writeFileSyncStub = vi.spyOn(nodeDeps.fs, "writeFileSync");
-    mkdirSyncStub = vi.spyOn(nodeDeps.fs, "mkdirSync");
+    // safe defaults: no-op so the test never writes real files under
+    // /tmp/test-home when TelemetryService persists the machine ID. Per-test
+    // overrides (e.g. mkdirSync throwing EACCES) replace these.
+    writeFileSyncStub = vi
+      .spyOn(nodeDeps.fs, "writeFileSync")
+      .mockImplementation(() => undefined);
+    mkdirSyncStub = vi
+      .spyOn(nodeDeps.fs, "mkdirSync")
+      .mockImplementation(
+        () => undefined as ReturnType<typeof nodeDeps.fs.mkdirSync>,
+      );
     vi.spyOn(nodeDeps.os, "homedir").mockReturnValue("/tmp/test-home");
 
     // env stub (replaces Proxy that would throw before initEnv)

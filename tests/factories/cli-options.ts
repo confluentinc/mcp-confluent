@@ -3,7 +3,7 @@ import { TransportType } from "@src/mcp/transports/types.js";
 
 const BASE_CLI_OPTIONS: CLIOptions = {
   transports: [TransportType.STDIO],
-  kafkaConfig: {},
+
   envFile: undefined,
   config: undefined,
   allowTools: undefined,

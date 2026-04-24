@@ -1,0 +1,18 @@
+connections:
+  production:
+    type: direct
+    confluent_cloud:
+      endpoint: "https://api.confluent.cloud"
+      auth:
+        type: api_key
+        key: "mycloudkey"
+        secret: "mycloudsecret"
+    flink:
+      endpoint: "https://flink.confluent.cloud"
+      auth:
+        type: api_key
+        key: "myflinkkey"
+        secret: "myflinksecret"
+      environment_id: "env-abc123"
+      organization_id: "org-xyz789"
+      compute_pool_id: "lfcp-pool01"

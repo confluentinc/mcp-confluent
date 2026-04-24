@@ -16,3 +16,6 @@ export const CONTROL_PLANE_REFRESH_WINDOW_MS = 30 * 1000;
 /** Default auto-refresh interval — CP lifetime minus the refresh window. */
 export const DEFAULT_REFRESH_INTERVAL_MS =
   CONTROL_PLANE_TOKEN_LIFETIME_MS - CONTROL_PLANE_REFRESH_WINDOW_MS;
+
+/** Failure count at which the auth context is flagged as permanently failed. */
+export const MAX_CONSECUTIVE_TRANSIENT_FAILURES = 50;

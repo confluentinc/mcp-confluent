@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 
 type EnvInput = Parameters<typeof consConfigFromEnv>[0];
 
-/** Returns a fully-populated env object with every known key set to undefined, overridden by the provided values. */
+/** Returns a fully-populated env object with connection vars undefined and server vars at envSchema defaults, overridden by the provided values. */
 function envWith(overrides: Partial<EnvInput> = {}): EnvInput {
   return {
+    // Connection vars — all optional, so undefined is valid
     BOOTSTRAP_SERVERS: undefined,
     KAFKA_API_KEY: undefined,
     KAFKA_API_SECRET: undefined,
@@ -31,6 +32,16 @@ function envWith(overrides: Partial<EnvInput> = {}): EnvInput {
     TELEMETRY_ENDPOINT: undefined,
     TELEMETRY_API_KEY: undefined,
     TELEMETRY_API_SECRET: undefined,
+    // Server vars — non-optional in Environment (have envSchema defaults), so must be provided
+    LOG_LEVEL: "info",
+    HTTP_PORT: 8080,
+    HTTP_HOST: "127.0.0.1",
+    HTTP_MCP_ENDPOINT_PATH: "/mcp",
+    SSE_MCP_ENDPOINT_PATH: "/sse",
+    SSE_MCP_MESSAGE_ENDPOINT_PATH: "/messages",
+    MCP_API_KEY: undefined,
+    MCP_AUTH_DISABLED: false,
+    MCP_ALLOWED_HOSTS: ["localhost", "127.0.0.1"],
     ...overrides,
   };
 }
@@ -508,6 +519,135 @@ describe("config/env-config.ts", () => {
         expect(() =>
           consConfigFromEnv(envWith({ TABLEFLOW_API_SECRET: "tfsecret" })),
         ).toThrow(/TABLEFLOW_API_KEY/);
+      });
+    });
+
+    describe("server block env vars", () => {
+      it("should populate server.log_level from LOG_LEVEL", () => {
+        const config = consConfigFromEnv(
+          envWith({ BOOTSTRAP_SERVERS: "localhost:9092", LOG_LEVEL: "debug" }),
+        );
+        expect(config.server.log_level).toBe("debug");
+      });
+
+      it("should populate server.http.port from HTTP_PORT", () => {
+        const config = consConfigFromEnv(
+          envWith({ BOOTSTRAP_SERVERS: "localhost:9092", HTTP_PORT: 9090 }),
+        );
+        expect(config.server.http.port).toBe(9090);
+      });
+
+      it("should populate server.http.host from HTTP_HOST", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            BOOTSTRAP_SERVERS: "localhost:9092",
+            HTTP_HOST: "0.0.0.0",
+          }),
+        );
+        expect(config.server.http.host).toBe("0.0.0.0");
+      });
+
+      it("should populate server.http.mcp_endpoint from HTTP_MCP_ENDPOINT_PATH", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            BOOTSTRAP_SERVERS: "localhost:9092",
+            HTTP_MCP_ENDPOINT_PATH: "/custom-mcp",
+          }),
+        );
+        expect(config.server.http.mcp_endpoint).toBe("/custom-mcp");
+      });
+
+      it("should populate server.http.sse_endpoint from SSE_MCP_ENDPOINT_PATH", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            BOOTSTRAP_SERVERS: "localhost:9092",
+            SSE_MCP_ENDPOINT_PATH: "/custom-sse",
+          }),
+        );
+        expect(config.server.http.sse_endpoint).toBe("/custom-sse");
+      });
+
+      it("should populate server.http.sse_message_endpoint from SSE_MCP_MESSAGE_ENDPOINT_PATH", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            BOOTSTRAP_SERVERS: "localhost:9092",
+            SSE_MCP_MESSAGE_ENDPOINT_PATH: "/custom-messages",
+          }),
+        );
+        expect(config.server.http.sse_message_endpoint).toBe(
+          "/custom-messages",
+        );
+      });
+
+      it("should populate server.auth.api_key from MCP_API_KEY when set", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            BOOTSTRAP_SERVERS: "localhost:9092",
+            MCP_API_KEY: "a".repeat(32),
+          }),
+        );
+        expect(config.server.auth.api_key).toBe("a".repeat(32));
+      });
+
+      it("should leave server.auth.api_key undefined when MCP_API_KEY is not set", () => {
+        const config = consConfigFromEnv(
+          envWith({ BOOTSTRAP_SERVERS: "localhost:9092" }),
+        );
+        expect(config.server.auth.api_key).toBeUndefined();
+      });
+
+      it("should populate server.auth.disabled from MCP_AUTH_DISABLED", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            BOOTSTRAP_SERVERS: "localhost:9092",
+            MCP_AUTH_DISABLED: true,
+          }),
+        );
+        expect(config.server.auth.disabled).toBe(true);
+      });
+
+      it("should populate server.auth.allowed_hosts from MCP_ALLOWED_HOSTS", () => {
+        const config = consConfigFromEnv(
+          envWith({
+            BOOTSTRAP_SERVERS: "localhost:9092",
+            MCP_ALLOWED_HOSTS: ["example.com", "api.example.com"],
+          }),
+        );
+        expect(config.server.auth.allowed_hosts).toEqual([
+          "example.com",
+          "api.example.com",
+        ]);
+      });
+
+      it("should reflect envSchema defaults when no server vars are overridden", () => {
+        const config = consConfigFromEnv(
+          envWith({ BOOTSTRAP_SERVERS: "localhost:9092" }),
+        );
+        expect(config.server.log_level).toBe("info");
+        expect(config.server.http.port).toBe(8080);
+        expect(config.server.http.host).toBe("127.0.0.1");
+        expect(config.server.http.mcp_endpoint).toBe("/mcp");
+        expect(config.server.http.sse_endpoint).toBe("/sse");
+        expect(config.server.http.sse_message_endpoint).toBe("/messages");
+        expect(config.server.auth.disabled).toBe(false);
+        expect(config.server.auth.allowed_hosts).toEqual([
+          "localhost",
+          "127.0.0.1",
+        ]);
+      });
+
+      it("should throw when MCP_AUTH_DISABLED:true and MCP_API_KEY are both set", () => {
+        expect(() =>
+          consConfigFromEnv(
+            envWith({
+              BOOTSTRAP_SERVERS: "localhost:9092",
+              MCP_AUTH_DISABLED: true,
+              MCP_API_KEY: "a".repeat(32),
+            }),
+          ),
+        ).toThrow(
+          /Failed to construct MCPServerConfiguration from environment variables/,
+        );
       });
     });
 

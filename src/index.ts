@@ -188,7 +188,6 @@ async function main() {
 
     // Convert our known env vars into a typed Environment obj.
     const env = initEnv();
-    setLogLevel(env.LOG_LEVEL);
 
     let mcpConfig: MCPServerConfiguration;
     // Load and validate configuration — from YAML file if --config provided, else from env vars.
@@ -201,6 +200,8 @@ async function main() {
         mcpConfig.setKafkaExtraProperties(cliOptions.kafkaConfig);
       }
     }
+
+    setLogLevel(mcpConfig.server.log_level);
 
     logger.info(
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
@@ -274,10 +275,12 @@ async function main() {
       );
     });
 
-    // Prepare auth configuration
-    const disableAuth = cliOptions.disableAuth || env.MCP_AUTH_DISABLED;
-    const allowedHosts = cliOptions.allowedHosts || env.MCP_ALLOWED_HOSTS;
-    const apiKey = env.MCP_API_KEY;
+    // Prepare auth configuration — CLI flags take precedence over config file.
+    const disableAuth =
+      cliOptions.disableAuth || mcpConfig.server.auth.disabled;
+    const allowedHosts =
+      cliOptions.allowedHosts ?? mcpConfig.server.auth.allowed_hosts;
+    const apiKey = mcpConfig.server.auth.api_key;
 
     // Warn if auth is disabled
     if (disableAuth) {
@@ -297,11 +300,11 @@ async function main() {
     logger.info(`Starting transports: ${cliOptions.transports.join(", ")}`);
     await transportManager.start(
       cliOptions.transports,
-      env.HTTP_PORT,
-      env.HTTP_HOST,
-      env.HTTP_MCP_ENDPOINT_PATH,
-      env.SSE_MCP_ENDPOINT_PATH,
-      env.SSE_MCP_MESSAGE_ENDPOINT_PATH,
+      mcpConfig.server.http.port,
+      mcpConfig.server.http.host,
+      mcpConfig.server.http.mcp_endpoint,
+      mcpConfig.server.http.sse_endpoint,
+      mcpConfig.server.http.sse_message_endpoint,
     );
 
     // Set up cleanup handlers

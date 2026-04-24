@@ -1,4 +1,5 @@
 import { validateBootstrapServers } from "@src/config/validation.js";
+import { logLevels } from "@src/logger.js";
 import { z } from "zod";
 
 /**
@@ -79,10 +80,17 @@ export type ConnectionConfig = DirectConnectionConfig;
  * Validated and constructed from parsed YAML via {@link mcpConfigSchema}.
  */
 export class MCPServerConfiguration {
-  connections: Record<string, ConnectionConfig>;
+  readonly connections: Record<string, ConnectionConfig>;
+  readonly server: ServerConfig;
 
-  constructor(data: { connections: Record<string, ConnectionConfig> }) {
+  constructor(data: {
+    connections: Record<string, ConnectionConfig>;
+    server?: ServerConfig;
+  }) {
     this.connections = data.connections;
+    // DEFAULT_SERVER_CONFIG is declared after the schemas below; it is always
+    // initialized before any MCPServerConfiguration instance is created at runtime.
+    this.server = data.server ?? DEFAULT_SERVER_CONFIG;
   }
 
   /**
@@ -446,6 +454,71 @@ const connectionConfigSchema = z
     } as ConnectionConfig;
   });
 
+// Server block schemas. Defaults are applied at each level so that omitting the
+// entire `server` block (or any sub-block) from YAML yields a fully-populated
+// ServerConfig with all fields set. MCPServerConfiguration.server is therefore
+// always non-optional and carries all operational settings.
+
+const serverHttpConfigSchema = z
+  .object({
+    port: z.number().int().positive().default(8080),
+    host: z.string().default("127.0.0.1"),
+    mcp_endpoint: z.string().default("/mcp"),
+    sse_endpoint: z.string().default("/sse"),
+    sse_message_endpoint: z.string().default("/messages"),
+  })
+  .strict();
+
+const serverAuthConfigSchema = z
+  .object({
+    api_key: z
+      .string()
+      .min(32, "server.auth.api_key must be at least 32 characters")
+      .optional(),
+    disabled: z.boolean().default(false),
+    allowed_hosts: z.array(z.string()).default(["localhost", "127.0.0.1"]),
+  })
+  .strict()
+  .refine((auth) => !(auth.disabled === true && auth.api_key !== undefined), {
+    message:
+      "server.auth.disabled and server.auth.api_key cannot both be set — remove the api_key or set disabled: false",
+  });
+
+// Zod v4 requires .default() to receive a value (or factory) matching the schema's
+// output type. Since each sub-schema's output type has required fields (those with
+// their own .default() calls), we use factory functions so Zod resolves field-level
+// defaults lazily through the schema itself rather than requiring a full literal here.
+const serverConfigSchema = z
+  .object({
+    log_level: z
+      .enum(
+        Object.keys(logLevels) as [
+          keyof typeof logLevels,
+          ...Array<keyof typeof logLevels>,
+        ],
+      )
+      .default("info"),
+    http: serverHttpConfigSchema.default(() =>
+      serverHttpConfigSchema.parse({}),
+    ),
+    auth: serverAuthConfigSchema.default(() =>
+      serverAuthConfigSchema.parse({}),
+    ),
+  })
+  .strict();
+
+/** Fully-resolved server configuration; all fields are populated (api_key excepted). */
+export type ServerConfig = z.infer<typeof serverConfigSchema>;
+export type ServerHttpConfig = z.infer<typeof serverHttpConfigSchema>;
+export type ServerAuthConfig = z.infer<typeof serverAuthConfigSchema>;
+
+/**
+ * The default server configuration produced when no `server` block is present in YAML
+ * or when MCPServerConfiguration is constructed without an explicit server argument.
+ * Derived from serverConfigSchema defaults — single source of truth.
+ */
+export const DEFAULT_SERVER_CONFIG: ServerConfig = serverConfigSchema.parse({});
+
 /**
  * Root configuration schema. This is the single validation and normalisation
  * entry point shared by both configuration paths: YAML files (via
@@ -467,6 +540,7 @@ export const mcpConfigSchema = z
         (connections) => Object.keys(connections).length === 1,
         "Exactly one connection must be defined (multiple connections not yet supported)",
       ),
+    server: serverConfigSchema.default(() => DEFAULT_SERVER_CONFIG),
   })
   .strict();
 

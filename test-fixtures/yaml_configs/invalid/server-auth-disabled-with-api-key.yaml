@@ -1,0 +1,10 @@
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "localhost:9092"
+
+server:
+  auth:
+    disabled: true
+    api_key: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

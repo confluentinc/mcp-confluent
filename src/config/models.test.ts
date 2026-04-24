@@ -323,6 +323,120 @@ describe("config/models.ts", () => {
     });
   });
 
+  describe("server block", () => {
+    const validConnection = {
+      type: "direct" as const,
+      kafka: { bootstrap_servers: "broker:9092" },
+    };
+
+    it("should apply default server config when server block is omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.log_level).toBe("info");
+        expect(result.data.server.http.port).toBe(8080);
+        expect(result.data.server.http.host).toBe("127.0.0.1");
+        expect(result.data.server.auth.disabled).toBe(false);
+        expect(result.data.server.auth.allowed_hosts).toEqual([
+          "localhost",
+          "127.0.0.1",
+        ]);
+      }
+    });
+
+    it("should accept a full server block with all fields", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: {
+          log_level: "debug",
+          http: {
+            port: 9090,
+            host: "0.0.0.0",
+            mcp_endpoint: "/mcp",
+            sse_endpoint: "/sse",
+            sse_message_endpoint: "/messages",
+          },
+          auth: {
+            api_key: "a".repeat(32),
+            disabled: false,
+            allowed_hosts: ["localhost", "example.com"],
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server?.log_level).toBe("debug");
+        expect(result.data.server?.http?.port).toBe(9090);
+        expect(result.data.server?.auth?.api_key).toBe("a".repeat(32));
+        expect(result.data.server?.auth?.allowed_hosts).toEqual([
+          "localhost",
+          "example.com",
+        ]);
+      }
+    });
+
+    it.each(["server", "server.http", "server.auth"])(
+      "should reject unknown keys in the %s block",
+      (block) => {
+        const serverPayload: Record<string, unknown> = {
+          server: { bogus: 1 },
+          "server.http": { http: { bogus: 1 } },
+          "server.auth": { auth: { bogus: 1 } },
+        }[block]!;
+        const result = mcpConfigSchema.safeParse({
+          connections: { production: validConnection },
+          server: serverPayload,
+        });
+        expect(result.success).toBe(false);
+      },
+    );
+
+    it("should reject server.auth.api_key shorter than 32 characters", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { auth: { api_key: "short" } },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatZodIssues(result.error.issues)).toMatch(/32/);
+      }
+    });
+
+    it("should reject server.auth when disabled:true and api_key are both set", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { auth: { disabled: true, api_key: "a".repeat(32) } },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept server.auth with disabled:true and no api_key", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { auth: { disabled: true } },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept server.auth with api_key only (no disabled field)", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { auth: { api_key: "a".repeat(32) } },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject an invalid server.log_level value", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { log_level: "verbose" },
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe("confluent_cloud block", () => {
     const baseCC = {
       auth: { type: "api_key" as const, key: "k", secret: "s" },

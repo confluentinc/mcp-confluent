@@ -4,6 +4,7 @@ import {
   TelemetryEvent,
   TelemetryService,
 } from "@src/confluent/telemetry.js";
+import { mockEnv } from "@tests/stubs/index.js";
 import {
   afterEach,
   beforeEach,
@@ -37,13 +38,15 @@ describe("TelemetryService", () => {
     analyticsConstructorStub.mockImplementation(function MockAnalytics(
       this: unknown,
     ) {
+      // Real Analytics has many methods; the service only calls these three,
+      // so we return a partial and cast through `unknown` rather than stub
+      // the rest of the surface.
       return {
         track: trackStub,
         identify: identifyStub,
         closeAndFlush: closeAndFlushStub,
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+      } as unknown as InstanceType<typeof nodeDeps.segment.Analytics>;
+    });
 
     // node builtin stubs (via wrapper for ESM compatibility)
     readFileSyncStub = vi
@@ -56,10 +59,7 @@ describe("TelemetryService", () => {
     vi.spyOn(nodeDeps.os, "homedir").mockReturnValue("/tmp/test-home");
 
     // env stub (replaces Proxy that would throw before initEnv)
-    vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue({
-      DO_NOT_TRACK: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    mockEnv({ DO_NOT_TRACK: false });
 
     // default: no built-in write key (simulates unpacked/dev build)
     vi.spyOn(
@@ -136,10 +136,7 @@ describe("TelemetryService", () => {
 
     it("should be disabled when DO_NOT_TRACK is true, even with a valid write key", () => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
-      vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue({
-        DO_NOT_TRACK: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+      mockEnv({ DO_NOT_TRACK: true });
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
@@ -193,10 +190,7 @@ describe("TelemetryService", () => {
 
     it("should skip identify calls when telemetry is disabled", () => {
       TelemetryService["instance"] = undefined;
-      vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue({
-        DO_NOT_TRACK: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+      mockEnv({ DO_NOT_TRACK: true });
 
       const disabled = TelemetryService.getInstance();
       disabled.identify("user-123", { org: "acme" });

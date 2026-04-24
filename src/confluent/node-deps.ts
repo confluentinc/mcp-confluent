@@ -17,4 +17,9 @@ export const path = { join, resolve };
 export const segment = { Analytics };
 export const config = { env: envProxy };
 export const nodeFetch = { fetch: globalThis.fetch };
-export const nodeCrypto = { randomBytes };
+// Wrapped as a single-signature arrow so spies don't have to disambiguate
+// between the sync and callback overloads of the underlying `node:crypto`
+// `randomBytes`. The codebase only uses the sync form.
+export const nodeCrypto = {
+  randomBytes: (size: number): Buffer => randomBytes(size),
+};

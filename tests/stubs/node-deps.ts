@@ -1,21 +1,28 @@
 import * as nodeDeps from "@src/confluent/node-deps.js";
-import { type Mock, vi } from "vitest";
+import { type MockInstance, vi } from "vitest";
 
 /**
- * Mocked {@link nodeDeps.fs} wrapper methods. Spies are auto-restored by
- * the `restoreMocks: true` setting in `vitest.config.ts`.
+ * Spies installed on every fs wrapper method in {@linkcode nodeDeps.fs}.
+ * Auto-restored between tests by the `restoreMocks: true` setting in
+ * `vitest.config.ts`.
+ *
+ * Note: each entry is a {@linkcode vi.spyOn} result that **calls through to
+ * the real implementation by default**. Tests must call `.mockReturnValue`
+ * (or similar) to override behavior; otherwise the wrapped fs primitive
+ * runs against the real filesystem.
  */
 export type MockedFsWrappers = {
-  existsSync: Mock;
-  readFileSync: Mock;
-  writeFileSync: Mock;
-  mkdirSync: Mock;
+  existsSync: MockInstance<typeof nodeDeps.fs.existsSync>;
+  readFileSync: MockInstance<typeof nodeDeps.fs.readFileSync>;
+  writeFileSync: MockInstance<typeof nodeDeps.fs.writeFileSync>;
+  mkdirSync: MockInstance<typeof nodeDeps.fs.mkdirSync>;
 };
 
 /**
- * Replaces all fs wrapper methods in {@linkcode nodeDeps.fs} with
- * {@linkcode vi.fn} spies. Tests can tune each spy's behavior with
- * `mockReturnValue`, `mockImplementation`, etc.
+ * Installs {@linkcode vi.spyOn} on each fs wrapper method.
+ *
+ * The returned spies are call-through by default; configure each spy with
+ * `mockReturnValue` / `mockImplementation` in the test to control behavior.
  *
  * @example
  * ```ts
@@ -30,35 +37,21 @@ export function createFsWrappers(): MockedFsWrappers {
     readFileSync: vi.spyOn(nodeDeps.fs, "readFileSync"),
     writeFileSync: vi.spyOn(nodeDeps.fs, "writeFileSync"),
     mkdirSync: vi.spyOn(nodeDeps.fs, "mkdirSync"),
-  } as MockedFsWrappers;
+  };
 }
 
-/** Mocked {@linkcode nodeDeps.nodeFetch} wrapper. */
-export type MockedFetchWrapper = {
-  fetch: Mock;
-};
-
 /**
- * Replaces the fetch wrapper in {@linkcode nodeDeps.nodeFetch} with a
- * {@linkcode vi.fn} spy.
+ * Spy on the env-proxy getter ({@linkcode nodeDeps.config.env}) and return
+ * the supplied partial as the full env object. Lets tests express only the
+ * env vars they actually care about without listing every other field.
+ *
+ * @example
+ * ```ts
+ * mockEnv({ DO_NOT_TRACK: true });
+ * ```
  */
-export function createFetchWrapper(): MockedFetchWrapper {
-  return {
-    fetch: vi.spyOn(nodeDeps.nodeFetch, "fetch"),
-  } as MockedFetchWrapper;
-}
-
-/** Mocked {@linkcode nodeDeps.nodeCrypto} wrapper. */
-export type MockedCryptoWrapper = {
-  randomBytes: Mock;
-};
-
-/**
- * Replaces the crypto wrapper in {@linkcode nodeDeps.nodeCrypto} with a
- * {@linkcode vi.fn} spy.
- */
-export function createCryptoWrapper(): MockedCryptoWrapper {
-  return {
-    randomBytes: vi.spyOn(nodeDeps.nodeCrypto, "randomBytes"),
-  } as MockedCryptoWrapper;
+export function mockEnv(overrides: Partial<typeof nodeDeps.config.env>): void {
+  vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue(
+    overrides as unknown as typeof nodeDeps.config.env,
+  );
 }

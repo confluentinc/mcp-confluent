@@ -1,5 +1,6 @@
+import { nodeCrypto } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
-import { randomBytes, timingSafeEqual } from "crypto";
+import { timingSafeEqual } from "crypto";
 import { FastifyReply, FastifyRequest } from "fastify";
 
 /**
@@ -15,19 +16,17 @@ export interface AuthConfig {
 }
 
 /**
- * Auth utilities exposed through a namespace object so tests can stub
- * individual members via {@linkcode vi.spyOn} — a free-function export
- * would be an ESM live binding that can't be stubbed after import.
+ * Generates a cryptographically secure random API key.
+ *
+ * Uses {@linkcode nodeCrypto.randomBytes} (rather than a direct `crypto` import)
+ * so tests can swap the primitive via `vi.spyOn(nodeCrypto, "randomBytes")`
+ * to assert deterministic output.
+ *
+ * @returns 64-character hex string
  */
-export const authUtils = {
-  /**
-   * Generates a cryptographically secure random API key.
-   * @returns 64-character hex string
-   */
-  generateApiKey(): string {
-    return randomBytes(32).toString("hex");
-  },
-};
+export function generateApiKey(): string {
+  return nodeCrypto.randomBytes(32).toString("hex");
+}
 
 /**
  * Timing-safe comparison of API keys to prevent timing attacks

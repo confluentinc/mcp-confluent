@@ -1,4 +1,3 @@
-import { nodeFetch } from "@src/confluent/node-deps.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
   exchangeAuthCodeForTokens,
@@ -11,14 +10,8 @@ import {
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type MockInstance,
-  vi,
-} from "vitest";
+import { mockFetch, type MockedFetch } from "@tests/stubs/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 
 function jsonResponse(body: object, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -28,10 +21,10 @@ function jsonResponse(body: object, status = 200): Response {
 }
 
 describe("oauth/token-chain.ts", () => {
-  let fetchSpy: MockInstance<typeof nodeFetch.fetch>;
+  let fetchSpy: MockedFetch;
 
   beforeEach(() => {
-    fetchSpy = vi.spyOn(nodeFetch, "fetch");
+    fetchSpy = mockFetch();
   });
 
   describe("exchangeAuthCodeForTokens", () => {

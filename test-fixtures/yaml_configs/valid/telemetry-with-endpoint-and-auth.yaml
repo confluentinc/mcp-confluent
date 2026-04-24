@@ -1,0 +1,9 @@
+connections:
+  production:
+    type: direct
+    telemetry:
+      endpoint: "https://api.telemetry.confluent.cloud"
+      auth:
+        type: api_key
+        key: "mytelemetrykey"
+        secret: "mytelemetrysecret"

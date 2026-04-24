@@ -1,0 +1,9 @@
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "broker.confluent.cloud:9092"
+      auth:
+        type: api_key
+        key: ""
+        secret: "mykafkasecret"

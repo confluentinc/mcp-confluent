@@ -155,7 +155,17 @@ Flat environment variables can only express a single implicit connection. A YAML
 
 #### Configuration examples
 
-Browse [test-fixtures/yaml_configs/valid/](test-fixtures/yaml_configs/valid/) for working examples covering a range of configurations. These files are executed as part of the test suite on every CI run, so they are always valid and current — use them as your starting point.
+Start from [`config.example.yaml`](config.example.yaml) at the repo root — it is the YAML analogue of `.env.example`, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) annotated and wired up with `${VAR}` placeholders so credentials stay in your environment.
+
+Copy it to `config.yaml` at the repo root and the `.gitignore` will keep your filled-in copy out of git — every `*.yaml`/`*.yml` file at the repo root is ignored by default unless explicitly allow-listed, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
+
+```bash
+cp config.example.yaml config.yaml
+# edit config.yaml, then:
+npx @confluentinc/mcp-confluent --config ./config.yaml
+```
+
+For more focused reference snippets, browse [test-fixtures/yaml_configs/valid/](test-fixtures/yaml_configs/valid/) — these files are executed as part of the test suite on every CI run, so they are always valid and current.
 
 #### Env-var interpolation in YAML
 

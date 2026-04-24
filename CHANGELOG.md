@@ -12,7 +12,8 @@ All notable changes to this MCP server will be documented in this file.
 ### Added
 
 - Configuration via YAML file.
-	- Details go here eventually.
+  - Details go here eventually.
+- `config.example.yaml` template for YAML-based configuration. Users copy it to `config.yaml` to use; `.gitignore` rules for `/*.yaml` and `/*.yml` (with explicit allow-rules for currently-tracked root files) keep personal configs and any other accidental root-level yaml out of git.
 
 ## 1.2.1
 

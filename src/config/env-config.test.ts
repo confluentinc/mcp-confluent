@@ -249,7 +249,7 @@ describe("config/env-config.ts", () => {
         );
       });
 
-      it("should not create a confluent_cloud block when only CONFLUENT_CLOUD_REST_ENDPOINT is set (no credentials)", () => {
+      it("should omit confluent_cloud block when endpoint is set without credentials", () => {
         const config = consConfigFromEnv(
           envWith({
             BOOTSTRAP_SERVERS: "broker:9092",

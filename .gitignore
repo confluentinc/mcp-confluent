@@ -156,3 +156,6 @@ connector-config.json
 
 # GSD planning directory
 .planning
+
+# Local git worktrees for isolated feature work
+.worktrees/

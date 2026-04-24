@@ -151,10 +151,10 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
   factories live in `tests/factories/`.
 - ESM named imports are read-only from outside the defining module per the ECMAScript spec, so
   `vi.spyOn` can't intercept a `import { readFileSync } from "node:fs"` at a call site. The
-  project's convention is to wrap such dependencies in a namespace object so callers access
-  them via property lookup: see `src/confluent/node-deps.ts` for Node builtins, third-party
-  constructors, and env access, and `authUtils` in `src/mcp/transports/auth.ts` for
-  project-local free functions.
+  project's convention is to route such dependencies through `src/confluent/node-deps.ts` so
+  callers access them via property lookup, and tests spy on those properties. Project-local
+  helpers that compose around already-wrapped primitives don't need their own namespace object;
+  tests stub the underlying primitive instead.
 - **`vi.mock` is not used in this project, by design.** It's a different mechanism from
   `vi.spyOn` (module graph rewrite vs. runtime property mutation) and the tradeoffs go the
   wrong way for this codebase: file-scoped mock state instead of per-test granularity, reduced

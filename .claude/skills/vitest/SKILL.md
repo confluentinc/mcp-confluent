@@ -39,7 +39,7 @@ Base URL: `https://vitest.dev`
    - CLI flag / runner behavior → `/guide/cli`
 
 2. **Check project rules first** - read `.claude/rules/unit-tests.md` before fetching. It already
-   documents: `restoreMocks: true` behavior, the `node-deps.ts` / `authUtils` namespace pattern,
+   documents: `restoreMocks: true` behavior, the `node-deps.ts` namespace pattern,
    `createMockInstance`, constructor-stub gotchas, and the `vi.mock` anti-pattern. Don't re-explain
    these; cite the rule and only fetch docs for anything beyond it.
 
@@ -121,8 +121,8 @@ Base URL: `https://vitest.dev`
 
 - **Don't use `vi.mock`**: it hoists above imports, loses type safety, and splits the project's
   stubbing model. If a dependency can't be spied on, wrap it in a namespace object (see
-  `node-deps.ts`, `authUtils` in `src/mcp/transports/auth.ts`). Full rationale in
-  `.claude/rules/unit-tests.md` §Design for Stubbing.
+  `src/confluent/node-deps.ts`). Full rationale in `.claude/rules/unit-tests.md` §Why `vi.mock`
+  is not used in this project.
 - **Don't add `afterEach` restore blocks**: `restoreMocks: true` in `vitest.config.ts` handles it.
 - **Don't use arrow functions for constructor mocks**: arrows aren't constructable. Use a regular
   `function` with `vi.spyOn(ns, "Ctor").mockImplementation(function () { return {...}; })`.

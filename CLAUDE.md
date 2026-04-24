@@ -79,13 +79,12 @@ test-writing rule (assertions, stubbing patterns, handler test structure, fake t
 below affect source-code edits too, so they're called out here:
 
 - **Design for stubbing.** External I/O (filesystem, env, network not mediated by `openapi-fetch`
-  or Kafka clients, third-party constructors) must route through a namespace object so tests
-  can spy on property lookups. `src/confluent/node-deps.ts` is the canonical example;
-  `authUtils` in `src/mcp/transports/auth.ts` is the pattern for project-local free functions.
-  Extend those before importing stubbable primitives at use sites. This is an ECMAScript-level
+  or Kafka clients, third-party constructors) must route through `src/confluent/node-deps.ts`
+  so tests can spy on property lookups rather than ESM named imports. Extend that namespace
+  before importing stubbable primitives directly at use sites. This is an ECMAScript-level
   constraint: ESM named imports are read-only from outside the defining module, so `vi.spyOn`
   can't intercept them directly. `vi.mock` is not used in this project; wrap the dependency
-  and spy on the wrapper instead (rationale in `.claude/rules/unit-tests.md`).
+  in `node-deps.ts` and spy on the wrapper instead (rationale in `.claude/rules/unit-tests.md`).
 - For handler-style tests that need a stubbed class instance, use `createMockInstance(Class)`
   from `@tests/stubs/index.js`; it returns a `Mocked<T>` with every method pre-stubbed as
   `vi.fn()`.

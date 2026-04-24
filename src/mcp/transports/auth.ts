@@ -1,5 +1,6 @@
+import { nodeCrypto } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
-import { randomBytes, timingSafeEqual } from "crypto";
+import { timingSafeEqual } from "crypto";
 import { FastifyReply, FastifyRequest } from "fastify";
 
 /**
@@ -15,11 +16,16 @@ export interface AuthConfig {
 }
 
 /**
- * Generates a cryptographically secure random API key
+ * Generates a cryptographically secure random API key.
+ *
+ * Uses {@linkcode nodeCrypto.randomBytes} (rather than a direct `crypto` import)
+ * so tests can swap the primitive via `vi.spyOn(nodeCrypto, "randomBytes")`
+ * to assert deterministic output.
+ *
  * @returns 64-character hex string
  */
 export function generateApiKey(): string {
-  return randomBytes(32).toString("hex");
+  return nodeCrypto.randomBytes(32).toString("hex");
 }
 
 /**

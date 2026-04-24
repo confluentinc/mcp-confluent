@@ -4,62 +4,75 @@ import {
   TelemetryEvent,
   TelemetryService,
 } from "@src/confluent/telemetry.js";
-import sinon from "sinon";
-import { afterEach, beforeEach, describe, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  type MockInstance,
+  vi,
+} from "vitest";
 
 describe("TelemetryService", () => {
-  let sandbox: sinon.SinonSandbox;
-
-  let trackStub: sinon.SinonStub;
-  let identifyStub: sinon.SinonStub;
-  let closeAndFlushStub: sinon.SinonStub;
-  let analyticsConstructorStub: sinon.SinonStub;
-  let readFileSyncStub: sinon.SinonStub;
-  let writeFileSyncStub: sinon.SinonStub;
-  let mkdirSyncStub: sinon.SinonStub;
-  let stubbedEnvVars: sinon.SinonStub;
-  let stubbedBuildConfig: sinon.SinonStub;
+  let trackStub: Mock;
+  let identifyStub: Mock;
+  let closeAndFlushStub: Mock;
+  let analyticsConstructorStub: MockInstance<
+    (typeof nodeDeps.segment)["Analytics"]
+  >;
+  let readFileSyncStub: MockInstance<typeof nodeDeps.fs.readFileSync>;
+  let writeFileSyncStub: MockInstance<typeof nodeDeps.fs.writeFileSync>;
+  let mkdirSyncStub: MockInstance<typeof nodeDeps.fs.mkdirSync>;
 
   beforeEach(() => {
-    sandbox = sinon.createSandbox();
-
     // analytics stubs (via wrapper for ESM compatibility)
-    trackStub = sandbox.stub();
-    identifyStub = sandbox.stub();
-    closeAndFlushStub = sandbox.stub().resolves(undefined);
-    analyticsConstructorStub = sandbox
-      .stub(nodeDeps.segment, "Analytics")
-      .returns({
+    trackStub = vi.fn();
+    identifyStub = vi.fn();
+    closeAndFlushStub = vi.fn().mockResolvedValue(undefined);
+    // `new segment.Analytics(...)` requires a constructable function —
+    // arrow functions can't be called with `new`.
+    analyticsConstructorStub = vi.spyOn(nodeDeps.segment, "Analytics");
+    analyticsConstructorStub.mockImplementation(function MockAnalytics(
+      this: unknown,
+    ) {
+      return {
         track: trackStub,
         identify: identifyStub,
         closeAndFlush: closeAndFlushStub,
-      });
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     // node builtin stubs (via wrapper for ESM compatibility)
-    readFileSyncStub = sandbox
-      .stub(nodeDeps.fs, "readFileSync")
-      .throws(new Error("ENOENT"));
-    writeFileSyncStub = sandbox.stub(nodeDeps.fs, "writeFileSync");
-    mkdirSyncStub = sandbox.stub(nodeDeps.fs, "mkdirSync");
-    sandbox.stub(nodeDeps.os, "homedir").returns("/tmp/test-home");
+    readFileSyncStub = vi
+      .spyOn(nodeDeps.fs, "readFileSync")
+      .mockImplementation(() => {
+        throw new Error("ENOENT");
+      });
+    writeFileSyncStub = vi.spyOn(nodeDeps.fs, "writeFileSync");
+    mkdirSyncStub = vi.spyOn(nodeDeps.fs, "mkdirSync");
+    vi.spyOn(nodeDeps.os, "homedir").mockReturnValue("/tmp/test-home");
 
     // env stub (replaces Proxy that would throw before initEnv)
-    stubbedEnvVars = sandbox.stub(nodeDeps.config, "env");
-    stubbedEnvVars.value({ DO_NOT_TRACK: false });
+    vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue({
+      DO_NOT_TRACK: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     // default: no built-in write key (simulates unpacked/dev build)
-    stubbedBuildConfig = sandbox.stub(
+    vi.spyOn(
       nodeDeps.buildConfig,
       "TELEMETRY_WRITE_KEY",
-    );
-    stubbedBuildConfig.value("");
+      "get",
+    ).mockReturnValue("");
 
     TelemetryService["instance"] = undefined;
   });
 
   afterEach(() => {
-    sandbox.restore();
-    // not managed by the sandbox, so clean up manually to avoid affecting other tests
+    // not managed by restoreMocks, so clean up manually to avoid affecting other tests
     delete process.env.TELEMETRY_WRITE_KEY;
   });
 
@@ -72,37 +85,43 @@ describe("TelemetryService", () => {
         toolName: "list_topics",
       });
 
-      sinon.assert.calledOnce(trackStub);
+      expect(trackStub).toHaveBeenCalledOnce();
     });
 
     it("should be enabled when the built-in write key is present (no env var)", () => {
-      stubbedBuildConfig.value("packed-key");
+      vi.spyOn(
+        nodeDeps.buildConfig,
+        "TELEMETRY_WRITE_KEY",
+        "get",
+      ).mockReturnValue("packed-key");
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
         toolName: "list_topics",
       });
 
-      sinon.assert.calledOnce(trackStub);
-      sinon.assert.calledWith(
-        analyticsConstructorStub,
-        sinon.match({ writeKey: "packed-key" }),
+      expect(trackStub).toHaveBeenCalledOnce();
+      expect(analyticsConstructorStub).toHaveBeenCalledWith(
+        expect.objectContaining({ writeKey: "packed-key" }),
       );
     });
 
     it("should prefer the env var over the built-in key", () => {
       process.env.TELEMETRY_WRITE_KEY = "env-key";
-      stubbedBuildConfig.value("packed-key");
+      vi.spyOn(
+        nodeDeps.buildConfig,
+        "TELEMETRY_WRITE_KEY",
+        "get",
+      ).mockReturnValue("packed-key");
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
         toolName: "list_topics",
       });
 
-      sinon.assert.calledOnce(trackStub);
-      sinon.assert.calledWith(
-        analyticsConstructorStub,
-        sinon.match({ writeKey: "env-key" }),
+      expect(trackStub).toHaveBeenCalledOnce();
+      expect(analyticsConstructorStub).toHaveBeenCalledWith(
+        expect.objectContaining({ writeKey: "env-key" }),
       );
     });
 
@@ -112,19 +131,22 @@ describe("TelemetryService", () => {
         toolName: "list_topics",
       });
 
-      sinon.assert.notCalled(trackStub);
+      expect(trackStub).not.toHaveBeenCalled();
     });
 
     it("should be disabled when DO_NOT_TRACK is true, even with a valid write key", () => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
-      stubbedEnvVars.value({ DO_NOT_TRACK: true });
+      vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue({
+        DO_NOT_TRACK: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
         toolName: "list_topics",
       });
 
-      sinon.assert.notCalled(trackStub);
+      expect(trackStub).not.toHaveBeenCalled();
     });
   });
 
@@ -142,19 +164,18 @@ describe("TelemetryService", () => {
         durationMs: 100,
       });
 
-      sinon.assert.calledOnce(trackStub);
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({
+      expect(trackStub).toHaveBeenCalledOnce();
+      expect(trackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
           event: TelemetryEvent.TOOL_CALL,
-          userId: sinon.match.string,
-          properties: sinon.match({
+          userId: expect.any(String),
+          properties: expect.objectContaining({
             toolName: "describe_topic",
             durationMs: 100,
-            serverSessionId: sinon.match.string,
-            osPlatform: sinon.match.string,
-            osVersion: sinon.match.string,
-            osArch: sinon.match.string,
+            serverSessionId: expect.any(String),
+            osPlatform: expect.any(String),
+            osVersion: expect.any(String),
+            osArch: expect.any(String),
           }),
         }),
       );
@@ -163,8 +184,8 @@ describe("TelemetryService", () => {
     it("should forward identify calls to the analytics client", () => {
       service.identify("user-123", { org: "acme" });
 
-      sinon.assert.calledOnce(identifyStub);
-      sinon.assert.calledWith(identifyStub, {
+      expect(identifyStub).toHaveBeenCalledOnce();
+      expect(identifyStub).toHaveBeenCalledWith({
         userId: "user-123",
         traits: { org: "acme" },
       });
@@ -172,12 +193,15 @@ describe("TelemetryService", () => {
 
     it("should skip identify calls when telemetry is disabled", () => {
       TelemetryService["instance"] = undefined;
-      stubbedEnvVars.value({ DO_NOT_TRACK: true });
+      vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue({
+        DO_NOT_TRACK: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
 
       const disabled = TelemetryService.getInstance();
       disabled.identify("user-123", { org: "acme" });
 
-      sinon.assert.notCalled(identifyStub);
+      expect(identifyStub).not.toHaveBeenCalled();
     });
   });
 
@@ -187,38 +211,37 @@ describe("TelemetryService", () => {
 
       TelemetryService.getInstance();
 
-      sinon.assert.calledOnce(writeFileSyncStub);
-      sinon.assert.calledWith(
-        writeFileSyncStub,
-        sinon.match("machine-id"),
-        sinon.match.string,
-        sinon.match.any,
+      expect(writeFileSyncStub).toHaveBeenCalledOnce();
+      expect(writeFileSyncStub).toHaveBeenCalledWith(
+        expect.stringContaining("machine-id"),
+        expect.any(String),
+        expect.anything(),
       );
     });
 
     it("should reuse an existing UUID when a machine-id file exists", () => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
-      readFileSyncStub.returns("existing-uuid");
+      readFileSyncStub.mockReturnValue("existing-uuid");
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {});
 
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({ userId: "existing-uuid" }),
+      expect(trackStub).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "existing-uuid" }),
       );
     });
 
     it("should fall back to an anonymous ID when the file system is not writable", () => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
-      mkdirSyncStub.throws(new Error("EACCES"));
+      mkdirSyncStub.mockImplementation(() => {
+        throw new Error("EACCES");
+      });
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {});
 
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({ userId: FALLBACK_MACHINE_ID }),
+      expect(trackStub).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: FALLBACK_MACHINE_ID }),
       );
     });
   });
@@ -229,14 +252,14 @@ describe("TelemetryService", () => {
 
       await TelemetryService.getInstance().shutdown();
 
-      sinon.assert.calledOnce(closeAndFlushStub);
-      sinon.assert.calledWith(closeAndFlushStub, { timeout: 5000 });
+      expect(closeAndFlushStub).toHaveBeenCalledOnce();
+      expect(closeAndFlushStub).toHaveBeenCalledWith({ timeout: 5000 });
     });
 
     it("should be a no-op when telemetry is disabled", async () => {
       await TelemetryService.getInstance().shutdown();
 
-      sinon.assert.notCalled(closeAndFlushStub);
+      expect(closeAndFlushStub).not.toHaveBeenCalled();
     });
   });
 
@@ -251,13 +274,12 @@ describe("TelemetryService", () => {
     it("should include OS info in every event", () => {
       service.track(TelemetryEvent.TOOL_CALL, { toolName: "test" });
 
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({
-          properties: sinon.match({
-            osPlatform: sinon.match.string,
-            osVersion: sinon.match.string,
-            osArch: sinon.match.string,
+      expect(trackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.objectContaining({
+            osPlatform: expect.any(String),
+            osVersion: expect.any(String),
+            osArch: expect.any(String),
           }),
         }),
       );
@@ -272,15 +294,14 @@ describe("TelemetryService", () => {
 
       service.track(TelemetryEvent.TOOL_CALL, { toolName: "test" });
 
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({
-          properties: sinon.match({
+      expect(trackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.objectContaining({
             serverVersion: "1.2.0",
             clientName: "claude-code",
             clientVersion: "2.1.87",
-            osPlatform: sinon.match.string,
-            serverSessionId: sinon.match.string,
+            osPlatform: expect.any(String),
+            serverSessionId: expect.any(String),
           }),
         }),
       );
@@ -293,10 +314,9 @@ describe("TelemetryService", () => {
         serverVersion: "override",
       });
 
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({
-          properties: sinon.match({ serverVersion: "override" }),
+      expect(trackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.objectContaining({ serverVersion: "override" }),
         }),
       );
     });
@@ -317,10 +337,9 @@ describe("TelemetryService", () => {
         status: "success",
       });
 
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({
-          properties: sinon.match({
+      expect(trackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.objectContaining({
             toolName: "list_topics",
             durationMs: 100,
             status: "success",
@@ -336,10 +355,9 @@ describe("TelemetryService", () => {
         status: "error",
       });
 
-      sinon.assert.calledWith(
-        trackStub,
-        sinon.match({
-          properties: sinon.match({
+      expect(trackStub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.objectContaining({
             toolName: "list_schemas",
             durationMs: 100,
             status: "error",
@@ -354,7 +372,7 @@ describe("TelemetryService", () => {
       const a = TelemetryService.getInstance();
       const b = TelemetryService.getInstance();
 
-      sinon.assert.match(a, b);
+      expect(a).toBe(b);
     });
   });
 });

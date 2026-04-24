@@ -47,8 +47,11 @@ are satisfied. Cloud-only tools can be disabled with `--disable-confluent-cloud-
 - **`src/confluent/openapi-schema.d.ts`** — generated from `openapi.json` via
   `npm run generate:openapi-types` (openapi-typescript). Never hand-edited.
 
-- **`src/confluent/node-deps.ts`** — thin wrapper around node modules that can't be stubbed (e.g.
-  C-backed filesystem APIs). All such interactions must route through this module.
+- **`src/confluent/node-deps.ts`** — namespace-object wrapper around Node builtins, third-party
+  constructors, and env access. ESM named imports are read-only from outside the defining
+  module, so `vi.spyOn` can't intercept them directly; routing those dependencies through a
+  namespace object lets tests spy on property access instead. All external I/O that isn't
+  mediated by `openapi-fetch` or the Kafka clients must route through this module.
 
 - **`src/mcp/transports/`** — stdio, HTTP (Streamable HTTP), and SSE transports built on Fastify.
   HTTP/SSE support API-key auth and DNS rebinding protection.
@@ -122,8 +125,8 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
 ### 5. Stubbable boundaries
 
 - External I/O (filesystem, process env, network not mediated by `openapi-fetch` or Kafka clients)
-  should go through `src/confluent/node-deps.ts` so unit tests can stub it via Sinon. If a PR
-  introduces a new direct node-module dependency, push back and ask for it to be routed through
+  should go through `src/confluent/node-deps.ts` so unit tests can spy on it via `vi.spyOn`. If a
+  PR introduces a new direct node-module dependency, push back and ask for it to be routed through
   `node-deps.ts`.
 - New configuration reads should go through the schema-validated config layer, not `process.env`
   or ad-hoc file reads.
@@ -142,15 +145,23 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
 
 - New behavior needs unit tests. Tests are co-located as `*.test.ts` next to the file under test
   and run with Vitest.
-- Stub external interactions with Sinon sandboxes. Sandboxes should be declared at the widest
-  appropriate `describe()` scope and restored in `afterEach()`. Shared stub helpers live in
-  `tests/stubs/`; test data factories live in `tests/factories/`.
-- ESM live bindings — functions or consts imported directly from another module — can't be
-  replaced by Sinon sandboxes (bindings are read-only from outside the defining module). For
-  those cases, fall back to Vitest's module-level mocking (`vi.mock` / `vi.hoisted` /
-  `vi.mocked`), which rewires the module graph before importers run. Prefer Sinon by default;
-  reach for `vi.mock` only when the binding can't otherwise be stubbed. See `src/index.test.ts`
-  for an example.
+- Stub external interactions with `vi.spyOn` (preferred) or `vi.fn()`. `vitest.config.ts` sets
+  `restoreMocks: true`, so every spy is auto-restored after each test, and no per-test
+  `afterEach` restore hooks are needed. Shared stub helpers live in `tests/stubs/`; test data
+  factories live in `tests/factories/`.
+- ESM named imports are read-only from outside the defining module per the ECMAScript spec, so
+  `vi.spyOn` can't intercept a `import { readFileSync } from "node:fs"` at a call site. The
+  project's convention is to route such dependencies through `src/confluent/node-deps.ts` so
+  callers access them via property lookup, and tests spy on those properties. Project-local
+  helpers that compose around already-wrapped primitives don't need their own namespace object;
+  tests stub the underlying primitive instead.
+- **`vi.mock` is not used in this project, by design.** It's a different mechanism from
+  `vi.spyOn` (module graph rewrite vs. runtime property mutation) and the tradeoffs go the
+  wrong way for this codebase: file-scoped mock state instead of per-test granularity, reduced
+  type safety on the real-module boundary, no equivalent for accessor-mode spies
+  (`vi.spyOn(obj, "prop", "get")`), and hoisting surprises. Every dependency that currently
+  needs stubbing can be handled by wrapping + `vi.spyOn`. Flag PRs that introduce `vi.mock`
+  and ask for a namespace-object wrapping instead.
 - Outer `describe()` per file, inner `describe()` per class/function, `it("should ...")` per
   behavior.
 

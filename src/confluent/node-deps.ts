@@ -1,4 +1,5 @@
-// Wrappers for easier stubbing in tests since sinon can't stub ES module imports directly
+// Wrappers for easier stubbing in tests — ESM live bindings can't be stubbed at runtime,
+// but property access on these namespace objects can be (via `vi.spyOn`).
 import { Analytics } from "@segment/analytics-node";
 import { TELEMETRY_WRITE_KEY } from "@src/build-config.js";
 import envProxy from "@src/env.js";

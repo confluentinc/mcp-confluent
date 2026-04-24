@@ -5,7 +5,11 @@ description:
   behavior. Triggers on questions like "vi.fn", "vi.spyOn", "vi.mocked", "Mocked<T>",
   "mockResolvedValue", "restoreMocks", "vitest mock", "createMockInstance", "useFakeTimers", or
   how to accomplish test double patterns with Vitest.
-allowed-tools: Read, Bash, WebFetch, WebSearch
+allowed-tools:
+  - Read
+  - Bash
+  - WebFetch
+  - WebSearch
 ---
 
 # Vitest Documentation Lookup

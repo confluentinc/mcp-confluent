@@ -79,6 +79,17 @@ web_modules/
 .env.production.local
 .env.local
 
+# project-root yaml/yml files are blanket-ignored as a guard against accidentally
+# committing a personal `config.yaml` (or similar) containing credentials. The
+# blanket is root-only — subdirectories (sample_configs/, test-fixtures/,
+# .semaphore/, etc.) are unaffected. To track a NEW yaml/yml file at the repo
+# root, add an explicit `!/your-file.{yaml,yml}` line below.
+/*.yaml
+/*.yml
+!/config.example.yaml
+!/docker-compose.yml
+!/service.yml
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

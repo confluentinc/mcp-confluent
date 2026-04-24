@@ -108,7 +108,7 @@ export class AuthContext {
   }
 
   /**
-   * Snapshot of recorded auth-lifecycle errors. Consumers check this to decide
+   * Readonly view of current auth-lifecycle errors. Consumers check this to decide
    * whether to prompt re-auth (when a non-transient error has been flagged).
    */
   getErrors(): Readonly<AuthErrors> {

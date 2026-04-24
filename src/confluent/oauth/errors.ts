@@ -9,9 +9,8 @@ export interface AuthError {
 }
 
 /**
- * Record of auth-lifecycle errors — one optional entry per phase. Shape
- * parallels IntelliJ's `CCloudOAuthErrors.AuthErrors` for the phases that fit
- * our model. `signIn` is intentionally omitted: sign-in failures throw from
+ * Record of auth-lifecycle errors — one optional entry per phase.
+ * `signIn` is intentionally omitted: sign-in failures throw from
  * {@link AuthContext.newFromInitialLogin} before any context exists, so they
  * have no instance on which to be stored.
  */

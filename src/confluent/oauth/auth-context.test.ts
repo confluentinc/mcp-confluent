@@ -2,6 +2,7 @@ import { nodeFetch } from "@src/confluent/node-deps.js";
 import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
+  MAX_CONSECUTIVE_TRANSIENT_FAILURES,
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
@@ -472,7 +473,7 @@ describe("oauth/auth-context.ts", () => {
         const ctx = await newLoggedInContext(fetchStub);
         // 50 generic 500s back-to-back. Each refresh() call consumes one fetch
         // (phase 1 fails and we return before phase 2).
-        for (let i = 0; i < 50; i++) {
+        for (let i = 0; i < MAX_CONSECUTIVE_TRANSIENT_FAILURES; i++) {
           fetchStub
             .onCall(3 + i)
             .resolves(new Response("server error", { status: 500 }));

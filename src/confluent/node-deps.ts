@@ -1,4 +1,5 @@
-// Wrappers for easier stubbing in tests since sinon can't stub ES module imports directly
+// Wrappers for easier stubbing in tests — ESM live bindings can't be stubbed at runtime,
+// but property access on these namespace objects can be (via `vi.spyOn`).
 import { Analytics } from "@segment/analytics-node";
 import { TELEMETRY_WRITE_KEY } from "@src/build-config.js";
 import envProxy from "@src/env.js";
@@ -16,4 +17,9 @@ export const path = { join, resolve };
 export const segment = { Analytics };
 export const config = { env: envProxy };
 export const nodeFetch = { fetch: globalThis.fetch };
-export const nodeCrypto = { randomBytes };
+// Wrapped as a single-signature arrow so spies don't have to disambiguate
+// between the sync and callback overloads of the underlying `node:crypto`
+// `randomBytes`. The codebase only uses the sync form.
+export const nodeCrypto = {
+  randomBytes: (size: number): Buffer => randomBytes(size),
+};

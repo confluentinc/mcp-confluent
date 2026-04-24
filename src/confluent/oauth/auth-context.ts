@@ -21,9 +21,9 @@ import { logger } from "@src/logger.js";
 
 /**
  * Owns one user's Confluent OAuth lifecycle — token state plus the
- * transformations that advance it. Internal state advances via named
- * transforms under {@link AuthContext.updateTokens} so each step is atomic
- * and no caller mutates the token set directly.
+ * transformations that advance it. Internal state advances via atomic
+ * transform functions under {@link AuthContext.updateTokens} so each step is
+ * atomic and no caller mutates the token set directly.
  */
 export class AuthContext {
   private internalTokens: ConfluentTokenSet;
@@ -65,8 +65,10 @@ export class AuthContext {
    * cleared or the CP token has expired. Call this immediately before each
    * API request — don't cache the returned string across awaits.
    */
-  getControlPlaneToken(now: number = Date.now()): string | undefined {
-    if (!this.hasValidControlPlaneToken(now)) return undefined;
+  getControlPlaneToken(): string | undefined {
+    if (this.cleared) return undefined;
+    if (this.internalTokens.controlPlaneExpiresAt <= Date.now())
+      return undefined;
     return this.internalTokens.controlPlaneToken;
   }
 
@@ -75,15 +77,10 @@ export class AuthContext {
    * cleared or the DP token has expired. Same usage guidance as
    * {@link getControlPlaneToken}.
    */
-  getDataPlaneToken(now: number = Date.now()): string | undefined {
+  getDataPlaneToken(): string | undefined {
     if (this.cleared) return undefined;
-    if (this.internalTokens.dataPlaneExpiresAt <= now) return undefined;
+    if (this.internalTokens.dataPlaneExpiresAt <= Date.now()) return undefined;
     return this.internalTokens.dataPlaneToken;
-  }
-
-  /** True while the CP token is still valid at `now`. */
-  hasValidControlPlaneToken(now: number = Date.now()): boolean {
-    return !this.cleared && this.internalTokens.controlPlaneExpiresAt > now;
   }
 
   /** True when the refresh token is no longer usable (expired or cleared). */
@@ -140,7 +137,7 @@ export class AuthContext {
     } catch (error) {
       logger.error(
         { error },
-        "Auth0 refresh failed; keeping existing stored token set for next tick",
+        "Auth0 refresh failed; keeping the context's current token state for next tick",
       );
       return;
     }

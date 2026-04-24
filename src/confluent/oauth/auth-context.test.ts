@@ -150,18 +150,18 @@ describe("oauth/auth-context.ts", () => {
 
       it("should return undefined for CP once `now` is past CP expiry", async () => {
         const ctx = await newLoggedInContext(fetchStub);
+        // Force CP's expiry into the past so Date.now() beats it.
+        internals(ctx).controlPlaneExpiresAt = Date.now() - 1;
 
-        expect(
-          ctx.getControlPlaneToken(internals(ctx).controlPlaneExpiresAt + 1),
-        ).toBeUndefined();
+        expect(ctx.getControlPlaneToken()).toBeUndefined();
       });
 
       it("should return undefined for DP once `now` is past DP expiry", async () => {
         const ctx = await newLoggedInContext(fetchStub);
+        // Force CP's expiry into the past so Date.now() beats it.
+        internals(ctx).dataPlaneExpiresAt = Date.now() - 1;
 
-        expect(
-          ctx.getDataPlaneToken(internals(ctx).dataPlaneExpiresAt + 1),
-        ).toBeUndefined();
+        expect(ctx.getDataPlaneToken()).toBeUndefined();
       });
 
       it("should return undefined from both accessors after clear()", async () => {
@@ -171,32 +171,6 @@ describe("oauth/auth-context.ts", () => {
 
         expect(ctx.getControlPlaneToken()).toBeUndefined();
         expect(ctx.getDataPlaneToken()).toBeUndefined();
-      });
-    });
-
-    describe("hasValidControlPlaneToken", () => {
-      it("should be true right after login", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-
-        expect(ctx.hasValidControlPlaneToken()).toBe(true);
-      });
-
-      it("should be false once `now` is past CP expiry", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-
-        expect(
-          ctx.hasValidControlPlaneToken(
-            internals(ctx).controlPlaneExpiresAt + 1,
-          ),
-        ).toBe(false);
-      });
-
-      it("should be false after clear()", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-
-        ctx.clear();
-
-        expect(ctx.hasValidControlPlaneToken()).toBe(false);
       });
     });
 
@@ -411,7 +385,8 @@ describe("oauth/auth-context.ts", () => {
 
         ctx.clear();
 
-        expect(ctx.hasValidControlPlaneToken()).toBe(false);
+        expect(ctx.getControlPlaneToken()).toBeUndefined();
+        expect(ctx.getDataPlaneToken()).toBeUndefined();
         expect(ctx.refreshTokenExpired()).toBe(true);
         expect(ctx.shouldAttemptRefresh()).toBe(false);
       });
@@ -496,7 +471,6 @@ describe("oauth/auth-context.ts", () => {
       await clock.tickAsync(60_000);
 
       sinon.assert.notCalled(refreshStub);
-      expect(ctx.hasValidControlPlaneToken()).toBe(false);
     });
 
     it("should skip a tick when the previous tick is still running", async () => {

@@ -64,7 +64,7 @@ connections:
         secret: "${CONFLUENT_CLOUD_API_SECRET}"
 
     # --- Flink ---
-    # All four of `endpoint`, `auth`, `environment_id`, `organization_id`, and
+    # All five of `endpoint`, `auth`, `environment_id`, `organization_id`, and
     # `compute_pool_id` are required if you include this block.
     flink:
       endpoint: "${FLINK_REST_ENDPOINT:-https://flink.us-east-1.aws.confluent.cloud}"

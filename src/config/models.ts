@@ -2,8 +2,16 @@ import { validateBootstrapServers } from "@src/config/validation.js";
 import { logLevels } from "@src/logger.js";
 import { z } from "zod";
 
+// The following interfaces and types define subcomponents of class MCPServerConfiguration, which represents our entire server configuration.
+// Each interface corresponds to a specific section of a YAML configuration file, as indicated in the comments, or through
+// legacy environment variable or CLI arguments (see consConfigFromEnv in src/config/env-config.ts).
+
+// Zod is used for validation and transformation of from-yaml or environment variables into these structured types, with the root schema
+// being mcpConfigSchema at the bottom of this file.
+
 /**
- * Connection configuration for a direct (local/Docker) Kafka cluster.
+ * Connection configuration for a direct (local/Docker/Cloud) Kafka cluster.
+ * Corresponds to `connections.<name>` (with `type: direct`) in the YAML configuration.
  * At least one of kafka, schema_registry, confluent_cloud, tableflow, flink, or telemetry must be present.
  */
 export interface DirectConnectionConfig {
@@ -16,7 +24,10 @@ export interface DirectConnectionConfig {
   flink?: FlinkDirectConfig;
 }
 
-/** Subcomponent of various parts of DirectConnectionConfig */
+/**
+ * API key credential pair used throughout connection sub-configs.
+ * Corresponds to `auth` blocks nested under each service in `connections.<name>`.
+ */
 export interface ApiKeyAuthConfig {
   type: "api_key";
   key: string;
@@ -25,7 +36,10 @@ export interface ApiKeyAuthConfig {
 
 export type AuthConfig = ApiKeyAuthConfig;
 
-/** Subcomponent of DirectConnectionConfig describing Kafka connection parameters */
+/**
+ * Kafka broker connection parameters.
+ * Corresponds to `connections.<name>.kafka` in the YAML configuration.
+ */
 export interface KafkaDirectConfig {
   bootstrap_servers?: string;
   auth?: AuthConfig;
@@ -35,30 +49,45 @@ export interface KafkaDirectConfig {
   extra_properties?: Record<string, string>;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Schema Registry connection parameters */
+/**
+ * Schema Registry connection parameters.
+ * Corresponds to `connections.<name>.schema_registry` in the YAML configuration.
+ */
 export interface SchemaRegistryDirectConfig {
   endpoint: string;
   auth?: AuthConfig;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Confluent Cloud connection parameters */
+/**
+ * Confluent Cloud control-plane connection parameters.
+ * Corresponds to `connections.<name>.confluent_cloud` in the YAML configuration.
+ */
 export interface ConfluentCloudDirectConfig {
   endpoint: string;
   auth: AuthConfig;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Tableflow connection parameters */
+/**
+ * Tableflow connection parameters.
+ * Corresponds to `connections.<name>.tableflow` in the YAML configuration.
+ */
 export interface TableflowDirectConfig {
   auth: AuthConfig;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Telemetry connection parameters */
+/**
+ * Telemetry API connection parameters.
+ * Corresponds to `connections.<name>.telemetry` in the YAML configuration.
+ */
 export interface TelemetryDirectConfig {
   endpoint: string;
   auth: AuthConfig;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Flink connection parameters */
+/**
+ * Flink compute-plane connection parameters.
+ * Corresponds to `connections.<name>.flink` in the YAML configuration.
+ */
 export interface FlinkDirectConfig {
   endpoint: string;
   auth: AuthConfig;
@@ -75,7 +104,21 @@ export interface FlinkDirectConfig {
  */
 export type ConnectionConfig = DirectConnectionConfig;
 
-/** Subcomponent of ServerConfig controlling the HTTP/SSE transport bind address and endpoint paths. */
+/**
+ * MCP server operational settings — transport, auth, and logging.
+ * Corresponds to the `server` block at the root of the YAML configuration.
+ * Distinct from connection config, which governs Kafka and Confluent Cloud client behaviour.
+ */
+export interface ServerConfig {
+  log_level: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
+  http: ServerHttpConfig;
+  auth: ServerAuthConfig;
+}
+
+/**
+ * HTTP/SSE transport bind address and endpoint paths.
+ * Corresponds to `server.http` in the YAML configuration.
+ */
 export interface ServerHttpConfig {
   port: number;
   host: string;
@@ -84,18 +127,15 @@ export interface ServerHttpConfig {
   sse_message_endpoint: string;
 }
 
-/** Subcomponent of ServerConfig controlling HTTP/SSE transport authentication. */
+/**
+ * HTTP/SSE transport authentication settings.
+ * Corresponds to `server.auth` in the YAML configuration.
+ * `api_key` and `disabled: true` are mutually exclusive.
+ */
 export interface ServerAuthConfig {
   api_key?: string;
   disabled: boolean;
   allowed_hosts: string[];
-}
-
-/** MCP server operational settings — transport, auth, and logging. Distinct from connection config, which governs Kafka and Confluent Cloud client behaviour. */
-export interface ServerConfig {
-  log_level: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
-  http: ServerHttpConfig;
-  auth: ServerAuthConfig;
 }
 
 /**

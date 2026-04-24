@@ -73,12 +73,19 @@ Tools are **auto-enabled/disabled** based on which environment variables are pre
 
 ## Unit Test Conventions
 
-- Write unit tests using vitest package and its `describe()`, `it()`, and `expect()`.
-- Test modules are stored beside the files they test, using `.test.ts` file extensions.
-- Use an outermost `describe()` block for the file, then inner `describe()` blocks for each item being tested.
-- Testing classes are done with a `describe()` block for the entire class, then individual `describe()` blocks for each method, with it() blocks for each aspect of the method.
-- External system interactions (including filesystem and environment variables) should be stubbed, primarily using `sinon` sandboxes.
-- Sinon sandboxes should be declared with a `let sandbox: sinon.SinonSandbox` statement at the most appropriate `describe()` block level to minimize declarations, be assigned to in that block's `beforeEach()`, and restored in that block's `afterEach()`. When adding test suites needing a sandbox to the same file, consider migrating any preexisting sandbox (and corresponding before/afterEach) to a broader scope.
-- Install and remove sinon sandboxes within `beforeEach()` and `afterEach()` at the widest appropriate scope in a test suite module.
-- Writing test suite utilities to install common blocks of stubs is a good technique to reduce test suite bloat. Those utilities should reside within the `tests/stubs` subtree.
-- Some node modules cannot be stubbed due to being implemented in C. The codebase should only use those indirectly, going through a stubbable js layer in `src/confluent/node-deps.js`. Look there and possibly add to it before making new parts of the codebase interact directly with the filesystem, etc.
+Tests are colocated as `*.test.ts` beside source files and run with Vitest. The authoritative
+test-writing rule (assertions, stubbing patterns, handler test structure, fake timers) lives in
+`.claude/rules/unit-tests.md` and auto-loads whenever you're editing a test file. The points
+below affect source-code edits too, so they're called out here:
+
+- **Design for stubbing.** External I/O (filesystem, env, network not mediated by `openapi-fetch`
+  or Kafka clients, third-party constructors) must route through a namespace object so tests
+  can spy on property lookups. `src/confluent/node-deps.ts` is the canonical example;
+  `authUtils` in `src/mcp/transports/auth.ts` is the pattern for project-local free functions.
+  Extend those before importing stubbable primitives at use sites. This is an ECMAScript-level
+  constraint: ESM named imports are read-only from outside the defining module, so `vi.spyOn`
+  can't intercept them directly. `vi.mock` is not used in this project; wrap the dependency
+  and spy on the wrapper instead (rationale in `.claude/rules/unit-tests.md`).
+- For handler-style tests that need a stubbed class instance, use `createMockInstance(Class)`
+  from `@tests/stubs/index.js`; it returns a `Mocked<T>` with every method pre-stubbed as
+  `vi.fn()`.

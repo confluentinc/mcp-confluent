@@ -25,7 +25,7 @@ import { EnvVar } from "@src/env-schema.js";
 import type { Environment } from "@src/env.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
-import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
+import { authUtils, TransportManager } from "@src/mcp/transports/index.js";
 
 /**
  * Determine the subset of ToolHandlers to register based on the filtered tool names,
@@ -80,7 +80,7 @@ export function getToolHandlersToRegister(
 }
 
 export function outputApiKey(): void {
-  const apiKey = generateApiKey();
+  const apiKey = authUtils.generateApiKey();
   console.log("\nGenerated MCP API Key:");
   console.log("=".repeat(64));
   console.log(apiKey);

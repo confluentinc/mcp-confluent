@@ -47,8 +47,11 @@ are satisfied. Cloud-only tools can be disabled with `--disable-confluent-cloud-
 - **`src/confluent/openapi-schema.d.ts`** — generated from `openapi.json` via
   `npm run generate:openapi-types` (openapi-typescript). Never hand-edited.
 
-- **`src/confluent/node-deps.ts`** — thin wrapper around node modules that can't be stubbed (e.g.
-  C-backed filesystem APIs). All such interactions must route through this module.
+- **`src/confluent/node-deps.ts`** — namespace-object wrapper around Node builtins, third-party
+  constructors, and env access. ESM named imports are read-only from outside the defining
+  module, so `vi.spyOn` can't intercept them directly; routing those dependencies through a
+  namespace object lets tests spy on property access instead. All external I/O that isn't
+  mediated by `openapi-fetch` or the Kafka clients must route through this module.
 
 - **`src/mcp/transports/`** — stdio, HTTP (Streamable HTTP), and SSE transports built on Fastify.
   HTTP/SSE support API-key auth and DNS rebinding protection.
@@ -143,16 +146,22 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
 - New behavior needs unit tests. Tests are co-located as `*.test.ts` next to the file under test
   and run with Vitest.
 - Stub external interactions with `vi.spyOn` (preferred) or `vi.fn()`. `vitest.config.ts` sets
-  `restoreMocks: true`, so every spy is auto-restored after each test - no per-test `afterEach`
-  restore hooks are needed. Shared stub helpers live in `tests/stubs/`; test data factories live
-  in `tests/factories/`.
-- ESM live bindings - functions or consts imported directly from another module - can't be spied
-  on by `vi.spyOn` (bindings are read-only from outside the defining module). The fix is to wrap
-  the dependency in a namespace object so callers access it via property lookup: see
-  `src/confluent/node-deps.ts` for Node builtins and third-party constructors, and `authUtils`
-  in `src/mcp/transports/auth.ts` for same-project free functions. Do **not** reach for
-  `vi.mock` as an escape hatch - it hoists above imports, loses type safety, and splits the
-  project's stubbing model.
+  `restoreMocks: true`, so every spy is auto-restored after each test, and no per-test
+  `afterEach` restore hooks are needed. Shared stub helpers live in `tests/stubs/`; test data
+  factories live in `tests/factories/`.
+- ESM named imports are read-only from outside the defining module per the ECMAScript spec, so
+  `vi.spyOn` can't intercept a `import { readFileSync } from "node:fs"` at a call site. The
+  project's convention is to wrap such dependencies in a namespace object so callers access
+  them via property lookup: see `src/confluent/node-deps.ts` for Node builtins, third-party
+  constructors, and env access, and `authUtils` in `src/mcp/transports/auth.ts` for
+  project-local free functions.
+- **`vi.mock` is not used in this project, by design.** It's a different mechanism from
+  `vi.spyOn` (module graph rewrite vs. runtime property mutation) and the tradeoffs go the
+  wrong way for this codebase: file-scoped mock state instead of per-test granularity, reduced
+  type safety on the real-module boundary, no equivalent for accessor-mode spies
+  (`vi.spyOn(obj, "prop", "get")`), and hoisting surprises. Every dependency that currently
+  needs stubbing can be handled by wrapping + `vi.spyOn`. Flag PRs that introduce `vi.mock`
+  and ask for a namespace-object wrapping instead.
 - Outer `describe()` per file, inner `describe()` per class/function, `it("should ...")` per
   behavior.
 

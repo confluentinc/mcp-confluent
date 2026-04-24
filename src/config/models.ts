@@ -75,6 +75,29 @@ export interface FlinkDirectConfig {
  */
 export type ConnectionConfig = DirectConnectionConfig;
 
+/** Subcomponent of ServerConfig controlling the HTTP/SSE transport bind address and endpoint paths. */
+export interface ServerHttpConfig {
+  port: number;
+  host: string;
+  mcp_endpoint: string;
+  sse_endpoint: string;
+  sse_message_endpoint: string;
+}
+
+/** Subcomponent of ServerConfig controlling HTTP/SSE transport authentication. */
+export interface ServerAuthConfig {
+  api_key?: string;
+  disabled: boolean;
+  allowed_hosts: string[];
+}
+
+/** MCP server operational settings — transport, auth, and logging. Distinct from connection config, which governs Kafka and Confluent Cloud client behaviour. */
+export interface ServerConfig {
+  log_level: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
+  http: ServerHttpConfig;
+  auth: ServerAuthConfig;
+}
+
 /**
  * Root configuration object representing the entire MCP server configuration.
  * Validated and constructed from parsed YAML via {@link mcpConfigSchema}.
@@ -507,10 +530,8 @@ const serverConfigSchema = z
   })
   .strict();
 
-/** Fully-resolved server configuration; all fields are populated (api_key excepted). */
-export type ServerConfig = z.infer<typeof serverConfigSchema>;
-export type ServerHttpConfig = z.infer<typeof serverHttpConfigSchema>;
-export type ServerAuthConfig = z.infer<typeof serverAuthConfigSchema>;
+// Compile-time assertion: ServerConfig interface must remain compatible with the schema output.
+serverConfigSchema satisfies z.ZodType<ServerConfig>;
 
 /**
  * The default server configuration produced when no `server` block is present in YAML

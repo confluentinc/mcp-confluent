@@ -377,6 +377,19 @@ describe("oauth/auth-context.ts", () => {
 
         expect(fetchStub.callCount).toBe(callCountAfterLogin);
       });
+
+      it("should be a no-op when the refresh token is already expired", async () => {
+        const ctx = await newLoggedInContext(fetchStub);
+        // Force the absolute refresh-token expiry into the past so refresh()
+        // sees a dead token. Without the guard it would still hit Auth0 and
+        // get a confusing "invalid refresh token" error back.
+        internals(ctx).refreshTokenAbsoluteExpiresAt = Date.now() - 1;
+        const callCountAfterLogin = fetchStub.callCount;
+
+        await ctx.refresh();
+
+        expect(fetchStub.callCount).toBe(callCountAfterLogin);
+      });
     });
 
     describe("clear", () => {

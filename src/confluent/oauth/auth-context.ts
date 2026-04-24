@@ -118,6 +118,7 @@ export class AuthContext {
    */
   async refresh(): Promise<void> {
     if (this.cleared) return;
+    if (this.refreshTokenExpired()) return;
     if (this.inflightRefresh) return this.inflightRefresh;
     this.inflightRefresh = this.doRefresh();
     try {
@@ -221,12 +222,15 @@ export class AuthContext {
     let tickInProgress = false;
     this.refreshInterval = setInterval(async () => {
       if (this.cleared || tickInProgress) return;
-      if (this.refreshTokenExpired()) {
+      // Single `now` per tick so the two predicates can't disagree at an
+      // expiry boundary within the same evaluation.
+      const now = Date.now();
+      if (this.refreshTokenExpired(now)) {
         logger.info("Refresh token expired; clearing context");
         this.clear();
         return;
       }
-      if (!this.shouldAttemptRefresh()) return;
+      if (!this.shouldAttemptRefresh(now)) return;
       tickInProgress = true;
       try {
         await this.refresh();

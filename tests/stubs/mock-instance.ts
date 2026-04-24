@@ -16,6 +16,11 @@ import { type Mocked, vi } from "vitest";
  * clientManager.getAdminClient.mockResolvedValue(admin);
  * ```
  */
+// `(...args: never[])` is the canonical "accept any constructor" pattern in
+// TypeScript: rest-parameter contravariance means a `never[]` parameter list
+// is satisfied by every concrete constructor signature. `unknown[]` would be
+// stricter and would reject classes whose constructor takes specific types
+// (e.g., DefaultClientManager's `ClientManagerConfig`).
 export function createMockInstance<T extends object>(
   Ctor: new (...args: never[]) => T,
 ): Mocked<T> {

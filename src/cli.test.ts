@@ -350,8 +350,8 @@ describe("cli.ts", () => {
     });
 
     it("should throw when both --config and --kafka-config-file are supplied", () => {
-      resolveStub.returns("/abs/kafka.properties");
-      fsStubs.existsSync.returns(true);
+      resolveSpy.mockReturnValue("/abs/kafka.properties");
+      fsMocks.existsSync.mockReturnValue(true);
 
       expect(() =>
         parseCliArgs(

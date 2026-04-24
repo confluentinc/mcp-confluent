@@ -7,8 +7,15 @@ import {
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
-import sinon from "sinon";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 
 function jsonResponse(body: object, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -29,13 +36,14 @@ function internals(ctx: AuthContext): ConfluentTokenSet {
     .internalTokens;
 }
 
-function stubAuth0OkAt(
-  fetchStub: sinon.SinonStub,
-  callIndex: number,
+type FetchSpy = MockInstance<typeof nodeFetch.fetch>;
+
+function stubAuth0Ok(
+  fetchSpy: FetchSpy,
   refreshToken: string,
   idToken: string,
 ): void {
-  fetchStub.onCall(callIndex).resolves(
+  fetchSpy.mockResolvedValueOnce(
     jsonResponse({
       id_token: idToken,
       refresh_token: refreshToken,
@@ -46,61 +54,44 @@ function stubAuth0OkAt(
   );
 }
 
-function stubCpOkAt(
-  fetchStub: sinon.SinonStub,
-  callIndex: number,
-  cpToken: string,
-): void {
-  fetchStub.onCall(callIndex).resolves(jsonResponse({ token: cpToken }));
+function stubCpOk(fetchSpy: FetchSpy, cpToken: string): void {
+  fetchSpy.mockResolvedValueOnce(jsonResponse({ token: cpToken }));
 }
 
-function stubDpOkAt(
-  fetchStub: sinon.SinonStub,
-  callIndex: number,
-  dpToken: string,
-): void {
-  fetchStub.onCall(callIndex).resolves(jsonResponse({ token: dpToken }));
+function stubDpOk(fetchSpy: FetchSpy, dpToken: string): void {
+  fetchSpy.mockResolvedValueOnce(jsonResponse({ token: dpToken }));
 }
 
 function stubSuccessfulChain(
-  fetchStub: sinon.SinonStub,
-  startCall: number,
+  fetchSpy: FetchSpy,
   refreshToken = "refresh-token",
   idToken = "id-token",
   cpToken = "cp-token",
   dpToken = "dp-token",
 ): void {
-  stubAuth0OkAt(fetchStub, startCall, refreshToken, idToken);
-  stubCpOkAt(fetchStub, startCall + 1, cpToken);
-  stubDpOkAt(fetchStub, startCall + 2, dpToken);
+  stubAuth0Ok(fetchSpy, refreshToken, idToken);
+  stubCpOk(fetchSpy, cpToken);
+  stubDpOk(fetchSpy, dpToken);
 }
 
-async function newLoggedInContext(
-  fetchStub: sinon.SinonStub,
-  startCall = 0,
-): Promise<AuthContext> {
-  stubSuccessfulChain(fetchStub, startCall);
+async function newLoggedInContext(fetchSpy: FetchSpy): Promise<AuthContext> {
+  stubSuccessfulChain(fetchSpy);
   const auth0Config = getAuth0Config("devel");
   return AuthContext.newFromInitialLogin(auth0Config, "code", "verifier");
 }
 
 describe("oauth/auth-context.ts", () => {
-  const sandbox = sinon.createSandbox();
   const auth0Config = getAuth0Config("devel");
-  let fetchStub: sinon.SinonStub;
+  let fetchSpy: FetchSpy;
 
   beforeEach(() => {
-    fetchStub = sandbox.stub(nodeFetch, "fetch");
-  });
-
-  afterEach(() => {
-    sandbox.restore();
+    fetchSpy = vi.spyOn(nodeFetch, "fetch");
   });
 
   describe("AuthContext", () => {
     describe("newFromInitialLogin", () => {
       it("should run the full chain and populate all token fields", async () => {
-        stubSuccessfulChain(fetchStub, 0);
+        stubSuccessfulChain(fetchSpy);
 
         const ctx = await AuthContext.newFromInitialLogin(
           auth0Config,
@@ -114,7 +105,7 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should generate an opaque accessToken that is stable across reads", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         expect(ctx.accessToken).toBeTruthy();
         expect(ctx.accessToken).toBe(ctx.accessToken);
@@ -122,7 +113,7 @@ describe("oauth/auth-context.ts", () => {
 
       it("should stamp absolute and idle refresh expiries from the login time", async () => {
         const before = Date.now();
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         const after = Date.now();
 
         const tokens = internals(ctx);
@@ -143,14 +134,14 @@ describe("oauth/auth-context.ts", () => {
 
     describe("getControlPlaneToken / getDataPlaneToken", () => {
       it("should return the current tokens right after login", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         expect(ctx.getControlPlaneToken()).toBe("cp-token");
         expect(ctx.getDataPlaneToken()).toBe("dp-token");
       });
 
       it("should return undefined for CP once `now` is past CP expiry", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         // Force CP's expiry into the past so Date.now() beats it.
         internals(ctx).controlPlaneExpiresAt = Date.now() - 1;
 
@@ -158,7 +149,7 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should return undefined for DP once `now` is past DP expiry", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         // Force CP's expiry into the past so Date.now() beats it.
         internals(ctx).dataPlaneExpiresAt = Date.now() - 1;
 
@@ -166,7 +157,7 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should return undefined from both accessors after clear()", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         ctx.clear();
 
@@ -177,13 +168,13 @@ describe("oauth/auth-context.ts", () => {
 
     describe("refreshTokenExpired", () => {
       it("should be false while both expiry clocks are in the future", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         expect(ctx.refreshTokenExpired()).toBe(false);
       });
 
       it("should be true past the absolute expiry", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         expect(
           ctx.refreshTokenExpired(
@@ -193,7 +184,7 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should be true past the idle expiry", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         expect(
           ctx.refreshTokenExpired(internals(ctx).refreshTokenIdleExpiresAt + 1),
@@ -201,7 +192,7 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should be true after clear()", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         ctx.clear();
 
@@ -211,14 +202,14 @@ describe("oauth/auth-context.ts", () => {
 
     describe("shouldAttemptRefresh", () => {
       it("should be false when CP is fresher than the refresh window", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
-        // Just after login, CP has ~5 min remaining, window is 30s — still fresh.
+        // Just after login, CP has ~5 min remaining, window is 30s - still fresh.
         expect(ctx.shouldAttemptRefresh()).toBe(false);
       });
 
       it("should be true once CP is inside the refresh window", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         // 10s before CP expiry → inside the 30s window.
         expect(
@@ -229,7 +220,7 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should be false when the refresh token has expired, even if CP is stale", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         expect(
           ctx.shouldAttemptRefresh(
@@ -239,7 +230,7 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should be false after clear()", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         ctx.clear();
 
@@ -253,10 +244,9 @@ describe("oauth/auth-context.ts", () => {
 
     describe("refresh", () => {
       it("should rotate refresh + CP + DP on full success", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         stubSuccessfulChain(
-          fetchStub,
-          3,
+          fetchSpy,
           "new-refresh",
           "new-id",
           "new-cp",
@@ -271,25 +261,25 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should coalesce concurrent callers into a single Auth0 rotation", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-        stubSuccessfulChain(fetchStub, 3, "new-refresh");
-        const callsBeforeRefresh = fetchStub.callCount;
+        const ctx = await newLoggedInContext(fetchSpy);
+        stubSuccessfulChain(fetchSpy, "new-refresh");
+        const callsBeforeRefresh = fetchSpy.mock.calls.length;
 
         await Promise.all([ctx.refresh(), ctx.refresh(), ctx.refresh()]);
 
         // Login consumed 3 fetches; refresh consumed 3 more (Auth0 + CP + DP).
         // Without single-flight, 3 concurrent refresh() calls would burn the
         // single-use refresh token 3 times.
-        expect(fetchStub.callCount).toBe(callsBeforeRefresh + 3);
+        expect(fetchSpy.mock.calls.length).toBe(callsBeforeRefresh + 3);
         expect(internals(ctx).refreshToken).toBe("new-refresh");
       });
 
       it("should leave state unchanged when Auth0 refresh fails", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         const originalTokens = { ...internals(ctx) };
-        fetchStub
-          .onCall(3)
-          .resolves(new Response("server error", { status: 500 }));
+        fetchSpy.mockResolvedValueOnce(
+          new Response("server error", { status: 500 }),
+        );
 
         await ctx.refresh();
 
@@ -297,12 +287,12 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should persist the rotated refresh token even when CP exchange fails", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         const originalCp = internals(ctx).controlPlaneToken;
-        stubAuth0OkAt(fetchStub, 3, "rotated-refresh", "new-id");
-        fetchStub
-          .onCall(4)
-          .resolves(new Response("bad gateway", { status: 502 }));
+        stubAuth0Ok(fetchSpy, "rotated-refresh", "new-id");
+        fetchSpy.mockResolvedValueOnce(
+          new Response("bad gateway", { status: 502 }),
+        );
 
         await ctx.refresh();
 
@@ -311,13 +301,13 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should persist the rotated refresh token even when DP exchange fails", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         const originalDp = internals(ctx).dataPlaneToken;
-        stubAuth0OkAt(fetchStub, 3, "rotated-refresh", "new-id");
-        stubCpOkAt(fetchStub, 4, "new-cp");
-        fetchStub
-          .onCall(5)
-          .resolves(new Response("forbidden", { status: 403 }));
+        stubAuth0Ok(fetchSpy, "rotated-refresh", "new-id");
+        stubCpOk(fetchSpy, "new-cp");
+        fetchSpy.mockResolvedValueOnce(
+          new Response("forbidden", { status: 403 }),
+        );
 
         await ctx.refresh();
 
@@ -326,9 +316,9 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should bump the idle expiry when the refresh token is rotated", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         const originalIdle = internals(ctx).refreshTokenIdleExpiresAt;
-        stubSuccessfulChain(fetchStub, 3, "new-refresh");
+        stubSuccessfulChain(fetchSpy, "new-refresh");
 
         await ctx.refresh();
 
@@ -340,10 +330,10 @@ describe("oauth/auth-context.ts", () => {
       it("should cap the rotated idle expiry at the absolute lifetime", async () => {
         // Log in, then overwrite the absolute expiry to be very close so
         // a naive `now + IDLE_LIFETIME` bump would blow past it.
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         const absoluteExpiry = Date.now() + 1000;
         internals(ctx).refreshTokenAbsoluteExpiresAt = absoluteExpiry;
-        stubSuccessfulChain(fetchStub, 3, "new-refresh");
+        stubSuccessfulChain(fetchSpy, "new-refresh");
 
         await ctx.refresh();
 
@@ -355,47 +345,48 @@ describe("oauth/auth-context.ts", () => {
       it("should short-circuit after clear() fires mid-flight", async () => {
         // clear() between phase-1 (Auth0) and phase-2 (CP) should abort the
         // remaining exchanges so we don't burn API calls on a dead session.
-        const ctx = await newLoggedInContext(fetchStub);
-        const cpCallIndex = 4;
-        stubAuth0OkAt(fetchStub, 3, "rotated-refresh", "new-id");
-        fetchStub.onCall(cpCallIndex).callsFake(async () => {
+        const ctx = await newLoggedInContext(fetchSpy);
+        stubAuth0Ok(fetchSpy, "rotated-refresh", "new-id");
+        fetchSpy.mockImplementationOnce(async () => {
           ctx.clear();
           return jsonResponse({ token: "late-cp-token" });
         });
+        const callsBeforeRefresh = fetchSpy.mock.calls.length;
 
         await ctx.refresh();
 
-        // Phase-2 aborted after the CP fetch returned — no DP call was made.
-        expect(fetchStub.callCount).toBe(cpCallIndex + 1);
+        // Phase-2 aborted after the CP fetch returned - no DP call was made.
+        // Refresh consumed 2 fetches (Auth0 + CP), not 3.
+        expect(fetchSpy.mock.calls.length).toBe(callsBeforeRefresh + 2);
       });
 
       it("should be a no-op after clear()", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         ctx.clear();
-        const callCountAfterLogin = fetchStub.callCount;
+        const callCountAfterLogin = fetchSpy.mock.calls.length;
 
         await ctx.refresh();
 
-        expect(fetchStub.callCount).toBe(callCountAfterLogin);
+        expect(fetchSpy.mock.calls.length).toBe(callCountAfterLogin);
       });
 
       it("should be a no-op when the refresh token is already expired", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         // Force the absolute refresh-token expiry into the past so refresh()
         // sees a dead token. Without the guard it would still hit Auth0 and
         // get a confusing "invalid refresh token" error back.
         internals(ctx).refreshTokenAbsoluteExpiresAt = Date.now() - 1;
-        const callCountAfterLogin = fetchStub.callCount;
+        const callCountAfterLogin = fetchSpy.mock.calls.length;
 
         await ctx.refresh();
 
-        expect(fetchStub.callCount).toBe(callCountAfterLogin);
+        expect(fetchSpy.mock.calls.length).toBe(callCountAfterLogin);
       });
     });
 
     describe("clear", () => {
       it("should make subsequent predicates report cleared state", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         ctx.clear();
 
@@ -406,7 +397,7 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should gate both token accessors", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
 
         ctx.clear();
 
@@ -417,10 +408,10 @@ describe("oauth/auth-context.ts", () => {
 
     describe("error classification", () => {
       it("should record a transient error on a generic phase-1 failure", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-        fetchStub
-          .onCall(3)
-          .resolves(new Response("server error", { status: 500 }));
+        const ctx = await newLoggedInContext(fetchSpy);
+        fetchSpy.mockResolvedValueOnce(
+          new Response("server error", { status: 500 }),
+        );
 
         await ctx.refresh();
 
@@ -435,15 +426,13 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should record a non-transient error when the refresh token is revoked", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-        fetchStub
-          .onCall(3)
-          .resolves(
-            new Response(
-              '{"error":"invalid_grant","error_description":"Unknown or invalid refresh token."}',
-              { status: 400 },
-            ),
-          );
+        const ctx = await newLoggedInContext(fetchSpy);
+        fetchSpy.mockResolvedValueOnce(
+          new Response(
+            '{"error":"invalid_grant","error_description":"Unknown or invalid refresh token."}',
+            { status: 400 },
+          ),
+        );
 
         await ctx.refresh();
 
@@ -459,10 +448,10 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should record a non-transient error on invalid_grant without the revoked-token message", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-        fetchStub
-          .onCall(3)
-          .resolves(new Response('{"error":"invalid_grant"}', { status: 400 }));
+        const ctx = await newLoggedInContext(fetchSpy);
+        fetchSpy.mockResolvedValueOnce(
+          new Response('{"error":"invalid_grant"}', { status: 400 }),
+        );
 
         await ctx.refresh();
 
@@ -470,13 +459,13 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should promote to non-transient after MAX_CONSECUTIVE_TRANSIENT_FAILURES", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-        // 50 generic 500s back-to-back. Each refresh() call consumes one fetch
+        const ctx = await newLoggedInContext(fetchSpy);
+        // N generic 500s back-to-back. Each refresh() call consumes one fetch
         // (phase 1 fails and we return before phase 2).
         for (let i = 0; i < MAX_CONSECUTIVE_TRANSIENT_FAILURES; i++) {
-          fetchStub
-            .onCall(3 + i)
-            .resolves(new Response("server error", { status: 500 }));
+          fetchSpy.mockResolvedValueOnce(
+            new Response("server error", { status: 500 }),
+          );
           await ctx.refresh();
         }
 
@@ -486,18 +475,17 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should clear the recorded error and reset the counter on a successful refresh", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
+        const ctx = await newLoggedInContext(fetchSpy);
         // First refresh fails transiently.
-        fetchStub
-          .onCall(3)
-          .resolves(new Response("server error", { status: 500 }));
+        fetchSpy.mockResolvedValueOnce(
+          new Response("server error", { status: 500 }),
+        );
         await ctx.refresh();
         expect(ctx.getErrors().tokenRefresh!.isTransient).toBe(true);
 
         // Next refresh succeeds.
         stubSuccessfulChain(
-          fetchStub,
-          4,
+          fetchSpy,
           "new-refresh",
           "new-id",
           "new-cp",
@@ -508,21 +496,21 @@ describe("oauth/auth-context.ts", () => {
         expect(ctx.getErrors().tokenRefresh).toBeUndefined();
         // Counter reset is observable via the classifier: a new generic failure
         // should be classified transient, not cascade from the prior counter.
-        fetchStub
-          .onCall(7)
-          .resolves(new Response("server error", { status: 500 }));
+        fetchSpy.mockResolvedValueOnce(
+          new Response("server error", { status: 500 }),
+        );
         await ctx.refresh();
         expect(ctx.getErrors().tokenRefresh!.isTransient).toBe(true);
       });
 
       it("should retry CP once on transient failure and succeed", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-        stubAuth0OkAt(fetchStub, 3, "new-refresh", "new-id");
-        fetchStub
-          .onCall(4)
-          .resolves(new Response("bad gateway", { status: 502 }));
-        stubCpOkAt(fetchStub, 5, "retry-cp");
-        stubDpOkAt(fetchStub, 6, "new-dp");
+        const ctx = await newLoggedInContext(fetchSpy);
+        stubAuth0Ok(fetchSpy, "new-refresh", "new-id");
+        fetchSpy.mockResolvedValueOnce(
+          new Response("bad gateway", { status: 502 }),
+        );
+        stubCpOk(fetchSpy, "retry-cp");
+        stubDpOk(fetchSpy, "new-dp");
 
         await ctx.refresh();
 
@@ -532,13 +520,13 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should retry DP once on transient failure and succeed", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-        stubAuth0OkAt(fetchStub, 3, "new-refresh", "new-id");
-        stubCpOkAt(fetchStub, 4, "new-cp");
-        fetchStub
-          .onCall(5)
-          .resolves(new Response("bad gateway", { status: 502 }));
-        stubDpOkAt(fetchStub, 6, "retry-dp");
+        const ctx = await newLoggedInContext(fetchSpy);
+        stubAuth0Ok(fetchSpy, "new-refresh", "new-id");
+        stubCpOk(fetchSpy, "new-cp");
+        fetchSpy.mockResolvedValueOnce(
+          new Response("bad gateway", { status: 502 }),
+        );
+        stubDpOk(fetchSpy, "retry-dp");
 
         await ctx.refresh();
 
@@ -547,21 +535,21 @@ describe("oauth/auth-context.ts", () => {
       });
 
       it("should not retry phase-2 when the error is a known non-transient signal", async () => {
-        const ctx = await newLoggedInContext(fetchStub);
-        stubAuth0OkAt(fetchStub, 3, "new-refresh", "new-id");
-        fetchStub
-          .onCall(4)
-          .resolves(
-            new Response(
-              '{"error":"invalid_grant","error_description":"Unknown or invalid refresh token."}',
-              { status: 400 },
-            ),
-          );
+        const ctx = await newLoggedInContext(fetchSpy);
+        const callsBeforeRefresh = fetchSpy.mock.calls.length;
+        stubAuth0Ok(fetchSpy, "new-refresh", "new-id");
+        fetchSpy.mockResolvedValueOnce(
+          new Response(
+            '{"error":"invalid_grant","error_description":"Unknown or invalid refresh token."}',
+            { status: 400 },
+          ),
+        );
 
         await ctx.refresh();
 
-        // Only the first CP call should have fired — no retry.
-        expect(fetchStub.callCount).toBe(5);
+        // Only the first CP call should have fired - no retry. Refresh
+        // consumed 2 fetches (Auth0 + CP), not 3.
+        expect(fetchSpy.mock.calls.length).toBe(callsBeforeRefresh + 2);
         expect(ctx.getErrors().tokenRefresh!.isTransient).toBe(false);
       });
     });
@@ -569,18 +557,17 @@ describe("oauth/auth-context.ts", () => {
 
   describe("startRefreshLoop / stopRefreshLoop", () => {
     let ctx: AuthContext;
-    let clock: sinon.SinonFakeTimers;
 
     beforeEach(async () => {
-      // Real timers for login — AbortSignal.timeout inside postJson needs
+      // Real timers for login - AbortSignal.timeout inside postJson needs
       // real setTimeout. Install fake timers only after the login resolves.
-      ctx = await newLoggedInContext(fetchStub);
-      clock = sinon.useFakeTimers({ shouldAdvanceTime: false });
+      ctx = await newLoggedInContext(fetchSpy);
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
       ctx.stopRefreshLoop();
-      clock.restore();
+      vi.useRealTimers();
     });
 
     it("should throw on invalid intervalMs", () => {
@@ -597,108 +584,109 @@ describe("oauth/auth-context.ts", () => {
 
     it("should be a no-op when the context is already cleared", async () => {
       ctx.clear();
-      const refreshStub = sandbox.stub(ctx, "refresh").resolves();
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
       ctx.startRefreshLoop(60_000);
-      await clock.tickAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
 
       // No timer was ever created → no ticks fired.
-      sinon.assert.notCalled(refreshStub);
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
 
     it("should call refresh when CP is inside the refresh window", async () => {
-      sandbox.stub(ctx, "shouldAttemptRefresh").returns(true);
-      const refreshStub = sandbox.stub(ctx, "refresh").resolves();
+      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
       ctx.startRefreshLoop(60_000);
-      await clock.tickAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
 
-      sinon.assert.calledOnce(refreshStub);
+      expect(refreshSpy).toHaveBeenCalledOnce();
     });
 
     it("should not call refresh when CP is still fresh", async () => {
-      sandbox.stub(ctx, "shouldAttemptRefresh").returns(false);
-      const refreshStub = sandbox.stub(ctx, "refresh").resolves();
+      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(false);
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
       ctx.startRefreshLoop(60_000);
-      await clock.tickAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
 
-      sinon.assert.notCalled(refreshStub);
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
 
     it("should clear and stop when the refresh token has expired", async () => {
-      sandbox.stub(ctx, "refreshTokenExpired").returns(true);
-      const refreshStub = sandbox.stub(ctx, "refresh").resolves();
+      vi.spyOn(ctx, "refreshTokenExpired").mockReturnValue(true);
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
       ctx.startRefreshLoop(60_000);
-      await clock.tickAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
       // Clear stops the loop, so subsequent ticks are no-ops.
-      await clock.tickAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
 
-      sinon.assert.notCalled(refreshStub);
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
 
     it("should skip a tick when the previous tick is still running", async () => {
-      sandbox.stub(ctx, "shouldAttemptRefresh").returns(true);
+      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
       let resolveRefresh: () => void = () => {};
-      const refreshStub = sandbox.stub(ctx, "refresh").returns(
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockReturnValue(
         new Promise<void>((r) => {
           resolveRefresh = r;
         }),
       );
 
       ctx.startRefreshLoop(60_000);
-      await clock.tickAsync(60_000);
-      await clock.tickAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
 
-      sinon.assert.calledOnce(refreshStub);
+      expect(refreshSpy).toHaveBeenCalledOnce();
       resolveRefresh();
     });
 
     it("should fire on every interval when no tick is in flight", async () => {
-      sandbox.stub(ctx, "shouldAttemptRefresh").returns(true);
-      const refreshStub = sandbox.stub(ctx, "refresh").resolves();
+      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
       ctx.startRefreshLoop(60_000);
-      await clock.tickAsync(60_000);
-      sinon.assert.calledOnce(refreshStub);
-      await clock.tickAsync(60_000);
-      sinon.assert.calledTwice(refreshStub);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(refreshSpy).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(refreshSpy).toHaveBeenCalledTimes(2);
     });
 
     it("should swallow errors thrown by refresh and keep looping", async () => {
-      sandbox.stub(ctx, "shouldAttemptRefresh").returns(true);
-      const refreshStub = sandbox.stub(ctx, "refresh");
-      refreshStub.onFirstCall().rejects(new Error("boom"));
-      refreshStub.onSecondCall().resolves();
+      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+      const refreshSpy = vi
+        .spyOn(ctx, "refresh")
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce();
 
       ctx.startRefreshLoop(60_000);
-      await clock.tickAsync(60_000);
-      await clock.tickAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
 
-      sinon.assert.calledTwice(refreshStub);
+      expect(refreshSpy).toHaveBeenCalledTimes(2);
     });
 
     it("should stop the loop when stopRefreshLoop is called", async () => {
-      sandbox.stub(ctx, "shouldAttemptRefresh").returns(true);
-      const refreshStub = sandbox.stub(ctx, "refresh").resolves();
+      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
       ctx.startRefreshLoop(60_000);
 
       ctx.stopRefreshLoop();
-      await clock.tickAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
 
-      sinon.assert.notCalled(refreshStub);
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
 
     it("should stop the loop when clear() is called", async () => {
-      sandbox.stub(ctx, "shouldAttemptRefresh").returns(true);
-      const refreshStub = sandbox.stub(ctx, "refresh").resolves();
+      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
       ctx.startRefreshLoop(60_000);
 
       ctx.clear();
-      await clock.tickAsync(60_000);
+      await vi.advanceTimersByTimeAsync(60_000);
 
-      sinon.assert.notCalled(refreshStub);
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
   });
 });

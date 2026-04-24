@@ -359,16 +359,12 @@ describe("index.ts", () => {
     // Stubbing the underlying randomBytes lets us assert deterministic output.
     const FAKE_BYTES = Buffer.alloc(32, 0xab);
     const EXPECTED_API_KEY = "ab".repeat(32);
-    // Narrow to the sync overload (size: number) => Buffer; the variadic
-    // callback overload would type mockReturnValue's arg as void.
-    let randomBytesSpy: MockInstance<(size: number) => Buffer>;
+    let randomBytesSpy: MockInstance<typeof nodeCrypto.randomBytes>;
 
     beforeEach(() => {
-      randomBytesSpy = vi.spyOn(
-        nodeCrypto,
-        "randomBytes",
-      ) as unknown as MockInstance<(size: number) => Buffer>;
-      randomBytesSpy.mockReturnValue(FAKE_BYTES);
+      randomBytesSpy = vi
+        .spyOn(nodeCrypto, "randomBytes")
+        .mockReturnValue(FAKE_BYTES);
     });
 
     it("should generate exactly one API key per invocation", () => {

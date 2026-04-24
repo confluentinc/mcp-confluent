@@ -1,5 +1,6 @@
 import { type DirectConnectionConfig } from "@src/config/index.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { nodeCrypto } from "@src/confluent/node-deps.js";
 import type {
   ToolConfig,
   ToolHandler,
@@ -14,7 +15,6 @@ import {
   outputApiKey,
   outputToolList,
 } from "@src/index.js";
-import { authUtils } from "@src/mcp/transports/index.js";
 import { envFactory } from "@tests/factories/env.js";
 import {
   beforeEach,
@@ -355,24 +355,31 @@ describe("index.ts", () => {
   });
 
   describe("outputApiKey()", () => {
-    const FAKE_API_KEY = "fake-api-key-for-testing";
-    let generateApiKeySpy: MockInstance<typeof authUtils.generateApiKey>;
+    // generateApiKey produces a 64-char hex string from 32 random bytes.
+    // Stubbing the underlying randomBytes lets us assert deterministic output.
+    const FAKE_BYTES = Buffer.alloc(32, 0xab);
+    const EXPECTED_API_KEY = "ab".repeat(32);
+    // Narrow to the sync overload (size: number) => Buffer; the variadic
+    // callback overload would type mockReturnValue's arg as void.
+    let randomBytesSpy: MockInstance<(size: number) => Buffer>;
 
     beforeEach(() => {
-      generateApiKeySpy = vi
-        .spyOn(authUtils, "generateApiKey")
-        .mockReturnValue(FAKE_API_KEY);
+      randomBytesSpy = vi.spyOn(
+        nodeCrypto,
+        "randomBytes",
+      ) as unknown as MockInstance<(size: number) => Buffer>;
+      randomBytesSpy.mockReturnValue(FAKE_BYTES);
     });
 
-    it("should call generateApiKey once", () => {
+    it("should generate exactly one API key per invocation", () => {
       outputApiKey();
-      expect(generateApiKeySpy).toHaveBeenCalledOnce();
+      expect(randomBytesSpy).toHaveBeenCalledOnce();
     });
 
     it("should print the generated key to console.log", () => {
       outputApiKey();
       const allArgs: unknown[] = consoleLog.mock.calls.flat();
-      expect(allArgs).toContain(FAKE_API_KEY);
+      expect(allArgs).toContain(EXPECTED_API_KEY);
     });
   });
 });

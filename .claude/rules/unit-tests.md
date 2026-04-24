@@ -56,8 +56,8 @@ limitation (Sinon had the same constraint).
 
 - Extract dependencies to separate modules and export them as properties of a namespace object
 - Pass dependencies as parameters
-- Use namespace objects (see `node-deps.ts`, `authUtils` pattern) so callers access via property
-  lookup instead of a bare named import
+- Use namespace objects (see `node-deps.ts`) so callers access via property lookup instead of a
+  bare named import
 
 ### ESM Live Bindings and `node-deps.ts`
 
@@ -89,11 +89,14 @@ the function.
 Add new deps to `node-deps.ts` as needed. For shared mutable objects like `logger`, spy methods
 directly on the object without a wrapper.
 
-### Other namespace-object patterns
+### When to extend `node-deps.ts` vs. stub one level deeper
 
-The same idea applies outside `node-deps.ts`: any exported free function that callers want to
-stub should live inside a namespace object. Example: `authUtils.generateApiKey` in
-`src/mcp/transports/auth.ts`. Tests spy via `vi.spyOn(authUtils, "generateApiKey")`.
+The general rule: wrap external I/O at the lowest stable boundary you control. If production code
+calls a Node builtin or third-party primitive that isn't already in `node-deps.ts`, add it there
+and spy on the wrapper. If the primitive is already wrapped (like `nodeCrypto.randomBytes`) and a
+project-local function just composes around it, stub the primitive — there's no need to also wrap
+the composing function. `generateApiKey` in `src/mcp/transports/auth.ts` is an example: tests stub
+`nodeCrypto.randomBytes` rather than wrapping `generateApiKey` in its own namespace.
 
 ### Why `vi.mock` is not used in this project
 

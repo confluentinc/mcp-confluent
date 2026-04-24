@@ -22,6 +22,7 @@ import type {
   Auth0TokenResponse,
   ConfluentTokenSet,
   ControlPlaneTokenResponse,
+  DataPlaneTokenResponse,
 } from "@src/confluent/oauth/types.js";
 import { logger } from "@src/logger.js";
 
@@ -208,7 +209,7 @@ export class AuthContext {
       }
       if (this.cleared) return;
 
-      let dpResponse;
+      let dpResponse: DataPlaneTokenResponse;
       try {
         dpResponse = await exchangeControlPlaneForDataPlaneToken(
           this.auth0Config.apiUrl,

@@ -122,8 +122,8 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
 ### 5. Stubbable boundaries
 
 - External I/O (filesystem, process env, network not mediated by `openapi-fetch` or Kafka clients)
-  should go through `src/confluent/node-deps.ts` so unit tests can stub it via Sinon. If a PR
-  introduces a new direct node-module dependency, push back and ask for it to be routed through
+  should go through `src/confluent/node-deps.ts` so unit tests can spy on it via `vi.spyOn`. If a
+  PR introduces a new direct node-module dependency, push back and ask for it to be routed through
   `node-deps.ts`.
 - New configuration reads should go through the schema-validated config layer, not `process.env`
   or ad-hoc file reads.
@@ -142,15 +142,17 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
 
 - New behavior needs unit tests. Tests are co-located as `*.test.ts` next to the file under test
   and run with Vitest.
-- Stub external interactions with Sinon sandboxes. Sandboxes should be declared at the widest
-  appropriate `describe()` scope and restored in `afterEach()`. Shared stub helpers live in
-  `tests/stubs/`; test data factories live in `tests/factories/`.
-- ESM live bindings — functions or consts imported directly from another module — can't be
-  replaced by Sinon sandboxes (bindings are read-only from outside the defining module). For
-  those cases, fall back to Vitest's module-level mocking (`vi.mock` / `vi.hoisted` /
-  `vi.mocked`), which rewires the module graph before importers run. Prefer Sinon by default;
-  reach for `vi.mock` only when the binding can't otherwise be stubbed. See `src/index.test.ts`
-  for an example.
+- Stub external interactions with `vi.spyOn` (preferred) or `vi.fn()`. `vitest.config.ts` sets
+  `restoreMocks: true`, so every spy is auto-restored after each test - no per-test `afterEach`
+  restore hooks are needed. Shared stub helpers live in `tests/stubs/`; test data factories live
+  in `tests/factories/`.
+- ESM live bindings - functions or consts imported directly from another module - can't be spied
+  on by `vi.spyOn` (bindings are read-only from outside the defining module). The fix is to wrap
+  the dependency in a namespace object so callers access it via property lookup: see
+  `src/confluent/node-deps.ts` for Node builtins and third-party constructors, and `authUtils`
+  in `src/mcp/transports/auth.ts` for same-project free functions. Do **not** reach for
+  `vi.mock` as an escape hatch - it hoists above imports, loses type safety, and splits the
+  project's stubbing model.
 - Outer `describe()` per file, inner `describe()` per class/function, `it("should ...")` per
   behavior.
 

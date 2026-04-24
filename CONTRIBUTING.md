@@ -56,7 +56,7 @@ library's core.
 │   │   ├── schema-registry-helper.ts
 │   │   └── tools/
 │   │       ├── base-tools.ts        # Base handler class
-│   │       ├── tool-factory.ts      # Tool registry
+│   │       ├── tool-registry.ts     # Tool registry
 │   │       ├── tool-name.ts         # Tool name enum
 │   │       └── handlers/
 │   │           ├── billing/         # Billing tools
@@ -278,12 +278,16 @@ After pressing F5, your MCP client should automatically discover the `confluent-
 
 ### Adding a New Tool
 
-1. Add a new enum to the enum class `ToolName`.
-2. Add your new tool to the handlers map in the `ToolFactory` class.
-3. Create a new file, exporting the class that extends `BaseToolHandler`.
-   1. Implement the `handle` method of the base class.
-   2. Implement the `getToolConfig` method of the base class.
-4. Once satisfied, add it to the set of `enabledTools` in `index.ts`.
+Tools are auto-enabled at startup based on which environment variables are present: each handler declares its requirements via `getRequiredEnvVars()`, and the server only exposes handlers whose requirements are satisfied. There is no manual enabled-tools list to maintain.
+
+1. Add a new entry to the `ToolName` enum in `src/confluent/tools/tool-name.ts`.
+2. Create a handler class under `src/confluent/tools/handlers/<domain>/` (pick the existing domain directory that matches the Confluent service the tool wraps, or add a new one). The class must extend `BaseToolHandler`.
+3. On your handler, implement:
+   - `getToolConfig()` — returns the tool name, description, Zod input schema, and annotations (`READ_ONLY`, `CREATE_UPDATE`, `DESTRUCTIVE`). For tools with no parameters, pass `inputSchema: {}`, not an omitted field.
+   - `handle()` — the runtime implementation.
+   - `getRequiredEnvVars()` — the env vars that must be set for the server to expose this tool.
+4. Register the handler in the `ToolHandlerRegistry.handlers` map in `src/confluent/tools/tool-registry.ts`.
+5. If the tool calls a Confluent Cloud REST endpoint whose path or response shape isn't already in `openapi.json`, add it and regenerate the typed client — see [Generating Types](#generating-types) below.
 
 ### Generating Types
 

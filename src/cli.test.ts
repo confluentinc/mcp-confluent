@@ -13,7 +13,6 @@ import {
   describe,
   expect,
   it,
-  type Mock,
   type MockInstance,
   vi,
 } from "vitest";
@@ -190,11 +189,11 @@ describe("cli.ts", () => {
     }
 
     let fsMocks: MockedFsWrappers;
-    let resolveSpy: Mock;
+    let resolveSpy: MockInstance<typeof nodeDeps.path.resolve>;
 
     beforeEach(() => {
       fsMocks = createFsWrappers();
-      resolveSpy = vi.spyOn(nodeDeps.path, "resolve") as unknown as Mock;
+      resolveSpy = vi.spyOn(nodeDeps.path, "resolve");
     });
 
     describe("error handling", () => {

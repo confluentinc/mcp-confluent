@@ -1,0 +1,8 @@
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "broker.confluent.cloud:9092"
+      rest_endpoint: "https://pkc-abc123.us-east-1.aws.confluent.cloud:443"
+      cluster_id: "lkc-abc123"
+      env_id: "env-xyz789"

@@ -1,0 +1,9 @@
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "broker.confluent.cloud:9092"
+      extra_properties:
+        socket.timeout.ms: "30000"
+        ssl.ca.location: "/etc/ssl/certs/ca-certificates.crt"
+        debug: "broker,topic"

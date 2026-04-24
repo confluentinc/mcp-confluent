@@ -1,0 +1,9 @@
+connections:
+  production:
+    type: direct
+    confluent_cloud:
+      endpoint: "https://custom.confluent.cloud"
+      auth:
+        type: api_key
+        key: "mycloudkey"
+        secret: "mycloudsecret"

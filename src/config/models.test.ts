@@ -32,7 +32,7 @@ describe("config/models.ts", () => {
     it.each([
       [
         "confluent_cloud",
-        { endpoint: "https://api.confluent.cloud", bogus: 1 },
+        { auth: { type: "api_key", key: "k", secret: "s" }, bogus: 1 },
       ],
       ["kafka", { bootstrap_servers: "broker:9092", bogus: 1 }],
       ["schema_registry", { endpoint: "https://sr.example.com", bogus: 1 }],
@@ -323,6 +323,68 @@ describe("config/models.ts", () => {
     });
   });
 
+  describe("confluent_cloud block", () => {
+    const baseCC = {
+      auth: { type: "api_key" as const, key: "k", secret: "s" },
+    };
+
+    it("should apply default endpoint when only auth is provided", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: { type: "direct", confluent_cloud: baseCC },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.connections["production"]?.confluent_cloud).toEqual({
+          endpoint: "https://api.confluent.cloud",
+          auth: { type: "api_key", key: "k", secret: "s" },
+        });
+      }
+    });
+
+    it("should preserve explicit endpoint when provided", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            confluent_cloud: {
+              ...baseCC,
+              endpoint: "https://custom.confluent.cloud",
+            },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          result.data.connections["production"]?.confluent_cloud?.endpoint,
+        ).toBe("https://custom.confluent.cloud");
+      }
+    });
+
+    it("should reject confluent_cloud block with no auth", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            confluent_cloud: { endpoint: "https://api.confluent.cloud" },
+          },
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject empty confluent_cloud block", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: { type: "direct", confluent_cloud: {} },
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe("MCPServerConfiguration", () => {
     describe("getConnectionNames", () => {
       it("should return connection names sorted alphabetically", () => {
@@ -376,6 +438,7 @@ describe("config/models.ts", () => {
             local: {
               type: "direct",
               confluent_cloud: {
+                endpoint: "https://api.confluent.cloud",
                 auth: { type: "api_key", key: "k", secret: "s" },
               },
             },
@@ -398,6 +461,7 @@ describe("config/models.ts", () => {
             local: {
               type: "direct",
               confluent_cloud: {
+                endpoint: "https://api.confluent.cloud",
                 auth: { type: "api_key", key: "k", secret: "s" },
               },
             },
@@ -426,6 +490,7 @@ describe("config/models.ts", () => {
             local: {
               type: "direct",
               confluent_cloud: {
+                endpoint: "https://api.confluent.cloud",
                 auth: { type: "api_key", key: "k", secret: "s" },
               },
             },
@@ -535,6 +600,7 @@ describe("config/models.ts", () => {
             local: {
               type: "direct",
               confluent_cloud: {
+                endpoint: "https://api.confluent.cloud",
                 auth: { type: "api_key", key: "k", secret: "s" },
               },
             },
@@ -552,6 +618,7 @@ describe("config/models.ts", () => {
             local: {
               type: "direct",
               confluent_cloud: {
+                endpoint: "https://api.confluent.cloud",
                 auth: { type: "api_key", key: "k", secret: "s" },
               },
             },

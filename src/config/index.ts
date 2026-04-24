@@ -1,10 +1,19 @@
 import { interpolateValues } from "@src/config/interpolation.js";
-import { MCPServerConfiguration, mcpConfigSchema } from "@src/config/models.js";
+import {
+  formatZodIssues,
+  mcpConfigSchema,
+  MCPServerConfiguration,
+} from "@src/config/models.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
-export { MCPServerConfiguration } from "@src/config/models.js";
+export { consConfigFromEnv } from "@src/config/env-config.js";
+export {
+  CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
+  MCPServerConfiguration,
+  type DirectConnectionConfig,
+} from "@src/config/models.js";
 
 /**
  * Loads and validates an MCP server configuration from a YAML file.
@@ -86,13 +95,9 @@ export function parseYamlConfiguration(
   const validationResult = mcpConfigSchema.safeParse(parsedYaml);
 
   if (!validationResult.success) {
-    const errors = validationResult.error.issues
-      .map((issue) => {
-        const path = issue.path.join(".");
-        return path ? `  - ${path}: ${issue.message}` : `  - ${issue.message}`;
-      })
-      .join("\n");
-    throw new Error(`Configuration validation failed:\n${errors}`);
+    throw new Error(
+      `Configuration validation failed:\n${formatZodIssues(validationResult.error.issues)}`,
+    );
   }
 
   // Promote from raw parsed object to MCPServerConfiguration instance.

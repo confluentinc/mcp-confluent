@@ -1,0 +1,4 @@
+connections:
+  production:
+    type: direct
+    telemetry: {}

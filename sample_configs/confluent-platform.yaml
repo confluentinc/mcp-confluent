@@ -1,0 +1,36 @@
+# Example MCP Confluent Server configuration for a Confluent Platform deployment.
+#
+# Confluent Platform (self-managed) is not a distinct mode in mcp-confluent — it is
+# simply a set of env var / connection values the existing code accepts. With the
+# configuration below, the server will register the seven Kafka and Schema Registry
+# tools that are compatible with CP, and auto-disable every tool that depends on a
+# Confluent Cloud service (Flink, Tableflow, Billing, Metrics, Stream Governance,
+# Managed Connect, Environments/Clusters).
+#
+# Auth assumption: PLAIN over SASL_SSL. If your CP cluster uses SCRAM, mTLS, or
+# another mechanism, override security.protocol and sasl.mechanisms via the
+# kafka.extra_properties map at the bottom of this file.
+#
+# TLS trust: if your CP brokers or Schema Registry use an internal CA not in Node's
+# default trust store, set NODE_EXTRA_CA_CERTS=/path/to/ca.pem in your environment.
+
+connections:
+  cp:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "cp-broker.internal:9092"
+      auth:
+        type: "api_key"
+        key: "${KAFKA_API_KEY}"
+        secret: "${KAFKA_API_SECRET}"
+      # extra_properties:
+      #   security.protocol: "SASL_SSL"
+      #   sasl.mechanisms: "PLAIN"
+      # # For SCRAM instead:
+      # #   sasl.mechanisms: "SCRAM-SHA-512"
+    schema_registry:
+      endpoint: "https://cp-sr.internal:8081"
+      auth:
+        type: "api_key"
+        key: "${SCHEMA_REGISTRY_API_KEY}"
+        secret: "${SCHEMA_REGISTRY_API_SECRET}"

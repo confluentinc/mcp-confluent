@@ -80,7 +80,7 @@ const envSchema = z.object({
   KAFKA_API_KEY: z
     .string()
     .describe(
-      "Authentication credential (username) required to establish secure connection with the Kafka cluster",
+      "SASL authentication username (API key on Confluent Cloud; principal name on Confluent Platform) for the Kafka cluster",
     )
     .trim()
     .min(1)
@@ -88,7 +88,7 @@ const envSchema = z.object({
   KAFKA_API_SECRET: z
     .string()
     .describe(
-      "Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access",
+      "SASL authentication password (API secret on Confluent Cloud; password on Confluent Platform), paired with KAFKA_API_KEY",
     )
     .trim()
     .min(1)
@@ -128,7 +128,7 @@ const envSchema = z.object({
   SCHEMA_REGISTRY_API_KEY: z
     .string()
     .describe(
-      "Authentication key for accessing Schema Registry services to manage and validate data schemas",
+      "HTTP Basic Auth username for Schema Registry (API key on Confluent Cloud; principal on Confluent Platform)",
     )
     .trim()
     .min(1)
@@ -136,7 +136,7 @@ const envSchema = z.object({
   SCHEMA_REGISTRY_API_SECRET: z
     .string()
     .describe(
-      "Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access",
+      "HTTP Basic Auth password for Schema Registry, paired with SCHEMA_REGISTRY_API_KEY",
     )
     .trim()
     .min(1)
@@ -226,7 +226,7 @@ const configSchema = z
     SCHEMA_REGISTRY_ENDPOINT: z
       .string()
       .describe(
-        "URL endpoint for accessing Schema Registry services to manage data schemas",
+        "Base URL of the Schema Registry (Confluent Cloud or Confluent Platform)",
       )
       .trim()
       .url(),

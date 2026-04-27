@@ -124,10 +124,7 @@ export class AuthHolder {
    * `maxMs` regardless. Production middleware calls this with `maxMs <= 5s`.
    */
   async waitForRefresh(opts: { maxMs: number }): Promise<void> {
-    if (!this.ctx) return;
-    const inflight = (
-      this.ctx as unknown as { inflightRefresh: Promise<void> | null }
-    ).inflightRefresh;
+    const inflight = this.ctx?.getInflightRefresh();
     if (!inflight) return;
     await Promise.race([
       inflight,

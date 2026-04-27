@@ -129,6 +129,16 @@ export class AuthContext {
     return this.errors;
   }
 
+  /**
+   * Promise tracking an in-flight refresh, or `null` when no refresh is
+   * pending. Callers (e.g., the bearer middleware via {@link AuthHolder.waitForRefresh})
+   * can `await` this to ride out the rotation window without triggering a
+   * recovery. Returns `null` once the refresh resolves.
+   */
+  getInflightRefresh(): Promise<void> | null {
+    return this.inflightRefresh;
+  }
+
   /** True when the refresh token is no longer usable (expired or cleared). */
   refreshTokenExpired(now: number = Date.now()): boolean {
     if (this.cleared) return true;

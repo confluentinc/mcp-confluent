@@ -204,6 +204,17 @@ export function mockHttpServer(): MockedHttpServer {
       if (event === "close") closeListeners.push(listener as () => void);
       return fakeServer as HttpServer;
     },
+    off(event: unknown, listener: unknown) {
+      if (event === "error") {
+        const idx = errorListeners.indexOf(listener as (err: Error) => void);
+        if (idx >= 0) errorListeners.splice(idx, 1);
+      }
+      if (event === "close") {
+        const idx = closeListeners.indexOf(listener as () => void);
+        if (idx >= 0) closeListeners.splice(idx, 1);
+      }
+      return fakeServer as HttpServer;
+    },
   };
 
   const spy = vi

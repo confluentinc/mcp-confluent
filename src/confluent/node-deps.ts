@@ -9,7 +9,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer as httpCreateServer } from "node:http";
 import { arch, homedir, platform, release } from "node:os";
 import { join, resolve } from "node:path";
-import open from "open";
 
 export const buildConfig = { TELEMETRY_WRITE_KEY };
 export const dotenvLib = { config: dotenv.config };
@@ -26,8 +25,12 @@ export const nodeCrypto = {
   randomBytes: (size: number): Buffer => randomBytes(size),
 };
 export const nodeHttp = { createServer: httpCreateServer };
-// `open` is a function with side effects; wrap so callers spy on the property,
-// not the imported binding (which is read-only per ESM live-binding rules).
+// `open` is loaded lazily so non-OAuth runs don't pay the import cost (it
+// pulls in is-wsl, default-browser, etc.). Callers spy on the property, not
+// the imported binding (which is read-only per ESM live-binding rules).
 export const nodeOpen = {
-  open: (target: string) => open(target),
+  open: async (target: string): Promise<void> => {
+    const { default: open } = await import("open");
+    await open(target);
+  },
 };

@@ -1,8 +1,18 @@
 import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { AuthHolder } from "@src/confluent/oauth/auth-holder.js";
-import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
+import {
+  getAuth0Config,
+  OAUTH_CALLBACK_PATH,
+} from "@src/confluent/oauth/auth0-config.js";
 import type { Auth0Config } from "@src/confluent/oauth/types.js";
-import { mockFetch, type MockedFetch } from "@tests/stubs/index.js";
+import {
+  mockFetch,
+  mockHttpServer,
+  mockOpen,
+  type MockedFetch,
+  type MockedHttpServer,
+  type MockedOpen,
+} from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 function jsonResponse(body: object, status = 200): Response {
@@ -132,6 +142,52 @@ describe("oauth/auth-holder.ts", () => {
 
       expect(fetchSpy).toHaveBeenCalledTimes(3);
       expect(holder.getControlPlaneToken()).toBe("cp");
+    });
+
+    it("should single-flight: two concurrent recoverIfBroken calls share one PKCE flow", async () => {
+      // Initial chain (login that gets us into a broken state).
+      stubFullChain(fetchSpy);
+      const ctx = await AuthContext.newFromInitialLogin(
+        auth0Config,
+        "code",
+        "verifier",
+      );
+      // Force the held context into a non-transient broken state — both
+      // CP and DP tokens become unreadable, recoverIfBroken's fast-path skipped.
+      (ctx as unknown as { cleared: boolean }).cleared = true;
+      (
+        ctx as unknown as { errors: { tokenRefresh: { isTransient: boolean } } }
+      ).errors = { tokenRefresh: { isTransient: false } as never };
+      const holder = makeHolder(auth0Config, ctx);
+
+      // Stub the PKCE flow's I/O so recoverIfBroken's runPkceLogin can complete.
+      const httpMock: MockedHttpServer = mockHttpServer();
+      const openSpy: MockedOpen = mockOpen();
+      // Recovery's full chain (auth0 + cp + dp).
+      stubFullChain(fetchSpy, "-recovered");
+
+      // Kick off two concurrent recoveries.
+      const a = holder.recoverIfBroken();
+      const b = holder.recoverIfBroken();
+
+      // Wait for the production code to bind the listener and open the browser.
+      await httpMock.listening;
+      // Single-flight: only ONE browser open across both callers.
+      expect(openSpy).toHaveBeenCalledTimes(1);
+
+      // Drive the PKCE callback so runPkceLogin can complete.
+      const openedUrl = openSpy.mock.calls[0]![0] as string;
+      const state = new URL(openedUrl).searchParams.get("state")!;
+      await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?code=auth-code-recovered&state=${state}`,
+      );
+
+      await Promise.all([a, b]);
+
+      // Recovery installed a fresh context with the new tokens.
+      expect(holder.getControlPlaneToken()).toBe("cp-recovered");
+      // Exactly one PKCE flow ran end-to-end.
+      expect(httpMock.spy).toHaveBeenCalledTimes(1);
     });
   });
 });

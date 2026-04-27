@@ -124,9 +124,11 @@ export async function runPkceLogin(
     resolveCode(code);
   });
 
-  // Bind, fail loudly on EADDRINUSE.
+  // Bind, fail loudly on EADDRINUSE. The error listener is detached after a
+  // successful bind so a late post-bind socket error doesn't try to reject an
+  // already-resolved promise (silent no-op that would mask real failures).
   const bindResult = new Promise<void>((resolve, reject) => {
-    server.on("error", (err: NodeJS.ErrnoException) => {
+    const onBindError = (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
         reject(
           new PkceLoginError(
@@ -137,8 +139,12 @@ export async function runPkceLogin(
       } else {
         reject(err);
       }
+    };
+    server.on("error", onBindError);
+    server.listen(OAUTH_CALLBACK_PORT, () => {
+      server.off("error", onBindError);
+      resolve();
     });
-    server.listen(OAUTH_CALLBACK_PORT, () => resolve());
   });
 
   let timer: ReturnType<typeof setTimeout> | undefined;

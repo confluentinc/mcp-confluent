@@ -16,13 +16,13 @@ import { z } from "zod";
  * At least one of kafka, schema_registry, confluent_cloud, tableflow, flink, or telemetry must be present.
  */
 export interface DirectConnectionConfig {
-  type: "direct";
-  kafka?: KafkaDirectConfig;
-  schema_registry?: SchemaRegistryDirectConfig;
-  confluent_cloud?: ConfluentCloudDirectConfig;
-  tableflow?: TableflowDirectConfig;
-  telemetry?: TelemetryDirectConfig;
-  flink?: FlinkDirectConfig;
+  readonly type: "direct";
+  readonly kafka?: KafkaDirectConfig;
+  readonly schema_registry?: SchemaRegistryDirectConfig;
+  readonly confluent_cloud?: ConfluentCloudDirectConfig;
+  readonly tableflow?: TableflowDirectConfig;
+  readonly telemetry?: TelemetryDirectConfig;
+  readonly flink?: FlinkDirectConfig;
 }
 
 /**
@@ -30,9 +30,9 @@ export interface DirectConnectionConfig {
  * Corresponds to `auth` blocks nested under each service in `connections.<name>`.
  */
 export interface ApiKeyAuthConfig {
-  type: "api_key";
-  key: string;
-  secret: string;
+  readonly type: "api_key";
+  readonly key: string;
+  readonly secret: string;
 }
 
 export type AuthConfig = ApiKeyAuthConfig;
@@ -42,12 +42,12 @@ export type AuthConfig = ApiKeyAuthConfig;
  * Corresponds to `connections.<name>.kafka` in the YAML configuration.
  */
 export interface KafkaDirectConfig {
-  bootstrap_servers?: string;
-  auth?: AuthConfig;
-  rest_endpoint?: string;
-  cluster_id?: string;
-  env_id?: string;
-  extra_properties?: Record<string, string>;
+  readonly bootstrap_servers?: string;
+  readonly auth?: AuthConfig;
+  readonly rest_endpoint?: string;
+  readonly cluster_id?: string;
+  readonly env_id?: string;
+  readonly extra_properties?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -55,8 +55,8 @@ export interface KafkaDirectConfig {
  * Corresponds to `connections.<name>.schema_registry` in the YAML configuration.
  */
 export interface SchemaRegistryDirectConfig {
-  endpoint: string;
-  auth?: AuthConfig;
+  readonly endpoint: string;
+  readonly auth?: AuthConfig;
 }
 
 /**
@@ -64,8 +64,8 @@ export interface SchemaRegistryDirectConfig {
  * Corresponds to `connections.<name>.confluent_cloud` in the YAML configuration.
  */
 export interface ConfluentCloudDirectConfig {
-  endpoint: string;
-  auth: AuthConfig;
+  readonly endpoint: string;
+  readonly auth: AuthConfig;
 }
 
 /**
@@ -73,7 +73,7 @@ export interface ConfluentCloudDirectConfig {
  * Corresponds to `connections.<name>.tableflow` in the YAML configuration.
  */
 export interface TableflowDirectConfig {
-  auth: AuthConfig;
+  readonly auth: AuthConfig;
 }
 
 /**
@@ -81,8 +81,8 @@ export interface TableflowDirectConfig {
  * Corresponds to `connections.<name>.telemetry` in the YAML configuration.
  */
 export interface TelemetryDirectConfig {
-  endpoint: string;
-  auth: AuthConfig;
+  readonly endpoint: string;
+  readonly auth: AuthConfig;
 }
 
 /**
@@ -90,13 +90,13 @@ export interface TelemetryDirectConfig {
  * Corresponds to `connections.<name>.flink` in the YAML configuration.
  */
 export interface FlinkDirectConfig {
-  endpoint: string;
-  auth: AuthConfig;
-  environment_id: string;
-  organization_id: string;
-  compute_pool_id: string;
-  environment_name?: string;
-  database_name?: string;
+  readonly endpoint: string;
+  readonly auth: AuthConfig;
+  readonly environment_id: string;
+  readonly organization_id: string;
+  readonly compute_pool_id: string;
+  readonly environment_name?: string;
+  readonly database_name?: string;
 }
 
 /**
@@ -111,11 +111,11 @@ export type ConnectionConfig = DirectConnectionConfig;
  * Distinct from connection config, which governs Kafka and Confluent Cloud client behaviour.
  */
 export interface ServerConfig {
-  transports: TransportType[];
-  log_level: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
-  do_not_track: boolean;
-  http: ServerHttpConfig;
-  auth: ServerAuthConfig;
+  readonly transports: readonly TransportType[];
+  readonly log_level: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
+  readonly do_not_track: boolean;
+  readonly http: ServerHttpConfig;
+  readonly auth: ServerAuthConfig;
 }
 
 /**
@@ -123,11 +123,11 @@ export interface ServerConfig {
  * Corresponds to `server.http` in the YAML configuration.
  */
 export interface ServerHttpConfig {
-  port: number;
-  host: string;
-  mcp_endpoint: string;
-  sse_endpoint: string;
-  sse_message_endpoint: string;
+  readonly port: number;
+  readonly host: string;
+  readonly mcp_endpoint: string;
+  readonly sse_endpoint: string;
+  readonly sse_message_endpoint: string;
 }
 
 /**
@@ -136,9 +136,9 @@ export interface ServerHttpConfig {
  * `api_key` and `disabled: true` are mutually exclusive.
  */
 export interface ServerAuthConfig {
-  api_key?: string;
-  disabled: boolean;
-  allowed_hosts: string[];
+  readonly api_key?: string;
+  readonly disabled: boolean;
+  readonly allowed_hosts: readonly string[];
 }
 
 /**
@@ -147,7 +147,7 @@ export interface ServerAuthConfig {
  */
 export class MCPServerConfiguration {
   /** Named connection map. Corresponds to the `connections` block at the root of the YAML configuration. */
-  readonly connections: Record<string, ConnectionConfig>;
+  readonly connections: Readonly<Record<string, ConnectionConfig>>;
   /** MCP server operational settings. Corresponds to the `server` block at the root of the YAML configuration. */
   readonly server: ServerConfig;
 
@@ -184,81 +184,6 @@ export class MCPServerConfiguration {
 
   getConnectionNames(): string[] {
     return Object.keys(this.connections).sort((a, b) => a.localeCompare(b));
-  }
-
-  /**
-   * Absorbs `-k` / `--kafka-config-file` properties into the kafka block so that all
-   * config is consolidated in MCPServerConfiguration before client construction.
-   *
-   * Only valid in the legacy env-var codepath (`buildConfigFromEnvAndCli`). YAML-configured
-   * connections must not use this method — the `--config` and `--kafka-config-file` flags
-   * are mutually exclusive and enforced at CLI parse time.
-   *
-   * Protected keys (`bootstrap.servers`, `sasl.username`, `sasl.password`) are always
-   * promoted into their corresponding named fields, overriding any env-var-derived values
-   * already present. All other keys go into `extra_properties`. This ensures the resulting
-   * MCPServerConfiguration is self-consistent: named fields hold the authoritative values
-   * with CLI arguments taking precedence over environment variables, matching the intended
-   * precedence order.
-   *
-   * Creates a kafka block if none exists, so that `-k` alone (without any Kafka env vars)
-   * is sufficient to configure the client.
-   *
-   * Throws if `extra_properties` is already set — guards against double-application.
-   */
-  setKafkaExtraProperties(props: Record<string, string>): void {
-    const conn = this.getSoleConnection();
-
-    for (const key of KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS) {
-      if (Object.hasOwn(props, key) && props[key] === "") {
-        throw new Error(
-          `--kafka-config-file: ${key} is present but empty — provide a non-empty value or omit the key`,
-        );
-      }
-    }
-
-    if (!conn.kafka) {
-      if (!Object.hasOwn(props, "bootstrap.servers")) {
-        throw new Error(
-          "--kafka-config-file: no kafka block is configured and props do not include bootstrap.servers — cannot establish a Kafka connection",
-        );
-      }
-      conn.kafka = {};
-    }
-
-    if (conn.kafka.extra_properties !== undefined) {
-      throw new Error(
-        "Cannot apply --kafka-config-file: kafka.extra_properties is already defined in configuration",
-      );
-    }
-
-    const hasSaslUser = Object.hasOwn(props, "sasl.username");
-    const hasSaslPass = Object.hasOwn(props, "sasl.password");
-    if (hasSaslUser !== hasSaslPass) {
-      throw new Error(
-        "--kafka-config-file: sasl.username and sasl.password must both be present or both be absent",
-      );
-    }
-
-    const protectedSet = new Set<string>(KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS);
-
-    if (Object.hasOwn(props, "bootstrap.servers")) {
-      conn.kafka.bootstrap_servers = props["bootstrap.servers"];
-    }
-    if (hasSaslUser && hasSaslPass) {
-      conn.kafka.auth = {
-        type: "api_key",
-        key: props["sasl.username"]!,
-        secret: props["sasl.password"]!,
-      };
-    }
-
-    const remaining = Object.fromEntries(
-      Object.entries(props).filter(([k]) => !protectedSet.has(k)),
-    );
-    if (Object.keys(remaining).length > 0) {
-      conn.kafka.extra_properties = remaining;
-    }
   }
 }
 
@@ -597,7 +522,7 @@ serverConfigSchema satisfies z.ZodType<ServerConfig>;
  * or when MCPServerConfiguration is constructed without an explicit server argument.
  * Derived from serverConfigSchema defaults — single source of truth.
  */
-export const DEFAULT_SERVER_CONFIG: ServerConfig = serverConfigSchema.parse({});
+export const DEFAULT_SERVER_CONFIG = serverConfigSchema.parse({});
 
 /**
  * Root configuration schema. This is the single validation and normalisation

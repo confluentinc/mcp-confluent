@@ -8,11 +8,11 @@ import { FastifyReply, FastifyRequest } from "fastify";
  */
 export interface AuthConfig {
   /** API key for authentication */
-  apiKey: string;
+  readonly apiKey: string;
   /** Whether authentication is enabled */
-  enabled: boolean;
+  readonly enabled: boolean;
   /** List of allowed Host header values for DNS rebinding protection */
-  allowedHosts: string[];
+  readonly allowedHosts: readonly string[];
 }
 
 /**
@@ -66,7 +66,7 @@ function parseHostname(hostHeader: string): string | null {
  */
 function isHostAllowed(
   hostHeader: string | undefined,
-  allowedHosts: string[],
+  allowedHosts: readonly string[],
 ): boolean {
   if (!hostHeader) {
     return false;

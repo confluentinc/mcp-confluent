@@ -875,6 +875,140 @@ describe("config/env-config.ts", () => {
       );
     });
 
+    it("should construct a kafka block when none existed and kafkaConfig provides bootstrap.servers", () => {
+      const config = buildConfigFromEnvAndCli(
+        envWith({
+          CONFLUENT_CLOUD_API_KEY: "k",
+          CONFLUENT_CLOUD_API_SECRET: "s",
+        }),
+        { kafkaConfig: { "bootstrap.servers": "broker:9092" } },
+      );
+      expect(config.getSoleConnection().kafka?.bootstrap_servers).toBe(
+        "broker:9092",
+      );
+      expect(
+        config.getSoleConnection().kafka?.extra_properties,
+      ).toBeUndefined();
+    });
+
+    it("should construct a kafka block with auth from sasl credentials when no kafka block existed", () => {
+      const config = buildConfigFromEnvAndCli(
+        envWith({
+          CONFLUENT_CLOUD_API_KEY: "k",
+          CONFLUENT_CLOUD_API_SECRET: "s",
+        }),
+        {
+          kafkaConfig: {
+            "bootstrap.servers": "broker:9092",
+            "sasl.username": "mykey",
+            "sasl.password": "mysecret",
+          },
+        },
+      );
+      const kafka = config.getSoleConnection().kafka;
+      expect(kafka?.bootstrap_servers).toBe("broker:9092");
+      expect(kafka?.auth).toEqual({
+        type: "api_key",
+        key: "mykey",
+        secret: "mysecret",
+      });
+      expect(kafka?.extra_properties).toBeUndefined();
+    });
+
+    it("should put non-protected keys into extra_properties when constructing a kafka block from scratch", () => {
+      const config = buildConfigFromEnvAndCli(
+        envWith({
+          CONFLUENT_CLOUD_API_KEY: "k",
+          CONFLUENT_CLOUD_API_SECRET: "s",
+        }),
+        {
+          kafkaConfig: {
+            "bootstrap.servers": "broker:9092",
+            "socket.timeout.ms": "30000",
+          },
+        },
+      );
+      const kafka = config.getSoleConnection().kafka;
+      expect(kafka?.bootstrap_servers).toBe("broker:9092");
+      expect(kafka?.extra_properties).toEqual({ "socket.timeout.ms": "30000" });
+    });
+
+    it("should override auth from env vars when kafkaConfig provides sasl credentials", () => {
+      const config = buildConfigFromEnvAndCli(
+        envWith({
+          BOOTSTRAP_SERVERS: "broker:9092",
+          KAFKA_API_KEY: "env-key",
+          KAFKA_API_SECRET: "env-secret",
+        }),
+        {
+          kafkaConfig: {
+            "sasl.username": "k-key",
+            "sasl.password": "k-secret",
+          },
+        },
+      );
+      const kafka = config.getSoleConnection().kafka;
+      expect(kafka?.auth).toEqual({
+        type: "api_key",
+        key: "k-key",
+        secret: "k-secret",
+      });
+      expect(kafka?.extra_properties).toBeUndefined();
+    });
+
+    it.each([
+      ["bootstrap.servers", { "bootstrap.servers": "" }],
+      ["sasl.username", { "sasl.username": "" }],
+      ["sasl.password", { "sasl.password": "" }],
+    ])(
+      "should throw when kafkaConfig protected key '%s' is present but empty",
+      (key, kafkaConfig) => {
+        expect(() =>
+          buildConfigFromEnvAndCli(envWith({ BOOTSTRAP_SERVERS: "b:9092" }), {
+            kafkaConfig,
+          }),
+        ).toThrow(key);
+      },
+    );
+
+    it.each([
+      [{ "sasl.username": "k-key" }, "sasl.password"],
+      [{ "sasl.password": "k-secret" }, "sasl.username"],
+    ])(
+      "should throw when kafkaConfig has only one SASL credential",
+      (kafkaConfig, missingKey) => {
+        expect(() =>
+          buildConfigFromEnvAndCli(envWith({ BOOTSTRAP_SERVERS: "b:9092" }), {
+            kafkaConfig,
+          }),
+        ).toThrow(missingKey);
+      },
+    );
+
+    it("should throw when no kafka block exists and kafkaConfig has no connectivity field", () => {
+      expect(() =>
+        buildConfigFromEnvAndCli(
+          envWith({
+            CONFLUENT_CLOUD_API_KEY: "k",
+            CONFLUENT_CLOUD_API_SECRET: "s",
+          }),
+          { kafkaConfig: { "socket.timeout.ms": "5000" } },
+        ),
+      ).toThrow("bootstrap.servers");
+    });
+
+    it("should throw when no kafka block exists and kafkaConfig is empty", () => {
+      expect(() =>
+        buildConfigFromEnvAndCli(
+          envWith({
+            CONFLUENT_CLOUD_API_KEY: "k",
+            CONFLUENT_CLOUD_API_SECRET: "s",
+          }),
+          { kafkaConfig: {} },
+        ),
+      ).toThrow("bootstrap.servers");
+    });
+
     it("should throw when disableAuth: true is combined with MCP_API_KEY set in env", () => {
       expect(() =>
         buildConfigFromEnvAndCli(

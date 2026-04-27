@@ -104,6 +104,33 @@ function readFileLines(filePath: string): string[] {
   return lines;
 }
 
+function assertNoConfigConflicts(
+  config: string | undefined,
+  kafkaConfigFile: string | undefined,
+  disableAuth: boolean | undefined,
+  allowedHosts: string | undefined,
+): void {
+  if (!config) return;
+  if (kafkaConfigFile) {
+    throw new Error(
+      "--config and --kafka-config-file are mutually exclusive: " +
+        "use kafka.extra_properties in the YAML file instead of -k",
+    );
+  }
+  if (disableAuth) {
+    throw new Error(
+      "--config and --disable-auth are mutually exclusive: " +
+        "use server.auth.disabled in the YAML file instead",
+    );
+  }
+  if (allowedHosts) {
+    throw new Error(
+      "--config and --allowed-hosts are mutually exclusive: " +
+        "use server.auth.allowed_hosts in the YAML file instead",
+    );
+  }
+}
+
 /**
  * Parse command line arguments into a structured CLIOptions object.
  *
@@ -185,12 +212,12 @@ export function parseCliArgs(argv: string[]): CLIOptions {
   try {
     const opts = program.parse(argv).opts();
 
-    if (opts.config && opts.kafkaConfigFile) {
-      throw new Error(
-        "--config and --kafka-config-file are mutually exclusive: " +
-          "use kafka.extra_properties in the YAML file instead of -k",
-      );
-    }
+    assertNoConfigConflicts(
+      opts.config,
+      opts.kafkaConfigFile,
+      opts.disableAuth,
+      opts.allowedHosts,
+    );
 
     // Precedence: CLI > file > undefined
     let allowTools: string[] | undefined = undefined;

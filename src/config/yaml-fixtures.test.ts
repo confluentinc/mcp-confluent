@@ -318,6 +318,33 @@ describe("config/yaml-fixtures.test.ts", () => {
     });
   });
 
+  describe("server block fixtures", () => {
+    it("should load a config with a server block and populate server fields", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/kafka-with-server-block.yaml"),
+        NO_ENV,
+      );
+      expect(config.server.log_level).toBe("debug");
+      expect(config.server.http.port).toBe(9090);
+      expect(config.server.http.host).toBe("0.0.0.0");
+      expect(config.server.http.mcp_endpoint).toBe("/mcp");
+      expect(config.server.auth.allowed_hosts).toEqual([
+        "localhost",
+        "example.com",
+      ]);
+      expect(config.server.auth.api_key).toBeUndefined();
+    });
+
+    it("should reject server.auth with disabled:true and api_key both set", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/server-auth-disabled-with-api-key.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/Configuration validation failed/);
+    });
+  });
+
   describe("invalid fixtures", () => {
     it("should reject auth block missing secret", () => {
       expect(() =>

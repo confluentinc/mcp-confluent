@@ -1,0 +1,19 @@
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "localhost:9092"
+
+server:
+  log_level: debug
+  http:
+    port: 9090
+    host: "0.0.0.0"
+    mcp_endpoint: "/mcp"
+    sse_endpoint: "/sse"
+    sse_message_endpoint: "/messages"
+  auth:
+    disabled: false
+    allowed_hosts:
+      - localhost
+      - example.com

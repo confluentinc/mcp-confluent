@@ -1,0 +1,11 @@
+connections:
+  production:
+    type: direct
+    kafka:
+      bootstrap_servers: "localhost:9092"
+
+server:
+  transports:
+    - http
+    - sse
+  do_not_track: true

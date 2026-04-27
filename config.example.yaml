@@ -22,17 +22,33 @@
 # When using --config, these replace the corresponding environment variables:
 #   LOG_LEVEL, HTTP_PORT, HTTP_HOST, HTTP_MCP_ENDPOINT_PATH,
 #   SSE_MCP_ENDPOINT_PATH, SSE_MCP_MESSAGE_ENDPOINT_PATH,
-#   MCP_API_KEY, MCP_AUTH_DISABLED, MCP_ALLOWED_HOSTS.
+#   MCP_API_KEY, MCP_AUTH_DISABLED, MCP_ALLOWED_HOSTS, DO_NOT_TRACK.
+# server.transports replaces the --transport CLI flag (the two are mutually
+# exclusive; omit --transport and declare transports here instead).
+# Exception: Env var DO_NOT_TRACK is always honored as a floor — if set in the
+# environment, telemetry is disabled regardless of do_not_track below.
 server:
+  # Transports to start. One or more of: stdio, http, sse. Defaults to [stdio].
+  # (Use server.transports instead of --transport when using --config.)
+  transports: [stdio]
+
   # Logging verbosity. One of: trace, debug, info, warn, error, fatal.
   log_level: "${LOG_LEVEL:-info}"
 
+  # Opt out of anonymous usage analytics.
+  # (DO_NOT_TRACK=true in the environment always wins; this field lets you opt
+  # out in YAML without needing the env var.)
+  # do_not_track: true
+
+  # HTTP and SSE transport settings. Omit entirely to use all defaults,
+  # or when only using the stdio transport.
   http:
-    # TCP port and bind address for HTTP/SSE transports.
+    # TCP port and bind address (applies to both http and sse transports).
     port: ${HTTP_PORT:-8080}
     host: "${HTTP_HOST:-127.0.0.1}"
-    # URL paths for each transport endpoint.
+    # URL path for the Streamable HTTP transport endpoint (http transport only).
     mcp_endpoint: "${HTTP_MCP_ENDPOINT_PATH:-/mcp}"
+    # URL paths for the SSE transport endpoints (sse transport only).
     sse_endpoint: "${SSE_MCP_ENDPOINT_PATH:-/sse}"
     sse_message_endpoint: "${SSE_MCP_MESSAGE_ENDPOINT_PATH:-/messages}"
 

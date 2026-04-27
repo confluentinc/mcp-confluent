@@ -86,7 +86,7 @@ export interface TelemetryDirectConfig {
 }
 
 /**
- * Flink compute-plane connection parameters.
+ * Flink connection parameters.
  * Corresponds to `connections.<name>.flink` in the YAML configuration.
  */
 export interface FlinkDirectConfig {

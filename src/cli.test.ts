@@ -335,6 +335,10 @@ describe("cli.ts", () => {
       expect(parseCliArgs(makeArgs(["--disable-auth"])).disableAuth).toBe(true);
     });
 
+    it("should leave disableAuth undefined when --disable-auth is not specified", () => {
+      expect(parseCliArgs(makeArgs([])).disableAuth).toBeUndefined();
+    });
+
     it("should set generateKey to true when --generate-key is specified", () => {
       expect(parseCliArgs(makeArgs(["--generate-key"])).generateKey).toBe(true);
     });

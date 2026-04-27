@@ -245,7 +245,7 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       kafkaConfig: opts.kafkaConfigFile
         ? parsePropertiesFile(opts.kafkaConfigFile)
         : undefined,
-      disableAuth: !!opts.disableAuth,
+      disableAuth: opts.disableAuth ? true : undefined,
       allowedHosts: opts.allowedHosts
         ? opts.allowedHosts
             .split(",")

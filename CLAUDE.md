@@ -39,7 +39,7 @@ Tools are **auto-enabled/disabled** based on which environment variables are pre
 - **`src/confluent/tools/`** — Tool system core:
   - `tool-name.ts` — `ToolName` enum; add new entries here when creating tools.
   - `base-tools.ts` — `BaseToolHandler` abstract class all handlers extend.
-  - `tool-factory.ts` — Static registry mapping `ToolName` → handler instance. Wire new tools here.
+  - `tool-registry.ts` — `ToolHandlerRegistry.handlers` map: `ToolName` → handler instance. Wire new tools here.
   - `handlers/<domain>/` — Organized by Confluent service (kafka, flink, connect, catalog, schema, tableflow, billing, search).
 
 - **`src/confluent/client-manager.ts`** — `DefaultClientManager` holds lazily-initialized Kafka clients (admin, producer, consumer via `@confluentinc/kafka-javascript`) and typed REST clients (`openapi-fetch`) for each Confluent Cloud API surface.
@@ -61,7 +61,7 @@ Tools are **auto-enabled/disabled** based on which environment variables are pre
 1. Add entry to `ToolName` enum in `src/confluent/tools/tool-name.ts`.
 2. Create handler class extending `BaseToolHandler` in `src/confluent/tools/handlers/<domain>/`.
 3. Implement `getToolConfig()` (name, description, Zod input schema), `handle()`, and `getRequiredEnvVars()`.
-4. Register the handler in `ToolFactory.handlers` map in `src/confluent/tools/tool-factory.ts`.
+4. Register the handler in the `ToolHandlerRegistry.handlers` map in `src/confluent/tools/tool-registry.ts`.
 5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `npm run generate:openapi-types`. Commit the updated `src/confluent/openapi-schema.d.ts` alongside the `openapi.json` change.
 
 ## Code Conventions

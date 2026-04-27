@@ -109,6 +109,7 @@ function assertNoConfigConflicts(
   kafkaConfigFile: string | undefined,
   disableAuth: boolean | undefined,
   allowedHosts: string | undefined,
+  transportExplicitlySet: boolean,
 ): void {
   if (!config) return;
   if (kafkaConfigFile) {
@@ -127,6 +128,12 @@ function assertNoConfigConflicts(
     throw new Error(
       "--config and --allowed-hosts are mutually exclusive: " +
         "use server.auth.allowed_hosts in the YAML file instead",
+    );
+  }
+  if (transportExplicitlySet) {
+    throw new Error(
+      "--config and --transport are mutually exclusive: " +
+        "use server.transports in the YAML file instead",
     );
   }
 }
@@ -217,6 +224,7 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       opts.kafkaConfigFile,
       opts.disableAuth,
       opts.allowedHosts,
+      program.getOptionValueSource("transport") === "cli",
     );
 
     // Precedence: CLI > file > undefined

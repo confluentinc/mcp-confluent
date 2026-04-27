@@ -1,5 +1,6 @@
 import { validateBootstrapServers } from "@src/config/validation.js";
 import { logLevels } from "@src/logger.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 import { z } from "zod";
 
 // The following interfaces and types define subcomponents of class MCPServerConfiguration, which represents our entire server configuration.
@@ -85,7 +86,7 @@ export interface TelemetryDirectConfig {
 }
 
 /**
- * Flink compute-plane connection parameters.
+ * Flink connection parameters.
  * Corresponds to `connections.<name>.flink` in the YAML configuration.
  */
 export interface FlinkDirectConfig {
@@ -110,7 +111,9 @@ export type ConnectionConfig = DirectConnectionConfig;
  * Distinct from connection config, which governs Kafka and Confluent Cloud client behaviour.
  */
 export interface ServerConfig {
+  transports: TransportType[];
   log_level: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
+  do_not_track: boolean;
   http: ServerHttpConfig;
   auth: ServerAuthConfig;
 }
@@ -541,7 +544,9 @@ const serverAuthConfigSchema = z
       .min(32, "server.auth.api_key must be at least 32 characters")
       .optional(),
     disabled: z.boolean().default(false),
-    allowed_hosts: z.array(z.string()).default(["localhost", "127.0.0.1"]),
+    allowed_hosts: z
+      .array(z.string())
+      .default(() => ["localhost", "127.0.0.1"]),
   })
   .strict()
   .refine((auth) => !(auth.disabled === true && auth.api_key !== undefined), {
@@ -555,6 +560,17 @@ const serverAuthConfigSchema = z
 // defaults lazily through the schema itself rather than requiring a full literal here.
 const serverConfigSchema = z
   .object({
+    transports: z
+      .array(
+        z.enum(
+          Object.values(TransportType) as [TransportType, ...TransportType[]],
+        ),
+      )
+      .min(1, "server.transports must contain at least one transport")
+      .refine((arr) => new Set(arr).size === arr.length, {
+        message: "server.transports must not contain duplicate entries",
+      })
+      .default(() => [TransportType.STDIO]),
     log_level: z
       .enum(
         Object.keys(logLevels) as [
@@ -563,6 +579,7 @@ const serverConfigSchema = z
         ],
       )
       .default("info"),
+    do_not_track: z.boolean().default(false),
     http: serverHttpConfigSchema.default(() =>
       serverHttpConfigSchema.parse({}),
     ),

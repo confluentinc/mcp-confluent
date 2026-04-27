@@ -379,6 +379,14 @@ describe("cli.ts", () => {
       ).toThrow(/mutually exclusive/);
     });
 
+    it("should throw when both --config and --transport are supplied", () => {
+      expect(() =>
+        parseCliArgs(
+          makeArgs(["--config", "server.yaml", "--transport", "http"]),
+        ),
+      ).toThrow(/mutually exclusive/);
+    });
+
     it("should throw when -k file does not exist", () => {
       resolveSpy.mockReturnValue("/abs/kafka.properties");
       fsMocks.existsSync.mockReturnValue(false);

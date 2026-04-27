@@ -85,9 +85,32 @@ describe("TelemetryService", () => {
     delete process.env.TELEMETRY_WRITE_KEY;
   });
 
+  describe("initialize / getInstance contract", () => {
+    it("should throw when getInstance is called before initialize", () => {
+      expect(() => TelemetryService.getInstance()).toThrow(
+        /initialize\(\) must be called before getInstance\(\)/,
+      );
+    });
+
+    it("should throw when initialize is called a second time", () => {
+      TelemetryService.initialize(false);
+      expect(() => TelemetryService.initialize(false)).toThrow(
+        /already been initialized/,
+      );
+    });
+
+    it("should return the same instance across multiple getInstance calls", () => {
+      TelemetryService.initialize(false);
+      const a = TelemetryService.getInstance();
+      const b = TelemetryService.getInstance();
+      expect(a).toBe(b);
+    });
+  });
+
   describe("activation", () => {
     it("should be enabled when the TELEMETRY_WRITE_KEY env var is set", () => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
+      TelemetryService.initialize(false);
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
@@ -103,6 +126,7 @@ describe("TelemetryService", () => {
         "TELEMETRY_WRITE_KEY",
         "get",
       ).mockReturnValue("packed-key");
+      TelemetryService.initialize(false);
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
@@ -122,6 +146,7 @@ describe("TelemetryService", () => {
         "TELEMETRY_WRITE_KEY",
         "get",
       ).mockReturnValue("packed-key");
+      TelemetryService.initialize(false);
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
@@ -135,6 +160,8 @@ describe("TelemetryService", () => {
     });
 
     it("should be disabled when neither env var nor built-in key is set", () => {
+      TelemetryService.initialize(false);
+
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
         toolName: "list_topics",
@@ -143,9 +170,9 @@ describe("TelemetryService", () => {
       expect(trackStub).not.toHaveBeenCalled();
     });
 
-    it("should be disabled when DO_NOT_TRACK is true, even with a valid write key", () => {
+    it("should be disabled when initialized with doNotTrack: true, even with a valid write key", () => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
-      mockEnv({ DO_NOT_TRACK: true });
+      TelemetryService.initialize(true);
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
@@ -161,6 +188,7 @@ describe("TelemetryService", () => {
 
     beforeEach(() => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
+      TelemetryService.initialize(false);
       service = TelemetryService.getInstance();
     });
 
@@ -197,9 +225,9 @@ describe("TelemetryService", () => {
       });
     });
 
-    it("should skip identify calls when telemetry is disabled", () => {
+    it("should skip identify calls when initialized with doNotTrack: true", () => {
       TelemetryService["instance"] = undefined;
-      mockEnv({ DO_NOT_TRACK: true });
+      TelemetryService.initialize(true);
 
       const disabled = TelemetryService.getInstance();
       disabled.identify("user-123", { org: "acme" });
@@ -211,6 +239,7 @@ describe("TelemetryService", () => {
   describe("machine ID persistence", () => {
     it("should generate and write a new UUID when no machine-id file exists", () => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
+      TelemetryService.initialize(false);
 
       TelemetryService.getInstance();
 
@@ -225,6 +254,7 @@ describe("TelemetryService", () => {
     it("should reuse an existing UUID when a machine-id file exists", () => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
       readFileSyncStub.mockReturnValue("existing-uuid");
+      TelemetryService.initialize(false);
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {});
@@ -239,6 +269,7 @@ describe("TelemetryService", () => {
       mkdirSyncStub.mockImplementation(() => {
         throw new Error("EACCES");
       });
+      TelemetryService.initialize(false);
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {});
@@ -252,6 +283,7 @@ describe("TelemetryService", () => {
   describe("shutdown", () => {
     it("should flush the analytics client on shutdown", async () => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
+      TelemetryService.initialize(false);
 
       await TelemetryService.getInstance().shutdown();
 
@@ -260,6 +292,8 @@ describe("TelemetryService", () => {
     });
 
     it("should be a no-op when telemetry is disabled", async () => {
+      TelemetryService.initialize(false);
+
       await TelemetryService.getInstance().shutdown();
 
       expect(closeAndFlushStub).not.toHaveBeenCalled();
@@ -271,6 +305,7 @@ describe("TelemetryService", () => {
 
     beforeEach(() => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
+      TelemetryService.initialize(false);
       service = TelemetryService.getInstance();
     });
 
@@ -330,6 +365,7 @@ describe("TelemetryService", () => {
 
     beforeEach(() => {
       process.env.TELEMETRY_WRITE_KEY = "real-key";
+      TelemetryService.initialize(false);
       service = TelemetryService.getInstance();
     });
 
@@ -367,15 +403,6 @@ describe("TelemetryService", () => {
           }),
         }),
       );
-    });
-  });
-
-  describe("getInstance", () => {
-    it("should return the same instance across multiple calls", () => {
-      const a = TelemetryService.getInstance();
-      const b = TelemetryService.getInstance();
-
-      expect(a).toBe(b);
     });
   });
 });

@@ -10,8 +10,8 @@ import {
   parseCliArgs,
 } from "@src/cli.js";
 import {
+  buildConfigFromEnvAndCli,
   CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
-  consConfigFromEnv,
   loadConfigFromYaml,
   MCPServerConfiguration,
   type DirectConnectionConfig,
@@ -188,19 +188,20 @@ async function main() {
 
     // Convert our known env vars into a typed Environment obj.
     const env = initEnv();
-    setLogLevel(env.LOG_LEVEL);
 
     let mcpConfig: MCPServerConfiguration;
-    // Load and validate configuration — from YAML file if --config provided, else from env vars.
+    // Load and validate configuration — from YAML file if --config provided, else from env vars + CLI overrides.
     if (cliOptions.config) {
       mcpConfig = loadConfigFromYaml(cliOptions.config, process.env);
     } else {
-      mcpConfig = consConfigFromEnv(env);
-
-      if (cliOptions.kafkaConfig) {
-        mcpConfig.setKafkaExtraProperties(cliOptions.kafkaConfig);
-      }
+      mcpConfig = buildConfigFromEnvAndCli(env, {
+        disableAuth: cliOptions.disableAuth,
+        allowedHosts: cliOptions.allowedHosts,
+        kafkaConfig: cliOptions.kafkaConfig,
+      });
     }
+
+    setLogLevel(mcpConfig.server.log_level);
 
     logger.info(
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
@@ -274,13 +275,8 @@ async function main() {
       );
     });
 
-    // Prepare auth configuration
-    const disableAuth = cliOptions.disableAuth || env.MCP_AUTH_DISABLED;
-    const allowedHosts = cliOptions.allowedHosts || env.MCP_ALLOWED_HOSTS;
-    const apiKey = env.MCP_API_KEY;
-
     // Warn if auth is disabled
-    if (disableAuth) {
+    if (mcpConfig.server.auth.disabled) {
       logger.warn(
         "Authentication is DISABLED for HTTP/SSE transports. " +
           "This should only be used in development environments.",
@@ -288,20 +284,20 @@ async function main() {
     }
 
     const transportManager = new TransportManager(server, {
-      disableAuth,
-      allowedHosts,
-      apiKey,
+      disableAuth: mcpConfig.server.auth.disabled,
+      allowedHosts: mcpConfig.server.auth.allowed_hosts,
+      apiKey: mcpConfig.server.auth.api_key,
     });
 
     // Start all transports with a single call
     logger.info(`Starting transports: ${cliOptions.transports.join(", ")}`);
     await transportManager.start(
       cliOptions.transports,
-      env.HTTP_PORT,
-      env.HTTP_HOST,
-      env.HTTP_MCP_ENDPOINT_PATH,
-      env.SSE_MCP_ENDPOINT_PATH,
-      env.SSE_MCP_MESSAGE_ENDPOINT_PATH,
+      mcpConfig.server.http.port,
+      mcpConfig.server.http.host,
+      mcpConfig.server.http.mcp_endpoint,
+      mcpConfig.server.http.sse_endpoint,
+      mcpConfig.server.http.sse_message_endpoint,
     );
 
     // Set up cleanup handlers

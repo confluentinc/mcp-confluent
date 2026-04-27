@@ -38,7 +38,7 @@ server:
   # Opt out of anonymous usage analytics.
   # (DO_NOT_TRACK=true in the environment always wins; this field lets you opt
   # out in YAML without needing the env var.)
-  do_not_track: true
+  # do_not_track: true
 
   # HTTP and SSE transport settings. Omit entirely to use all defaults,
   # or when only using the stdio transport.

@@ -12,24 +12,24 @@ import { Transport, TransportType } from "@src/mcp/transports/types.js";
  */
 export interface TransportManagerConfig {
   /** Disable authentication for HTTP/SSE transports */
-  disableAuth?: boolean;
+  readonly disableAuth?: boolean;
   /** List of allowed Host header values for DNS rebinding protection */
-  allowedHosts?: string[];
+  readonly allowedHosts?: readonly string[];
   /** API key for authentication (required when auth is enabled) */
-  apiKey?: string;
+  readonly apiKey?: string;
 }
 
 export class TransportManager {
-  private transports: Map<TransportType, Transport> = new Map();
+  private readonly transports: Map<TransportType, Transport> = new Map();
   private httpServer: HttpServer | null = null;
 
   constructor(
-    private server: McpServer,
-    private config?: TransportManagerConfig,
+    private readonly server: McpServer,
+    private readonly config?: TransportManagerConfig,
   ) {}
 
   async start(
-    types: TransportType[],
+    types: readonly TransportType[],
     port?: number,
     host?: string,
     httpMcpEndpointPath?: string,

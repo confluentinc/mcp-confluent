@@ -2,6 +2,7 @@ import {
   type AuthConfig,
   type KafkaDirectConfig,
   formatZodIssues,
+  KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
   mcpConfigSchema,
   MCPServerConfiguration,
 } from "@src/config/models.js";
@@ -75,6 +76,7 @@ const ENV_VAR_TO_ZPATH = {
 function buildConfigFromEnv(
   env: Environment,
   authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
+  kafkaConfig?: KeyValuePairObject,
 ): MCPServerConfiguration {
   const connection: Record<string, unknown> = { type: "direct" };
 
@@ -92,6 +94,13 @@ function buildConfigFromEnv(
   for (const build of connectionBuilders) {
     const result = build(env);
     if (result) Object.assign(connection, result);
+  }
+
+  if (kafkaConfig) {
+    connection.kafka = mergeKafkaConfigIntoRawBlock(
+      connection.kafka as Record<string, unknown> | undefined,
+      kafkaConfig,
+    );
   }
 
   // Build root document with both the connection and the server block.
@@ -141,13 +150,14 @@ export function buildConfigFromEnvAndCli(
   env: Environment,
   overrides: EnvPathCliOverrides = {},
 ): MCPServerConfiguration {
-  const config = buildConfigFromEnv(env, {
-    disableAuth: overrides.disableAuth,
-    allowedHosts: overrides.allowedHosts,
-  });
-  if (overrides.kafkaConfig)
-    config.setKafkaExtraProperties(overrides.kafkaConfig);
-  return config;
+  return buildConfigFromEnv(
+    env,
+    {
+      disableAuth: overrides.disableAuth,
+      allowedHosts: overrides.allowedHosts,
+    },
+    overrides.kafkaConfig,
+  );
 }
 
 /**
@@ -435,4 +445,66 @@ function humanizeEnvConfigPaths(message: string): string {
     (msg, [envVar, zodPath]) => msg.replaceAll(zodPath, envVar),
     message,
   );
+}
+
+/**
+ * Merges `-k` / `--kafka-config-file` properties into the raw (pre-Zod) kafka block so
+ * that all config is consolidated before MCPServerConfiguration is constructed.
+ *
+ * Protected keys (`bootstrap.servers`, `sasl.username`, `sasl.password`) are promoted
+ * into their corresponding named fields, overriding any env-var-derived values already
+ * present. All other keys go into `extra_properties`. Creates a kafka block if none
+ * exists, provided `bootstrap.servers` is supplied.
+ */
+function mergeKafkaConfigIntoRawBlock(
+  kafka: Record<string, unknown> | undefined,
+  props: Record<string, string>,
+): Record<string, unknown> {
+  for (const key of KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS) {
+    if (Object.hasOwn(props, key) && props[key] === "") {
+      throw new Error(
+        `--kafka-config-file: ${key} is present but empty — provide a non-empty value or omit the key`,
+      );
+    }
+  }
+
+  if (!kafka) {
+    if (!Object.hasOwn(props, "bootstrap.servers")) {
+      throw new Error(
+        "--kafka-config-file: no kafka block is configured and props do not include bootstrap.servers — cannot establish a Kafka connection",
+      );
+    }
+    kafka = {};
+  }
+
+  const hasSaslUser = Object.hasOwn(props, "sasl.username");
+  const hasSaslPass = Object.hasOwn(props, "sasl.password");
+  if (hasSaslUser !== hasSaslPass) {
+    throw new Error(
+      "--kafka-config-file: sasl.username and sasl.password must both be present or both be absent",
+    );
+  }
+
+  const protectedSet = new Set<string>(KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS);
+  const result: Record<string, unknown> = { ...kafka };
+
+  if (Object.hasOwn(props, "bootstrap.servers")) {
+    result.bootstrap_servers = props["bootstrap.servers"];
+  }
+  if (hasSaslUser && hasSaslPass) {
+    result.auth = {
+      type: "api_key",
+      key: props["sasl.username"]!,
+      secret: props["sasl.password"]!,
+    };
+  }
+
+  const remaining = Object.fromEntries(
+    Object.entries(props).filter(([k]) => !protectedSet.has(k)),
+  );
+  if (Object.keys(remaining).length > 0) {
+    result.extra_properties = remaining;
+  }
+
+  return result;
 }

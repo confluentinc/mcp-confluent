@@ -226,6 +226,10 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
   // without this, StdioClientTransport.close() sends the kill signal but
   // returns before the child has actually exited — a later test file could
   // then race with a lingering child holding a Kafka/CCloud connection.
+  //
+  // TODO: drop the private-field peek once the SDK exposes a public way to
+  // await child exit on StdioClientTransport (no such API as of
+  // @modelcontextprotocol/sdk v1.x).
   const child = (transport as unknown as { _process?: ChildProcess })._process;
 
   const stop = async () => {

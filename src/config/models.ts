@@ -544,7 +544,9 @@ const serverAuthConfigSchema = z
       .min(32, "server.auth.api_key must be at least 32 characters")
       .optional(),
     disabled: z.boolean().default(false),
-    allowed_hosts: z.array(z.string()).default(["localhost", "127.0.0.1"]),
+    allowed_hosts: z
+      .array(z.string())
+      .default(() => ["localhost", "127.0.0.1"]),
   })
   .strict()
   .refine((auth) => !(auth.disabled === true && auth.api_key !== undefined), {
@@ -565,7 +567,7 @@ const serverConfigSchema = z
         ),
       )
       .min(1, "server.transports must contain at least one transport")
-      .default([TransportType.STDIO]),
+      .default(() => [TransportType.STDIO]),
     log_level: z
       .enum(
         Object.keys(logLevels) as [

@@ -660,6 +660,26 @@ describe("config/env-config.ts", () => {
         ).toThrow(
           /Failed to construct MCPServerConfiguration from environment variables/,
         );
+        expect(() =>
+          buildConfigFromEnvAndCli(
+            envWith({
+              BOOTSTRAP_SERVERS: "localhost:9092",
+              MCP_AUTH_DISABLED: true,
+              MCP_API_KEY: "a".repeat(32),
+            }),
+          ),
+        ).toThrow(/MCP_AUTH_DISABLED.*MCP_API_KEY/);
+      });
+
+      it("should throw when MCP_API_KEY is shorter than 32 characters, with error mentioning MCP_API_KEY", () => {
+        expect(() =>
+          buildConfigFromEnvAndCli(
+            envWith({
+              BOOTSTRAP_SERVERS: "localhost:9092",
+              MCP_API_KEY: "short",
+            }),
+          ),
+        ).toThrow(/MCP_API_KEY.*32/);
       });
     });
 
@@ -842,7 +862,7 @@ describe("config/env-config.ts", () => {
           }),
           { disableAuth: true },
         ),
-      ).toThrow(/api_key.*disabled|disabled.*api_key/i);
+      ).toThrow(/MCP_AUTH_DISABLED.*MCP_API_KEY/);
     });
   });
 });

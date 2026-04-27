@@ -1,5 +1,6 @@
 import { validateBootstrapServers } from "@src/config/validation.js";
 import { logLevels } from "@src/logger.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 import { z } from "zod";
 
 // The following interfaces and types define subcomponents of class MCPServerConfiguration, which represents our entire server configuration.
@@ -110,7 +111,9 @@ export type ConnectionConfig = DirectConnectionConfig;
  * Distinct from connection config, which governs Kafka and Confluent Cloud client behaviour.
  */
 export interface ServerConfig {
+  transports: TransportType[];
   log_level: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
+  do_not_track: boolean;
   http: ServerHttpConfig;
   auth: ServerAuthConfig;
 }
@@ -555,6 +558,14 @@ const serverAuthConfigSchema = z
 // defaults lazily through the schema itself rather than requiring a full literal here.
 const serverConfigSchema = z
   .object({
+    transports: z
+      .array(
+        z.enum(
+          Object.values(TransportType) as [TransportType, ...TransportType[]],
+        ),
+      )
+      .min(1, "server.transports must contain at least one transport")
+      .default([TransportType.STDIO]),
     log_level: z
       .enum(
         Object.keys(logLevels) as [
@@ -563,6 +574,7 @@ const serverConfigSchema = z
         ],
       )
       .default("info"),
+    do_not_track: z.boolean().default(false),
     http: serverHttpConfigSchema.default(() =>
       serverHttpConfigSchema.parse({}),
     ),

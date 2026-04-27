@@ -203,6 +203,18 @@ async function main() {
 
     setLogLevel(mcpConfig.server.log_level);
 
+    // Transport selection: YAML config is authoritative when --config is used;
+    // CLI flag (or its default) is used on the env-var path.
+    const transports = cliOptions.config
+      ? mcpConfig.server.transports
+      : cliOptions.transports;
+
+    // DO_NOT_TRACK is a cross-tool user preference (consoledonottrack.com);
+    // the env var acts as a floor so it is honored even when --config is used.
+    TelemetryService.initialize(
+      mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
+    );
+
     logger.info(
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
@@ -219,7 +231,7 @@ async function main() {
 
     TelemetryService.getInstance().setCommonProperties({
       serverVersion,
-      transportType: cliOptions.transports.join(","),
+      transportType: transports.join(","),
     });
 
     // Capture MCP client info when the handshake completes.
@@ -290,9 +302,9 @@ async function main() {
     });
 
     // Start all transports with a single call
-    logger.info(`Starting transports: ${cliOptions.transports.join(", ")}`);
+    logger.info(`Starting transports: ${transports.join(", ")}`);
     await transportManager.start(
-      cliOptions.transports,
+      transports,
       mcpConfig.server.http.port,
       mcpConfig.server.http.host,
       mcpConfig.server.http.mcp_endpoint,

@@ -61,6 +61,7 @@ const ENV_VAR_TO_ZPATH = {
   MCP_API_KEY: "server.auth.api_key",
   MCP_AUTH_DISABLED: "server.auth.disabled",
   MCP_ALLOWED_HOSTS: "server.auth.allowed_hosts",
+  DO_NOT_TRACK: "server.do_not_track",
 } satisfies Partial<Record<keyof Environment, string>>;
 
 /**
@@ -386,6 +387,7 @@ function buildFlinkBlock(env: EnvSubset): {
  *     mcp_endpoint: "${HTTP_MCP_ENDPOINT_PATH}"
  *     sse_endpoint: "${SSE_MCP_ENDPOINT_PATH}"
  *     sse_message_endpoint: "${SSE_MCP_MESSAGE_ENDPOINT_PATH}"
+ *   do_not_track: ${DO_NOT_TRACK}
  *   auth:
  *     api_key: "${MCP_API_KEY}"       # omitted when not set
  *     disabled: ${MCP_AUTH_DISABLED}
@@ -398,6 +400,7 @@ function buildServerBlock(
   return {
     server: {
       log_level: env.LOG_LEVEL,
+      do_not_track: env.DO_NOT_TRACK,
       http: {
         port: env.HTTP_PORT,
         host: env.HTTP_HOST,

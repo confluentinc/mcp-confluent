@@ -79,6 +79,20 @@ export class AuthContext {
     });
   }
 
+  /**
+   * Build a context from an already-acquired token set. Used by
+   * {@link AuthHolder} which runs PKCE itself and then needs to wrap the
+   * resulting tokens. Production callers should not invoke this directly —
+   * either use {@link newFromInitialLogin} (full chain) or go through
+   * {@link AuthHolder.bootstrap}.
+   */
+  static fromTokensForHolder(
+    auth0Config: Auth0Config,
+    tokens: ConfluentTokenSet,
+  ): AuthContext {
+    return new AuthContext(auth0Config, tokens);
+  }
+
   /** Opaque access token — stable across refreshes. */
   get accessToken(): string {
     return this.internalTokens.accessToken;

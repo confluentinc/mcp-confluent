@@ -484,6 +484,17 @@ describe("config/models.ts", () => {
       expect(result.success).toBe(false);
     });
 
+    it("should reject duplicate entries in server.transports", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { transports: ["http", "http"] },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatZodIssues(result.error.issues)).toMatch(/duplicate/i);
+      }
+    });
+
     it("should default server.do_not_track to false when omitted", () => {
       const result = mcpConfigSchema.safeParse({
         connections: { production: validConnection },

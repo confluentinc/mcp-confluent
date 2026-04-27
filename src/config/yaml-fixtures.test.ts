@@ -362,6 +362,15 @@ describe("config/yaml-fixtures.test.ts", () => {
       ).toThrow(/Configuration validation failed/);
     });
 
+    it("should reject duplicate entries in server.transports", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/server-transports-duplicate.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/duplicate/i);
+    });
+
     it("should return the YAML do_not_track value even when DO_NOT_TRACK is set in the environment", () => {
       // loadConfigFromYaml does not apply the env-var floor — that is the
       // caller's responsibility (index.ts ORs mcpConfig.server.do_not_track

@@ -567,6 +567,9 @@ const serverConfigSchema = z
         ),
       )
       .min(1, "server.transports must contain at least one transport")
+      .refine((arr) => new Set(arr).size === arr.length, {
+        message: "server.transports must not contain duplicate entries",
+      })
       .default(() => [TransportType.STDIO]),
     log_level: z
       .enum(

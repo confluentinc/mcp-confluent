@@ -1,6 +1,5 @@
 import {
   buildConfig,
-  config,
   fs,
   os,
   path,
@@ -58,12 +57,11 @@ export class TelemetryService {
   private serverSessionId: string;
   private commonProperties: Record<string, unknown>;
 
-  private constructor() {
+  private constructor(doNotTrack: boolean) {
     // runtime env var can override the build-time value for local dev/testing
     const writeKey =
       process.env.TELEMETRY_WRITE_KEY || buildConfig.TELEMETRY_WRITE_KEY;
-    const disabled = config.env.DO_NOT_TRACK;
-    const enabled = !disabled && !!writeKey;
+    const enabled = !doNotTrack && !!writeKey;
 
     this.machineId = getOrCreateMachineId();
     this.serverSessionId = randomUUID();
@@ -82,9 +80,20 @@ export class TelemetryService {
     }
   }
 
+  static initialize(doNotTrack: boolean): void {
+    if (TelemetryService.instance) {
+      throw new Error(
+        "TelemetryService has already been initialized — initialize() must be called exactly once before getInstance()",
+      );
+    }
+    TelemetryService.instance = new TelemetryService(doNotTrack);
+  }
+
   static getInstance(): TelemetryService {
     if (!TelemetryService.instance) {
-      TelemetryService.instance = new TelemetryService();
+      throw new Error(
+        "TelemetryService.initialize() must be called before getInstance()",
+      );
     }
     return TelemetryService.instance;
   }

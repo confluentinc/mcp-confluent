@@ -42,6 +42,7 @@ function envWith(overrides: Partial<EnvInput> = {}): EnvInput {
     MCP_API_KEY: undefined,
     MCP_AUTH_DISABLED: false,
     MCP_ALLOWED_HOSTS: ["localhost", "127.0.0.1"],
+    DO_NOT_TRACK: false,
     ...overrides,
   };
 }
@@ -680,6 +681,27 @@ describe("config/env-config.ts", () => {
             }),
           ),
         ).toThrow(/MCP_API_KEY.*32/);
+      });
+
+      it("should populate server.do_not_track from DO_NOT_TRACK", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({ BOOTSTRAP_SERVERS: "localhost:9092", DO_NOT_TRACK: true }),
+        );
+        expect(config.server.do_not_track).toBe(true);
+      });
+
+      it("should default server.do_not_track to false when DO_NOT_TRACK is not set", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({ BOOTSTRAP_SERVERS: "localhost:9092" }),
+        );
+        expect(config.server.do_not_track).toBe(false);
+      });
+
+      it("should leave server.transports at the schema default [stdio] on the env-var path", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({ BOOTSTRAP_SERVERS: "localhost:9092" }),
+        );
+        expect(config.server.transports).toEqual(["stdio"]);
       });
     });
 

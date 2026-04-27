@@ -526,7 +526,7 @@ const connectionConfigSchema = z
 
 const serverHttpConfigSchema = z
   .object({
-    port: z.number().int().positive().default(8080),
+    port: z.coerce.number().int().positive().default(8080),
     host: z.string().default("127.0.0.1"),
     mcp_endpoint: z.string().default("/mcp"),
     sse_endpoint: z.string().default("/sse"),

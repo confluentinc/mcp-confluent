@@ -435,6 +435,17 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it("should coerce server.http.port from a string to a number (post-interpolation values are strings)", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { http: { port: "9090" } },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.http.port).toBe(9090);
+      }
+    });
   });
 
   describe("confluent_cloud block", () => {

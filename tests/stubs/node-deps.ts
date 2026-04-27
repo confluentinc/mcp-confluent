@@ -178,7 +178,9 @@ export function mockHttpServer(): MockedHttpServer {
   });
 
   const fakeServer: Partial<HttpServer> = {
-    listen(port?: unknown, _hostname?: unknown, cb?: unknown) {
+    listen(port?: unknown, hostnameOrCb?: unknown, cb?: unknown) {
+      // Support both listen(port, cb) and listen(port, hostname, cb) overloads.
+      const resolvedCb = typeof hostnameOrCb === "function" ? hostnameOrCb : cb;
       if (listenError) {
         queueMicrotask(() =>
           errorListeners.forEach((fn) => fn(listenError as Error)),
@@ -186,7 +188,7 @@ export function mockHttpServer(): MockedHttpServer {
       } else {
         const numericPort = typeof port === "number" ? port : 0;
         listenResolve?.(numericPort);
-        if (typeof cb === "function") (cb as () => void)();
+        if (typeof resolvedCb === "function") (resolvedCb as () => void)();
       }
       return fakeServer as HttpServer;
     },

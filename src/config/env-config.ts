@@ -131,11 +131,11 @@ export interface EnvPathCliOverrides {
 
 /**
  * Constructs a fully-resolved MCPServerConfiguration from environment variables and optional
- * CLI flag overrides. Extends {@link buildConfigFromEnvAndCli} by folding in the three CLI flags that
+ * CLI flag overrides. Extends {@link buildConfigFromEnv} by folding in the three CLI flags that
  * are only valid on the env-var path (`--disable-auth`, `--allowed-hosts`, `--kafka-config-file`),
  * so that the returned config needs no further patching by the caller.
  *
- * @param env - Environment variables (same contract as buildConfigFromEnvAndCli)
+ * @param env - Environment variables (same contract as {@link buildConfigFromEnv})
  * @param overrides - CLI flag values to merge on top of the env-var-derived config
  */
 export function buildConfigFromEnvAndCli(

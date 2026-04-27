@@ -14,8 +14,8 @@ const ENV_CONNECTION_NAME = "env-connection";
 const CONN = `connections.${ENV_CONNECTION_NAME}`;
 
 /**
- * Maps each environment variable name handled by buildConfigFromEnvAndCli to its
- * corresponding Zod document path in the manufactured MCPServerConfiguration.
+ * Maps each environment variable in type Environment (and handled by buildConfigFromEnvAndCli)
+ * to its corresponding Zod document path in the manufactured MCPServerConfiguration.
  * The keys drive the Pick<Environment, ...> type of buildConfigFromEnvAndCli, so every
  * env var the function touches must have an entry here.
  */
@@ -62,7 +62,7 @@ const ENV_VAR_TO_ZPATH = {
   MCP_AUTH_DISABLED: "server.auth.disabled",
   MCP_ALLOWED_HOSTS: "server.auth.allowed_hosts",
   DO_NOT_TRACK: "server.do_not_track",
-} satisfies Partial<Record<keyof Environment, string>>;
+} satisfies Record<keyof Environment, string>;
 
 /**
  * Constructs a single-direct-connection MCPServerConfiguration from environment variables.
@@ -75,7 +75,7 @@ const ENV_VAR_TO_ZPATH = {
  * @throws Error if required environment variables are missing or if validation fails
  */
 function buildConfigFromEnv(
-  env: Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>,
+  env: Environment,
   authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
 ): MCPServerConfiguration {
   const connection: Record<string, unknown> = { type: "direct" };
@@ -140,7 +140,7 @@ export interface EnvPathCliOverrides {
  * @param overrides - CLI flag values to merge on top of the env-var-derived config
  */
 export function buildConfigFromEnvAndCli(
-  env: Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>,
+  env: Environment,
   overrides: EnvPathCliOverrides = {},
 ): MCPServerConfiguration {
   const config = buildConfigFromEnv(env, {
@@ -151,8 +151,6 @@ export function buildConfigFromEnvAndCli(
     config.setKafkaExtraProperties(overrides.kafkaConfig);
   return config;
 }
-
-type EnvSubset = Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>;
 
 /**
  * Builds the `kafka` connection block from env vars. Triggered when any Kafka-related
@@ -171,7 +169,9 @@ type EnvSubset = Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>;
  *     key: "${KAFKA_API_KEY}"
  *     secret: "${KAFKA_API_SECRET}"
  */
-function buildKafkaBlock(env: EnvSubset): { kafka: KafkaDirectConfig } | null {
+function buildKafkaBlock(
+  env: Environment,
+): { kafka: KafkaDirectConfig } | null {
   if (
     !env.BOOTSTRAP_SERVERS &&
     !env.KAFKA_API_KEY &&
@@ -214,7 +214,7 @@ function buildKafkaBlock(env: EnvSubset): { kafka: KafkaDirectConfig } | null {
  * to make the complaint that endpoint is required if only the auth var(s) are set.
  */
 function buildSchemaRegistryBlock(
-  env: EnvSubset,
+  env: Environment,
 ): { schema_registry: { endpoint?: string; auth?: AuthConfig } } | null {
   if (
     !env.SCHEMA_REGISTRY_ENDPOINT &&
@@ -249,7 +249,7 @@ function buildSchemaRegistryBlock(
  *     key: "${CONFLUENT_CLOUD_API_KEY}"
  *     secret: "${CONFLUENT_CLOUD_API_SECRET}"
  */
-function buildConfluentCloudBlock(env: EnvSubset) {
+function buildConfluentCloudBlock(env: Environment) {
   if (!env.CONFLUENT_CLOUD_API_KEY && !env.CONFLUENT_CLOUD_API_SECRET)
     return null;
   return {
@@ -277,7 +277,7 @@ function buildConfluentCloudBlock(env: EnvSubset) {
  *     key: "${TABLEFLOW_API_KEY}"
  *     secret: "${TABLEFLOW_API_SECRET}"
  */
-function buildTableflowBlock(env: EnvSubset) {
+function buildTableflowBlock(env: Environment) {
   if (!env.TABLEFLOW_API_KEY && !env.TABLEFLOW_API_SECRET) return null;
   return {
     tableflow: apiKeyAuth(env.TABLEFLOW_API_KEY, env.TABLEFLOW_API_SECRET),
@@ -298,7 +298,7 @@ function buildTableflowBlock(env: EnvSubset) {
  *     secret: "${TELEMETRY_API_SECRET}"
  */
 function buildTelemetryBlock(
-  env: EnvSubset,
+  env: Environment,
 ): { telemetry: { endpoint?: string; auth?: AuthConfig } } | null {
   if (
     !env.TELEMETRY_ENDPOINT &&
@@ -334,7 +334,7 @@ function buildTelemetryBlock(
  *     key: "${FLINK_API_KEY}"
  *     secret: "${FLINK_API_SECRET}"
  */
-function buildFlinkBlock(env: EnvSubset): {
+function buildFlinkBlock(env: Environment): {
   flink: {
     endpoint?: string;
     auth?: AuthConfig;
@@ -394,7 +394,7 @@ function buildFlinkBlock(env: EnvSubset): {
  *     allowed_hosts: ${MCP_ALLOWED_HOSTS}
  */
 function buildServerBlock(
-  env: EnvSubset,
+  env: Environment,
   authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
 ): { server: Record<string, unknown> } {
   return {

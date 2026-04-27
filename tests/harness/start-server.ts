@@ -1,15 +1,18 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+// the MCP spec deprecated the SSE transport in favor of streamable HTTP, but
+// the server in this repo still ships SSE, so integration tests need to keep
+// exercising it until the server-side wiring is removed.
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 import { findFreePort } from "@tests/harness/find-port.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { resolve } from "node:path";
 
-export type Transport = "stdio" | "http";
-
 export interface StartServerOptions {
-  transport: Transport;
+  transport: TransportType;
   /**
    * Extra env vars merged over the parent process environment. Used for things
    * like overriding HTTP_PORT per-test or injecting tool-specific credentials.
@@ -97,7 +100,7 @@ async function startHttp(options: StartServerOptions): Promise<StartedServer> {
   // just removes a header dance the tests aren't trying to exercise.
   const child: ChildProcess = spawn(
     process.execPath,
-    ["--no-deprecation", SERVER_ENTRY, "--transport", "http"],
+    ["--no-deprecation", SERVER_ENTRY, "--transport", TransportType.HTTP],
     {
       env: buildEnv({
         ...options.env,
@@ -144,10 +147,71 @@ async function startHttp(options: StartServerOptions): Promise<StartedServer> {
   return { client, stop };
 }
 
+async function startSse(options: StartServerOptions): Promise<StartedServer> {
+  const port = await findFreePort();
+
+  // SSE shares the Fastify instance and HTTP_PORT with the streamable HTTP
+  // transport server-side, and the same auth hook governs both, so the same
+  // MCP_AUTH_DISABLED override removes the API-key header dance.
+  const child: ChildProcess = spawn(
+    process.execPath,
+    ["--no-deprecation", SERVER_ENTRY, "--transport", TransportType.SSE],
+    {
+      env: buildEnv({
+        ...options.env,
+        HTTP_PORT: String(port),
+        MCP_AUTH_DISABLED: "true",
+      }),
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  let outputBuf = "";
+  child.stdout?.on("data", (chunk) => {
+    outputBuf += String(chunk);
+  });
+  child.stderr?.on("data", (chunk) => {
+    outputBuf += String(chunk);
+  });
+
+  try {
+    await waitForPing(`http://127.0.0.1:${port}/ping`, child, () => outputBuf);
+  } catch (error) {
+    if (child.exitCode === null) child.kill("SIGTERM");
+    throw error;
+  }
+
+  // /sse matches the SSE_MCP_ENDPOINT_PATH default; the SDK transport opens
+  // the EventSource against this URL, then routes outbound messages to the
+  // session-scoped /messages endpoint (handled inside the SDK).
+  const transport = new SSEClientTransport(
+    new URL(`http://127.0.0.1:${port}/sse`),
+  );
+  const client = new Client({
+    name: "mcp-confluent-integration",
+    version: "0.0.0-test",
+  });
+  await client.connect(transport);
+
+  const stop = async () => {
+    await client.close();
+    if (child.exitCode === null) {
+      child.kill("SIGTERM");
+      await once(child, "exit");
+    }
+  };
+
+  return { client, stop };
+}
+
 async function startStdio(options: StartServerOptions): Promise<StartedServer> {
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: ["--no-deprecation", SERVER_ENTRY, "--transport", "stdio"],
+    args: [
+      "--no-deprecation",
+      SERVER_ENTRY,
+      "--transport",
+      TransportType.STDIO,
+    ],
     env: buildEnv(options.env),
     stderr: "inherit",
   });
@@ -185,7 +249,12 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
 export async function startServer(
   options: StartServerOptions,
 ): Promise<StartedServer> {
-  return options.transport === "http"
-    ? await startHttp(options)
-    : await startStdio(options);
+  switch (options.transport) {
+    case TransportType.HTTP:
+      return await startHttp(options);
+    case TransportType.SSE:
+      return await startSse(options);
+    case TransportType.STDIO:
+      return await startStdio(options);
+  }
 }

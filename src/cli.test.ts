@@ -335,6 +335,10 @@ describe("cli.ts", () => {
       expect(parseCliArgs(makeArgs(["--disable-auth"])).disableAuth).toBe(true);
     });
 
+    it("should leave disableAuth undefined when --disable-auth is not specified", () => {
+      expect(parseCliArgs(makeArgs([])).disableAuth).toBeUndefined();
+    });
+
     it("should set generateKey to true when --generate-key is specified", () => {
       expect(parseCliArgs(makeArgs(["--generate-key"])).generateKey).toBe(true);
     });
@@ -357,6 +361,20 @@ describe("cli.ts", () => {
       expect(() =>
         parseCliArgs(
           makeArgs(["--config", "server.yaml", "-k", "kafka.properties"]),
+        ),
+      ).toThrow(/mutually exclusive/);
+    });
+
+    it("should throw when both --config and --disable-auth are supplied", () => {
+      expect(() =>
+        parseCliArgs(makeArgs(["--config", "server.yaml", "--disable-auth"])),
+      ).toThrow(/mutually exclusive/);
+    });
+
+    it("should throw when both --config and --allowed-hosts are supplied", () => {
+      expect(() =>
+        parseCliArgs(
+          makeArgs(["--config", "server.yaml", "--allowed-hosts", "localhost"]),
         ),
       ).toThrow(/mutually exclusive/);
     });

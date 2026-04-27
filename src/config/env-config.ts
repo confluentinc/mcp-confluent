@@ -6,6 +6,7 @@ import {
   MCPServerConfiguration,
 } from "@src/config/models.js";
 import type { Environment } from "@src/env.js";
+import { type KeyValuePairObject } from "properties-file";
 
 const ENV_CONNECTION_NAME = "env-connection";
 
@@ -13,9 +14,9 @@ const ENV_CONNECTION_NAME = "env-connection";
 const CONN = `connections.${ENV_CONNECTION_NAME}`;
 
 /**
- * Maps each environment variable name handled by consConfigFromEnv to its
+ * Maps each environment variable name handled by buildConfigFromEnvAndCli to its
  * corresponding Zod document path in the manufactured MCPServerConfiguration.
- * The keys drive the Pick<Environment, ...> type of consConfigFromEnv, so every
+ * The keys drive the Pick<Environment, ...> type of buildConfigFromEnvAndCli, so every
  * env var the function touches must have an entry here.
  */
 const ENV_VAR_TO_ZPATH = {
@@ -50,6 +51,16 @@ const ENV_VAR_TO_ZPATH = {
   TELEMETRY_ENDPOINT: `${CONN}.telemetry.endpoint`,
   TELEMETRY_API_KEY: `${CONN}.telemetry.auth.key`,
   TELEMETRY_API_SECRET: `${CONN}.telemetry.auth.secret`,
+  // Server configuration
+  LOG_LEVEL: "server.log_level",
+  HTTP_PORT: "server.http.port",
+  HTTP_HOST: "server.http.host",
+  HTTP_MCP_ENDPOINT_PATH: "server.http.mcp_endpoint",
+  SSE_MCP_ENDPOINT_PATH: "server.http.sse_endpoint",
+  SSE_MCP_MESSAGE_ENDPOINT_PATH: "server.http.sse_message_endpoint",
+  MCP_API_KEY: "server.auth.api_key",
+  MCP_AUTH_DISABLED: "server.auth.disabled",
+  MCP_ALLOWED_HOSTS: "server.auth.allowed_hosts",
 } satisfies Partial<Record<keyof Environment, string>>;
 
 /**
@@ -62,14 +73,15 @@ const ENV_VAR_TO_ZPATH = {
  * @returns MCPServerConfiguration with a single connection constructed from an Environment object
  * @throws Error if required environment variables are missing or if validation fails
  */
-export function consConfigFromEnv(
+function buildConfigFromEnv(
   env: Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>,
+  authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
 ): MCPServerConfiguration {
   const connection: Record<string, unknown> = { type: "direct" };
 
-  // Each builder returns { <blockKey>: { ...fields } } or null — the key is owned
+  // Each connection builder returns { <blockKey>: { ...fields } } or null — the key is owned
   // by the builder, not the caller. See builder docstrings for the env vars each handles.
-  const builders = [
+  const connectionBuilders = [
     buildKafkaBlock,
     buildSchemaRegistryBlock,
     buildConfluentCloudBlock,
@@ -78,19 +90,25 @@ export function consConfigFromEnv(
     buildFlinkBlock,
   ];
 
-  for (const build of builders) {
+  for (const build of connectionBuilders) {
     const result = build(env);
     if (result) Object.assign(connection, result);
   }
+
+  // Build root document with both the connection and the server block.
+  // authOverrides are folded in here so Zod validates the final combined state,
+  // including the disabled+api_key mutual exclusion refine.
+  const rawDocument: Record<string, unknown> = {
+    connections: { [ENV_CONNECTION_NAME]: connection },
+    ...buildServerBlock(env, authOverrides),
+  };
 
   // Validate the manufactured config object against the schema, as if it were loaded from a YAML file.
   //
   // (We do this inline here so that we can reverse project any validation errors back into the
   // env var space in the catch block, which we would not be able to do if we deferred validation
   // to a single codepath shared with YAML-loaded configs.)
-  const result = mcpConfigSchema.safeParse({
-    connections: { [ENV_CONNECTION_NAME]: connection },
-  });
+  const result = mcpConfigSchema.safeParse(rawDocument);
 
   if (!result.success) {
     const formattedIssues = humanizeEnvConfigPaths(
@@ -102,6 +120,35 @@ export function consConfigFromEnv(
   }
 
   return new MCPServerConfiguration(result.data);
+}
+
+/** CLI flags that may override values in the env-var config path. Mutually exclusive with --config (YAML path). */
+export interface EnvPathCliOverrides {
+  disableAuth?: boolean;
+  allowedHosts?: string[];
+  kafkaConfig?: KeyValuePairObject;
+}
+
+/**
+ * Constructs a fully-resolved MCPServerConfiguration from environment variables and optional
+ * CLI flag overrides. Extends {@link buildConfigFromEnv} by folding in the three CLI flags that
+ * are only valid on the env-var path (`--disable-auth`, `--allowed-hosts`, `--kafka-config-file`),
+ * so that the returned config needs no further patching by the caller.
+ *
+ * @param env - Environment variables (same contract as {@link buildConfigFromEnv})
+ * @param overrides - CLI flag values to merge on top of the env-var-derived config
+ */
+export function buildConfigFromEnvAndCli(
+  env: Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>,
+  overrides: EnvPathCliOverrides = {},
+): MCPServerConfiguration {
+  const config = buildConfigFromEnv(env, {
+    disableAuth: overrides.disableAuth,
+    allowedHosts: overrides.allowedHosts,
+  });
+  if (overrides.kafkaConfig)
+    config.setKafkaExtraProperties(overrides.kafkaConfig);
+  return config;
 }
 
 type EnvSubset = Pick<Environment, keyof typeof ENV_VAR_TO_ZPATH>;
@@ -321,6 +368,48 @@ function buildFlinkBlock(env: EnvSubset): {
       ...(env.FLINK_DATABASE_NAME && {
         database_name: env.FLINK_DATABASE_NAME,
       }),
+    },
+  };
+}
+
+/**
+ * Builds the root-level `server` block from env vars. Always returns a block —
+ * all fields have defaults in envSchema so they are always present after initEnv().
+ *
+ * Equivalent YAML:
+ *
+ * server:
+ *   log_level: "${LOG_LEVEL}"
+ *   http:
+ *     port: ${HTTP_PORT}
+ *     host: "${HTTP_HOST}"
+ *     mcp_endpoint: "${HTTP_MCP_ENDPOINT_PATH}"
+ *     sse_endpoint: "${SSE_MCP_ENDPOINT_PATH}"
+ *     sse_message_endpoint: "${SSE_MCP_MESSAGE_ENDPOINT_PATH}"
+ *   auth:
+ *     api_key: "${MCP_API_KEY}"       # omitted when not set
+ *     disabled: ${MCP_AUTH_DISABLED}
+ *     allowed_hosts: ${MCP_ALLOWED_HOSTS}
+ */
+function buildServerBlock(
+  env: EnvSubset,
+  authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
+): { server: Record<string, unknown> } {
+  return {
+    server: {
+      log_level: env.LOG_LEVEL,
+      http: {
+        port: env.HTTP_PORT,
+        host: env.HTTP_HOST,
+        mcp_endpoint: env.HTTP_MCP_ENDPOINT_PATH,
+        sse_endpoint: env.SSE_MCP_ENDPOINT_PATH,
+        sse_message_endpoint: env.SSE_MCP_MESSAGE_ENDPOINT_PATH,
+      },
+      auth: {
+        ...(env.MCP_API_KEY !== undefined && { api_key: env.MCP_API_KEY }),
+        disabled: authOverrides.disableAuth ?? env.MCP_AUTH_DISABLED,
+        allowed_hosts: authOverrides.allowedHosts ?? env.MCP_ALLOWED_HOSTS,
+      },
     },
   };
 }

@@ -1,8 +1,17 @@
 import { validateBootstrapServers } from "@src/config/validation.js";
+import { logLevels } from "@src/logger.js";
 import { z } from "zod";
 
+// The following interfaces and types define subcomponents of class MCPServerConfiguration, which represents our entire server configuration.
+// Each interface corresponds to a specific section of a YAML configuration file, as indicated in the comments, or through
+// legacy environment variable or CLI arguments (see buildConfigFromEnvAndCli in src/config/env-config.ts).
+
+// Zod is used for validation and transformation of from-yaml or environment variables into these structured types, with the root schema
+// being mcpConfigSchema at the bottom of this file.
+
 /**
- * Connection configuration for a direct (local/Docker) Kafka cluster.
+ * Connection configuration for a direct (local/Docker/Cloud) Kafka cluster.
+ * Corresponds to `connections.<name>` (with `type: direct`) in the YAML configuration.
  * At least one of kafka, schema_registry, confluent_cloud, tableflow, flink, or telemetry must be present.
  */
 export interface DirectConnectionConfig {
@@ -15,7 +24,10 @@ export interface DirectConnectionConfig {
   flink?: FlinkDirectConfig;
 }
 
-/** Subcomponent of various parts of DirectConnectionConfig */
+/**
+ * API key credential pair used throughout connection sub-configs.
+ * Corresponds to `auth` blocks nested under each service in `connections.<name>`.
+ */
 export interface ApiKeyAuthConfig {
   type: "api_key";
   key: string;
@@ -24,7 +36,10 @@ export interface ApiKeyAuthConfig {
 
 export type AuthConfig = ApiKeyAuthConfig;
 
-/** Subcomponent of DirectConnectionConfig describing Kafka connection parameters */
+/**
+ * Kafka broker connection parameters.
+ * Corresponds to `connections.<name>.kafka` in the YAML configuration.
+ */
 export interface KafkaDirectConfig {
   bootstrap_servers?: string;
   auth?: AuthConfig;
@@ -34,30 +49,45 @@ export interface KafkaDirectConfig {
   extra_properties?: Record<string, string>;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Schema Registry connection parameters */
+/**
+ * Schema Registry connection parameters.
+ * Corresponds to `connections.<name>.schema_registry` in the YAML configuration.
+ */
 export interface SchemaRegistryDirectConfig {
   endpoint: string;
   auth?: AuthConfig;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Confluent Cloud connection parameters */
+/**
+ * Confluent Cloud control-plane connection parameters.
+ * Corresponds to `connections.<name>.confluent_cloud` in the YAML configuration.
+ */
 export interface ConfluentCloudDirectConfig {
   endpoint: string;
   auth: AuthConfig;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Tableflow connection parameters */
+/**
+ * Tableflow connection parameters.
+ * Corresponds to `connections.<name>.tableflow` in the YAML configuration.
+ */
 export interface TableflowDirectConfig {
   auth: AuthConfig;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Telemetry connection parameters */
+/**
+ * Telemetry API connection parameters.
+ * Corresponds to `connections.<name>.telemetry` in the YAML configuration.
+ */
 export interface TelemetryDirectConfig {
   endpoint: string;
   auth: AuthConfig;
 }
 
-/** Subcomponent of DirectConnectionConfig describing Flink connection parameters */
+/**
+ * Flink compute-plane connection parameters.
+ * Corresponds to `connections.<name>.flink` in the YAML configuration.
+ */
 export interface FlinkDirectConfig {
   endpoint: string;
   auth: AuthConfig;
@@ -75,14 +105,57 @@ export interface FlinkDirectConfig {
 export type ConnectionConfig = DirectConnectionConfig;
 
 /**
+ * MCP server operational settings — transport, auth, and logging.
+ * Corresponds to the `server` block at the root of the YAML configuration.
+ * Distinct from connection config, which governs Kafka and Confluent Cloud client behaviour.
+ */
+export interface ServerConfig {
+  log_level: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
+  http: ServerHttpConfig;
+  auth: ServerAuthConfig;
+}
+
+/**
+ * HTTP/SSE transport bind address and endpoint paths.
+ * Corresponds to `server.http` in the YAML configuration.
+ */
+export interface ServerHttpConfig {
+  port: number;
+  host: string;
+  mcp_endpoint: string;
+  sse_endpoint: string;
+  sse_message_endpoint: string;
+}
+
+/**
+ * HTTP/SSE transport authentication settings.
+ * Corresponds to `server.auth` in the YAML configuration.
+ * `api_key` and `disabled: true` are mutually exclusive.
+ */
+export interface ServerAuthConfig {
+  api_key?: string;
+  disabled: boolean;
+  allowed_hosts: string[];
+}
+
+/**
  * Root configuration object representing the entire MCP server configuration.
  * Validated and constructed from parsed YAML via {@link mcpConfigSchema}.
  */
 export class MCPServerConfiguration {
-  connections: Record<string, ConnectionConfig>;
+  /** Named connection map. Corresponds to the `connections` block at the root of the YAML configuration. */
+  readonly connections: Record<string, ConnectionConfig>;
+  /** MCP server operational settings. Corresponds to the `server` block at the root of the YAML configuration. */
+  readonly server: ServerConfig;
 
-  constructor(data: { connections: Record<string, ConnectionConfig> }) {
+  constructor(data: {
+    connections: Record<string, ConnectionConfig>;
+    server?: ServerConfig;
+  }) {
     this.connections = data.connections;
+    // DEFAULT_SERVER_CONFIG is declared after the schemas below; it is always
+    // initialized before any MCPServerConfiguration instance is created at runtime.
+    this.server = data.server ?? DEFAULT_SERVER_CONFIG;
   }
 
   /**
@@ -114,7 +187,7 @@ export class MCPServerConfiguration {
    * Absorbs `-k` / `--kafka-config-file` properties into the kafka block so that all
    * config is consolidated in MCPServerConfiguration before client construction.
    *
-   * Only valid in the legacy env-var codepath (`consConfigFromEnv`). YAML-configured
+   * Only valid in the legacy env-var codepath (`buildConfigFromEnvAndCli`). YAML-configured
    * connections must not use this method — the `--config` and `--kafka-config-file` flags
    * are mutually exclusive and enforced at CLI parse time.
    *
@@ -446,11 +519,74 @@ const connectionConfigSchema = z
     } as ConnectionConfig;
   });
 
+// Server block schemas. Defaults are applied at each level so that omitting the
+// entire `server` block (or any sub-block) from YAML yields a fully-populated
+// ServerConfig with all fields set. MCPServerConfiguration.server is therefore
+// always non-optional and carries all operational settings.
+
+const serverHttpConfigSchema = z
+  .object({
+    port: z.coerce.number().int().positive().default(8080),
+    host: z.string().default("127.0.0.1"),
+    mcp_endpoint: z.string().default("/mcp"),
+    sse_endpoint: z.string().default("/sse"),
+    sse_message_endpoint: z.string().default("/messages"),
+  })
+  .strict();
+
+const serverAuthConfigSchema = z
+  .object({
+    api_key: z
+      .string()
+      .min(32, "server.auth.api_key must be at least 32 characters")
+      .optional(),
+    disabled: z.boolean().default(false),
+    allowed_hosts: z.array(z.string()).default(["localhost", "127.0.0.1"]),
+  })
+  .strict()
+  .refine((auth) => !(auth.disabled === true && auth.api_key !== undefined), {
+    message:
+      "server.auth.disabled and server.auth.api_key cannot both be set — remove the api_key or set disabled: false",
+  });
+
+// Zod v4 requires .default() to receive a value (or factory) matching the schema's
+// output type. Since each sub-schema's output type has required fields (those with
+// their own .default() calls), we use factory functions so Zod resolves field-level
+// defaults lazily through the schema itself rather than requiring a full literal here.
+const serverConfigSchema = z
+  .object({
+    log_level: z
+      .enum(
+        Object.keys(logLevels) as [
+          keyof typeof logLevels,
+          ...Array<keyof typeof logLevels>,
+        ],
+      )
+      .default("info"),
+    http: serverHttpConfigSchema.default(() =>
+      serverHttpConfigSchema.parse({}),
+    ),
+    auth: serverAuthConfigSchema.default(() =>
+      serverAuthConfigSchema.parse({}),
+    ),
+  })
+  .strict();
+
+// Compile-time assertion: ServerConfig interface must remain compatible with the schema output.
+serverConfigSchema satisfies z.ZodType<ServerConfig>;
+
+/**
+ * The default server configuration produced when no `server` block is present in YAML
+ * or when MCPServerConfiguration is constructed without an explicit server argument.
+ * Derived from serverConfigSchema defaults — single source of truth.
+ */
+export const DEFAULT_SERVER_CONFIG: ServerConfig = serverConfigSchema.parse({});
+
 /**
  * Root configuration schema. This is the single validation and normalisation
  * entry point shared by both configuration paths: YAML files (via
  * {@link parseYamlConfiguration}) and environment variables (via
- * {@link consConfigFromEnv}). Transforms and cross-field rules defined here
+ * {@link buildConfigFromEnvAndCli}). Transforms and cross-field rules defined here
  * therefore apply equally to both.
  *
  * Parsed output is wrapped in {@link MCPServerConfiguration} by
@@ -467,6 +603,7 @@ export const mcpConfigSchema = z
         (connections) => Object.keys(connections).length === 1,
         "Exactly one connection must be defined (multiple connections not yet supported)",
       ),
+    server: serverConfigSchema.default(() => DEFAULT_SERVER_CONFIG),
   })
   .strict();
 

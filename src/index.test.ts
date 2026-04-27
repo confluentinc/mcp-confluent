@@ -1,5 +1,6 @@
 import { type DirectConnectionConfig } from "@src/config/index.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { nodeCrypto } from "@src/confluent/node-deps.js";
 import type {
   ToolConfig,
   ToolHandler,
@@ -14,22 +15,21 @@ import {
   outputApiKey,
   outputToolList,
 } from "@src/index.js";
-import { generateApiKey } from "@src/mcp/transports/index.js";
 import { envFactory } from "@tests/factories/env.js";
-import sinon from "sinon";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 
 function connWith(
   fields: Omit<DirectConnectionConfig, "type">,
 ): DirectConnectionConfig {
   return { type: "direct", ...fields };
 }
-
-// generateApiKey is an ESM live binding — must be mocked at the module level
-// via vi.mock (hoisted by Vitest) so index.ts receives the mock on import.
-vi.mock("@src/mcp/transports/index.js", () => ({
-  generateApiKey: vi.fn(),
-}));
 
 function fakeHandler(requiredVars: EnvVar[], isCloudOnly = false): ToolHandler {
   return {
@@ -41,32 +41,26 @@ function fakeHandler(requiredVars: EnvVar[], isCloudOnly = false): ToolHandler {
       inputSchema: {},
       annotations: READ_ONLY,
     }),
-    handle: sinon.stub() as ToolHandler["handle"],
+    handle: vi.fn() as unknown as ToolHandler["handle"],
   };
 }
 
 describe("index.ts", () => {
-  let sandbox: sinon.SinonSandbox;
-  let consoleLog: sinon.SinonStub;
+  let consoleLog: MockInstance<typeof console.log>;
 
   beforeEach(() => {
-    sandbox = sinon.createSandbox();
-    consoleLog = sandbox.stub(console, "log");
-  });
-
-  afterEach(() => {
-    sandbox.restore();
+    consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
   describe("outputToolList()", () => {
     it("should not call console.log when the tool list is empty", () => {
       outputToolList([]);
-      sinon.assert.notCalled(consoleLog);
+      expect(consoleLog).not.toHaveBeenCalled();
     });
 
     it("should call console.log once for a single tool", () => {
       outputToolList([ToolName.LIST_TOPICS]);
-      sinon.assert.calledOnce(consoleLog);
+      expect(consoleLog).toHaveBeenCalledOnce();
     });
 
     it("should call console.log once per tool for multiple tools", () => {
@@ -75,18 +69,18 @@ describe("index.ts", () => {
         ToolName.CREATE_TOPICS,
         ToolName.DELETE_TOPICS,
       ]);
-      sinon.assert.callCount(consoleLog, 3);
+      expect(consoleLog).toHaveBeenCalledTimes(3);
     });
 
     it("should include the tool name in the output line", () => {
       outputToolList([ToolName.LIST_TOPICS]);
-      const output: string = consoleLog.firstCall.args[0];
+      const output = consoleLog.mock.calls[0]![0] as string;
       expect(output).toContain(ToolName.LIST_TOPICS);
     });
 
     it("should include the full description when it is within 120 characters", () => {
       const shortDesc = "A short description.";
-      sandbox.stub(ToolHandlerRegistry, "getToolConfig").returns({
+      vi.spyOn(ToolHandlerRegistry, "getToolConfig").mockReturnValue({
         name: ToolName.LIST_TOPICS,
         description: shortDesc,
         inputSchema: {},
@@ -95,14 +89,14 @@ describe("index.ts", () => {
 
       outputToolList([ToolName.LIST_TOPICS]);
 
-      const output: string = consoleLog.firstCall.args[0];
+      const output = consoleLog.mock.calls[0]![0] as string;
       expect(output).toContain(shortDesc);
       expect(output).not.toContain("...");
     });
 
     it("should truncate descriptions longer than 120 characters with ellipsis", () => {
       const longDesc = "x".repeat(150);
-      sandbox.stub(ToolHandlerRegistry, "getToolConfig").returns({
+      vi.spyOn(ToolHandlerRegistry, "getToolConfig").mockReturnValue({
         name: ToolName.LIST_TOPICS,
         description: longDesc,
         inputSchema: {},
@@ -111,7 +105,7 @@ describe("index.ts", () => {
 
       outputToolList([ToolName.LIST_TOPICS]);
 
-      const output: string = consoleLog.firstCall.args[0];
+      const output = consoleLog.mock.calls[0]![0] as string;
       expect(output).toContain("...");
       // ANSI codes only wrap the tool name before the ": " separator, so
       // splitting there isolates the description without needing regex stripping.
@@ -122,9 +116,9 @@ describe("index.ts", () => {
 
   describe("getToolHandlersToRegister()", () => {
     it("should include a tool when all its required env vars are present", () => {
-      sandbox
-        .stub(ToolHandlerRegistry, "getToolHandler")
-        .returns(fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]));
+      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
+        fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]),
+      );
 
       const result = getToolHandlersToRegister(
         [ToolName.LIST_TOPICS],
@@ -136,9 +130,9 @@ describe("index.ts", () => {
     });
 
     it("should exclude a tool when a required env var is missing", () => {
-      sandbox
-        .stub(ToolHandlerRegistry, "getToolHandler")
-        .returns(fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]));
+      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
+        fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]),
+      );
 
       expect(() =>
         getToolHandlersToRegister(
@@ -150,10 +144,7 @@ describe("index.ts", () => {
     });
 
     it("should exclude a tool absent from filteredToolNames even when env vars are present", () => {
-      const getToolHandler = sandbox.stub(
-        ToolHandlerRegistry,
-        "getToolHandler",
-      );
+      const getToolHandler = vi.spyOn(ToolHandlerRegistry, "getToolHandler");
 
       expect(() =>
         getToolHandlersToRegister(
@@ -163,18 +154,16 @@ describe("index.ts", () => {
         ),
       ).toThrow("No tools enabled");
 
-      sinon.assert.notCalled(getToolHandler);
+      expect(getToolHandler).not.toHaveBeenCalled();
     });
 
     it("should exclude a cloud-only tool when disableConfluentCloudTools is true", () => {
-      sandbox
-        .stub(ToolHandlerRegistry, "getToolHandler")
-        .returns(
-          fakeHandler(
-            ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"],
-            true,
-          ),
-        );
+      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
+        fakeHandler(
+          ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"],
+          true,
+        ),
+      );
 
       expect(() =>
         getToolHandlersToRegister(
@@ -189,14 +178,12 @@ describe("index.ts", () => {
     });
 
     it("should include a cloud-only tool when disableConfluentCloudTools is false", () => {
-      sandbox
-        .stub(ToolHandlerRegistry, "getToolHandler")
-        .returns(
-          fakeHandler(
-            ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"],
-            true,
-          ),
-        );
+      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
+        fakeHandler(
+          ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"],
+          true,
+        ),
+      );
 
       const result = getToolHandlersToRegister(
         [ToolName.LIST_TOPICS],
@@ -211,16 +198,15 @@ describe("index.ts", () => {
     });
 
     it("should include only the tool whose env vars are satisfied when tools have mixed satisfaction", () => {
-      const getToolHandler = sandbox.stub(
-        ToolHandlerRegistry,
-        "getToolHandler",
+      const listHandler = fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]);
+      const createHandler = fakeHandler(["FLINK_API_KEY", "FLINK_API_SECRET"]);
+      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockImplementation(
+        (name) => {
+          if (name === ToolName.LIST_TOPICS) return listHandler;
+          if (name === ToolName.CREATE_TOPICS) return createHandler;
+          throw new Error(`unexpected tool ${name}`);
+        },
       );
-      getToolHandler
-        .withArgs(ToolName.LIST_TOPICS)
-        .returns(fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]));
-      getToolHandler
-        .withArgs(ToolName.CREATE_TOPICS)
-        .returns(fakeHandler(["FLINK_API_KEY", "FLINK_API_SECRET"]));
 
       const result = getToolHandlersToRegister(
         [ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS],
@@ -369,25 +355,27 @@ describe("index.ts", () => {
   });
 
   describe("outputApiKey()", () => {
-    const FAKE_API_KEY = "fake-api-key-for-testing";
+    // generateApiKey produces a 64-char hex string from 32 random bytes.
+    // Stubbing the underlying randomBytes lets us assert deterministic output.
+    const FAKE_BYTES = Buffer.alloc(32, 0xab);
+    const EXPECTED_API_KEY = "ab".repeat(32);
+    let randomBytesSpy: MockInstance<typeof nodeCrypto.randomBytes>;
 
     beforeEach(() => {
-      vi.mocked(generateApiKey).mockReturnValue(FAKE_API_KEY);
+      randomBytesSpy = vi
+        .spyOn(nodeCrypto, "randomBytes")
+        .mockReturnValue(FAKE_BYTES);
     });
 
-    afterEach(() => {
-      vi.mocked(generateApiKey).mockReset();
-    });
-
-    it("should call generateApiKey once", () => {
+    it("should generate exactly one API key per invocation", () => {
       outputApiKey();
-      expect(vi.mocked(generateApiKey)).toHaveBeenCalledOnce();
+      expect(randomBytesSpy).toHaveBeenCalledOnce();
     });
 
     it("should print the generated key to console.log", () => {
       outputApiKey();
-      const allArgs: unknown[] = (console.log as sinon.SinonStub).args.flat();
-      expect(allArgs).toContain(FAKE_API_KEY);
+      const allArgs: unknown[] = consoleLog.mock.calls.flat();
+      expect(allArgs).toContain(EXPECTED_API_KEY);
     });
   });
 });

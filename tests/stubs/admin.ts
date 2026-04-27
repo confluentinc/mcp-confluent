@@ -1,29 +1,29 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import sinon from "sinon";
+import { type Mock, vi } from "vitest";
 
-/** {@link KafkaJS.Admin} with all methods replaced by {@link stubs}. */
-export type StubbedAdmin = {
-  [K in keyof KafkaJS.Admin]: sinon.SinonStub;
+/** {@link KafkaJS.Admin} with all methods replaced by {@link Mock mocks}. */
+export type MockedAdmin = {
+  [K in keyof KafkaJS.Admin]: Mock;
 };
 
 /**
- * Creates a {@link KafkaJS.Admin} stub with all methods replaced by
- * {@link SinonStub stubs}. Each method resolves with a sensible empty default.
+ * Creates a {@link KafkaJS.Admin} mock with all methods replaced by
+ * {@link Mock mocks}. Each method resolves with a sensible empty default.
  */
-export function createStubAdmin(): StubbedAdmin {
+export function createMockAdmin(): MockedAdmin {
   return {
-    connect: sinon.stub().resolves(),
-    disconnect: sinon.stub().resolves(),
-    createTopics: sinon.stub().resolves(true),
-    deleteTopics: sinon.stub().resolves(),
-    listTopics: sinon.stub().resolves([]),
-    listGroups: sinon.stub().resolves({ groups: [], errors: [] }),
-    describeGroups: sinon.stub().resolves({ groups: [] }),
-    deleteGroups: sinon.stub().resolves([]),
-    fetchOffsets: sinon.stub().resolves([]),
-    deleteTopicRecords: sinon.stub().resolves([]),
-    fetchTopicMetadata: sinon.stub().resolves({ topics: [] }),
-    fetchTopicOffsets: sinon.stub().resolves([]),
-    fetchTopicOffsetsByTimestamp: sinon.stub().resolves([]),
+    connect: vi.fn().mockResolvedValue(undefined),
+    disconnect: vi.fn().mockResolvedValue(undefined),
+    createTopics: vi.fn().mockResolvedValue(true),
+    deleteTopics: vi.fn().mockResolvedValue(undefined),
+    listTopics: vi.fn().mockResolvedValue([]),
+    listGroups: vi.fn().mockResolvedValue({ groups: [], errors: [] }),
+    describeGroups: vi.fn().mockResolvedValue({ groups: [] }),
+    deleteGroups: vi.fn().mockResolvedValue([]),
+    fetchOffsets: vi.fn().mockResolvedValue([]),
+    deleteTopicRecords: vi.fn().mockResolvedValue([]),
+    fetchTopicMetadata: vi.fn().mockResolvedValue({ topics: [] }),
+    fetchTopicOffsets: vi.fn().mockResolvedValue([]),
+    fetchTopicOffsetsByTimestamp: vi.fn().mockResolvedValue([]),
   };
 }

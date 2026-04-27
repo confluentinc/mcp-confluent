@@ -30,19 +30,28 @@ const silentKafkaLogger: KafkaJS.Logger = {
 };
 
 /**
+ * Builds a {@link KafkaJS.Kafka} client. The library accepts either rdkafka-style
+ * (top-level keys like `bootstrap.servers`) or kafkajs-style (nested `kafkaJS`
+ * object); we use rdkafka-style so the `kafkaJS` field only carries the logger
+ * override.
+ */
+function newKafkaClient(clientId: string): KafkaJS.Kafka {
+  return new KafkaJS.Kafka({
+    ...kafkaConfig(clientId),
+    // no need to pass 'brokers' here because the rdkafka-style config is already
+    // doing that via 'bootstrap.servers'
+    kafkaJS: { logger: silentKafkaLogger } as KafkaJS.KafkaConfig,
+  });
+}
+
+/**
  * Connects a Kafka admin client directly (not via the MCP server) for
  * test-side resource lifecycle: creating topics in `beforeAll`, cleaning up
  * in `afterAll`, verifying topic state after a handler call, etc. Callers
  * must `admin.disconnect()` when done.
  */
 export async function connectTestAdmin(): Promise<KafkaJS.Admin> {
-  const kafka = new KafkaJS.Kafka({
-    ...kafkaConfig("mcp-confluent-it-admin"),
-    // typescript requires kafkaJS even though most config is above
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    kafkaJS: { logger: silentKafkaLogger } as any,
-  });
-  const admin = kafka.admin();
+  const admin = newKafkaClient("mcp-confluent-it-admin").admin();
   await admin.connect();
   return admin;
 }
@@ -53,12 +62,7 @@ export async function connectTestAdmin(): Promise<KafkaJS.Admin> {
  * must `producer.disconnect()` when done.
  */
 export async function connectTestProducer(): Promise<KafkaJS.Producer> {
-  const kafka = new KafkaJS.Kafka({
-    ...kafkaConfig("mcp-confluent-it-producer"),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    kafkaJS: { logger: silentKafkaLogger } as any,
-  });
-  const producer = kafka.producer();
+  const producer = newKafkaClient("mcp-confluent-it-producer").producer();
   await producer.connect();
   return producer;
 }
@@ -72,31 +76,4 @@ export async function connectTestProducer(): Promise<KafkaJS.Producer> {
 export function uniqueTopicName(slug: string): string {
   const random = Math.random().toString(36).slice(2, 8);
   return `int-${slug}-${Date.now()}-${random}`;
-}
-
-/**
- * Polls `admin.listTopics()` until `predicate(topics)` returns true or the
- * timeout elapses. CCloud Kafka propagates metadata asynchronously, so a
- * separate admin client's view of the topic list can lag the broker by a
- * few seconds after a create/delete. Use this to verify state from the
- * test's side-channel without flaking.
- *
- * Resolves when the predicate passes; rejects with the last-seen topic list
- * in the error message if the timeout elapses first.
- */
-export async function waitForTopicState(
-  admin: KafkaJS.Admin,
-  predicate: (topics: string[]) => boolean,
-  { timeoutMs = 15_000, intervalMs = 500 } = {},
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  let lastSeen: string[] = [];
-  while (Date.now() < deadline) {
-    lastSeen = await admin.listTopics();
-    if (predicate(lastSeen)) return;
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  throw new Error(
-    `waitForTopicState timed out after ${timeoutMs}ms; last-seen topic count: ${lastSeen.length}`,
-  );
 }

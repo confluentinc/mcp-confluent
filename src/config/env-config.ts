@@ -16,8 +16,6 @@ const CONN = `connections.${ENV_CONNECTION_NAME}`;
 /**
  * Maps each environment variable in type Environment (and handled by buildConfigFromEnvAndCli)
  * to its corresponding Zod document path in the manufactured MCPServerConfiguration.
- * The keys drive the Pick<Environment, ...> type of buildConfigFromEnvAndCli, so every
- * env var the function touches must have an entry here.
  */
 const ENV_VAR_TO_ZPATH = {
   // Kafka connection parameters

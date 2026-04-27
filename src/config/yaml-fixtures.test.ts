@@ -343,6 +343,75 @@ describe("config/yaml-fixtures.test.ts", () => {
         ),
       ).toThrow(/Configuration validation failed/);
     });
+
+    it("should load server.transports and server.do_not_track from YAML", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/kafka-with-server-transports.yaml"),
+        NO_ENV,
+      );
+      expect(config.server.transports).toEqual(["http", "sse"]);
+      expect(config.server.do_not_track).toBe(true);
+    });
+
+    it("should reject an empty server.transports array", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/server-transports-empty.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/Configuration validation failed/);
+    });
+
+    it("should reject duplicate entries in server.transports", () => {
+      expect(() =>
+        loadConfigFromYaml(
+          fixtureFile("invalid/server-transports-duplicate.yaml"),
+          NO_ENV,
+        ),
+      ).toThrow(/duplicate/i);
+    });
+
+    it("should return the YAML do_not_track value even when DO_NOT_TRACK is set in the environment", () => {
+      // loadConfigFromYaml does not apply the env-var floor — that is the
+      // caller's responsibility (index.ts ORs mcpConfig.server.do_not_track
+      // with env.DO_NOT_TRACK before calling TelemetryService.initialize).
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/kafka-with-server-block.yaml"),
+        { DO_NOT_TRACK: "true" },
+      );
+      expect(config.server.do_not_track).toBe(false);
+    });
+  });
+
+  describe("config.example.yaml", () => {
+    // Prove that the example config can be parsed successfully with a minimal environment providing values for the fields
+    // that it references using ${VAR} interpolation. This ensures the example is a valid config that can be used as a starting
+    // point by users as the codebase evolves.
+
+    // Minimal env: supply values for every ${VAR} placeholder that has no :-default.
+    // Placeholders with defaults (e.g. ${KAFKA_BOOTSTRAP_SERVERS:-pkc-xxxxx...}) resolve
+    // on their own; only the bare auth fields need values to pass schema validation.
+    const EXAMPLE_ENV: Record<string, string> = {
+      KAFKA_API_KEY: "example-kafka-key",
+      KAFKA_API_SECRET: "example-kafka-secret",
+      SCHEMA_REGISTRY_API_KEY: "example-sr-key",
+      SCHEMA_REGISTRY_API_SECRET: "example-sr-secret",
+      CONFLUENT_CLOUD_API_KEY: "example-cloud-key",
+      CONFLUENT_CLOUD_API_SECRET: "example-cloud-secret",
+      FLINK_API_KEY: "example-flink-key",
+      FLINK_API_SECRET: "example-flink-secret",
+      FLINK_ORG_ID: "example-org-id",
+      TABLEFLOW_API_KEY: "example-tableflow-key",
+      TABLEFLOW_API_SECRET: "example-tableflow-secret",
+    };
+
+    const EXAMPLE_FILE = fileURLToPath(
+      new URL("../../config.example.yaml", import.meta.url),
+    );
+
+    it("should parse without error", () => {
+      expect(() => loadConfigFromYaml(EXAMPLE_FILE, EXAMPLE_ENV)).not.toThrow();
+    });
   });
 
   describe("invalid fixtures", () => {

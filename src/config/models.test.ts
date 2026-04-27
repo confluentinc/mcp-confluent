@@ -446,6 +446,75 @@ describe("config/models.ts", () => {
         expect(result.data.server.http.port).toBe(9090);
       }
     });
+
+    it("should default server.transports to [stdio] when omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.transports).toEqual(["stdio"]);
+      }
+    });
+
+    it("should accept an explicit server.transports list", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { transports: ["http", "sse"] },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.transports).toEqual(["http", "sse"]);
+      }
+    });
+
+    it("should reject an empty server.transports array", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { transports: [] },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject an unknown transport value in server.transports", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { transports: ["grpc"] },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject duplicate entries in server.transports", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { transports: ["http", "http"] },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatZodIssues(result.error.issues)).toMatch(/duplicate/i);
+      }
+    });
+
+    it("should default server.do_not_track to false when omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.do_not_track).toBe(false);
+      }
+    });
+
+    it("should accept server.do_not_track: true", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { do_not_track: true },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.do_not_track).toBe(true);
+      }
+    });
   });
 
   describe("confluent_cloud block", () => {

@@ -72,6 +72,9 @@ export class AuthHolder {
    * in-flight recovery.
    */
   async recoverIfBroken(): Promise<void> {
+    // CP-only health check is sufficient as long as DP TTL >= CP TTL (the
+    // current `token-lifetimes.ts` invariant: DP=10min, CP=5min). If those
+    // ever invert, expand this to also check `getDataPlaneToken()`.
     if (
       this.ctx?.getControlPlaneToken() !== undefined &&
       !this.hasNonTransientError()

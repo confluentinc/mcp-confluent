@@ -1,3 +1,4 @@
+import type { CCloudOAuthConfig } from "@src/config/models.js";
 import {
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
   MCPServerConfiguration,
@@ -624,6 +625,34 @@ describe("config/models.ts", () => {
         );
       });
     });
+  });
+});
+
+describe("MCPServerConfiguration ccloud-oauth field", () => {
+  it("should return undefined from getCCloudOAuth() when no oauth config is supplied", () => {
+    const config = new MCPServerConfiguration({
+      connections: {},
+    });
+    expect(config.getCCloudOAuth()).toBeUndefined();
+  });
+
+  it("should return the supplied config from getCCloudOAuth()", () => {
+    const oauth: CCloudOAuthConfig = { type: "ccloud_oauth", env: "stag" };
+    const config = new MCPServerConfiguration({
+      connections: {},
+      ccloudOAuth: oauth,
+    });
+    expect(config.getCCloudOAuth()).toEqual(oauth);
+  });
+
+  it("should not expose ccloudOAuth as an enumerable property", () => {
+    const config = new MCPServerConfiguration({
+      connections: {},
+      ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+    });
+    // Private fields should not appear on Object.keys.
+    expect(Object.keys(config)).not.toContain("ccloudOAuth");
+    expect(Object.keys(config)).not.toContain("#ccloudOAuth");
   });
 });
 

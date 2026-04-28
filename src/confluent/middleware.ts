@@ -2,6 +2,19 @@ import { logger } from "@src/logger.js";
 import { Middleware } from "openapi-fetch";
 import pkg from "../../package.json" with { type: "json" };
 
+/**
+ * Thrown by the bearer middleware when the token getter returns undefined —
+ * typically because OAuth bootstrap has not completed (or has been cleared by
+ * shutdown) at the moment a request is being constructed. Carries a clear
+ * message; propagates through `BaseToolHandler` into `CallToolResult.isError`.
+ */
+export class BearerTokenUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BearerTokenUnavailableError";
+  }
+}
+
 export interface ConfluentEndpoints {
   cloud?: string;
   tableflow?: string;

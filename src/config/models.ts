@@ -165,15 +165,34 @@ export class MCPServerConfiguration {
   readonly connections: Readonly<Record<string, ConnectionConfig>>;
   /** MCP server operational settings. Corresponds to the `server` block at the root of the YAML configuration. */
   readonly server: ServerConfig;
+  /**
+   * CCloud OAuth connection config, when configured via `--oauth` /
+   * `--oauth-env` on the env-var pathway. Held outside the `connections`
+   * record because the single-connection guard prohibits a second entry;
+   * the connections-record migration will move it inside the record and
+   * remove both this private field and {@link MCPServerConfiguration.getCCloudOAuth}.
+   */
+  readonly #ccloudOAuth: CCloudOAuthConfig | undefined;
 
   constructor(data: {
     connections: Record<string, ConnectionConfig>;
     server?: ServerConfig;
+    ccloudOAuth?: CCloudOAuthConfig;
   }) {
     this.connections = data.connections;
     // DEFAULT_SERVER_CONFIG is declared after the schemas below; it is always
     // initialized before any MCPServerConfiguration instance is created at runtime.
     this.server = data.server ?? DEFAULT_SERVER_CONFIG;
+    this.#ccloudOAuth = data.ccloudOAuth;
+  }
+
+  /**
+   * Returns the CCloud OAuth connection config when one was supplied at
+   * construction time; `undefined` otherwise. {@link ServerRuntime.fromConfig}
+   * uses this to decide whether to bootstrap an `OAuthHolder`.
+   */
+  getCCloudOAuth(): CCloudOAuthConfig | undefined {
+    return this.#ccloudOAuth;
   }
 
   /**

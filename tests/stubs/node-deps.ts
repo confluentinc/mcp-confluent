@@ -1,4 +1,9 @@
 import * as nodeDeps from "@src/confluent/node-deps.js";
+import type {
+  Server as HttpServer,
+  IncomingMessage,
+  ServerResponse,
+} from "node:http";
 import { type MockInstance, vi } from "vitest";
 
 /**
@@ -120,4 +125,134 @@ export function mockDotenv(): MockedDotenv {
         "or .mockReturnValue({ error: new Error(...) }) for a failure.",
     );
   });
+}
+
+/** Spy returned by {@linkcode mockOpen}. */
+export type MockedOpen = MockInstance<typeof nodeDeps.nodeOpen.open>;
+
+/**
+ * Install a {@linkcode vi.spyOn} on {@linkcode nodeDeps.nodeOpen.open} that
+ * resolves to a no-op by default. Callers may override per-test with
+ * `.mockResolvedValue(...)` or assert calls with `.toHaveBeenCalledWith(...)`.
+ */
+export function mockOpen(): MockedOpen {
+  return vi
+    .spyOn(nodeDeps.nodeOpen, "open")
+    .mockResolvedValue(
+      undefined as unknown as Awaited<
+        ReturnType<typeof nodeDeps.nodeOpen.open>
+      >,
+    );
+}
+
+/**
+ * Test handle returned by {@linkcode mockHttpServer}. Tests drive the fake
+ * server by:
+ *  - awaiting `listening` (resolves once production code calls `.listen`)
+ *  - calling `fireRequest(url)` to deliver a synthetic request to the registered listener
+ *  - asserting `closed` after the production code finishes
+ */
+export type MockedHttpServer = {
+  spy: MockInstance<typeof nodeDeps.nodeHttp.createServer>;
+  listening: Promise<number>;
+  fireRequest: (url: string) => Promise<{ statusCode: number; body: string }>;
+  setListenError: (err: NodeJS.ErrnoException) => void;
+  closed: () => boolean;
+};
+
+/**
+ * Install a fake HTTP server. Returns a handle the test uses to inject a
+ * fake redirect request and observe lifecycle.
+ */
+export function mockHttpServer(): MockedHttpServer {
+  let requestHandler:
+    | ((req: IncomingMessage, res: ServerResponse) => void)
+    | null = null;
+  let listenResolve: ((port: number) => void) | null = null;
+  let listenError: NodeJS.ErrnoException | null = null;
+  const errorListeners: Array<(err: Error) => void> = [];
+  const closeListeners: Array<() => void> = [];
+  let isClosed = false;
+  const listening = new Promise<number>((resolve) => {
+    listenResolve = resolve;
+  });
+
+  const fakeServer: Partial<HttpServer> = {
+    listen(port?: unknown, hostnameOrCb?: unknown, cb?: unknown) {
+      // Support both listen(port, cb) and listen(port, hostname, cb) overloads.
+      const resolvedCb = typeof hostnameOrCb === "function" ? hostnameOrCb : cb;
+      if (listenError) {
+        queueMicrotask(() =>
+          errorListeners.forEach((fn) => fn(listenError as Error)),
+        );
+      } else {
+        const numericPort = typeof port === "number" ? port : 0;
+        listenResolve?.(numericPort);
+        if (typeof resolvedCb === "function") (resolvedCb as () => void)();
+      }
+      return fakeServer as HttpServer;
+    },
+    close(cb?: unknown) {
+      isClosed = true;
+      closeListeners.forEach((fn) => fn());
+      if (typeof cb === "function") (cb as (err?: Error) => void)();
+      return fakeServer as HttpServer;
+    },
+    on(event: unknown, listener: unknown) {
+      if (event === "error")
+        errorListeners.push(listener as (err: Error) => void);
+      if (event === "close") closeListeners.push(listener as () => void);
+      return fakeServer as HttpServer;
+    },
+    off(event: unknown, listener: unknown) {
+      if (event === "error") {
+        const idx = errorListeners.indexOf(listener as (err: Error) => void);
+        if (idx >= 0) errorListeners.splice(idx, 1);
+      }
+      if (event === "close") {
+        const idx = closeListeners.indexOf(listener as () => void);
+        if (idx >= 0) closeListeners.splice(idx, 1);
+      }
+      return fakeServer as HttpServer;
+    },
+  };
+
+  const spy = vi
+    .spyOn(nodeDeps.nodeHttp, "createServer")
+    .mockImplementation((handler: unknown) => {
+      requestHandler = handler as typeof requestHandler;
+      return fakeServer as HttpServer;
+    });
+
+  const fireRequest = async (
+    url: string,
+  ): Promise<{ statusCode: number; body: string }> => {
+    if (!requestHandler) {
+      throw new Error("mockHttpServer.fireRequest called before createServer");
+    }
+    let statusCode = 200;
+    let body = "";
+    const fakeReq = { url, method: "GET" } as unknown as IncomingMessage;
+    const fakeRes = {
+      writeHead: (code: number) => {
+        statusCode = code;
+      },
+      end: (text?: string) => {
+        if (typeof text === "string") body = text;
+      },
+      setHeader: () => undefined,
+    } as unknown as ServerResponse;
+    requestHandler(fakeReq, fakeRes);
+    return { statusCode, body };
+  };
+
+  return {
+    spy,
+    listening,
+    fireRequest,
+    setListenError: (err) => {
+      listenError = err;
+    },
+    closed: () => isClosed,
+  };
 }

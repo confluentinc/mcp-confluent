@@ -79,6 +79,14 @@ export class AuthContext {
     });
   }
 
+  /** Build a context from an already-acquired token set. */
+  static fromTokens(
+    auth0Config: Auth0Config,
+    tokens: ConfluentTokenSet,
+  ): AuthContext {
+    return new AuthContext(auth0Config, tokens);
+  }
+
   /** Opaque access token — stable across refreshes. */
   get accessToken(): string {
     return this.internalTokens.accessToken;

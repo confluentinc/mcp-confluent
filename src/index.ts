@@ -138,6 +138,10 @@ async function main() {
       process.exit(0);
     }
 
+    if (cliOptions.oauth && cliOptions.oauthEnv) {
+      applyOauthEnvDefaults(cliOptions.oauthEnv);
+    }
+
     if (cliOptions.envFile) {
       // NOW load env vars into process.env!
       loadDotEnvIntoProcessEnv(cliOptions.envFile);
@@ -155,6 +159,8 @@ async function main() {
         disableAuth: cliOptions.disableAuth,
         allowedHosts: cliOptions.allowedHosts,
         kafkaConfig: cliOptions.kafkaConfig,
+        oauth: cliOptions.oauth,
+        oauthEnv: cliOptions.oauthEnv,
       });
     }
 
@@ -176,7 +182,7 @@ async function main() {
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
 
-    const runtime = ServerRuntime.fromConfig(mcpConfig, env);
+    const runtime = await ServerRuntime.fromConfig(mcpConfig, env);
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({
@@ -274,6 +280,7 @@ async function main() {
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
+      runtime.oauthHolder?.shutdown();
       await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
       await runtime.clientManager.disconnect();

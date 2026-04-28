@@ -240,6 +240,9 @@ export function parseCliArgs(argv: string[]): CLIOptions {
     if (opts.oauth && !opts.oauthEnv) {
       throw new Error("--oauth requires --oauth-env <devel|stag|prod>");
     }
+    if (opts.oauthEnv && !opts.oauth) {
+      throw new Error("--oauth-env requires --oauth");
+    }
     if (opts.oauth && opts.config) {
       throw new Error(
         "--oauth and --config are mutually exclusive in this release; YAML-driven OAuth is tracked as a follow-up",

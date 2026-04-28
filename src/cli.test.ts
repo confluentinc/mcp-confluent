@@ -467,6 +467,12 @@ describe("cli.ts", () => {
         ).toThrow(/--oauth-env/);
       });
 
+      it("should reject --oauth-env without --oauth", () => {
+        expect(() =>
+          parseCliArgs(["node", "mcp-confluent", "--oauth-env", "devel"]),
+        ).toThrow(/--oauth-env requires --oauth/);
+      });
+
       it("should reject --oauth-env with an unknown environment", () => {
         expect(() =>
           parseCliArgs([

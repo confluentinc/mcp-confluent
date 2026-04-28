@@ -6,8 +6,12 @@ import {
   CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import {
+  connectionIdsWhere,
+  hasKafkaRest,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, KAFKA_REST_REQUIRED_ENV_VARS } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -82,8 +86,8 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return KAFKA_REST_REQUIRED_ENV_VARS;
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(runtime.config.connections, hasKafkaRest);
   }
 
   isConfluentCloudOnly(): boolean {

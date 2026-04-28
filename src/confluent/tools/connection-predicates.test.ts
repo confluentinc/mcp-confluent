@@ -5,7 +5,8 @@ import {
   hasConfluentCloud,
   hasFlink,
   hasKafka,
-  hasKafkaRest,
+  hasKafkaBootstrap,
+  hasKafkaRestWithAuth,
   hasSchemaRegistry,
   hasTableflow,
   hasTelemetry,
@@ -21,6 +22,12 @@ function conn(
 const KAFKA_CONN = conn({ kafka: { bootstrap_servers: "broker:9092" } });
 const KAFKA_REST_CONN = conn({
   kafka: { rest_endpoint: "http://kafka-rest:8082" },
+});
+const KAFKA_REST_WITH_AUTH_CONN = conn({
+  kafka: {
+    rest_endpoint: "http://kafka-rest:8082",
+    auth: { type: "api_key", key: "k", secret: "s" },
+  },
 });
 const SCHEMA_REGISTRY_CONN = conn({
   schema_registry: { endpoint: "http://schema-registry:8081" },
@@ -61,17 +68,35 @@ describe("connection-predicates.ts", () => {
     });
   });
 
-  describe("hasKafkaRest()", () => {
-    it("should return true when kafka.rest_endpoint is present", () => {
-      expect(hasKafkaRest(KAFKA_REST_CONN)).toBe(true);
+  describe("hasKafkaBootstrap()", () => {
+    it("should return true when kafka.bootstrap_servers is present", () => {
+      expect(hasKafkaBootstrap(KAFKA_CONN)).toBe(true);
     });
 
     it("should return false when kafka block is absent", () => {
-      expect(hasKafkaRest(SCHEMA_REGISTRY_CONN)).toBe(false);
+      expect(hasKafkaBootstrap(SCHEMA_REGISTRY_CONN)).toBe(false);
     });
 
-    it("should return false when kafka block is present but rest_endpoint is absent", () => {
-      expect(hasKafkaRest(KAFKA_CONN)).toBe(false);
+    it("should return false when kafka block is present but bootstrap_servers is absent", () => {
+      expect(hasKafkaBootstrap(KAFKA_REST_CONN)).toBe(false);
+    });
+  });
+
+  describe("hasKafkaRestWithAuth()", () => {
+    it("should return true when kafka.rest_endpoint and auth are both present", () => {
+      expect(hasKafkaRestWithAuth(KAFKA_REST_WITH_AUTH_CONN)).toBe(true);
+    });
+
+    it("should return false when kafka block is absent", () => {
+      expect(hasKafkaRestWithAuth(SCHEMA_REGISTRY_CONN)).toBe(false);
+    });
+
+    it("should return false when kafka block has no rest_endpoint", () => {
+      expect(hasKafkaRestWithAuth(KAFKA_CONN)).toBe(false);
+    });
+
+    it("should return false when rest_endpoint is present but auth is absent", () => {
+      expect(hasKafkaRestWithAuth(KAFKA_REST_CONN)).toBe(false);
     });
   });
 

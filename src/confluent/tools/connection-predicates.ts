@@ -6,8 +6,14 @@ export function hasKafka(conn: ConnectionConfig): boolean {
   return conn.kafka !== undefined;
 }
 
-export function hasKafkaRest(conn: ConnectionConfig): boolean {
-  return conn.kafka?.rest_endpoint !== undefined;
+export function hasKafkaBootstrap(conn: ConnectionConfig): boolean {
+  return conn.kafka?.bootstrap_servers !== undefined;
+}
+
+export function hasKafkaRestWithAuth(conn: ConnectionConfig): boolean {
+  return (
+    conn.kafka?.rest_endpoint !== undefined && conn.kafka?.auth !== undefined
+  );
 }
 
 export function hasSchemaRegistry(conn: ConnectionConfig): boolean {

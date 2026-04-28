@@ -1,10 +1,11 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
-import { envFactory } from "@tests/factories/env.js";
 import {
+  bareRuntime,
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  kafkaRestOnlyRuntime,
+  kafkaRuntime,
 } from "@tests/factories/runtime.js";
 import {
   createMockAdmin,
@@ -25,28 +26,21 @@ describe("list-topics-handler.ts", () => {
       clientManager.getAdminClient.mockResolvedValue(admin as KafkaJS.Admin);
     });
 
-    describe("getRequiredEnvVars()", () => {
-      it("should only require bootstrap servers", () => {
-        const vars = handler.getRequiredEnvVars();
-
-        expect(vars).toEqual(["BOOTSTRAP_SERVERS"]);
-      });
-    });
-
     describe("enabledConnectionIds()", () => {
-      it("should return the connection ID when BOOTSTRAP_SERVERS is set", () => {
-        const runtime = runtimeWith(
-          envFactory({ BOOTSTRAP_SERVERS: "broker:9092" }),
-          { kafka: { bootstrap_servers: "broker:9092" } },
-        );
-        expect(handler.enabledConnectionIds(runtime)).toEqual([
+      it("should return the connection ID for a connection with kafka.bootstrap_servers", () => {
+        expect(handler.enabledConnectionIds(kafkaRuntime())).toEqual([
           DEFAULT_CONNECTION_ID,
         ]);
       });
 
-      it("should return an empty array when BOOTSTRAP_SERVERS is absent", () => {
-        const runtime = runtimeWith(envFactory());
-        expect(handler.enabledConnectionIds(runtime)).toEqual([]);
+      it("should return an empty array for a connection without a kafka block", () => {
+        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
+      });
+
+      it("should return an empty array for a kafka block without bootstrap_servers", () => {
+        expect(handler.enabledConnectionIds(kafkaRestOnlyRuntime())).toEqual(
+          [],
+        );
       });
     });
 

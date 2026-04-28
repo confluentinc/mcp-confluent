@@ -1,5 +1,6 @@
 import {
   type AuthConfig,
+  type CCloudOAuthConfig,
   type KafkaDirectConfig,
   formatZodIssues,
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
@@ -77,6 +78,7 @@ function buildConfigFromEnv(
   env: Environment,
   authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
   kafkaConfig?: KeyValuePairObject,
+  ccloudOAuth?: CCloudOAuthConfig,
 ): MCPServerConfiguration {
   const connection: Record<string, unknown> = { type: "direct" };
 
@@ -127,7 +129,7 @@ function buildConfigFromEnv(
     );
   }
 
-  return new MCPServerConfiguration(result.data);
+  return new MCPServerConfiguration({ ...result.data, ccloudOAuth });
 }
 
 /** CLI flags that may override values in the env-var config path. Mutually exclusive with --config (YAML path). */
@@ -135,6 +137,8 @@ export interface EnvPathCliOverrides {
   disableAuth?: boolean;
   allowedHosts?: string[];
   kafkaConfig?: KeyValuePairObject;
+  oauth?: boolean;
+  oauthEnv?: "devel" | "stag" | "prod";
 }
 
 /**
@@ -150,6 +154,10 @@ export function buildConfigFromEnvAndCli(
   env: Environment,
   overrides: EnvPathCliOverrides = {},
 ): MCPServerConfiguration {
+  const ccloudOAuth: CCloudOAuthConfig | undefined =
+    overrides.oauth && overrides.oauthEnv
+      ? { type: "ccloud_oauth" as const, env: overrides.oauthEnv }
+      : undefined;
   return buildConfigFromEnv(
     env,
     {
@@ -157,6 +165,7 @@ export function buildConfigFromEnvAndCli(
       allowedHosts: overrides.allowedHosts,
     },
     overrides.kafkaConfig,
+    ccloudOAuth,
   );
 }
 

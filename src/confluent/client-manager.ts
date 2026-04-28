@@ -255,7 +255,9 @@ export class DefaultClientManager
       if (!this.confluentCloudSchemaRegistryBaseUrl) {
         throw new Error("Schema Registry endpoint not configured");
       }
-      const { apiKey, apiSecret } = config.auth.schemaRegistry;
+      const schemaRegistryAuth = config.auth.schemaRegistry;
+      const { apiKey, apiSecret } =
+        schemaRegistryAuth.type !== "oauth" ? schemaRegistryAuth : {};
       const clientConfig: ClientConfig = {
         baseURLs: [this.confluentCloudSchemaRegistryBaseUrl],
       };

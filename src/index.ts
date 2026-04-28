@@ -13,6 +13,8 @@ import {
   loadConfigFromYaml,
   MCPServerConfiguration,
 } from "@src/config/index.js";
+import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
+import type { Auth0Environment } from "@src/confluent/oauth/types.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -78,6 +80,27 @@ export function getToolHandlersToRegister(
   return toolHandlers;
 }
 
+/**
+ * Inject placeholder values into `process.env` so an `--oauth` run works with
+ * zero env-file configuration. Sets `CONFLUENT_CLOUD_REST_ENDPOINT` (derived
+ * from the Auth0 environment) plus placeholder values for
+ * `CONFLUENT_CLOUD_API_KEY` and `CONFLUENT_CLOUD_API_SECRET`. Does not
+ * overwrite existing values, so the user's `.env` file (loaded after this)
+ * takes precedence. Bearer middleware overrides auth at request time, so
+ * placeholder values never go on the wire.
+ */
+export function applyOauthEnvDefaults(env: Auth0Environment): void {
+  const placeholder = "_oauth_placeholder";
+  const defaults: Record<string, string> = {
+    CONFLUENT_CLOUD_REST_ENDPOINT: getAuth0Config(env).apiUrl,
+    CONFLUENT_CLOUD_API_KEY: placeholder,
+    CONFLUENT_CLOUD_API_SECRET: placeholder,
+  };
+  for (const [key, value] of Object.entries(defaults)) {
+    if (!process.env[key]) process.env[key] = value;
+  }
+}
+
 export function outputApiKey(): void {
   const apiKey = generateApiKey();
   console.log("\nGenerated MCP API Key:");
@@ -122,6 +145,10 @@ async function main() {
       process.exit(0);
     }
 
+    if (cliOptions.oauth && cliOptions.oauthEnv) {
+      applyOauthEnvDefaults(cliOptions.oauthEnv);
+    }
+
     if (cliOptions.envFile) {
       // NOW load env vars into process.env!
       loadDotEnvIntoProcessEnv(cliOptions.envFile);
@@ -139,6 +166,8 @@ async function main() {
         disableAuth: cliOptions.disableAuth,
         allowedHosts: cliOptions.allowedHosts,
         kafkaConfig: cliOptions.kafkaConfig,
+        oauth: cliOptions.oauth,
+        oauthEnv: cliOptions.oauthEnv,
       });
     }
 
@@ -160,7 +189,7 @@ async function main() {
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
 
-    const runtime = ServerRuntime.fromConfig(mcpConfig, env);
+    const runtime = await ServerRuntime.fromConfig(mcpConfig, env);
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({
@@ -258,6 +287,7 @@ async function main() {
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
+      runtime.oauthHolder?.shutdown();
       await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
       await runtime.clientManager.disconnect();

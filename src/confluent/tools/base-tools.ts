@@ -3,6 +3,7 @@ import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { EnvVar } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { ZodRawShape } from "zod";
 
 /**
@@ -33,15 +34,13 @@ export interface ToolHandler {
   getToolConfig(): ToolConfig;
 
   /**
-   * Returns an array of environment variables required for this tool to function.
+   * Returns the IDs of connections that satisfy this tool's requirements.
+   * A non-empty result means the tool is enabled; empty means disabled.
    *
-   * This method is used to conditionally enable/disable tools based on the availability
-   * of required environment variables. Tools will be disabled if any of their required
-   * environment variables are not set at process startup time.
-   *
-   * @returns Array of environment variable names required by this tool
+   * Override in subclasses with typed connection predicates (issue-173 children).
+   * The default shim in BaseToolHandler delegates to getRequiredEnvVars().
    */
-  getRequiredEnvVars(): readonly EnvVar[];
+  enabledConnectionIds(runtime: ServerRuntime): string[];
 
   /**
    * Returns true if this tool can only be used with Confluent Cloud REST APIs.
@@ -67,15 +66,25 @@ export abstract class BaseToolHandler implements ToolHandler {
   abstract getToolConfig(): ToolConfig;
 
   /**
-   * Return an array of environment variable names required for the operation of this tool.
-   *
-   * Preferable to return a constant array of EnvVars defined in src/env-schema.ts for easier determination
-   * of which tools require which subset of env vars.
-   *
-   * If any of the required environment variables are not set at process
-   * startup time, the tool will be disabled and not returned by the tool loader.
+   * Return the env var names required for this tool.
+   * Used by the enabledConnectionIds() shim; replaced by typed connection predicates
+   * when each handler migrates (issue-173 children). Remove once all handlers migrate.
    */
   abstract getRequiredEnvVars(): readonly EnvVar[];
+
+  /**
+   * Shim implementation: returns all connection IDs when every required env var is
+   * present in runtime.env, otherwise returns [].
+   * Override with typed connection predicates during issue-173 migration.
+   */
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    const missingVars = this.getRequiredEnvVars().filter(
+      (varName) => !runtime.env[varName],
+    );
+    return missingVars.length === 0
+      ? Object.keys(runtime.config.connections)
+      : [];
+  }
 
   /**
    * Default implementation returns false, indicating the tool is not Confluent Cloud only.

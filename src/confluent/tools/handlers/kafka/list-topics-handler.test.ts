@@ -34,6 +34,7 @@ describe("list-topics-handler.ts", () => {
       it("should return the connection ID when BOOTSTRAP_SERVERS is set", () => {
         const runtime = runtimeWith(
           envFactory({ BOOTSTRAP_SERVERS: "broker:9092" }),
+          { kafka: { bootstrap_servers: "broker:9092" } },
         );
         expect(handler.enabledConnectionIds(runtime)).toEqual(["default"]);
       });

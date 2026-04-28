@@ -31,7 +31,7 @@ export function hasTableflow(conn: ConnectionConfig): boolean {
 }
 
 export function connectionIdsWhere(
-  connections: Record<string, ConnectionConfig>,
+  connections: Readonly<Record<string, ConnectionConfig>>,
   predicate: ConnectionPredicate,
 ): string[] {
   return Object.entries(connections)

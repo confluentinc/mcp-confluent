@@ -6,6 +6,7 @@ import envProxy from "@src/env.js";
 import * as dotenv from "dotenv";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer as httpCreateServer } from "node:http";
 import { arch, homedir, platform, release } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -22,4 +23,13 @@ export const nodeFetch = { fetch: globalThis.fetch };
 // `randomBytes`. The codebase only uses the sync form.
 export const nodeCrypto = {
   randomBytes: (size: number): Buffer => randomBytes(size),
+};
+export const nodeHttp = { createServer: httpCreateServer };
+// `open` is loaded lazily so non-OAuth runs don't pay the import cost (it
+// pulls in is-wsl, default-browser, etc.).
+export const nodeOpen = {
+  open: async (target: string): Promise<void> => {
+    const { default: open } = await import("open");
+    await open(target);
+  },
 };

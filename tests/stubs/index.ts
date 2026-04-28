@@ -5,7 +5,11 @@ export {
   mockDotenv,
   mockEnv,
   mockFetch,
+  mockHttpServer,
+  mockOpen,
   type MockedDotenv,
   type MockedFetch,
   type MockedFsWrappers,
+  type MockedHttpServer,
+  type MockedOpen,
 } from "./node-deps.js";

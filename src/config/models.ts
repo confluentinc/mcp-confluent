@@ -534,6 +534,7 @@ export const DEFAULT_SERVER_CONFIG = serverConfigSchema.parse({});
  * Parsed output is wrapped in {@link MCPServerConfiguration} by
  * parseYamlConfiguration().
  */
+
 export const mcpConfigSchema = z
   .object({
     connections: z
@@ -542,7 +543,7 @@ export const mcpConfigSchema = z
         connectionConfigSchema,
       )
       .refine(
-        (connections) => Object.keys(connections).length === 1,
+        enforceSingleConnectionOnly,
         "Exactly one connection must be defined (multiple connections not yet supported)",
       ),
     server: serverConfigSchema.default(() => DEFAULT_SERVER_CONFIG),
@@ -557,4 +558,11 @@ export function formatZodIssues(issues: z.ZodError["issues"]): string {
       return path ? `  - ${path}: ${issue.message}` : `  - ${issue.message}`;
     })
     .join("\n");
+}
+
+// Temporary guard: remove when multi-connection support (#151) lands.
+function enforceSingleConnectionOnly(
+  connections: Record<string, unknown>,
+): boolean {
+  return Object.keys(connections).length === 1;
 }

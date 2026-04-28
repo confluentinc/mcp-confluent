@@ -267,7 +267,7 @@ export type EnvVar = keyof z.infer<typeof combinedSchema>;
 export const TELEMETRY_REQUIRED_ENV_VARS = [
   // Configuring the telemetry client will first look for TELEMETRY_API_KEY/SECRET, then fall back to CONFLUENT_CLOUD_API_KEY/SECRET, so
   // the only absolute required env vars for telemetry are the Confluent Cloud API key/secret.
-  // Likewise, TELEMETRY_ENDPOINT is optional (no default — the fallback is applied in constructDefaultClientManager()).
+  // Likewise, TELEMETRY_ENDPOINT is optional (no default — the fallback is applied in constructClientManagerForConnection()).
 
   // The fallback behavior for the configuration of telemetry
   // in DefaultClientManager indicates that the entire concept

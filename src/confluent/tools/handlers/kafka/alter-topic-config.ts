@@ -8,7 +8,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasKafkaRest,
+  hasKafkaRestWithAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -87,7 +87,7 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaRest);
+    return connectionIdsWhere(runtime.config.connections, hasKafkaRestWithAuth);
   }
 
   isConfluentCloudOnly(): boolean {

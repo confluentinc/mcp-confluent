@@ -62,12 +62,20 @@ export function kafkaRuntime(): ServerRuntime {
   });
 }
 
-/** Runtime with a kafka block including a rest_endpoint. */
+/** Runtime with a kafka block containing only a rest_endpoint (no bootstrap_servers) — the disabled case for admin-client handlers. */
+export function kafkaRestOnlyRuntime(): ServerRuntime {
+  return runtimeWith(envFactory(), {
+    kafka: { rest_endpoint: "https://kafka-rest.example.com" },
+  });
+}
+
+/** Runtime with a kafka block including a rest_endpoint and auth. */
 export function kafkaRestRuntime(): ServerRuntime {
   return runtimeWith(envFactory(), {
     kafka: {
       bootstrap_servers: "broker:9092",
       rest_endpoint: "https://kafka-rest.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
     },
   });
 }

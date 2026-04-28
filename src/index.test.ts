@@ -1,4 +1,5 @@
 import { type DirectConnectionConfig } from "@src/config/index.js";
+import { MCPServerConfiguration } from "@src/config/models.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import type {
@@ -10,12 +11,13 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import type { EnvVar } from "@src/env-schema.js";
 import {
-  constructDefaultClientManager,
   getToolHandlersToRegister,
   outputApiKey,
   outputToolList,
 } from "@src/index.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { envFactory } from "@tests/factories/env.js";
+import { createMockInstance } from "@tests/stubs/index.js";
 import {
   beforeEach,
   describe,
@@ -29,6 +31,16 @@ function connWith(
   fields: Omit<DirectConnectionConfig, "type">,
 ): DirectConnectionConfig {
   return { type: "direct", ...fields };
+}
+
+function runtimeWith(env: ReturnType<typeof envFactory>): ServerRuntime {
+  return new ServerRuntime(
+    new MCPServerConfiguration({
+      connections: { default: connWith({}) },
+    }),
+    { default: createMockInstance(DefaultClientManager) },
+    env,
+  );
 }
 
 function fakeHandler(requiredVars: EnvVar[], isCloudOnly = false): ToolHandler {
@@ -123,7 +135,9 @@ describe("index.ts", () => {
       const result = getToolHandlersToRegister(
         [ToolName.LIST_TOPICS],
         false,
-        envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
+        runtimeWith(
+          envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
+        ),
       );
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
@@ -138,7 +152,7 @@ describe("index.ts", () => {
         getToolHandlersToRegister(
           [ToolName.LIST_TOPICS],
           false,
-          envFactory(), // no credentials
+          runtimeWith(envFactory()), // no credentials
         ),
       ).toThrow("No tools enabled");
     });
@@ -150,7 +164,9 @@ describe("index.ts", () => {
         getToolHandlersToRegister(
           [], // LIST_TOPICS not in the allowed set
           false,
-          envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
+          runtimeWith(
+            envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
+          ),
         ),
       ).toThrow("No tools enabled");
 
@@ -169,10 +185,12 @@ describe("index.ts", () => {
         getToolHandlersToRegister(
           [ToolName.LIST_TOPICS],
           true, // cloud tools disabled
-          envFactory({
-            CONFLUENT_CLOUD_API_KEY: "key",
-            CONFLUENT_CLOUD_API_SECRET: "secret",
-          }),
+          runtimeWith(
+            envFactory({
+              CONFLUENT_CLOUD_API_KEY: "key",
+              CONFLUENT_CLOUD_API_SECRET: "secret",
+            }),
+          ),
         ),
       ).toThrow("No tools enabled");
     });
@@ -188,10 +206,12 @@ describe("index.ts", () => {
       const result = getToolHandlersToRegister(
         [ToolName.LIST_TOPICS],
         false,
-        envFactory({
-          CONFLUENT_CLOUD_API_KEY: "key",
-          CONFLUENT_CLOUD_API_SECRET: "secret",
-        }),
+        runtimeWith(
+          envFactory({
+            CONFLUENT_CLOUD_API_KEY: "key",
+            CONFLUENT_CLOUD_API_SECRET: "secret",
+          }),
+        ),
       );
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
@@ -211,146 +231,13 @@ describe("index.ts", () => {
       const result = getToolHandlersToRegister(
         [ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS],
         false,
-        envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
+        runtimeWith(
+          envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
+        ),
       );
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
       expect(result.has(ToolName.CREATE_TOPICS)).toBe(false);
-    });
-  });
-
-  describe("constructDefaultClientManager()", () => {
-    it("should return a DefaultClientManager instance", () => {
-      const manager = constructDefaultClientManager(
-        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-      );
-      expect(manager).toBeInstanceOf(DefaultClientManager);
-    });
-
-    it("should always set client.id to mcp-confluent", () => {
-      const manager = constructDefaultClientManager(
-        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-      );
-      expect(manager["kafkaConfig"]["client.id"]).toBe("mcp-confluent");
-    });
-
-    it("should set bootstrap.servers from the kafka block", () => {
-      const manager = constructDefaultClientManager(
-        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-      );
-      expect(manager["kafkaConfig"]["bootstrap.servers"]).toBe("broker:9092");
-    });
-
-    it("should include SASL config when the kafka block has auth", () => {
-      const manager = constructDefaultClientManager(
-        connWith({
-          kafka: {
-            bootstrap_servers: "broker:9092",
-            auth: { type: "api_key", key: "the-key", secret: "the-secret" },
-          },
-        }),
-      );
-      expect(manager["kafkaConfig"]["security.protocol"]).toBe("sasl_ssl");
-      expect(manager["kafkaConfig"]["sasl.username"]).toBe("the-key");
-      expect(manager["kafkaConfig"]["sasl.password"]).toBe("the-secret");
-    });
-
-    it("should omit SASL config when the kafka block has no auth", () => {
-      const manager = constructDefaultClientManager(
-        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-      );
-      expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
-    });
-
-    it("should omit SASL config when there is no kafka block", () => {
-      const manager = constructDefaultClientManager(
-        connWith({
-          confluent_cloud: {
-            endpoint: "https://api.confluent.cloud",
-            auth: { type: "api_key", key: "k", secret: "s" },
-          },
-        }),
-      );
-      expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
-    });
-
-    it("should spread kafka extra_properties into the GlobalConfig", () => {
-      const manager = constructDefaultClientManager(
-        connWith({
-          kafka: {
-            bootstrap_servers: "broker:9092",
-            extra_properties: { "socket.timeout.ms": "5000" },
-          },
-        }),
-      );
-      expect(manager["kafkaConfig"]["socket.timeout.ms"]).toBe("5000");
-    });
-
-    it("should set confluentCloudBaseUrl from the confluent_cloud block endpoint", () => {
-      const manager = constructDefaultClientManager(
-        connWith({
-          confluent_cloud: {
-            endpoint: "https://my.cloud.api",
-            auth: { type: "api_key", key: "k", secret: "s" },
-          },
-        }),
-      );
-      expect(manager["confluentCloudBaseUrl"]).toBe("https://my.cloud.api");
-    });
-
-    it("should set confluentCloudBaseUrl to https://api.confluent.cloud when the block uses the default endpoint", () => {
-      const manager = constructDefaultClientManager(
-        connWith({
-          confluent_cloud: {
-            endpoint: "https://api.confluent.cloud",
-            auth: { type: "api_key", key: "k", secret: "s" },
-          },
-        }),
-      );
-      expect(manager["confluentCloudBaseUrl"]).toBe(
-        "https://api.confluent.cloud",
-      );
-    });
-
-    it("should default confluentCloudBaseUrl to https://api.confluent.cloud when there is no confluent_cloud block", () => {
-      const manager = constructDefaultClientManager(
-        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-      );
-      expect(manager["confluentCloudBaseUrl"]).toBe(
-        "https://api.confluent.cloud",
-      );
-    });
-
-    it("should set confluentCloudTableflowBaseUrl to https://api.confluent.cloud when only tableflow is configured", () => {
-      const manager = constructDefaultClientManager(
-        connWith({
-          tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-        }),
-      );
-      expect(manager["confluentCloudTableflowBaseUrl"]).toBe(
-        "https://api.confluent.cloud",
-      );
-    });
-
-    it("should set confluentCloudTelemetryBaseUrl from the telemetry block", () => {
-      const manager = constructDefaultClientManager(
-        connWith({
-          telemetry: {
-            endpoint: "https://my.telemetry.api",
-            auth: { type: "api_key", key: "k", secret: "s" },
-          },
-        }),
-      );
-      expect(manager["confluentCloudTelemetryBaseUrl"]).toBe(
-        "https://my.telemetry.api",
-      );
-    });
-
-    it("should leave confluentCloudTelemetryBaseUrl undefined when there is no telemetry block", () => {
-      const manager = constructDefaultClientManager(
-        connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-      );
-      expect(manager["confluentCloudTelemetryBaseUrl"]).toBeUndefined();
     });
   });
 

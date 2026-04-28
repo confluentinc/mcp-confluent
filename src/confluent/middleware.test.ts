@@ -58,6 +58,16 @@ describe("middleware.ts", () => {
       expect(request.headers.has("Authorization")).toBe(false);
     });
 
+    it("should throw BearerTokenUnavailableError when the getter returns an empty string", async () => {
+      const middleware = createBearerMiddleware(() => "");
+      const request = new Request("https://example.com/api");
+
+      await expect(callOnRequest(middleware, request)).rejects.toThrow(
+        BearerTokenUnavailableError,
+      );
+      expect(request.headers.has("Authorization")).toBe(false);
+    });
+
     it("should set the User-Agent header on success", async () => {
       const middleware = createBearerMiddleware(() => "tok");
       const request = new Request("https://example.com/api");

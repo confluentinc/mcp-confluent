@@ -29,7 +29,7 @@ export const createBearerMiddleware = (
 ): Middleware => ({
   async onRequest({ request }) {
     const token = getToken();
-    if (token === undefined) {
+    if (!token) {
       throw new BearerTokenUnavailableError(
         "OAuth token unavailable; the session may have expired. Restart the server to re-authenticate.",
       );

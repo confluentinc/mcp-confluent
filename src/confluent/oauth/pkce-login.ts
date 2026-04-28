@@ -1,4 +1,4 @@
-import { nodeCrypto, nodeHttp, nodeOpen } from "@src/confluent/node-deps.js";
+import { nodeHttp, nodeOpen } from "@src/confluent/node-deps.js";
 import {
   OAUTH_CALLBACK_PATH,
   OAUTH_CALLBACK_PORT,
@@ -6,6 +6,7 @@ import {
 import {
   generateCodeChallenge,
   generateCodeVerifier,
+  generateOpaqueToken,
 } from "@src/confluent/oauth/crypto-utils.js";
 import {
   executeFullTokenChain,
@@ -76,7 +77,7 @@ export async function runPkceLogin(
 
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
-  const state = nodeCrypto.randomBytes(16).toString("hex");
+  const state = generateOpaqueToken();
 
   let resolveCode: (code: string) => void = () => undefined;
   let rejectFlow: (err: PkceLoginError) => void = () => undefined;
@@ -124,9 +125,6 @@ export async function runPkceLogin(
     resolveCode(code);
   });
 
-  // Bind, fail loudly on EADDRINUSE. The error listener is detached after a
-  // successful bind so a late post-bind socket error doesn't try to reject an
-  // already-resolved promise (silent no-op that would mask real failures).
   const bindResult = new Promise<void>((resolve, reject) => {
     const onBindError = (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
@@ -143,6 +141,11 @@ export async function runPkceLogin(
     server.on("error", onBindError);
     server.listen(OAUTH_CALLBACK_PORT, () => {
       server.off("error", onBindError);
+      // Replace the bind-time rejector with a log-only listener so a stray
+      // post-bind socket error doesn't escape as an uncaught 'error' event.
+      server.on("error", (err) => {
+        logger.warn({ err }, "PKCE callback server post-bind error");
+      });
       resolve();
     });
   });
@@ -159,32 +162,22 @@ export async function runPkceLogin(
     }, PKCE_LOGIN_TIMEOUT_MS);
   });
 
-  try {
-    await bindResult;
-  } catch (err) {
-    if (timer) clearTimeout(timer);
-    server.close();
-    throw err;
-  }
-
-  try {
-    await nodeOpen.open(
-      buildAuthorizationUrl(auth0Config, codeChallenge, state),
-    );
-  } catch (err) {
-    if (timer) clearTimeout(timer);
-    server.close();
-    throw new PkceLoginError(
-      "configuration",
-      `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-
   let authCode: string;
   try {
+    await bindResult;
+    try {
+      await nodeOpen.open(
+        buildAuthorizationUrl(auth0Config, codeChallenge, state),
+      );
+    } catch (err) {
+      throw new PkceLoginError(
+        "configuration",
+        `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     authCode = await Promise.race([codePromise, timeoutPromise]);
   } finally {
-    if (timer) clearTimeout(timer);
+    clearTimeout(timer);
     server.close();
   }
 

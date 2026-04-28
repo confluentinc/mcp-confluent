@@ -16,6 +16,10 @@ import {
 } from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+async function flushMicrotasks(ticks: number): Promise<void> {
+  for (let i = 0; i < ticks; i++) await Promise.resolve();
+}
+
 function jsonResponse(body: object, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -64,11 +68,7 @@ describe("oauth/pkce-login.ts", () => {
 
       const port = await httpMock.listening;
       expect(port).toBe(OAUTH_CALLBACK_PORT);
-      // Flush multiple microtask ticks so the production code progresses through
-      // `await bindResult` and `await nodeOpen.open()`.
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      await flushMicrotasks(3);
       expect(openSpy).toHaveBeenCalledTimes(1);
 
       const openedUrl = openSpy.mock.calls[0]![0] as string;
@@ -98,8 +98,6 @@ describe("oauth/pkce-login.ts", () => {
     it("should reject the request and not run the token chain if the state parameter does not match", async () => {
       vi.useFakeTimers();
       const loginPromise = runPkceLogin(auth0Config);
-      // Flush microtasks so production code progresses through `await bindResult`
-      // and `await nodeOpen.open()` before we interact with the server.
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(0);
       await httpMock.listening;
@@ -133,8 +131,7 @@ describe("oauth/pkce-login.ts", () => {
     it("should reject when the redirect carries an error parameter", async () => {
       const loginPromise = runPkceLogin(auth0Config);
       await httpMock.listening;
-      // One extra tick so the production code's `await nodeOpen.open()` executes.
-      await Promise.resolve();
+      await flushMicrotasks(1);
       const openedUrl = openSpy.mock.calls[0]![0] as string;
       const state = new URL(openedUrl).searchParams.get("state")!;
 

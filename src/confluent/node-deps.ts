@@ -26,8 +26,7 @@ export const nodeCrypto = {
 };
 export const nodeHttp = { createServer: httpCreateServer };
 // `open` is loaded lazily so non-OAuth runs don't pay the import cost (it
-// pulls in is-wsl, default-browser, etc.). Callers spy on the property, not
-// the imported binding (which is read-only per ESM live-binding rules).
+// pulls in is-wsl, default-browser, etc.).
 export const nodeOpen = {
   open: async (target: string): Promise<void> => {
     const { default: open } = await import("open");

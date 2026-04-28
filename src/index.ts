@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { GlobalConfig } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   DisplayedCommandLineUsageError,
@@ -11,21 +10,18 @@ import {
 } from "@src/cli.js";
 import {
   buildConfigFromEnvAndCli,
-  CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
   loadConfigFromYaml,
   MCPServerConfiguration,
-  type DirectConnectionConfig,
 } from "@src/config/index.js";
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { EnvVar } from "@src/env-schema.js";
-import type { Environment } from "@src/env.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
 import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
  * Determine the subset of ToolHandlers to register based on the filtered tool names,
@@ -34,7 +30,7 @@ import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
 export function getToolHandlersToRegister(
   filteredToolNames: ToolName[],
   disableConfluentCloudTools: boolean,
-  env: Environment,
+  runtime: ServerRuntime,
 ): Map<ToolName, ToolHandler> {
   const toolHandlers = new Map<ToolName, ToolHandler>();
 
@@ -57,7 +53,7 @@ export function getToolHandlersToRegister(
 
     const missingVars = handler
       .getRequiredEnvVars()
-      .filter((varName: EnvVar) => !env[varName]);
+      .filter((varName: EnvVar) => !runtime.env[varName]);
 
     if (missingVars.length === 0) {
       toolHandlers.set(toolName, handler);
@@ -98,64 +94,6 @@ export function outputToolList(filteredToolNames: ToolName[]): void {
       desc = desc.slice(0, MAX_DESC_LENGTH - 3) + "...";
     }
     console.log(`\x1b[32m${config.name}\x1b[0m: ${desc}`);
-  });
-}
-
-export function constructDefaultClientManager(
-  conn: DirectConnectionConfig,
-): DefaultClientManager {
-  const kafkaClientConfig: GlobalConfig = {
-    "client.id": "mcp-confluent",
-    ...(conn.kafka?.bootstrap_servers && {
-      "bootstrap.servers": conn.kafka.bootstrap_servers,
-    }),
-    ...(conn.kafka?.auth
-      ? {
-          "security.protocol": "sasl_ssl",
-          "sasl.mechanisms": "PLAIN",
-          "sasl.username": conn.kafka.auth.key,
-          "sasl.password": conn.kafka.auth.secret,
-        }
-      : {}),
-    ...conn.kafka?.extra_properties,
-  };
-
-  return new DefaultClientManager({
-    kafka: kafkaClientConfig,
-    endpoints: {
-      // DefaultClientManager uses this as the Tableflow base URL too (see client-manager.ts constructor), so always supply the default.
-      cloud: conn.confluent_cloud?.endpoint ?? CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
-      flink: conn.flink?.endpoint,
-      schemaRegistry: conn.schema_registry?.endpoint,
-      kafka: conn.kafka?.rest_endpoint,
-      telemetry: conn.telemetry?.endpoint,
-    },
-    auth: {
-      cloud: {
-        apiKey: conn.confluent_cloud?.auth.key,
-        apiSecret: conn.confluent_cloud?.auth.secret,
-      },
-      tableflow: {
-        apiKey: conn.tableflow?.auth.key,
-        apiSecret: conn.tableflow?.auth.secret,
-      },
-      flink: {
-        apiKey: conn.flink?.auth.key,
-        apiSecret: conn.flink?.auth.secret,
-      },
-      schemaRegistry: {
-        apiKey: conn.schema_registry?.auth?.key,
-        apiSecret: conn.schema_registry?.auth?.secret,
-      },
-      kafka: {
-        apiKey: conn.kafka?.auth?.key,
-        apiSecret: conn.kafka?.auth?.secret,
-      },
-      telemetry: {
-        apiKey: conn.telemetry?.auth.key,
-        apiSecret: conn.telemetry?.auth.secret,
-      },
-    },
   });
 }
 
@@ -219,9 +157,7 @@ async function main() {
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
 
-    const clientManager = constructDefaultClientManager(
-      mcpConfig.getSoleConnection(),
-    );
+    const runtime = ServerRuntime.fromConfig(mcpConfig, env);
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({
@@ -246,7 +182,7 @@ async function main() {
     const toolHandlers = getToolHandlersToRegister(
       filteredToolNames,
       cliOptions.disableConfluentCloudTools ?? false,
-      env,
+      runtime,
     );
 
     logger.info(
@@ -268,7 +204,11 @@ async function main() {
           const sessionId = context?.sessionId;
           const startTime = Date.now();
           try {
-            const result = await handler.handle(clientManager, args, sessionId);
+            const result = await handler.handle(
+              runtime.clientManager,
+              args,
+              sessionId,
+            );
             TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
               toolName: name,
               durationMs: Date.now() - startTime,
@@ -317,7 +257,7 @@ async function main() {
       logger.info("Shutting down...");
       await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
-      await clientManager.disconnect();
+      await runtime.clientManager.disconnect();
       await server.close();
       process.exit(0);
     };

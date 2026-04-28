@@ -1020,39 +1020,39 @@ describe("config/env-config.ts", () => {
         ),
       ).toThrow(/MCP_AUTH_DISABLED.*MCP_API_KEY/);
     });
-  });
-});
 
-describe("buildConfigFromEnvAndCli ccloudOAuth", () => {
-  it("should leave ccloudOAuth undefined when neither flag is set", () => {
-    const config = buildConfigFromEnvAndCli(
-      envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
-      {},
-    );
-    expect(config.getCCloudOAuth()).toBeUndefined();
-  });
+    describe("ccloudOAuth", () => {
+      it("should leave ccloudOAuth undefined when neither flag is set", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
+          {},
+        );
+        expect(config.getCCloudOAuth()).toBeUndefined();
+      });
 
-  it("should populate ccloudOAuth when oauth and oauthEnv are set", () => {
-    const config = buildConfigFromEnvAndCli(
-      envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
-      {
-        oauth: true,
-        oauthEnv: "devel",
-      },
-    );
-    expect(config.getCCloudOAuth()).toEqual({
-      type: "ccloud_oauth",
-      env: "devel",
+      it("should populate ccloudOAuth when oauth and oauthEnv are set", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
+          {
+            oauth: true,
+            oauthEnv: "devel",
+          },
+        );
+        expect(config.getCCloudOAuth()).toEqual({
+          type: "ccloud_oauth",
+          env: "devel",
+        });
+      });
+
+      it("should leave ccloudOAuth undefined when oauth is set but oauthEnv is not", () => {
+        // Defensive: parseCliArgs would reject this combination, but the env-config
+        // builder must not silently invent an env value.
+        const config = buildConfigFromEnvAndCli(
+          envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
+          { oauth: true },
+        );
+        expect(config.getCCloudOAuth()).toBeUndefined();
+      });
     });
-  });
-
-  it("should leave ccloudOAuth undefined when oauth is set but oauthEnv is not", () => {
-    // Defensive: parseCliArgs would reject this combination, but the env-config
-    // builder must not silently invent an env value.
-    const config = buildConfigFromEnvAndCli(
-      envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
-      { oauth: true },
-    );
-    expect(config.getCCloudOAuth()).toBeUndefined();
   });
 });

@@ -5,19 +5,24 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { envFactory } from "@tests/factories/env.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 
+/** Connection ID used by the named runtime factories and their default single-connection runtimes. */
+export const DEFAULT_CONNECTION_ID = "default";
+
 /**
  * Creates a ServerRuntime with a mocked ClientManager and a customizable env.
  *
  * Pass `connectionConfig` to populate the connection's service blocks (kafka,
- * flink, schema_registry, etc.). Tests for `enabledConnectionIds()` should
- * supply both the relevant env vars (for the current shim) and the matching
- * service block (for the post-migration predicate), so the test survives the
- * issue-173 migration without modification.
+ * flink, schema_registry, etc.).
+ *
+ * For `enabledConnectionIds()` tests on handlers still using the shim (not yet
+ * migrated to predicate form), supply matching env vars so the shim path passes.
+ * For migrated handlers, env vars are irrelevant — prefer the named factory
+ * functions (`bareRuntime()`, `schemaRegistryRuntime()`, etc.) which omit them.
  */
 export function runtimeWith(
   env: ReturnType<typeof envFactory>,
   connectionConfig: Omit<DirectConnectionConfig, "type"> = {},
-  connectionId = "default",
+  connectionId = DEFAULT_CONNECTION_ID,
 ): ServerRuntime {
   return new ServerRuntime(
     new MCPServerConfiguration({
@@ -26,4 +31,26 @@ export function runtimeWith(
     { [connectionId]: createMockInstance(DefaultClientManager) },
     env,
   );
+}
+
+/** Runtime with no service blocks — used as the disabled case in enabledConnectionIds() tests. */
+export function bareRuntime(): ServerRuntime {
+  return runtimeWith(envFactory());
+}
+
+/** Runtime with a schema_registry block — used by catalog and schema handler tests. */
+export function schemaRegistryRuntime(): ServerRuntime {
+  return runtimeWith(envFactory(), {
+    schema_registry: { endpoint: "https://schema-registry.example.com" },
+  });
+}
+
+/** Runtime with a confluent_cloud block — used by billing, clusters, connect, environments, and search handler tests. */
+export function confluentCloudRuntime(): ServerRuntime {
+  return runtimeWith(envFactory(), {
+    confluent_cloud: {
+      endpoint: "https://api.confluent.cloud",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+  });
 }

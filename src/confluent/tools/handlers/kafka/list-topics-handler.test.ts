@@ -2,7 +2,10 @@ import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { envFactory } from "@tests/factories/env.js";
-import { runtimeWith } from "@tests/factories/runtime.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  runtimeWith,
+} from "@tests/factories/runtime.js";
 import {
   createMockAdmin,
   createMockInstance,
@@ -36,7 +39,9 @@ describe("list-topics-handler.ts", () => {
           envFactory({ BOOTSTRAP_SERVERS: "broker:9092" }),
           { kafka: { bootstrap_servers: "broker:9092" } },
         );
-        expect(handler.enabledConnectionIds(runtime)).toEqual(["default"]);
+        expect(handler.enabledConnectionIds(runtime)).toEqual([
+          DEFAULT_CONNECTION_ID,
+        ]);
       });
 
       it("should return an empty array when BOOTSTRAP_SERVERS is absent", () => {

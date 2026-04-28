@@ -7,7 +7,10 @@ import {
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import type { EnvVar } from "@src/env-schema.js";
 import { envFactory } from "@tests/factories/env.js";
-import { runtimeWith } from "@tests/factories/runtime.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  runtimeWith,
+} from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
 
 class StubHandler extends BaseToolHandler {
@@ -40,7 +43,9 @@ describe("BaseToolHandler", () => {
       const runtime = runtimeWith(
         envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
       );
-      expect(handler.enabledConnectionIds(runtime)).toEqual(["default"]);
+      expect(handler.enabledConnectionIds(runtime)).toEqual([
+        DEFAULT_CONNECTION_ID,
+      ]);
     });
 
     it("should return an empty array when a required env var is missing", () => {
@@ -58,7 +63,30 @@ describe("BaseToolHandler", () => {
     it("should return the connection ID when getRequiredEnvVars returns an empty array", () => {
       const handler = new StubHandler([]);
       const runtime = runtimeWith(envFactory());
-      expect(handler.enabledConnectionIds(runtime)).toEqual(["default"]);
+      expect(handler.enabledConnectionIds(runtime)).toEqual([
+        DEFAULT_CONNECTION_ID,
+      ]);
+    });
+
+    it("should throw when neither enabledConnectionIds nor getRequiredEnvVars is overridden", () => {
+      class BareHandler extends BaseToolHandler {
+        getToolConfig(): ToolConfig {
+          return {
+            name: ToolName.LIST_TOPICS,
+            description: "bare",
+            inputSchema: {},
+            annotations: READ_ONLY,
+          };
+        }
+        handle(): CallToolResult {
+          return this.createResponse("bare");
+        }
+      }
+      expect(() =>
+        new BareHandler().enabledConnectionIds(runtimeWith(envFactory())),
+      ).toThrow(
+        "BareHandler must override enabledConnectionIds() or implement getRequiredEnvVars()",
+      );
     });
   });
 });

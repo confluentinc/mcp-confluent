@@ -252,46 +252,46 @@ describe("index.ts", () => {
       expect(allArgs).toContain(EXPECTED_API_KEY);
     });
   });
-});
 
-describe("applyOauthEnvDefaults", () => {
-  const cleared = [
-    "CONFLUENT_CLOUD_REST_ENDPOINT",
-    "CONFLUENT_CLOUD_API_KEY",
-    "CONFLUENT_CLOUD_API_SECRET",
-  ];
+  describe("applyOauthEnvDefaults", () => {
+    const cleared = [
+      "CONFLUENT_CLOUD_REST_ENDPOINT",
+      "CONFLUENT_CLOUD_API_KEY",
+      "CONFLUENT_CLOUD_API_SECRET",
+    ];
 
-  afterEach(() => {
-    for (const key of cleared) delete process.env[key];
-  });
+    afterEach(() => {
+      for (const key of cleared) delete process.env[key];
+    });
 
-  it("should populate placeholder env vars for the chosen env when none are set", () => {
-    applyOauthEnvDefaults("devel");
-    expect(process.env.CONFLUENT_CLOUD_REST_ENDPOINT).toBe(
-      "https://devel.cpdev.cloud",
-    );
-    expect(process.env.CONFLUENT_CLOUD_API_KEY).toBe("_oauth_placeholder");
-    expect(process.env.CONFLUENT_CLOUD_API_SECRET).toBe("_oauth_placeholder");
-  });
+    it("should populate placeholder env vars for the chosen env when none are set", () => {
+      applyOauthEnvDefaults("devel");
+      expect(process.env.CONFLUENT_CLOUD_REST_ENDPOINT).toBe(
+        "https://devel.cpdev.cloud",
+      );
+      expect(process.env.CONFLUENT_CLOUD_API_KEY).toBe("_oauth_placeholder");
+      expect(process.env.CONFLUENT_CLOUD_API_SECRET).toBe("_oauth_placeholder");
+    });
 
-  it("should not overwrite existing values", () => {
-    process.env.CONFLUENT_CLOUD_REST_ENDPOINT = "https://existing.example";
-    process.env.CONFLUENT_CLOUD_API_KEY = "user-key";
-    process.env.CONFLUENT_CLOUD_API_SECRET = "user-secret";
+    it("should not overwrite existing values", () => {
+      process.env.CONFLUENT_CLOUD_REST_ENDPOINT = "https://existing.example";
+      process.env.CONFLUENT_CLOUD_API_KEY = "user-key";
+      process.env.CONFLUENT_CLOUD_API_SECRET = "user-secret";
 
-    applyOauthEnvDefaults("stag");
+      applyOauthEnvDefaults("stag");
 
-    expect(process.env.CONFLUENT_CLOUD_REST_ENDPOINT).toBe(
-      "https://existing.example",
-    );
-    expect(process.env.CONFLUENT_CLOUD_API_KEY).toBe("user-key");
-    expect(process.env.CONFLUENT_CLOUD_API_SECRET).toBe("user-secret");
-  });
+      expect(process.env.CONFLUENT_CLOUD_REST_ENDPOINT).toBe(
+        "https://existing.example",
+      );
+      expect(process.env.CONFLUENT_CLOUD_API_KEY).toBe("user-key");
+      expect(process.env.CONFLUENT_CLOUD_API_SECRET).toBe("user-secret");
+    });
 
-  it("should derive the endpoint from the Auth0 environment table", () => {
-    applyOauthEnvDefaults("prod");
-    expect(process.env.CONFLUENT_CLOUD_REST_ENDPOINT).toBe(
-      "https://confluent.cloud",
-    );
+    it("should derive the endpoint from the Auth0 environment table", () => {
+      applyOauthEnvDefaults("prod");
+      expect(process.env.CONFLUENT_CLOUD_REST_ENDPOINT).toBe(
+        "https://confluent.cloud",
+      );
+    });
   });
 });

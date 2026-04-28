@@ -228,40 +228,38 @@ describe("ServerRuntime", () => {
       expect(runtime.config).toBe(config);
       expect(runtime.env).toBe(env);
     });
-  });
-});
 
-describe("ServerRuntime.fromConfig with --oauth", () => {
-  it("should return a runtime with no oauthHolder when config has no ccloud-oauth", async () => {
-    const config = new MCPServerConfiguration({
-      connections: {
-        "env-connection": connWith({
-          kafka: { bootstrap_servers: "broker:9092" },
-        }),
-      },
-    });
-    const runtime = await ServerRuntime.fromConfig(config, envFactory());
-    expect(runtime.oauthHolder).toBeUndefined();
-  });
-
-  it("should bootstrap an OAuthHolder when config.getCCloudOAuth() returns a value", async () => {
-    const fakeHolder = {} as OAuthHolder;
-    const bootstrapSpy = vi
-      .spyOn(OAuthHolder, "bootstrap")
-      .mockResolvedValue(fakeHolder);
-
-    const config = new MCPServerConfiguration({
-      connections: {
-        "env-connection": connWith({
-          kafka: { bootstrap_servers: "broker:9092" },
-        }),
-      },
-      ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+    it("should leave oauthHolder undefined when the config has no ccloud-oauth", async () => {
+      const noOauthConfig = new MCPServerConfiguration({
+        connections: {
+          "env-connection": connWith({
+            kafka: { bootstrap_servers: "broker:9092" },
+          }),
+        },
+      });
+      const runtime = await ServerRuntime.fromConfig(noOauthConfig, env);
+      expect(runtime.oauthHolder).toBeUndefined();
     });
 
-    const runtime = await ServerRuntime.fromConfig(config, envFactory());
+    it("should bootstrap an OAuthHolder when the config has ccloud-oauth", async () => {
+      const fakeHolder = {} as OAuthHolder;
+      const bootstrapSpy = vi
+        .spyOn(OAuthHolder, "bootstrap")
+        .mockResolvedValue(fakeHolder);
 
-    expect(bootstrapSpy).toHaveBeenCalledWith("devel");
-    expect(runtime.oauthHolder).toBe(fakeHolder);
+      const oauthConfig = new MCPServerConfiguration({
+        connections: {
+          "env-connection": connWith({
+            kafka: { bootstrap_servers: "broker:9092" },
+          }),
+        },
+        ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+      });
+
+      const runtime = await ServerRuntime.fromConfig(oauthConfig, env);
+
+      expect(bootstrapSpy).toHaveBeenCalledWith("devel");
+      expect(runtime.oauthHolder).toBe(fakeHolder);
+    });
   });
 });

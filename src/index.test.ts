@@ -202,6 +202,23 @@ describe("index.ts", () => {
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
     });
 
+    it("should throw when enabledConnectionIds returns an ID not present in the config", () => {
+      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue({
+        ...fakeHandler([]),
+        enabledConnectionIds: () => ["nonexistent-connection"],
+      });
+
+      expect(() =>
+        getToolHandlersToRegister(
+          [ToolName.LIST_TOPICS],
+          false,
+          runtimeWith(envFactory()),
+        ),
+      ).toThrow(
+        "Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
+      );
+    });
+
     it("should include only the tool whose env vars are satisfied when tools have mixed satisfaction", () => {
       const listHandler = fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]);
       const createHandler = fakeHandler(["FLINK_API_KEY", "FLINK_API_SECRET"]);

@@ -17,7 +17,6 @@ import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
-import { EnvVar } from "@src/env-schema.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
 import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
@@ -51,16 +50,13 @@ export function getToolHandlersToRegister(
       return;
     }
 
-    const missingVars = handler
-      .getRequiredEnvVars()
-      .filter((varName: EnvVar) => !runtime.env[varName]);
-
-    if (missingVars.length === 0) {
+    const enabledIds = handler.enabledConnectionIds(runtime);
+    if (enabledIds.length > 0) {
       toolHandlers.set(toolName, handler);
       logger.info(`Tool ${toolName} enabled`);
     } else {
       logger.warn(
-        `Tool ${toolName} disabled due to missing environment variables: ${missingVars.join(", ")}`,
+        `Tool ${toolName} disabled; no connections satisfy its requirements`,
       );
     }
   });

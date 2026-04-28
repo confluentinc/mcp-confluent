@@ -69,6 +69,10 @@ describe("BaseToolHandler", () => {
     });
 
     it("should throw when neither enabledConnectionIds nor getRequiredEnvVars is overridden", () => {
+      // Exists only during the issue-173 transition: once enabledConnectionIds() is abstract,
+      // the compiler enforces this and the runtime throw (and this test) can be deleted.
+      // A class is required (not a plain ToolHandler object) so that constructor.name
+      // appears in the thrown message, proving the error identifies the offending handler.
       class BareHandler extends BaseToolHandler {
         getToolConfig(): ToolConfig {
           return {

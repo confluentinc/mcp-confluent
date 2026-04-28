@@ -1,5 +1,6 @@
 import { nodeHttp, nodeOpen } from "@src/confluent/node-deps.js";
 import {
+  OAUTH_CALLBACK_HOST,
   OAUTH_CALLBACK_PATH,
   OAUTH_CALLBACK_PORT,
 } from "@src/confluent/oauth/auth0-config.js";
@@ -125,6 +126,7 @@ export async function runPkceLogin(
     resolveCode(code);
   });
 
+  let bound = false;
   const bindResult = new Promise<void>((resolve, reject) => {
     const onBindError = (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
@@ -135,11 +137,17 @@ export async function runPkceLogin(
           ),
         );
       } else {
-        reject(err);
+        reject(
+          new PkceLoginError(
+            "configuration",
+            `Failed to bind PKCE callback server on ${OAUTH_CALLBACK_HOST}:${OAUTH_CALLBACK_PORT}: ${err.message}`,
+          ),
+        );
       }
     };
     server.on("error", onBindError);
-    server.listen(OAUTH_CALLBACK_PORT, () => {
+    server.listen(OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_HOST, () => {
+      bound = true;
       server.off("error", onBindError);
       // Replace the bind-time rejector with a log-only listener so a stray
       // post-bind socket error doesn't escape as an uncaught 'error' event.
@@ -178,7 +186,7 @@ export async function runPkceLogin(
     authCode = await Promise.race([codePromise, timeoutPromise]);
   } finally {
     clearTimeout(timer);
-    server.close();
+    if (bound) server.close();
   }
 
   logger.info("PKCE auth code received; exchanging for token chain");

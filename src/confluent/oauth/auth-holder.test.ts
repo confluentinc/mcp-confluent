@@ -1,7 +1,15 @@
 import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { AuthHolder } from "@src/confluent/oauth/auth-holder.js";
-import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
-import { mockFetch, type MockedFetch } from "@tests/stubs/index.js";
+import {
+  getAuth0Config,
+  OAUTH_CALLBACK_PATH,
+} from "@src/confluent/oauth/auth0-config.js";
+import {
+  mockFetch,
+  mockHttpServer,
+  mockOpen,
+  type MockedFetch,
+} from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 function jsonResponse(body: object, status = 200): Response {
@@ -79,6 +87,35 @@ describe("oauth/auth-holder.ts", () => {
     it("should be safe to call when no context is held", () => {
       const holder = makeHolder(undefined);
       expect(() => holder.shutdown()).not.toThrow();
+    });
+  });
+
+  describe("bootstrap", () => {
+    it("should run PKCE end-to-end and return a holder serving the issued tokens", async () => {
+      const httpMock = mockHttpServer();
+      const openSpy = mockOpen();
+      stubFullChain(fetchSpy);
+
+      const bootstrapPromise = AuthHolder.bootstrap("devel");
+
+      await httpMock.listening;
+      // Flush microtasks so production code progresses past `await bindResult`
+      // and `await nodeOpen.open()` before we drive the callback.
+      await Promise.resolve();
+      await Promise.resolve();
+      const openedUrl = openSpy.mock.calls[0]![0];
+      const state = new URL(openedUrl).searchParams.get("state")!;
+      await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+      );
+
+      const holder = await bootstrapPromise;
+      try {
+        expect(holder.getControlPlaneToken()).toBe("cp");
+        expect(holder.getDataPlaneToken()).toBe("dp");
+      } finally {
+        holder.shutdown();
+      }
     });
   });
 });

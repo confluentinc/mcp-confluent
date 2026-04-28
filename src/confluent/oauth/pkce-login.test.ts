@@ -1,9 +1,11 @@
 import {
   getAuth0Config,
+  OAUTH_CALLBACK_PATH,
   OAUTH_CALLBACK_PORT,
 } from "@src/confluent/oauth/auth0-config.js";
 import {
   PKCE_LOGIN_TIMEOUT_MS,
+  PkceLoginError,
   runPkceLogin,
 } from "@src/confluent/oauth/pkce-login.js";
 import {
@@ -71,7 +73,7 @@ describe("oauth/pkce-login.ts", () => {
       await flushMicrotasks(3);
       expect(openSpy).toHaveBeenCalledTimes(1);
 
-      const openedUrl = openSpy.mock.calls[0]![0] as string;
+      const openedUrl = openSpy.mock.calls[0]![0];
       const parsed = new URL(openedUrl);
       expect(parsed.origin).toBe(`https://${auth0Config.domain}`);
       expect(parsed.pathname).toBe("/authorize");
@@ -132,7 +134,7 @@ describe("oauth/pkce-login.ts", () => {
       const loginPromise = runPkceLogin(auth0Config);
       await httpMock.listening;
       await flushMicrotasks(1);
-      const openedUrl = openSpy.mock.calls[0]![0] as string;
+      const openedUrl = openSpy.mock.calls[0]![0];
       const state = new URL(openedUrl).searchParams.get("state")!;
 
       await httpMock.fireRequest(
@@ -140,6 +142,86 @@ describe("oauth/pkce-login.ts", () => {
       );
 
       await expect(loginPromise).rejects.toThrow(/access_denied|user_aborted/);
+    });
+
+    it("should throw a configuration error when clientId is empty", async () => {
+      const cfgWithoutClient = { ...auth0Config, clientId: "" };
+      await expect(runPkceLogin(cfgWithoutClient)).rejects.toMatchObject({
+        reason: "configuration",
+      });
+    });
+
+    it("should wrap a non-EADDRINUSE bind error as PkceLoginError", async () => {
+      httpMock.setListenError(
+        Object.assign(new Error("EACCES"), { code: "EACCES" }),
+      );
+      await expect(runPkceLogin(auth0Config)).rejects.toMatchObject({
+        reason: "configuration",
+      });
+    });
+
+    it("should wrap a browser-open failure as a configuration error", async () => {
+      openSpy.mockRejectedValueOnce(new Error("no browser available"));
+      await expect(runPkceLogin(auth0Config)).rejects.toMatchObject({
+        reason: "configuration",
+        message: expect.stringContaining("Failed to open browser"),
+      });
+    });
+
+    it("should wrap a token-chain failure as auth0_unreachable", async () => {
+      fetchSpy.mockRejectedValueOnce(new Error("auth0 down"));
+
+      const loginPromise = runPkceLogin(auth0Config);
+      await httpMock.listening;
+      await flushMicrotasks(2);
+      const openedUrl = openSpy.mock.calls[0]![0];
+      const state = new URL(openedUrl).searchParams.get("state")!;
+      await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+      );
+
+      await expect(loginPromise).rejects.toBeInstanceOf(PkceLoginError);
+      await expect(loginPromise).rejects.toMatchObject({
+        reason: "auth0_unreachable",
+      });
+    });
+
+    it("should respond 404 when the request hits a path other than the callback", async () => {
+      const loginPromise = runPkceLogin(auth0Config);
+      await httpMock.listening;
+      await flushMicrotasks(1);
+
+      const response = await httpMock.fireRequest("/some/other/path");
+      expect(response.statusCode).toBe(404);
+
+      // Drive the real callback so the login resolves and afterEach is clean.
+      const openedUrl = openSpy.mock.calls[0]![0];
+      const state = new URL(openedUrl).searchParams.get("state")!;
+      stubFullChain(fetchSpy);
+      await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+      );
+      await loginPromise;
+    });
+
+    it("should respond 400 when the callback omits the code parameter", async () => {
+      const loginPromise = runPkceLogin(auth0Config);
+      await httpMock.listening;
+      await flushMicrotasks(1);
+
+      const openedUrl = openSpy.mock.calls[0]![0];
+      const state = new URL(openedUrl).searchParams.get("state")!;
+      const response = await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?state=${state}`,
+      );
+      expect(response.statusCode).toBe(400);
+
+      // Drive a successful callback to let the login resolve.
+      stubFullChain(fetchSpy);
+      await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+      );
+      await loginPromise;
     });
   });
 });

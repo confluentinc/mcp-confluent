@@ -139,6 +139,9 @@ export class CreateConnectorHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
+    // Known gap: handle() still reads KAFKA_API_KEY/KAFKA_API_SECRET from global env via
+    // getEnsuredParam(). A YAML-configured connection with kafka.auth but no env vars will
+    // pass this predicate yet throw at call time. Resolves when handle() is migrated in #230.
     return connectionIdsWhere(
       runtime.config.connections,
       (conn) => hasConfluentCloud(conn) && hasKafkaAuth(conn),

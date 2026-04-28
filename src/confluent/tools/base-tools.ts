@@ -70,7 +70,7 @@ export abstract class BaseToolHandler implements ToolHandler {
    * Used by the enabledConnectionIds() shim; replaced by typed connection predicates
    * when each handler migrates (issue-173 children). Remove once all handlers migrate.
    */
-  abstract getRequiredEnvVars(): readonly EnvVar[];
+  protected abstract getRequiredEnvVars(): readonly EnvVar[];
 
   /**
    * Shim implementation: returns all connection IDs when every required env var is

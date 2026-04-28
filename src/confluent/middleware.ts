@@ -19,10 +19,10 @@ export class BearerTokenUnavailableError extends Error {
 
 /**
  * Build a {@link Middleware} that attaches `Authorization: Bearer <token>`
- * read from `getToken()`. The closure is supplied by the caller; this
- * middleware has no knowledge of where the token comes from or when it
- * expires. Throws {@link BearerTokenUnavailableError} when `getToken`
- * returns `undefined`.
+ * read from `getToken()` and sets a `User-Agent` header containing this
+ * package's version. The closure is supplied by the caller; this middleware
+ * has no knowledge of where the token comes from or when it expires. Throws
+ * {@link BearerTokenUnavailableError} when `getToken` returns `undefined`.
  */
 export const createBearerMiddleware = (
   getToken: () => string | undefined,

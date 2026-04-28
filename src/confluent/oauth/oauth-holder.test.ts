@@ -1,9 +1,9 @@
 import { AuthContext } from "@src/confluent/oauth/auth-context.js";
-import { AuthHolder } from "@src/confluent/oauth/auth-holder.js";
 import {
   getAuth0Config,
   OAUTH_CALLBACK_PATH,
 } from "@src/confluent/oauth/auth0-config.js";
+import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import {
   mockFetch,
   mockHttpServer,
@@ -33,7 +33,7 @@ function stubFullChain(fetchSpy: MockedFetch): void {
   fetchSpy.mockResolvedValueOnce(jsonResponse({ token: "dp" }));
 }
 
-describe("oauth/auth-holder.ts", () => {
+describe("oauth/oauth-holder.ts", () => {
   let fetchSpy: MockedFetch;
   const auth0Config = getAuth0Config("devel");
 
@@ -96,7 +96,7 @@ describe("oauth/auth-holder.ts", () => {
       const openSpy = mockOpen();
       stubFullChain(fetchSpy);
 
-      const bootstrapPromise = AuthHolder.bootstrap("devel");
+      const bootstrapPromise = OAuthHolder.bootstrap("devel");
 
       await httpMock.listening;
       // Flush microtasks so production code progresses past `await bindResult`
@@ -120,7 +120,7 @@ describe("oauth/auth-holder.ts", () => {
   });
 });
 
-function makeHolder(ctx: AuthContext | undefined): AuthHolder {
-  type PrivateCtor = new (ctx: AuthContext | undefined) => AuthHolder;
-  return new (AuthHolder as unknown as PrivateCtor)(ctx);
+function makeHolder(ctx: AuthContext | undefined): OAuthHolder {
+  type PrivateCtor = new (ctx: AuthContext | undefined) => OAuthHolder;
+  return new (OAuthHolder as unknown as PrivateCtor)(ctx);
 }

@@ -14,7 +14,7 @@ import { logger } from "@src/logger.js";
  * first context from a PKCE login and exposes the read-side accessors that
  * the bearer middleware uses.
  */
-export class AuthHolder {
+export class OAuthHolder {
   private ctx: AuthContext | undefined;
 
   private constructor(initialContext: AuthContext | undefined) {
@@ -25,7 +25,7 @@ export class AuthHolder {
    * Run PKCE login interactively, build the first {@link AuthContext},
    * start its refresh loop, and return a holder wrapping it.
    */
-  static async bootstrap(env: Auth0Environment): Promise<AuthHolder> {
+  static async bootstrap(env: Auth0Environment): Promise<OAuthHolder> {
     const auth0Config = getAuth0Config(env);
     logger.info({ env }, "Starting OAuth login");
     const tokenChain = await runPkceLogin(auth0Config);
@@ -36,7 +36,7 @@ export class AuthHolder {
     const ctx = AuthContext.fromTokens(auth0Config, tokens);
     ctx.startRefreshLoop(DEFAULT_REFRESH_INTERVAL_MS);
     logger.info({ env }, "OAuth login successful");
-    return new AuthHolder(ctx);
+    return new OAuthHolder(ctx);
   }
 
   /** Live control-plane bearer token; `undefined` while broken. */

@@ -1,7 +1,4 @@
-import {
-  MCPServerConfiguration,
-  type DirectConnectionConfig,
-} from "@src/config/index.js";
+import { MCPServerConfiguration } from "@src/config/index.js";
 import {
   constructClientManagerForConnection,
   type ClientManager,
@@ -62,7 +59,7 @@ export class ServerRuntime {
     const clientManagers = Object.fromEntries(
       Object.entries(config.connections).map(([id, conn]) => [
         id,
-        constructClientManagerForConnection(conn as DirectConnectionConfig),
+        constructClientManagerForConnection(conn),
       ]),
     );
     // Wrap in ServerRuntime and return.

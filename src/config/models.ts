@@ -26,6 +26,21 @@ export interface DirectConnectionConfig {
 }
 
 /**
+ * Connection-shaped configuration for a Confluent Cloud OAuth (PKCE) connection.
+ * Peer to {@link DirectConnectionConfig}. For now this is held as a private
+ * optional field on {@link MCPServerConfiguration} (see `#ccloudOAuth`); the
+ * connections-record migration moves it into `connections` as a second member
+ * of the discriminated `ConnectionConfig` union.
+ *
+ * Endpoints derive from `env` via the Auth0 environment table — the only data
+ * needed to drive the PKCE flow and resolve REST base URLs.
+ */
+export interface CCloudOAuthConfig {
+  readonly type: "ccloud_oauth";
+  readonly env: "devel" | "stag" | "prod";
+}
+
+/**
  * API key credential pair used throughout connection sub-configs.
  * Corresponds to `auth` blocks nested under each service in `connections.<name>`.
  */
@@ -523,6 +538,14 @@ serverConfigSchema satisfies z.ZodType<ServerConfig>;
  * Derived from serverConfigSchema defaults — single source of truth.
  */
 export const DEFAULT_SERVER_CONFIG = serverConfigSchema.parse({});
+
+/** Zod schema for {@link CCloudOAuthConfig}. */
+export const ccloudOAuthConfigSchema = z
+  .object({
+    type: z.literal("ccloud_oauth"),
+    env: z.enum(["devel", "stag", "prod"]),
+  })
+  .strict();
 
 /**
  * Root configuration schema. This is the single validation and normalisation

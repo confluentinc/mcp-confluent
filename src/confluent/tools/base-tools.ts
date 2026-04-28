@@ -34,11 +34,13 @@ export interface ToolHandler {
   getToolConfig(): ToolConfig;
 
   /**
-   * Returns the IDs of connections that satisfy this tool's requirements.
-   * A non-empty result means the tool is enabled; empty means disabled.
+   * Returns the IDs of connections that satisfy this tool's service requirements.
+   * A non-empty result enables the tool; an empty result disables it. Implementations
+   * should return a subset of the keys in runtime.config.connections.
    *
-   * Override in subclasses with typed connection predicates (issue-173 children).
-   * The default shim in BaseToolHandler delegates to getRequiredEnvVars().
+   * Each handler is intended to implement this by applying the appropriate predicate from
+   * connection-predicates.ts via connectionIdsWhere(), e.g.:
+   *   return connectionIdsWhere(runtime.config.connections, hasKafka);
    */
   enabledConnectionIds(runtime: ServerRuntime): string[];
 
@@ -70,14 +72,21 @@ export abstract class BaseToolHandler implements ToolHandler {
    * Used by the enabledConnectionIds() shim; replaced by typed connection predicates
    * when each handler migrates (issue-173 children). Remove once all handlers migrate.
    */
-  protected abstract getRequiredEnvVars(): readonly EnvVar[];
+  protected getRequiredEnvVars(): readonly EnvVar[] {
+    throw new Error(
+      `${this.constructor.name} must override enabledConnectionIds() or implement getRequiredEnvVars()`,
+    );
+  }
 
   /**
-   * Shim implementation: returns all connection IDs when every required env var is
-   * present in runtime.env, otherwise returns [].
-   * Override with typed connection predicates during issue-173 migration.
+   * Determines which configured connections can serve this tool by inspecting
+   * their service blocks. If returns an empty array, the tool is disabled.
+   *
+   * The canonical implementation is a one-liner:
+   *   return connectionIdsWhere(runtime.config.connections, some-predicate-function);
    */
   enabledConnectionIds(runtime: ServerRuntime): string[] {
+    // Shim: delegates to getRequiredEnvVars() until all handlers migrate (issue-173).
     const missingVars = this.getRequiredEnvVars().filter(
       (varName) => !runtime.env[varName],
     );

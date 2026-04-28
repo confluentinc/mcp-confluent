@@ -32,6 +32,7 @@ export function getToolHandlersToRegister(
   runtime: ServerRuntime,
 ): Map<ToolName, ToolHandler> {
   const toolHandlers = new Map<ToolName, ToolHandler>();
+  const knownIds = new Set(Object.keys(runtime.config.connections));
 
   Object.values(ToolName).forEach((toolName) => {
     // Skip names that are not in the filtered list of tool names provided.
@@ -51,6 +52,12 @@ export function getToolHandlersToRegister(
     }
 
     const enabledIds = handler.enabledConnectionIds(runtime);
+    const unknownIds = enabledIds.filter((id) => !knownIds.has(id));
+    if (unknownIds.length > 0) {
+      throw new Error(
+        `Tool ${toolName}: enabledConnectionIds() returned unknown connection ID(s): ${unknownIds.join(", ")}`,
+      );
+    }
     if (enabledIds.length > 0) {
       toolHandlers.set(toolName, handler);
       logger.info(`Tool ${toolName} enabled`);

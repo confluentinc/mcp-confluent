@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BearerTokenUnavailableError,
+  createAuthMiddleware,
   createBearerMiddleware,
 } from "@src/confluent/middleware.js";
 
@@ -63,5 +64,43 @@ describe("createBearerMiddleware", () => {
     await callOnRequest(middleware, request);
 
     expect(request.headers.get("User-Agent")).toMatch(/^mcp-confluent-local\//);
+  });
+});
+
+describe("createAuthMiddleware (discriminated union dispatch)", () => {
+  it("should attach a bearer header when type is 'oauth'", async () => {
+    const middleware = createAuthMiddleware({
+      type: "oauth",
+      getToken: () => "xyz789",
+    });
+    const request = new Request("https://example.com/api");
+
+    await callOnRequest(middleware, request);
+
+    expect(request.headers.get("Authorization")).toBe("Bearer xyz789");
+  });
+
+  it("should attach a basic header when type is 'api_key'", async () => {
+    const middleware = createAuthMiddleware({
+      type: "api_key",
+      apiKey: "k",
+      apiSecret: "s",
+    });
+    const request = new Request("https://example.com/api");
+
+    await callOnRequest(middleware, request);
+
+    expect(request.headers.get("Authorization")).toMatch(/^Basic /);
+  });
+
+  it("should attach a basic header when type is omitted (back-compat)", async () => {
+    // Existing call sites that pass `{ apiKey, apiSecret }` without `type`
+    // must continue to work.
+    const middleware = createAuthMiddleware({ apiKey: "k", apiSecret: "s" });
+    const request = new Request("https://example.com/api");
+
+    await callOnRequest(middleware, request);
+
+    expect(request.headers.get("Authorization")).toMatch(/^Basic /);
   });
 });

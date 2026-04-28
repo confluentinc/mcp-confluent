@@ -47,15 +47,35 @@ export interface ConfluentEndpoints {
   telemetry?: string;
 }
 
-export interface ConfluentAuth {
-  apiKey?: string;
-  apiSecret?: string;
-}
+/**
+ * Discriminated union over the two authentication shapes the middleware
+ * understands. The `api_key` variant's `type` field is optional so existing
+ * call sites that pass `{ apiKey, apiSecret }` keep working.
+ */
+export type ConfluentAuth =
+  | { type?: "api_key"; apiKey?: string; apiSecret?: string }
+  | { type: "oauth"; getToken: () => string | undefined };
 
 /**
- * Creates a middleware that adds Authorization header using the provided auth credentials
+ * Creates a middleware that attaches an Authorization header. Dispatches on
+ * the `type` discriminator: `oauth` → bearer; `api_key` (or unset) → Basic.
  */
-export const createAuthMiddleware = (auth: ConfluentAuth): Middleware => ({
+export const createAuthMiddleware = (auth: ConfluentAuth): Middleware => {
+  if (auth.type === "oauth") {
+    return createBearerMiddleware(auth.getToken);
+  }
+  return createApiKeyMiddleware(auth);
+};
+
+/**
+ * Original Basic-auth middleware, unchanged from before the discriminated
+ * union was introduced. Extracted to a named factory so {@link createAuthMiddleware}
+ * can dispatch to it without inlining its body.
+ */
+const createApiKeyMiddleware = (auth: {
+  apiKey?: string;
+  apiSecret?: string;
+}): Middleware => ({
   async onRequest({ request }) {
     logger.debug({ request }, "Processing request");
     if (auth.apiKey && auth.apiSecret) {

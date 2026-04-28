@@ -1,5 +1,3 @@
-import { MCPServerConfiguration } from "@src/config/models.js";
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import type {
   ToolConfig,
@@ -14,9 +12,8 @@ import {
   outputApiKey,
   outputToolList,
 } from "@src/index.js";
-import { ServerRuntime } from "@src/server-runtime.js";
 import { envFactory } from "@tests/factories/env.js";
-import { createMockInstance } from "@tests/stubs/index.js";
+import { runtimeWith } from "@tests/factories/runtime.js";
 import {
   beforeEach,
   describe,
@@ -28,7 +25,12 @@ import {
 
 function fakeHandler(requiredVars: EnvVar[], isCloudOnly = false): ToolHandler {
   return {
-    getRequiredEnvVars: () => requiredVars,
+    enabledConnectionIds: (runtime) => {
+      const missing = requiredVars.filter((v) => !runtime.env[v]);
+      return missing.length === 0
+        ? Object.keys(runtime.config.connections)
+        : [];
+    },
     isConfluentCloudOnly: () => isCloudOnly,
     getToolConfig: () => ({
       name: ToolName.LIST_TOPICS,
@@ -110,18 +112,6 @@ describe("index.ts", () => {
   });
 
   describe("getToolHandlersToRegister()", () => {
-    // Helper to construct a ServerRuntime with a mocked ClientManager and a customizable
-    // env, since the tool registration logic (currently) depends on env vars.
-    function runtimeWith(env: ReturnType<typeof envFactory>): ServerRuntime {
-      return new ServerRuntime(
-        new MCPServerConfiguration({
-          connections: { default: { type: "direct" } },
-        }),
-        { default: createMockInstance(DefaultClientManager) },
-        env,
-      );
-    }
-
     it("should include a tool when all its required env vars are present", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
         fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]),

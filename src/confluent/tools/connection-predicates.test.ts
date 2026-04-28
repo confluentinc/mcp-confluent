@@ -1,0 +1,156 @@
+import type { DirectConnectionConfig } from "@src/config/index.js";
+import type { ConnectionConfig } from "@src/config/models.js";
+import {
+  connectionIdsWhere,
+  hasConfluentCloud,
+  hasFlink,
+  hasKafka,
+  hasKafkaRest,
+  hasSchemaRegistry,
+  hasTableflow,
+  hasTelemetry,
+} from "@src/confluent/tools/connection-predicates.js";
+import { describe, expect, it } from "vitest";
+
+function conn(
+  fields: Omit<DirectConnectionConfig, "type">,
+): DirectConnectionConfig {
+  return { type: "direct", ...fields };
+}
+
+const KAFKA_CONN = conn({ kafka: { bootstrap_servers: "broker:9092" } });
+const KAFKA_REST_CONN = conn({
+  kafka: { rest_endpoint: "http://kafka-rest:8082" },
+});
+const SCHEMA_REGISTRY_CONN = conn({
+  schema_registry: { endpoint: "http://schema-registry:8081" },
+});
+const CONFLUENT_CLOUD_CONN = conn({
+  confluent_cloud: {
+    endpoint: "https://api.confluent.cloud",
+    auth: { type: "api_key", key: "k", secret: "s" },
+  },
+});
+const FLINK_CONN = conn({
+  flink: {
+    endpoint: "https://flink.confluent.cloud",
+    auth: { type: "api_key", key: "k", secret: "s" },
+    environment_id: "env-abc",
+    organization_id: "org-123",
+    compute_pool_id: "lfcp-xyz",
+  },
+});
+const TELEMETRY_CONN = conn({
+  telemetry: {
+    endpoint: "https://api.telemetry.confluent.cloud",
+    auth: { type: "api_key", key: "k", secret: "s" },
+  },
+});
+const TABLEFLOW_CONN = conn({
+  tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
+});
+
+describe("connection-predicates.ts", () => {
+  describe("hasKafka()", () => {
+    it("should return true when the kafka block is present", () => {
+      expect(hasKafka(KAFKA_CONN)).toBe(true);
+    });
+
+    it("should return false when the kafka block is absent", () => {
+      expect(hasKafka(SCHEMA_REGISTRY_CONN)).toBe(false);
+    });
+  });
+
+  describe("hasKafkaRest()", () => {
+    it("should return true when kafka.rest_endpoint is present", () => {
+      expect(hasKafkaRest(KAFKA_REST_CONN)).toBe(true);
+    });
+
+    it("should return false when kafka block is absent", () => {
+      expect(hasKafkaRest(SCHEMA_REGISTRY_CONN)).toBe(false);
+    });
+
+    it("should return false when kafka block is present but rest_endpoint is absent", () => {
+      expect(hasKafkaRest(KAFKA_CONN)).toBe(false);
+    });
+  });
+
+  describe("hasSchemaRegistry()", () => {
+    it("should return true when the schema_registry block is present", () => {
+      expect(hasSchemaRegistry(SCHEMA_REGISTRY_CONN)).toBe(true);
+    });
+
+    it("should return false when the schema_registry block is absent", () => {
+      expect(hasSchemaRegistry(KAFKA_CONN)).toBe(false);
+    });
+  });
+
+  describe("hasConfluentCloud()", () => {
+    it("should return true when the confluent_cloud block is present", () => {
+      expect(hasConfluentCloud(CONFLUENT_CLOUD_CONN)).toBe(true);
+    });
+
+    it("should return false when the confluent_cloud block is absent", () => {
+      expect(hasConfluentCloud(KAFKA_CONN)).toBe(false);
+    });
+  });
+
+  describe("hasFlink()", () => {
+    it("should return true when the flink block is present", () => {
+      expect(hasFlink(FLINK_CONN)).toBe(true);
+    });
+
+    it("should return false when the flink block is absent", () => {
+      expect(hasFlink(KAFKA_CONN)).toBe(false);
+    });
+  });
+
+  describe("hasTelemetry()", () => {
+    it("should return true when the telemetry block is present", () => {
+      expect(hasTelemetry(TELEMETRY_CONN)).toBe(true);
+    });
+
+    it("should return false when the telemetry block is absent", () => {
+      expect(hasTelemetry(KAFKA_CONN)).toBe(false);
+    });
+  });
+
+  describe("hasTableflow()", () => {
+    it("should return true when the tableflow block is present", () => {
+      expect(hasTableflow(TABLEFLOW_CONN)).toBe(true);
+    });
+
+    it("should return false when the tableflow block is absent", () => {
+      expect(hasTableflow(KAFKA_CONN)).toBe(false);
+    });
+  });
+
+  describe("connectionIdsWhere()", () => {
+    it("should return an empty array when no connections match the predicate", () => {
+      const connections: Record<string, ConnectionConfig> = {
+        sr: SCHEMA_REGISTRY_CONN,
+      };
+      expect(connectionIdsWhere(connections, hasKafka)).toEqual([]);
+    });
+
+    it("should return the matching connection ID when one connection matches", () => {
+      const connections: Record<string, ConnectionConfig> = {
+        kafka: KAFKA_CONN,
+        sr: SCHEMA_REGISTRY_CONN,
+      };
+      expect(connectionIdsWhere(connections, hasKafka)).toEqual(["kafka"]);
+    });
+
+    it("should return all matching IDs when multiple connections satisfy the predicate", () => {
+      const connections: Record<string, ConnectionConfig> = {
+        kafka1: KAFKA_CONN,
+        kafka2: KAFKA_REST_CONN,
+        sr: SCHEMA_REGISTRY_CONN,
+      };
+      expect(connectionIdsWhere(connections, hasKafka)).toEqual([
+        "kafka1",
+        "kafka2",
+      ]);
+    });
+  });
+});

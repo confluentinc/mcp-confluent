@@ -1,3 +1,4 @@
+import { Middleware } from "openapi-fetch";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +6,8 @@ import {
   createAuthMiddleware,
   createBearerMiddleware,
 } from "@src/confluent/middleware.js";
+
+type OnRequestArg = Parameters<NonNullable<Middleware["onRequest"]>>[0];
 
 /**
  * The openapi-fetch Middleware.onRequest signature requires several
@@ -19,10 +22,8 @@ async function callOnRequest(
   return middleware.onRequest({
     request,
     schemaPath: "/test",
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    params: {} as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    options: {} as any,
+    params: {} as OnRequestArg["params"],
+    options: {} as OnRequestArg["options"],
     id: "test-id",
   });
 }

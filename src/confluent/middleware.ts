@@ -5,8 +5,10 @@ import pkg from "../../package.json" with { type: "json" };
 /**
  * Thrown by the bearer middleware when the token getter returns undefined —
  * typically because OAuth bootstrap has not completed (or has been cleared by
- * shutdown) at the moment a request is being constructed. Carries a clear
- * message; propagates through `BaseToolHandler` into `CallToolResult.isError`.
+ * shutdown) at the moment a request is about to be sent. Surfaces a clear
+ * message for callers; tool handlers can catch it explicitly to return
+ * `{ isError: true }` instead of letting it propagate as a protocol-level
+ * error from the MCP transport.
  */
 export class BearerTokenUnavailableError extends Error {
   constructor(message: string) {

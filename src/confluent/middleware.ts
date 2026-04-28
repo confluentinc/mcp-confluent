@@ -15,6 +15,29 @@ export class BearerTokenUnavailableError extends Error {
   }
 }
 
+/**
+ * Build a {@link Middleware} that attaches `Authorization: Bearer <token>`
+ * read from `getToken()`. The closure is supplied by the caller; this
+ * middleware has no knowledge of where the token comes from or when it
+ * expires. Throws {@link BearerTokenUnavailableError} when `getToken`
+ * returns `undefined`.
+ */
+export const createBearerMiddleware = (
+  getToken: () => string | undefined,
+): Middleware => ({
+  async onRequest({ request }) {
+    const token = getToken();
+    if (token === undefined) {
+      throw new BearerTokenUnavailableError(
+        "OAuth token unavailable; the session may have expired. Restart the server to re-authenticate.",
+      );
+    }
+    request.headers.set("Authorization", `Bearer ${token}`);
+    request.headers.set("User-Agent", `mcp-confluent-local/${pkg.version}`);
+    return request;
+  },
+});
+
 export interface ConfluentEndpoints {
   cloud?: string;
   tableflow?: string;

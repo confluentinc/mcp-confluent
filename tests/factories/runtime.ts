@@ -33,24 +33,41 @@ export function runtimeWith(
   );
 }
 
-/** Runtime with no service blocks — used as the disabled case in enabledConnectionIds() tests. */
+/** Runtime with no service blocks — the disabled case in enabledConnectionIds() tests. */
 export function bareRuntime(): ServerRuntime {
   return runtimeWith(envFactory());
 }
 
-/** Runtime with a schema_registry block — used by catalog and schema handler tests. */
+/** Runtime with a schema_registry block. */
 export function schemaRegistryRuntime(): ServerRuntime {
   return runtimeWith(envFactory(), {
     schema_registry: { endpoint: "https://schema-registry.example.com" },
   });
 }
 
-/** Runtime with a confluent_cloud block — used by billing, clusters, connect, environments, and search handler tests. */
+/** Runtime with a confluent_cloud block. */
 export function confluentCloudRuntime(): ServerRuntime {
   return runtimeWith(envFactory(), {
     confluent_cloud: {
       endpoint: "https://api.confluent.cloud",
       auth: { type: "api_key", key: "k", secret: "s" },
+    },
+  });
+}
+
+/** Runtime with a kafka block. */
+export function kafkaRuntime(): ServerRuntime {
+  return runtimeWith(envFactory(), {
+    kafka: { bootstrap_servers: "broker:9092" },
+  });
+}
+
+/** Runtime with a kafka block including a rest_endpoint. */
+export function kafkaRestRuntime(): ServerRuntime {
+  return runtimeWith(envFactory(), {
+    kafka: {
+      bootstrap_servers: "broker:9092",
+      rest_endpoint: "https://kafka-rest.example.com",
     },
   });
 }

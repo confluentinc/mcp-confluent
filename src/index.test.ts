@@ -1,4 +1,3 @@
-import { type DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
@@ -26,22 +25,6 @@ import {
   type MockInstance,
   vi,
 } from "vitest";
-
-function connWith(
-  fields: Omit<DirectConnectionConfig, "type">,
-): DirectConnectionConfig {
-  return { type: "direct", ...fields };
-}
-
-function runtimeWith(env: ReturnType<typeof envFactory>): ServerRuntime {
-  return new ServerRuntime(
-    new MCPServerConfiguration({
-      connections: { default: connWith({}) },
-    }),
-    { default: createMockInstance(DefaultClientManager) },
-    env,
-  );
-}
 
 function fakeHandler(requiredVars: EnvVar[], isCloudOnly = false): ToolHandler {
   return {
@@ -127,6 +110,18 @@ describe("index.ts", () => {
   });
 
   describe("getToolHandlersToRegister()", () => {
+    // Helper to construct a ServerRuntime with a mocked ClientManager and a customizable
+    // env, since the tool registration logic (currently) depends on env vars.
+    function runtimeWith(env: ReturnType<typeof envFactory>): ServerRuntime {
+      return new ServerRuntime(
+        new MCPServerConfiguration({
+          connections: { default: { type: "direct" } },
+        }),
+        { default: createMockInstance(DefaultClientManager) },
+        env,
+      );
+    }
+
     it("should include a tool when all its required env vars are present", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
         fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]),

@@ -79,3 +79,13 @@ export function kafkaRestRuntime(): ServerRuntime {
     },
   });
 }
+
+/** Runtime with a telemetry block. */
+export function telemetryRuntime(): ServerRuntime {
+  return runtimeWith(envFactory(), {
+    telemetry: {
+      endpoint: "https://api.telemetry.confluent.cloud",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+  });
+}

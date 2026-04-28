@@ -77,7 +77,7 @@ export interface TableflowDirectConfig {
 }
 
 /**
- * Telemetry API connection parameters.
+ * Telemetry API connection parameters (post-transform output type).
  * Corresponds to `connections.<name>.telemetry` in the YAML configuration.
  */
 export interface TelemetryDirectConfig {
@@ -317,6 +317,9 @@ const directConnectionSchema = z
           .trim()
           .check(z.url({ error: "telemetry.endpoint must be a valid URL" }))
           .optional(),
+        // Optional in raw input: absent auth falls back to confluent_cloud.auth in
+        // the connection-level transform, so TelemetryDirectConfig.auth is always
+        // non-null after parsing. See the transform below and TelemetryDirectConfig.
         auth: authConfigSchema.optional(),
       })
       .strict()
@@ -419,6 +422,8 @@ const connectionConfigSchema = z
     if (rawTelemetry) {
       // superRefine above guarantees auth is non-null: endpoint-only telemetry without
       // any auth fallback is rejected before this transform runs.
+      // Post-condition: resolvedTelemetry.auth is always non-null — hasTelemetry() is
+      // sufficient to gate telemetry-dependent tools; a separate auth check is redundant.
       const auth = (rawTelemetry.auth ?? ccAuth)!;
       const endpoint = rawTelemetry.endpoint ?? TELEMETRY_DEFAULT_ENDPOINT;
       resolvedTelemetry = { endpoint, auth };

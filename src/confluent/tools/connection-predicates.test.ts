@@ -5,6 +5,7 @@ import {
   hasConfluentCloud,
   hasFlink,
   hasKafka,
+  hasKafkaAuth,
   hasKafkaBootstrap,
   hasKafkaRestWithAuth,
   hasSchemaRegistry,
@@ -53,6 +54,7 @@ const TELEMETRY_CONN = conn({
     auth: { type: "api_key", key: "k", secret: "s" },
   },
 });
+
 const TABLEFLOW_CONN = conn({
   tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
 });
@@ -79,6 +81,20 @@ describe("connection-predicates.ts", () => {
 
     it("should return false when kafka block is present but bootstrap_servers is absent", () => {
       expect(hasKafkaBootstrap(KAFKA_REST_CONN)).toBe(false);
+    });
+  });
+
+  describe("hasKafkaAuth()", () => {
+    it("should return true when kafka.auth is present", () => {
+      expect(hasKafkaAuth(KAFKA_REST_WITH_AUTH_CONN)).toBe(true);
+    });
+
+    it("should return false when the kafka block is absent", () => {
+      expect(hasKafkaAuth(SCHEMA_REGISTRY_CONN)).toBe(false);
+    });
+
+    it("should return false when the kafka block has no auth", () => {
+      expect(hasKafkaAuth(KAFKA_CONN)).toBe(false);
     });
   });
 

@@ -1,6 +1,8 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
+import { envFactory } from "@tests/factories/env.js";
+import { runtimeWith } from "@tests/factories/runtime.js";
 import {
   createMockAdmin,
   createMockInstance,
@@ -25,6 +27,21 @@ describe("list-topics-handler.ts", () => {
         const vars = handler.getRequiredEnvVars();
 
         expect(vars).toEqual(["BOOTSTRAP_SERVERS"]);
+      });
+    });
+
+    describe("enabledConnectionIds()", () => {
+      it("should return the connection ID when BOOTSTRAP_SERVERS is set", () => {
+        const runtime = runtimeWith(
+          envFactory({ BOOTSTRAP_SERVERS: "broker:9092" }),
+          { kafka: { bootstrap_servers: "broker:9092" } },
+        );
+        expect(handler.enabledConnectionIds(runtime)).toEqual(["default"]);
+      });
+
+      it("should return an empty array when BOOTSTRAP_SERVERS is absent", () => {
+        const runtime = runtimeWith(envFactory());
+        expect(handler.enabledConnectionIds(runtime)).toEqual([]);
       });
     });
 

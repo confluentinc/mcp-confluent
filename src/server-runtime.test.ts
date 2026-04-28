@@ -181,6 +181,19 @@ describe("ServerRuntime", () => {
         "ServerRuntime has no client managers",
       );
     });
+
+    it("should throw when clientManagers has more than one entry", () => {
+      const cm1 = createMockInstance(DefaultClientManager);
+      const cm2 = createMockInstance(DefaultClientManager);
+      const runtime = new ServerRuntime(
+        config,
+        { conn1: cm1, conn2: cm2 },
+        env,
+      );
+      expect(() => runtime.clientManager).toThrow(
+        "ServerRuntime has multiple client managers",
+      );
+    });
   });
 
   describe("fromConfig()", () => {

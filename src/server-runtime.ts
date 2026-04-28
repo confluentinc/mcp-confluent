@@ -38,11 +38,18 @@ export class ServerRuntime {
    * Remove (or make multi-connection-aware) when issue #151 lands.
    */
   get clientManager(): ClientManager {
-    const [id] = Object.keys(this.clientManagers);
-    if (id === undefined) {
+    const managers = Object.values(this.clientManagers);
+    if (managers.length === 0) {
       throw new Error("ServerRuntime has no client managers");
     }
-    return this.clientManagers[id]!;
+    if (managers.length > 1) {
+      // enforceSingleConnectionOnly() in config/models.ts should prevent this at parse time;
+      // this guard is the runtime mirror of that constraint.
+      throw new Error(
+        "ServerRuntime has multiple client managers; use clientManagers[id] directly",
+      );
+    }
+    return managers[0]!;
   }
 
   static fromConfig(

@@ -30,25 +30,28 @@ Pre-commit hook runs `npm run format && npm run lint` automatically via Husky.
 
 ### Entry Point & Startup Flow
 
-`src/index.ts` → `parseCliArgs()` → `initEnv()` (Zod-validated env vars) → creates `DefaultClientManager` → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
+`src/index.ts` → `parseCliArgs()` → `initEnv()` → branch on `cliOptions.config`: when `-c <path>` is supplied, `loadConfigFromYaml(path, process.env)` parses + interpolates + validates the YAML; otherwise `buildConfigFromEnvAndCli(env, ...)` synthesizes the same `MCPServerConfiguration` shape from env vars + CLI args (legacy path, see issue #151). Both branches converge into `ServerRuntime.fromConfig()`, which constructs a `DefaultClientManager` per connection → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
 
-Tools are **auto-enabled/disabled** based on which service blocks are present in the connection config (YAML) or the corresponding environment variables (set directly or via a `.env` file). Each handler implements `enabledConnectionIds()` using typed predicates from `connection-predicates.ts` to declare which connections it can serve.
+Tools are **auto-enabled/disabled** based on which **service blocks** are present in each connection (e.g., a tool requiring `flink` is enabled iff some connection's resolved config has a `flink:` block). The connection's blocks come from YAML when one is supplied via `-c <path>`; otherwise they're synthesized from env vars + CLI args for backwards compatibility during the migration. Each handler declares its requirement via `enabledConnectionIds(runtime)`, which returns the ids of connections satisfying a predicate from `src/confluent/tools/connection-predicates.ts`. An empty result disables the tool. Domain-wide gating (e.g., all Flink tools) lives on intermediate base classes such as `FlinkToolHandler`.
 
 ### Key Layers
 
+- **`src/config/`** — Configuration core. `models.ts` defines `MCPServerConfiguration` (a Zod schema with per-service connection blocks: `kafka`, `flink`, `schema_registry`, `confluent_cloud`, `tableflow`, `telemetry`). `index.ts` exposes `loadConfigFromYaml()` for the `-c <path>` branch (parsing, `${VAR}` interpolation via `interpolation.ts`, Zod validation). `env-config.ts` exports `buildConfigFromEnvAndCli()` for the legacy env-var + CLI path. Both produce an `MCPServerConfiguration`.
+
 - **`src/confluent/tools/`** — Tool system core:
   - `tool-name.ts` — `ToolName` enum; add new entries here when creating tools.
-  - `base-tools.ts` — `BaseToolHandler` abstract class all handlers extend.
+  - `base-tools.ts` — `BaseToolHandler` abstract class all handlers extend (directly or via a domain subclass like `FlinkToolHandler`).
+  - `connection-predicates.ts` — `hasKafka`, `hasFlink`, `hasSchemaRegistry`, etc., plus `connectionIdsWhere(connections, predicate)`. The vocabulary handlers use to express their enablement requirement.
   - `tool-registry.ts` — `ToolHandlerRegistry.handlers` map: `ToolName` → handler instance. Wire new tools here.
-  - `handlers/<domain>/` — Organized by Confluent service (kafka, flink, connect, catalog, schema, tableflow, billing, search).
+  - `handlers/<domain>/` — Organized by Confluent service (kafka, flink, connect, catalog, schema, tableflow, billing, search, metrics, environments, clusters). Some domains expose an intermediate base class (e.g., `flink-tool-handler.ts`) that implements `enabledConnectionIds()` once for the whole domain.
 
-- **`src/confluent/client-manager.ts`** — `DefaultClientManager` holds lazily-initialized Kafka clients (admin, producer, consumer via `@confluentinc/kafka-javascript`) and typed REST clients (`openapi-fetch`) for each Confluent Cloud API surface.
+- **`src/confluent/client-manager.ts`** — `DefaultClientManager` holds lazily-initialized Kafka clients (admin, producer, consumer via `@confluentinc/kafka-javascript`) and typed REST clients (`openapi-fetch`) for each Confluent Cloud API surface. One instance per connection, constructed from a `ConnectionConfig` (not directly from env vars).
 
 - **`src/confluent/openapi-schema.d.ts`** — Generated types from `openapi.json` using `openapi-typescript`. Provides type-safe REST calls throughout the codebase.
 
 - **`src/mcp/transports/`** — Transport layer supporting stdio, HTTP (Streamable HTTP), and SSE. `TransportManager` orchestrates startup/shutdown. HTTP/SSE transports use Fastify and support API key auth + DNS rebinding protection.
 
-- **`src/env-schema.ts`** — Zod schema defining all environment variables with defaults and validation. Merged from required (`envSchema`) and optional (`configSchema`) sections.
+- **`src/env-schema.ts`** — Zod schema for the legacy env-var path. Still consulted when no YAML file is provided, but the configuration that flows through the rest of the app is the resolved `MCPServerConfiguration` from `src/config/`, not the raw env. Slated to shrink as the YAML migration completes (see issue #151 and follow-ups).
 
 - **`src/confluent/middleware.ts`** — Auth middleware injected into `openapi-fetch` clients for Confluent Cloud API authentication.
 
@@ -58,9 +61,11 @@ Tools are **auto-enabled/disabled** based on which service blocks are present in
 
 ## Adding a New Tool
 
+Detailed conventions (handler structure, input schema rules, registration checklist, predicate selection) live in `.claude/rules/tool-handlers.md`, which auto-loads when you edit `src/confluent/tools/**/*.ts`. The high-level shape:
+
 1. Add entry to `ToolName` enum in `src/confluent/tools/tool-name.ts`.
-2. Create handler class extending `BaseToolHandler` in `src/confluent/tools/handlers/<domain>/`.
-3. Implement `getToolConfig()` (name, description, Zod input schema), `handle()`, and `enabledConnectionIds()` (use predicates from `connection-predicates.ts`).
+2. Create handler class in `src/confluent/tools/handlers/<domain>/`. Extend the domain subclass if one exists (e.g., `FlinkToolHandler`); otherwise extend `BaseToolHandler` directly and implement `enabledConnectionIds(runtime)` using a predicate from `connection-predicates.ts`.
+3. Implement `getToolConfig()` (name, description, Zod input schema, `annotations`) and `handle()`.
 4. Register the handler in the `ToolHandlerRegistry.handlers` map in `src/confluent/tools/tool-registry.ts`.
 5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `npm run generate:openapi-types`. Commit the updated `src/confluent/openapi-schema.d.ts` alongside the `openapi.json` change.
 

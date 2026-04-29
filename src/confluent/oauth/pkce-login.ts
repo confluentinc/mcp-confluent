@@ -64,11 +64,19 @@ function buildAuthorizationUrl(
  *  - exchanges the code for the full Confluent token chain
  *
  * Bounded by {@link PKCE_LOGIN_TIMEOUT_MS}. Throws {@link PkceLoginError} on
- * failure with a structured `reason`.
+ * failure with a structured `reason`. If `signal` aborts before the auth
+ * code arrives, throws `PkceLoginError("user_aborted", ...)` and the finally
+ * block tears down the timer + HTTP server.
  */
 export async function runPkceLogin(
   auth0Config: Auth0Config,
+  signal?: AbortSignal,
 ): Promise<TokenChainResult> {
+  // Early abort: skip the bind/open work entirely if the caller has already
+  // signaled cancellation.
+  if (signal?.aborted) {
+    throw new PkceLoginError("user_aborted", "PKCE login aborted");
+  }
   if (!auth0Config.clientId) {
     throw new PkceLoginError(
       "configuration",
@@ -170,21 +178,38 @@ export async function runPkceLogin(
     }, PKCE_LOGIN_TIMEOUT_MS);
   });
 
+  // One abortPromise + listener races every long-lived await below, so a
+  // cancellation observed during bind/open also unblocks promptly.
+  let abortListener: (() => void) | undefined;
+  const abortPromise = new Promise<never>((_, reject) => {
+    abortListener = () =>
+      reject(new PkceLoginError("user_aborted", "PKCE login aborted"));
+    signal?.addEventListener("abort", abortListener, { once: true });
+  });
+
   let authCode: string;
   try {
-    await bindResult;
+    await Promise.race([bindResult, abortPromise]);
     try {
-      await nodeOpen.open(
-        buildAuthorizationUrl(auth0Config, codeChallenge, state),
-      );
+      await Promise.race([
+        nodeOpen.open(buildAuthorizationUrl(auth0Config, codeChallenge, state)),
+        abortPromise,
+      ]);
     } catch (err) {
+      // Preserve user_aborted from the race; wrap any other open() failure.
+      if (err instanceof PkceLoginError) throw err;
       throw new PkceLoginError(
         "configuration",
         `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    authCode = await Promise.race([codePromise, timeoutPromise]);
+    authCode = await Promise.race([codePromise, timeoutPromise, abortPromise]);
   } finally {
+    // Remove the abort listener if the race resolved via something other
+    // than abort, so we don't leak a listener on a long-lived AbortSignal.
+    if (signal && abortListener) {
+      signal.removeEventListener("abort", abortListener);
+    }
     clearTimeout(timer);
     if (bound) server.close();
   }

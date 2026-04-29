@@ -268,8 +268,4 @@ export class ListMetricsHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasTelemetry);
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

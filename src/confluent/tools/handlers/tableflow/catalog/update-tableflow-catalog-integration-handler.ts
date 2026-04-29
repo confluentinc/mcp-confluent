@@ -87,8 +87,4 @@ export class UpdateTableFlowCatalogIntegrationHandler extends TableflowToolHandl
       annotations: CREATE_UPDATE,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

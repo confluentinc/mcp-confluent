@@ -83,8 +83,4 @@ export class ListTableFlowTopicsHandler extends TableflowToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

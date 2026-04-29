@@ -87,6 +87,19 @@ export function tableflowRuntime(): ServerRuntime {
   });
 }
 
+/** Runtime with a flink block. */
+export function flinkRuntime(): ServerRuntime {
+  return runtimeWith(envFactory(), {
+    flink: {
+      endpoint: "https://flink.us-east-1.aws.confluent.cloud",
+      auth: { type: "api_key", key: "k", secret: "s" },
+      environment_id: "env-abc123",
+      organization_id: "org-xyz789",
+      compute_pool_id: "lfcp-pool01",
+    },
+  });
+}
+
 /** Runtime with a telemetry block. */
 export function telemetryRuntime(): ServerRuntime {
   return runtimeWith(envFactory(), {

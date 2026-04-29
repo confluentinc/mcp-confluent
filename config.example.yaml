@@ -80,7 +80,7 @@ connections:
     # Kafka admin REST operations against Confluent Cloud (topics, configs,
     # ACLs).
     kafka:
-      bootstrap_servers: "${KAFKA_BOOTSTRAP_SERVERS:-pkc-xxxxx.us-east-1.aws.confluent.cloud:9092}"
+      bootstrap_servers: "${BOOTSTRAP_SERVERS:-pkc-xxxxx.us-east-1.aws.confluent.cloud:9092}"
       auth:
         type: api_key
         key: "${KAFKA_API_KEY}"
@@ -108,7 +108,7 @@ connections:
     # service accounts, connectors, billing, etc.). `endpoint` defaults to
     # https://api.confluent.cloud when omitted.
     confluent_cloud:
-      endpoint: "${CONFLUENT_CLOUD_ENDPOINT:-https://api.confluent.cloud}"
+      endpoint: "${CONFLUENT_CLOUD_REST_ENDPOINT:-https://api.confluent.cloud}"
       auth:
         type: api_key
         key: "${CONFLUENT_CLOUD_API_KEY}"

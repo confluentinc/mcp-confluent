@@ -22,8 +22,10 @@ export class ServerRuntime {
   readonly env: Environment;
   /**
    * The active OAuth holder when the config carries a CCloud OAuth connection.
-   * Bootstrapped in {@link ServerRuntime.fromConfig} when `config.getCCloudOAuth()`
-   * returns a value; `undefined` on api_key paths.
+   * Constructed by {@link ServerRuntime.fromConfig} when `config.getCCloudOAuth()`
+   * returns a value; `undefined` on api_key paths. The holder runs PKCE in the
+   * background — inspect `holder.bootstrapPromise` or its token accessors to
+   * know if tokens are live.
    */
   readonly oauthHolder: OAuthHolder | undefined;
 
@@ -58,13 +60,13 @@ export class ServerRuntime {
     return managers[0]!;
   }
 
-  static async fromConfig(
+  static fromConfig(
     config: MCPServerConfiguration,
     env: Environment,
-  ): Promise<ServerRuntime> {
+  ): ServerRuntime {
     const ccloudOAuth = config.getCCloudOAuth();
     const oauthHolder = ccloudOAuth
-      ? await OAuthHolder.bootstrap(ccloudOAuth.env)
+      ? OAuthHolder.start(ccloudOAuth.env)
       : undefined;
 
     // Construct a ClientManager for each connection in the config.
@@ -75,7 +77,6 @@ export class ServerRuntime {
         constructClientManagerForConnection(conn),
       ]),
     );
-    // Wrap in ServerRuntime and return.
     return new ServerRuntime(config, clientManagers, env, oauthHolder);
   }
 }

@@ -13,30 +13,31 @@ import { logger } from "@src/logger.js";
  * Owns the current {@link AuthContext} reference for the process. Builds the
  * first context from a PKCE login and exposes the read-side accessors that
  * the bearer middleware uses.
+ *
+ * Constructed via {@link OAuthHolder.start}, which returns synchronously and
+ * runs PKCE in the background. The {@link bootstrapPromise} field always
+ * resolves (never rejects) — callers inspect the holder's accessors after the
+ * await to know whether bootstrap succeeded.
  */
 export class OAuthHolder {
   private ctx: AuthContext | undefined;
+  private cleared = false;
+  readonly bootstrapPromise: Promise<void>;
 
-  private constructor(initialContext: AuthContext | undefined) {
-    this.ctx = initialContext;
+  private constructor(env: Auth0Environment) {
+    // Idiomatic async-init: `bootstrapPromise` is the documented completion
+    // handle (see class JSDoc). Holder is fully usable immediately after
+    // construction — every method correctly handles the bootstrapping state.
+    this.bootstrapPromise = this.runBootstrap(env); // NOSONAR(S7059)
   }
 
   /**
-   * Run PKCE login interactively, build the first {@link AuthContext},
-   * start its refresh loop, and return a holder wrapping it.
+   * Construct a holder synchronously and run PKCE login in the background.
+   * Returned holder has undefined tokens until {@link bootstrapPromise}
+   * settles. Shutdown is safe at any point.
    */
-  static async bootstrap(env: Auth0Environment): Promise<OAuthHolder> {
-    const auth0Config = getAuth0Config(env);
-    logger.info({ env }, "Starting OAuth login");
-    const tokenChain = await runPkceLogin(auth0Config);
-    const tokens: ConfluentTokenSet = {
-      ...tokenChain,
-      accessToken: generateOpaqueToken(),
-    };
-    const ctx = AuthContext.fromTokens(auth0Config, tokens);
-    ctx.startRefreshLoop(DEFAULT_REFRESH_INTERVAL_MS);
-    logger.info({ env }, "OAuth login successful");
-    return new OAuthHolder(ctx);
+  static start(env: Auth0Environment): OAuthHolder {
+    return new OAuthHolder(env);
   }
 
   /** Live control-plane bearer token; `undefined` while broken. */
@@ -53,5 +54,41 @@ export class OAuthHolder {
   shutdown(): void {
     this.ctx?.clear();
     this.ctx = undefined;
+    this.cleared = true;
+  }
+
+  private async runBootstrap(env: Auth0Environment): Promise<void> {
+    try {
+      const auth0Config = getAuth0Config(env);
+      logger.info({ env }, "Starting OAuth login");
+      const tokenChain = await runPkceLogin(auth0Config);
+      // shutdown() may have fired during PKCE — discard the in-flight context.
+      if (this.cleared) {
+        logger.info(
+          { env },
+          "OAuth login completed but holder was cleared; discarding tokens",
+        );
+        return;
+      }
+      const tokens: ConfluentTokenSet = {
+        ...tokenChain,
+        accessToken: generateOpaqueToken(),
+      };
+      const ctx = AuthContext.fromTokens(auth0Config, tokens);
+      ctx.startRefreshLoop(DEFAULT_REFRESH_INTERVAL_MS);
+      this.ctx = ctx;
+      logger.info({ env }, "OAuth login successful");
+    } catch (err) {
+      // If shutdown closed the PKCE HTTP server out from under us, downgrade
+      // the user-facing log from "failed" to "discarded after shutdown".
+      if (this.cleared) {
+        logger.info(
+          { env, err },
+          "OAuth login failed after holder was cleared; discarding error",
+        );
+        return;
+      }
+      logger.error({ env, err }, "OAuth login failed");
+    }
   }
 }

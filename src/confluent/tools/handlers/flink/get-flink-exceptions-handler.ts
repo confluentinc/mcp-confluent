@@ -93,8 +93,4 @@ export class GetFlinkExceptionsHandler extends FlinkToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

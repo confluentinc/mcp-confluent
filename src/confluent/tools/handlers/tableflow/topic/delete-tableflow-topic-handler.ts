@@ -77,8 +77,4 @@ export class DeleteTableFlowTopicHandler extends TableflowToolHandler {
       annotations: DESTRUCTIVE,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

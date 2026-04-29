@@ -1,5 +1,4 @@
 import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
-import { envFactory } from "@tests/factories/env.js";
 import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
@@ -14,7 +13,7 @@ describe("query-profiler-handler.ts", () => {
 
     describe("enabledConnectionIds()", () => {
       it("should return the connection ID for a connection with both flink and telemetry blocks", () => {
-        const runtime = runtimeWith(envFactory(), {
+        const runtime = runtimeWith({
           flink: {
             endpoint: "https://flink.us-east-1.aws.confluent.cloud",
             auth: { type: "api_key", key: "k", secret: "s" },

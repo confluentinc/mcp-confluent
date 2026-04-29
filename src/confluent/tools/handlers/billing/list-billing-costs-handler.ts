@@ -217,8 +217,4 @@ Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : "
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

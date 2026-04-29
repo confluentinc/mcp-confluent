@@ -1,6 +1,8 @@
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
 import {
   bareRuntime,
+  confluentCloudRuntime,
+  confluentCloudWithSchemaRegistryRuntime,
   DEFAULT_CONNECTION_ID,
   schemaRegistryRuntime,
 } from "@tests/factories/runtime.js";
@@ -11,13 +13,27 @@ describe("search-topic-by-tag-handler.ts", () => {
     const handler = new SearchTopicsByTagHandler();
 
     describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a schema_registry block", () => {
-        expect(handler.enabledConnectionIds(schemaRegistryRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
+      it("should return the connection ID when both confluent_cloud and schema_registry blocks are present", () => {
+        expect(
+          handler.enabledConnectionIds(
+            confluentCloudWithSchemaRegistryRuntime(),
+          ),
+        ).toEqual([DEFAULT_CONNECTION_ID]);
       });
 
-      it("should return an empty array for a connection without a schema_registry block", () => {
+      it("should return an empty array when only schema_registry block is present", () => {
+        expect(handler.enabledConnectionIds(schemaRegistryRuntime())).toEqual(
+          [],
+        );
+      });
+
+      it("should return an empty array when only confluent_cloud block is present", () => {
+        expect(handler.enabledConnectionIds(confluentCloudRuntime())).toEqual(
+          [],
+        );
+      });
+
+      it("should return an empty array when neither block is present", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });
     });

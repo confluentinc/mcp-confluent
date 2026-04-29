@@ -11,7 +11,7 @@ All notable changes to this MCP server will be documented in this file.
 
 ### Removed
 
-- `--disable-confluent-cloud-tools` CLI flag and its `DISABLE_CONFLUENT_CLOUD_TOOLS` environment variable counterpart. Tool enablement is now determined entirely by which service blocks are present in the connection config — to suppress Confluent Cloud tools, omit the `confluent_cloud` block from your connection YAML or leave `CONFLUENT_CLOUD_API_KEY` / `CONFLUENT_CLOUD_API_SECRET` unset in your environment / environment file.
+- `--disable-confluent-cloud-tools` CLI flag and its `DISABLE_CONFLUENT_CLOUD_TOOLS` environment variable counterpart. Tool enablement is now determined entirely by which service blocks are present in the connection configation YAML or the equivalent \*\_KEY and \*\_SECRET environment variables.
 
 ### Added
 

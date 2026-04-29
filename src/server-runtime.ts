@@ -24,29 +24,21 @@ export class ServerRuntime {
    * The active OAuth holder when the config carries a CCloud OAuth connection.
    * Constructed by {@link ServerRuntime.fromConfig} when `config.getCCloudOAuth()`
    * returns a value; `undefined` on api_key paths. The holder runs PKCE in the
-   * background — inspect {@link oauthBootstrap} or holder accessors to know if
-   * tokens are live.
+   * background — inspect `holder.bootstrapPromise` or its token accessors to
+   * know if tokens are live.
    */
   readonly oauthHolder: OAuthHolder | undefined;
-  /**
-   * Promise that resolves when the OAuth bootstrap settles (success or failure).
-   * `undefined` when the config has no OAuth connection. Always resolves; never
-   * rejects. Exposed for tests, diagnostics, and shutdown synchronization.
-   */
-  readonly oauthBootstrap: Promise<void> | undefined;
 
   constructor(
     config: MCPServerConfiguration,
     clientManagers: Record<string, ClientManager>,
     env: Environment,
     oauthHolder: OAuthHolder | undefined = undefined,
-    oauthBootstrap: Promise<void> | undefined = undefined,
   ) {
     this.config = config;
     this.clientManagers = clientManagers;
     this.env = env;
     this.oauthHolder = oauthHolder;
-    this.oauthBootstrap = oauthBootstrap;
   }
 
   /**
@@ -76,7 +68,6 @@ export class ServerRuntime {
     const oauthHolder = ccloudOAuth
       ? OAuthHolder.start(ccloudOAuth.env)
       : undefined;
-    const oauthBootstrap = oauthHolder?.bootstrapPromise;
 
     // Construct a ClientManager for each connection in the config.
     // (although currently there will only be one, see `enforceSingleConnectionOnly()`)
@@ -86,12 +77,6 @@ export class ServerRuntime {
         constructClientManagerForConnection(conn),
       ]),
     );
-    return new ServerRuntime(
-      config,
-      clientManagers,
-      env,
-      oauthHolder,
-      oauthBootstrap,
-    );
+    return new ServerRuntime(config, clientManagers, env, oauthHolder);
   }
 }

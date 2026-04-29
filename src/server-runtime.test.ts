@@ -229,7 +229,7 @@ describe("ServerRuntime", () => {
       expect(runtime.env).toBe(env);
     });
 
-    it("should leave oauthHolder and oauthBootstrap undefined when the config has no ccloud-oauth", () => {
+    it("should leave oauthHolder undefined when the config has no ccloud-oauth", () => {
       const noOauthConfig = new MCPServerConfiguration({
         connections: {
           "env-connection": connWith({
@@ -239,14 +239,10 @@ describe("ServerRuntime", () => {
       });
       const runtime = ServerRuntime.fromConfig(noOauthConfig, env);
       expect(runtime.oauthHolder).toBeUndefined();
-      expect(runtime.oauthBootstrap).toBeUndefined();
     });
 
-    it("should call OAuthHolder.start and expose oauthHolder + oauthBootstrap when the config has ccloud-oauth", () => {
-      const fakePromise = Promise.resolve();
-      const fakeHolder = {
-        bootstrapPromise: fakePromise,
-      } as unknown as OAuthHolder;
+    it("should call OAuthHolder.start and expose oauthHolder when the config has ccloud-oauth", () => {
+      const fakeHolder = {} as OAuthHolder;
       const startSpy = vi
         .spyOn(OAuthHolder, "start")
         .mockReturnValue(fakeHolder);
@@ -264,7 +260,6 @@ describe("ServerRuntime", () => {
 
       expect(startSpy).toHaveBeenCalledWith("devel");
       expect(runtime.oauthHolder).toBe(fakeHolder);
-      expect(runtime.oauthBootstrap).toBe(fakePromise);
     });
   });
 });

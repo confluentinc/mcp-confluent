@@ -139,14 +139,22 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 
 ## Handler Tests
 
-- Test config (`getToolConfig()`), required env vars (`getRequiredEnvVars()`), and behavior (`handle()`)
-- Stub `ClientManager` methods with `createMockInstance(DefaultClientManager)`
+- Test `getToolConfig()` (name, description, input schema, annotations).
+- Test `enabledConnectionIds(runtime)` against representative `ServerRuntime` fixtures: a runtime
+  whose connection has the relevant service block (expect the connection id) and a bare runtime
+  without that block (expect `[]`). Helper factories live in `tests/factories/runtime.ts`
+  (`flinkRuntime()`, `tableflowRuntime()`, `bareRuntime()`, etc.).
+- Test `handle()` for typical and edge-case inputs.
+- Stub `ClientManager` methods with `createMockInstance(DefaultClientManager)`.
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
-  `listTopics`), not on the `ClientManager` mock itself — add an eslint-disable comment when needed
+  `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.
 
-## Environment Proxy
+## Test Server & Runtime Fixtures
 
-- `createTestServer()` calls `initEnv()` automatically so Zod `.default()` callbacks in tool
-  schemas don't throw
-- For handler-only tests that don't use `createTestServer()`, call `initEnv()` in `beforeAll` if
-  the handler's Zod schema references `env.*` in `.default()` callbacks
+- `createTestServer(clientManager, toolNames?)` from `@tests/server.js` boots a real `McpServer`
+  with all tools (or a passed subset) wired to a stubbed `ClientManager` over `InMemoryTransport`.
+  Use it for protocol-level integration tests.
+- For `enabledConnectionIds()` tests, build a `ServerRuntime` via the named factories in
+  `@tests/factories/runtime.js`: `bareRuntime()`, `kafkaRuntime()`, `flinkRuntime()`,
+  `tableflowRuntime()`, `schemaRegistryRuntime()`, `confluentCloudRuntime()`,
+  `telemetryRuntime()`, etc. For uncommon shapes, use `runtimeWith(connectionConfig?, connectionId?)` (both args optional; `connectionId` defaults to `"default"`).

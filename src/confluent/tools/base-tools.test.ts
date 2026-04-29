@@ -1,4 +1,4 @@
-import { StubHandler } from "@tests/stubs/stub-handler.js";
+import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 describe("base-tools.ts", () => {

@@ -1,4 +1,5 @@
 import { nodeCrypto } from "@src/confluent/node-deps.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import {
@@ -7,7 +8,7 @@ import {
   outputToolList,
 } from "@src/index.js";
 import { runtimeWith } from "@tests/factories/runtime.js";
-import { StubHandler } from "@tests/stubs/stub-handler.js";
+import { StubHandler } from "@tests/stubs/index.js";
 import {
   beforeEach,
   describe,

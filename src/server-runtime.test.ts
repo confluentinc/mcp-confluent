@@ -6,7 +6,6 @@ import {
 } from "@src/confluent/client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { envFactory } from "@tests/factories/env.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
 
@@ -157,27 +156,25 @@ describe("ServerRuntime", () => {
       "test-conn": connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     },
   });
-  const env = envFactory();
 
   describe("constructor", () => {
-    it("should store config, clientManagers, and env as-is", () => {
+    it("should store config and clientManagers as-is", () => {
       const cm = createMockInstance(DefaultClientManager);
-      const runtime = new ServerRuntime(config, { "test-conn": cm }, env);
+      const runtime = new ServerRuntime(config, { "test-conn": cm });
       expect(runtime.config).toBe(config);
       expect(runtime.clientManagers).toStrictEqual({ "test-conn": cm });
-      expect(runtime.env).toBe(env);
     });
   });
 
   describe("get clientManager()", () => {
     it("should return the sole client manager", () => {
       const cm = createMockInstance(DefaultClientManager);
-      const runtime = new ServerRuntime(config, { "test-conn": cm }, env);
+      const runtime = new ServerRuntime(config, { "test-conn": cm });
       expect(runtime.clientManager).toBe(cm);
     });
 
     it("should throw when clientManagers is empty", () => {
-      const runtime = new ServerRuntime(config, {}, env);
+      const runtime = new ServerRuntime(config, {});
       expect(() => runtime.clientManager).toThrow(
         "ServerRuntime has no client managers",
       );
@@ -186,11 +183,7 @@ describe("ServerRuntime", () => {
     it("should throw when clientManagers has more than one entry", () => {
       const cm1 = createMockInstance(DefaultClientManager);
       const cm2 = createMockInstance(DefaultClientManager);
-      const runtime = new ServerRuntime(
-        config,
-        { conn1: cm1, conn2: cm2 },
-        env,
-      );
+      const runtime = new ServerRuntime(config, { conn1: cm1, conn2: cm2 });
       expect(() => runtime.clientManager).toThrow(
         "ServerRuntime has multiple client managers",
       );
@@ -210,7 +203,7 @@ describe("ServerRuntime", () => {
           }),
         },
       });
-      const runtime = await ServerRuntime.fromConfig(twoConnConfig, env);
+      const runtime = await ServerRuntime.fromConfig(twoConnConfig);
       expect(Object.keys(runtime.clientManagers)).toStrictEqual([
         "conn1",
         "conn2",
@@ -223,10 +216,9 @@ describe("ServerRuntime", () => {
       );
     });
 
-    it("should store the config and env on the returned runtime", async () => {
-      const runtime = await ServerRuntime.fromConfig(config, env);
+    it("should store the config on the returned runtime", async () => {
+      const runtime = await ServerRuntime.fromConfig(config);
       expect(runtime.config).toBe(config);
-      expect(runtime.env).toBe(env);
     });
 
     it("should leave oauthHolder undefined when the config has no ccloud-oauth", async () => {
@@ -237,7 +229,7 @@ describe("ServerRuntime", () => {
           }),
         },
       });
-      const runtime = await ServerRuntime.fromConfig(noOauthConfig, env);
+      const runtime = await ServerRuntime.fromConfig(noOauthConfig);
       expect(runtime.oauthHolder).toBeUndefined();
     });
 
@@ -256,7 +248,7 @@ describe("ServerRuntime", () => {
         ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
       });
 
-      const runtime = await ServerRuntime.fromConfig(oauthConfig, env);
+      const runtime = await ServerRuntime.fromConfig(oauthConfig);
 
       expect(bootstrapSpy).toHaveBeenCalledWith("devel");
       expect(runtime.oauthHolder).toBe(fakeHolder);
@@ -276,7 +268,7 @@ describe("ServerRuntime", () => {
         ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
       });
 
-      await expect(ServerRuntime.fromConfig(oauthConfig, env)).rejects.toThrow(
+      await expect(ServerRuntime.fromConfig(oauthConfig)).rejects.toThrow(
         "Auth0 unreachable",
       );
     });

@@ -7,7 +7,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasSchemaRegistry,
+  hasCCloudCatalogSupport,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -60,10 +60,9 @@ export class DeleteTagHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasSchemaRegistry);
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
+    return connectionIdsWhere(
+      runtime.config.connections,
+      hasCCloudCatalogSupport,
+    );
   }
 }

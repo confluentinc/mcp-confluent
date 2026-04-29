@@ -119,8 +119,4 @@ export class ListTablesHandler extends FlinkToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

@@ -418,7 +418,7 @@ describe("config/yaml-fixtures.test.ts", () => {
     it("should only reference var names that exist in env-schema", () => {
       const raw = readFileSync(EXAMPLE_FILE, "utf-8");
       const placeholderRe = /\$\{([A-Za-z_]\w*)(?::-.*)?\}/g;
-      const found = new Set([...raw.matchAll(placeholderRe)].map((m) => m[1]));
+      const found = new Set([...raw.matchAll(placeholderRe)].map((m) => m[1]!));
       // "VAR" appears only in the documentation-prose comment on line 10;
       // it is not a real env-var placeholder.
       found.delete("VAR");

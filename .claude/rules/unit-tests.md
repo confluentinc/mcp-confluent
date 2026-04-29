@@ -157,6 +157,6 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 - For `enabledConnectionIds()` tests, build a `ServerRuntime` via the named factories in
   `@tests/factories/runtime.js`: `bareRuntime()`, `kafkaRuntime()`, `flinkRuntime()`,
   `tableflowRuntime()`, `schemaRegistryRuntime()`, `confluentCloudRuntime()`,
-  `telemetryRuntime()`, etc. For uncommon shapes, use `runtimeWith(env, connectionConfig)`.
+  `telemetryRuntime()`, etc. For uncommon shapes, use `runtimeWith(connectionConfig?, connectionId?)` (both args optional; `connectionId` defaults to `"default"`).
 - Integration tests (`*.integration.test.ts`) default to real I/O; stub selectively. Unit tests
   default to stubbed dependencies via `vi.spyOn` and the `node-deps.ts` namespace pattern.

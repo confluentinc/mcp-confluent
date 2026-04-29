@@ -1,5 +1,4 @@
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
-import { envFactory } from "@tests/factories/env.js";
 import {
   bareRuntime,
   confluentCloudRuntime,
@@ -14,7 +13,7 @@ describe("create-connector-handler.ts", () => {
 
     describe("enabledConnectionIds()", () => {
       it("should return the connection ID for a connection with confluent_cloud and kafka.auth", () => {
-        const runtime = runtimeWith(envFactory(), {
+        const runtime = runtimeWith({
           confluent_cloud: {
             endpoint: "https://api.confluent.cloud",
             auth: { type: "api_key", key: "k", secret: "s" },

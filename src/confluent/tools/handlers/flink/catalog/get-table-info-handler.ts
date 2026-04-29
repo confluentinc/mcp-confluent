@@ -144,8 +144,4 @@ export class GetTableInfoHandler extends FlinkToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

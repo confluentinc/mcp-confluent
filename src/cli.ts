@@ -27,7 +27,6 @@ export interface CLIOptions {
   allowTools?: string[];
   blockTools?: string[];
   listTools?: boolean;
-  disableConfluentCloudTools?: boolean;
   kafkaConfig?: KeyValuePairObject;
   disableAuth?: boolean;
   allowedHosts?: string[];
@@ -198,10 +197,6 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       "Print the final set of enabled tool names (with descriptions) after allow/block filtering and exit. Does not start the server.",
     )
     .option(
-      "--disable-confluent-cloud-tools",
-      "Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).",
-    )
-    .option(
       "--disable-auth",
       "Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.",
     )
@@ -249,7 +244,6 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       allowTools,
       blockTools,
       listTools: !!opts.listTools,
-      disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
       kafkaConfig: opts.kafkaConfigFile
         ? parsePropertiesFile(opts.kafkaConfigFile)
         : undefined,

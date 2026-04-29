@@ -70,8 +70,4 @@ export class SearchTopicsByTagHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasSchemaRegistry);
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

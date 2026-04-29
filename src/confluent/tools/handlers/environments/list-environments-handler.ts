@@ -177,8 +177,4 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

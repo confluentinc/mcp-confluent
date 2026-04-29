@@ -22,21 +22,31 @@ export class ServerRuntime {
   readonly env: Environment;
   /**
    * The active OAuth holder when the config carries a CCloud OAuth connection.
-   * Bootstrapped in {@link ServerRuntime.fromConfig} when `config.getCCloudOAuth()`
-   * returns a value; `undefined` on api_key paths.
+   * Constructed by {@link ServerRuntime.fromConfig} when `config.getCCloudOAuth()`
+   * returns a value; `undefined` on api_key paths. The holder runs PKCE in the
+   * background — inspect {@link oauthBootstrap} or holder accessors to know if
+   * tokens are live.
    */
   readonly oauthHolder: OAuthHolder | undefined;
+  /**
+   * Promise that resolves when the OAuth bootstrap settles (success or failure).
+   * `undefined` when the config has no OAuth connection. Always resolves; never
+   * rejects. Exposed for tests, diagnostics, and shutdown synchronization.
+   */
+  readonly oauthBootstrap: Promise<void> | undefined;
 
   constructor(
     config: MCPServerConfiguration,
     clientManagers: Record<string, ClientManager>,
     env: Environment,
     oauthHolder: OAuthHolder | undefined = undefined,
+    oauthBootstrap: Promise<void> | undefined = undefined,
   ) {
     this.config = config;
     this.clientManagers = clientManagers;
     this.env = env;
     this.oauthHolder = oauthHolder;
+    this.oauthBootstrap = oauthBootstrap;
   }
 
   /**
@@ -58,14 +68,15 @@ export class ServerRuntime {
     return managers[0]!;
   }
 
-  static async fromConfig(
+  static fromConfig(
     config: MCPServerConfiguration,
     env: Environment,
-  ): Promise<ServerRuntime> {
+  ): ServerRuntime {
     const ccloudOAuth = config.getCCloudOAuth();
     const oauthHolder = ccloudOAuth
-      ? await OAuthHolder.bootstrap(ccloudOAuth.env)
+      ? OAuthHolder.start(ccloudOAuth.env)
       : undefined;
+    const oauthBootstrap = oauthHolder?.bootstrapPromise;
 
     // Construct a ClientManager for each connection in the config.
     // (although currently there will only be one, see `enforceSingleConnectionOnly()`)
@@ -75,7 +86,12 @@ export class ServerRuntime {
         constructClientManagerForConnection(conn),
       ]),
     );
-    // Wrap in ServerRuntime and return.
-    return new ServerRuntime(config, clientManagers, env, oauthHolder);
+    return new ServerRuntime(
+      config,
+      clientManagers,
+      env,
+      oauthHolder,
+      oauthBootstrap,
+    );
   }
 }

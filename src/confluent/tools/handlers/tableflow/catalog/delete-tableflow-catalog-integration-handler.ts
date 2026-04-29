@@ -1,13 +1,9 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  DESTRUCTIVE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { DESTRUCTIVE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -25,7 +21,7 @@ const deleteTableflowCatalogIntegrationArguments = z.object({
     .describe("Scope the operation to the give Kafka cluster."),
 });
 
-export class DeleteTableFlowCatalogIntegrationHandler extends BaseToolHandler {
+export class DeleteTableFlowCatalogIntegrationHandler extends TableflowToolHandler {
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
@@ -78,10 +74,6 @@ export class DeleteTableFlowCatalogIntegrationHandler extends BaseToolHandler {
       inputSchema: deleteTableflowCatalogIntegrationArguments.shape,
       annotations: DESTRUCTIVE,
     };
-  }
-
-  getRequiredEnvVars(): EnvVar[] {
-    return ["TABLEFLOW_API_KEY", "TABLEFLOW_API_SECRET"];
   }
 
   isConfluentCloudOnly(): boolean {

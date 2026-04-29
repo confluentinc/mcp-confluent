@@ -1,13 +1,9 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -38,7 +34,7 @@ const listTableFlowTopicArguments = z.object({
     .describe("An opaque pagination token for collection requests."),
 });
 
-export class ListTableFlowTopicsHandler extends BaseToolHandler {
+export class ListTableFlowTopicsHandler extends TableflowToolHandler {
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
@@ -86,10 +82,6 @@ export class ListTableFlowTopicsHandler extends BaseToolHandler {
       inputSchema: listTableFlowTopicArguments.shape,
       annotations: READ_ONLY,
     };
-  }
-
-  getRequiredEnvVars(): EnvVar[] {
-    return ["TABLEFLOW_API_KEY", "TABLEFLOW_API_SECRET"];
   }
 
   isConfluentCloudOnly(): boolean {

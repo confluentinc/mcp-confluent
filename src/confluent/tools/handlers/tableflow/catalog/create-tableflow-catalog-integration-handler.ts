@@ -1,13 +1,9 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  CREATE_UPDATE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -37,7 +33,7 @@ const createTableflowCatalogIntegrationArguments = z.object({
   }),
 });
 
-export class CreateTableFlowCatalogIntegrationHandler extends BaseToolHandler {
+export class CreateTableFlowCatalogIntegrationHandler extends TableflowToolHandler {
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
@@ -94,10 +90,6 @@ export class CreateTableFlowCatalogIntegrationHandler extends BaseToolHandler {
       inputSchema: createTableflowCatalogIntegrationArguments.shape,
       annotations: CREATE_UPDATE,
     };
-  }
-
-  getRequiredEnvVars(): EnvVar[] {
-    return ["TABLEFLOW_API_KEY", "TABLEFLOW_API_SECRET"];
   }
 
   isConfluentCloudOnly(): boolean {

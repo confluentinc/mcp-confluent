@@ -82,8 +82,4 @@ export class DeleteFlinkStatementHandler extends FlinkToolHandler {
       annotations: DESTRUCTIVE,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

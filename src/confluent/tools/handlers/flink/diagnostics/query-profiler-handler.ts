@@ -549,8 +549,4 @@ export class QueryProfilerHandler extends FlinkToolHandler {
       (conn) => hasFlink(conn) && hasTelemetry(conn),
     );
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

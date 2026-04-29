@@ -126,8 +126,4 @@ Environment: ${environmentDetails.name}
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

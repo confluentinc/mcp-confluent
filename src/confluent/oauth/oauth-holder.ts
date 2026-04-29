@@ -88,14 +88,11 @@ export class OAuthHolder {
       this.ctx = ctx;
       logger.info({ env }, "OAuth login successful");
     } catch (err) {
-      // shutdown() aborts the in-flight PKCE via AbortSignal. If the catch
-      // fires after shutdown, downgrade the user-facing log from "failed"
-      // to "discarded after shutdown".
+      // shutdown() aborts the in-flight PKCE via AbortSignal — when the catch
+      // fires after shutdown, the error is the expected user_aborted signal
+      // we triggered ourselves. Log a terse line without the stack trace.
       if (this.cleared) {
-        logger.info(
-          { env, err },
-          "OAuth login failed after holder was cleared; discarding error",
-        );
+        logger.info({ env }, "OAuth login aborted by shutdown");
         return;
       }
       logger.error({ env, err }, "OAuth login failed");

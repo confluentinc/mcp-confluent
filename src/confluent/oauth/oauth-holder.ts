@@ -9,8 +9,6 @@ import type {
 } from "@src/confluent/oauth/types.js";
 import { logger } from "@src/logger.js";
 
-type HolderState = "bootstrapping" | "ready" | "failed" | "cleared";
-
 /**
  * Owns the current {@link AuthContext} reference for the process. Builds the
  * first context from a PKCE login and exposes the read-side accessors that
@@ -23,7 +21,7 @@ type HolderState = "bootstrapping" | "ready" | "failed" | "cleared";
  */
 export class OAuthHolder {
   private ctx: AuthContext | undefined;
-  private state: HolderState = "bootstrapping";
+  private cleared = false;
   readonly bootstrapPromise: Promise<void>;
 
   private constructor(env: Auth0Environment) {
@@ -35,8 +33,8 @@ export class OAuthHolder {
 
   /**
    * Construct a holder synchronously and run PKCE login in the background.
-   * Returned holder is in `"bootstrapping"` state with undefined tokens until
-   * {@link bootstrapPromise} settles. Shutdown is safe at any point.
+   * Returned holder has undefined tokens until {@link bootstrapPromise}
+   * settles. Shutdown is safe at any point.
    */
   static start(env: Auth0Environment): OAuthHolder {
     return new OAuthHolder(env);
@@ -56,7 +54,7 @@ export class OAuthHolder {
   shutdown(): void {
     this.ctx?.clear();
     this.ctx = undefined;
-    this.state = "cleared";
+    this.cleared = true;
   }
 
   private async runBootstrap(env: Auth0Environment): Promise<void> {
@@ -65,7 +63,7 @@ export class OAuthHolder {
     try {
       const tokenChain = await runPkceLogin(auth0Config);
       // shutdown() may have fired during PKCE — discard the in-flight context.
-      if (this.state === "cleared") {
+      if (this.cleared) {
         logger.info(
           { env },
           "OAuth login completed but holder was cleared; discarding tokens",
@@ -79,18 +77,17 @@ export class OAuthHolder {
       const ctx = AuthContext.fromTokens(auth0Config, tokens);
       ctx.startRefreshLoop(DEFAULT_REFRESH_INTERVAL_MS);
       this.ctx = ctx;
-      this.state = "ready";
       logger.info({ env }, "OAuth login successful");
     } catch (err) {
-      // Cleared mid-bootstrap — keep state="cleared", just log and return.
-      if (this.state === "cleared") {
+      // If shutdown closed the PKCE HTTP server out from under us, downgrade
+      // the user-facing log from "failed" to "discarded after shutdown".
+      if (this.cleared) {
         logger.info(
           { env, err },
           "OAuth login failed after holder was cleared; discarding error",
         );
         return;
       }
-      this.state = "failed";
       logger.error({ env, err }, "OAuth login failed");
     }
   }

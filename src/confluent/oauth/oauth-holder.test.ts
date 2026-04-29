@@ -42,15 +42,27 @@ describe("oauth/oauth-holder.ts", () => {
   });
 
   describe("start", () => {
-    it("should return a holder synchronously in the bootstrapping state with undefined tokens", () => {
-      mockHttpServer();
-      mockOpen();
+    it("should return a holder synchronously in the bootstrapping state with undefined tokens", async () => {
+      const httpMock = mockHttpServer();
+      const openSpy = mockOpen();
       stubFullChain(fetchSpy);
 
       const holder = OAuthHolder.start("devel");
+      // Sync observables, asserted before any await so the bootstrap is still in flight.
+      expect(holder.getControlPlaneToken()).toBeUndefined();
+      expect(holder.getDataPlaneToken()).toBeUndefined();
+
       try {
-        expect(holder.getControlPlaneToken()).toBeUndefined();
-        expect(holder.getDataPlaneToken()).toBeUndefined();
+        // Drain the in-flight bootstrap so its timer/HTTP server don't dangle past this test.
+        await httpMock.listening;
+        await Promise.resolve();
+        await Promise.resolve();
+        const openedUrl = openSpy.mock.calls[0]![0];
+        const state = new URL(openedUrl).searchParams.get("state")!;
+        await httpMock.fireRequest(
+          `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+        );
+        await holder.bootstrapPromise;
       } finally {
         holder.shutdown();
       }
@@ -102,21 +114,25 @@ describe("oauth/oauth-holder.ts", () => {
       stubFullChain(fetchSpy);
 
       const holder = OAuthHolder.start("devel");
-      await httpMock.listening;
-      await Promise.resolve();
-      await Promise.resolve();
-      const openedUrl = openSpy.mock.calls[0]![0];
-      const state = new URL(openedUrl).searchParams.get("state")!;
-      await httpMock.fireRequest(
-        `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
-      );
-      await holder.bootstrapPromise;
+      try {
+        await httpMock.listening;
+        await Promise.resolve();
+        await Promise.resolve();
+        const openedUrl = openSpy.mock.calls[0]![0];
+        const state = new URL(openedUrl).searchParams.get("state")!;
+        await httpMock.fireRequest(
+          `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+        );
+        await holder.bootstrapPromise;
 
-      expect(() => {
+        expect(() => {
+          holder.shutdown();
+          holder.shutdown();
+        }).not.toThrow();
+        expect(holder.getControlPlaneToken()).toBeUndefined();
+      } finally {
         holder.shutdown();
-        holder.shutdown();
-      }).not.toThrow();
-      expect(holder.getControlPlaneToken()).toBeUndefined();
+      }
     });
 
     it("should not start a refresh loop when shutdown happens before bootstrap settles", async () => {

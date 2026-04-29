@@ -1168,6 +1168,33 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}/error-recommendations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The unique name of the connector. */
+        connector_name: string;
+        /** @description The unique identifier of the environment this resource belongs to. */
+        environment_id: string;
+        /** @description The unique identifier for the Kafka cluster. */
+        kafka_cluster_id: string;
+      };
+      cookie?: never;
+    };
+    /**
+     * Read Connector Error Recommendations
+     * @description Get suggested remediation steps for a connector that has failed or is in an error state. Recommendations are generated server-side from the connector's recent failure traces and configuration.
+     */
+    get: operations["readConnectv1ConnectorErrorRecommendations"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}/tasks": {
     parameters: {
       query?: never;
@@ -27276,6 +27303,55 @@ export interface operations {
               worker_id: string;
               msg?: string;
             }[];
+          };
+        };
+      };
+      401: components["responses"]["connect.v1.UnauthenticatedError"];
+      404: components["responses"]["connect.v1.AccountNotFoundError"];
+      429: components["responses"]["RateLimitError"];
+      500: components["responses"]["connect.v1.DefaultSystemError"];
+    };
+  };
+  readConnectv1ConnectorErrorRecommendations: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The unique name of the connector. */
+        connector_name: string;
+        /** @description The unique identifier of the environment this resource belongs to. */
+        environment_id: string;
+        /** @description The unique identifier for the Kafka cluster. */
+        kafka_cluster_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Connector error recommendations. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          /**
+           * @example {
+           *       "error": null,
+           *       "event_id": "lcc-oo0vvx_1777437507",
+           *       "recommendations": [
+           *         "Verify that the 'database.user' and 'database.password' values in the connector configuration are correct and match the credentials for the PostgreSQL database.",
+           *         "Ensure that the PostgreSQL server at 'database.hostname' is accessible from Confluent Cloud and that the firewall or network settings allow connections on port 5432.",
+           *         "Check that the PostgreSQL database exists and the user has the necessary permissions to access it."
+           *       ]
+           *     }
+           */
+          "application/json": {
+            /** @description Engine-side error string when the recommendation engine itself failed; null on success. */
+            error?: string | null;
+            /** @description Identifier for the recommendation event, useful for cross-referencing with support. */
+            event_id: string;
+            /** @description Suggested remediation steps for the connector's current error state. */
+            recommendations: string[];
           };
         };
       };

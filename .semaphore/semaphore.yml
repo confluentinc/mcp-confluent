@@ -62,3 +62,7 @@ after_pipeline:
       - name: Publish Test Results
         commands:
           - test-results gen-pipeline-report || true
+
+promotions:
+  - name: Docker Image Scan
+    pipeline_file: docker-image-scan.yml

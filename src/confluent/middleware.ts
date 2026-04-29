@@ -31,7 +31,7 @@ export const createBearerMiddleware = (
     const token = getToken();
     if (!token) {
       throw new BearerTokenUnavailableError(
-        "OAuth token unavailable; the session may have expired. Restart the server to re-authenticate.",
+        "OAuth token is not currently available.",
       );
     }
     request.headers.set("Authorization", `Bearer ${token}`);

@@ -7,7 +7,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasSchemaRegistry,
+  hasCCloudCatalogSupport,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -73,6 +73,9 @@ export class CreateTopicTagsHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasSchemaRegistry);
+    return connectionIdsWhere(
+      runtime.config.connections,
+      hasCCloudCatalogSupport,
+    );
   }
 }

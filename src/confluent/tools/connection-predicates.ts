@@ -38,6 +38,16 @@ export function hasTableflow(conn: ConnectionConfig): boolean {
   return conn.tableflow !== undefined;
 }
 
+/**
+ * True when both a confluent_cloud block and a schema_registry block are present.
+ * Models Confluent Cloud catalog API support (e.g. /catalog/v1/search/...) — initially
+ * a conjunction of the two constituent predicates. When the config model gains a richer
+ * way to express catalog availability this predicate is the single place to tighten it.
+ */
+export function hasCCloudCatalogSupport(conn: ConnectionConfig): boolean {
+  return hasConfluentCloud(conn) && hasSchemaRegistry(conn);
+}
+
 export function connectionIdsWhere(
   connections: Readonly<Record<string, ConnectionConfig>>,
   predicate: ConnectionPredicate,

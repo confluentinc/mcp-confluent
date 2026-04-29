@@ -13,30 +13,32 @@ import { logger } from "@src/logger.js";
  * Owns the current {@link AuthContext} reference for the process. Builds the
  * first context from a PKCE login and exposes the read-side accessors that
  * the bearer middleware uses.
+ *
+ * Constructed via {@link OAuthHolder.start}, which returns synchronously and
+ * runs PKCE in the background. The {@link bootstrapPromise} field always
+ * resolves (never rejects) — callers inspect the holder's accessors after the
+ * await to know whether bootstrap succeeded.
  */
 export class OAuthHolder {
   private ctx: AuthContext | undefined;
+  private cleared = false;
+  private readonly abortController = new AbortController();
+  readonly bootstrapPromise: Promise<void>;
 
-  private constructor(initialContext: AuthContext | undefined) {
-    this.ctx = initialContext;
+  private constructor(env: Auth0Environment) {
+    // Idiomatic async-init: `bootstrapPromise` is the documented completion
+    // handle (see class JSDoc). Holder is fully usable immediately after
+    // construction — every method correctly handles the bootstrapping state.
+    this.bootstrapPromise = this.runBootstrap(env); // NOSONAR(S7059)
   }
 
   /**
-   * Run PKCE login interactively, build the first {@link AuthContext},
-   * start its refresh loop, and return a holder wrapping it.
+   * Construct a holder synchronously and run PKCE login in the background.
+   * Returned holder has undefined tokens until {@link bootstrapPromise}
+   * settles. Shutdown is safe at any point.
    */
-  static async bootstrap(env: Auth0Environment): Promise<OAuthHolder> {
-    const auth0Config = getAuth0Config(env);
-    logger.info({ env }, "Starting OAuth login");
-    const tokenChain = await runPkceLogin(auth0Config);
-    const tokens: ConfluentTokenSet = {
-      ...tokenChain,
-      accessToken: generateOpaqueToken(),
-    };
-    const ctx = AuthContext.fromTokens(auth0Config, tokens);
-    ctx.startRefreshLoop(DEFAULT_REFRESH_INTERVAL_MS);
-    logger.info({ env }, "OAuth login successful");
-    return new OAuthHolder(ctx);
+  static start(env: Auth0Environment): OAuthHolder {
+    return new OAuthHolder(env);
   }
 
   /** Live control-plane bearer token; `undefined` while broken. */
@@ -49,9 +51,51 @@ export class OAuthHolder {
     return this.ctx?.getDataPlaneToken();
   }
 
-  /** Stops the refresh loop and clears the held context. Safe to double-call. */
+  /**
+   * Stops the refresh loop, clears the held context, and aborts any in-flight
+   * PKCE login (so a `^C` before browser sign-in completes doesn't leave a
+   * 120s zombie timer / port-bound HTTP server). Safe to double-call.
+   */
   shutdown(): void {
     this.ctx?.clear();
     this.ctx = undefined;
+    this.cleared = true;
+    this.abortController.abort();
+  }
+
+  private async runBootstrap(env: Auth0Environment): Promise<void> {
+    try {
+      const auth0Config = getAuth0Config(env);
+      logger.info({ env }, "Starting OAuth login");
+      const tokenChain = await runPkceLogin(
+        auth0Config,
+        this.abortController.signal,
+      );
+      // shutdown() may have fired during PKCE — discard the in-flight context.
+      if (this.cleared) {
+        logger.info(
+          { env },
+          "OAuth login completed but holder was cleared; discarding tokens",
+        );
+        return;
+      }
+      const tokens: ConfluentTokenSet = {
+        ...tokenChain,
+        accessToken: generateOpaqueToken(),
+      };
+      const ctx = AuthContext.fromTokens(auth0Config, tokens);
+      ctx.startRefreshLoop(DEFAULT_REFRESH_INTERVAL_MS);
+      this.ctx = ctx;
+      logger.info({ env }, "OAuth login successful");
+    } catch (err) {
+      // shutdown() aborts the in-flight PKCE via AbortSignal — when the catch
+      // fires after shutdown, the error is the expected user_aborted signal
+      // we triggered ourselves. Log a terse line without the stack trace.
+      if (this.cleared) {
+        logger.info({ env }, "OAuth login aborted by shutdown");
+        return;
+      }
+      logger.error({ env, err }, "OAuth login failed");
+    }
   }
 }

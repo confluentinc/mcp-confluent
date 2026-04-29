@@ -30,13 +30,13 @@ Pre-commit hook runs `npm run format && npm run lint` automatically via Husky.
 
 ### Entry Point & Startup Flow
 
-`src/index.ts` → `parseCliArgs()` → `buildConfigFromEnvAndCli()` (re-exported via `src/config/index.ts`, resolves a single `MCPServerConfiguration` from either a YAML file or env vars + CLI args, see issue #151) → `ServerRuntime.fromConfig()` constructs a `DefaultClientManager` per connection → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
+`src/index.ts` → `parseCliArgs()` → `initEnv()` → branch on `cliOptions.config`: when `-c <path>` is supplied, `loadConfigFromYaml(path, process.env)` parses + interpolates + validates the YAML; otherwise `buildConfigFromEnvAndCli(env, ...)` synthesizes the same `MCPServerConfiguration` shape from env vars + CLI args (legacy path, see issue #151). Both branches converge into `ServerRuntime.fromConfig()`, which constructs a `DefaultClientManager` per connection → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
 
 Tools are **auto-enabled/disabled** based on which **service blocks** are present in each connection (e.g., a tool requiring `flink` is enabled iff some connection's resolved config has a `flink:` block). The connection's blocks come from YAML when one is supplied via `-c <path>`; otherwise they're synthesized from env vars + CLI args for backwards compatibility during the migration. Each handler declares its requirement via `enabledConnectionIds(runtime)`, which returns the ids of connections satisfying a predicate from `src/confluent/tools/connection-predicates.ts`. An empty result disables the tool. Domain-wide gating (e.g., all Flink tools) lives on intermediate base classes such as `FlinkToolHandler`.
 
 ### Key Layers
 
-- **`src/config/`** — Configuration core. `models.ts` defines `MCPServerConfiguration` (a Zod schema with per-service connection blocks: `kafka`, `flink`, `schema_registry`, `confluent_cloud`, `tableflow`, `telemetry`). `env-config.ts` exports `buildConfigFromEnvAndCli()` (re-exported from `index.ts`), the single entry point that produces a config from either a YAML file (`-c <path>`) or env vars + CLI args. `interpolation.ts` handles `${VAR}` interpolation inside YAML.
+- **`src/config/`** — Configuration core. `models.ts` defines `MCPServerConfiguration` (a Zod schema with per-service connection blocks: `kafka`, `flink`, `schema_registry`, `confluent_cloud`, `tableflow`, `telemetry`). `index.ts` exposes `loadConfigFromYaml()` for the `-c <path>` branch (parsing, `${VAR}` interpolation via `interpolation.ts`, Zod validation). `env-config.ts` exports `buildConfigFromEnvAndCli()` for the legacy env-var + CLI path. Both produce an `MCPServerConfiguration`.
 
 - **`src/confluent/tools/`** — Tool system core:
   - `tool-name.ts` — `ToolName` enum; add new entries here when creating tools.

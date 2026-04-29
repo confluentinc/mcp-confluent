@@ -153,7 +153,7 @@ async function main() {
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
 
-    const runtime = await ServerRuntime.fromConfig(mcpConfig);
+    const runtime = ServerRuntime.fromConfig(mcpConfig);
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({
@@ -249,6 +249,7 @@ async function main() {
       logger.info("Shutting down...");
       await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
+      // shutdown() is race-safe with an in-flight bootstrap.
       runtime.oauthHolder?.shutdown();
       await runtime.clientManager.disconnect();
       await server.close();

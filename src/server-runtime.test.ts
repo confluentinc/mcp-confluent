@@ -191,7 +191,7 @@ describe("ServerRuntime", () => {
   });
 
   describe("fromConfig()", () => {
-    it("should create a DefaultClientManager for each connection", async () => {
+    it("should create a DefaultClientManager for each connection", () => {
       const twoConnConfig = new MCPServerConfiguration({
         connections: {
           conn1: connWith({ kafka: { bootstrap_servers: "broker1:9092" } }),
@@ -203,7 +203,7 @@ describe("ServerRuntime", () => {
           }),
         },
       });
-      const runtime = await ServerRuntime.fromConfig(twoConnConfig);
+      const runtime = ServerRuntime.fromConfig(twoConnConfig);
       expect(Object.keys(runtime.clientManagers)).toStrictEqual([
         "conn1",
         "conn2",
@@ -216,12 +216,12 @@ describe("ServerRuntime", () => {
       );
     });
 
-    it("should store the config on the returned runtime", async () => {
-      const runtime = await ServerRuntime.fromConfig(config);
+    it("should store the config on the returned runtime", () => {
+      const runtime = ServerRuntime.fromConfig(config);
       expect(runtime.config).toBe(config);
     });
 
-    it("should leave oauthHolder undefined when the config has no ccloud-oauth", async () => {
+    it("should leave oauthHolder undefined when the config has no ccloud-oauth", () => {
       const noOauthConfig = new MCPServerConfiguration({
         connections: {
           "env-connection": connWith({
@@ -229,15 +229,15 @@ describe("ServerRuntime", () => {
           }),
         },
       });
-      const runtime = await ServerRuntime.fromConfig(noOauthConfig);
+      const runtime = ServerRuntime.fromConfig(noOauthConfig);
       expect(runtime.oauthHolder).toBeUndefined();
     });
 
-    it("should bootstrap an OAuthHolder when the config has ccloud-oauth", async () => {
+    it("should call OAuthHolder.start and expose oauthHolder when the config has ccloud-oauth", () => {
       const fakeHolder = {} as OAuthHolder;
-      const bootstrapSpy = vi
-        .spyOn(OAuthHolder, "bootstrap")
-        .mockResolvedValue(fakeHolder);
+      const startSpy = vi
+        .spyOn(OAuthHolder, "start")
+        .mockReturnValue(fakeHolder);
 
       const oauthConfig = new MCPServerConfiguration({
         connections: {
@@ -248,29 +248,10 @@ describe("ServerRuntime", () => {
         ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
       });
 
-      const runtime = await ServerRuntime.fromConfig(oauthConfig);
+      const runtime = ServerRuntime.fromConfig(oauthConfig);
 
-      expect(bootstrapSpy).toHaveBeenCalledWith("devel");
+      expect(startSpy).toHaveBeenCalledWith("devel");
       expect(runtime.oauthHolder).toBe(fakeHolder);
-    });
-
-    it("should propagate OAuthHolder.bootstrap rejection", async () => {
-      vi.spyOn(OAuthHolder, "bootstrap").mockRejectedValue(
-        new Error("Auth0 unreachable"),
-      );
-
-      const oauthConfig = new MCPServerConfiguration({
-        connections: {
-          "env-connection": connWith({
-            kafka: { bootstrap_servers: "broker:9092" },
-          }),
-        },
-        ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
-      });
-
-      await expect(ServerRuntime.fromConfig(oauthConfig)).rejects.toThrow(
-        "Auth0 unreachable",
-      );
     });
   });
 });

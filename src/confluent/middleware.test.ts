@@ -55,6 +55,9 @@ describe("middleware.ts", () => {
       await expect(callOnRequest(middleware, request)).rejects.toThrow(
         BearerTokenUnavailableError,
       );
+      await expect(callOnRequest(middleware, request)).rejects.toThrow(
+        "OAuth token is not currently available.",
+      );
       expect(request.headers.has("Authorization")).toBe(false);
     });
 
@@ -64,6 +67,9 @@ describe("middleware.ts", () => {
 
       await expect(callOnRequest(middleware, request)).rejects.toThrow(
         BearerTokenUnavailableError,
+      );
+      await expect(callOnRequest(middleware, request)).rejects.toThrow(
+        "OAuth token is not currently available.",
       );
       expect(request.headers.has("Authorization")).toBe(false);
     });

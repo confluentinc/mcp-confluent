@@ -38,6 +38,16 @@ export function hasTableflow(conn: ConnectionConfig): boolean {
   return conn.tableflow !== undefined;
 }
 
+/**
+ * True when the schema_registry block is present and carries api_key auth.
+ * That combination is the reliable signal that the SR is CCloud-hosted and therefore
+ * exposes the /catalog/v1/ endpoints. A vanilla CP SR has no auth block, so it returns
+ * false even when a schema_registry block is present.
+ */
+export function hasCCloudCatalogSupport(conn: ConnectionConfig): boolean {
+  return conn.schema_registry?.auth?.type === "api_key";
+}
+
 export function connectionIdsWhere(
   connections: Readonly<Record<string, ConnectionConfig>>,
   predicate: ConnectionPredicate,

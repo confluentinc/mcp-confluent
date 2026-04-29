@@ -1,4 +1,6 @@
 import { loadConfigFromYaml } from "@src/config/index.js";
+import { combinedSchema } from "@src/env-schema.js";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -389,7 +391,7 @@ describe("config/yaml-fixtures.test.ts", () => {
     // point by users as the codebase evolves.
 
     // Minimal env: supply values for every ${VAR} placeholder that has no :-default.
-    // Placeholders with defaults (e.g. ${KAFKA_BOOTSTRAP_SERVERS:-pkc-xxxxx...}) resolve
+    // Placeholders with defaults (e.g. ${BOOTSTRAP_SERVERS:-pkc-xxxxx...}) resolve
     // on their own; only the bare auth fields need values to pass schema validation.
     const EXAMPLE_ENV: Record<string, string> = {
       KAFKA_API_KEY: "example-kafka-key",
@@ -411,6 +413,18 @@ describe("config/yaml-fixtures.test.ts", () => {
 
     it("should parse without error", () => {
       expect(() => loadConfigFromYaml(EXAMPLE_FILE, EXAMPLE_ENV)).not.toThrow();
+    });
+
+    it("should only reference var names that exist in env-schema", () => {
+      const raw = readFileSync(EXAMPLE_FILE, "utf-8");
+      const placeholderRe = /\$\{([A-Za-z_]\w*)(?::-.*)?\}/g;
+      const found = new Set([...raw.matchAll(placeholderRe)].map((m) => m[1]!));
+      // "VAR" appears only in the documentation-prose comment on line 10;
+      // it is not a real env-var placeholder.
+      found.delete("VAR");
+      const knownKeys = new Set(Object.keys(combinedSchema.shape));
+      const unknown = [...found].filter((name) => !knownKeys.has(name));
+      expect(unknown).toEqual([]);
     });
   });
 

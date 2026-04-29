@@ -75,8 +75,4 @@ export class DeleteTableFlowCatalogIntegrationHandler extends TableflowToolHandl
       annotations: DESTRUCTIVE,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

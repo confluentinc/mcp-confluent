@@ -115,8 +115,4 @@ export class ReadFlinkStatementHandler extends FlinkToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

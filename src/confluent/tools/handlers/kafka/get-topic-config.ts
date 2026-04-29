@@ -97,8 +97,4 @@ export class GetTopicConfigHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasKafkaRestWithAuth);
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

@@ -136,8 +136,4 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
       annotations: CREATE_UPDATE,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

@@ -85,8 +85,4 @@ export class ListConnectorsHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

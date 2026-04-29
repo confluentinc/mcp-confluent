@@ -24,8 +24,9 @@ export class ServerRuntime {
    * The active OAuth holder when the config carries a CCloud OAuth connection.
    * Constructed by {@link ServerRuntime.fromConfig} when `config.getCCloudOAuth()`
    * returns a value; `undefined` on api_key paths. The holder runs PKCE in the
-   * background — inspect `holder.bootstrapPromise` or its token accessors to
-   * know if tokens are live.
+   * background — callers can await `holder.bootstrapPromise` to know the
+   * bootstrap attempt has finished, then inspect the token accessors to
+   * determine whether tokens are available.
    */
   readonly oauthHolder: OAuthHolder | undefined;
 

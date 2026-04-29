@@ -22,6 +22,7 @@ import { logger } from "@src/logger.js";
 export class OAuthHolder {
   private ctx: AuthContext | undefined;
   private cleared = false;
+  private readonly abortController = new AbortController();
   readonly bootstrapPromise: Promise<void>;
 
   private constructor(env: Auth0Environment) {
@@ -50,18 +51,26 @@ export class OAuthHolder {
     return this.ctx?.getDataPlaneToken();
   }
 
-  /** Stops the refresh loop and clears the held context. Safe to double-call. */
+  /**
+   * Stops the refresh loop, clears the held context, and aborts any in-flight
+   * PKCE login (so a `^C` before browser sign-in completes doesn't leave a
+   * 120s zombie timer / port-bound HTTP server). Safe to double-call.
+   */
   shutdown(): void {
     this.ctx?.clear();
     this.ctx = undefined;
     this.cleared = true;
+    this.abortController.abort();
   }
 
   private async runBootstrap(env: Auth0Environment): Promise<void> {
     try {
       const auth0Config = getAuth0Config(env);
       logger.info({ env }, "Starting OAuth login");
-      const tokenChain = await runPkceLogin(auth0Config);
+      const tokenChain = await runPkceLogin(
+        auth0Config,
+        this.abortController.signal,
+      );
       // shutdown() may have fired during PKCE — discard the in-flight context.
       if (this.cleared) {
         logger.info(
@@ -79,8 +88,9 @@ export class OAuthHolder {
       this.ctx = ctx;
       logger.info({ env }, "OAuth login successful");
     } catch (err) {
-      // If shutdown closed the PKCE HTTP server out from under us, downgrade
-      // the user-facing log from "failed" to "discarded after shutdown".
+      // shutdown() aborts the in-flight PKCE via AbortSignal. If the catch
+      // fires after shutdown, downgrade the user-facing log from "failed"
+      // to "discarded after shutdown".
       if (this.cleared) {
         logger.info(
           { env, err },

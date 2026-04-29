@@ -223,5 +223,32 @@ describe("oauth/pkce-login.ts", () => {
       );
       await loginPromise;
     });
+
+    it("should reject with user_aborted when the AbortSignal aborts mid-flight", async () => {
+      const controller = new AbortController();
+      const loginPromise = runPkceLogin(auth0Config, controller.signal);
+      await httpMock.listening;
+      await flushMicrotasks(3);
+
+      controller.abort();
+
+      await expect(loginPromise).rejects.toThrow(PkceLoginError);
+      await expect(loginPromise).rejects.toMatchObject({
+        reason: "user_aborted",
+      });
+      expect(httpMock.closed()).toBe(true);
+    });
+
+    it("should reject with user_aborted immediately when the signal is already aborted before the race", async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        runPkceLogin(auth0Config, controller.signal),
+      ).rejects.toMatchObject({
+        reason: "user_aborted",
+      });
+      expect(httpMock.closed()).toBe(true);
+    });
   });
 });

@@ -64,10 +64,13 @@ function buildAuthorizationUrl(
  *  - exchanges the code for the full Confluent token chain
  *
  * Bounded by {@link PKCE_LOGIN_TIMEOUT_MS}. Throws {@link PkceLoginError} on
- * failure with a structured `reason`.
+ * failure with a structured `reason`. If `signal` aborts before the auth
+ * code arrives, throws `PkceLoginError("user_aborted", ...)` and the finally
+ * block tears down the timer + HTTP server.
  */
 export async function runPkceLogin(
   auth0Config: Auth0Config,
+  signal?: AbortSignal,
 ): Promise<TokenChainResult> {
   if (!auth0Config.clientId) {
     throw new PkceLoginError(
@@ -183,7 +186,18 @@ export async function runPkceLogin(
         `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    authCode = await Promise.race([codePromise, timeoutPromise]);
+    const abortPromise = new Promise<never>((_, reject) => {
+      if (signal?.aborted) {
+        reject(new PkceLoginError("user_aborted", "PKCE login aborted"));
+        return;
+      }
+      signal?.addEventListener(
+        "abort",
+        () => reject(new PkceLoginError("user_aborted", "PKCE login aborted")),
+        { once: true },
+      );
+    });
+    authCode = await Promise.race([codePromise, timeoutPromise, abortPromise]);
   } finally {
     clearTimeout(timer);
     if (bound) server.close();

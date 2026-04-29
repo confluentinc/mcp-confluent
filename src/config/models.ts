@@ -204,6 +204,21 @@ export const KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS = [
   "sasl.password",
 ] as const;
 
+/**
+ * Requires at least one primary connectivity field (`bootstrap_servers` or `rest_endpoint`).
+ *
+ * (`cluster_id` and `env_id` are intentionally excluded: they are per-call defaults
+ * resolved at handler runtime via `getEnsuredParam`, which checks (in order) the tool
+ * argument supplied by the LLM, then the env var, then throws. Either field can be
+ * omitted from config and supplied at call time, so partial presence is valid.)
+ */
+function kafkaBlockHasConnectivity(k: {
+  bootstrap_servers?: string;
+  rest_endpoint?: string;
+}): boolean {
+  return k.bootstrap_servers !== undefined || k.rest_endpoint !== undefined;
+}
+
 const apiKeyAuthSchema = z
   .object({
     type: z.literal("api_key"),
@@ -280,17 +295,10 @@ const directConnectionSchema = z
           .optional(),
       })
       .strict()
-      .refine(
-        (k) =>
-          k.bootstrap_servers !== undefined ||
-          k.rest_endpoint !== undefined ||
-          k.cluster_id !== undefined ||
-          k.env_id !== undefined,
-        {
-          message:
-            "kafka block must contain at least one of 'bootstrap_servers', 'rest_endpoint', 'cluster_id', or 'env_id'",
-        },
-      )
+      .refine(kafkaBlockHasConnectivity, {
+        message:
+          "kafka block must contain at least one of 'bootstrap_servers' or 'rest_endpoint'",
+      })
       .optional(),
     schema_registry: z
       .object({

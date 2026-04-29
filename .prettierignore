@@ -2,3 +2,6 @@ src/generated
 # Confluent Cloud API spec; keep upstream formatting so spec bumps
 # don't mix with prettier whitespace churn.
 openapi.json
+# servicebot requires single-quoted task descriptions; prettier's
+# singleQuote=false silently breaks them, so don't format this file.
+service.yml

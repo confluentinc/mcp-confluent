@@ -396,5 +396,41 @@ describe("ServerRuntime", () => {
       expect(startSpy).toHaveBeenCalledWith("devel");
       expect(runtime.oauthHolder).toBe(fakeHolder);
     });
+
+    it("should thread oauthHolder so cloud REST calls read from the CP plane getter", async () => {
+      const cpSpy = vi.fn(() => "cp-token");
+      const dpSpy = vi.fn(() => "dp-token");
+      const fakeHolder = {
+        getControlPlaneToken: cpSpy,
+        getDataPlaneToken: dpSpy,
+      } as unknown as OAuthHolder;
+      vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeHolder);
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("{}"));
+
+      const oauthConfig = new MCPServerConfiguration({
+        connections: {
+          "env-connection": connWith({
+            confluent_cloud: {
+              endpoint: "https://cp.example.com",
+              auth: { type: "api_key", key: "k", secret: "s" },
+            },
+          }),
+        },
+        ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+      });
+
+      const runtime = ServerRuntime.fromConfig(oauthConfig);
+      const cloudClient =
+        runtime.clientManagers["env-connection"]!.getConfluentCloudRestClient();
+      await cloudClient.GET("/iam/v2/api-keys");
+
+      expect(cpSpy).toHaveBeenCalled();
+      expect(dpSpy).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const request = fetchSpy.mock.calls[0]![0] as Request;
+      expect(request.headers.get("Authorization")).toBe("Bearer cp-token");
+    });
   });
 });

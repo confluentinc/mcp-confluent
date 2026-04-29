@@ -1,3 +1,4 @@
+import type { ClientManager } from "@src/confluent/client-manager.js";
 import type { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -29,7 +30,13 @@ export class StubHandler extends BaseToolHandler {
     };
   }
 
-  handle(): CallToolResult {
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  handle(
+    _clientManager: ClientManager,
+    _toolArguments: Record<string, unknown> | undefined,
+    _sessionId?: string,
+  ): CallToolResult {
+    /* eslint-enable @typescript-eslint/no-unused-vars */
     return this.createResponse("stub");
   }
 

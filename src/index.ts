@@ -262,11 +262,7 @@ async function main() {
       logger.info("Shutting down...");
       await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
-      // Wait for any in-flight OAuth bootstrap to settle before shutting the
-      // holder down, so we don't clear the holder mid-PKCE-redirect and leak
-      // state. bootstrapPromise always resolves (never rejects), so this await
-      // is safe.
-      await runtime.oauthBootstrap;
+      // shutdown() is race-safe with an in-flight bootstrap.
       runtime.oauthHolder?.shutdown();
       await runtime.clientManager.disconnect();
       await server.close();

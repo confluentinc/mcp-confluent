@@ -239,7 +239,7 @@ describe("oauth/pkce-login.ts", () => {
       expect(httpMock.closed()).toBe(true);
     });
 
-    it("should reject with user_aborted immediately when the signal is already aborted before the race", async () => {
+    it("should reject without binding the server or opening the browser when the signal is already aborted", async () => {
       const controller = new AbortController();
       controller.abort();
 
@@ -248,7 +248,10 @@ describe("oauth/pkce-login.ts", () => {
       ).rejects.toMatchObject({
         reason: "user_aborted",
       });
-      expect(httpMock.closed()).toBe(true);
+      // Already-aborted should short-circuit before any side effects.
+      expect(openSpy).not.toHaveBeenCalled();
+      // `closed()` is false because we never bound (so there was nothing to close).
+      expect(httpMock.closed()).toBe(false);
     });
   });
 });

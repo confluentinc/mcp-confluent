@@ -92,7 +92,7 @@ export interface TableflowDirectConfig {
 }
 
 /**
- * Telemetry API connection parameters.
+ * Telemetry API connection parameters (post-transform output type).
  * Corresponds to `connections.<name>.telemetry` in the YAML configuration.
  */
 export interface TelemetryDirectConfig {
@@ -238,6 +238,21 @@ export const KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS = [
   "sasl.password",
 ] as const;
 
+/**
+ * Requires at least one primary connectivity field (`bootstrap_servers` or `rest_endpoint`).
+ *
+ * (`cluster_id` and `env_id` are intentionally excluded: they are per-call defaults
+ * resolved at handler runtime via `getEnsuredParam`, which checks (in order) the tool
+ * argument supplied by the LLM, then the env var, then throws. Either field can be
+ * omitted from config and supplied at call time, so partial presence is valid.)
+ */
+function kafkaBlockHasConnectivity(k: {
+  bootstrap_servers?: string;
+  rest_endpoint?: string;
+}): boolean {
+  return k.bootstrap_servers !== undefined || k.rest_endpoint !== undefined;
+}
+
 const apiKeyAuthSchema = z
   .object({
     type: z.literal("api_key"),
@@ -314,17 +329,10 @@ const directConnectionSchema = z
           .optional(),
       })
       .strict()
-      .refine(
-        (k) =>
-          k.bootstrap_servers !== undefined ||
-          k.rest_endpoint !== undefined ||
-          k.cluster_id !== undefined ||
-          k.env_id !== undefined,
-        {
-          message:
-            "kafka block must contain at least one of 'bootstrap_servers', 'rest_endpoint', 'cluster_id', or 'env_id'",
-        },
-      )
+      .refine(kafkaBlockHasConnectivity, {
+        message:
+          "kafka block must contain at least one of 'bootstrap_servers' or 'rest_endpoint'",
+      })
       .optional(),
     schema_registry: z
       .object({
@@ -351,6 +359,9 @@ const directConnectionSchema = z
           .trim()
           .check(z.url({ error: "telemetry.endpoint must be a valid URL" }))
           .optional(),
+        // Optional in raw input: absent auth falls back to confluent_cloud.auth in
+        // the connection-level transform, so TelemetryDirectConfig.auth is always
+        // non-null after parsing. See the transform below and TelemetryDirectConfig.
         auth: authConfigSchema.optional(),
       })
       .strict()
@@ -453,6 +464,8 @@ const connectionConfigSchema = z
     if (rawTelemetry) {
       // superRefine above guarantees auth is non-null: endpoint-only telemetry without
       // any auth fallback is rejected before this transform runs.
+      // Post-condition: resolvedTelemetry.auth is always non-null — hasTelemetry() is
+      // sufficient to gate telemetry-dependent tools; a separate auth check is redundant.
       const auth = (rawTelemetry.auth ?? ccAuth)!;
       const endpoint = rawTelemetry.endpoint ?? TELEMETRY_DEFAULT_ENDPOINT;
       resolvedTelemetry = { endpoint, auth };

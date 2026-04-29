@@ -230,9 +230,22 @@ describe("config/env-config.ts", () => {
             envWith({ KAFKA_API_KEY: "mykey", KAFKA_API_SECRET: "mysecret" }),
           ),
         ).toThrow(
-          /kafka block must contain at least one of 'bootstrap_servers', 'rest_endpoint', 'cluster_id', or 'env_id'/,
+          /kafka block must contain at least one of 'bootstrap_servers' or 'rest_endpoint'/,
         );
       });
+
+      it.each([
+        { KAFKA_CLUSTER_ID: "lkc-abc123" },
+        { KAFKA_ENV_ID: "env-xyz789" },
+        { KAFKA_CLUSTER_ID: "lkc-abc123", KAFKA_ENV_ID: "env-xyz789" },
+      ])(
+        "should throw when only kafka metadata fields are set (no bootstrap_servers or rest_endpoint): %o",
+        (overrides) => {
+          expect(() => buildConfigFromEnvAndCli(envWith(overrides))).toThrow(
+            /kafka block must contain at least one of 'bootstrap_servers' or 'rest_endpoint'/,
+          );
+        },
+      );
 
       it("should throw when SR auth is set but SCHEMA_REGISTRY_ENDPOINT is absent", () => {
         expect(() =>

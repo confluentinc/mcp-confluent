@@ -1,11 +1,7 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
   getSchemaMapping,
   resolveCatalogName,
@@ -13,8 +9,8 @@ import {
   resolveToSchemaName,
 } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
+import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { z } from "zod";
 
 const getTableInfoArguments = z.object({
@@ -54,7 +50,7 @@ const getTableInfoArguments = z.object({
     .describe("The name of the table to get info for."),
 });
 
-export class GetTableInfoHandler extends BaseToolHandler {
+export class GetTableInfoHandler extends FlinkToolHandler {
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
@@ -147,10 +143,6 @@ export class GetTableInfoHandler extends BaseToolHandler {
       inputSchema: getTableInfoArguments.shape,
       annotations: READ_ONLY,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return FLINK_REQUIRED_ENV_VARS;
   }
 
   isConfluentCloudOnly(): boolean {

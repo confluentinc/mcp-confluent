@@ -10,10 +10,12 @@ export function hasKafkaBootstrap(conn: ConnectionConfig): boolean {
   return conn.kafka?.bootstrap_servers !== undefined;
 }
 
+export function hasKafkaAuth(conn: ConnectionConfig): boolean {
+  return conn.kafka?.auth !== undefined;
+}
+
 export function hasKafkaRestWithAuth(conn: ConnectionConfig): boolean {
-  return (
-    conn.kafka?.rest_endpoint !== undefined && conn.kafka?.auth !== undefined
-  );
+  return conn.kafka?.rest_endpoint !== undefined && hasKafkaAuth(conn);
 }
 
 export function hasSchemaRegistry(conn: ConnectionConfig): boolean {

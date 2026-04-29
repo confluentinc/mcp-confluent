@@ -154,6 +154,20 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it.each([
+      { cluster_id: "lkc-abc123" },
+      { env_id: "env-xyz789" },
+      { cluster_id: "lkc-abc123", env_id: "env-xyz789" },
+    ])(
+      "should reject kafka block with no bootstrap_servers or rest_endpoint: %o",
+      (kafka) => {
+        const result = mcpConfigSchema.safeParse({
+          connections: { production: { type: "direct", kafka } },
+        });
+        expect(result.success).toBe(false);
+      },
+    );
   });
 
   describe("kafka extra_properties", () => {

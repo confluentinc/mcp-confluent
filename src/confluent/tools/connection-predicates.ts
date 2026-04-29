@@ -39,13 +39,13 @@ export function hasTableflow(conn: ConnectionConfig): boolean {
 }
 
 /**
- * True when both a confluent_cloud block and a schema_registry block are present.
- * Models Confluent Cloud catalog API support (e.g. /catalog/v1/search/...) — initially
- * a conjunction of the two constituent predicates. When the config model gains a richer
- * way to express catalog availability this predicate is the single place to tighten it.
+ * True when the schema_registry block is present and carries api_key auth.
+ * That combination is the reliable signal that the SR is CCloud-hosted and therefore
+ * exposes the /catalog/v1/ endpoints. A vanilla CP SR has no auth block, so it returns
+ * false even when a schema_registry block is present.
  */
 export function hasCCloudCatalogSupport(conn: ConnectionConfig): boolean {
-  return hasConfluentCloud(conn) && hasSchemaRegistry(conn);
+  return conn.schema_registry?.auth?.type === "api_key";
 }
 
 export function connectionIdsWhere(

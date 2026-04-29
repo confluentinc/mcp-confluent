@@ -60,13 +60,10 @@ const TABLEFLOW_CONN = conn({
   tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
 });
 
-const CCLOUD_WITH_SR_CONN = conn({
-  confluent_cloud: {
-    endpoint: "https://api.confluent.cloud",
-    auth: { type: "api_key", key: "k", secret: "s" },
-  },
+const CCLOUD_SR_CONN = conn({
   schema_registry: {
     endpoint: "https://psrc-abc.us-east-1.aws.confluent.cloud",
+    auth: { type: "api_key", key: "k", secret: "s" },
   },
 });
 
@@ -168,16 +165,16 @@ describe("connection-predicates.ts", () => {
   });
 
   describe("hasCCloudCatalogSupport()", () => {
-    it("should return true when both confluent_cloud and schema_registry blocks are present", () => {
-      expect(hasCCloudCatalogSupport(CCLOUD_WITH_SR_CONN)).toBe(true);
+    it("should return true when schema_registry has api_key auth", () => {
+      expect(hasCCloudCatalogSupport(CCLOUD_SR_CONN)).toBe(true);
     });
 
-    it("should return false when only the confluent_cloud block is present", () => {
-      expect(hasCCloudCatalogSupport(CONFLUENT_CLOUD_CONN)).toBe(false);
-    });
-
-    it("should return false when only the schema_registry block is present", () => {
+    it("should return false when schema_registry has no auth", () => {
       expect(hasCCloudCatalogSupport(SCHEMA_REGISTRY_CONN)).toBe(false);
+    });
+
+    it("should return false when the confluent_cloud block is present but schema_registry is absent", () => {
+      expect(hasCCloudCatalogSupport(CONFLUENT_CLOUD_CONN)).toBe(false);
     });
 
     it("should return false when neither block is present", () => {

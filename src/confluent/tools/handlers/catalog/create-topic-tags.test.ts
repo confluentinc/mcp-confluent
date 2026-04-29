@@ -1,8 +1,8 @@
 import { CreateTopicTagsHandler } from "@src/confluent/tools/handlers/catalog/create-topic-tags.js";
 import {
   bareRuntime,
+  ccloudSchemaRegistryRuntime,
   confluentCloudRuntime,
-  confluentCloudWithSchemaRegistryRuntime,
   DEFAULT_CONNECTION_ID,
   schemaRegistryRuntime,
 } from "@tests/factories/runtime.js";
@@ -13,11 +13,9 @@ describe("create-topic-tags.ts", () => {
     const handler = new CreateTopicTagsHandler();
 
     describe("enabledConnectionIds()", () => {
-      it("should return the connection ID when both confluent_cloud and schema_registry blocks are present", () => {
+      it("should return the connection ID when schema_registry has api_key auth", () => {
         expect(
-          handler.enabledConnectionIds(
-            confluentCloudWithSchemaRegistryRuntime(),
-          ),
+          handler.enabledConnectionIds(ccloudSchemaRegistryRuntime()),
         ).toEqual([DEFAULT_CONNECTION_ID]);
       });
 

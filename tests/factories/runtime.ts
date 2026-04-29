@@ -47,15 +47,12 @@ export function confluentCloudRuntime(): ServerRuntime {
   });
 }
 
-/** Runtime with both a confluent_cloud block and a schema_registry block — the enabled case for catalog-API tools. */
-export function confluentCloudWithSchemaRegistryRuntime(): ServerRuntime {
+/** Runtime with a CCloud-hosted schema_registry (api_key auth) — the minimal enabled case for catalog-API tools. */
+export function ccloudSchemaRegistryRuntime(): ServerRuntime {
   return runtimeWith({
-    confluent_cloud: {
-      endpoint: "https://api.confluent.cloud",
-      auth: { type: "api_key", key: "k", secret: "s" },
-    },
     schema_registry: {
       endpoint: "https://psrc-abc.us-east-1.aws.confluent.cloud",
+      auth: { type: "api_key", key: "k", secret: "s" },
     },
   });
 }

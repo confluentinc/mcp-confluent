@@ -1,31 +1,5 @@
-import type { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  type ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
-import type { ServerRuntime } from "@src/server-runtime.js";
+import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
-
-class StubHandler extends BaseToolHandler {
-  getToolConfig(): ToolConfig {
-    return {
-      name: ToolName.LIST_TOPICS,
-      description: "stub",
-      inputSchema: {},
-      annotations: READ_ONLY,
-    };
-  }
-  handle(): CallToolResult {
-    return this.createResponse("stub");
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  enabledConnectionIds(_runtime: ServerRuntime): string[] {
-    return [];
-  }
-}
 
 describe("base-tools.ts", () => {
   describe("BaseToolHandler", () => {

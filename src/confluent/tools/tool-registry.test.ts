@@ -48,25 +48,17 @@ describe("tool-registry.ts", () => {
         }
       });
 
-      it("should have no handler with getRequiredEnvVars() (deleted in issue-228)", () => {
-        for (const name of ALL_TOOL_NAMES) {
+      for (const name of ALL_TOOL_NAMES) {
+        it(`${name}: should not implement getRequiredEnvVars() (deleted in issue-228)`, () => {
           const handler = ToolHandlerRegistry.getToolHandler(name);
-          expect(
-            typeof (handler as Record<string, unknown>).getRequiredEnvVars,
-            `${name}: getRequiredEnvVars() was removed in issue-228 — delete it from this handler`,
-          ).not.toBe("function");
-        }
-      });
+          expect("getRequiredEnvVars" in handler).toBe(false);
+        });
 
-      it("should have no handler with isConfluentCloudOnly() (deleted in issue-228)", () => {
-        for (const name of ALL_TOOL_NAMES) {
+        it(`${name}: should not implement isConfluentCloudOnly() (deleted in issue-228)`, () => {
           const handler = ToolHandlerRegistry.getToolHandler(name);
-          expect(
-            typeof (handler as Record<string, unknown>).isConfluentCloudOnly,
-            `${name}: isConfluentCloudOnly() was removed in issue-228 — delete it from this handler`,
-          ).not.toBe("function");
-        }
-      });
+          expect("isConfluentCloudOnly" in handler).toBe(false);
+        });
+      }
 
       it("should use annotations that match the tool name prefix convention", () => {
         const readOnlyPrefixes = new Set([

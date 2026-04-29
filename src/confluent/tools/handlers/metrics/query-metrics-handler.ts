@@ -5,10 +5,14 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import {
+  connectionIdsWhere,
+  hasTelemetry,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, TELEMETRY_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const queryMetricsArguments = z.object({
@@ -210,8 +214,8 @@ export class QueryMetricsHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return TELEMETRY_REQUIRED_ENV_VARS;
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(runtime.config.connections, hasTelemetry);
   }
 
   isConfluentCloudOnly(): boolean {

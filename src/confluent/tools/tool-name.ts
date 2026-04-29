@@ -21,6 +21,8 @@ export enum ToolName {
   READ_CONNECTOR = "read-connector",
   CREATE_CONNECTOR = "create-connector",
   DELETE_CONNECTOR = "delete-connector",
+  LIST_CONNECTOR_METRICS = "list-connector-metrics",
+  QUERY_CONNECTOR_METRICS = "query-connector-metrics",
   SEARCH_TOPICS_BY_TAG = "search-topics-by-tag",
   SEARCH_TOPICS_BY_NAME = "search-topics-by-name",
   CREATE_TOPIC_TAGS = "create-topic-tags",

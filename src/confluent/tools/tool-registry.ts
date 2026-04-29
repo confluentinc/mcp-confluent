@@ -8,7 +8,9 @@ import { RemoveTagFromEntityHandler } from "@src/confluent/tools/handlers/catalo
 import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list-clusters-handler.js";
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
+import { ListConnectorMetricsHandler } from "@src/confluent/tools/handlers/connect/list-connector-metrics-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
+import { QueryConnectorMetricsHandler } from "@src/confluent/tools/handlers/connect/query-connector-metrics-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
@@ -76,6 +78,8 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_CONNECTORS, new ListConnectorsHandler()],
     [ToolName.READ_CONNECTOR, new ReadConnectorHandler()],
     [ToolName.CREATE_CONNECTOR, new CreateConnectorHandler()],
+    [ToolName.LIST_CONNECTOR_METRICS, new ListConnectorMetricsHandler()],
+    [ToolName.QUERY_CONNECTOR_METRICS, new QueryConnectorMetricsHandler()],
     [ToolName.SEARCH_TOPICS_BY_TAG, new SearchTopicsByTagHandler()],
     [ToolName.CREATE_TOPIC_TAGS, new CreateTopicTagsHandler()],
     [ToolName.DELETE_TAG, new DeleteTagHandler()],

@@ -317,7 +317,6 @@ Options:
   --allow-tools-file <file>        File with tool names to allow (one per line). Used only if --allow-tools is not provided. Allow-list is applied before block-list.
   --block-tools-file <file>        File with tool names to block (one per line). Used only if --block-tools is not provided. Block-list is applied after allow-list.
   --list-tools                     Print the final set of enabled tool names (with descriptions) after allow/block filtering and exit. Does not start the server.
-  --disable-confluent-cloud-tools  Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).
   --disable-auth                   Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.
   --allowed-hosts <hosts>          Comma-separated list of allowed Host header values for DNS rebinding protection.
   --generate-key                   Generate a secure API key for MCP_API_KEY and print it to stdout, then exit.

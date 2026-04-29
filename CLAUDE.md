@@ -32,7 +32,7 @@ Pre-commit hook runs `npm run format && npm run lint` automatically via Husky.
 
 `src/index.ts` → `parseCliArgs()` → `initEnv()` (Zod-validated env vars) → creates `DefaultClientManager` → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
 
-Tools are **auto-enabled/disabled** based on which environment variables are present. Each handler declares its requirements via `getRequiredEnvVars()`. Cloud-only tools can be disabled with `--disable-confluent-cloud-tools`.
+Tools are **auto-enabled/disabled** based on which service blocks are present in the connection config (YAML) or the corresponding environment variables (set directly or via a `.env` file). Each handler implements `enabledConnectionIds()` using typed predicates from `connection-predicates.ts` to declare which connections it can serve.
 
 ### Key Layers
 
@@ -60,7 +60,7 @@ Tools are **auto-enabled/disabled** based on which environment variables are pre
 
 1. Add entry to `ToolName` enum in `src/confluent/tools/tool-name.ts`.
 2. Create handler class extending `BaseToolHandler` in `src/confluent/tools/handlers/<domain>/`.
-3. Implement `getToolConfig()` (name, description, Zod input schema), `handle()`, and `getRequiredEnvVars()`.
+3. Implement `getToolConfig()` (name, description, Zod input schema), `handle()`, and `enabledConnectionIds()` (use predicates from `connection-predicates.ts`).
 4. Register the handler in the `ToolHandlerRegistry.handlers` map in `src/confluent/tools/tool-registry.ts`.
 5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `npm run generate:openapi-types`. Commit the updated `src/confluent/openapi-schema.d.ts` alongside the `openapi.json` change.
 

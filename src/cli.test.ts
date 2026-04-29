@@ -308,13 +308,6 @@ describe("cli.ts", () => {
         expect(result.listTools).toBe(true);
       });
 
-      it("should set disableConfluentCloudTools to true when --disable-confluent-cloud-tools is specified", () => {
-        const result = parseCliArgs(
-          makeArgs(["--disable-confluent-cloud-tools"]),
-        );
-        expect(result.disableConfluentCloudTools).toBe(true);
-      });
-
       it("should throw when --allow-tools-file does not exist", () => {
         resolveSpy.mockReturnValue("/abs/allow.txt");
         fsMocks.existsSync.mockReturnValue(false);
@@ -324,10 +317,9 @@ describe("cli.ts", () => {
         ).toThrow("Tool list file not found: /abs/allow.txt");
       });
 
-      it("should default listTools and disableConfluentCloudTools to false", () => {
+      it("should default listTools to false", () => {
         const result = parseCliArgs(makeArgs([]));
         expect(result.listTools).toBe(false);
-        expect(result.disableConfluentCloudTools).toBe(false);
       });
     });
 

@@ -101,8 +101,4 @@ export class ListDatabasesHandler extends FlinkToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

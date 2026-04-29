@@ -8,7 +8,8 @@ assistants. The tool surface splits into two groups:
 - **Kafka-protocol tools** that work against any Apache Kafka®-compatible cluster or Schema
   Registry (e.g., topic CRUD, producing and consuming messages, schema management).
 - **Confluent Cloud-specific tools** that wrap CCloud REST APIs (e.g., Flink, Tableflow,
-  billing), collectively disable-able via the `--disable-confluent-cloud-tools` CLI switch.
+  billing), automatically disabled when no `confluent_cloud` block is present in the connection
+  config (YAML) or when the corresponding environment variables are not set.
 
 Built with TypeScript, Node.js ≥22, and the `@modelcontextprotocol/sdk`. Ships as an npm package
 and a Docker image; supports stdio, Streamable HTTP, and (for backwards compatibility with older
@@ -26,9 +27,10 @@ At startup the server parses CLI arguments, loads and validates configuration, c
 shared client manager, builds the set of enabled tools, registers them, and starts the configured
 transports.
 
-**Tools are auto-enabled/disabled** at startup based on the available configuration: handlers
-declare which config surfaces they need, and the server only exposes the ones whose requirements
-are satisfied. Cloud-only tools can be disabled with `--disable-confluent-cloud-tools`.
+**Tools are auto-enabled/disabled** at startup based on the available configuration: each handler
+implements `enabledConnectionIds()` using typed predicates (e.g., `hasConfluentCloud`,
+`hasSchemaRegistry`) to declare which connections it can serve; the server only registers tools
+for connections that satisfy the predicate.
 
 ### Key layers
 
@@ -184,6 +186,9 @@ coverage output, etc. are already excluded via `.gitignore` and won't appear in 
 - Formatting and import ordering are owned by Prettier + `prettier-plugin-organize-imports`, which
   run in the Husky pre-commit hook. Don't comment on whitespace, quote style, or import order.
 - Focus reviews on logic, architecture, testing, and the checkpoints above.
+- We have competent CICD checks enforcing linting, typescript type checks, and running of the test
+  suite. When reviewing, do not bother considering if a change "might fail the build" — if it does,
+  it will be caught and will be fixed before merging.
 
 ## Review checklist
 

@@ -217,10 +217,6 @@ export class QueryMetricsHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasTelemetry);
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }
 
 function formatMetricsResponse(

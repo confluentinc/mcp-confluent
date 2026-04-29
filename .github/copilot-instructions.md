@@ -9,7 +9,8 @@ assistants. The tool surface splits into two groups:
   Registry (e.g., topic CRUD, producing and consuming messages, schema management).
 - **Confluent Cloud-specific tools** that wrap CCloud REST APIs (e.g., Flink, Tableflow,
   billing), enabled only when the relevant service block (`confluent_cloud:`, `flink:`,
-  `tableflow:`) is present in a connection's YAML config.
+  `tableflow:`) is present in a connection's resolved config (from YAML or, during the
+  migration, legacy env vars + CLI args).
 
 Built with TypeScript, Node.js ≥22, and the `@modelcontextprotocol/sdk`. Ships as an npm package
 and a Docker image; supports stdio, Streamable HTTP, and (for backwards compatibility with older

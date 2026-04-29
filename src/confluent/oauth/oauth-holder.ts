@@ -58,9 +58,9 @@ export class OAuthHolder {
   }
 
   private async runBootstrap(env: Auth0Environment): Promise<void> {
-    const auth0Config = getAuth0Config(env);
-    logger.info({ env }, "Starting OAuth login");
     try {
+      const auth0Config = getAuth0Config(env);
+      logger.info({ env }, "Starting OAuth login");
       const tokenChain = await runPkceLogin(auth0Config);
       // shutdown() may have fired during PKCE — discard the in-flight context.
       if (this.cleared) {

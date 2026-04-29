@@ -24,9 +24,10 @@ this codebase. Author-facing guidance (how to scaffold a tool, run the inspector
 
 ### Entry flow
 
-At startup: `parseCliArgs()` → `buildConfigFromEnvAndCli()` (resolves a single
-`MCPServerConfiguration` from either a YAML file via `-c <path>` or legacy env vars + CLI args)
-→ `ServerRuntime.fromConfig()` constructs one `DefaultClientManager` per connection → iterates
+At startup: `parseCliArgs()` → `initEnv()` → branch on whether `-c <path>` was supplied:
+`loadConfigFromYaml(path, process.env)` for the YAML path, or `buildConfigFromEnvAndCli(env, ...)`
+for the legacy env+CLI path. Both return a single `MCPServerConfiguration`. Then
+`ServerRuntime.fromConfig()` constructs one `DefaultClientManager` per connection → iterates
 `ToolName` enum to build the enabled tool set → registers tools on `McpServer` → starts transports.
 
 **Tools are auto-enabled/disabled** at startup based on which service blocks are present in each
@@ -39,8 +40,10 @@ from `src/confluent/tools/connection-predicates.ts`. An empty result disables th
 
 - **`src/config/`** — Configuration core. `models.ts` defines `MCPServerConfiguration` (a Zod
   schema with per-service connection blocks: `kafka`, `flink`, `schema_registry`,
-  `confluent_cloud`, `tableflow`, `telemetry`). `env-config.ts` exports
-  `buildConfigFromEnvAndCli()`, the single entry point that resolves config from YAML or env vars.
+  `confluent_cloud`, `tableflow`, `telemetry`). `index.ts` exposes `loadConfigFromYaml()` for
+  the `-c <path>` branch (parsing, `${VAR}` interpolation via `interpolation.ts`, and Zod
+  validation). `env-config.ts` exports `buildConfigFromEnvAndCli()` for the legacy env-var + CLI
+  path. Both return an `MCPServerConfiguration`.
 
 - **`src/confluent/tools/`** — Tool system core:
   - `tool-name.ts` — `ToolName` enum; every tool has an entry here.

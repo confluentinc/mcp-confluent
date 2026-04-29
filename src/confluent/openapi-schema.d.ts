@@ -27040,7 +27040,10 @@ export interface operations {
   };
   readConnectv1Connector: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Comma-separated list of expansions. Pass `id` to receive the connector's resource ID (e.g. `lcc-...`) alongside the standard fields. */
+        expand?: string;
+      };
       header?: never;
       path: {
         /** @description The unique name of the connector. */
@@ -27209,7 +27212,10 @@ export interface operations {
   };
   readConnectv1ConnectorStatus: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Comma-separated list of expansions. Pass `id` to receive the connector's resource ID (e.g. `lcc-...`) alongside the standard fields. */
+        expand?: string;
+      };
       header?: never;
       path: {
         /** @description The unique name of the connector. */

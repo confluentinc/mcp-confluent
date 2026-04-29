@@ -64,6 +64,7 @@ export class ReadConnectorHandler extends BaseToolHandler {
           environment_id: environment_id,
           kafka_cluster_id: kafka_cluster_id,
         },
+        query: { expand: "id" },
       },
     });
     if (error) {
@@ -72,8 +73,17 @@ export class ReadConnectorHandler extends BaseToolHandler {
         true,
       );
     }
+    // The OpenAPI schema doesn't declare the `id` field, but `?expand=id`
+    // augments the response with `{ id: { id: "lcc-...", id_type: "ID" } }`.
+    const expanded = response as
+      | (typeof response & {
+          id?: { id?: string; id_type?: string };
+        })
+      | undefined;
+    const lccId = expanded?.id?.id;
+    const detail = lccId ? { ...expanded, lccId } : expanded;
     return this.createResponse(
-      `Connector Details for ${connectorName}: ${JSON.stringify(response)}`,
+      `Connector Details for ${connectorName}: ${JSON.stringify(detail)}`,
     );
   }
   getToolConfig(): ToolConfig {

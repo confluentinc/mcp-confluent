@@ -8,6 +8,10 @@ import { RemoveTagFromEntityHandler } from "@src/confluent/tools/handlers/catalo
 import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list-clusters-handler.js";
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
+import { GetConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/get-connector-config-handler.js";
+import { GetConnectorOffsetsHandler } from "@src/confluent/tools/handlers/connect/get-connector-offsets-handler.js";
+import { GetConnectorStatusHandler } from "@src/confluent/tools/handlers/connect/get-connector-status-handler.js";
+import { GetConnectorTasksHandler } from "@src/confluent/tools/handlers/connect/get-connector-tasks-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
@@ -76,6 +80,10 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_CONNECTORS, new ListConnectorsHandler()],
     [ToolName.READ_CONNECTOR, new ReadConnectorHandler()],
     [ToolName.CREATE_CONNECTOR, new CreateConnectorHandler()],
+    [ToolName.GET_CONNECTOR_CONFIG, new GetConnectorConfigHandler()],
+    [ToolName.GET_CONNECTOR_OFFSETS, new GetConnectorOffsetsHandler()],
+    [ToolName.GET_CONNECTOR_STATUS, new GetConnectorStatusHandler()],
+    [ToolName.GET_CONNECTOR_TASKS, new GetConnectorTasksHandler()],
     [ToolName.SEARCH_TOPICS_BY_TAG, new SearchTopicsByTagHandler()],
     [ToolName.CREATE_TOPIC_TAGS, new CreateTopicTagsHandler()],
     [ToolName.DELETE_TAG, new DeleteTagHandler()],

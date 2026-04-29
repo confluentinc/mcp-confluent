@@ -38,20 +38,13 @@ blocks:
           commands:
             - npm run typecheck
 
-  - name: "Build"
+  - name: "Build & Test"
     dependencies: ["Static Analysis"]
     task:
       jobs:
-        - name: "Build"
+        - name: "Build & Test"
           commands:
             - npm run build
-
-  - name: "Test"
-    dependencies: ["Build"]
-    task:
-      jobs:
-        - name: "Test"
-          commands:
             - npm run test:coverage
       epilogue:
         always:

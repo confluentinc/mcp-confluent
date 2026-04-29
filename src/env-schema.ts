@@ -223,6 +223,13 @@ const configSchema = z
       .describe("Base URL for Confluent Cloud's REST API services")
       .trim()
       .url(),
+    CONFLUENT_CLOUD_ORG_ID: z
+      .string()
+      .describe(
+        "Organization identifier within Confluent Cloud. Required for tools that build CRNs (e.g. the connector logs API).",
+      )
+      .trim()
+      .min(1),
     SCHEMA_REGISTRY_ENDPOINT: z
       .string()
       .describe(

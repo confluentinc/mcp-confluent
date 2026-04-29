@@ -10,6 +10,7 @@ import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/cr
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
 import { GetConnectorErrorRecommendationsHandler } from "@src/confluent/tools/handlers/connect/get-connector-error-recommendations-handler.js";
 import { GetConnectorErrorSummaryHandler } from "@src/confluent/tools/handlers/connect/get-connector-error-summary-handler.js";
+import { GetConnectorLogsHandler } from "@src/confluent/tools/handlers/connect/get-connector-logs-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
@@ -86,6 +87,7 @@ export class ToolHandlerRegistry {
       ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
       new GetConnectorErrorRecommendationsHandler(),
     ],
+    [ToolName.GET_CONNECTOR_LOGS, new GetConnectorLogsHandler()],
     [ToolName.SEARCH_TOPICS_BY_TAG, new SearchTopicsByTagHandler()],
     [ToolName.CREATE_TOPIC_TAGS, new CreateTopicTagsHandler()],
     [ToolName.DELETE_TAG, new DeleteTagHandler()],

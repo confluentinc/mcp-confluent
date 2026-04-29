@@ -23,6 +23,7 @@ export enum ToolName {
   DELETE_CONNECTOR = "delete-connector",
   GET_CONNECTOR_ERROR_SUMMARY = "get-connector-error-summary",
   GET_CONNECTOR_ERROR_RECOMMENDATIONS = "get-connector-error-recommendations",
+  GET_CONNECTOR_LOGS = "get-connector-logs",
   SEARCH_TOPICS_BY_TAG = "search-topics-by-tag",
   SEARCH_TOPICS_BY_NAME = "search-topics-by-name",
   CREATE_TOPIC_TAGS = "create-topic-tags",

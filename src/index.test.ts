@@ -1,9 +1,5 @@
 import { nodeCrypto } from "@src/confluent/node-deps.js";
-import type {
-  ToolConfig,
-  ToolHandler,
-} from "@src/confluent/tools/base-tools.js";
-import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import {
@@ -12,6 +8,7 @@ import {
   outputToolList,
 } from "@src/index.js";
 import { runtimeWith } from "@tests/factories/runtime.js";
+import { StubHandler } from "@tests/stubs/index.js";
 import {
   beforeEach,
   describe,
@@ -20,20 +17,6 @@ import {
   type MockInstance,
   vi,
 } from "vitest";
-
-function fakeHandler(enabled: boolean = true): ToolHandler {
-  return {
-    enabledConnectionIds: (runtime) =>
-      enabled ? Object.keys(runtime.config.connections) : [],
-    getToolConfig: () => ({
-      name: ToolName.LIST_TOPICS,
-      description: "test handler",
-      inputSchema: {},
-      annotations: READ_ONLY,
-    }),
-    handle: vi.fn() as unknown as ToolHandler["handle"],
-  };
-}
 
 describe("index.ts", () => {
   let consoleLog: MockInstance<typeof console.log>;
@@ -107,7 +90,7 @@ describe("index.ts", () => {
   describe("getToolHandlersToRegister()", () => {
     it("should include a tool when enabledConnectionIds returns connection IDs", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
-        fakeHandler(true),
+        new StubHandler(),
       );
 
       const result = getToolHandlersToRegister(
@@ -120,7 +103,7 @@ describe("index.ts", () => {
 
     it("should exclude a tool when enabledConnectionIds returns empty", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
-        fakeHandler(false),
+        new StubHandler({ enabled: false }),
       );
 
       expect(() =>
@@ -142,10 +125,11 @@ describe("index.ts", () => {
     });
 
     it("should throw when enabledConnectionIds returns an ID not present in the config", () => {
-      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue({
-        ...fakeHandler(true),
-        enabledConnectionIds: () => ["nonexistent-connection"],
-      });
+      const handler = new StubHandler();
+      vi.spyOn(handler, "enabledConnectionIds").mockReturnValue([
+        "nonexistent-connection",
+      ]);
+      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(handler);
 
       expect(() =>
         getToolHandlersToRegister([ToolName.LIST_TOPICS], runtimeWith()),
@@ -155,8 +139,8 @@ describe("index.ts", () => {
     });
 
     it("should include only the tool whose enabledConnectionIds returns IDs when tools have mixed results", () => {
-      const listHandler = fakeHandler(true);
-      const createHandler = fakeHandler(false);
+      const listHandler = new StubHandler();
+      const createHandler = new StubHandler({ enabled: false });
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockImplementation(
         (name) => {
           if (name === ToolName.LIST_TOPICS) return listHandler;

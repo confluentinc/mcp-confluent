@@ -23,12 +23,11 @@ import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
- * Determine the subset of ToolHandlers to register based on the filtered tool names,
- * cloud tool settings, and environment variables
+ * Determine the subset of ToolHandlers to register based on the filtered tool names
+ * and which connections satisfy each tool's service requirements.
  **/
 export function getToolHandlersToRegister(
   filteredToolNames: ToolName[],
-  disableConfluentCloudTools: boolean,
   runtime: ServerRuntime,
 ): Map<ToolName, ToolHandler> {
   const toolHandlers = new Map<ToolName, ToolHandler>();
@@ -42,14 +41,6 @@ export function getToolHandlersToRegister(
     }
 
     const handler = ToolHandlerRegistry.getToolHandler(toolName);
-
-    // Skip cloud-only tools if disabled by CLI/env
-    if (disableConfluentCloudTools && handler.isConfluentCloudOnly()) {
-      logger.warn(
-        `Tool ${toolName} disabled due to --disable-confluent-cloud-tools flag or DISABLE_CONFLUENT_CLOUD_TOOLS env var`,
-      );
-      return;
-    }
 
     const enabledIds = handler.enabledConnectionIds(runtime);
     const unknownIds = enabledIds.filter((id) => !knownIds.has(id));
@@ -162,7 +153,7 @@ async function main() {
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
 
-    const runtime = ServerRuntime.fromConfig(mcpConfig, env);
+    const runtime = ServerRuntime.fromConfig(mcpConfig);
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({
@@ -184,11 +175,7 @@ async function main() {
       });
     };
 
-    const toolHandlers = getToolHandlersToRegister(
-      filteredToolNames,
-      cliOptions.disableConfluentCloudTools ?? false,
-      runtime,
-    );
+    const toolHandlers = getToolHandlersToRegister(filteredToolNames, runtime);
 
     logger.info(
       { enabledTools: [...toolHandlers.keys()] },

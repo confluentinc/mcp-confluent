@@ -6,13 +6,11 @@ import type {
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
-import type { EnvVar } from "@src/env-schema.js";
 import {
   getToolHandlersToRegister,
   outputApiKey,
   outputToolList,
 } from "@src/index.js";
-import { envFactory } from "@tests/factories/env.js";
 import { runtimeWith } from "@tests/factories/runtime.js";
 import {
   beforeEach,
@@ -23,15 +21,10 @@ import {
   vi,
 } from "vitest";
 
-function fakeHandler(requiredVars: EnvVar[], isCloudOnly = false): ToolHandler {
+function fakeHandler(enabled: boolean = true): ToolHandler {
   return {
-    enabledConnectionIds: (runtime) => {
-      const missing = requiredVars.filter((v) => !runtime.env[v]);
-      return missing.length === 0
-        ? Object.keys(runtime.config.connections)
-        : [];
-    },
-    isConfluentCloudOnly: () => isCloudOnly,
+    enabledConnectionIds: (runtime) =>
+      enabled ? Object.keys(runtime.config.connections) : [],
     getToolConfig: () => ({
       name: ToolName.LIST_TOPICS,
       description: "test handler",
@@ -112,116 +105,58 @@ describe("index.ts", () => {
   });
 
   describe("getToolHandlersToRegister()", () => {
-    it("should include a tool when all its required env vars are present", () => {
+    it("should include a tool when enabledConnectionIds returns connection IDs", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
-        fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]),
+        fakeHandler(true),
       );
 
       const result = getToolHandlersToRegister(
         [ToolName.LIST_TOPICS],
-        false,
-        runtimeWith(
-          envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
-        ),
+        runtimeWith(),
       );
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
     });
 
-    it("should exclude a tool when a required env var is missing", () => {
+    it("should exclude a tool when enabledConnectionIds returns empty", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
-        fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]),
+        fakeHandler(false),
       );
 
       expect(() =>
-        getToolHandlersToRegister(
-          [ToolName.LIST_TOPICS],
-          false,
-          runtimeWith(envFactory()), // no credentials
-        ),
+        getToolHandlersToRegister([ToolName.LIST_TOPICS], runtimeWith()),
       ).toThrow("No tools enabled");
     });
 
-    it("should exclude a tool absent from filteredToolNames even when env vars are present", () => {
+    it("should exclude a tool absent from filteredToolNames", () => {
       const getToolHandler = vi.spyOn(ToolHandlerRegistry, "getToolHandler");
 
       expect(() =>
         getToolHandlersToRegister(
           [], // LIST_TOPICS not in the allowed set
-          false,
-          runtimeWith(
-            envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
-          ),
+          runtimeWith(),
         ),
       ).toThrow("No tools enabled");
 
       expect(getToolHandler).not.toHaveBeenCalled();
     });
 
-    it("should exclude a cloud-only tool when disableConfluentCloudTools is true", () => {
-      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
-        fakeHandler(
-          ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"],
-          true,
-        ),
-      );
-
-      expect(() =>
-        getToolHandlersToRegister(
-          [ToolName.LIST_TOPICS],
-          true, // cloud tools disabled
-          runtimeWith(
-            envFactory({
-              CONFLUENT_CLOUD_API_KEY: "key",
-              CONFLUENT_CLOUD_API_SECRET: "secret",
-            }),
-          ),
-        ),
-      ).toThrow("No tools enabled");
-    });
-
-    it("should include a cloud-only tool when disableConfluentCloudTools is false", () => {
-      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
-        fakeHandler(
-          ["CONFLUENT_CLOUD_API_KEY", "CONFLUENT_CLOUD_API_SECRET"],
-          true,
-        ),
-      );
-
-      const result = getToolHandlersToRegister(
-        [ToolName.LIST_TOPICS],
-        false,
-        runtimeWith(
-          envFactory({
-            CONFLUENT_CLOUD_API_KEY: "key",
-            CONFLUENT_CLOUD_API_SECRET: "secret",
-          }),
-        ),
-      );
-
-      expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
-    });
-
     it("should throw when enabledConnectionIds returns an ID not present in the config", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue({
-        ...fakeHandler([]),
+        ...fakeHandler(true),
         enabledConnectionIds: () => ["nonexistent-connection"],
       });
 
       expect(() =>
-        getToolHandlersToRegister(
-          [ToolName.LIST_TOPICS],
-          false,
-          runtimeWith(envFactory()),
-        ),
+        getToolHandlersToRegister([ToolName.LIST_TOPICS], runtimeWith()),
       ).toThrow(
         "Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
       );
     });
 
-    it("should include only the tool whose env vars are satisfied when tools have mixed satisfaction", () => {
-      const listHandler = fakeHandler(["KAFKA_API_KEY", "KAFKA_API_SECRET"]);
-      const createHandler = fakeHandler(["FLINK_API_KEY", "FLINK_API_SECRET"]);
+    it("should include only the tool whose enabledConnectionIds returns IDs when tools have mixed results", () => {
+      const listHandler = fakeHandler(true);
+      const createHandler = fakeHandler(false);
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockImplementation(
         (name) => {
           if (name === ToolName.LIST_TOPICS) return listHandler;
@@ -232,10 +167,7 @@ describe("index.ts", () => {
 
       const result = getToolHandlersToRegister(
         [ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS],
-        false,
-        runtimeWith(
-          envFactory({ KAFKA_API_KEY: "key", KAFKA_API_SECRET: "secret" }),
-        ),
+        runtimeWith(),
       );
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);

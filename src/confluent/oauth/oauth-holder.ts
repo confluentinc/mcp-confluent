@@ -27,7 +27,10 @@ export class OAuthHolder {
   readonly bootstrapPromise: Promise<void>;
 
   private constructor(env: Auth0Environment) {
-    this.bootstrapPromise = this.runBootstrap(env);
+    // Idiomatic async-init: `bootstrapPromise` is the documented completion
+    // handle (see class JSDoc). Holder is fully usable immediately after
+    // construction — every method correctly handles the bootstrapping state.
+    this.bootstrapPromise = this.runBootstrap(env); // NOSONAR(S7059)
   }
 
   /**

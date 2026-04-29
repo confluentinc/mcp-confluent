@@ -1,3 +1,4 @@
+import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { OAUTH_CALLBACK_PATH } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import {
@@ -122,6 +123,10 @@ describe("oauth/oauth-holder.ts", () => {
       const httpMock = mockHttpServer();
       const openSpy = mockOpen();
       stubFullChain(fetchSpy);
+      const startRefreshLoopSpy = vi.spyOn(
+        AuthContext.prototype,
+        "startRefreshLoop",
+      );
 
       const holder = OAuthHolder.start("devel");
       await httpMock.listening;
@@ -137,6 +142,7 @@ describe("oauth/oauth-holder.ts", () => {
       );
       await holder.bootstrapPromise;
 
+      expect(startRefreshLoopSpy).not.toHaveBeenCalled();
       expect(holder.getControlPlaneToken()).toBeUndefined();
       expect(holder.getDataPlaneToken()).toBeUndefined();
     });

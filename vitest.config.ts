@@ -1,7 +1,9 @@
 import { defineConfig } from "vitest/config";
 
-// LCOV for CI (sonarqube); text and HTML for local runs
-const coverageReporters = process.env.CI ? ["lcov"] : ["text", "html"];
+// LCOV for CI (sonarqube); text, HTML, and json-summary for local runs
+const coverageReporters = process.env.CI
+  ? ["lcov"]
+  : ["text", "html", "json-summary"];
 
 export default defineConfig({
   resolve: {

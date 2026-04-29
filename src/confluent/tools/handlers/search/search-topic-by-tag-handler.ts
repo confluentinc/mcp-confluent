@@ -5,11 +5,12 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
-  CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS,
-  EnvVar,
-} from "@src/env-schema.js";
+  connectionIdsWhere,
+  hasSchemaRegistry,
+} from "@src/confluent/tools/connection-predicates.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -66,8 +67,8 @@ export class SearchTopicsByTagHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS;
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(runtime.config.connections, hasSchemaRegistry);
   }
 
   isConfluentCloudOnly(): boolean {

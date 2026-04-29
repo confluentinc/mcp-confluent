@@ -80,6 +80,13 @@ export function kafkaRestRuntime(): ServerRuntime {
   });
 }
 
+/** Runtime with a tableflow block. */
+export function tableflowRuntime(): ServerRuntime {
+  return runtimeWith(envFactory(), {
+    tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
+  });
+}
+
 /** Runtime with a flink block. */
 export function flinkRuntime(): ServerRuntime {
   return runtimeWith(envFactory(), {

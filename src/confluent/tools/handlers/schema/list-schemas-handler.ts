@@ -6,9 +6,13 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import {
+  connectionIdsWhere,
+  hasSchemaRegistry,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listSchemasArguments = z.object({
@@ -166,7 +170,7 @@ export class ListSchemasHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["SCHEMA_REGISTRY_ENDPOINT"];
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(runtime.config.connections, hasSchemaRegistry);
   }
 }

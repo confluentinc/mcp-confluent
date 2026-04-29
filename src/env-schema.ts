@@ -263,28 +263,3 @@ export const combinedSchema = envSchema.merge(configSchema);
 
 // Export type for environment variable names
 export type EnvVar = keyof z.infer<typeof combinedSchema>;
-
-export const TELEMETRY_REQUIRED_ENV_VARS = [
-  // Configuring the telemetry client will first look for TELEMETRY_API_KEY/SECRET, then fall back to CONFLUENT_CLOUD_API_KEY/SECRET, so
-  // the only absolute required env vars for telemetry are the Confluent Cloud API key/secret.
-  // Likewise, TELEMETRY_ENDPOINT is optional: config/models.ts defaults it to TELEMETRY_DEFAULT_ENDPOINT
-  // and can synthesize a telemetry block entirely from confluent_cloud.auth.
-
-  // The fallback behavior for the configuration of telemetry
-  // in DefaultClientManager indicates that the entire concept
-  // of BaseToolHandler.getRequiredEnvVars() is ill designed, and that tool enablement
-  // needs to be made more flexible, which should happen in conjunction with
-  // migrating configuration to primarily be YAML based, not env var based.
-
-  // For now, though, we describe the truly required env vars for telemetry as
-  // just the Confluent Cloud API key/secret, for better or worse.
-
-  "CONFLUENT_CLOUD_API_KEY",
-  "CONFLUENT_CLOUD_API_SECRET",
-] as const;
-
-export const CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS = [
-  "SCHEMA_REGISTRY_ENDPOINT",
-  "SCHEMA_REGISTRY_API_KEY",
-  "SCHEMA_REGISTRY_API_SECRET",
-] as const;

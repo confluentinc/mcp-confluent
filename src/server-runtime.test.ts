@@ -5,7 +5,6 @@ import {
   DefaultClientManager,
 } from "@src/confluent/client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { envFactory } from "@tests/factories/env.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
@@ -156,27 +155,25 @@ describe("ServerRuntime", () => {
       "test-conn": connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     },
   });
-  const env = envFactory();
 
   describe("constructor", () => {
-    it("should store config, clientManagers, and env as-is", () => {
+    it("should store config and clientManagers as-is", () => {
       const cm = createMockInstance(DefaultClientManager);
-      const runtime = new ServerRuntime(config, { "test-conn": cm }, env);
+      const runtime = new ServerRuntime(config, { "test-conn": cm });
       expect(runtime.config).toBe(config);
       expect(runtime.clientManagers).toStrictEqual({ "test-conn": cm });
-      expect(runtime.env).toBe(env);
     });
   });
 
   describe("get clientManager()", () => {
     it("should return the sole client manager", () => {
       const cm = createMockInstance(DefaultClientManager);
-      const runtime = new ServerRuntime(config, { "test-conn": cm }, env);
+      const runtime = new ServerRuntime(config, { "test-conn": cm });
       expect(runtime.clientManager).toBe(cm);
     });
 
     it("should throw when clientManagers is empty", () => {
-      const runtime = new ServerRuntime(config, {}, env);
+      const runtime = new ServerRuntime(config, {});
       expect(() => runtime.clientManager).toThrow(
         "ServerRuntime has no client managers",
       );
@@ -185,11 +182,7 @@ describe("ServerRuntime", () => {
     it("should throw when clientManagers has more than one entry", () => {
       const cm1 = createMockInstance(DefaultClientManager);
       const cm2 = createMockInstance(DefaultClientManager);
-      const runtime = new ServerRuntime(
-        config,
-        { conn1: cm1, conn2: cm2 },
-        env,
-      );
+      const runtime = new ServerRuntime(config, { conn1: cm1, conn2: cm2 });
       expect(() => runtime.clientManager).toThrow(
         "ServerRuntime has multiple client managers",
       );
@@ -209,7 +202,7 @@ describe("ServerRuntime", () => {
           }),
         },
       });
-      const runtime = ServerRuntime.fromConfig(twoConnConfig, env);
+      const runtime = ServerRuntime.fromConfig(twoConnConfig);
       expect(Object.keys(runtime.clientManagers)).toStrictEqual([
         "conn1",
         "conn2",
@@ -222,10 +215,9 @@ describe("ServerRuntime", () => {
       );
     });
 
-    it("should store the config and env on the returned runtime", () => {
-      const runtime = ServerRuntime.fromConfig(config, env);
+    it("should store the config on the returned runtime", () => {
+      const runtime = ServerRuntime.fromConfig(config);
       expect(runtime.config).toBe(config);
-      expect(runtime.env).toBe(env);
     });
   });
 });

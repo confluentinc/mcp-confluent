@@ -75,8 +75,4 @@ export class ReadTableFlowCatalogIntegrationHandler extends TableflowToolHandler
       annotations: READ_ONLY,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

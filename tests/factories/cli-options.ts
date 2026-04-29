@@ -9,7 +9,6 @@ const BASE_CLI_OPTIONS: CLIOptions = {
   allowTools: undefined,
   blockTools: undefined,
   listTools: false,
-  disableConfluentCloudTools: false,
   disableAuth: false,
   allowedHosts: undefined,
   generateKey: false,

@@ -112,8 +112,4 @@ export class CreateTableFlowTopicHandler extends TableflowToolHandler {
       annotations: CREATE_UPDATE,
     };
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

@@ -261,5 +261,24 @@ describe("ServerRuntime", () => {
       expect(bootstrapSpy).toHaveBeenCalledWith("devel");
       expect(runtime.oauthHolder).toBe(fakeHolder);
     });
+
+    it("should propagate OAuthHolder.bootstrap rejection", async () => {
+      vi.spyOn(OAuthHolder, "bootstrap").mockRejectedValue(
+        new Error("Auth0 unreachable"),
+      );
+
+      const oauthConfig = new MCPServerConfiguration({
+        connections: {
+          "env-connection": connWith({
+            kafka: { bootstrap_servers: "broker:9092" },
+          }),
+        },
+        ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+      });
+
+      await expect(ServerRuntime.fromConfig(oauthConfig, env)).rejects.toThrow(
+        "Auth0 unreachable",
+      );
+    });
   });
 });

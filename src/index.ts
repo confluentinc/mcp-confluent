@@ -260,9 +260,9 @@ async function main() {
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
-      runtime.oauthHolder?.shutdown();
       await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
+      runtime.oauthHolder?.shutdown();
       await runtime.clientManager.disconnect();
       await server.close();
       process.exit(0);

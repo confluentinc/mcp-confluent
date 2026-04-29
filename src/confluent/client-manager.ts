@@ -255,7 +255,13 @@ export class DefaultClientManager
       if (!this.confluentCloudSchemaRegistryBaseUrl) {
         throw new Error("Schema Registry endpoint not configured");
       }
-      const { apiKey, apiSecret } = config.auth.schemaRegistry;
+      const schemaRegistryAuth = config.auth.schemaRegistry;
+      if (schemaRegistryAuth.type === "oauth") {
+        throw new Error(
+          "Schema Registry OAuth authentication is not supported for SchemaRegistryClient yet. Configure SCHEMA_REGISTRY_API_KEY and SCHEMA_REGISTRY_API_SECRET instead.",
+        );
+      }
+      const { apiKey, apiSecret } = schemaRegistryAuth;
       const clientConfig: ClientConfig = {
         baseURLs: [this.confluentCloudSchemaRegistryBaseUrl],
       };

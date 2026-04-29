@@ -26,22 +26,8 @@ export class OAuthHolder {
   private state: HolderState = "bootstrapping";
   readonly bootstrapPromise: Promise<void>;
 
-  private constructor(
-    initialContextOrEnv: AuthContext | undefined | { env: Auth0Environment },
-  ) {
-    if (
-      initialContextOrEnv &&
-      typeof initialContextOrEnv === "object" &&
-      "env" in initialContextOrEnv
-    ) {
-      // start() path — kick off background bootstrap.
-      this.bootstrapPromise = this.runBootstrap(initialContextOrEnv.env);
-    } else {
-      // Legacy bootstrap() path — context is already wired up.
-      this.ctx = initialContextOrEnv as AuthContext | undefined;
-      this.state = this.ctx ? "ready" : "cleared";
-      this.bootstrapPromise = Promise.resolve();
-    }
+  private constructor(env: Auth0Environment) {
+    this.bootstrapPromise = this.runBootstrap(env);
   }
 
   /**
@@ -50,29 +36,7 @@ export class OAuthHolder {
    * {@link bootstrapPromise} settles. Shutdown is safe at any point.
    */
   static start(env: Auth0Environment): OAuthHolder {
-    return new OAuthHolder({ env });
-  }
-
-  /**
-   * Run PKCE login interactively, build the first {@link AuthContext},
-   * start its refresh loop, and return a holder wrapping it.
-   *
-   * @deprecated Use {@link OAuthHolder.start} for non-blocking bootstrap. This
-   * factory is retained only for the interim until call sites migrate; it
-   * will be removed in the same PR.
-   */
-  static async bootstrap(env: Auth0Environment): Promise<OAuthHolder> {
-    const auth0Config = getAuth0Config(env);
-    logger.info({ env }, "Starting OAuth login");
-    const tokenChain = await runPkceLogin(auth0Config);
-    const tokens: ConfluentTokenSet = {
-      ...tokenChain,
-      accessToken: generateOpaqueToken(),
-    };
-    const ctx = AuthContext.fromTokens(auth0Config, tokens);
-    ctx.startRefreshLoop(DEFAULT_REFRESH_INTERVAL_MS);
-    logger.info({ env }, "OAuth login successful");
-    return new OAuthHolder(ctx);
+    return new OAuthHolder(env);
   }
 
   /** Live control-plane bearer token; `undefined` while broken. */

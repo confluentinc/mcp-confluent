@@ -8,8 +8,9 @@ assistants. The tool surface splits into two groups:
 - **Kafka-protocol tools** that work against any Apache Kafka®-compatible cluster or Schema
   Registry (e.g., topic CRUD, producing and consuming messages, schema management).
 - **Confluent Cloud-specific tools** that wrap CCloud REST APIs (e.g., Flink, Tableflow,
-  billing), automatically disabled when no `confluent_cloud` block is present in the connection
-  config (YAML) or when the corresponding environment variables are not set.
+  billing), enabled only when the relevant service block (`confluent_cloud:`, `flink:`,
+  `tableflow:`) is present in a connection's resolved config (from YAML or, during the
+  migration, legacy env vars + CLI args).
 
 Built with TypeScript, Node.js ≥22, and the `@modelcontextprotocol/sdk`. Ships as an npm package
 and a Docker image; supports stdio, Streamable HTTP, and (for backwards compatibility with older
@@ -23,24 +24,38 @@ this codebase. Author-facing guidance (how to scaffold a tool, run the inspector
 
 ### Entry flow
 
-At startup the server parses CLI arguments, loads and validates configuration, constructs the
-shared client manager, builds the set of enabled tools, registers them, and starts the configured
-transports.
+At startup: `parseCliArgs()` → `buildConfigFromEnvAndCli()` (resolves a single
+`MCPServerConfiguration` from either a YAML file via `-c <path>` or legacy env vars + CLI args)
+→ `ServerRuntime.fromConfig()` constructs one `DefaultClientManager` per connection → iterates
+`ToolName` enum to build the enabled tool set → registers tools on `McpServer` → starts transports.
 
-**Tools are auto-enabled/disabled** at startup based on the available configuration: each handler
-implements `enabledConnectionIds()` using typed predicates (e.g., `hasConfluentCloud`,
-`hasSchemaRegistry`) to declare which connections it can serve; the server only registers tools
-for connections that satisfy the predicate.
+**Tools are auto-enabled/disabled** at startup based on which service blocks are present in each
+connection's resolved config (which can come from a YAML file or, for backwards compatibility
+during the migration, from env vars + CLI args). Each handler declares its requirement via
+`enabledConnectionIds(runtime)`, which returns the ids of connections that satisfy a predicate
+from `src/confluent/tools/connection-predicates.ts`. An empty result disables the tool.
 
 ### Key layers
 
+- **`src/config/`** — Configuration core. `models.ts` defines `MCPServerConfiguration` (a Zod
+  schema with per-service connection blocks: `kafka`, `flink`, `schema_registry`,
+  `confluent_cloud`, `tableflow`, `telemetry`). `env-config.ts` exports
+  `buildConfigFromEnvAndCli()`, the single entry point that resolves config from YAML or env vars.
+
 - **`src/confluent/tools/`** — Tool system core:
   - `tool-name.ts` — `ToolName` enum; every tool has an entry here.
-  - `base-tools.ts` — `BaseToolHandler` abstract class all handlers extend.
+  - `base-tools.ts` — `BaseToolHandler` abstract class all handlers extend (directly or via a
+    domain subclass like `FlinkToolHandler` or `TableflowToolHandler`).
+  - `connection-predicates.ts` — predicate vocabulary handlers use to express enablement:
+    `hasKafka`, `hasFlink`, `hasSchemaRegistry`, `hasConfluentCloud`, `hasTableflow`,
+    `hasTelemetry`, `hasKafkaRestWithAuth`, and conjunctions like `hasCCloudCatalogSupport`.
+    `connectionIdsWhere(connections, predicate)` is the canonical way to call them.
   - `tool-registry.ts` — `ToolHandlerRegistry.handlers` maps `ToolName` → handler instance.
     Wiring must be complete here for a tool to exist.
   - `handlers/<domain>/` — organized by service (e.g., `kafka/`, `schema/`, `flink/`); new
-    handlers go under the matching domain or a new one if no fit exists.
+    handlers go under the matching domain or a new one if no fit exists. Some domains expose an
+    intermediate base class (e.g., `flink-tool-handler.ts`, `tableflow-tool-handler.ts`) that
+    implements `enabledConnectionIds()` once for the whole domain.
 
 - **`src/confluent/client-manager.ts`** — `DefaultClientManager` holds lazily-initialized Kafka
   clients (admin/producer/consumer via `@confluentinc/kafka-javascript`) and typed `openapi-fetch`
@@ -57,10 +72,6 @@ for connections that satisfy the predicate.
 
 - **`src/mcp/transports/`** — stdio, HTTP (Streamable HTTP), and SSE transports built on Fastify.
   HTTP/SSE support API-key auth and DNS rebinding protection.
-
-- **Server configuration** — loaded and schema-validated at startup into a typed object. Each
-  handler's declared configuration dependencies resolve against this object, and that resolution
-  determines which tools the server exposes.
 
 ### Path aliases and module format
 
@@ -96,14 +107,18 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
   enforcement. Pick the one that matches the tool's actual behavior, but don't treat `READ_ONLY`
   as a safety guarantee — the implementation still has to avoid mutations.
 - **Input schema** should always be provided to `getToolConfig()`. For tools with parameters,
-  use a Zod object schema's `.shape` and make sure each field has a `.describe()` call (those
-  descriptions surface to the AI assistant as parameter docs). For tools with no parameters,
-  provide an empty object (`inputSchema: {}`), not omit the field.
-- **Config dependencies** drive auto-enablement: each handler declares what configuration it
-  needs, and the server skips exposing tools whose requirements aren't satisfied. A missing
-  declaration silently breaks the tool on servers where that config isn't set — it registers,
-  then fails at call time with a confusing error. Check that declared dependencies match what the
-  handler actually reads.
+  use a Zod object schema's `.shape`. Every field must have a `.describe()` call; those
+  descriptions surface as parameter docs to the AI client and are a review blocker if missing.
+  For tools with no parameters, provide an empty object (`inputSchema: {}`), not omit the field.
+- **`enabledConnectionIds(runtime)`** drives auto-enablement. A missing or incorrect
+  implementation silently misconfigures the tool: it may register on a server that doesn't
+  support it, or be disabled on one that does. Verify two things: (1) the predicate selected from
+  `connection-predicates.ts` actually matches the service blocks the handler reads; (2) if a
+  domain subclass exists (e.g., `FlinkToolHandler`, `TableflowToolHandler`), the handler extends
+  it rather than reimplementing the same predicate. Multiple handlers in the same domain with
+  the same predicate and no shared subclass are a candidate for extracting a domain base class.
+- **New predicates** in `connection-predicates.ts` are rare. Before accepting one, verify no
+  existing predicate (or conjunction) covers the case.
 
 ### 3. Type safety
 
@@ -186,17 +201,18 @@ coverage output, etc. are already excluded via `.gitignore` and won't appear in 
 - Formatting and import ordering are owned by Prettier + `prettier-plugin-organize-imports`, which
   run in the Husky pre-commit hook. Don't comment on whitespace, quote style, or import order.
 - Focus reviews on logic, architecture, testing, and the checkpoints above.
-- We have competent CICD checks enforcing linting, typescript type checks, and running of the test
-  suite. When reviewing, do not bother considering if a change "might fail the build" — if it does,
-  it will be caught and will be fixed before merging.
+- We have competent CI/CD checks enforcing linting, TypeScript type-checks, and the test suite.
+  When reviewing, do not bother flagging that a change "might fail the build"; if it does, CI
+  will catch it and the author will fix it before merge.
 
 ## Review checklist
 
 Before approving, confirm:
 
 - [ ] New tools touch all three registration points (`ToolName` enum, handler file,
-      `ToolHandlerRegistry.handlers`), and the handler's declared config dependencies reflect
-      what it actually reads.
+      `ToolHandlerRegistry.handlers`). `enabledConnectionIds()` uses the correct predicate from
+      `connection-predicates.ts` (or inherits it from a domain subclass). All input schema fields
+      have `.describe()` calls.
 - [ ] No `any` types introduced; types come from `openapi-schema.d.ts` where applicable.
 - [ ] Error paths surface actionable messages; exceptions are logged or rethrown, never swallowed.
 - [ ] New external I/O is stubbable (routed through `node-deps.ts` or typed API clients).

@@ -147,8 +147,4 @@ export class CreateConnectorHandler extends BaseToolHandler {
       (conn) => hasConfluentCloud(conn) && hasKafkaAuth(conn),
     );
   }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
 }

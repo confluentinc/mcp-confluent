@@ -3,6 +3,7 @@ import {
   constructClientManagerForConnection,
   type ClientManager,
 } from "@src/confluent/client-manager.js";
+import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 
 /**
  * Aggregate of all runtime state threaded through the server.
@@ -12,13 +13,21 @@ import {
 export class ServerRuntime {
   readonly config: MCPServerConfiguration;
   readonly clientManagers: Record<string, ClientManager>;
+  /**
+   * The active OAuth holder when the config carries a CCloud OAuth connection.
+   * Bootstrapped in {@link ServerRuntime.fromConfig} when `config.getCCloudOAuth()`
+   * returns a value; `undefined` on api_key paths.
+   */
+  readonly oauthHolder: OAuthHolder | undefined;
 
   constructor(
     config: MCPServerConfiguration,
     clientManagers: Record<string, ClientManager>,
+    oauthHolder: OAuthHolder | undefined = undefined,
   ) {
     this.config = config;
     this.clientManagers = clientManagers;
+    this.oauthHolder = oauthHolder;
   }
 
   /**
@@ -40,16 +49,22 @@ export class ServerRuntime {
     return managers[0]!;
   }
 
-  static fromConfig(config: MCPServerConfiguration): ServerRuntime {
+  static async fromConfig(
+    config: MCPServerConfiguration,
+  ): Promise<ServerRuntime> {
+    const ccloudOAuth = config.getCCloudOAuth();
+    const oauthHolder = ccloudOAuth
+      ? await OAuthHolder.bootstrap(ccloudOAuth.env)
+      : undefined;
+
     // Construct a ClientManager for each connection in the config.
     // (although currently there will only be one, see `enforceSingleConnectionOnly()`)
-
     const clientManagers = Object.fromEntries(
       Object.entries(config.connections).map(([id, conn]) => [
         id,
         constructClientManagerForConnection(conn),
       ]),
     );
-    return new ServerRuntime(config, clientManagers);
+    return new ServerRuntime(config, clientManagers, oauthHolder);
   }
 }

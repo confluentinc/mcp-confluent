@@ -418,5 +418,84 @@ describe("cli.ts", () => {
         });
       },
     );
+
+    describe("--oauth flags", () => {
+      it("should parse --oauth and --oauth-env into cliOptions", () => {
+        const result = parseCliArgs([
+          "node",
+          "mcp-confluent",
+          "--oauth",
+          "--oauth-env",
+          "devel",
+        ]);
+        expect(result.oauth).toBe(true);
+        expect(result.oauthEnv).toBe("devel");
+      });
+
+      it("should accept stag and prod for --oauth-env", () => {
+        expect(
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--oauth-env",
+            "stag",
+          ]).oauthEnv,
+        ).toBe("stag");
+        expect(
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--oauth-env",
+            "prod",
+          ]).oauthEnv,
+        ).toBe("prod");
+      });
+
+      it("should reject --oauth without --oauth-env", () => {
+        expect(() =>
+          parseCliArgs(["node", "mcp-confluent", "--oauth"]),
+        ).toThrow(/--oauth-env/);
+      });
+
+      it("should reject --oauth-env without --oauth", () => {
+        expect(() =>
+          parseCliArgs(["node", "mcp-confluent", "--oauth-env", "devel"]),
+        ).toThrow(/--oauth-env requires --oauth/);
+      });
+
+      it("should reject --oauth-env with an unknown environment", () => {
+        expect(() =>
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--oauth-env",
+            "bogus",
+          ]),
+        ).toThrow();
+      });
+
+      it("should reject --oauth combined with --config", () => {
+        expect(() =>
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--oauth-env",
+            "devel",
+            "--config",
+            "/tmp/foo.yaml",
+          ]),
+        ).toThrow(/oauth.*config|config.*oauth/i);
+      });
+
+      it("should leave oauth and oauthEnv undefined when neither flag is set", () => {
+        const result = parseCliArgs(["node", "mcp-confluent"]);
+        expect(result.oauth).toBeUndefined();
+        expect(result.oauthEnv).toBeUndefined();
+      });
+    });
   });
 });

@@ -130,6 +130,8 @@ async function main() {
         disableAuth: cliOptions.disableAuth,
         allowedHosts: cliOptions.allowedHosts,
         kafkaConfig: cliOptions.kafkaConfig,
+        oauth: cliOptions.oauth,
+        oauthEnv: cliOptions.oauthEnv,
       });
     }
 
@@ -151,7 +153,7 @@ async function main() {
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
 
-    const runtime = ServerRuntime.fromConfig(mcpConfig);
+    const runtime = await ServerRuntime.fromConfig(mcpConfig);
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({
@@ -247,6 +249,7 @@ async function main() {
       logger.info("Shutting down...");
       await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
+      runtime.oauthHolder?.shutdown();
       await runtime.clientManager.disconnect();
       await server.close();
       process.exit(0);

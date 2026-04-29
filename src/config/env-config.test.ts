@@ -230,7 +230,7 @@ describe("config/env-config.ts", () => {
             envWith({ KAFKA_API_KEY: "mykey", KAFKA_API_SECRET: "mysecret" }),
           ),
         ).toThrow(
-          /kafka block must contain at least one of 'bootstrap_servers', 'rest_endpoint', 'cluster_id', or 'env_id'/,
+          /kafka block must contain at least one of 'bootstrap_servers' or 'rest_endpoint'/,
         );
       });
 

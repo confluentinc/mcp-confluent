@@ -53,7 +53,7 @@ semaphore:
       branch: main
       pipeline_file: .semaphore/npm-audit.yml
       scheduled: true
-      at: '0 6 * * 1' # Every Monday at 06:00 UTC
+      at: '0 6 * * *' # Daily at 06:00 UTC
       parameters:
         - name: TARGET_BRANCH
           required: false

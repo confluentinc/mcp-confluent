@@ -63,7 +63,7 @@ export class ServerRuntime {
     const clientManagers = Object.fromEntries(
       Object.entries(config.connections).map(([id, conn]) => [
         id,
-        constructClientManagerForConnection(conn),
+        constructClientManagerForConnection(conn, oauthHolder),
       ]),
     );
     return new ServerRuntime(config, clientManagers, oauthHolder);

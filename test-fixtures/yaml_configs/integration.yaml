@@ -1,0 +1,23 @@
+# Single source of truth for non-secret integration test config.
+
+# Update these literals in place when resource identifiers change.
+
+# Secrets stay as `${VAR}` interpolation, sourced from `.env.integration`
+# (which `make setup-test-env` writes from Vault).
+#
+# A missing secret env var throws at YAML load time; `tests/harness/runtime.ts`
+# catches it, returns an empty runtime, and every test's
+# `enabledConnectionIds(runtime)` gate yields a clean skip with the
+# requiredConnectionPath as the reason.
+connections:
+  integration:
+    type: direct
+
+    kafka:
+      bootstrap_servers: "pkc-PLACEHOLDER.region.aws.confluent.cloud:9092"
+      rest_endpoint: "https://pkc-PLACEHOLDER.region.aws.confluent.cloud:443"
+      cluster_id: "lkc-PLACEHOLDER"
+      auth:
+        type: api_key
+        key: "${KAFKA_API_KEY}"
+        secret: "${KAFKA_API_SECRET}"

@@ -14,6 +14,7 @@ import {
   ConfluentEndpoints,
   createAuthMiddleware,
 } from "@src/confluent/middleware.js";
+import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { paths } from "@src/confluent/openapi-schema.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
 import { kafkaLogger, logger } from "@src/logger.js";
@@ -363,10 +364,61 @@ export class DefaultClientManager
 }
 
 /**
- * Constructs a {@link DefaultClientManager} from a single direct connection config.
+ * Resolves the per-surface {@link ConfluentAuth} slice for a single direct
+ * connection. When `oauthHolder` is supplied, every cloud REST surface
+ * authenticates with the `oauth` variant of `ConfluentAuth`, with a closure
+ * over the right plane's getter:
+ *
+ * | Surface                           | Plane | Closure                                    |
+ * | --------------------------------- | ----- | ------------------------------------------ |
+ * | cloud / tableflow / telemetry     | CP    | `() => oauthHolder.getControlPlaneToken()` |
+ * | flink / schemaRegistry / kafka    | DP    | `() => oauthHolder.getDataPlaneToken()`    |
+ *
+ * The closures resolve the token at request time (not at construction time)
+ * so they compose cleanly with the concurrent OAuth bootstrap from #279:
+ * requests fired before `OAuthHolder.bootstrapPromise` settles return
+ * `undefined` and the bearer middleware throws `BearerTokenUnavailableError`.
+ *
+ * When `oauthHolder` is `undefined`, every surface uses the legacy `api_key`
+ * shape derived from its connection block's `auth.key` / `auth.secret`.
+ */
+export function buildAuthConfigForConnection(
+  conn: DirectConnectionConfig,
+  oauthHolder?: OAuthHolder,
+): ClientManagerConfig["auth"] {
+  const cpGetter: (() => string | undefined) | undefined = oauthHolder
+    ? () => oauthHolder.getControlPlaneToken()
+    : undefined;
+  const dpGetter: (() => string | undefined) | undefined = oauthHolder
+    ? () => oauthHolder.getDataPlaneToken()
+    : undefined;
+
+  const surfaceAuth = (
+    apiKeyAuth: { key?: string; secret?: string } | undefined,
+    oauthGetter: (() => string | undefined) | undefined,
+  ): ConfluentAuth =>
+    oauthGetter
+      ? { type: "oauth", getToken: oauthGetter }
+      : { apiKey: apiKeyAuth?.key, apiSecret: apiKeyAuth?.secret };
+
+  return {
+    cloud: surfaceAuth(conn.confluent_cloud?.auth, cpGetter),
+    tableflow: surfaceAuth(conn.tableflow?.auth, cpGetter),
+    telemetry: surfaceAuth(conn.telemetry?.auth, cpGetter),
+    flink: surfaceAuth(conn.flink?.auth, dpGetter),
+    schemaRegistry: surfaceAuth(conn.schema_registry?.auth, dpGetter),
+    kafka: surfaceAuth(conn.kafka?.auth, dpGetter),
+  };
+}
+
+/**
+ * Constructs a {@link DefaultClientManager} from a single direct connection
+ * config. When `oauthHolder` is supplied, per-surface auth is wired via
+ * {@link buildAuthConfigForConnection}; behavior is unchanged when it isn't.
  */
 export function constructClientManagerForConnection(
   conn: DirectConnectionConfig,
+  oauthHolder?: OAuthHolder,
 ): DefaultClientManager {
   const kafkaClientConfig: GlobalConfig = {
     "client.id": "mcp-confluent",
@@ -394,31 +446,6 @@ export function constructClientManagerForConnection(
       kafka: conn.kafka?.rest_endpoint,
       telemetry: conn.telemetry?.endpoint,
     },
-    auth: {
-      cloud: {
-        apiKey: conn.confluent_cloud?.auth.key,
-        apiSecret: conn.confluent_cloud?.auth.secret,
-      },
-      tableflow: {
-        apiKey: conn.tableflow?.auth.key,
-        apiSecret: conn.tableflow?.auth.secret,
-      },
-      flink: {
-        apiKey: conn.flink?.auth.key,
-        apiSecret: conn.flink?.auth.secret,
-      },
-      schemaRegistry: {
-        apiKey: conn.schema_registry?.auth?.key,
-        apiSecret: conn.schema_registry?.auth?.secret,
-      },
-      kafka: {
-        apiKey: conn.kafka?.auth?.key,
-        apiSecret: conn.kafka?.auth?.secret,
-      },
-      telemetry: {
-        apiKey: conn.telemetry?.auth.key,
-        apiSecret: conn.telemetry?.auth.secret,
-      },
-    },
+    auth: buildAuthConfigForConnection(conn, oauthHolder),
   });
 }

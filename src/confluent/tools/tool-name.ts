@@ -49,4 +49,5 @@ export enum ToolName {
   LIST_BILLING_COSTS = "list-billing-costs",
   QUERY_METRICS = "query-metrics",
   LIST_METRICS = "list-available-metrics",
+  LIST_ORGANIZATIONS = "list-organizations",
 }

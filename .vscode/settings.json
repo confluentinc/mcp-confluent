@@ -2,10 +2,7 @@
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
-    "editor.formatOnType": false,
-    "editor.codeActionsOnSave": {
-      // "source.organizeImports": "explicit"  // disabled: strips imports mid-edit when Claude Code is writing files; ESLint handles removal at commit time
-    }
+    "editor.formatOnType": false
   },
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",

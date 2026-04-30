@@ -1,48 +1,5 @@
 import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
-
-// mirrors the kafkaClientConfig built in src/index.ts so tests connect the
-// same way the server does. we build from process.env directly rather than
-// going through env-schema so this helper can be called outside the server's
-// initEnv() lifecycle.
-function kafkaConfig(clientId: string): GlobalConfig {
-  return {
-    "bootstrap.servers": process.env.BOOTSTRAP_SERVERS!,
-    "client.id": clientId,
-    "security.protocol": "sasl_ssl",
-    "sasl.mechanisms": "PLAIN",
-    "sasl.username": process.env.KAFKA_API_KEY!,
-    "sasl.password": process.env.KAFKA_API_SECRET!,
-  };
-}
-
-// No-op logger for test-side Kafka clients. Integration tests care about the
-// server's logs (visible via stdio's inherited stderr or HTTP's stderr buffer);
-// the test-side admin/producer is just shuttling resources to Kafka and its
-// librdkafka-level telemetry would otherwise leak to the test runner's stdout
-// via KafkaJS's default console fallback.
-const silentKafkaLogger: KafkaJS.Logger = {
-  namespace: () => silentKafkaLogger,
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  debug: () => {},
-  setLogLevel: () => {},
-};
-
-/**
- * Builds a {@link KafkaJS.Kafka} client. The library accepts either rdkafka-style
- * (top-level keys like `bootstrap.servers`) or kafkajs-style (nested `kafkaJS`
- * object); we use rdkafka-style so the `kafkaJS` field only carries the logger
- * override.
- */
-function newKafkaClient(clientId: string): KafkaJS.Kafka {
-  return new KafkaJS.Kafka({
-    ...kafkaConfig(clientId),
-    // no need to pass 'brokers' here because the rdkafka-style config is already
-    // doing that via 'bootstrap.servers'
-    kafkaJS: { logger: silentKafkaLogger } as KafkaJS.KafkaConfig,
-  });
-}
+import { integrationRuntime } from "@tests/harness/runtime.js";
 
 /**
  * Connects a Kafka admin client directly (not via the MCP server) for
@@ -77,3 +34,47 @@ export function uniqueTopicName(slug: string): string {
   const random = Math.random().toString(36).slice(2, 8);
   return `int-${slug}-${Date.now()}-${random}`;
 }
+
+/**
+ * Builds a {@link KafkaJS.Kafka} client. The library accepts either rdkafka-style
+ * (top-level keys like `bootstrap.servers`) or kafkajs-style (nested `kafkaJS`
+ * object); we use rdkafka-style so the `kafkaJS` field only carries the logger
+ * override.
+ */
+function newKafkaClient(clientId: string): KafkaJS.Kafka {
+  return new KafkaJS.Kafka({
+    ...kafkaConfig(clientId),
+    kafkaJS: { logger: silentKafkaLogger } as KafkaJS.KafkaConfig,
+  });
+}
+
+// resolve from the same YAML fixture the server reads, so the test-side admin and the MCP server
+// can never disagree on which cluster they're talking to
+function kafkaConfig(clientId: string): GlobalConfig {
+  const conn = Object.values(integrationRuntime().config.connections)[0];
+  if (!conn?.kafka?.bootstrap_servers || !conn.kafka.auth) {
+    throw new Error(
+      "test-side kafka admin requires kafka.bootstrap_servers + kafka.auth in test-fixtures/yaml_configs/integration.yaml",
+    );
+  }
+  return {
+    "bootstrap.servers": conn.kafka.bootstrap_servers,
+    "client.id": clientId,
+    "security.protocol": "sasl_ssl",
+    "sasl.mechanisms": "PLAIN",
+    "sasl.username": conn.kafka.auth.key,
+    "sasl.password": conn.kafka.auth.secret,
+  };
+}
+
+// no-op logger for test-side Kafka clients: integration tests care about the
+// server's logs, and librdkafka-level telemetry would otherwise leak to the
+// runner's stdout via KafkaJS's default console fallback.
+const silentKafkaLogger: KafkaJS.Logger = {
+  namespace: () => silentKafkaLogger,
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  debug: () => {},
+  setLogLevel: () => {},
+};

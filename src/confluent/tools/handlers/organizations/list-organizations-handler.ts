@@ -16,7 +16,7 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listOrganizationsArguments = z.object({
-  page_size: z
+  pageSize: z
     .number()
     .int()
     .positive()
@@ -24,11 +24,11 @@ const listOrganizationsArguments = z.object({
     .describe(
       "Maximum organizations to return in this response. Server-side default applies if omitted.",
     ),
-  page_token: z
+  pageToken: z
     .string()
     .optional()
     .describe(
-      "Opaque pagination token from a previous response's _meta.next_page_token. Omit on first request.",
+      "Opaque pagination token from a previous response's _meta.nextPageToken. Omit on first request.",
     ),
 });
 
@@ -69,7 +69,9 @@ export class ListOrganizationsHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const args = listOrganizationsArguments.parse(toolArguments ?? {});
+    const { pageSize, pageToken } = listOrganizationsArguments.parse(
+      toolArguments ?? {},
+    );
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(
@@ -81,8 +83,8 @@ export class ListOrganizationsHandler extends BaseToolHandler {
       ].GET({
         params: {
           query: {
-            page_size: args.page_size,
-            page_token: args.page_token,
+            page_size: pageSize,
+            page_token: pageToken,
           },
         },
       });
@@ -124,11 +126,11 @@ Organization: ${org.name}
 
       const summary = `Retrieved ${organizations.length} organization${
         organizations.length === 1 ? "" : "s"
-      }${nextPageToken ? " (more pages available — pass next_page_token to fetch the next page)" : ""}:`;
+      }${nextPageToken ? " (more pages available — pass nextPageToken back as pageToken to fetch the next page)" : ""}:`;
 
       return this.createResponse(`${summary}\n${orgDetails}`, false, {
         organizations,
-        next_page_token: nextPageToken,
+        nextPageToken,
       });
     } catch (error) {
       logger.error({ error }, "Error in ListOrganizationsHandler");
@@ -145,7 +147,7 @@ Organization: ${org.name}
     return {
       name: ToolName.LIST_ORGANIZATIONS,
       description:
-        "List Confluent Cloud organizations the current credentials can see. Paginated; if the response includes a next_page_token, pass it back as page_token to fetch additional pages.",
+        "List Confluent Cloud organizations the current credentials can see. Paginated; if the response includes a nextPageToken, pass it back as pageToken to fetch additional pages.",
       inputSchema: listOrganizationsArguments.shape,
       annotations: READ_ONLY,
     };

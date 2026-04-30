@@ -1,22 +1,15 @@
 import { type DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import {
+  buildAuthConfigForConnection,
   constructClientManagerForConnection,
   DefaultClientManager,
 } from "@src/confluent/client-manager.js";
+import { ConfluentAuth } from "@src/confluent/middleware.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
-import { paths } from "@src/confluent/openapi-schema.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
-import { Client } from "openapi-fetch";
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type MockInstance,
-  vi,
-} from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 function connWith(
   fields: Omit<DirectConnectionConfig, "type">,
@@ -157,139 +150,119 @@ describe("constructClientManagerForConnection()", () => {
     );
     expect(manager["confluentCloudTelemetryBaseUrl"]).toBeUndefined();
   });
+});
 
-  describe("with oauthHolder", () => {
-    let cpSpy: ReturnType<typeof vi.fn>;
-    let dpSpy: ReturnType<typeof vi.fn>;
-    let fakeHolder: OAuthHolder;
-    let fetchSpy: MockInstance<typeof globalThis.fetch>;
+describe("buildAuthConfigForConnection()", () => {
+  // Connection fixture with every surface wired so each surface's auth slice
+  // resolves with both an api_key block (for the fallback test) and a
+  // realistic shape. Pure-function tests — no client constructed.
+  const connFull = connWith({
+    kafka: {
+      bootstrap_servers: "broker:9092",
+      rest_endpoint: "https://kafka-rest.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+    schema_registry: {
+      endpoint: "https://sr.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+    flink: {
+      endpoint: "https://flink.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+      environment_id: "env-1",
+      organization_id: "org-1",
+      compute_pool_id: "lfcp-1",
+    },
+    confluent_cloud: {
+      endpoint: "https://cp.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+    tableflow: {
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+    telemetry: {
+      endpoint: "https://telemetry.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+  });
 
-    // Connection fixture with every surface wired so each lazy REST client
-    // can be initialized for these tests. Endpoints are placeholder hosts;
-    // openapi-fetch hands the request to globalThis.fetch (which we spy on)
-    // before any network round-trip happens.
-    const connFull = connWith({
-      kafka: {
-        bootstrap_servers: "broker:9092",
-        rest_endpoint: "https://kafka-rest.example.com",
-        auth: { type: "api_key", key: "k", secret: "s" },
-      },
-      schema_registry: {
-        endpoint: "https://sr.example.com",
-        auth: { type: "api_key", key: "k", secret: "s" },
-      },
-      flink: {
-        endpoint: "https://flink.example.com",
-        auth: { type: "api_key", key: "k", secret: "s" },
-        environment_id: "env-1",
-        organization_id: "org-1",
-        compute_pool_id: "lfcp-1",
-      },
-      confluent_cloud: {
-        endpoint: "https://cp.example.com",
-        auth: { type: "api_key", key: "k", secret: "s" },
-      },
-      tableflow: {
-        auth: { type: "api_key", key: "k", secret: "s" },
-      },
-      telemetry: {
-        endpoint: "https://telemetry.example.com",
-        auth: { type: "api_key", key: "k", secret: "s" },
-      },
-    });
-
-    beforeEach(() => {
-      cpSpy = vi.fn(() => "cp-token");
-      dpSpy = vi.fn(() => "dp-token");
-      fakeHolder = {
-        getControlPlaneToken: cpSpy,
-        getDataPlaneToken: dpSpy,
-      } as unknown as OAuthHolder;
-      fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValue(new Response("{}"));
-    });
-
-    // Exercises the openapi-fetch client with an arbitrary path and returns
-    // the Request that the bearer middleware mutated before
-    // globalThis.fetch was called. Cast to `any` because the openapi-fetch
-    // typing constrains paths to keys of `paths` and we don't care which
-    // path runs — any path traverses the middleware identically.
-    async function fireRequest(
-      client: Client<paths, `${string}/${string}`>,
-    ): Promise<Request> {
-      fetchSpy.mockClear();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (client as any).GET("/test-path");
-      expect(fetchSpy).toHaveBeenCalledOnce();
-      return fetchSpy.mock.calls[0]![0] as Request;
+  // Narrows a ConfluentAuth to its oauth variant or fails the test loudly.
+  // Lets each test call .getToken() without re-narrowing in every body.
+  function expectOAuth(auth: ConfluentAuth): {
+    type: "oauth";
+    getToken: () => string | undefined;
+  } {
+    if (auth.type !== "oauth") {
+      throw new Error(`expected oauth variant, got ${JSON.stringify(auth)}`);
     }
+    return auth;
+  }
 
-    it("should attach Bearer <CP token> on the Confluent Cloud REST client", async () => {
-      const manager = constructClientManagerForConnection(connFull, fakeHolder);
-      const request = await fireRequest(manager.getConfluentCloudRestClient());
-      expect(request.headers.get("Authorization")).toBe("Bearer cp-token");
-      expect(cpSpy).toHaveBeenCalled();
-      expect(dpSpy).not.toHaveBeenCalled();
+  it("should wire the CP plane closure on cloud, tableflow, and telemetry when oauthHolder is supplied", () => {
+    const cpSpy = vi.fn(() => "cp-token");
+    const dpSpy = vi.fn(() => "dp-token");
+    const fakeHolder = {
+      getControlPlaneToken: cpSpy,
+      getDataPlaneToken: dpSpy,
+    } as unknown as OAuthHolder;
+
+    const auth = buildAuthConfigForConnection(connFull, fakeHolder);
+
+    expect(expectOAuth(auth.cloud).getToken()).toBe("cp-token");
+    expect(expectOAuth(auth.tableflow).getToken()).toBe("cp-token");
+    expect(expectOAuth(auth.telemetry).getToken()).toBe("cp-token");
+    expect(cpSpy).toHaveBeenCalledTimes(3);
+    expect(dpSpy).not.toHaveBeenCalled();
+  });
+
+  it("should wire the DP plane closure on flink, schemaRegistry, and kafka when oauthHolder is supplied", () => {
+    const cpSpy = vi.fn(() => "cp-token");
+    const dpSpy = vi.fn(() => "dp-token");
+    const fakeHolder = {
+      getControlPlaneToken: cpSpy,
+      getDataPlaneToken: dpSpy,
+    } as unknown as OAuthHolder;
+
+    const auth = buildAuthConfigForConnection(connFull, fakeHolder);
+
+    expect(expectOAuth(auth.flink).getToken()).toBe("dp-token");
+    expect(expectOAuth(auth.schemaRegistry).getToken()).toBe("dp-token");
+    expect(expectOAuth(auth.kafka).getToken()).toBe("dp-token");
+    expect(dpSpy).toHaveBeenCalledTimes(3);
+    expect(cpSpy).not.toHaveBeenCalled();
+  });
+
+  it("should fall back to api_key shape on every surface when oauthHolder is omitted", () => {
+    const auth = buildAuthConfigForConnection(connFull);
+
+    const expected = { apiKey: "k", apiSecret: "s" };
+    expect(auth.cloud).toEqual(expected);
+    expect(auth.tableflow).toEqual(expected);
+    expect(auth.telemetry).toEqual(expected);
+    expect(auth.flink).toEqual(expected);
+    expect(auth.schemaRegistry).toEqual(expected);
+    expect(auth.kafka).toEqual(expected);
+  });
+
+  it("should leave api_key fields undefined when the connection block is missing entirely", () => {
+    const sparseConn = connWith({
+      kafka: { bootstrap_servers: "broker:9092" },
     });
 
-    it("should attach Bearer <CP token> on the Tableflow REST client", async () => {
-      const manager = constructClientManagerForConnection(connFull, fakeHolder);
-      const request = await fireRequest(
-        manager.getConfluentCloudTableflowRestClient(),
-      );
-      expect(request.headers.get("Authorization")).toBe("Bearer cp-token");
-      expect(cpSpy).toHaveBeenCalled();
-      expect(dpSpy).not.toHaveBeenCalled();
-    });
+    const auth = buildAuthConfigForConnection(sparseConn);
 
-    it("should attach Bearer <CP token> on the Telemetry REST client", async () => {
-      const manager = constructClientManagerForConnection(connFull, fakeHolder);
-      const request = await fireRequest(
-        manager.getConfluentCloudTelemetryRestClient(),
-      );
-      expect(request.headers.get("Authorization")).toBe("Bearer cp-token");
-      expect(cpSpy).toHaveBeenCalled();
-      expect(dpSpy).not.toHaveBeenCalled();
+    // No confluent_cloud / tableflow / telemetry / flink / schema_registry blocks
+    // → each surface falls back to apiKey/apiSecret = undefined. The kafka
+    // block is present but has no `auth` field, so the same fallback applies.
+    expect(auth.cloud).toEqual({ apiKey: undefined, apiSecret: undefined });
+    expect(auth.tableflow).toEqual({ apiKey: undefined, apiSecret: undefined });
+    expect(auth.telemetry).toEqual({ apiKey: undefined, apiSecret: undefined });
+    expect(auth.flink).toEqual({ apiKey: undefined, apiSecret: undefined });
+    expect(auth.schemaRegistry).toEqual({
+      apiKey: undefined,
+      apiSecret: undefined,
     });
-
-    it("should attach Bearer <DP token> on the Flink REST client", async () => {
-      const manager = constructClientManagerForConnection(connFull, fakeHolder);
-      const request = await fireRequest(
-        manager.getConfluentCloudFlinkRestClient(),
-      );
-      expect(request.headers.get("Authorization")).toBe("Bearer dp-token");
-      expect(dpSpy).toHaveBeenCalled();
-      expect(cpSpy).not.toHaveBeenCalled();
-    });
-
-    it("should attach Bearer <DP token> on the Schema Registry REST client", async () => {
-      const manager = constructClientManagerForConnection(connFull, fakeHolder);
-      const request = await fireRequest(
-        manager.getConfluentCloudSchemaRegistryRestClient(),
-      );
-      expect(request.headers.get("Authorization")).toBe("Bearer dp-token");
-      expect(dpSpy).toHaveBeenCalled();
-      expect(cpSpy).not.toHaveBeenCalled();
-    });
-
-    it("should attach Bearer <DP token> on the Kafka REST client", async () => {
-      const manager = constructClientManagerForConnection(connFull, fakeHolder);
-      const request = await fireRequest(
-        manager.getConfluentCloudKafkaRestClient(),
-      );
-      expect(request.headers.get("Authorization")).toBe("Bearer dp-token");
-      expect(dpSpy).toHaveBeenCalled();
-      expect(cpSpy).not.toHaveBeenCalled();
-    });
-
-    it("should fall back to api_key Basic auth on every surface when oauthHolder is omitted", async () => {
-      const manager = constructClientManagerForConnection(connFull);
-      const request = await fireRequest(manager.getConfluentCloudRestClient());
-      expect(request.headers.get("Authorization")).toMatch(/^Basic /);
-      expect(cpSpy).not.toHaveBeenCalled();
-      expect(dpSpy).not.toHaveBeenCalled();
-    });
+    expect(auth.kafka).toEqual({ apiKey: undefined, apiSecret: undefined });
   });
 });
 
@@ -395,42 +368,6 @@ describe("ServerRuntime", () => {
 
       expect(startSpy).toHaveBeenCalledWith("devel");
       expect(runtime.oauthHolder).toBe(fakeHolder);
-    });
-
-    it("should thread oauthHolder so cloud REST calls read from the CP plane getter", async () => {
-      const cpSpy = vi.fn(() => "cp-token");
-      const dpSpy = vi.fn(() => "dp-token");
-      const fakeHolder = {
-        getControlPlaneToken: cpSpy,
-        getDataPlaneToken: dpSpy,
-      } as unknown as OAuthHolder;
-      vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeHolder);
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValue(new Response("{}"));
-
-      const oauthConfig = new MCPServerConfiguration({
-        connections: {
-          "env-connection": connWith({
-            confluent_cloud: {
-              endpoint: "https://cp.example.com",
-              auth: { type: "api_key", key: "k", secret: "s" },
-            },
-          }),
-        },
-        ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
-      });
-
-      const runtime = ServerRuntime.fromConfig(oauthConfig);
-      const cloudClient =
-        runtime.clientManagers["env-connection"]!.getConfluentCloudRestClient();
-      await cloudClient.GET("/iam/v2/api-keys");
-
-      expect(cpSpy).toHaveBeenCalled();
-      expect(dpSpy).not.toHaveBeenCalled();
-      expect(fetchSpy).toHaveBeenCalledOnce();
-      const request = fetchSpy.mock.calls[0]![0] as Request;
-      expect(request.headers.get("Authorization")).toBe("Bearer cp-token");
     });
   });
 });

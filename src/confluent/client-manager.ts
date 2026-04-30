@@ -364,23 +364,57 @@ export class DefaultClientManager
 }
 
 /**
- * Constructs a {@link DefaultClientManager} from a single direct connection config.
- *
- * When `oauthHolder` is supplied, every cloud REST surface authenticates with
- * the `oauth` variant of {@link ConfluentAuth}. The closure over the right
- * plane's getter is read at request time, so requests fired before
- * `OAuthHolder.bootstrapPromise` settles throw `BearerTokenUnavailableError`
- * via the bearer middleware. After bootstrap completes, subsequent calls
- * succeed without any state-machine choreography.
+ * Resolves the per-surface {@link ConfluentAuth} slice for a single direct
+ * connection. When `oauthHolder` is supplied, every cloud REST surface
+ * authenticates with the `oauth` variant of `ConfluentAuth`, with a closure
+ * over the right plane's getter:
  *
  * | Surface                           | Plane | Closure                                    |
  * | --------------------------------- | ----- | ------------------------------------------ |
  * | cloud / tableflow / telemetry     | CP    | `() => oauthHolder.getControlPlaneToken()` |
  * | flink / schemaRegistry / kafka    | DP    | `() => oauthHolder.getDataPlaneToken()`    |
  *
- * When `oauthHolder` is `undefined`, behavior is unchanged from before #284:
- * each surface uses Basic auth derived from its connection block's
- * `auth.key` / `auth.secret`.
+ * The closures resolve the token at request time (not at construction time)
+ * so they compose cleanly with the concurrent OAuth bootstrap from #279:
+ * requests fired before `OAuthHolder.bootstrapPromise` settles return
+ * `undefined` and the bearer middleware throws `BearerTokenUnavailableError`.
+ *
+ * When `oauthHolder` is `undefined`, every surface uses the legacy `api_key`
+ * shape derived from its connection block's `auth.key` / `auth.secret`.
+ */
+export function buildAuthConfigForConnection(
+  conn: DirectConnectionConfig,
+  oauthHolder?: OAuthHolder,
+): ClientManagerConfig["auth"] {
+  const cpGetter: (() => string | undefined) | undefined = oauthHolder
+    ? () => oauthHolder.getControlPlaneToken()
+    : undefined;
+  const dpGetter: (() => string | undefined) | undefined = oauthHolder
+    ? () => oauthHolder.getDataPlaneToken()
+    : undefined;
+
+  const surfaceAuth = (
+    apiKeyAuth: { key?: string; secret?: string } | undefined,
+    oauthGetter: (() => string | undefined) | undefined,
+  ): ConfluentAuth =>
+    oauthGetter
+      ? { type: "oauth", getToken: oauthGetter }
+      : { apiKey: apiKeyAuth?.key, apiSecret: apiKeyAuth?.secret };
+
+  return {
+    cloud: surfaceAuth(conn.confluent_cloud?.auth, cpGetter),
+    tableflow: surfaceAuth(conn.tableflow?.auth, cpGetter),
+    telemetry: surfaceAuth(conn.telemetry?.auth, cpGetter),
+    flink: surfaceAuth(conn.flink?.auth, dpGetter),
+    schemaRegistry: surfaceAuth(conn.schema_registry?.auth, dpGetter),
+    kafka: surfaceAuth(conn.kafka?.auth, dpGetter),
+  };
+}
+
+/**
+ * Constructs a {@link DefaultClientManager} from a single direct connection
+ * config. When `oauthHolder` is supplied, per-surface auth is wired via
+ * {@link buildAuthConfigForConnection}; behavior is unchanged when it isn't.
  */
 export function constructClientManagerForConnection(
   conn: DirectConnectionConfig,
@@ -402,26 +436,6 @@ export function constructClientManagerForConnection(
     ...conn.kafka?.extra_properties,
   };
 
-  // Plane getters are captured once per construction. They are `undefined`
-  // when no OAuth holder is in play, which makes `surfaceAuth` collapse to
-  // the legacy api_key shape. Closures resolve the token at request time
-  // (not at construction time) so they compose cleanly with the concurrent
-  // OAuth bootstrap from #279.
-  const cpGetter: (() => string | undefined) | undefined = oauthHolder
-    ? () => oauthHolder.getControlPlaneToken()
-    : undefined;
-  const dpGetter: (() => string | undefined) | undefined = oauthHolder
-    ? () => oauthHolder.getDataPlaneToken()
-    : undefined;
-
-  const surfaceAuth = (
-    apiKeyAuth: { key?: string; secret?: string } | undefined,
-    oauthGetter: (() => string | undefined) | undefined,
-  ): ConfluentAuth =>
-    oauthGetter
-      ? { type: "oauth", getToken: oauthGetter }
-      : { apiKey: apiKeyAuth?.key, apiSecret: apiKeyAuth?.secret };
-
   return new DefaultClientManager({
     kafka: kafkaClientConfig,
     endpoints: {
@@ -432,13 +446,6 @@ export function constructClientManagerForConnection(
       kafka: conn.kafka?.rest_endpoint,
       telemetry: conn.telemetry?.endpoint,
     },
-    auth: {
-      cloud: surfaceAuth(conn.confluent_cloud?.auth, cpGetter),
-      tableflow: surfaceAuth(conn.tableflow?.auth, cpGetter),
-      telemetry: surfaceAuth(conn.telemetry?.auth, cpGetter),
-      flink: surfaceAuth(conn.flink?.auth, dpGetter),
-      schemaRegistry: surfaceAuth(conn.schema_registry?.auth, dpGetter),
-      kafka: surfaceAuth(conn.kafka?.auth, dpGetter),
-    },
+    auth: buildAuthConfigForConnection(conn, oauthHolder),
   });
 }

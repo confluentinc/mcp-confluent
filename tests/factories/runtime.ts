@@ -111,3 +111,21 @@ export function telemetryRuntime(): ServerRuntime {
     },
   });
 }
+
+/**
+ * Runtime whose config carries a `ccloudOAuth` block (proxying the `--oauth` CLI
+ * flag). The connection is bare — no service-specific blocks — to prove that
+ * OAuth-eligibility is decided at the server level, independent of which
+ * api_key blocks happen to be present.
+ */
+export function ccloudOAuthRuntime(): ServerRuntime {
+  return new ServerRuntime(
+    new MCPServerConfiguration({
+      connections: {
+        [DEFAULT_CONNECTION_ID]: { type: "direct" },
+      },
+      ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+    }),
+    { [DEFAULT_CONNECTION_ID]: createMockInstance(DefaultClientManager) },
+  );
+}

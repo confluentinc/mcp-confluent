@@ -1,4 +1,6 @@
+import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -8,18 +10,12 @@ import { activeTransports } from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// list-topics uses the Kafka admin client, which needs bootstrap servers +
-// Kafka API creds. Skip when any is missing so a CCloud-only .env.integration
-// can still run control plane tests.
-const hasKafkaCreds = Boolean(
-  process.env.BOOTSTRAP_SERVERS &&
-    process.env.KAFKA_API_KEY &&
-    process.env.KAFKA_API_SECRET,
-);
+const handler = new ListTopicsHandler();
+const runtime = integrationRuntime();
 
 describe("list-topics-handler", { tags: [Tag.KAFKA] }, () => {
-  if (!hasKafkaCreds) {
-    it.skip("requires BOOTSTRAP_SERVERS, KAFKA_API_KEY, KAFKA_API_SECRET", () => {});
+  if (handler.enabledConnectionIds(runtime).length === 0) {
+    it.skip("requires kafka.bootstrap_servers config", () => {});
     return;
   }
 

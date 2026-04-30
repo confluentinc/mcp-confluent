@@ -1,0 +1,26 @@
+version: v1.0
+name: Docker Image Scan
+agent:
+  machine:
+    type: s1-prod-ubuntu24-04-amd64-2
+
+execution_time_limit:
+  hours: 1
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+
+blocks:
+  - name: "Docker Image Scan"
+    dependencies: []
+    task:
+      jobs:
+        - name: "Trivy Scan"
+          commands:
+            - docker build -t mcp-confluent:${SEMAPHORE_GIT_SHA:0:7} .
+            # fail the job only on CRITICAL vulnerabilities
+            - trivy image --exit-code 1 --severity CRITICAL mcp-confluent:${SEMAPHORE_GIT_SHA:0:7}
+            # report HIGH and MEDIUM vulnerabilities but don't fail the job
+            - trivy image --severity HIGH,MEDIUM mcp-confluent:${SEMAPHORE_GIT_SHA:0:7}

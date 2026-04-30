@@ -196,11 +196,7 @@ async function main() {
           const sessionId = context?.sessionId;
           const startTime = Date.now();
           try {
-            const result = await handler.handle(
-              runtime.clientManager,
-              args,
-              sessionId,
-            );
+            const result = await handler.handle(runtime, args, sessionId);
             TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
               toolName: name,
               durationMs: Date.now() - startTime,

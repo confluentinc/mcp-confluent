@@ -182,6 +182,15 @@ describe("tool-registry.ts", () => {
      * list of all getter mocks; callers use it to assert that at least one was
      * invoked when a handler resolves successfully.
      */
+    /** Classifies a thrown value into the string used for matching in ZERO_ARG_OUTCOMES. */
+    function classifyThrown(name: string, thrown: unknown): string {
+      if (thrown instanceof ZodError) return "ZodError";
+      if (thrown instanceof Error) return thrown.message;
+      throw new Error(
+        `Wacky -- ${name}: handler threw a non-Error value: ${JSON.stringify(thrown)}`,
+      );
+    }
+
     function stubClientGetters() {
       const proxy = new Proxy(() => Promise.resolve(proxy), {
         get: (_t, prop) => {
@@ -230,14 +239,23 @@ describe("tool-registry.ts", () => {
     type Resolves = { resolves: string };
     /** Handler throws: "ZodError" or error message contains `throws`. */
     type Throws = { throws: string };
-    type ZeroArgOutcome = Resolves | Throws;
+    /** Placeholder: run the smoke test to discover and replace with the real outcome. */
+    type ZeroArgOutcome = Resolves | Throws | "TODO";
+
+    // Reverse map from enum value ("list-topics") → enum key ("LIST_TOPICS"),
+    // used to generate helpful copy-paste suggestions in failure messages.
+    const TOOL_NAME_TO_KEY = Object.fromEntries(
+      Object.entries(ToolName).map(([k, v]) => [v, k]),
+    ) as Record<ToolName, string>;
 
     /**
      * What each handler produces when called with no arguments against a
      * fully-wired universal client. Use `{ resolves }` when the handler
      * completes and `{ throws }` when it raises before returning.
+     * Use `"TODO"` as a placeholder — the smoke test will run the handler
+     * and report the correct entry to paste in.
      */
-    const ZERO_ARG_OUTCOMES: Record<ToolName, ZeroArgOutcome> = {
+    const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, ZeroArgOutcome>> = {
       // Kafka
       [ToolName.LIST_TOPICS]: { resolves: "Kafka topics:" },
       [ToolName.CREATE_TOPICS]: { throws: "ZodError" },
@@ -319,6 +337,18 @@ describe("tool-registry.ts", () => {
       initEnv();
     });
 
+    // One test per tool — each missing entry is its own failure with a copy-paste fix.
+    it.each(ALL_TOOL_NAMES)(
+      "%s: should have an entry in ZERO_ARG_OUTCOMES",
+      (name) => {
+        expect(
+          name in ZERO_ARG_OUTCOMES,
+          `Add [ToolName.${TOOL_NAME_TO_KEY[name]}]: "TODO" to ZERO_ARG_OUTCOMES, ` +
+            `then run: npm test -- src/confluent/tools/tool-registry.test.ts`,
+        ).toBe(true);
+      },
+    );
+
     it.each(Object.entries(ZERO_ARG_OUTCOMES) as [ToolName, ZeroArgOutcome][])(
       "%s: handle() should not crash before reaching the ClientManager",
       async (name, outcome) => {
@@ -329,7 +359,7 @@ describe("tool-registry.ts", () => {
         const handler = ToolHandlerRegistry.getToolHandler(name);
 
         // Precondition: { resolves } must carry a real substring, not ""
-        if ("resolves" in outcome) {
+        if (typeof outcome === "object" && "resolves" in outcome) {
           expect(
             outcome.resolves,
             `${name}: resolves must be a non-empty substring, not ""`,
@@ -344,10 +374,24 @@ describe("tool-registry.ts", () => {
           thrown = err;
         }
 
+        // Placeholder sentinel: run completed — report what to replace it with
+        if (outcome === "TODO") {
+          const discovered =
+            thrown === undefined
+              ? `{ resolves: "${result!.content
+                  .map((c) => ("text" in c ? c.text : ""))
+                  .join("")
+                  .slice(0, 60)}" }`
+              : `{ throws: "${classifyThrown(name, thrown)}" }`;
+          throw new Error(
+            `${name}: outcome is TODO — replace with: ${discovered}`,
+          );
+        }
+
         if (thrown === undefined) {
           // Outcome table must declare { resolves }, not { throws }
           expect(
-            "resolves" in outcome,
+            typeof outcome === "object" && "resolves" in outcome,
             `${name}: resolved successfully but outcome specifies { throws }`,
           ).toBe(true);
 
@@ -367,30 +411,14 @@ describe("tool-registry.ts", () => {
             `${name}: resolved without error but no client getter was called`,
           ).toBe(true);
         } else {
-          // We expect specific error/message to have been thrown.
           // Outcome table must declare { throws }, not { resolves }
           expect(
-            "throws" in outcome,
+            typeof outcome === "object" && "throws" in outcome,
             `${name}: handler threw but outcome specifies { resolves }`,
           ).toBe(true);
 
-          // Classify the thrown value into a comparable string
-          let actual: string;
-          if (thrown instanceof ZodError) {
-            // We don't care about which exact ZodError it is, because
-            // that's determined by the ordering of zod refinements in the handler, which is an
-            // internal detail.
-            actual = "ZodError";
-          } else if (thrown instanceof Error) {
-            actual = thrown.message;
-          } else {
-            throw new Error(
-              `Wacky -- ${name}: handler threw a non-Error value: ${JSON.stringify(thrown)}`,
-            );
-          }
-
           expect(
-            actual,
+            classifyThrown(name, thrown),
             `${name}: unexpected error — update ZERO_ARG_OUTCOMES table with actual`,
           ).toContain((outcome as Throws).throws);
         }

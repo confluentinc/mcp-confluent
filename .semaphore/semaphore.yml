@@ -27,23 +27,14 @@ global_job_config:
       - cache store npm-cache-$(checksum package-lock.json) ~/.npm
 
 blocks:
-  - name: "Static Analysis"
-    dependencies: []
-    task:
-      jobs:
-        - name: "ESLint"
-          commands:
-            - npm run lint
-        - name: "TypeScript"
-          commands:
-            - npm run typecheck
-
   - name: "Build & Test"
-    dependencies: ["Static Analysis"]
+    dependencies: []
     task:
       jobs:
         - name: "Build & Test"
           commands:
+            - npm run lint
+            - npm run typecheck
             - npm run build
             - npm run test:coverage
       epilogue:

@@ -53,9 +53,14 @@ semaphore:
       branch: main
       pipeline_file: .semaphore/npm-audit.yml
       scheduled: true
-      at: '0 6 * * 1' # Every Monday at 06:00 UTC
+      at: '0 6 * * *' # Daily at 06:00 UTC
       parameters:
         - name: TARGET_BRANCH
           required: false
           default_value: 'main'
           description: 'The branch to audit and base the PR against. Defaults to main; override for release branches like v1.2.x.'
+    - name: scheduled-docker-image-scan
+      branch: main
+      pipeline_file: .semaphore/docker-image-scan.yml
+      scheduled: true
+      at: "0 12 * * *" # Daily at 12:00 UTC

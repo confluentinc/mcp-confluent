@@ -20,8 +20,7 @@ const listTopicArgs = z.object({
 export class ListTopicsHandler extends BaseToolHandler {
   async handle(
     clientManager: ClientManager,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    toolArguments: Record<string, unknown>,
+    _toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const topics = await (await clientManager.getAdminClient()).listTopics();
     return this.createResponse(`Kafka topics: ${topics.join(",")}`);

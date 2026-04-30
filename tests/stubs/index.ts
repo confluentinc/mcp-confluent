@@ -13,3 +13,4 @@ export {
   type MockedHttpServer,
   type MockedOpen,
 } from "./node-deps.js";
+export { StubHandler } from "./stub-handler.js";

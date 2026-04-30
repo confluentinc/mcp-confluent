@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+
+# Run typechecking and linting in parallel, and only allow the push if
+# both succeed.
+
+npm run lint &
+LINT_PID=$!
+npm run typecheck &
+TYPE_PID=$!
+
+wait $LINT_PID; EC_LINT=$?
+wait $TYPE_PID; EC_TYPE=$?
+
+# Exit with a non-zero code if either linting or typechecking failed.
+[ $EC_LINT -eq 0 ] && [ $EC_TYPE -eq 0 ]

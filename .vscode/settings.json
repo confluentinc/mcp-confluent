@@ -4,7 +4,7 @@
     "editor.formatOnSave": true,
     "editor.formatOnType": false,
     "editor.codeActionsOnSave": {
-      "source.organizeImports": "explicit"
+      // "source.organizeImports": "explicit"  // disabled: strips imports mid-edit when Claude Code is writing files; ESLint handles removal at commit time
     }
   },
   "[json]": {

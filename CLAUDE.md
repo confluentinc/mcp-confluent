@@ -72,7 +72,7 @@ Detailed conventions (handler structure, input schema rules, registration checkl
 ## Code Conventions
 
 - ESM modules (`"type": "module"` in package.json); use `.js` extensions in import paths.
-- Prettier + ESLint enforced; pre-commit hook runs both automatically via Husky.
+- Prettier + ESLint enforced; pre-commit hook runs both automatically via Husky. `eslint --fix` auto-removes unused imports via `eslint-plugin-unused-imports`, so stale imports left during a migration are cleaned up at commit time without manual intervention.
 - `noImplicitAny` is disabled in tsconfig due to OpenAPI type resolution issues.
 - REST API calls use `openapi-fetch` with typed paths from the generated schema — prefer this over raw fetch.
 

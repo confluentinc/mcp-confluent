@@ -1,5 +1,6 @@
 import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import { integrationRuntime } from "@tests/harness/runtime.js";
+import { afterAll, beforeAll } from "vitest";
 
 /**
  * Connects a Kafka admin client directly (not via the MCP server) for
@@ -25,6 +26,24 @@ export async function connectTestProducer(): Promise<KafkaJS.Producer> {
 }
 
 /**
+ * Returns the `kafka.cluster_id` value from the integration test fixture, for
+ * tests that need to address a specific Kafka cluster (e.g., REST proxy
+ * calls). Throws if the field is missing: the credential gate uses
+ * `bootstrap_servers`/`rest_endpoint` predicates and won't catch a missing
+ * `cluster_id`, so without this check the handler would silently receive
+ * `undefined` and produce a confusing downstream error.
+ */
+export function testClusterId(): string {
+  const conn = Object.values(integrationRuntime().config.connections)[0];
+  if (!conn?.kafka?.cluster_id) {
+    throw new Error(
+      "test-side cluster id requires kafka.cluster_id in test-fixtures/yaml_configs/integration.yaml",
+    );
+  }
+  return conn.kafka.cluster_id;
+}
+
+/**
  * Generates a unique topic name with an `int-` prefix so stale resources from
  * failed test runs can be distinguished from production topics during
  * cleanup. Format: `int-<slug>-<timestamp>-<random>`, matching the `e2e-`
@@ -33,6 +52,40 @@ export async function connectTestProducer(): Promise<KafkaJS.Producer> {
 export function uniqueTopicName(slug: string): string {
   const random = Math.random().toString(36).slice(2, 8);
   return `int-${slug}-${Date.now()}-${random}`;
+}
+
+/**
+ * Registers `beforeAll`/`afterAll` hooks at the calling describe scope to
+ * manage a shared {@link KafkaJS.Admin} client across the tests in that
+ * scope. Tests push topic names onto `createdTopics` as they create them;
+ * `afterAll` deletes whatever is still tracked before disconnecting.
+ *
+ * The returned `admin` is a getter (`() => KafkaJS.Admin`) because the
+ * underlying client is only assigned inside `beforeAll`, so a direct
+ * reference captured at describe-body evaluation would be `undefined` when
+ * test bodies run.
+ */
+export function withSharedAdmin(): {
+  admin: () => KafkaJS.Admin;
+  createdTopics: string[];
+} {
+  let admin: KafkaJS.Admin;
+  const createdTopics: string[] = [];
+
+  beforeAll(async () => {
+    admin = await connectTestAdmin();
+  });
+
+  afterAll(async () => {
+    if (createdTopics.length > 0) {
+      await admin.deleteTopics({ topics: createdTopics }).catch(() => {
+        // teardown-only: a cleanup failure shouldn't fail an already-asserted test
+      });
+    }
+    await admin.disconnect();
+  });
+
+  return { admin: () => admin, createdTopics };
 }
 
 /**

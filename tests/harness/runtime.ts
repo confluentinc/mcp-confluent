@@ -1,6 +1,5 @@
 import { loadConfigFromYaml } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
-import { initEnv } from "@src/env.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -39,15 +38,13 @@ export interface SpawnConfigOptions {
  * tool's `requiredConnectionPath` as the reason.
  */
 export function integrationRuntime(): ServerRuntime {
-  const env = initEnv();
   try {
     const config = loadConfigFromYaml(BASE_FIXTURE_PATH, process.env);
-    return ServerRuntime.fromConfig(config, env);
+    return ServerRuntime.fromConfig(config);
   } catch {
     return new ServerRuntime(
       new MCPServerConfiguration({ connections: {} }),
       {},
-      env,
     );
   }
 }

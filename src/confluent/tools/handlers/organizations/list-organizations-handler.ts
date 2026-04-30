@@ -15,7 +15,22 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
-const listOrganizationsArguments = z.object({});
+const listOrganizationsArguments = z.object({
+  page_size: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      "Maximum organizations to return in this response. Server-side default applies if omitted.",
+    ),
+  page_token: z
+    .string()
+    .optional()
+    .describe(
+      "Opaque pagination token from a previous response's _meta.next_page_token. Omit on first request.",
+    ),
+});
 
 /**
  * Schema for validating Confluent Cloud organization responses
@@ -29,7 +44,7 @@ export const organizationSchema = z.object({
     created_at: z.string(),
     updated_at: z.string(),
     resource_name: z.string(),
-    self: z.string().url(),
+    self: z.url(),
   }),
   display_name: z.string(),
   jit_enabled: z.boolean().optional(),
@@ -38,6 +53,11 @@ export const organizationSchema = z.object({
 export const organizationListSchema = z.object({
   api_version: z.literal("org/v2"),
   kind: z.literal("OrganizationList"),
+  metadata: z
+    .object({
+      next: z.url().optional(),
+    })
+    .optional(),
   data: z.array(organizationSchema),
 });
 
@@ -49,7 +69,7 @@ export class ListOrganizationsHandler extends BaseToolHandler {
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    listOrganizationsArguments.parse(toolArguments ?? {});
+    const args = listOrganizationsArguments.parse(toolArguments ?? {});
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(
@@ -58,7 +78,14 @@ export class ListOrganizationsHandler extends BaseToolHandler {
 
       const { data: response, error } = await pathBasedClient[
         "/org/v2/organizations"
-      ].GET({});
+      ].GET({
+        params: {
+          query: {
+            page_size: args.page_size,
+            page_token: args.page_token,
+          },
+        },
+      });
 
       if (error) {
         logger.error({ error }, "API Error");
@@ -78,6 +105,11 @@ export class ListOrganizationsHandler extends BaseToolHandler {
         updated_at: org.metadata.updated_at,
       }));
 
+      const nextPageToken = validated.metadata?.next
+        ? (new URL(validated.metadata.next).searchParams.get("page_token") ??
+          undefined)
+        : undefined;
+
       const orgDetails = organizations
         .map(
           (org) => `
@@ -90,11 +122,14 @@ Organization: ${org.name}
         )
         .join("\n");
 
-      return this.createResponse(
-        `Successfully retrieved ${organizations.length} organizations:\n${orgDetails}`,
-        false,
-        { organizations },
-      );
+      const summary = `Retrieved ${organizations.length} organization${
+        organizations.length === 1 ? "" : "s"
+      }${nextPageToken ? " (more pages available — pass next_page_token to fetch the next page)" : ""}:`;
+
+      return this.createResponse(`${summary}\n${orgDetails}`, false, {
+        organizations,
+        next_page_token: nextPageToken,
+      });
     } catch (error) {
       logger.error({ error }, "Error in ListOrganizationsHandler");
       const message = error instanceof Error ? error.message : String(error);
@@ -110,7 +145,7 @@ Organization: ${org.name}
     return {
       name: ToolName.LIST_ORGANIZATIONS,
       description:
-        "Get all Confluent Cloud organizations the current credentials have access to",
+        "List Confluent Cloud organizations the current credentials can see. Paginated; if the response includes a next_page_token, pass it back as page_token to fetch additional pages.",
       inputSchema: listOrganizationsArguments.shape,
       annotations: READ_ONLY,
     };

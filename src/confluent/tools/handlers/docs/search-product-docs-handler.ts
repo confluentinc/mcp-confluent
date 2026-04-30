@@ -36,6 +36,7 @@ const DEVELOPER_CONTENT_TYPES = [
 ] as const;
 const DESCRIPTION_MAX_LENGTH = 300;
 const USER_AGENT = "mcp-confluent/search-product-docs";
+const REQUEST_TIMEOUT_MS = 10_000;
 
 type Source =
   | "docs.confluent.io"
@@ -111,14 +112,11 @@ export class SearchProductDocsHandler extends BaseToolHandler {
       per_page: String(Math.min(50, limit * 3)),
       page: "1",
     });
-    const response = await nodeFetch.fetch(
+    const json = await fetchSourceJson<SwiftypeResponse>(
       `${SWIFTYPE_SEARCH_URL}?${params.toString()}`,
       { headers: { "user-agent": USER_AGENT, accept: "application/json" } },
+      "Swiftype",
     );
-    if (!response.ok) {
-      throw new Error(`Swiftype ${response.status} ${response.statusText}`);
-    }
-    const json = (await response.json()) as SwiftypeResponse;
     const hits = json.records?.page ?? [];
     return hits
       .map((h): NormalizedResult | null => {
@@ -139,26 +137,24 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     query: string,
     limit: number,
   ): Promise<NormalizedResult[]> {
-    const response = await nodeFetch.fetch(DEVELOPER_SEARCH_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "user-agent": USER_AGENT,
-        accept: "application/json",
+    const json = await fetchSourceJson<DeveloperProxyResponse>(
+      DEVELOPER_SEARCH_URL,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "user-agent": USER_AGENT,
+          accept: "application/json",
+        },
+        body: JSON.stringify({
+          query,
+          page: 1,
+          perPage: Math.min(50, limit * 2),
+          contentTypes: DEVELOPER_CONTENT_TYPES,
+        }),
       },
-      body: JSON.stringify({
-        query,
-        page: 1,
-        perPage: Math.min(50, limit * 2),
-        contentTypes: DEVELOPER_CONTENT_TYPES,
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(
-        `developer.confluent.io /api/search ${response.status} ${response.statusText}`,
-      );
-    }
-    const json = (await response.json()) as DeveloperProxyResponse;
+      "developer.confluent.io /api/search",
+    );
     const results: NormalizedResult[] = [];
     for (const contentType of DEVELOPER_CONTENT_TYPES) {
       const items = json[contentType]?.items ?? [];
@@ -193,14 +189,11 @@ export class SearchProductDocsHandler extends BaseToolHandler {
       query,
       per_page: String(Math.min(50, limit * 2)),
     });
-    const response = await nodeFetch.fetch(
+    const json = await fetchSourceJson<ZendeskSearchResponse>(
       `${SUPPORT_SEARCH_URL}?${params.toString()}`,
       { headers: { "user-agent": USER_AGENT, accept: "application/json" } },
+      "Zendesk",
     );
-    if (!response.ok) {
-      throw new Error(`Zendesk ${response.status} ${response.statusText}`);
-    }
-    const json = (await response.json()) as ZendeskSearchResponse;
     const hits = json.results ?? [];
     return hits
       .map((h): NormalizedResult | null => {
@@ -221,7 +214,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     return {
       name: ToolName.SEARCH_PRODUCT_DOCS,
       description:
-        "Search Confluent product documentation (docs.confluent.io, developer.confluent.io, and support.confluent.io) by keyword. Returns ranked results with title, url, and a short description. Use this first to discover relevant pages, then pass a url to get-product-doc-pages to read the full content.",
+        "Search Confluent product documentation (docs.confluent.io, developer.confluent.io, and support.confluent.io) by keyword. Returns ranked results with title, url, and a short description to help discover relevant documentation pages.",
       inputSchema: searchProductDocsArguments.shape,
       annotations: READ_ONLY,
     };
@@ -273,6 +266,34 @@ interface ZendeskSearchHit {
 
 interface ZendeskSearchResponse {
   results?: ZendeskSearchHit[];
+}
+
+/**
+ * Fetches JSON from `url`, bounded by `REQUEST_TIMEOUT_MS`. Any failure —
+ * timeout, non-2xx response, or network error — is rethrown as an Error
+ * prefixed with `label`, so the caller can tell which source failed.
+ */
+async function fetchSourceJson<T>(
+  url: string,
+  init: RequestInit,
+  label: string,
+): Promise<T> {
+  let response: Response;
+  try {
+    response = await nodeFetch.fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      throw new Error(`${label} timed out after ${REQUEST_TIMEOUT_MS}ms`);
+    }
+    throw err;
+  }
+  if (!response.ok) {
+    throw new Error(`${label} ${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as T;
 }
 
 function extractResults(

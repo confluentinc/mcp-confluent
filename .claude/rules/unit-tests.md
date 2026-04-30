@@ -144,8 +144,15 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   whose connection has the relevant service block (expect the connection id) and a bare runtime
   without that block (expect `[]`). Helper factories live in `tests/factories/runtime.ts`
   (`flinkRuntime()`, `tableflowRuntime()`, `bareRuntime()`, etc.).
-- Test `handle()` for typical and edge-case inputs.
-- Stub `ClientManager` methods with `createMockInstance(DefaultClientManager)`.
+- Test `handle()` for typical and edge-case inputs. `handle()` now receives a `ServerRuntime`
+  instead of a bare `ClientManager`. Create the mock first, configure it, then inject it into
+  `runtimeWith()` as the third argument:
+  ```typescript
+  clientManager = createMockInstance(DefaultClientManager);
+  clientManager.getSomeClient.mockResolvedValue(...);
+  const runtime = runtimeWith({ kafka: { bootstrap_servers: "..." } }, DEFAULT_CONNECTION_ID, clientManager);
+  handler.handle(runtime, args);
+  ```
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
   `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.
 

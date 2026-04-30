@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -19,9 +18,10 @@ const listTopicArgs = z.object({
 
 export class ListTopicsHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     _toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const topics = await (await clientManager.getAdminClient()).listTopics();
     return this.createResponse(`Kafka topics: ${topics.join(",")}`);
   }

@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
@@ -33,9 +32,10 @@ const getTopicConfigArguments = z.object({
  */
 export class GetTopicConfigHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { clusterId, topicName } =
       getTopicConfigArguments.parse(toolArguments);
     const kafka_cluster_id = getEnsuredParam(

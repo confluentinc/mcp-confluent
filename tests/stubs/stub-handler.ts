@@ -29,13 +29,11 @@ export class StubHandler extends BaseToolHandler {
     };
   }
 
-  /* eslint-disable @typescript-eslint/no-unused-vars */
   handle(
     _runtime: ServerRuntime,
     _toolArguments: Record<string, unknown> | undefined,
     _sessionId?: string,
   ): CallToolResult {
-    /* eslint-enable @typescript-eslint/no-unused-vars */
     return this.createResponse("stub");
   }
 

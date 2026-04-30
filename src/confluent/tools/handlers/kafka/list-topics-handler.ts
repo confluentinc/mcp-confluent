@@ -19,8 +19,7 @@ const listTopicArgs = z.object({
 export class ListTopicsHandler extends BaseToolHandler {
   async handle(
     runtime: ServerRuntime,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    toolArguments: Record<string, unknown>,
+    _toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
     const topics = await (await clientManager.getAdminClient()).listTopics();

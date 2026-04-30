@@ -24,7 +24,7 @@ npm run inspector      # launch MCP inspector for manual testing
 npm run print:schema   # print tool schemas as markdown
 ```
 
-Pre-commit hook runs `npm run format && npm run lint` automatically via Husky. Pre-push hook runs `npm run lint && npm run typecheck` across the whole repo.
+Pre-commit hook runs `npx prettier` and `npx eslint` automatically via Husky on staged files only. Pre-push hook runs `npm run lint` and `npm run typecheck` in parallel.
 
 ## Architecture
 

@@ -1,5 +1,4 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -25,7 +24,7 @@ export const DESTRUCTIVE: ToolAnnotations = {
 
 export interface ToolHandler {
   handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
     sessionId?: string,
   ): Promise<CallToolResult> | CallToolResult;
@@ -53,7 +52,7 @@ export interface ToolConfig {
 
 export abstract class BaseToolHandler implements ToolHandler {
   abstract handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
     sessionId?: string,
   ): Promise<CallToolResult> | CallToolResult;

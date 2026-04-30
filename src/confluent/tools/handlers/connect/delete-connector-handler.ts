@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
@@ -34,9 +33,10 @@ const deleteConnectorArguments = z.object({
 
 export class DeleteConnectorHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName } =
       deleteConnectorArguments.parse(toolArguments);
     const environment_id = getEnsuredParam(

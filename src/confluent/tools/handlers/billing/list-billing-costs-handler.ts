@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -76,9 +75,10 @@ type BillingCostsList = z.infer<typeof billingCostsSchema>;
 
 export class ListBillingCostsHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { startDate, endDate, pageSize, pageToken } =
       listBillingCostsArguments.parse(toolArguments);
 

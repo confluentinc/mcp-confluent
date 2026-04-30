@@ -1,10 +1,13 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
-import { nodeFetch } from "@src/confluent/node-deps.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import sinon from "sinon";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  bareRuntime,
+  DEFAULT_CONNECTION_ID,
+} from "@tests/factories/runtime.js";
+import { type MockedFetch, mockFetch } from "@tests/stubs/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 
 const SWIFTYPE_URL_PREFIX = "https://search-api.swiftype.com/";
 const DEVELOPER_URL = "https://developer.confluent.io/api/search";
@@ -36,19 +39,14 @@ describe("search-product-docs-handler.ts", () => {
   describe("SearchProductDocsHandler", () => {
     const handler = new SearchProductDocsHandler();
     const clientManager = {} as ClientManager;
-    const sandbox = sinon.createSandbox();
-    let fetchStub: sinon.SinonStub;
+    let fetchSpy: MockedFetch;
 
     beforeEach(() => {
-      fetchStub = sandbox.stub(nodeFetch, "fetch");
-    });
-
-    afterEach(() => {
-      sandbox.restore();
+      fetchSpy = mockFetch();
     });
 
     function setupAllSources(opts: SourceResponses): void {
-      fetchStub.callsFake(async (input: unknown) => {
+      fetchSpy.mockImplementation(async (input) => {
         const url = String(input);
         if (url.startsWith(SWIFTYPE_URL_PREFIX)) {
           return jsonResponse(opts.swiftype ?? {}, opts.swiftypeStatus ?? 200);
@@ -77,15 +75,11 @@ describe("search-product-docs-handler.ts", () => {
       });
     });
 
-    describe("getRequiredEnvVars()", () => {
-      it("should not require any env vars", () => {
-        expect(handler.getRequiredEnvVars()).toEqual([]);
-      });
-    });
-
-    describe("isConfluentCloudOnly()", () => {
-      it("should not be a Confluent Cloud-only tool", () => {
-        expect(handler.isConfluentCloudOnly()).toBe(false);
+    describe("enabledConnectionIds()", () => {
+      it("should return every configured connection id (no service-block requirement)", () => {
+        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([
+          DEFAULT_CONNECTION_ID,
+        ]);
       });
     });
 
@@ -147,7 +141,7 @@ describe("search-product-docs-handler.ts", () => {
         });
 
         expect(result.isError).toBeFalsy();
-        sinon.assert.callCount(fetchStub, 3);
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
         const parsed = JSON.parse(getText(result)) as {
           results: Array<{
             title: string;
@@ -308,8 +302,29 @@ describe("search-product-docs-handler.ts", () => {
         expect(parsed.warnings[0]).toMatch(/developer\.confluent\.io/);
       });
 
+      it("should record a labeled timeout warning when an upstream stalls past the request budget", async () => {
+        fetchSpy.mockImplementation(async (input) => {
+          const url = String(input);
+          if (url === DEVELOPER_URL) {
+            const err = new Error("aborted");
+            err.name = "TimeoutError";
+            throw err;
+          }
+          return jsonResponse({});
+        });
+
+        const result = await handler.handle(clientManager, { query: "x" });
+        const parsed = JSON.parse(getText(result)) as { warnings: string[] };
+
+        expect(parsed.warnings).toHaveLength(1);
+        expect(parsed.warnings[0]).toContain("developer.confluent.io");
+        expect(parsed.warnings[0]).toMatch(/timed out after \d+ms/);
+      });
+
       it("should return an error response when every source fails", async () => {
-        fetchStub.rejects(new Error("network down"));
+        fetchSpy.mockImplementation(async () => {
+          throw new Error("network down");
+        });
 
         const result = await handler.handle(clientManager, { query: "kafka" });
 
@@ -332,11 +347,11 @@ describe("search-product-docs-handler.ts", () => {
           limit: 5,
         });
 
-        const call = fetchStub
-          .getCalls()
-          .find((c) => String(c.args[0]).startsWith(SWIFTYPE_URL_PREFIX));
+        const call = fetchSpy.mock.calls.find(([input]) =>
+          String(input).startsWith(SWIFTYPE_URL_PREFIX),
+        );
         expect(call).toBeDefined();
-        const url = new URL(String(call!.args[0]));
+        const url = new URL(String(call![0]));
         expect(url.searchParams.get("q")).toBe("kafka topics");
         expect(url.searchParams.get("engine_key")).toBe("FbBthqzRNii8B32is9R2");
         // Over-fetch by 3x so host filtering still yields `limit` results.
@@ -349,11 +364,11 @@ describe("search-product-docs-handler.ts", () => {
 
         await handler.handle(clientManager, { query: "flink", limit: 4 });
 
-        const call = fetchStub
-          .getCalls()
-          .find((c) => c.args[0] === DEVELOPER_URL);
+        const call = fetchSpy.mock.calls.find(
+          ([input]) => input === DEVELOPER_URL,
+        );
         expect(call).toBeDefined();
-        const init = call!.args[1] as RequestInit;
+        const init = call![1] as RequestInit;
         expect(init.method).toBe("POST");
         const body = JSON.parse(init.body as string) as {
           query: string;
@@ -374,11 +389,11 @@ describe("search-product-docs-handler.ts", () => {
 
         await handler.handle(clientManager, { query: "ssl", limit: 6 });
 
-        const call = fetchStub
-          .getCalls()
-          .find((c) => String(c.args[0]).startsWith(SUPPORT_URL_PREFIX));
+        const call = fetchSpy.mock.calls.find(([input]) =>
+          String(input).startsWith(SUPPORT_URL_PREFIX),
+        );
         expect(call).toBeDefined();
-        const url = new URL(String(call!.args[0]));
+        const url = new URL(String(call![0]));
         expect(url.searchParams.get("query")).toBe("ssl");
         expect(url.searchParams.get("per_page")).toBe("12");
       });

@@ -7,8 +7,8 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 // Public search-only key embedded in docs.confluent.io's frontend
@@ -220,12 +220,10 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return [];
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return false;
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    // Public docs search has no service-block requirement, so it's enabled
+    // whenever the runtime has at least one connection configured.
+    return Object.keys(runtime.config.connections);
   }
 }
 

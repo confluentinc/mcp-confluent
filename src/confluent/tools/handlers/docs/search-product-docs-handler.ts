@@ -201,7 +201,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
         const source = sourceForUrl(url);
         if (source === null) return null;
         return {
-          title: typeof h.title === "string" ? h.title : url,
+          title: coerceTitle(h.title) ?? url,
           url,
           description: buildDescription(h.snippet, h.body),
           source,
@@ -214,7 +214,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     return {
       name: ToolName.SEARCH_PRODUCT_DOCS,
       description:
-        "Search Confluent product documentation (docs.confluent.io, developer.confluent.io, and support.confluent.io) by keyword. Returns ranked results with title, url, and a short description to help discover relevant documentation pages.",
+        "Search Confluent product documentation across docs.confluent.io, developer.confluent.io, and support.confluent.io. Returns ranked results with title, url, and a short description.",
       inputSchema: searchProductDocsArguments.shape,
       annotations: READ_ONLY,
     };
@@ -232,7 +232,6 @@ interface SwiftypeHit {
   url?: string;
   body?: string;
   highlight?: { body?: string };
-  _score?: number;
 }
 
 interface SwiftypeResponse {
@@ -245,7 +244,6 @@ interface DeveloperProxyItem {
   body?: string;
   description?: string;
   highlight?: { body?: string };
-  _score?: number;
 }
 
 type DeveloperProxyResponse = Partial<

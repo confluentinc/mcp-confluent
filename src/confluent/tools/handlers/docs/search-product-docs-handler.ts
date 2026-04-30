@@ -85,18 +85,18 @@ export class SearchProductDocsHandler extends BaseToolHandler {
       extractResults(supportSettled, "support.confluent.io", warnings),
     ];
 
-    const totalHits = sources.reduce((n, s) => n + s.length, 0);
-    if (totalHits === 0) {
-      const details = warnings.length > 0 ? `\n${warnings.join("\n")}` : "";
-      return this.createResponse(
-        `No results found for "${query}".${details}`,
-        warnings.length > 0,
-      );
-    }
-
     const merged = interleaveAndDedupe(sources, limit);
+    const payload: {
+      results: NormalizedResult[];
+      warnings: string[];
+      message?: string;
+    } = { results: merged, warnings };
+    if (merged.length === 0) {
+      payload.message = `No results found for "${query}".`;
+    }
     return this.createResponse(
-      JSON.stringify({ results: merged, warnings }, null, 2),
+      JSON.stringify(payload, null, 2),
+      merged.length === 0 && warnings.length > 0,
     );
   }
 

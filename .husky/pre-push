@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+npm run lint &
+PID_LINT=$!
+npm run typecheck &
+PID_TYPE=$!
+
+wait $PID_LINT; EC_LINT=$?
+wait $PID_TYPE; EC_TYPE=$?
+
+[ $EC_LINT -eq 0 ] && [ $EC_TYPE -eq 0 ]

@@ -29,7 +29,6 @@ export interface StartedServer {
 // resolve from the worktree root (vitest runs with cwd at the project root)
 const SERVER_ENTRY = resolve(process.cwd(), "dist/index.js");
 
-// ───────────── Per-transport entry points ─────────────
 // Function declarations are hoisted, so these can call the plumbing defined
 // further down without forward-reference gymnastics.
 
@@ -134,8 +133,6 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
 
   return { client, stop };
 }
-
-// ───────────── Plumbing ─────────────
 
 /**
  * Merges `process.env` with caller overrides into a `Record<string, string>`

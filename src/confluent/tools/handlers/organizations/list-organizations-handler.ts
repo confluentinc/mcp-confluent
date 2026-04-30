@@ -69,52 +69,39 @@ export class ListOrganizationsHandler extends BaseToolHandler {
         );
       }
 
-      try {
-        const validated = organizationListSchema.parse(
-          response,
-        ) as OrganizationList;
-        const organizations = validated.data.map((org) => ({
-          id: org.id,
-          name: org.display_name,
-          resource_name: org.metadata.resource_name,
-          created_at: org.metadata.created_at,
-          updated_at: org.metadata.updated_at,
-        }));
+      const validated = organizationListSchema.parse(response);
+      const organizations = validated.data.map((org) => ({
+        id: org.id,
+        name: org.display_name,
+        resource_name: org.metadata.resource_name,
+        created_at: org.metadata.created_at,
+        updated_at: org.metadata.updated_at,
+      }));
 
-        const orgDetails = organizations
-          .map(
-            (org) => `
+      const orgDetails = organizations
+        .map(
+          (org) => `
 Organization: ${org.name}
   ID: ${org.id}
   Resource Name: ${org.resource_name}
   Created At: ${org.created_at}
   Updated At: ${org.updated_at}
 `,
-          )
-          .join("\n");
+        )
+        .join("\n");
 
-        return this.createResponse(
-          `Successfully retrieved ${organizations.length} organizations:\n${orgDetails}`,
-          false,
-          { organizations },
-        );
-      } catch (validationError) {
-        logger.error(
-          { error: validationError },
-          "Organization list validation error",
-        );
-        return this.createResponse(
-          `Invalid organization list data: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
-          true,
-          { error: validationError },
-        );
-      }
+      return this.createResponse(
+        `Successfully retrieved ${organizations.length} organizations:\n${orgDetails}`,
+        false,
+        { organizations },
+      );
     } catch (error) {
       logger.error({ error }, "Error in ListOrganizationsHandler");
+      const message = error instanceof Error ? error.message : String(error);
       return this.createResponse(
-        `Failed to fetch organizations: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to fetch organizations: ${message}`,
         true,
-        { error: error instanceof Error ? error.message : String(error) },
+        { error: message },
       );
     }
   }
@@ -130,16 +117,9 @@ Organization: ${org.name}
   }
 
   /**
-   * Enabled under either auth path:
-   *   - When `runtime.config.getCCloudOAuth()` returns a config, OAuth is in
-   *     effect server-wide and every connection is OAuth-eligible regardless
-   *     of its api_key blocks. Return all connection ids.
-   *   - Otherwise, fall back to the api_key path: enabled iff a connection
-   *     carries a `confluent_cloud` block.
-   *
-   * The runtime-aware branching is inlined here intentionally. A future ticket
-   * extracts this into a `cloudCapableConnectionIds(runtime)` helper and
-   * migrates every cloud handler in one shot — this handler is the template.
+   * Server-wide OAuth (`ccloudOAuth`) makes every connection cloud-eligible
+   * regardless of its api_key blocks; absent OAuth, falls back to the
+   * `hasConfluentCloud` per-connection predicate.
    */
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     if (runtime.config.getCCloudOAuth() !== undefined) {

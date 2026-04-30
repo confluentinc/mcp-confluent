@@ -1,5 +1,8 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
-import { MCPServerConfiguration } from "@src/config/models.js";
+import {
+  CCloudOAuthConfig,
+  MCPServerConfiguration,
+} from "@src/config/models.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
@@ -11,15 +14,18 @@ export const DEFAULT_CONNECTION_ID = "default";
  * Creates a ServerRuntime with a mocked ClientManager.
  *
  * Pass `connectionConfig` to populate the connection's service blocks (kafka,
- * flink, schema_registry, etc.).
+ * flink, schema_registry, etc.). Pass `ccloudOAuth` to set the root-level
+ * OAuth config (which lives outside any individual connection).
  */
 export function runtimeWith(
   connectionConfig: Omit<DirectConnectionConfig, "type"> = {},
   connectionId = DEFAULT_CONNECTION_ID,
+  ccloudOAuth?: CCloudOAuthConfig,
 ): ServerRuntime {
   return new ServerRuntime(
     new MCPServerConfiguration({
       connections: { [connectionId]: { type: "direct", ...connectionConfig } },
+      ccloudOAuth,
     }),
     { [connectionId]: createMockInstance(DefaultClientManager) },
   );
@@ -119,13 +125,8 @@ export function telemetryRuntime(): ServerRuntime {
  * api_key blocks happen to be present.
  */
 export function ccloudOAuthRuntime(): ServerRuntime {
-  return new ServerRuntime(
-    new MCPServerConfiguration({
-      connections: {
-        [DEFAULT_CONNECTION_ID]: { type: "direct" },
-      },
-      ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
-    }),
-    { [DEFAULT_CONNECTION_ID]: createMockInstance(DefaultClientManager) },
-  );
+  return runtimeWith({}, DEFAULT_CONNECTION_ID, {
+    type: "ccloud_oauth",
+    env: "devel",
+  });
 }

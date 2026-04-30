@@ -1,17 +1,15 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
+import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
-  BaseToolHandler,
-  READ_ONLY,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+  connectionIdsWhere,
+  hasFlink,
+  hasTelemetry,
+} from "@src/confluent/tools/connection-predicates.js";
+import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  EnvVar,
-  FLINK_REQUIRED_ENV_VARS,
-  TELEMETRY_REQUIRED_ENV_VARS,
-} from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -113,7 +111,7 @@ interface DetectedIssue {
 // Long.MIN_VALUE indicates no watermark set
 const LONG_MIN_VALUE = -9223372036854776000;
 
-export class QueryProfilerHandler extends BaseToolHandler {
+export class QueryProfilerHandler extends FlinkToolHandler {
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
@@ -544,14 +542,11 @@ export class QueryProfilerHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): readonly EnvVar[] {
-    // Hits both Flink REST API and Telemetry APIs, so include all required env vars for both
-    const vars = [] as EnvVar[];
-    vars.push(...FLINK_REQUIRED_ENV_VARS, ...TELEMETRY_REQUIRED_ENV_VARS);
-    return vars;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
+  /** Overrides FlinkToolHandler: also requires a telemetry block because profiling fetches metrics from the Telemetry API in addition to the Flink REST API. */
+  override enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(
+      runtime.config.connections,
+      (conn) => hasFlink(conn) && hasTelemetry(conn),
+    );
   }
 }

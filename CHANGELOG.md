@@ -9,6 +9,16 @@ All notable changes to this MCP server will be documented in this file.
 - Removed `baseUrl` invocation parameter from all tool definitions. Now any API non-defaulting endpoint URLs must be provided through environment variable configuration prior to MCP server startup.
 - MCP tool annotations (`readOnlyHint`, `destructiveHint`) for all tools to enable AI clients to distinguish between read-only operations (e.g., `list-topics`) and destructive operations (e.g., `delete-topics`, `delete-schema`).
 
+### Removed
+
+- `--disable-confluent-cloud-tools` CLI flag and its `DISABLE_CONFLUENT_CLOUD_TOOLS` environment variable counterpart have been removed. Tool enablement is now determined entirely by which service blocks are present in the connection configation YAML or the equivalent \*\_KEY and \*\_SECRET environment variables.
+
+### Added
+
+- Configuration via YAML file.
+  - Details go here eventually.
+- `config.example.yaml` template for YAML-based configuration. Users copy it to `config.yaml` to use; `.gitignore` rules for `/*.yaml` and `/*.yml` (with explicit allow-rules for currently-tracked root files) keep personal configs and any other accidental root-level yaml out of git.
+
 ## 1.2.1
 
 ### Fixed

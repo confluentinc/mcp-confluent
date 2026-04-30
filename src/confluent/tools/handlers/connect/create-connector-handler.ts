@@ -6,8 +6,13 @@ import {
   CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import {
+  connectionIdsWhere,
+  hasConfluentCloud,
+  hasKafkaAuth,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -133,16 +138,13 @@ export class CreateConnectorHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return [
-      "CONFLUENT_CLOUD_API_KEY",
-      "CONFLUENT_CLOUD_API_SECRET",
-      "KAFKA_API_KEY",
-      "KAFKA_API_SECRET",
-    ];
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    // Known gap: handle() still reads KAFKA_API_KEY/KAFKA_API_SECRET from global env via
+    // getEnsuredParam(). A YAML-configured connection with kafka.auth but no env vars will
+    // pass this predicate yet throw at call time. Resolves when handle() is migrated in #230.
+    return connectionIdsWhere(
+      runtime.config.connections,
+      (conn) => hasConfluentCloud(conn) && hasKafkaAuth(conn),
+    );
   }
 }

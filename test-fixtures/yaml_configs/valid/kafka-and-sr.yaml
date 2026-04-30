@@ -1,0 +1,7 @@
+connections:
+  local:
+    type: direct
+    kafka:
+      bootstrap_servers: "localhost:9092"
+    schema_registry:
+      endpoint: "http://localhost:8081"

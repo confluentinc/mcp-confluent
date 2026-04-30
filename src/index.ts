@@ -1,37 +1,37 @@
 #!/usr/bin/env node
 
-import { GlobalConfig } from "@confluentinc/kafka-javascript";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  CLIOptions,
   DisplayedCommandLineUsageError,
   getFilteredToolNames,
   getPackageVersion,
   loadDotEnvIntoProcessEnv,
   parseCliArgs,
 } from "@src/cli.js";
-import { loadConfigFromYaml } from "@src/config/index.js";
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import {
+  buildConfigFromEnvAndCli,
+  loadConfigFromYaml,
+  MCPServerConfiguration,
+} from "@src/config/index.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
-import { EnvVar } from "@src/env-schema.js";
-import type { Environment } from "@src/env.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
 import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
- * Determine the subset of ToolHandlers to register based on the filtered tool names,
- * cloud tool settings, and environment variables
+ * Determine the subset of ToolHandlers to register based on the filtered tool names
+ * and which connections satisfy each tool's service requirements.
  **/
 export function getToolHandlersToRegister(
   filteredToolNames: ToolName[],
-  disableConfluentCloudTools: boolean,
-  env: Environment,
+  runtime: ServerRuntime,
 ): Map<ToolName, ToolHandler> {
   const toolHandlers = new Map<ToolName, ToolHandler>();
+  const knownIds = new Set(Object.keys(runtime.config.connections));
 
   Object.values(ToolName).forEach((toolName) => {
     // Skip names that are not in the filtered list of tool names provided.
@@ -42,24 +42,19 @@ export function getToolHandlersToRegister(
 
     const handler = ToolHandlerRegistry.getToolHandler(toolName);
 
-    // Skip cloud-only tools if disabled by CLI/env
-    if (disableConfluentCloudTools && handler.isConfluentCloudOnly()) {
-      logger.warn(
-        `Tool ${toolName} disabled due to --disable-confluent-cloud-tools flag or DISABLE_CONFLUENT_CLOUD_TOOLS env var`,
+    const enabledIds = handler.enabledConnectionIds(runtime);
+    const unknownIds = enabledIds.filter((id) => !knownIds.has(id));
+    if (unknownIds.length > 0) {
+      throw new Error(
+        `Tool ${toolName}: enabledConnectionIds() returned unknown connection ID(s): ${unknownIds.join(", ")}`,
       );
-      return;
     }
-
-    const missingVars = handler
-      .getRequiredEnvVars()
-      .filter((varName: EnvVar) => !env[varName]);
-
-    if (missingVars.length === 0) {
+    if (enabledIds.length > 0) {
       toolHandlers.set(toolName, handler);
       logger.info(`Tool ${toolName} enabled`);
     } else {
       logger.warn(
-        `Tool ${toolName} disabled due to missing environment variables: ${missingVars.join(", ")}`,
+        `Tool ${toolName} disabled; no connections satisfy its requirements`,
       );
     }
   });
@@ -96,69 +91,6 @@ export function outputToolList(filteredToolNames: ToolName[]): void {
   });
 }
 
-export function constructDefaultClientManager(
-  env: Environment,
-  cliOptions: CLIOptions,
-): DefaultClientManager {
-  // Merge environment variables with kafka config from CLI
-  // some additional configurations could be set in the client manager
-  // like separating groupIds by sessionId
-  const kafkaClientConfig: GlobalConfig = {
-    // Base configuration from environment variables
-    "bootstrap.servers": env.BOOTSTRAP_SERVERS,
-    "client.id": "mcp-confluent",
-    ...(env.KAFKA_API_KEY && env.KAFKA_API_SECRET
-      ? {
-          "security.protocol": "sasl_ssl",
-          "sasl.mechanisms": "PLAIN",
-          "sasl.username": env.KAFKA_API_KEY,
-          "sasl.password": env.KAFKA_API_SECRET,
-        }
-      : {}),
-    // Merge any additional properties from the kafka config file
-    ...cliOptions.kafkaConfig,
-  };
-
-  return new DefaultClientManager({
-    kafka: kafkaClientConfig,
-    endpoints: {
-      cloud: env.CONFLUENT_CLOUD_REST_ENDPOINT,
-      flink: env.FLINK_REST_ENDPOINT,
-      schemaRegistry: env.SCHEMA_REGISTRY_ENDPOINT,
-      kafka: env.KAFKA_REST_ENDPOINT,
-      telemetry:
-        env.TELEMETRY_ENDPOINT ?? "https://api.telemetry.confluent.cloud",
-    },
-    auth: {
-      cloud: {
-        apiKey: env.CONFLUENT_CLOUD_API_KEY!,
-        apiSecret: env.CONFLUENT_CLOUD_API_SECRET!,
-      },
-      tableflow: {
-        apiKey: env.TABLEFLOW_API_KEY!,
-        apiSecret: env.TABLEFLOW_API_SECRET!,
-      },
-      flink: {
-        apiKey: env.FLINK_API_KEY!,
-        apiSecret: env.FLINK_API_SECRET!,
-      },
-      schemaRegistry: {
-        apiKey: env.SCHEMA_REGISTRY_API_KEY!,
-        apiSecret: env.SCHEMA_REGISTRY_API_SECRET!,
-      },
-      kafka: {
-        apiKey: env.KAFKA_API_KEY!,
-        apiSecret: env.KAFKA_API_SECRET!,
-      },
-      telemetry: {
-        apiKey: (env.TELEMETRY_API_KEY ?? env.CONFLUENT_CLOUD_API_KEY)!,
-        apiSecret: (env.TELEMETRY_API_SECRET ??
-          env.CONFLUENT_CLOUD_API_SECRET)!,
-      },
-    },
-  });
-}
-
 async function main() {
   try {
     // Parse command line arguments.(NO LONGER LOADS ENV VARS FROM -e file!)
@@ -188,23 +120,40 @@ async function main() {
 
     // Convert our known env vars into a typed Environment obj.
     const env = initEnv();
-    setLogLevel(env.LOG_LEVEL);
 
-    // Load and validate YAML configuration if --config is provided
+    let mcpConfig: MCPServerConfiguration;
+    // Load and validate configuration — from YAML file if --config provided, else from env vars + CLI overrides.
     if (cliOptions.config) {
-      loadConfigFromYaml(cliOptions.config, process.env);
-
-      // TODO(issue #151): Use config to construct connection manager instead of env vars
-      logger.warn(
-        "Configuration file parsed and validated successfully, but it is not applied yet; startup still uses" +
-          " environment variables and CLI Kafka properties",
-      );
+      mcpConfig = loadConfigFromYaml(cliOptions.config, process.env);
+    } else {
+      mcpConfig = buildConfigFromEnvAndCli(env, {
+        disableAuth: cliOptions.disableAuth,
+        allowedHosts: cliOptions.allowedHosts,
+        kafkaConfig: cliOptions.kafkaConfig,
+        oauth: cliOptions.oauth,
+        oauthEnv: cliOptions.oauthEnv,
+      });
     }
 
-    // TODO #162, #165, #174: do this from the obj tree constructed from the
-    // config file (or equiv obj built from legacy env vars) instead of DIRECTLY from
-    // env vars and CLI options!
-    const clientManager = constructDefaultClientManager(env, cliOptions);
+    setLogLevel(mcpConfig.server.log_level);
+
+    // Transport selection: YAML config is authoritative when --config is used;
+    // CLI flag (or its default) is used on the env-var path.
+    const transports = cliOptions.config
+      ? mcpConfig.server.transports
+      : cliOptions.transports;
+
+    // DO_NOT_TRACK is a cross-tool user preference (consoledonottrack.com);
+    // the env var acts as a floor so it is honored even when --config is used.
+    TelemetryService.initialize(
+      mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
+    );
+
+    logger.info(
+      `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
+    );
+
+    const runtime = ServerRuntime.fromConfig(mcpConfig);
 
     const serverVersion = getPackageVersion();
     const server = new McpServer({
@@ -214,7 +163,7 @@ async function main() {
 
     TelemetryService.getInstance().setCommonProperties({
       serverVersion,
-      transportType: cliOptions.transports.join(","),
+      transportType: transports.join(","),
     });
 
     // Capture MCP client info when the handshake completes.
@@ -226,11 +175,7 @@ async function main() {
       });
     };
 
-    const toolHandlers = getToolHandlersToRegister(
-      filteredToolNames,
-      cliOptions.disableConfluentCloudTools ?? false,
-      env,
-    );
+    const toolHandlers = getToolHandlersToRegister(filteredToolNames, runtime);
 
     logger.info(
       { enabledTools: [...toolHandlers.keys()] },
@@ -251,7 +196,11 @@ async function main() {
           const sessionId = context?.sessionId;
           const startTime = Date.now();
           try {
-            const result = await handler.handle(clientManager, args, sessionId);
+            const result = await handler.handle(
+              runtime.clientManager,
+              args,
+              sessionId,
+            );
             TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
               toolName: name,
               durationMs: Date.now() - startTime,
@@ -270,13 +219,8 @@ async function main() {
       );
     });
 
-    // Prepare auth configuration
-    const disableAuth = cliOptions.disableAuth || env.MCP_AUTH_DISABLED;
-    const allowedHosts = cliOptions.allowedHosts || env.MCP_ALLOWED_HOSTS;
-    const apiKey = env.MCP_API_KEY;
-
     // Warn if auth is disabled
-    if (disableAuth) {
+    if (mcpConfig.server.auth.disabled) {
       logger.warn(
         "Authentication is DISABLED for HTTP/SSE transports. " +
           "This should only be used in development environments.",
@@ -284,20 +228,20 @@ async function main() {
     }
 
     const transportManager = new TransportManager(server, {
-      disableAuth,
-      allowedHosts,
-      apiKey,
+      disableAuth: mcpConfig.server.auth.disabled,
+      allowedHosts: mcpConfig.server.auth.allowed_hosts,
+      apiKey: mcpConfig.server.auth.api_key,
     });
 
     // Start all transports with a single call
-    logger.info(`Starting transports: ${cliOptions.transports.join(", ")}`);
+    logger.info(`Starting transports: ${transports.join(", ")}`);
     await transportManager.start(
-      cliOptions.transports,
-      env.HTTP_PORT,
-      env.HTTP_HOST,
-      env.HTTP_MCP_ENDPOINT_PATH,
-      env.SSE_MCP_ENDPOINT_PATH,
-      env.SSE_MCP_MESSAGE_ENDPOINT_PATH,
+      transports,
+      mcpConfig.server.http.port,
+      mcpConfig.server.http.host,
+      mcpConfig.server.http.mcp_endpoint,
+      mcpConfig.server.http.sse_endpoint,
+      mcpConfig.server.http.sse_message_endpoint,
     );
 
     // Set up cleanup handlers
@@ -305,7 +249,9 @@ async function main() {
       logger.info("Shutting down...");
       await TelemetryService.getInstance().shutdown();
       await transportManager.stop();
-      await clientManager.disconnect();
+      // shutdown() is race-safe with an in-flight bootstrap.
+      runtime.oauthHolder?.shutdown();
+      await runtime.clientManager.disconnect();
       await server.close();
       process.exit(0);
     };

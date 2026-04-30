@@ -8,11 +8,19 @@ import {
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { TransportType } from "@src/mcp/transports/types.js";
-import sinon from "sinon";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 import {
   createFsWrappers,
-  StubbedFsWrappers,
+  mockDotenv,
+  type MockedDotenv,
+  type MockedFsWrappers,
 } from "../tests/stubs/node-deps.js";
 
 describe("cli.ts", () => {
@@ -101,25 +109,19 @@ describe("cli.ts", () => {
   });
 
   describe("loadDotEnvIntoProcessEnv()", () => {
-    let sandbox: sinon.SinonSandbox;
-    let existsSyncStub: sinon.SinonStub;
-    let resolveStub: sinon.SinonStub;
-    let dotenvConfigStub: sinon.SinonStub;
+    let existsSyncSpy: MockInstance<typeof nodeDeps.fs.existsSync>;
+    let resolveSpy: MockInstance<typeof nodeDeps.path.resolve>;
+    let dotenvConfigSpy: MockedDotenv;
 
     beforeEach(() => {
-      sandbox = sinon.createSandbox();
-      existsSyncStub = sandbox.stub(nodeDeps.fs, "existsSync");
-      resolveStub = sandbox.stub(nodeDeps.path, "resolve");
-      dotenvConfigStub = sandbox.stub(nodeDeps.dotenvLib, "config");
-    });
-
-    afterEach(() => {
-      sandbox.restore();
+      existsSyncSpy = vi.spyOn(nodeDeps.fs, "existsSync");
+      resolveSpy = vi.spyOn(nodeDeps.path, "resolve");
+      dotenvConfigSpy = mockDotenv();
     });
 
     it("should throw when the env file does not exist", () => {
-      resolveStub.returns("/resolved/.env");
-      existsSyncStub.returns(false);
+      resolveSpy.mockReturnValue("/resolved/.env");
+      existsSyncSpy.mockReturnValue(false);
 
       expect(() => loadDotEnvIntoProcessEnv(".env")).toThrow(
         "Environment file not found: /resolved/.env",
@@ -127,19 +129,19 @@ describe("cli.ts", () => {
     });
 
     it("should resolve the path and pass it to existsSync", () => {
-      resolveStub.returns("/abs/path/.env");
-      existsSyncStub.returns(false);
+      resolveSpy.mockReturnValue("/abs/path/.env");
+      existsSyncSpy.mockReturnValue(false);
 
       expect(() => loadDotEnvIntoProcessEnv("relative/.env")).toThrow();
 
-      sinon.assert.calledWith(resolveStub, "relative/.env");
-      sinon.assert.calledWith(existsSyncStub, "/abs/path/.env");
+      expect(resolveSpy).toHaveBeenCalledWith("relative/.env");
+      expect(existsSyncSpy).toHaveBeenCalledWith("/abs/path/.env");
     });
 
     it("should throw when dotenv.config returns an error", () => {
-      resolveStub.returns("/resolved/.env");
-      existsSyncStub.returns(true);
-      dotenvConfigStub.returns({ error: new Error("parse error") });
+      resolveSpy.mockReturnValue("/resolved/.env");
+      existsSyncSpy.mockReturnValue(true);
+      dotenvConfigSpy.mockReturnValue({ error: new Error("parse error") });
 
       expect(() => loadDotEnvIntoProcessEnv(".env")).toThrow(
         "Error loading environment variables:",
@@ -147,25 +149,25 @@ describe("cli.ts", () => {
     });
 
     it("should call dotenv.config with the resolved path and override option", () => {
-      resolveStub.returns("/abs/path/.env");
-      existsSyncStub.returns(true);
-      dotenvConfigStub.returns({ parsed: {} });
+      resolveSpy.mockReturnValue("/abs/path/.env");
+      existsSyncSpy.mockReturnValue(true);
+      dotenvConfigSpy.mockReturnValue({ parsed: {} });
 
       loadDotEnvIntoProcessEnv("relative/.env");
 
       // Should call with the resolved absolute path and override: true
       // to ensure CLI env vars take precedence over existing ones in process.env
       // (and that the call will definitely mutate process.env)
-      sinon.assert.calledWith(dotenvConfigStub, {
+      expect(dotenvConfigSpy).toHaveBeenCalledWith({
         path: "/abs/path/.env",
         override: true,
       });
     });
 
     it("should return the parsed variables on success", () => {
-      resolveStub.returns("/resolved/.env");
-      existsSyncStub.returns(true);
-      dotenvConfigStub.returns({ parsed: { FOO: "bar", BAZ: "qux" } });
+      resolveSpy.mockReturnValue("/resolved/.env");
+      existsSyncSpy.mockReturnValue(true);
+      dotenvConfigSpy.mockReturnValue({ parsed: { FOO: "bar", BAZ: "qux" } });
 
       const result = loadDotEnvIntoProcessEnv(".env");
 
@@ -173,9 +175,9 @@ describe("cli.ts", () => {
     });
 
     it("should return empty object when dotenv yields no parsed variables", () => {
-      resolveStub.returns("/resolved/.env");
-      existsSyncStub.returns(true);
-      dotenvConfigStub.returns({ parsed: undefined });
+      resolveSpy.mockReturnValue("/resolved/.env");
+      existsSyncSpy.mockReturnValue(true);
+      dotenvConfigSpy.mockReturnValue({ parsed: undefined });
 
       const result = loadDotEnvIntoProcessEnv(".env");
 
@@ -188,18 +190,12 @@ describe("cli.ts", () => {
       return ["node", "mcp-confluent", ...trailingArgs];
     }
 
-    let sandbox: sinon.SinonSandbox;
-    let fsStubs: StubbedFsWrappers;
-    let resolveStub: sinon.SinonStub;
+    let fsMocks: MockedFsWrappers;
+    let resolveSpy: MockInstance<typeof nodeDeps.path.resolve>;
 
     beforeEach(() => {
-      sandbox = sinon.createSandbox();
-      fsStubs = createFsWrappers(sandbox);
-      resolveStub = sandbox.stub(nodeDeps.path, "resolve");
-    });
-
-    afterEach(() => {
-      sandbox.restore();
+      fsMocks = createFsWrappers();
+      resolveSpy = vi.spyOn(nodeDeps.path, "resolve");
     });
 
     describe("error handling", () => {
@@ -275,9 +271,11 @@ describe("cli.ts", () => {
       });
 
       it("should parse --allow-tools-file into allowTools by reading file lines", () => {
-        resolveStub.returns("/abs/allow.txt");
-        fsStubs.existsSync.returns(true);
-        fsStubs.readFileSync.returns("tool-a\ntool-b\n# comment\n\ntool-c");
+        resolveSpy.mockReturnValue("/abs/allow.txt");
+        fsMocks.existsSync.mockReturnValue(true);
+        fsMocks.readFileSync.mockReturnValue(
+          "tool-a\ntool-b\n# comment\n\ntool-c",
+        );
 
         const result = parseCliArgs(
           makeArgs(["--allow-tools-file", "allow.txt"]),
@@ -294,9 +292,9 @@ describe("cli.ts", () => {
       });
 
       it("should parse --block-tools-file into blockTools by reading file lines", () => {
-        resolveStub.returns("/abs/block.txt");
-        fsStubs.existsSync.returns(true);
-        fsStubs.readFileSync.returns("tool-x\ntool-y");
+        resolveSpy.mockReturnValue("/abs/block.txt");
+        fsMocks.existsSync.mockReturnValue(true);
+        fsMocks.readFileSync.mockReturnValue("tool-x\ntool-y");
 
         const result = parseCliArgs(
           makeArgs(["--block-tools-file", "block.txt"]),
@@ -310,31 +308,27 @@ describe("cli.ts", () => {
         expect(result.listTools).toBe(true);
       });
 
-      it("should set disableConfluentCloudTools to true when --disable-confluent-cloud-tools is specified", () => {
-        const result = parseCliArgs(
-          makeArgs(["--disable-confluent-cloud-tools"]),
-        );
-        expect(result.disableConfluentCloudTools).toBe(true);
-      });
-
       it("should throw when --allow-tools-file does not exist", () => {
-        resolveStub.returns("/abs/allow.txt");
-        fsStubs.existsSync.returns(false);
+        resolveSpy.mockReturnValue("/abs/allow.txt");
+        fsMocks.existsSync.mockReturnValue(false);
 
         expect(() =>
           parseCliArgs(makeArgs(["--allow-tools-file", "allow.txt"])),
         ).toThrow("Tool list file not found: /abs/allow.txt");
       });
 
-      it("should default listTools and disableConfluentCloudTools to false", () => {
+      it("should default listTools to false", () => {
         const result = parseCliArgs(makeArgs([]));
         expect(result.listTools).toBe(false);
-        expect(result.disableConfluentCloudTools).toBe(false);
       });
     });
 
     it("should set disableAuth to true when --disable-auth is specified", () => {
       expect(parseCliArgs(makeArgs(["--disable-auth"])).disableAuth).toBe(true);
+    });
+
+    it("should leave disableAuth undefined when --disable-auth is not specified", () => {
+      expect(parseCliArgs(makeArgs([])).disableAuth).toBeUndefined();
     });
 
     it("should set generateKey to true when --generate-key is specified", () => {
@@ -352,9 +346,42 @@ describe("cli.ts", () => {
       ]);
     });
 
+    it("should throw when both --config and --kafka-config-file are supplied", () => {
+      resolveSpy.mockReturnValue("/abs/kafka.properties");
+      fsMocks.existsSync.mockReturnValue(true);
+
+      expect(() =>
+        parseCliArgs(
+          makeArgs(["--config", "server.yaml", "-k", "kafka.properties"]),
+        ),
+      ).toThrow(/mutually exclusive/);
+    });
+
+    it("should throw when both --config and --disable-auth are supplied", () => {
+      expect(() =>
+        parseCliArgs(makeArgs(["--config", "server.yaml", "--disable-auth"])),
+      ).toThrow(/mutually exclusive/);
+    });
+
+    it("should throw when both --config and --allowed-hosts are supplied", () => {
+      expect(() =>
+        parseCliArgs(
+          makeArgs(["--config", "server.yaml", "--allowed-hosts", "localhost"]),
+        ),
+      ).toThrow(/mutually exclusive/);
+    });
+
+    it("should throw when both --config and --transport are supplied", () => {
+      expect(() =>
+        parseCliArgs(
+          makeArgs(["--config", "server.yaml", "--transport", "http"]),
+        ),
+      ).toThrow(/mutually exclusive/);
+    });
+
     it("should throw when -k file does not exist", () => {
-      resolveStub.returns("/abs/kafka.properties");
-      fsStubs.existsSync.returns(false);
+      resolveSpy.mockReturnValue("/abs/kafka.properties");
+      fsMocks.existsSync.mockReturnValue(false);
 
       expect(() => parseCliArgs(makeArgs(["-k", "kafka.properties"]))).toThrow(
         "Properties file not found: /abs/kafka.properties",
@@ -362,9 +389,11 @@ describe("cli.ts", () => {
     });
 
     it("should throw when -k file cannot be parsed", () => {
-      resolveStub.returns("/abs/kafka.properties");
-      fsStubs.existsSync.returns(true);
-      fsStubs.readFileSync.throws(new Error("disk error"));
+      resolveSpy.mockReturnValue("/abs/kafka.properties");
+      fsMocks.existsSync.mockReturnValue(true);
+      fsMocks.readFileSync.mockImplementation(() => {
+        throw new Error("disk error");
+      });
 
       expect(() => parseCliArgs(makeArgs(["-k", "kafka.properties"]))).toThrow(
         "Failed to parse properties file: disk error",
@@ -374,20 +403,99 @@ describe("cli.ts", () => {
     it.each(["-k", "--kafka-config-file"])(
       "should parse %s <path> into kafkaConfig by reading and parsing the file",
       (flag) => {
-        resolveStub.returns("/abs/kafka.properties");
-        fsStubs.existsSync.returns(true);
-        fsStubs.readFileSync.returns(
+        resolveSpy.mockReturnValue("/abs/kafka.properties");
+        fsMocks.existsSync.mockReturnValue(true);
+        fsMocks.readFileSync.mockReturnValue(
           "bootstrap.servers=localhost:9092\nsasl.username=mykey",
         );
 
         const result = parseCliArgs(makeArgs([flag, "kafka.properties"]));
 
-        sinon.assert.calledWith(resolveStub, "kafka.properties");
+        expect(resolveSpy).toHaveBeenCalledWith("kafka.properties");
         expect(result.kafkaConfig).toEqual({
           "bootstrap.servers": "localhost:9092",
           "sasl.username": "mykey",
         });
       },
     );
+
+    describe("--oauth flags", () => {
+      it("should parse --oauth and --oauth-env into cliOptions", () => {
+        const result = parseCliArgs([
+          "node",
+          "mcp-confluent",
+          "--oauth",
+          "--oauth-env",
+          "devel",
+        ]);
+        expect(result.oauth).toBe(true);
+        expect(result.oauthEnv).toBe("devel");
+      });
+
+      it("should accept stag and prod for --oauth-env", () => {
+        expect(
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--oauth-env",
+            "stag",
+          ]).oauthEnv,
+        ).toBe("stag");
+        expect(
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--oauth-env",
+            "prod",
+          ]).oauthEnv,
+        ).toBe("prod");
+      });
+
+      it("should reject --oauth without --oauth-env", () => {
+        expect(() =>
+          parseCliArgs(["node", "mcp-confluent", "--oauth"]),
+        ).toThrow(/--oauth-env/);
+      });
+
+      it("should reject --oauth-env without --oauth", () => {
+        expect(() =>
+          parseCliArgs(["node", "mcp-confluent", "--oauth-env", "devel"]),
+        ).toThrow(/--oauth-env requires --oauth/);
+      });
+
+      it("should reject --oauth-env with an unknown environment", () => {
+        expect(() =>
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--oauth-env",
+            "bogus",
+          ]),
+        ).toThrow();
+      });
+
+      it("should reject --oauth combined with --config", () => {
+        expect(() =>
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--oauth-env",
+            "devel",
+            "--config",
+            "/tmp/foo.yaml",
+          ]),
+        ).toThrow(/oauth.*config|config.*oauth/i);
+      });
+
+      it("should leave oauth and oauthEnv undefined when neither flag is set", () => {
+        const result = parseCliArgs(["node", "mcp-confluent"]);
+        expect(result.oauth).toBeUndefined();
+        expect(result.oauthEnv).toBeUndefined();
+      });
+    });
   });
 });

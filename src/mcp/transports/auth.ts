@@ -1,5 +1,6 @@
+import { nodeCrypto } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
-import { randomBytes, timingSafeEqual } from "crypto";
+import { timingSafeEqual } from "crypto";
 import { FastifyReply, FastifyRequest } from "fastify";
 
 /**
@@ -7,19 +8,24 @@ import { FastifyReply, FastifyRequest } from "fastify";
  */
 export interface AuthConfig {
   /** API key for authentication */
-  apiKey: string;
+  readonly apiKey: string;
   /** Whether authentication is enabled */
-  enabled: boolean;
+  readonly enabled: boolean;
   /** List of allowed Host header values for DNS rebinding protection */
-  allowedHosts: string[];
+  readonly allowedHosts: readonly string[];
 }
 
 /**
- * Generates a cryptographically secure random API key
+ * Generates a cryptographically secure random API key.
+ *
+ * Uses {@linkcode nodeCrypto.randomBytes} (rather than a direct `crypto` import)
+ * so tests can swap the primitive via `vi.spyOn(nodeCrypto, "randomBytes")`
+ * to assert deterministic output.
+ *
  * @returns 64-character hex string
  */
 export function generateApiKey(): string {
-  return randomBytes(32).toString("hex");
+  return nodeCrypto.randomBytes(32).toString("hex");
 }
 
 /**
@@ -60,7 +66,7 @@ function parseHostname(hostHeader: string): string | null {
  */
 function isHostAllowed(
   hostHeader: string | undefined,
-  allowedHosts: string[],
+  allowedHosts: readonly string[],
 ): boolean {
   if (!hostHeader) {
     return false;

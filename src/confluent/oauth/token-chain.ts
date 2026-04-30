@@ -1,4 +1,10 @@
 import { nodeFetch } from "@src/confluent/node-deps.js";
+import {
+  CONTROL_PLANE_TOKEN_LIFETIME_MS,
+  DATA_PLANE_TOKEN_LIFETIME_MS,
+  REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+  REFRESH_TOKEN_IDLE_LIFETIME_MS,
+} from "@src/confluent/oauth/token-lifetimes.js";
 import type {
   Auth0Config,
   Auth0TokenResponse,
@@ -7,32 +13,15 @@ import type {
 } from "@src/confluent/oauth/types.js";
 import { logger } from "@src/logger.js";
 
-/** 5 minutes in milliseconds — control plane token lifetime */
-const CONTROL_PLANE_TOKEN_LIFETIME_MS = 5 * 60 * 1000;
-
-/** 10 minutes in milliseconds — data plane token lifetime */
-const DATA_PLANE_TOKEN_LIFETIME_MS = 10 * 60 * 1000;
-
-/** 8 hours in milliseconds — refresh token absolute lifetime from original login */
-const REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS = 8 * 60 * 60 * 1000;
-
-/** 4 hours in milliseconds — refresh token idle timeout, resets on each rotation */
-const REFRESH_TOKEN_IDLE_LIFETIME_MS = 4 * 60 * 60 * 1000;
-
 /** Per-request timeout bounding each Auth0/Confluent HTTP call. */
 const REQUEST_TIMEOUT_MS = 30_000;
 
-/**
- * Result of a single token-chain execution — either the initial login
- * ({@link executeFullTokenChain}) or a subsequent refresh ({@link refreshTokenChain}).
- * Callers persist this into the token store so downstream CP/DP requests can
- * retrieve still-valid credentials.
- */
+/** Result of a full initial-login token chain from {@link executeFullTokenChain}. */
 export interface TokenChainResult {
   refreshToken: string;
-  /** Only set on initial login. Absent on refresh — callers must preserve the original value. */
-  refreshTokenAbsoluteExpiresAt?: number;
-  /** Reset on every rotation (initial login and refresh). */
+  /** Set once on initial login and preserved across subsequent refreshes. */
+  refreshTokenAbsoluteExpiresAt: number;
+  /** Set on initial login; subsequent refreshes bump this value in the store directly. */
   refreshTokenIdleExpiresAt: number;
   controlPlaneToken: string;
   controlPlaneExpiresAt: number;
@@ -91,7 +80,7 @@ export async function exchangeAuthCodeForTokens(
     redirect_uri: auth0Config.callbackUrl,
   });
 
-  return postJson<Auth0TokenResponse>(
+  const response = await postJson<Auth0TokenResponse>(
     `https://${auth0Config.domain}/oauth/token`,
     {
       method: "POST",
@@ -100,6 +89,13 @@ export async function exchangeAuthCodeForTokens(
     },
     "Auth0 token exchange",
   );
+  if (!response.id_token) {
+    throw new Error("Auth0 token exchange: missing id_token");
+  }
+  if (!response.refresh_token) {
+    throw new Error("Auth0 token exchange: missing refresh_token");
+  }
+  return response;
 }
 
 /**
@@ -110,7 +106,7 @@ export async function exchangeIdTokenForControlPlaneToken(
   apiUrl: string,
   idToken: string,
 ): Promise<ControlPlaneTokenResponse> {
-  return postJson<ControlPlaneTokenResponse>(
+  const response = await postJson<ControlPlaneTokenResponse>(
     `${apiUrl}/api/sessions`,
     {
       method: "POST",
@@ -119,6 +115,10 @@ export async function exchangeIdTokenForControlPlaneToken(
     },
     "Control plane token exchange",
   );
+  if (!response.token) {
+    throw new Error("Control plane token exchange: missing token");
+  }
+  return response;
 }
 
 /**
@@ -129,7 +129,7 @@ export async function exchangeControlPlaneForDataPlaneToken(
   apiUrl: string,
   controlPlaneToken: string,
 ): Promise<DataPlaneTokenResponse> {
-  return postJson<DataPlaneTokenResponse>(
+  const response = await postJson<DataPlaneTokenResponse>(
     `${apiUrl}/api/access_tokens`,
     {
       method: "POST",
@@ -141,23 +141,30 @@ export async function exchangeControlPlaneForDataPlaneToken(
     },
     "Data plane token exchange",
   );
+  if (!response.token) {
+    throw new Error("Data plane token exchange: missing token");
+  }
+  return response;
 }
 
 /**
- * Uses a refresh token to obtain new Auth0 tokens, then derives CP and DP tokens.
- * This is used by the background refresh loop.
+ * Exchanges a refresh token for a new Auth0 token set (ID token + rotated
+ * refresh token). This is a single-use destructive operation: on success the
+ * old refresh token is invalidated by Auth0. Callers that then derive CP/DP
+ * tokens should persist the new refresh token BEFORE the CP/DP calls so a
+ * failure there doesn't lose the rotated token.
  */
-export async function refreshTokenChain(
+export async function exchangeRefreshTokenForAuth0Tokens(
   auth0Config: Auth0Config,
   refreshToken: string,
-): Promise<TokenChainResult> {
+): Promise<Auth0TokenResponse> {
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     client_id: auth0Config.clientId,
     refresh_token: refreshToken,
   });
 
-  const auth0Response = await postJson<Auth0TokenResponse>(
+  const response = await postJson<Auth0TokenResponse>(
     `https://${auth0Config.domain}/oauth/token`,
     {
       method: "POST",
@@ -166,8 +173,13 @@ export async function refreshTokenChain(
     },
     "Auth0 token refresh",
   );
-
-  return deriveConfluentTokens(auth0Config, auth0Response);
+  if (!response.id_token) {
+    throw new Error("Auth0 token refresh: missing id_token");
+  }
+  if (!response.refresh_token) {
+    throw new Error("Auth0 token refresh: missing refresh_token");
+  }
+  return response;
 }
 
 /**
@@ -187,25 +199,6 @@ export async function executeFullTokenChain(
     codeVerifier,
   );
 
-  const result = await deriveConfluentTokens(auth0Config, auth0Response);
-
-  return {
-    ...result,
-    refreshTokenAbsoluteExpiresAt:
-      Date.now() + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
-  };
-}
-
-/**
- * Given Auth0 tokens, derives Confluent control plane and data plane tokens.
- * Expiration times are computed client-side using fixed durations.
- *
- * Does NOT set refreshTokenAbsoluteExpiresAt — that is only set on initial login.
- */
-async function deriveConfluentTokens(
-  auth0Config: Auth0Config,
-  auth0Response: Auth0TokenResponse,
-): Promise<TokenChainResult> {
   const cpResponse = await exchangeIdTokenForControlPlaneToken(
     auth0Config.apiUrl,
     auth0Response.id_token,
@@ -220,6 +213,7 @@ async function deriveConfluentTokens(
 
   return {
     refreshToken: auth0Response.refresh_token,
+    refreshTokenAbsoluteExpiresAt: now + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
     refreshTokenIdleExpiresAt: now + REFRESH_TOKEN_IDLE_LIFETIME_MS,
     controlPlaneToken: cpResponse.token,
     controlPlaneExpiresAt: now + CONTROL_PLANE_TOKEN_LIFETIME_MS,

@@ -1,13 +1,9 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  CREATE_UPDATE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import env from "@src/env.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -65,7 +61,7 @@ const createFlinkStatementArguments = z.object({
     ),
 });
 
-export class CreateFlinkStatementHandler extends BaseToolHandler {
+export class CreateFlinkStatementHandler extends FlinkToolHandler {
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
@@ -139,13 +135,5 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
       inputSchema: createFlinkStatementArguments.shape,
       annotations: CREATE_UPDATE,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return FLINK_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

@@ -5,8 +5,12 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import {
+  connectionIdsWhere,
+  hasKafkaBootstrap,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listTopicArgs = z.object({
@@ -16,8 +20,7 @@ const listTopicArgs = z.object({
 export class ListTopicsHandler extends BaseToolHandler {
   async handle(
     clientManager: ClientManager,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    toolArguments: Record<string, unknown>,
+    _toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const topics = await (await clientManager.getAdminClient()).listTopics();
     return this.createResponse(`Kafka topics: ${topics.join(",")}`);
@@ -32,7 +35,7 @@ export class ListTopicsHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): EnvVar[] {
-    return ["BOOTSTRAP_SERVERS"];
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(runtime.config.connections, hasKafkaBootstrap);
   }
 }

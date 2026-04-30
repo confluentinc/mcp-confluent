@@ -1,13 +1,9 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  DESTRUCTIVE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { DESTRUCTIVE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -36,7 +32,7 @@ const deleteFlinkStatementArguments = z.object({
     ),
 });
 
-export class DeleteFlinkStatementHandler extends BaseToolHandler {
+export class DeleteFlinkStatementHandler extends FlinkToolHandler {
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
@@ -85,13 +81,5 @@ export class DeleteFlinkStatementHandler extends BaseToolHandler {
       inputSchema: deleteFlinkStatementArguments.shape,
       annotations: DESTRUCTIVE,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return FLINK_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

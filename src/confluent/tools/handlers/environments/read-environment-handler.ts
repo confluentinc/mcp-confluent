@@ -6,15 +6,16 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
+  connectionIdsWhere,
+  hasConfluentCloud,
+} from "@src/confluent/tools/connection-predicates.js";
+import {
   Environment,
   environmentSchema,
 } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
-  EnvVar,
-} from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -122,11 +123,7 @@ Environment: ${environmentDetails.name}
     };
   }
 
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 }

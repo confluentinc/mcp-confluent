@@ -5,22 +5,11 @@ import {
 } from "@src/config/index.js";
 import {
   createFsWrappers,
-  type StubbedFsWrappers,
+  type MockedFsWrappers,
 } from "@tests/stubs/node-deps.js";
-import sinon from "sinon";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 describe("config/index.ts", () => {
-  let sandbox: sinon.SinonSandbox;
-
-  beforeEach(() => {
-    sandbox = sinon.createSandbox();
-  });
-
-  afterEach(() => {
-    sandbox.restore();
-  });
-
   describe("parseYamlConfiguration", () => {
     it("should successfully parse minimal valid config (kafka only)", () => {
       const yamlContent = `connections:
@@ -136,7 +125,7 @@ describe("config/index.ts", () => {
         /Configuration validation failed/,
       );
       expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /At least one of 'kafka' or 'schema_registry' must be defined/,
+        /At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined/,
       );
     });
 
@@ -335,6 +324,64 @@ describe("config/index.ts", () => {
       ).toThrow(/Invalid format 'not-a-valid-host-port': must be host:port/);
     });
 
+    describe("unknown key rejection", () => {
+      it("should reject an unknown key at the connection level", () => {
+        const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+    typo_field: "oops"
+`;
+        expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+          /Configuration validation failed/,
+        );
+      });
+
+      it("should reject an unknown key inside the kafka sub-object", () => {
+        const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+      boostrap_servers: "typo"
+`;
+        expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+          /Configuration validation failed/,
+        );
+      });
+
+      it("should reject an unknown key inside the schema_registry sub-object", () => {
+        const yamlContent = `connections:
+  local:
+    type: "direct"
+    schema_registry:
+      endpoint: "http://localhost:8081"
+      endpint: "typo"
+`;
+        expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+          /Configuration validation failed/,
+        );
+      });
+
+      it("should reject an unknown key inside the auth block", () => {
+        const yamlContent = `connections:
+  local:
+    type: "direct"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+      auth:
+        type: api_key
+        key: "mykey"
+        secret: "mysecret"
+        extra_field: "oops"
+`;
+        expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+          /Configuration validation failed/,
+        );
+      });
+    });
+
     it("should throw when a referenced variable is missing from env", () => {
       const yamlContent = `connections:
   local:
@@ -353,10 +400,10 @@ describe("config/index.ts", () => {
   });
 
   describe("loadConfigFromYaml", () => {
-    let fsStubs: StubbedFsWrappers;
+    let fsMocks: MockedFsWrappers;
 
     beforeEach(() => {
-      fsStubs = createFsWrappers(sandbox);
+      fsMocks = createFsWrappers();
     });
 
     it("should successfully load and parse a valid config file", () => {
@@ -366,8 +413,8 @@ describe("config/index.ts", () => {
     kafka:
       bootstrap_servers: "localhost:9092"
 `;
-      fsStubs.existsSync.returns(true);
-      fsStubs.readFileSync.returns(yamlContent);
+      fsMocks.existsSync.mockReturnValue(true);
+      fsMocks.readFileSync.mockReturnValue(yamlContent);
 
       const config = loadConfigFromYaml("/path/to/config.yaml", {});
 
@@ -383,8 +430,8 @@ describe("config/index.ts", () => {
     kafka:
       bootstrap_servers: "\${BOOTSTRAP_SERVERS}"
 `;
-      fsStubs.existsSync.returns(true);
-      fsStubs.readFileSync.returns(yamlContent);
+      fsMocks.existsSync.mockReturnValue(true);
+      fsMocks.readFileSync.mockReturnValue(yamlContent);
 
       const config = loadConfigFromYaml("/path/to/config.yaml", {
         BOOTSTRAP_SERVERS: "broker1:9092",
@@ -396,7 +443,7 @@ describe("config/index.ts", () => {
     });
 
     it("should throw error when file does not exist", () => {
-      fsStubs.existsSync.returns(false);
+      fsMocks.existsSync.mockReturnValue(false);
 
       expect(() => loadConfigFromYaml("/nonexistent.yaml", {})).toThrow(
         /Configuration file not found/,
@@ -404,8 +451,8 @@ describe("config/index.ts", () => {
     });
 
     it("should throw error on invalid YAML syntax", () => {
-      fsStubs.existsSync.returns(true);
-      fsStubs.readFileSync.returns("invalid: [yaml");
+      fsMocks.existsSync.mockReturnValue(true);
+      fsMocks.readFileSync.mockReturnValue("invalid: [yaml");
 
       expect(() => loadConfigFromYaml("/path/to/config.yaml", {})).toThrow(
         /Failed to parse YAML/,
@@ -418,8 +465,8 @@ describe("config/index.ts", () => {
     type: "direct"
     # missing both kafka and schema_registry
 `;
-      fsStubs.existsSync.returns(true);
-      fsStubs.readFileSync.returns(invalidYaml);
+      fsMocks.existsSync.mockReturnValue(true);
+      fsMocks.readFileSync.mockReturnValue(invalidYaml);
 
       expect(() => loadConfigFromYaml("/path/to/config.yaml", {})).toThrow(
         /Configuration validation failed/,
@@ -428,10 +475,10 @@ describe("config/index.ts", () => {
   });
 
   describe("loadConfigFileContents", () => {
-    let fsStubs: StubbedFsWrappers;
+    let fsMocks: MockedFsWrappers;
 
     beforeEach(() => {
-      fsStubs = createFsWrappers(sandbox);
+      fsMocks = createFsWrappers();
     });
 
     it("should read file contents successfully", () => {
@@ -441,28 +488,30 @@ describe("config/index.ts", () => {
     kafka:
       bootstrap_servers: "localhost:9092"
 `;
-      fsStubs.existsSync.returns(true);
-      fsStubs.readFileSync.returns(testContent);
+      fsMocks.existsSync.mockReturnValue(true);
+      fsMocks.readFileSync.mockReturnValue(testContent);
 
       const content = loadConfigFileContents("/some/path/config.yaml");
 
       expect(content).toBe(testContent);
-      sinon.assert.calledOnce(fsStubs.existsSync);
-      sinon.assert.calledOnce(fsStubs.readFileSync);
+      expect(fsMocks.existsSync).toHaveBeenCalledOnce();
+      expect(fsMocks.readFileSync).toHaveBeenCalledOnce();
     });
 
     it("should throw error when file does not exist", () => {
-      fsStubs.existsSync.returns(false);
+      fsMocks.existsSync.mockReturnValue(false);
 
       expect(() =>
         loadConfigFileContents("/nonexistent/path/to/config.yaml"),
       ).toThrow(/Configuration file not found/);
-      sinon.assert.calledOnce(fsStubs.existsSync);
+      expect(fsMocks.existsSync).toHaveBeenCalledOnce();
     });
 
     it("should throw error when file cannot be read", () => {
-      fsStubs.existsSync.returns(true);
-      fsStubs.readFileSync.throws(new Error("Permission denied"));
+      fsMocks.existsSync.mockReturnValue(true);
+      fsMocks.readFileSync.mockImplementation(() => {
+        throw new Error("Permission denied");
+      });
 
       expect(() => loadConfigFileContents("/some/path/config.yaml")).toThrow(
         /Failed to read configuration file: Permission denied/,

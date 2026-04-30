@@ -5,11 +5,12 @@ import {
   CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
-  CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS,
-  EnvVar,
-} from "@src/env-schema.js";
+  connectionIdsWhere,
+  hasCCloudCatalogSupport,
+} from "@src/confluent/tools/connection-predicates.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -67,11 +68,10 @@ export class AddTagToTopicHandler extends BaseToolHandler {
     };
   }
 
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(
+      runtime.config.connections,
+      hasCCloudCatalogSupport,
+    );
   }
 }

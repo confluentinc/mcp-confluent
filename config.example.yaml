@@ -1,0 +1,152 @@
+# Example MCP Confluent Server configuration.
+#
+# Copy this file to `config.yaml` at the repo root (that filename is gitignored
+# so your filled-in credentials stay out of git) and launch the server with:
+#
+#   cp config.example.yaml config.yaml
+#   # edit config.yaml, then:
+#   npx @confluentinc/mcp-confluent --config ./config.yaml
+#
+# Every `${VAR}` and `${VAR:-default}` placeholder is resolved from the process
+# environment at startup, so secrets can stay in your shell or `.env` file
+# rather than the YAML itself. Plain literal values are also fine when you do
+# not need interpolation.
+#
+# Each sub-block under `connections.<name>` is independently optional; remove
+# the ones you do not need. At least one of `kafka`, `schema_registry`,
+# `confluent_cloud`, `flink`, `tableflow`, or `telemetry` must remain.
+
+# --- Server ---
+# MCP server transport, authentication, and logging settings.
+# All fields are optional — omit the entire block to use the defaults shown.
+# When using --config, these replace the corresponding environment variables:
+#   LOG_LEVEL, HTTP_PORT, HTTP_HOST, HTTP_MCP_ENDPOINT_PATH,
+#   SSE_MCP_ENDPOINT_PATH, SSE_MCP_MESSAGE_ENDPOINT_PATH,
+#   MCP_API_KEY, MCP_AUTH_DISABLED, MCP_ALLOWED_HOSTS, DO_NOT_TRACK.
+# server.transports replaces the --transport CLI flag (the two are mutually
+# exclusive; omit --transport and declare transports here instead).
+# Exception: Env var DO_NOT_TRACK is always honored as a floor — if set in the
+# environment, telemetry is disabled regardless of do_not_track below.
+server:
+  # Transports to start. One or more of: stdio, http, sse. Defaults to [stdio].
+  # (Use server.transports instead of --transport when using --config.)
+  transports: [stdio]
+
+  # Logging verbosity. One of: trace, debug, info, warn, error, fatal.
+  log_level: "${LOG_LEVEL:-info}"
+
+  # Opt out of anonymous usage analytics.
+  # (DO_NOT_TRACK=true in the environment always wins; this field lets you opt
+  # out in YAML without needing the env var.)
+  # do_not_track: true
+
+  # HTTP and SSE transport settings. Omit entirely to use all defaults,
+  # or when only using the stdio transport.
+  http:
+    # TCP port and bind address (applies to both http and sse transports).
+    port: ${HTTP_PORT:-8080}
+    host: "${HTTP_HOST:-127.0.0.1}"
+    # URL path for the Streamable HTTP transport endpoint (http transport only).
+    mcp_endpoint: "${HTTP_MCP_ENDPOINT_PATH:-/mcp}"
+    # URL paths for the SSE transport endpoints (sse transport only).
+    sse_endpoint: "${SSE_MCP_ENDPOINT_PATH:-/sse}"
+    sse_message_endpoint: "${SSE_MCP_MESSAGE_ENDPOINT_PATH:-/messages}"
+
+  auth:
+    # Bearer token required on every HTTP/SSE request when set (min 32 chars).
+    # (Omit to run without a fixed API key; incompatible with disabled: true.)
+    # api_key: "${MCP_API_KEY}"
+
+    # Hosts accepted in the HTTP Host header (DNS-rebinding protection).
+    # (Defaults to [localhost, 127.0.0.1] when omitted.)
+    allowed_hosts:
+      - localhost
+      - "127.0.0.1"
+
+    # Disables HTTP/SSE authentication entirely when set to true.
+    # (For development environments only; incompatible with api_key.)
+    # disabled: true
+
+connections:
+  # Connection name is freeform. Currently exactly one connection is supported,
+  # but the structure is plural so multi-connection support can land later
+  # without a breaking change.
+  default:
+    type: direct
+
+    # --- Kafka ---
+    # `bootstrap_servers` is required for any Kafka client (admin, producer,
+    # consumer). `rest_endpoint` + `cluster_id` + `env_id` are required for
+    # Kafka admin REST operations against Confluent Cloud (topics, configs,
+    # ACLs).
+    kafka:
+      bootstrap_servers: "${BOOTSTRAP_SERVERS:-pkc-xxxxx.us-east-1.aws.confluent.cloud:9092}"
+      auth:
+        type: api_key
+        key: "${KAFKA_API_KEY}"
+        secret: "${KAFKA_API_SECRET}"
+      rest_endpoint: "${KAFKA_REST_ENDPOINT:-https://pkc-xxxxx.us-east-1.aws.confluent.cloud:443}"
+      cluster_id: "${KAFKA_CLUSTER_ID:-lkc-xxxxx}"
+      env_id: "${KAFKA_ENV_ID:-env-xxxxx}"
+      # Optional pass-through librdkafka properties. Must NOT include
+      # `bootstrap.servers`, `sasl.username`, or `sasl.password` — use the
+      # named fields above for those (the schema rejects them here).
+      # extra_properties:
+      #   socket.timeout.ms: "30000"
+      #   debug: "broker,topic"
+
+    # --- Schema Registry ---
+    schema_registry:
+      endpoint: "${SCHEMA_REGISTRY_ENDPOINT:-https://psrc-xxxxx.us-east-2.aws.confluent.cloud}"
+      auth:
+        type: api_key
+        key: "${SCHEMA_REGISTRY_API_KEY}"
+        secret: "${SCHEMA_REGISTRY_API_SECRET}"
+
+    # --- Confluent Cloud control plane ---
+    # Required for tools that hit the Confluent Cloud REST API (environments,
+    # service accounts, connectors, billing, etc.). `endpoint` defaults to
+    # https://api.confluent.cloud when omitted.
+    confluent_cloud:
+      endpoint: "${CONFLUENT_CLOUD_REST_ENDPOINT:-https://api.confluent.cloud}"
+      auth:
+        type: api_key
+        key: "${CONFLUENT_CLOUD_API_KEY}"
+        secret: "${CONFLUENT_CLOUD_API_SECRET}"
+
+    # --- Flink ---
+    # All five of `endpoint`, `auth`, `environment_id`, `organization_id`, and
+    # `compute_pool_id` are required if you include this block.
+    flink:
+      endpoint: "${FLINK_REST_ENDPOINT:-https://flink.us-east-1.aws.confluent.cloud}"
+      auth:
+        type: api_key
+        key: "${FLINK_API_KEY}"
+        secret: "${FLINK_API_SECRET}"
+      organization_id: "${FLINK_ORG_ID}"
+      environment_id: "${FLINK_ENV_ID:-env-xxxxx}"
+      compute_pool_id: "${FLINK_COMPUTE_POOL_ID:-lfcp-xxxxx}"
+      # Optional human-readable labels surfaced to tools / prompts:
+      # environment_name: "${FLINK_ENV_NAME:-production}"
+      # database_name: "${FLINK_DATABASE_NAME:-my-cluster}"
+
+    # --- Tableflow ---
+    # Tableflow tools also need `confluent_cloud` above for environment and
+    # cluster lookups.
+    tableflow:
+      auth:
+        type: api_key
+        key: "${TABLEFLOW_API_KEY}"
+        secret: "${TABLEFLOW_API_SECRET}"
+
+    # --- Telemetry / Metrics ---
+    # If you omit this block entirely, telemetry inherits `confluent_cloud.auth`
+    # and uses the default endpoint (https://api.telemetry.confluent.cloud).
+    # Define this block only when you need to override one of those, e.g. with
+    # a separate metrics-only API key (recommended for least-privilege access).
+    # telemetry:
+    #   endpoint: "${TELEMETRY_ENDPOINT:-https://api.telemetry.confluent.cloud}"
+    #   auth:
+    #     type: api_key
+    #     key: "${TELEMETRY_API_KEY}"
+    #     secret: "${TELEMETRY_API_SECRET}"

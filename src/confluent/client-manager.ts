@@ -6,6 +6,10 @@ import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import type { ClientConfig } from "@confluentinc/schemaregistry";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
+  CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
+  type DirectConnectionConfig,
+} from "@src/config/models.js";
+import {
   ConfluentAuth,
   ConfluentEndpoints,
   createAuthMiddleware,
@@ -251,7 +255,13 @@ export class DefaultClientManager
       if (!this.confluentCloudSchemaRegistryBaseUrl) {
         throw new Error("Schema Registry endpoint not configured");
       }
-      const { apiKey, apiSecret } = config.auth.schemaRegistry;
+      const schemaRegistryAuth = config.auth.schemaRegistry;
+      if (schemaRegistryAuth.type === "oauth") {
+        throw new Error(
+          "Schema Registry OAuth authentication is not supported for SchemaRegistryClient yet. Configure SCHEMA_REGISTRY_API_KEY and SCHEMA_REGISTRY_API_SECRET instead.",
+        );
+      }
+      const { apiKey, apiSecret } = schemaRegistryAuth;
       const clientConfig: ClientConfig = {
         baseURLs: [this.confluentCloudSchemaRegistryBaseUrl],
       };
@@ -350,4 +360,65 @@ export class DefaultClientManager
   getSchemaRegistryClient(): SchemaRegistryClient {
     return this.schemaRegistryClient.get();
   }
+}
+
+/**
+ * Constructs a {@link DefaultClientManager} from a single direct connection config.
+ */
+export function constructClientManagerForConnection(
+  conn: DirectConnectionConfig,
+): DefaultClientManager {
+  const kafkaClientConfig: GlobalConfig = {
+    "client.id": "mcp-confluent",
+    ...(conn.kafka?.bootstrap_servers && {
+      "bootstrap.servers": conn.kafka.bootstrap_servers,
+    }),
+    ...(conn.kafka?.auth
+      ? {
+          "security.protocol": "sasl_ssl",
+          "sasl.mechanisms": "PLAIN",
+          "sasl.username": conn.kafka.auth.key,
+          "sasl.password": conn.kafka.auth.secret,
+        }
+      : {}),
+    ...conn.kafka?.extra_properties,
+  };
+
+  return new DefaultClientManager({
+    kafka: kafkaClientConfig,
+    endpoints: {
+      // DefaultClientManager uses this as the Tableflow base URL too (see constructor), so always supply the default.
+      cloud: conn.confluent_cloud?.endpoint ?? CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
+      flink: conn.flink?.endpoint,
+      schemaRegistry: conn.schema_registry?.endpoint,
+      kafka: conn.kafka?.rest_endpoint,
+      telemetry: conn.telemetry?.endpoint,
+    },
+    auth: {
+      cloud: {
+        apiKey: conn.confluent_cloud?.auth.key,
+        apiSecret: conn.confluent_cloud?.auth.secret,
+      },
+      tableflow: {
+        apiKey: conn.tableflow?.auth.key,
+        apiSecret: conn.tableflow?.auth.secret,
+      },
+      flink: {
+        apiKey: conn.flink?.auth.key,
+        apiSecret: conn.flink?.auth.secret,
+      },
+      schemaRegistry: {
+        apiKey: conn.schema_registry?.auth?.key,
+        apiSecret: conn.schema_registry?.auth?.secret,
+      },
+      kafka: {
+        apiKey: conn.kafka?.auth?.key,
+        apiSecret: conn.kafka?.auth?.secret,
+      },
+      telemetry: {
+        apiKey: conn.telemetry?.auth.key,
+        apiSecret: conn.telemetry?.auth.secret,
+      },
+    },
+  });
 }

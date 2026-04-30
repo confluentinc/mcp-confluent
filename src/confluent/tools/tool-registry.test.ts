@@ -48,6 +48,18 @@ describe("tool-registry.ts", () => {
         }
       });
 
+      for (const name of ALL_TOOL_NAMES) {
+        it(`${name}: should not implement getRequiredEnvVars() (deleted in issue-228)`, () => {
+          const handler = ToolHandlerRegistry.getToolHandler(name);
+          expect("getRequiredEnvVars" in handler).toBe(false);
+        });
+
+        it(`${name}: should not implement isConfluentCloudOnly() (deleted in issue-228)`, () => {
+          const handler = ToolHandlerRegistry.getToolHandler(name);
+          expect("isConfluentCloudOnly" in handler).toBe(false);
+        });
+      }
+
       it("should use annotations that match the tool name prefix convention", () => {
         const readOnlyPrefixes = new Set([
           "list",

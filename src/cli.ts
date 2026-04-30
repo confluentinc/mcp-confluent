@@ -27,11 +27,12 @@ export interface CLIOptions {
   allowTools?: string[];
   blockTools?: string[];
   listTools?: boolean;
-  disableConfluentCloudTools?: boolean;
-  kafkaConfig: KeyValuePairObject;
+  kafkaConfig?: KeyValuePairObject;
   disableAuth?: boolean;
   allowedHosts?: string[];
   generateKey?: boolean;
+  oauth?: boolean;
+  oauthEnv?: "devel" | "stag" | "prod";
 }
 
 /**
@@ -104,6 +105,40 @@ function readFileLines(filePath: string): string[] {
   return lines;
 }
 
+function assertNoConfigConflicts(
+  config: string | undefined,
+  kafkaConfigFile: string | undefined,
+  disableAuth: boolean | undefined,
+  allowedHosts: string | undefined,
+  transportExplicitlySet: boolean,
+): void {
+  if (!config) return;
+  if (kafkaConfigFile) {
+    throw new Error(
+      "--config and --kafka-config-file are mutually exclusive: " +
+        "use kafka.extra_properties in the YAML file instead of -k",
+    );
+  }
+  if (disableAuth) {
+    throw new Error(
+      "--config and --disable-auth are mutually exclusive: " +
+        "use server.auth.disabled in the YAML file instead",
+    );
+  }
+  if (allowedHosts) {
+    throw new Error(
+      "--config and --allowed-hosts are mutually exclusive: " +
+        "use server.auth.allowed_hosts in the YAML file instead",
+    );
+  }
+  if (transportExplicitlySet) {
+    throw new Error(
+      "--config and --transport are mutually exclusive: " +
+        "use server.transports in the YAML file instead",
+    );
+  }
+}
+
 /**
  * Parse command line arguments into a structured CLIOptions object.
  *
@@ -164,10 +199,6 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       "Print the final set of enabled tool names (with descriptions) after allow/block filtering and exit. Does not start the server.",
     )
     .option(
-      "--disable-confluent-cloud-tools",
-      "Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).",
-    )
-    .option(
       "--disable-auth",
       "Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.",
     )
@@ -179,11 +210,39 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       "--generate-key",
       "Generate a secure API key for MCP_API_KEY and print it to stdout, then exit. Use this to set MCP_API_KEY in your .env file.",
     )
+    .option("--oauth", "Enable OAuth (PKCE) auth against Confluent Cloud")
+    .addOption(
+      new Option("--oauth-env <env>", "Auth0 environment for --oauth").choices([
+        "devel",
+        "stag",
+        "prod",
+      ] as const),
+    )
     .allowExcessArguments(false)
     .exitOverride();
 
   try {
     const opts = program.parse(argv).opts();
+
+    assertNoConfigConflicts(
+      opts.config,
+      opts.kafkaConfigFile,
+      opts.disableAuth,
+      opts.allowedHosts,
+      program.getOptionValueSource("transport") === "cli",
+    );
+
+    if (opts.oauth && !opts.oauthEnv) {
+      throw new Error("--oauth requires --oauth-env <devel|stag|prod>");
+    }
+    if (opts.oauthEnv && !opts.oauth) {
+      throw new Error("--oauth-env requires --oauth");
+    }
+    if (opts.oauth && opts.config) {
+      throw new Error(
+        "--oauth and --config are mutually exclusive in this release; YAML-driven OAuth is tracked as a follow-up",
+      );
+    }
 
     // Precedence: CLI > file > undefined
     let allowTools: string[] | undefined = undefined;
@@ -198,10 +257,6 @@ export function parseCliArgs(argv: string[]): CLIOptions {
     } else if (opts.blockToolsFile) {
       blockTools = readFileLines(opts.blockToolsFile);
     }
-    let kafkaConfig: KeyValuePairObject = {};
-    if (opts.kafkaConfigFile) {
-      kafkaConfig = parsePropertiesFile(opts.kafkaConfigFile);
-    }
     return {
       envFile: opts.envFile,
       config: opts.config,
@@ -211,15 +266,18 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       allowTools,
       blockTools,
       listTools: !!opts.listTools,
-      disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
-      kafkaConfig: kafkaConfig,
-      disableAuth: !!opts.disableAuth,
+      kafkaConfig: opts.kafkaConfigFile
+        ? parsePropertiesFile(opts.kafkaConfigFile)
+        : undefined,
+      disableAuth: opts.disableAuth ? true : undefined,
       allowedHosts: opts.allowedHosts
         ? opts.allowedHosts
             .split(",")
             .map((h: string) => h.trim().toLowerCase())
         : undefined,
       generateKey: !!opts.generateKey,
+      oauth: opts.oauth,
+      oauthEnv: opts.oauthEnv,
     };
   } catch (error: unknown) {
     if (

@@ -1,13 +1,9 @@
 import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -47,7 +43,7 @@ interface HealthStatus {
   };
 }
 
-export class CheckHealthHandler extends BaseToolHandler {
+export class CheckHealthHandler extends FlinkToolHandler {
   async handle(
     clientManager: ClientManager,
     toolArguments: Record<string, unknown> | undefined,
@@ -176,13 +172,5 @@ export class CheckHealthHandler extends BaseToolHandler {
       inputSchema: checkHealthArguments.shape,
       annotations: READ_ONLY,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return FLINK_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

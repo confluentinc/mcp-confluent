@@ -18,10 +18,25 @@ export interface StartServerOptions {
    * like overriding HTTP_PORT per-test or injecting tool-specific credentials.
    */
   env?: Record<string, string>;
+  /**
+   * Enable HTTP/SSE auth on the spawned server with the given API key. When
+   * set, the harness writes `server.auth.api_key` into the YAML, propagates
+   * the `cflt-mcp-api-key` header through the `/ping` readiness probe and
+   * the SDK client transport. Used by the auth smoke test; routine tests
+   * omit this and run with auth disabled. Ignored for stdio.
+   */
+  auth?: { apiKey: string };
 }
 
 export interface StartedServer {
   client: Client;
+  /**
+   * Base URL of the spawned HTTP/SSE server (e.g. `http://127.0.0.1:51234`).
+   * Undefined for stdio. Tests use this to send raw fetch requests
+   * bypassing the SDK client (e.g. exercising the auth middleware with
+   * deliberately-bad headers).
+   */
+  baseUrl?: string;
   /** Sends SIGTERM to the child, awaits exit, and closes the MCP client. */
   stop: () => Promise<void>;
 }
@@ -53,20 +68,27 @@ export async function startServer(
 
 /**
  * Spawns the server on a free loopback port and connects via Streamable HTTP
- * at `/mcp`. Auth is disabled at the server level (DNS rebinding protection
- * still applies, so loopback + auth-disabled is safe).
+ * at `/mcp`. Auth is disabled at the server level by default (DNS rebinding
+ * protection still applies, so loopback + auth-disabled is safe). When
+ * `options.auth` is supplied, the spawned server requires the matching
+ * `cflt-mcp-api-key` header and the harness wires it into the SDK transport
+ * so the connection still succeeds.
  */
 async function startHttp(options: StartServerOptions): Promise<StartedServer> {
   const port = await findFreePort();
   const child = await spawnHttpChild(options, port);
 
+  const baseUrl = `http://127.0.0.1:${port}`;
   const transport = new StreamableHTTPClientTransport(
-    new URL(`http://127.0.0.1:${port}/mcp`),
+    new URL(`${baseUrl}/mcp`),
+    options.auth
+      ? { requestInit: { headers: authHeaders(options.auth.apiKey) } }
+      : undefined,
   );
   const client = newClient();
   await client.connect(transport);
 
-  return { client, stop: makeHttpStop(client, child) };
+  return { client, baseUrl, stop: makeHttpStop(client, child) };
 }
 
 /**
@@ -81,13 +103,22 @@ async function startSse(options: StartServerOptions): Promise<StartedServer> {
 
   // /sse matches the SSE_MCP_ENDPOINT_PATH default; the SDK transport opens an EventSource
   // against this URL, then routes outbound messages to the session-scoped /messages endpoint
+  const baseUrl = `http://127.0.0.1:${port}`;
   const transport = new SSEClientTransport(
-    new URL(`http://127.0.0.1:${port}/sse`),
+    new URL(`${baseUrl}/sse`),
+    options.auth
+      ? { requestInit: { headers: authHeaders(options.auth.apiKey) } }
+      : undefined,
   );
   const client = newClient();
   await client.connect(transport);
 
-  return { client, stop: makeHttpStop(client, child) };
+  return { client, baseUrl, stop: makeHttpStop(client, child) };
+}
+
+/** Header object the auth middleware checks (`cflt-mcp-api-key`). */
+function authHeaders(apiKey: string): Record<string, string> {
+  return { "cflt-mcp-api-key": apiKey };
 }
 
 /**
@@ -172,12 +203,17 @@ function newClient(): Client {
  * or {@linkcode timeoutMs} elapses. Captures combined stdout+stderr via the
  * caller-supplied accessor so a startup failure (bad CLI arg, Zod
  * validation, etc.) surfaces immediately instead of after the full timeout.
+ *
+ * `extraHeaders` is forwarded to the fetch — the auth middleware is global,
+ * so when the spawn enables auth the readiness probe needs to send the same
+ * `cflt-mcp-api-key` header as the SDK transport.
  */
 async function waitForPing(
   url: string,
   child: ChildProcess,
   getOutput: () => string,
   timeoutMs = 30_000,
+  extraHeaders: Record<string, string> = {},
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -192,7 +228,7 @@ async function waitForPing(
     try {
       const response = await fetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...extraHeaders },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
       });
       if (response.ok) return;
@@ -228,7 +264,8 @@ async function spawnHttpChild(
       spawnConfigPath({
         transport: options.transport,
         httpPort: port,
-        authDisabled: true,
+        authDisabled: !options.auth,
+        apiKey: options.auth?.apiKey,
       }),
     ],
     {
@@ -245,7 +282,13 @@ async function spawnHttpChild(
   });
 
   try {
-    await waitForPing(`http://127.0.0.1:${port}/ping`, child, () => outputBuf);
+    await waitForPing(
+      `http://127.0.0.1:${port}/ping`,
+      child,
+      () => outputBuf,
+      undefined,
+      options.auth ? authHeaders(options.auth.apiKey) : {},
+    );
   } catch (error) {
     if (child.exitCode === null) child.kill("SIGTERM");
     throw error;

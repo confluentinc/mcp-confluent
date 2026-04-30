@@ -234,7 +234,7 @@ npm run test:integration -- --tags-filter=@kafka
 
 Each tool group needs a specific credential subset; `.env.integration.example` annotates which var feeds which tests. Tests whose credentials aren't populated skip themselves with a clear reason — you don't have to fill in every var to run a subset.
 
-Minimum for `@kafka` tests: `BOOTSTRAP_SERVERS`, `KAFKA_API_KEY`, `KAFKA_API_SECRET`. `KAFKA_REST_ENDPOINT` + `KAFKA_CLUSTER_ID` are only needed for the `alter-topic-config` / `get-topic-config` tests.
+Minimum for `@kafka` tests: `KAFKA_API_KEY`, `KAFKA_API_SECRET`. Non-secret config (bootstrap servers, REST endpoint, cluster id) lives in `test-fixtures/yaml_configs/integration.yaml` and doesn't need to be set in the env file.
 
 ##### Timing expectations
 
@@ -244,7 +244,7 @@ Minimum for `@kafka` tests: `BOOTSTRAP_SERVERS`, `KAFKA_API_KEY`, `KAFKA_API_SEC
 
 ##### Other useful commands
 
-- Filter to one test file: `npm run test:integration -- tests-filter=@kafka path/to/my.integration.test.ts`.
+- Filter to one test file: `npm run test:integration -- --tags-filter=@kafka path/to/my.integration.test.ts`.
 - Just the tool-group tag: `npm run test:integration -- --tags-filter=@kafka`.
 - Run both unit and integration in one shot: `npm run test`.
 - Clean up the secrets file: `make remove-test-env`.

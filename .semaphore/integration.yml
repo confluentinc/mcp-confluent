@@ -1,5 +1,5 @@
 version: v1.0
-name: "MCP Integration Tests"
+name: "MCP Integration Tests - ${{parameters.TOOL_GROUPS}} (${{parameters.TRANSPORTS}})"
 agent:
   machine:
     type: s1-prod-ubuntu24-04-amd64-1
@@ -29,7 +29,6 @@ global_job_config:
     always:
       commands:
         - make remove-test-env
-        - make store-integration-test-results TAG="$TOOL_GROUP" TRANSPORT="$TRANSPORT"
 
 blocks:
   - name: "Integration Tests: stdio"
@@ -41,6 +40,12 @@ blocks:
       env_vars:
         - name: TRANSPORT
           value: stdio
+      # task-level epilogue so $TOOL_GROUP / $TRANSPORT from the matrix axis
+      # are unambiguously in scope when result-publishing runs.
+      epilogue: &transport-epilogue
+        always:
+          commands:
+            - make store-integration-test-results TAG="$TOOL_GROUP" TRANSPORT="$TRANSPORT"
       jobs: &transport-jobs
         - name: "Integration: ${TOOL_GROUP} (${TRANSPORT})"
           commands:
@@ -59,6 +64,7 @@ blocks:
       env_vars:
         - name: TRANSPORT
           value: http
+      epilogue: *transport-epilogue
       jobs: *transport-jobs
 
   - name: "Integration Tests: sse"
@@ -69,6 +75,7 @@ blocks:
       env_vars:
         - name: TRANSPORT
           value: sse
+      epilogue: *transport-epilogue
       jobs: *transport-jobs
 
 after_pipeline:

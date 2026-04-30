@@ -1,9 +1,11 @@
 import { type DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import {
+  buildAuthConfigForConnection,
   constructClientManagerForConnection,
   DefaultClientManager,
 } from "@src/confluent/client-manager.js";
+import { ConfluentAuth } from "@src/confluent/middleware.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
@@ -147,6 +149,120 @@ describe("constructClientManagerForConnection()", () => {
       connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     );
     expect(manager["confluentCloudTelemetryBaseUrl"]).toBeUndefined();
+  });
+});
+
+describe("buildAuthConfigForConnection()", () => {
+  // Connection fixture with every surface wired so each surface's auth slice
+  // resolves with both an api_key block (for the fallback test) and a
+  // realistic shape. Pure-function tests — no client constructed.
+  const connFull = connWith({
+    kafka: {
+      bootstrap_servers: "broker:9092",
+      rest_endpoint: "https://kafka-rest.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+    schema_registry: {
+      endpoint: "https://sr.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+    flink: {
+      endpoint: "https://flink.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+      environment_id: "env-1",
+      organization_id: "org-1",
+      compute_pool_id: "lfcp-1",
+    },
+    confluent_cloud: {
+      endpoint: "https://cp.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+    tableflow: {
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+    telemetry: {
+      endpoint: "https://telemetry.example.com",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+  });
+
+  // Narrows a ConfluentAuth to its oauth variant or fails the test loudly.
+  // Lets each test call .getToken() without re-narrowing in every body.
+  function expectOAuth(auth: ConfluentAuth): {
+    type: "oauth";
+    getToken: () => string | undefined;
+  } {
+    if (auth.type !== "oauth") {
+      throw new Error(`expected oauth variant, got ${JSON.stringify(auth)}`);
+    }
+    return auth;
+  }
+
+  it("should wire the CP plane closure on cloud, tableflow, and telemetry when oauthHolder is supplied", () => {
+    const cpSpy = vi.fn(() => "cp-token");
+    const dpSpy = vi.fn(() => "dp-token");
+    const fakeHolder = {
+      getControlPlaneToken: cpSpy,
+      getDataPlaneToken: dpSpy,
+    } as unknown as OAuthHolder;
+
+    const auth = buildAuthConfigForConnection(connFull, fakeHolder);
+
+    expect(expectOAuth(auth.cloud).getToken()).toBe("cp-token");
+    expect(expectOAuth(auth.tableflow).getToken()).toBe("cp-token");
+    expect(expectOAuth(auth.telemetry).getToken()).toBe("cp-token");
+    expect(cpSpy).toHaveBeenCalledTimes(3);
+    expect(dpSpy).not.toHaveBeenCalled();
+  });
+
+  it("should wire the DP plane closure on flink, schemaRegistry, and kafka when oauthHolder is supplied", () => {
+    const cpSpy = vi.fn(() => "cp-token");
+    const dpSpy = vi.fn(() => "dp-token");
+    const fakeHolder = {
+      getControlPlaneToken: cpSpy,
+      getDataPlaneToken: dpSpy,
+    } as unknown as OAuthHolder;
+
+    const auth = buildAuthConfigForConnection(connFull, fakeHolder);
+
+    expect(expectOAuth(auth.flink).getToken()).toBe("dp-token");
+    expect(expectOAuth(auth.schemaRegistry).getToken()).toBe("dp-token");
+    expect(expectOAuth(auth.kafka).getToken()).toBe("dp-token");
+    expect(dpSpy).toHaveBeenCalledTimes(3);
+    expect(cpSpy).not.toHaveBeenCalled();
+  });
+
+  it("should fall back to api_key shape on every surface when oauthHolder is omitted", () => {
+    const auth = buildAuthConfigForConnection(connFull);
+
+    const expected = { apiKey: "k", apiSecret: "s" };
+    expect(auth.cloud).toEqual(expected);
+    expect(auth.tableflow).toEqual(expected);
+    expect(auth.telemetry).toEqual(expected);
+    expect(auth.flink).toEqual(expected);
+    expect(auth.schemaRegistry).toEqual(expected);
+    expect(auth.kafka).toEqual(expected);
+  });
+
+  it("should leave api_key fields undefined when the connection block is missing entirely", () => {
+    const sparseConn = connWith({
+      kafka: { bootstrap_servers: "broker:9092" },
+    });
+
+    const auth = buildAuthConfigForConnection(sparseConn);
+
+    // No confluent_cloud / tableflow / telemetry / flink / schema_registry blocks
+    // → each surface falls back to apiKey/apiSecret = undefined. The kafka
+    // block is present but has no `auth` field, so the same fallback applies.
+    expect(auth.cloud).toEqual({ apiKey: undefined, apiSecret: undefined });
+    expect(auth.tableflow).toEqual({ apiKey: undefined, apiSecret: undefined });
+    expect(auth.telemetry).toEqual({ apiKey: undefined, apiSecret: undefined });
+    expect(auth.flink).toEqual({ apiKey: undefined, apiSecret: undefined });
+    expect(auth.schemaRegistry).toEqual({
+      apiKey: undefined,
+      apiSecret: undefined,
+    });
+    expect(auth.kafka).toEqual({ apiKey: undefined, apiSecret: undefined });
   });
 });
 

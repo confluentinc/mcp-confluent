@@ -8,16 +8,16 @@
 # A missing secret env var throws at YAML load time; `tests/harness/runtime.ts`
 # catches it, returns an empty runtime, and every test's
 # `enabledConnectionIds(runtime)` gate yields a clean skip with the
-# requiredConnectionPath as the reason.
+# handler's predicate config path as the reason.
 connections:
   integration:
     type: direct
 
     kafka:
-      bootstrap_servers: "pkc-PLACEHOLDER.region.aws.confluent.cloud:9092"
-      rest_endpoint: "https://pkc-PLACEHOLDER.region.aws.confluent.cloud:443"
-      cluster_id: "lkc-PLACEHOLDER"
       auth:
         type: api_key
         key: "${KAFKA_API_KEY}"
         secret: "${KAFKA_API_SECRET}"
+      bootstrap_servers: "pkc-921jm.us-east-2.aws.confluent.cloud:9092"
+      cluster_id: "lkc-dm5vyd"
+      rest_endpoint: "https://pkc-921jm.us-east-2.aws.confluent.cloud:443"

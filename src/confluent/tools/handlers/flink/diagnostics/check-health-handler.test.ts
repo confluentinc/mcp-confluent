@@ -1,4 +1,4 @@
-import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
+import { CheckHealthHandler } from "@src/confluent/tools/handlers/flink/diagnostics/check-health-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
@@ -31,9 +31,9 @@ type HandleCaseWithConn = HandleCase & {
   connectionConfig?: Parameters<typeof runtimeWith>[0];
 };
 
-describe("get-flink-exceptions-handler.ts", () => {
-  describe("GetFlinkExceptionsHandler", () => {
-    const handler = new GetFlinkExceptionsHandler();
+describe("check-health-handler.ts", () => {
+  describe("CheckHealthHandler", () => {
+    const handler = new CheckHealthHandler();
 
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
@@ -59,23 +59,17 @@ describe("get-flink-exceptions-handler.ts", () => {
           connectionConfig: {},
         },
         {
-          label: "uses org/env IDs from config when args absent",
+          label:
+            "uses org/env IDs from config and reports healthy for running statement",
           args: { statementName: STATEMENT_NAME },
-          responseData: { data: [] },
-          outcome: {
-            resolves: `No exceptions found for statement '${STATEMENT_NAME}'.`,
-          },
+          responseData: { status: { phase: "RUNNING" }, data: [] },
+          outcome: { resolves: `Health check for '${STATEMENT_NAME}'` },
         },
         {
-          label:
-            "uses explicit org/env args over config and returns exception list",
+          label: "uses explicit org/env args over config",
           args: { statementName: STATEMENT_NAME, ...EXPLICIT_IDS },
-          responseData: {
-            data: [{ message: "OOM error" }, { message: "Timeout" }],
-          },
-          outcome: {
-            resolves: `Flink Statement Exceptions for '${STATEMENT_NAME}'`,
-          },
+          responseData: { status: { phase: "RUNNING" }, data: [] },
+          outcome: { resolves: `Health check for '${STATEMENT_NAME}'` },
         },
       ];
 

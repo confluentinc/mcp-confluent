@@ -1,10 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 
 export interface TestServerContext {
   server: McpServer;
@@ -19,13 +19,12 @@ export interface TestServerContext {
  * Spins up an {@link McpServer} and {@link Client} connected via
  * {@link InMemoryTransport} for protocol-level integration tests.
  *
- * @param clientManager - (Stubbed) {@link ClientManager} injected into every
- *   tool handler
+ * @param runtime - {@link ServerRuntime} injected into every tool handler
  * @param toolNames - (Optional) Subset of tools to register (defaults to all
  *   {@link ToolName} values)
  */
 export async function createTestServer(
-  clientManager: ClientManager,
+  runtime: ServerRuntime,
   toolNames?: ToolName[],
 ): Promise<TestServerContext> {
   // ensure the env proxy is initialized so Zod .default() callbacks
@@ -45,7 +44,7 @@ export async function createTestServer(
       toolName as string,
       { description: config.description, inputSchema: config.inputSchema },
       async (args, context) => {
-        return await handler.handle(clientManager, args, context?.sessionId);
+        return await handler.handle(runtime, args, context?.sessionId);
       },
     );
   }

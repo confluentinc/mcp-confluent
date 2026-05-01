@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -64,9 +63,10 @@ export type EnvironmentList = z.infer<typeof environmentListSchema>;
 
 export class ListEnvironmentsHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { pageToken } = listEnvironmentsArguments.parse(toolArguments);
 
     try {

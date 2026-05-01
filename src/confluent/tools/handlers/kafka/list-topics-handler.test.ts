@@ -1,5 +1,5 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/client-manager.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import {
   bareRuntime,
@@ -18,12 +18,12 @@ import { beforeEach, describe, expect, it, type Mocked } from "vitest";
 describe("list-topics-handler.ts", () => {
   describe("ListTopicsHandler", () => {
     const handler = new ListTopicsHandler();
-    let clientManager: Mocked<DefaultClientManager>;
+    let clientManager: Mocked<DirectClientManager>;
     let admin: MockedAdmin;
 
     beforeEach(() => {
       admin = createMockAdmin();
-      clientManager = createMockInstance(DefaultClientManager);
+      clientManager = createMockInstance(DirectClientManager);
       clientManager.getAdminClient.mockResolvedValue(admin as KafkaJS.Admin);
     });
 

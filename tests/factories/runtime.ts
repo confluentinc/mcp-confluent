@@ -1,6 +1,6 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import type { Mocked } from "vitest";
@@ -17,8 +17,8 @@ export const DEFAULT_CONNECTION_ID = "default";
 export function runtimeWith(
   connectionConfig: Omit<DirectConnectionConfig, "type"> = {},
   connectionId = DEFAULT_CONNECTION_ID,
-  clientManager: Mocked<DefaultClientManager> = createMockInstance(
-    DefaultClientManager,
+  clientManager: Mocked<DirectClientManager> = createMockInstance(
+    DirectClientManager,
   ),
 ): ServerRuntime {
   return new ServerRuntime(

@@ -15,6 +15,9 @@
 # catches it, returns an empty runtime, and every test's
 # `enabledConnectionIds(runtime)` gate yields a clean skip with the
 # handler's predicate config path as the reason.
+server:
+  log_level: error
+
 connections:
   integration:
     type: direct

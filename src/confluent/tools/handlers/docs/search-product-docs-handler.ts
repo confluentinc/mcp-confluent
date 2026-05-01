@@ -78,8 +78,8 @@ export class SearchProductDocsHandler extends BaseToolHandler {
       ]);
 
     const warnings: string[] = [];
-    // Order matters — first into a bucket leads it. dev-proxy (DevRel-curated)
-    // outranks Swiftype's noisier full-text hits; Swiftype fills the gaps.
+    // Whichever backend pushes into a bucket first leads it.
+    // dev-proxy is curated, so its hits outrank Swiftype's; Swiftype fills gaps.
     const all = [
       ...extractResults(developerSettled, "developer.confluent.io", warnings),
       ...extractResults(supportSettled, "support.confluent.io", warnings),

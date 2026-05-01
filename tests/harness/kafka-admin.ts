@@ -33,7 +33,7 @@ export async function connectTestProducer(): Promise<KafkaJS.Producer> {
  * `cluster_id`, so without this check the handler would silently receive
  * `undefined` and produce a confusing downstream error.
  */
-export function testClusterId(): string {
+export function getTestClusterId(): string {
   const conn = Object.values(integrationRuntime().config.connections)[0];
   if (!conn?.kafka?.cluster_id) {
     throw new Error(
@@ -65,7 +65,7 @@ export function uniqueTopicName(slug: string): string {
  * reference captured at describe-body evaluation would be `undefined` when
  * test bodies run.
  */
-export function withSharedAdmin(): {
+export function withSharedAdminClient(): {
   admin: () => KafkaJS.Admin;
   createdTopics: string[];
 } {

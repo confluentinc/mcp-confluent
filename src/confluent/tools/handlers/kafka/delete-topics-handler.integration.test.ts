@@ -1,9 +1,8 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
-  connectTestAdmin,
   uniqueTopicName,
+  withSharedAdminClient,
 } from "@tests/harness/kafka-admin.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
@@ -23,23 +22,8 @@ describe("delete-topics-handler", { tags: [Tag.KAFKA] }, () => {
     return;
   }
 
-  // the admin client pre-creates topics for the handler to delete, and cleans up any that the
-  // handler failed to remove
-  let admin: KafkaJS.Admin;
-  const createdTopics: string[] = [];
-
-  beforeAll(async () => {
-    admin = await connectTestAdmin();
-  });
-
-  afterAll(async () => {
-    if (createdTopics.length > 0) {
-      await admin.deleteTopics({ topics: createdTopics }).catch(() => {
-        // the handler-under-test already deleted these on success; ignore any not-found errors
-      });
-    }
-    await admin.disconnect();
-  });
+  // installs beforeAll/afterAll at this describe scope (shared admin client, topic cleanup)
+  const { admin, createdTopics } = withSharedAdminClient();
 
   describe.each(activeTransports)("via %s transport", (transport) => {
     let server: StartedServer;
@@ -55,10 +39,10 @@ describe("delete-topics-handler", { tags: [Tag.KAFKA] }, () => {
     it("should delete the requested Kafka topic", async () => {
       const topic = uniqueTopicName(`delete-${transport}`);
       createdTopics.push(topic);
-      await admin.createTopics({ topics: [{ topic, numPartitions: 1 }] });
+      await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
       // wait for the newly-created topic to be visible before deleting it
       await expect
-        .poll(() => admin.listTopics(), {
+        .poll(() => admin().listTopics(), {
           timeout: 15_000,
           interval: 500,
         })
@@ -72,7 +56,7 @@ describe("delete-topics-handler", { tags: [Tag.KAFKA] }, () => {
       expect(result.isError).not.toBe(true);
 
       await expect
-        .poll(() => admin.listTopics(), {
+        .poll(() => admin().listTopics(), {
           timeout: 15_000,
           interval: 500,
         })

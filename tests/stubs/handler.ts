@@ -192,13 +192,20 @@ export async function assertHandleCase(options: {
   }
 
   if (outcome === "TODO") {
-    const discovered =
-      thrown === undefined
-        ? `{ resolves: "${result!.content
-            .map((c) => ("text" in c ? c.text : ""))
-            .join("")
-            .slice(0, 60)}" }`
-        : `{ throws: "${classifyThrown(name, thrown)}" }`;
+    let discovered: string;
+    if (thrown !== undefined) {
+      discovered = `{ throws: ${JSON.stringify(classifyThrown(name, thrown))} }`;
+    } else if (result === undefined) {
+      throw new Error(
+        `Wacky -- ${name}: handle() returned undefined instead of a CallToolResult`,
+      );
+    } else {
+      const text = result.content
+        .map((c) => ("text" in c ? c.text : ""))
+        .join("")
+        .slice(0, 60);
+      discovered = `{ resolves: ${JSON.stringify(text)} }`;
+    }
     throw new Error(`${name}: outcome is TODO — replace with: ${discovered}`);
   }
 

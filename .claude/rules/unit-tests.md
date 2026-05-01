@@ -32,8 +32,8 @@ paths:
 
 ## Key Patterns
 
-- Use `createMockInstance(DefaultClientManager)` (from `@tests/stubs/index.js`) for handler tests
-  with one class dependency. The returned object is typed as `Mocked<DefaultClientManager>` so
+- Use `createMockInstance(DirectClientManager)` (from `@tests/stubs/index.js`) for handler tests
+  with one class dependency. The returned object is typed as `Mocked<DirectClientManager>` so
   method-chain autocomplete works (`.mockResolvedValue`, etc.)
 - Don't wrap simple one-liners in helper functions
 - Use `createTestServer()` from `@tests/server` for integration-style tests that need a full MCP
@@ -148,7 +148,7 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   instead of a bare `ClientManager`. Create the mock first, configure it, then inject it into
   `runtimeWith()` as the third argument:
   ```typescript
-  clientManager = createMockInstance(DefaultClientManager);
+  clientManager = createMockInstance(DirectClientManager);
   clientManager.getSomeClient.mockResolvedValue(...);
   const runtime = runtimeWith({ kafka: { bootstrap_servers: "..." } }, DEFAULT_CONNECTION_ID, clientManager);
   handler.handle(runtime, args);

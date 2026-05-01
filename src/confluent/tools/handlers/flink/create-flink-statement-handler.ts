@@ -73,21 +73,12 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
       organizationId,
     } = createFlinkStatementArguments.parse(toolArguments);
     const conn = runtime.config.getSoleConnection();
-    const organization_id = this.resolveParam(
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      conn,
       organizationId,
-      conn.flink?.organization_id,
-      "Organization ID",
-    );
-    const environment_id = this.resolveParam(
       environmentId,
-      conn.flink?.environment_id,
-      "Environment ID",
     );
-    const compute_pool_id = this.resolveParam(
-      computePoolId,
-      conn.flink?.compute_pool_id,
-      "Compute Pool ID",
-    );
+    const compute_pool_id = this.resolveComputePoolId(conn, computePoolId);
     const resolvedCatalogName =
       catalogName || conn.flink?.environment_name || "";
     const resolvedDatabaseName =

@@ -66,15 +66,10 @@ export class DetectIssuesHandler extends FlinkToolHandler {
     } = detectIssuesArguments.parse(toolArguments);
 
     const conn = runtime.config.getSoleConnection();
-    const organization_id = this.resolveParam(
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      conn,
       organizationId,
-      conn.flink?.organization_id,
-      "Organization ID",
-    );
-    const environment_id = this.resolveParam(
       environmentId,
-      conn.flink?.environment_id,
-      "Environment ID",
     );
     const compute_pool_id = computePoolId || conn.flink?.compute_pool_id;
 

@@ -40,8 +40,8 @@ function buildConfig(overrides: ConfigOverrides = {}): ClientManagerConfig {
   };
 }
 
-describe("BaseClientManager (via DirectClientManager)", () => {
-  describe("REST client getters", () => {
+describe("client-manager.ts", () => {
+  describe("BaseClientManager", () => {
     type RestGetterKey = keyof ConfluentCloudRestClientManager;
 
     const restCases: Array<{
@@ -90,97 +90,96 @@ describe("BaseClientManager (via DirectClientManager)", () => {
     ];
 
     for (const { getter, endpointKey, url, errorFragment } of restCases) {
-      it(`${getter} should return a client when ${endpointKey} endpoint is configured`, () => {
-        const cm = new DirectClientManager(
-          buildConfig({ endpoints: { [endpointKey]: url } }),
-        );
-        const client = cm[getter]();
-        expect(client).toBeDefined();
-        expect(typeof client.GET).toBe("function");
-      });
+      describe(`${getter}()`, () => {
+        it("should return a client when the endpoint is configured", () => {
+          const cm = new DirectClientManager(
+            buildConfig({ endpoints: { [endpointKey]: url } }),
+          );
+          const client = cm[getter]();
+          expect(client).toBeDefined();
+          expect(typeof client.GET).toBe("function");
+        });
 
-      it(`${getter} should throw when the endpoint is not configured`, () => {
-        const cm = new DirectClientManager(buildConfig());
-        expect(() => cm[getter]()).toThrow(errorFragment);
+        it("should throw when the endpoint is not configured", () => {
+          const cm = new DirectClientManager(buildConfig());
+          expect(() => cm[getter]()).toThrow(errorFragment);
+        });
       });
     }
-  });
 
-  describe("getSchemaRegistryClient", () => {
-    const url = "https://psrc-abc.us-east-1.aws.confluent.cloud";
+    describe("getSchemaRegistryClient()", () => {
+      const url = "https://psrc-abc.us-east-1.aws.confluent.cloud";
 
-    it("should return a SchemaRegistryClient when api_key and secret are both set", () => {
-      const cm = new DirectClientManager(
-        buildConfig({
-          endpoints: { schemaRegistry: url },
-          auth: { schemaRegistry: { apiKey: "k", apiSecret: "s" } },
-        }),
-      );
-      expect(cm.getSchemaRegistryClient()).toBeInstanceOf(SchemaRegistryClient);
-    });
+      it("should return a SchemaRegistryClient when api_key and secret are both set", () => {
+        const cm = new DirectClientManager(
+          buildConfig({
+            endpoints: { schemaRegistry: url },
+            auth: { schemaRegistry: { apiKey: "k", apiSecret: "s" } },
+          }),
+        );
+        expect(cm.getSchemaRegistryClient()).toBeInstanceOf(
+          SchemaRegistryClient,
+        );
+      });
 
-    it("should return a SchemaRegistryClient when no credentials are supplied (anonymous)", () => {
-      const cm = new DirectClientManager(
-        buildConfig({
-          endpoints: { schemaRegistry: url },
-          auth: { schemaRegistry: { apiKey: undefined, apiSecret: undefined } },
-        }),
-      );
-      expect(cm.getSchemaRegistryClient()).toBeInstanceOf(SchemaRegistryClient);
-    });
+      it("should return a SchemaRegistryClient when no credentials are supplied", () => {
+        const cm = new DirectClientManager(
+          buildConfig({
+            endpoints: { schemaRegistry: url },
+            auth: {
+              schemaRegistry: { apiKey: undefined, apiSecret: undefined },
+            },
+          }),
+        );
+        expect(cm.getSchemaRegistryClient()).toBeInstanceOf(
+          SchemaRegistryClient,
+        );
+      });
 
-    it("should throw on partial credentials (apiKey without apiSecret)", () => {
-      const cm = new DirectClientManager(
-        buildConfig({
-          endpoints: { schemaRegistry: url },
-          auth: { schemaRegistry: { apiKey: "k", apiSecret: undefined } },
-        }),
-      );
-      expect(() => cm.getSchemaRegistryClient()).toThrow(
-        "SCHEMA_REGISTRY_API_SECRET",
-      );
-    });
+      it("should throw on partial credentials when apiKey is set without apiSecret", () => {
+        const cm = new DirectClientManager(
+          buildConfig({
+            endpoints: { schemaRegistry: url },
+            auth: { schemaRegistry: { apiKey: "k", apiSecret: undefined } },
+          }),
+        );
+        expect(() => cm.getSchemaRegistryClient()).toThrow(
+          "SCHEMA_REGISTRY_API_SECRET",
+        );
+      });
 
-    it("should throw on partial credentials (apiSecret without apiKey)", () => {
-      const cm = new DirectClientManager(
-        buildConfig({
-          endpoints: { schemaRegistry: url },
-          auth: { schemaRegistry: { apiKey: undefined, apiSecret: "s" } },
-        }),
-      );
-      expect(() => cm.getSchemaRegistryClient()).toThrow(
-        "SCHEMA_REGISTRY_API_KEY",
-      );
-    });
+      it("should throw on partial credentials when apiSecret is set without apiKey", () => {
+        const cm = new DirectClientManager(
+          buildConfig({
+            endpoints: { schemaRegistry: url },
+            auth: { schemaRegistry: { apiKey: undefined, apiSecret: "s" } },
+          }),
+        );
+        expect(() => cm.getSchemaRegistryClient()).toThrow(
+          "SCHEMA_REGISTRY_API_KEY",
+        );
+      });
 
-    it("should throw when the schema registry endpoint is not configured", () => {
-      const cm = new DirectClientManager(buildConfig());
-      expect(() => cm.getSchemaRegistryClient()).toThrow(
-        "Schema Registry endpoint not configured",
-      );
-    });
+      it("should throw when the schema registry endpoint is not configured", () => {
+        const cm = new DirectClientManager(buildConfig());
+        expect(() => cm.getSchemaRegistryClient()).toThrow(
+          "Schema Registry endpoint not configured",
+        );
+      });
 
-    it("should throw when the schema registry auth is the oauth variant (SDK OAuth not supported yet)", () => {
-      const cm = new DirectClientManager(
-        buildConfig({
-          endpoints: { schemaRegistry: url },
-          auth: {
-            schemaRegistry: { type: "oauth", getToken: () => "token" },
-          },
-        }),
-      );
-      expect(() => cm.getSchemaRegistryClient()).toThrow(
-        "Schema Registry OAuth authentication is not supported",
-      );
-    });
-  });
-});
-
-describe("DirectClientManager", () => {
-  describe("disconnect", () => {
-    it("should resolve without error on a fresh instance (no Kafka clients materialized)", async () => {
-      const cm = new DirectClientManager(buildConfig());
-      await expect(cm.disconnect()).resolves.toBeUndefined();
+      it("should throw when the schema registry auth uses the oauth variant", () => {
+        const cm = new DirectClientManager(
+          buildConfig({
+            endpoints: { schemaRegistry: url },
+            auth: {
+              schemaRegistry: { type: "oauth", getToken: () => "token" },
+            },
+          }),
+        );
+        expect(() => cm.getSchemaRegistryClient()).toThrow(
+          "Schema Registry OAuth authentication is not supported",
+        );
+      });
     });
   });
 });

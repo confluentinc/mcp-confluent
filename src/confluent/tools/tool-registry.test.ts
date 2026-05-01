@@ -1,4 +1,4 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import {
   CREATE_UPDATE,
   DESTRUCTIVE,
@@ -137,7 +137,7 @@ describe("tool-registry.ts", () => {
      * Builds a `ServerRuntime` with every service block populated, injecting
      * `clientManager` so callers can verify which client getters were invoked.
      */
-    function allServicesRuntime(clientManager: Mocked<DefaultClientManager>) {
+    function allServicesRuntime(clientManager: Mocked<DirectClientManager>) {
       return runtimeWith(
         {
           kafka: {
@@ -181,7 +181,7 @@ describe("tool-registry.ts", () => {
     }
 
     /**
-     * Wires every client getter on a fresh `Mocked<DefaultClientManager>` to a
+     * Wires every client getter on a fresh `Mocked<DirectClientManager>` to a
      * two-proxy pair so handler bodies never throw a TypeError before reaching
      * real logic. Supply `responseData` to push a specific handler past schema
      * validation into its success branch (defaults to `{}`).
@@ -222,7 +222,7 @@ describe("tool-registry.ts", () => {
           return callableProxy;
         },
       });
-      const clientManager = createMockInstance(DefaultClientManager);
+      const clientManager = createMockInstance(DirectClientManager);
       clientManager.getAdminClient.mockResolvedValue(callableProxy as never);
       clientManager.getProducer.mockResolvedValue(callableProxy as never);
       clientManager.getConsumer.mockResolvedValue(callableProxy as never);

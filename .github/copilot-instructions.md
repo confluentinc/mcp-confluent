@@ -27,7 +27,7 @@ this codebase. Author-facing guidance (how to scaffold a tool, run the inspector
 At startup: `parseCliArgs()` → `initEnv()` → branch on whether `-c <path>` was supplied:
 `loadConfigFromYaml(path, process.env)` for the YAML path, or `buildConfigFromEnvAndCli(env, ...)`
 for the legacy env+CLI path. Both return a single `MCPServerConfiguration`. Then
-`ServerRuntime.fromConfig()` constructs one `DefaultClientManager` per connection → iterates
+`ServerRuntime.fromConfig()` constructs one `DirectClientManager` per connection → iterates
 `ToolName` enum to build the enabled tool set → registers tools on `McpServer` → starts transports.
 
 **Tools are auto-enabled/disabled** at startup based on which service blocks are present in each
@@ -60,9 +60,12 @@ from `src/confluent/tools/connection-predicates.ts`. An empty result disables th
     intermediate base class (e.g., `flink-tool-handler.ts`, `tableflow-tool-handler.ts`) that
     implements `enabledConnectionIds()` once for the whole domain.
 
-- **`src/confluent/client-manager.ts`** — `DefaultClientManager` holds lazily-initialized Kafka
-  clients (admin/producer/consumer via `@confluentinc/kafka-javascript`) and typed `openapi-fetch`
-  REST clients for each Confluent Cloud API surface.
+- **`src/confluent/client-manager.ts`** — public client-manager contracts (`ClientManager` and
+  its constituent interfaces).
+- **`src/confluent/base-client-manager.ts`** — abstract `BaseClientManager` owning every typed
+  `openapi-fetch` REST client and the Schema Registry SDK client. No native Kafka broker.
+- **`src/confluent/direct-client-manager.ts`** — concrete `DirectClientManager` adding api-key
+  Kafka admin/producer/consumer via `@confluentinc/kafka-javascript`.
 
 - **`src/confluent/openapi-schema.d.ts`** — generated from `openapi.json` via
   `npm run generate:openapi-types` (openapi-typescript). Never hand-edited.

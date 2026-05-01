@@ -1,4 +1,4 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import {
   CREATE_UPDATE,
   DESTRUCTIVE,
@@ -140,7 +140,7 @@ describe("tool-registry.ts", () => {
      * Builds a `ServerRuntime` with every service block populated, injecting
      * `clientManager` so callers can verify which client getters were invoked.
      */
-    function allServicesRuntime(clientManager: Mocked<DefaultClientManager>) {
+    function allServicesRuntime(clientManager: Mocked<DirectClientManager>) {
       return runtimeWith(
         {
           kafka: {

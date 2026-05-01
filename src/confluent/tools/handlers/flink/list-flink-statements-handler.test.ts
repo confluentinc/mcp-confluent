@@ -1,5 +1,4 @@
 import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
-import { initEnv } from "@src/env.js";
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
@@ -9,7 +8,7 @@ import {
   stubClientGetters,
   type HandleCase,
 } from "@tests/stubs/index.js";
-import { beforeAll, describe, it } from "vitest";
+import { describe, it } from "vitest";
 
 const FLINK_CONN = {
   flink: {
@@ -26,22 +25,33 @@ const EXPLICIT_IDS = {
   environmentId: "env-from-args",
 };
 
+type HandleCaseWithConn = HandleCase & {
+  connectionConfig?: Parameters<typeof runtimeWith>[0];
+};
+
 describe("list-flink-statements-handler.ts", () => {
   describe("ListFlinkStatementsHandler", () => {
     const handler = new ListFlinkStatementsHandler();
 
-    // Required while the handler reads env vars via getEnsuredParam/Zod defaults.
-    // Remove after issue #231 migrates those reads to conn.flink config fields.
-    beforeAll(() => {
-      initEnv();
-    });
-
     describe("handle()", () => {
-      const cases: HandleCase[] = [
+      const cases: HandleCaseWithConn[] = [
         {
-          label: "throws when organizationId is absent and not in env",
+          label: "throws when organizationId is absent and not in config",
           args: {},
           outcome: { throws: "Organization ID is required" },
+          connectionConfig: {},
+        },
+        {
+          label: "throws when environmentId is absent and not in config",
+          args: { organizationId: "org-from-args" },
+          outcome: { throws: "Environment ID is required" },
+          connectionConfig: {},
+        },
+        {
+          label:
+            "uses org/env IDs and computePoolId from config when args absent",
+          args: {},
+          outcome: { resolves: "{}" },
         },
         {
           label: "resolves when required IDs are supplied as explicit args",
@@ -78,13 +88,18 @@ describe("list-flink-statements-handler.ts", () => {
 
       it.each(cases)(
         "should $label",
-        async ({ args, outcome, responseData }) => {
+        async ({
+          args,
+          outcome,
+          responseData,
+          connectionConfig = FLINK_CONN,
+        }) => {
           const { clientManager, clientGetters } =
             stubClientGetters(responseData);
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
-              FLINK_CONN,
+              connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
             ),

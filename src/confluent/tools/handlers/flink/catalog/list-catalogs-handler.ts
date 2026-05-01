@@ -1,4 +1,3 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
@@ -35,26 +34,18 @@ export class ListCatalogsHandler extends FlinkToolHandler {
     const { organizationId, environmentId, computePoolId } =
       listCatalogsArguments.parse(toolArguments);
 
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
-      organizationId,
-    );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
-      environmentId,
-    );
-    const compute_pool_id = getEnsuredParam(
-      "FLINK_COMPUTE_POOL_ID",
-      "Compute Pool ID is required",
-      computePoolId,
-    );
-    // Smart resolution: use FLINK_ENV_ID as the catalog name
-    const catalog_name = resolveCatalogName();
+    const conn = runtime.config.getSoleConnection();
+    const organization_id = organizationId || conn.flink?.organization_id;
+    if (!organization_id) throw new Error("Organization ID is required");
+    const environment_id = environmentId || conn.flink?.environment_id;
+    if (!environment_id) throw new Error("Environment ID is required");
+    const compute_pool_id = computePoolId || conn.flink?.compute_pool_id;
+    if (!compute_pool_id) throw new Error("Compute Pool ID is required");
+    // Smart resolution: use flink.environment_id from connection config as the catalog name
+    const catalog_name = resolveCatalogName(undefined, conn);
     if (!catalog_name) {
       return this.createResponse(
-        "Catalog name could not be resolved. Set FLINK_ENV_ID.",
+        "Catalog name could not be resolved. Set flink.environment_id in config.",
         true,
       );
     }

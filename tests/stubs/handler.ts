@@ -7,18 +7,33 @@ import { ZodError } from "zod";
 import { createMockInstance } from "./mock-instance.js";
 
 export type Resolves = {
-  /** Minimal valid API response to feed into the proxy's `data` property.
-   *  Omit to use `{}` (sufficient when the handler just JSON-serialises the
-   *  response); supply `{ data: [] }` or a richer shape to push the handler
-   *  past guard checks into its real success branch. */
+  /**
+   * Controls what each stubbed API call resolves to. Forwarded directly to
+   * `stubClientGetters()` — see its JSDoc for the full element-shape contract.
+   *
+   * Quick reference:
+   * - Omit (or `{}`) when the handler short-circuits before reading the result.
+   * - Plain object → becomes `(await call()).data`. Match the shape the handler
+   *   reads: e.g. `{ status: { phase: "COMPLETED" }, results: { data: [...] } }`.
+   * - `{ response: { status: N } }` → for handlers that destructure `response`
+   *   (e.g. DELETE endpoints: `const { response } = await client.DELETE(...)`).
+   * - `{ error: { ... } }` → makes `(await call()).error` truthy, triggering
+   *   error-branch code.
+   * - Array of the above → consumed in call order; last element reused when
+   *   the array is exhausted (needed for poll-then-fetch handlers).
+   */
   responseData?: unknown;
   /** Substring that must appear in the resolved response text. */
   resolves: string;
 };
 
 export type Throws = {
-  /** Same as `Resolves.responseData` — set when the handler needs valid-ish
-   *  data before it reaches the code that throws. */
+  /**
+   * Same contract as `Resolves.responseData`. Supply when the handler must
+   * complete one or more successful API calls before reaching the code that
+   * throws (e.g. a handler that fetches data and then validates it).
+   * Omit when the throw happens before any client call.
+   */
   responseData?: unknown;
   /** Substring that must appear in the thrown error message, or "ZodError"
    *  to match any ZodError regardless of message. */
@@ -36,12 +51,16 @@ export type HandleOutcome = Resolves | Throws | "TODO";
  *  Each element is a Vitest mock whose `.mock.calls` records invocations. */
 export type ClientGetters = Array<{ mock: { calls: unknown[] } }>;
 
-/** One entry in an `it.each` handler test suite. Supply `responseData` to push
- *  the handler past guard checks; omit to use the default `{}` response. */
+/** One entry in an `it.each` handler test suite. */
 export type HandleCase = {
   label: string;
   args: Record<string, unknown>;
   outcome: HandleOutcome;
+  /**
+   * Forwarded to `stubClientGetters()`. Omit for cases that throw or
+   * short-circuit before touching the client. See `Resolves.responseData`
+   * for the element-shape contract and array usage.
+   */
   responseData?: unknown;
 };
 
@@ -56,44 +75,95 @@ export function classifyThrown(label: string, thrown: unknown): string {
 
 /**
  * Wires every client getter on a fresh `Mocked<DefaultClientManager>` to a
- * two-proxy pair so handler bodies never throw a TypeError before reaching
- * real logic. Supply `responseData` to push a specific handler past schema
- * validation into its success branch (defaults to `{}`).
+ * two-proxy pair so handler bodies can traverse arbitrary method chains
+ * (`.GET(...)`, `.POST(...)`, `.path(...).method(...)`, etc.) without throwing
+ * a TypeError. Every async call resolves to a proxy that models the
+ * `{ data, error, response }` shape returned by `openapi-fetch`.
  *
- * Returns `{ clientManager, clientGetters }`. `clientGetters` is the
- * canonical list of all getter mocks; pass it to `assertHandleCase` to
- * assert that at least one was invoked when a handler resolves successfully.
+ * ## `responseData` — single value
+ *
+ * Pass a plain object; it becomes `(await call()).data`. Shape it to match
+ * what the handler reads:
+ * ```typescript
+ * // handler does: const { data } = await client.GET(...); data.status.phase
+ * stubClientGetters({ status: { phase: "COMPLETED" }, results: { data: [] } })
+ * ```
+ *
+ * Two special top-level keys override the defaults:
+ * - `response` — surfaced as `(await call()).response`. Use for handlers that
+ *   destructure `response` directly, e.g. DELETE endpoints that check
+ *   `response?.status`:
+ *   ```typescript
+ *   stubClientGetters({ response: { status: 204 } })
+ *   ```
+ * - `error` — surfaced as `(await call()).error`. Use to exercise a handler's
+ *   error branch (`if (error) return this.createResponse(..., true)`):
+ *   ```typescript
+ *   stubClientGetters({ error: { message: "not found" } })
+ *   ```
+ *
+ * ## `responseData` — array of elements
+ *
+ * Pass an array to feed different data to successive calls. Each element
+ * follows the same shape contract above. The last element is reused once the
+ * array is exhausted, so you only need to enumerate the calls that differ:
+ * ```typescript
+ * // handler: POST to create → GET to poll status → GET to fetch results
+ * stubClientGetters([
+ *   {},                                                    // POST (ignored)
+ *   { status: { phase: "COMPLETED" } },                   // GET poll
+ *   { results: { data: [{ COLUMN_NAME: "id" }] } },       // GET results
+ * ])
+ * ```
+ *
+ * Returns `{ clientManager, clientGetters }`. Pass `clientGetters` to
+ * `assertHandleCase` to assert the handler reached the client layer on a
+ * successful resolve.
  */
 export function stubClientGetters(responseData: unknown = {}) {
   // Two-proxy setup: callableProxy (function target) handles method chains
-  // and calls; responseProxy (plain-object target) is what async calls
-  // resolve to, modelling the { data, error } shape from openapi-fetch.
-  // Future refinement: accept responseData as an array to support sequential
-  // per-call responses (needed for multi-call handlers). The apply trap would
-  // become index-aware, constructing a fresh responseProxy per invocation.
-  let responseProxy: object = {};
-  const callableProxy = new Proxy((() => {}) as () => Promise<object>, {
+  // and calls; per-call responseProxies model the { data, error, response }
+  // shape from openapi-fetch. When responseData is an array, each element is
+  // consumed in order; the last element is reused once the array is exhausted.
+  const responses = Array.isArray(responseData) ? responseData : [responseData];
+  let callIndex = 0;
+
+  const callableProxy: object = new Proxy((() => {}) as () => Promise<object>, {
     get: (_t, prop) => {
       if (prop === "then" || prop === "error") return undefined;
       return callableProxy;
     },
-    apply: () => Promise.resolve(responseProxy),
-  });
-  responseProxy = new Proxy({} as object, {
-    // Four properties are special-cased:
-    //   `then`          → undefined  (prevents JS treating this as a thenable)
-    //   `error`         → undefined  (openapi-fetch "success" signal)
-    //   `data`          → responseData  (caller-supplied; defaults to {})
-    //   Symbol.iterator → empty-array iterator (handlers that iterate the
-    //                     resolved value directly get an empty loop, not a TypeError)
-    get: (_t, prop) => {
-      if (prop === "then" || prop === "error") return undefined;
-      if (prop === "data") return responseData;
-      if (prop === Symbol.iterator)
-        return Array.prototype[Symbol.iterator].bind([]);
-      return callableProxy;
+    apply: () => {
+      const element = responses[Math.min(callIndex++, responses.length - 1)];
+      return Promise.resolve(makeResponseProxy(element));
     },
   });
+
+  function makeResponseProxy(element: unknown): object {
+    const elem =
+      element !== null && typeof element === "object"
+        ? (element as Record<string | symbol, unknown>)
+        : null;
+    return new Proxy({} as object, {
+      // Special-cased properties:
+      //   `then`          → undefined  (prevents JS treating this as a thenable)
+      //   `error`         → element.error if present, else undefined
+      //   `data`          → element  (backward compat: element IS the data)
+      //   `response`      → element.response if present, else callableProxy
+      //   Symbol.iterator → empty-array iterator
+      get: (_t, prop) => {
+        if (prop === "then") return undefined;
+        if (prop === Symbol.iterator)
+          return Array.prototype[Symbol.iterator].bind([]);
+        if (prop === "error")
+          return elem && "error" in elem ? elem["error"] : undefined;
+        if (prop === "data") return element;
+        if (prop === "response")
+          return elem && "response" in elem ? elem["response"] : callableProxy;
+        return callableProxy;
+      },
+    });
+  }
 
   const clientManager = createMockInstance(DefaultClientManager);
   clientManager.getAdminClient.mockResolvedValue(callableProxy as never);

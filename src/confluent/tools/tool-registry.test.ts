@@ -200,9 +200,7 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_SCHEMAS]: { resolves: "{}" },
       [ToolName.DELETE_SCHEMA]: { throws: "ZodError" },
       // Flink
-      [ToolName.LIST_FLINK_STATEMENTS]: {
-        throws: "Organization ID is required",
-      },
+      [ToolName.LIST_FLINK_STATEMENTS]: { resolves: "{}" },
       [ToolName.CREATE_FLINK_STATEMENT]: { throws: "ZodError" },
       [ToolName.READ_FLINK_STATEMENT]: { throws: "ZodError" },
       [ToolName.DELETE_FLINK_STATEMENTS]: { throws: "ZodError" },
@@ -210,11 +208,18 @@ describe("tool-registry.ts", () => {
       [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: { throws: "ZodError" },
       [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: { throws: "ZodError" },
       [ToolName.GET_FLINK_STATEMENT_PROFILE]: { throws: "ZodError" },
-      [ToolName.LIST_FLINK_CATALOGS]: { throws: "Organization ID is required" },
-      [ToolName.LIST_FLINK_DATABASES]: {
-        throws: "Organization ID is required",
+      [ToolName.LIST_FLINK_CATALOGS]: {
+        responseData: { status: { phase: "COMPLETED" }, results: { data: [] } },
+        resolves: "No catalogs found.",
       },
-      [ToolName.LIST_FLINK_TABLES]: { throws: "Organization ID is required" },
+      [ToolName.LIST_FLINK_DATABASES]: {
+        responseData: { status: { phase: "COMPLETED" }, results: { data: [] } },
+        resolves: "No databases found.",
+      },
+      [ToolName.LIST_FLINK_TABLES]: {
+        responseData: { status: { phase: "COMPLETED" }, results: { data: [] } },
+        resolves: "No tables found in catalog",
+      },
       [ToolName.DESCRIBE_FLINK_TABLE]: { throws: "ZodError" },
       [ToolName.GET_FLINK_TABLE_INFO]: { throws: "ZodError" },
       // Connect

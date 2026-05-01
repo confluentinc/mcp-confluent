@@ -382,6 +382,14 @@ describe("tool-registry.ts", () => {
         responseData: { data: [] },
         resolves: "No metrics descriptors available",
       },
+      [ToolName.LIST_ORGANIZATIONS]: {
+        responseData: {
+          api_version: "org/v2",
+          kind: "OrganizationList",
+          data: [],
+        },
+        resolves: "Retrieved 0 organizations",
+      },
     };
 
     beforeAll(() => {

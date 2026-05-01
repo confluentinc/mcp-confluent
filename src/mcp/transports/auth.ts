@@ -4,6 +4,18 @@ import { timingSafeEqual } from "crypto";
 import { FastifyReply, FastifyRequest } from "fastify";
 
 /**
+ * HTTP header name carrying the MCP API key. Confluent custom-header
+ * convention prefixes with `cflt-`. Defined here (rather than in `server.ts`)
+ * because {@link authErrorSchemas} below is a module-level const that
+ * references it eagerly; putting the constant in `server.ts` would create a
+ * cyclic-import init-order bug.
+ *
+ * Header lookups must use the lowercased form Fastify normalizes incoming
+ * headers to.
+ */
+export const CFLT_MCP_API_KEY_HEADER = "cflt-mcp-api-key";
+
+/**
  * Configuration for MCP server authentication
  */
 export interface AuthConfig {
@@ -123,13 +135,15 @@ export function createAuthHook(config: AuthConfig) {
     }
 
     // 3. Validate API Key (header names are lowercased by Fastify)
-    const apiKey = request.headers["cflt-mcp-api-key"];
+    const apiKey = request.headers[CFLT_MCP_API_KEY_HEADER];
 
     if (!apiKey || typeof apiKey !== "string") {
-      logger.warn("Request rejected: Missing cflt-mcp-api-Key header");
+      logger.warn(
+        `Request rejected: Missing ${CFLT_MCP_API_KEY_HEADER} header`,
+      );
       reply.status(401).send({
         error: "Unauthorized",
-        message: "Missing cflt-mcp-api-Key header",
+        message: `Missing ${CFLT_MCP_API_KEY_HEADER} header`,
       });
       return;
     }
@@ -155,7 +169,10 @@ export const authErrorSchemas = {
     type: "object",
     properties: {
       error: { type: "string", example: "Unauthorized" },
-      message: { type: "string", example: "Missing cflt-mcp-api-Key header" },
+      message: {
+        type: "string",
+        example: `Missing ${CFLT_MCP_API_KEY_HEADER} header`,
+      },
     },
   },
   forbidden: {

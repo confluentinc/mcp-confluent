@@ -9,7 +9,7 @@ paths:
 ## Framework & Location
 
 - Co-located `.test.ts` files alongside source code using Vitest
-- Run with `npm run test` (single run) or `npm run test:watch` (watch mode)
+- Run with `npm run test:unit` (single run) or `npm run test:unit:watch` (watch mode). `npm run test` runs both unit and integration; reach for it only when you want the full sweep.
 - Config in `vitest.config.ts`; `@src/*` aliases resolved via `resolve.tsconfigPaths`
 - `restoreMocks: true` is set project-wide, so every `vi.spyOn` call is automatically restored
   after each test - no per-test restore hooks needed

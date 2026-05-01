@@ -11,9 +11,12 @@ import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { createMockInstance } from "@tests/stubs/index.js";
-import { type Mocked, beforeAll, describe, expect, it } from "vitest";
-import { ZodError } from "zod";
+import {
+  assertHandleCase,
+  stubClientGetters,
+  type HandleOutcome,
+} from "@tests/stubs/index.js";
+import { beforeAll, describe, expect, it, type Mocked } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
 
@@ -171,121 +174,6 @@ describe("tool-registry.ts", () => {
       );
     }
 
-    /** Classifies a thrown value into the string used for matching in ZERO_ARG_OUTCOMES. */
-    function classifyThrown(name: string, thrown: unknown): string {
-      if (thrown instanceof ZodError) return "ZodError";
-      if (thrown instanceof Error) return thrown.message;
-      throw new Error(
-        `Wacky -- ${name}: handler threw a non-Error value: ${JSON.stringify(thrown)}`,
-      );
-    }
-
-    /**
-     * Wires every client getter on a fresh `Mocked<DirectClientManager>` to a
-     * two-proxy pair so handler bodies never throw a TypeError before reaching
-     * real logic. Supply `responseData` to push a specific handler past schema
-     * validation into its success branch (defaults to `{}`).
-     *
-     * Returns `{ clientManager, clientGetters }`. `clientGetters` is the canonical
-     * list of all getter mocks; callers use it to assert that at least one was
-     * invoked when a handler resolves successfully.
-     *
-     * (No explicit return type: `clientGetters` is a heterogeneous array of mock
-     * method references whose element type is too verbose to write by hand — inference
-     * is clearer here than annotation would be.)
-     */
-    function stubClientGetters(responseData: unknown = {}) {
-      // Two-proxy setup: callableProxy (function target) handles method chains
-      // and calls; responseProxy (plain-object target) is what async calls
-      // resolve to.
-      let responseProxy: object = {};
-      const callableProxy = new Proxy((() => {}) as () => Promise<object>, {
-        get: (_t, prop) => {
-          if (prop === "then" || prop === "error") return undefined;
-          return callableProxy;
-        },
-        apply: () => Promise.resolve(responseProxy),
-      });
-      responseProxy = new Proxy({} as object, {
-        // Four properties are special-cased:
-        //   `then`            → undefined  (prevents JS treating this as a thenable)
-        //   `error`           → undefined  (openapi-fetch "success" signal)
-        //   `data`            → responseData  (caller-supplied; defaults to {})
-        //   Symbol.iterator   → empty-array iterator (handlers that iterate the
-        //                       resolved value directly get an empty loop, not a
-        //                       TypeError)
-        get: (_t, prop) => {
-          if (prop === "then" || prop === "error") return undefined;
-          if (prop === "data") return responseData;
-          if (prop === Symbol.iterator)
-            return Array.prototype[Symbol.iterator].bind([]);
-          return callableProxy;
-        },
-      });
-      const clientManager = createMockInstance(DirectClientManager);
-      clientManager.getAdminClient.mockResolvedValue(callableProxy as never);
-      clientManager.getProducer.mockResolvedValue(callableProxy as never);
-      clientManager.getConsumer.mockResolvedValue(callableProxy as never);
-      clientManager.getConfluentCloudFlinkRestClient.mockReturnValue(
-        callableProxy as never,
-      );
-      clientManager.getConfluentCloudRestClient.mockReturnValue(
-        callableProxy as never,
-      );
-      clientManager.getConfluentCloudTableflowRestClient.mockReturnValue(
-        callableProxy as never,
-      );
-      clientManager.getConfluentCloudSchemaRegistryRestClient.mockReturnValue(
-        callableProxy as never,
-      );
-      clientManager.getConfluentCloudKafkaRestClient.mockReturnValue(
-        callableProxy as never,
-      );
-      clientManager.getConfluentCloudTelemetryRestClient.mockReturnValue(
-        callableProxy as never,
-      );
-      clientManager.getSchemaRegistryClient.mockReturnValue(
-        callableProxy as never,
-      );
-      const clientGetters = [
-        clientManager.getAdminClient,
-        clientManager.getProducer,
-        clientManager.getConsumer,
-        clientManager.getConfluentCloudFlinkRestClient,
-        clientManager.getConfluentCloudRestClient,
-        clientManager.getConfluentCloudTableflowRestClient,
-        clientManager.getConfluentCloudSchemaRegistryRestClient,
-        clientManager.getConfluentCloudKafkaRestClient,
-        clientManager.getConfluentCloudTelemetryRestClient,
-        clientManager.getSchemaRegistryClient,
-      ];
-      return { clientManager, clientGetters };
-    }
-
-    type Resolves = {
-      /** Minimal valid API response to feed into the proxy's `data` property.
-       *  Omit to use `{}` (sufficient when the handler just JSON-serialises the
-       *  response); supply `{ data: [] }` or a richer shape to push the handler
-       *  past schema validation into its real success branch. */
-      responseData?: unknown;
-      /** Substring that must appear in the resolved response text. */
-      resolves: string;
-    };
-    type Throws = {
-      /** Same as `Resolves.responseData` — set when the handler needs valid-ish
-       *  data before it reaches the code that throws. */
-      responseData?: unknown;
-      /** Substring that must appear in the thrown error message, or "ZodError"
-       *  to match any ZodError regardless of message. */
-      throws: string;
-    };
-    /** Complete smoke-test specification for one handler: what to feed in
-     *  (`responseData`) and what to expect out (`resolves` / `throws`).
-     *  The string sentinel value triggers a "golden file"-style discovery run:
-     *  the test executes the handler, reports the actual outcome, and asks you
-     *  to paste it in as the recorded expectation. */
-    type HandleSmokeCase = Resolves | Throws | "TODO";
-
     // Reverse map from enum value ("list-topics") → enum key ("LIST_TOPICS"),
     // used to generate helpful copy-paste suggestions in failure messages.
     const TOOL_NAME_TO_KEY = Object.fromEntries(
@@ -299,7 +187,7 @@ describe("tool-registry.ts", () => {
      * Use `"TODO"` as a placeholder — the smoke test will run the handler
      * and report the correct entry to paste in.
      */
-    const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, HandleSmokeCase>> = {
+    const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, HandleOutcome>> = {
       // Kafka
       [ToolName.LIST_TOPICS]: { resolves: "Kafka topics:" },
       [ToolName.CREATE_TOPICS]: { throws: "ZodError" },
@@ -382,6 +270,8 @@ describe("tool-registry.ts", () => {
         responseData: { data: [] },
         resolves: "No metrics descriptors available",
       },
+      // Documentation
+      [ToolName.SEARCH_PRODUCT_DOCS]: { throws: "ZodError" },
     };
 
     beforeAll(() => {
@@ -400,7 +290,7 @@ describe("tool-registry.ts", () => {
       },
     );
 
-    it.each(Object.entries(ZERO_ARG_OUTCOMES) as [ToolName, HandleSmokeCase][])(
+    it.each(Object.entries(ZERO_ARG_OUTCOMES) as [ToolName, HandleOutcome][])(
       "%s: handle() should not crash before reaching the ClientManager",
       async (name, outcome) => {
         const responseData =
@@ -409,75 +299,14 @@ describe("tool-registry.ts", () => {
             : undefined;
         const { clientManager, clientGetters } =
           stubClientGetters(responseData);
-
-        const runtime = allServicesRuntime(clientManager);
-
-        const handler = ToolHandlerRegistry.getToolHandler(name);
-
-        // Precondition: { resolves } must carry a real substring, not ""
-        if (typeof outcome === "object" && "resolves" in outcome) {
-          expect(
-            outcome.resolves,
-            `${name}: resolves must be a non-empty substring, not ""`,
-          ).not.toBe("");
-        }
-
-        let result: Awaited<ReturnType<typeof handler.handle>> | undefined;
-        let thrown: unknown;
-        try {
-          result = await handler.handle(runtime, {}, undefined);
-        } catch (err) {
-          thrown = err;
-        }
-
-        // Placeholder sentinel: run completed — report what to replace it with
-        if (outcome === "TODO") {
-          const discovered =
-            thrown === undefined
-              ? `{ resolves: "${result!.content
-                  .map((c) => ("text" in c ? c.text : ""))
-                  .join("")
-                  .slice(0, 60)}" }`
-              : `{ throws: "${classifyThrown(name, thrown)}" }`;
-          throw new Error(
-            `${name}: outcome is TODO — replace with: ${discovered}`,
-          );
-        }
-
-        if (thrown === undefined) {
-          // Outcome table must declare { resolves }, not { throws }
-          expect(
-            typeof outcome === "object" && "resolves" in outcome,
-            `${name}: resolved successfully but outcome specifies { throws }`,
-          ).toBe(true);
-
-          // Response text must contain the declared substring
-          const { resolves } = outcome as Resolves;
-          const responseText = result!.content
-            .map((c) => ("text" in c ? c.text : ""))
-            .join("");
-          expect(
-            responseText,
-            `${name}: response text does not contain expected substring`,
-          ).toContain(resolves);
-
-          // At least one client getter must have been called
-          expect(
-            clientGetters.some((m) => m.mock.calls.length > 0),
-            `${name}: resolved without error but no client getter was called`,
-          ).toBe(true);
-        } else {
-          // Outcome table must declare { throws }, not { resolves }
-          expect(
-            typeof outcome === "object" && "throws" in outcome,
-            `${name}: handler threw but outcome specifies { resolves }`,
-          ).toBe(true);
-
-          expect(
-            classifyThrown(name, thrown),
-            `${name}: unexpected error — update ZERO_ARG_OUTCOMES table with actual`,
-          ).toContain((outcome as Throws).throws);
-        }
+        await assertHandleCase({
+          handler: ToolHandlerRegistry.getToolHandler(name),
+          runtime: allServicesRuntime(clientManager),
+          args: {},
+          outcome,
+          clientGetters,
+          name,
+        });
       },
     );
   });

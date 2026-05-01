@@ -1,0 +1,33 @@
+# Single source of truth for non-secret integration test config.
+#
+# Currently scoped to @kafka. Schema Registry, Flink, Tableflow, CCloud
+# control plane, and Telemetry blocks are added in follow-up PRs as those
+# tool-group integration tests land. Until then, `.env.integration` slots
+# for those groups have no matching block here, so handlers gating on them
+# skip via the empty-runtime path.
+#
+# Update these literals in place when resource identifiers change.
+#
+# Secrets stay as `${VAR}` interpolation, sourced from `.env.integration`
+# (which `make setup-test-env` writes from Vault).
+#
+# A missing secret env var throws at YAML load time; `tests/harness/runtime.ts`
+# catches it, returns an empty runtime, and every test's
+# `enabledConnectionIds(runtime)` gate yields a clean skip with the
+# handler's predicate config path as the reason.
+server:
+  log_level: error
+
+connections:
+  integration:
+    type: direct
+
+    # --- @kafka (admin client + REST proxy) ---
+    kafka:
+      auth:
+        type: api_key
+        key: "${KAFKA_API_KEY}"
+        secret: "${KAFKA_API_SECRET}"
+      bootstrap_servers: "pkc-921jm.us-east-2.aws.confluent.cloud:9092"
+      cluster_id: "lkc-dm5vyd"
+      rest_endpoint: "https://pkc-921jm.us-east-2.aws.confluent.cloud:443"

@@ -1,4 +1,4 @@
-import { DirectClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { createTestServer, TestServerContext } from "@tests/server.js";
 import { createMockInstance } from "@tests/stubs/index.js";

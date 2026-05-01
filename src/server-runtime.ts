@@ -1,8 +1,6 @@
 import { MCPServerConfiguration } from "@src/config/index.js";
-import {
-  constructClientManagerForConnection,
-  type ClientManager,
-} from "@src/confluent/client-manager.js";
+import { type ClientManager } from "@src/confluent/client-manager.js";
+import { constructClientManagerForConnection } from "@src/confluent/direct-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 
 /**

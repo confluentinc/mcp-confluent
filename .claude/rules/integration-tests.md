@@ -209,6 +209,16 @@ if (handler.enabledConnectionIds(runtime).length === 0) {
 harness rewrites for each spawn). Both paths share that loader, so the
 test's view of "configured" matches the server's by construction.
 
+The fixture is validated by the Zod schema in `src/config/models.ts`
+(`MCPServerConfiguration`). Adding a new service block to the YAML without
+a matching schema entry throws at load time with a Zod path pointing at the
+offending key — surface that error there rather than chasing a downstream
+predicate failure.
+
+The predicates referenced below live in
+`src/confluent/tools/connection-predicates.ts`. Pick the one matching the
+handler's predicate; if none fit, add a new predicate there first.
+
 The skip-reason string is a hand-typed dotted-path label that names the
 YAML config block(s) the handler's predicate inspects. Picking the right
 label per test:
@@ -218,6 +228,9 @@ label per test:
   `"requires kafka.bootstrap_servers config"`.
 - Handlers gating on `hasKafkaRestWithAuth` (REST proxy: `get-topic-config`,
   `alter-topic-config`): `"requires kafka.rest_endpoint + kafka.auth config"`.
+  These tests also call `testClusterId()` from `@tests/harness/kafka-admin.js`
+  to address the cluster — the helper throws (vs. silently returning
+  `undefined`) if `kafka.cluster_id` is missing from the fixture.
 - Other tool groups (e.g. `@schema`, `@flink`) follow the same shape:
   pick the dotted YAML key(s) that the handler's predicate touches.
 
@@ -252,26 +265,30 @@ identifying test-created resources during cleanup of orphaned state.
 
 ```ts
 import {
-  connectTestAdmin,
   uniqueTopicName,
+  withSharedAdmin,
 } from "@tests/harness/kafka-admin.js";
 
+// in the describe body, after the predicate gate:
+const { admin, createdTopics } = withSharedAdmin();
+
+// in an `it` block:
 const topic = uniqueTopicName("create"); // e.g. "int-create-1729123456789-a7f3b2"
-
-beforeAll(async () => {
-  admin = await connectTestAdmin();
-  await admin.createTopics({ topics: [{ topic, numPartitions: 1 }] });
-});
-
-afterAll(async () => {
-  await admin.deleteTopics({ topics: [topic] }).catch(() => {});
-  await admin.disconnect();
-});
+createdTopics.push(topic);
+await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
 ```
 
-Set up and tear down resources at the **outer** describe level (before
-`describe.each`) so both transports share one topic (fewer CCloud API round
-trips).
+`withSharedAdmin()` registers `beforeAll`/`afterAll` at the calling describe
+scope — connecting one admin client up front, deleting any tracked topics
+after the suite, and disconnecting. Tests push names onto `createdTopics`
+as they create them. The `admin` getter is a function because the
+underlying client is only assigned inside `beforeAll`, so a direct value
+captured at describe-body evaluation would be `undefined` when test bodies
+run.
+
+Call `withSharedAdmin()` at the **outer** describe level (before
+`describe.each`) so all transport iterations share one admin connection
+(fewer CCloud round trips).
 
 ### Verifying state on a separate admin client
 
@@ -315,15 +332,42 @@ sets it per-block (see CI Matrix below).
 `.semaphore/integration.yml` is structured like vscode's `playwright-e2e.yml`:
 one block per MCP transport (stdio, http, and sse), each skippable via the
 `TRANSPORTS` pipeline parameter. Within a block, jobs parallelize across
-tool groups (the `TOOL_GROUP` matrix axis).
+tool groups (the `TOOL_GROUP` matrix axis). The matrix axis picks up new
+tags automatically — no block or anchor changes needed.
 
-Adding a new tool group means:
+## Adding a New Tool Group
 
-1. Add `*.integration.test.ts` files tagged with the new tag.
-2. Add the tag value to `tests/tags.ts` if not already declared. `vitest.config.ts` picks it up from there automatically.
-3. Optionally bump the `TOOL_GROUPS` default in `service.yml`'s `run-integration-tests` and `scheduled-run-integration-tests` tasks (or just override per-run in the Semaphore UI).
+To add `*.integration.test.ts` coverage for a new Confluent service (e.g.,
+Schema Registry, Flink, Tableflow):
 
-No matrix or block changes needed: the new tag joins the existing matrix axis.
+1. **Tag enum**: add an entry to the `Tag` enum in `tests/tags.ts`.
+   `vitest.config.ts` derives its `test.tags` list from this enum, so no
+   other config updates are needed.
+
+2. **YAML fixture**: add the service block (e.g., `schema_registry:`,
+   `flink:`) to `test-fixtures/yaml_configs/integration.yaml` under a
+   `# --- @<tag> ---` marker matching the `kafka:` block's pattern. The Zod
+   schema in `src/config/models.ts` (`MCPServerConfiguration`) must accept
+   the keys you add — if it doesn't, the fixture throws at load time with
+   a Zod path that points at the offending key.
+
+3. **Secret slots**: add the corresponding secret env vars to
+   `.env.integration.example` under a `# --- @<tag> ---` section. Reference
+   them in the YAML via `${VAR}` interpolation; non-secret config (cluster
+   IDs, endpoints, region names, etc.) stays as YAML literals.
+
+4. **Vault fields** (if Vault-backed): add the field names to
+   `VAULT_PATH_FIELDS` in the `Makefile` so `make setup-test-env` populates
+   them from the team's Vault path.
+
+5. **Tests**: add `*.integration.test.ts` files colocated with handlers,
+   tagged with the new `Tag` value. Pick a connection predicate from
+   `src/confluent/tools/connection-predicates.ts` for the skip gate (or
+   add a new predicate there if none fit).
+
+6. **CI default** (optional): bump the `TOOL_GROUPS` default in
+   `service.yml`'s `scheduled-integration-tests` task to include the new
+   tag, or override per-run via the Semaphore UI.
 
 ## What NOT to Do
 

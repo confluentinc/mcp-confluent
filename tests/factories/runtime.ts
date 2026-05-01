@@ -1,6 +1,6 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import type { Mocked } from "vitest";
@@ -17,8 +17,8 @@ export const DEFAULT_CONNECTION_ID = "default";
 export function runtimeWith(
   connectionConfig: Omit<DirectConnectionConfig, "type"> = {},
   connectionId = DEFAULT_CONNECTION_ID,
-  clientManager: Mocked<DefaultClientManager> = createMockInstance(
-    DefaultClientManager,
+  clientManager: Mocked<DirectClientManager> = createMockInstance(
+    DirectClientManager,
   ),
 ): ServerRuntime {
   return new ServerRuntime(
@@ -114,4 +114,20 @@ export function telemetryRuntime(): ServerRuntime {
       auth: { type: "api_key", key: "k", secret: "s" },
     },
   });
+}
+
+/**
+ * Runtime carrying a CCloud OAuth side-car config (no `confluent_cloud` block on the
+ * connection itself). Mirrors the env-var path's `--oauth --oauth-env=devel` shape:
+ * the `ccloudOAuth` field on `MCPServerConfiguration` flips on the OAuth-aware
+ * branch in handlers that opt in via `runtime.config.getCCloudOAuth()`.
+ */
+export function ccloudOAuthRuntime(): ServerRuntime {
+  return new ServerRuntime(
+    new MCPServerConfiguration({
+      connections: { [DEFAULT_CONNECTION_ID]: { type: "direct" } },
+      ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+    }),
+    { [DEFAULT_CONNECTION_ID]: createMockInstance(DirectClientManager) },
+  );
 }

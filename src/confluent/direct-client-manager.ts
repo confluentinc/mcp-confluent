@@ -11,8 +11,8 @@ import {
 import {
   BaseClientManager,
   type BaseClientManagerConfig,
-  type ClientManager,
-} from "@src/confluent/client-manager.js";
+} from "@src/confluent/base-client-manager.js";
+import { type ClientManager } from "@src/confluent/client-manager.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
 import { kafkaLogger, logger } from "@src/logger.js";
 

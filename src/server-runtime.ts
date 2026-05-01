@@ -1,6 +1,7 @@
 import { MCPServerConfiguration } from "@src/config/index.js";
 import { type ClientManager } from "@src/confluent/client-manager.js";
 import { constructClientManagerForConnection } from "@src/confluent/direct-client-manager.js";
+import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 
 /**
@@ -58,10 +59,14 @@ export class ServerRuntime {
 
     // Construct a ClientManager for each connection in the config.
     // (although currently there will only be one, see `enforceSingleConnectionOnly()`)
+    // When OAuth is in play, every connection's manager is bearer-auth-backed by
+    // the shared holder; otherwise, fall back to the per-connection direct factory.
     const clientManagers = Object.fromEntries(
       Object.entries(config.connections).map(([id, conn]) => [
         id,
-        constructClientManagerForConnection(conn),
+        oauthHolder && ccloudOAuth
+          ? new OAuthClientManager(oauthHolder, ccloudOAuth.env)
+          : constructClientManagerForConnection(conn),
       ]),
     );
     return new ServerRuntime(config, clientManagers, oauthHolder);

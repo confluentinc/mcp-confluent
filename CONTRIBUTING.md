@@ -192,6 +192,65 @@ Here's how to build your Docker image and run it in different modes.
 
 ### Testing
 
+#### Unit Tests
+
+```bash
+npm run test:unit           # single run (fast, no build)
+npm run test:unit:watch     # watch mode
+npm run test:unit:coverage  # with coverage report
+```
+
+(`npm run test` runs unit **and** integration — use it for the full sweep.
+`npm run test:coverage` does the same with coverage.)
+
+Unit tests are co-located with source files as `*.test.ts`. Conventions (naming, stubbing, assertion style, `node-deps.ts` indirection pattern) live in `.claude/rules/unit-tests.md`.
+
+#### Integration Tests
+
+Integration tests exercise the real MCP server as a child process against a real Confluent Cloud account, over both stdio and streamable HTTP transports. They live alongside handlers as `*.integration.test.ts` and run in a separate Vitest project from unit tests.
+
+##### Prerequisites
+
+- A `.env.integration` file with credentials for the tool groups you want to run. `dist/` is rebuilt automatically by `test`, `test:coverage`, `test:integration`, and `test:integration:coverage`. If you're iterating rapidly on handler code, keep `npm run dev` running in a separate terminal so the build prefix becomes a no-op incremental check.
+
+##### Option A: Vault-backed setup (team workflow)
+
+If you have Vault CLI access to the team's secrets path:
+
+```bash
+make setup-test-env                     # fetches secrets from Vault into .env.integration (chmod 600)
+npm run test:integration -- --tags-filter=@kafka
+```
+
+`make setup-test-env` fails fast if the Vault CLI isn't on `PATH` or you're not authed. If an individual Vault field is empty, the command still writes it to `.env.integration`; tests that need that credential skip themselves with a clear reason instead of failing setup.
+
+##### Option B: Bring your own cluster (no Vault required)
+
+```bash
+cp .env.integration.example .env.integration
+# edit .env.integration — fill in the vars for the tool group(s) you want
+npm run test:integration -- --tags-filter=@kafka
+```
+
+Each tool group needs a specific credential subset; `.env.integration.example` annotates which var feeds which tests. Tests whose credentials aren't populated skip themselves with a clear reason — you don't have to fill in every var to run a subset.
+
+Minimum for `@kafka` tests: `KAFKA_API_KEY`, `KAFKA_API_SECRET`. Non-secret config (bootstrap servers, REST endpoint, cluster id) lives in `test-fixtures/yaml_configs/integration.yaml` and doesn't need to be set in the env file.
+
+##### Timing expectations
+
+- Cold start per test file: ~5-10s (server spawn + MCP handshake + first CCloud round-trip).
+- Per-test CCloud round-trip: 1-30s depending on call and region.
+- `vitest.config.ts` sets a 60s testTimeout for this project; don't lower it without measuring first.
+
+##### Other useful commands
+
+- Filter to one test file: `npm run test:integration -- --tags-filter=@kafka path/to/my.integration.test.ts`.
+- Just the tool-group tag: `npm run test:integration -- --tags-filter=@kafka`.
+- Run both unit and integration in one shot: `npm run test`.
+- Clean up the secrets file: `make remove-test-env`.
+
+For patterns, conventions, and write-path test lifecycle rules, see `.claude/rules/integration-tests.md`.
+
 #### MCP Inspector
 
 For testing MCP servers, you can use [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) which is an interactive developer tool for testing and debugging MCP servers.

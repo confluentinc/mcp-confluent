@@ -110,6 +110,25 @@ Three non-obvious things the harness does for you:
 Always call `stop()` in `afterAll` to tear down the child process. The harness
 awaits the child's exit event symmetrically for both transports.
 
+### Auth-enabled spawns
+
+HTTP and SSE spawns default to `server.auth.disabled = true`; routine tests
+don't need any auth secrets. To exercise the API-key middleware end-to-end,
+opt in via `startServer({ auth: { apiKey } })`. The harness then:
+
+- writes `server.auth.api_key` and forces `server.auth.disabled = false`
+  into the per-spawn YAML (the Zod schema rejects both being set);
+- propagates the matching `cflt-mcp-api-key` header through both the SDK
+  client transport AND the `/ping` readiness probe (the auth hook is
+  `onRequest`-scoped, so `/ping` is gated too);
+- exposes `StartedServer.baseUrl` (HTTP/SSE only) for raw-fetch negative
+  paths that bypass the SDK client.
+
+The header name is exported as `CFLT_MCP_API_KEY_HEADER` from
+`@src/mcp/transports/auth.js`. See
+`src/mcp/transports/auth.integration.test.ts` for the canonical
+no-header / wrong-header / correct-header pattern.
+
 ## Canonical Test Structure
 
 ```ts

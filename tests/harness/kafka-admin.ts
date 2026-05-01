@@ -82,7 +82,9 @@ export function withSharedAdminClient(): {
         // teardown-only: a cleanup failure shouldn't fail an already-asserted test
       });
     }
-    await admin.disconnect();
+    await admin.disconnect().catch(() => {
+      // disconnect race during teardown isn't actionable
+    });
   });
 
   return { admin: () => admin, createdTopics };

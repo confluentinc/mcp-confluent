@@ -48,7 +48,9 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
     await admin.deleteTopics({ topics: [topic] }).catch(() => {
       // teardown-only; a cleanup failure shouldn't fail an already-asserted test
     });
-    await admin.disconnect();
+    await admin.disconnect().catch(() => {
+      // disconnect race during teardown isn't actionable
+    });
   });
 
   describe.each(activeTransports)("via %s transport", (transport) => {

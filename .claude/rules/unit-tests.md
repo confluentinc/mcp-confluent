@@ -32,8 +32,8 @@ paths:
 
 ## Key Patterns
 
-- Use `createMockInstance(DefaultClientManager)` (from `@tests/stubs/index.js`) for handler tests
-  with one class dependency. The returned object is typed as `Mocked<DefaultClientManager>` so
+- Use `createMockInstance(DirectClientManager)` (from `@tests/stubs/index.js`) for handler tests
+  with one class dependency. The returned object is typed as `Mocked<DirectClientManager>` so
   method-chain autocomplete works (`.mockResolvedValue`, etc.)
 - Don't wrap simple one-liners in helper functions
 - Use `createTestServer()` from `@tests/server` for integration-style tests that need a full MCP
@@ -145,7 +145,7 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   without that block (expect `[]`). Helper factories live in `tests/factories/runtime.ts`
   (`flinkRuntime()`, `tableflowRuntime()`, `bareRuntime()`, etc.).
 - Test `handle()` for typical and edge-case inputs.
-- Stub `ClientManager` methods with `createMockInstance(DefaultClientManager)`.
+- Stub `ClientManager` methods with `createMockInstance(DirectClientManager)`.
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
   `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.
 

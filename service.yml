@@ -49,6 +49,20 @@ semaphore:
         - name: PREVIOUS_RELEASE_TAG
           required: false
           description: 'The previous release tag for generating release notes. If not provided, will use the latest (non-prerelease) GitHub Release.'
+    - name: scheduled-integration-tests
+      branch: main
+      pipeline_file: .semaphore/integration.yml
+      scheduled: true
+      at: "0 5 * * *" # Every day at 05:00 UTC
+      parameters:
+        - name: TOOL_GROUPS
+          required: true
+          default_value: "@kafka"
+          description: 'Pipe-separated tool-group tags to test.'
+        - name: TRANSPORTS
+          required: true
+          default_value: "stdio|http|sse"
+          description: 'Pipe-separated MCP transport(s) to test.'
     - name: scheduled-npm-audit
       branch: main
       pipeline_file: .semaphore/npm-audit.yml

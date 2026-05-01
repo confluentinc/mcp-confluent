@@ -1,4 +1,4 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import type { CallToolResult } from "@src/confluent/schema.js";
 import type { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
@@ -55,7 +55,7 @@ export function classifyThrown(label: string, thrown: unknown): string {
 }
 
 /**
- * Wires every client getter on a fresh `Mocked<DefaultClientManager>` to a
+ * Wires every client getter on a fresh `Mocked<DirectClientManager>` to a
  * two-proxy pair so handler bodies never throw a TypeError before reaching
  * real logic. Supply `responseData` to push a specific handler past schema
  * validation into its success branch (defaults to `{}`).
@@ -95,7 +95,7 @@ export function stubClientGetters(responseData: unknown = {}) {
     },
   });
 
-  const clientManager = createMockInstance(DefaultClientManager);
+  const clientManager = createMockInstance(DirectClientManager);
   clientManager.getAdminClient.mockResolvedValue(callableProxy as never);
   clientManager.getProducer.mockResolvedValue(callableProxy as never);
   clientManager.getConsumer.mockResolvedValue(callableProxy as never);

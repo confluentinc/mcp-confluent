@@ -13,6 +13,7 @@ const AUTH0_CONFIGS: Record<Auth0Environment, Auth0Config> = {
     clientId: "D8DV9ee7XrKX4ncAc6vJtBFgIzTMNgoY",
     domain: "login.confluent-dev.io",
     apiUrl: "https://devel.cpdev.cloud",
+    cloudRestUrl: "https://api.devel.cpdev.cloud",
     callbackUrl: OAUTH_CALLBACK_URL,
     scopes: OAUTH_SCOPES,
   },
@@ -20,6 +21,7 @@ const AUTH0_CONFIGS: Record<Auth0Environment, Auth0Config> = {
     clientId: "adtjckxmHbjddhNK36PvcXIDDbrJUMDH",
     domain: "login-stag.confluent-dev.io",
     apiUrl: "https://stag.cpdev.cloud",
+    cloudRestUrl: "https://api.stag.cpdev.cloud",
     callbackUrl: OAUTH_CALLBACK_URL,
     scopes: OAUTH_SCOPES,
   },
@@ -27,6 +29,7 @@ const AUTH0_CONFIGS: Record<Auth0Environment, Auth0Config> = {
     clientId: "", // TBD: not yet registered in identity-login-static
     domain: "login.confluent.io",
     apiUrl: "https://confluent.cloud",
+    cloudRestUrl: "https://api.confluent.cloud",
     callbackUrl: OAUTH_CALLBACK_URL,
     scopes: OAUTH_SCOPES,
   },
@@ -34,4 +37,13 @@ const AUTH0_CONFIGS: Record<Auth0Environment, Auth0Config> = {
 
 export function getAuth0Config(environment: Auth0Environment): Auth0Config {
   return AUTH0_CONFIGS[environment];
+}
+
+/**
+ * Returns the Confluent Cloud REST API base URL for the given Auth0 environment.
+ * Used by {@link OAuthClientManager} to derive the cloud surface's base URL when
+ * the OAuth path doesn't carry an explicit `confluent_cloud.endpoint`.
+ */
+export function getCloudRestUrlForEnv(environment: Auth0Environment): string {
+  return AUTH0_CONFIGS[environment].cloudRestUrl;
 }

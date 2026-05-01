@@ -4,10 +4,18 @@ import {
   constructClientManagerForConnection,
   DirectClientManager,
 } from "@src/confluent/direct-client-manager.js";
+import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
+
+function fakeOAuthHolder(): OAuthHolder {
+  return {
+    getControlPlaneToken: () => "cp-token",
+    getDataPlaneToken: () => "dp-token",
+  } as unknown as OAuthHolder;
+}
 
 function connWith(
   fields: Omit<DirectConnectionConfig, "type">,
@@ -234,7 +242,7 @@ describe("ServerRuntime", () => {
     });
 
     it("should call OAuthHolder.start and expose oauthHolder when the config has ccloud-oauth", () => {
-      const fakeHolder = {} as OAuthHolder;
+      const fakeHolder = fakeOAuthHolder();
       const startSpy = vi
         .spyOn(OAuthHolder, "start")
         .mockReturnValue(fakeHolder);
@@ -252,6 +260,24 @@ describe("ServerRuntime", () => {
 
       expect(startSpy).toHaveBeenCalledWith("devel");
       expect(runtime.oauthHolder).toBe(fakeHolder);
+    });
+
+    it("should construct OAuthClientManager instances for every connection when ccloud-oauth is set", () => {
+      vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
+      const oauthConfig = new MCPServerConfiguration({
+        connections: {
+          "env-connection": connWith({
+            kafka: { bootstrap_servers: "broker:9092" },
+          }),
+        },
+        ccloudOAuth: { type: "ccloud_oauth", env: "stag" },
+      });
+
+      const runtime = ServerRuntime.fromConfig(oauthConfig);
+
+      expect(runtime.clientManagers["env-connection"]).toBeInstanceOf(
+        OAuthClientManager,
+      );
     });
   });
 });

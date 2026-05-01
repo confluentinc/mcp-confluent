@@ -51,10 +51,16 @@ export class ReadFlinkStatementHandler extends FlinkToolHandler {
       organizationId,
     } = readFlinkStatementArguments.parse(toolArguments);
     const conn = runtime.config.getSoleConnection();
-    const organization_id = organizationId || conn.flink?.organization_id;
-    if (!organization_id) throw new Error("Organization ID is required");
-    const environment_id = environmentId || conn.flink?.environment_id;
-    if (!environment_id) throw new Error("Environment ID is required");
+    const organization_id = this.resolveParam(
+      organizationId,
+      conn.flink?.organization_id,
+      "Organization ID",
+    );
+    const environment_id = this.resolveParam(
+      environmentId,
+      conn.flink?.environment_id,
+      "Environment ID",
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),

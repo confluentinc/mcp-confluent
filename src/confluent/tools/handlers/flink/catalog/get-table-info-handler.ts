@@ -65,12 +65,21 @@ export class GetTableInfoHandler extends FlinkToolHandler {
     } = getTableInfoArguments.parse(toolArguments);
 
     const conn = runtime.config.getSoleConnection();
-    const organization_id = organizationId || conn.flink?.organization_id;
-    if (!organization_id) throw new Error("Organization ID is required");
-    const environment_id = environmentId || conn.flink?.environment_id;
-    if (!environment_id) throw new Error("Environment ID is required");
-    const compute_pool_id = computePoolId || conn.flink?.compute_pool_id;
-    if (!compute_pool_id) throw new Error("Compute Pool ID is required");
+    const organization_id = this.resolveParam(
+      organizationId,
+      conn.flink?.organization_id,
+      "Organization ID",
+    );
+    const environment_id = this.resolveParam(
+      environmentId,
+      conn.flink?.environment_id,
+      "Environment ID",
+    );
+    const compute_pool_id = this.resolveParam(
+      computePoolId,
+      conn.flink?.compute_pool_id,
+      "Compute Pool ID",
+    );
     // Smart resolution: only accept env-* format, otherwise fall back to flink.environment_id from connection config
     const catalog_name = resolveCatalogName(catalogName, conn);
     if (!catalog_name) {

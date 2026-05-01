@@ -38,8 +38,11 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     const { clusterId, topicName } =
       getTopicConfigArguments.parse(toolArguments);
     const conn = runtime.config.getSoleConnection();
-    const kafka_cluster_id = clusterId || conn.kafka?.cluster_id;
-    if (!kafka_cluster_id) throw new Error("Kafka Cluster ID is required");
+    const kafka_cluster_id = this.resolveParam(
+      clusterId,
+      conn.kafka?.cluster_id,
+      "Kafka Cluster ID",
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudKafkaRestClient(),

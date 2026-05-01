@@ -89,9 +89,9 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
       "Compute Pool ID",
     );
     const resolvedCatalogName =
-      catalogName ?? conn.flink?.environment_name ?? "";
+      catalogName || conn.flink?.environment_name || "";
     const resolvedDatabaseName =
-      databaseName ?? conn.flink?.database_name ?? "";
+      databaseName || conn.flink?.database_name || "";
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),

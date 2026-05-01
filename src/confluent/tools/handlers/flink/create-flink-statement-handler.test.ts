@@ -110,6 +110,21 @@ describe("create-flink-statement-handler.ts", () => {
           },
           outcome: { resolves: "{}" },
         },
+        {
+          // Regression: blank strings must fall back to config, not silently omit the
+          // sql.current-catalog / sql.current-database properties. The Zod schema trims
+          // whitespace, so "  " becomes "". Using || (not ??) ensures "" is treated as
+          // absent and the connection config value is used instead.
+          label:
+            "blank catalogName/databaseName fall back to connection config rather than passing empty string",
+          args: {
+            ...REQUIRED_ARGS,
+            ...EXPLICIT_IDS,
+            catalogName: "   ",
+            databaseName: "   ",
+          },
+          outcome: { resolves: "{}" },
+        },
       ];
 
       it.each(cases)(

@@ -7,9 +7,8 @@ import { FastifyReply, FastifyRequest } from "fastify";
  * HTTP header name carrying the MCP API key. Confluent custom-header
  * convention prefixes with `cflt-`. Defined here (rather than in `server.ts`)
  * because {@link authErrorSchemas} below is a module-level const that
- * references it eagerly — putting the constant in `server.ts` would create a
- * cyclic-import init-order bug. `server.ts` re-exports it so tests have a
- * single import target.
+ * references it eagerly; putting the constant in `server.ts` would create a
+ * cyclic-import init-order bug.
  *
  * Header lookups must use the lowercased form Fastify normalizes incoming
  * headers to.

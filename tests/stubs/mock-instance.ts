@@ -12,7 +12,7 @@ import { type Mocked, vi } from "vitest";
  *
  * @example
  * ```ts
- * const clientManager = createMockInstance(DefaultClientManager);
+ * const clientManager = createMockInstance(DirectClientManager);
  * clientManager.getAdminClient.mockResolvedValue(admin);
  * ```
  */
@@ -20,7 +20,7 @@ import { type Mocked, vi } from "vitest";
 // TypeScript: rest-parameter contravariance means a `never[]` parameter list
 // is satisfied by every concrete constructor signature. `unknown[]` would be
 // stricter and would reject classes whose constructor takes specific types
-// (e.g., DefaultClientManager's `ClientManagerConfig`).
+// (e.g., DirectClientManager's `ClientManagerConfig`).
 export function createMockInstance<T extends object>(
   Ctor: new (...args: never[]) => T,
 ): Mocked<T> {

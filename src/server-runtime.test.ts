@@ -2,7 +2,7 @@ import { type DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import {
   constructClientManagerForConnection,
-  DefaultClientManager,
+  DirectClientManager,
 } from "@src/confluent/client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -16,11 +16,11 @@ function connWith(
 }
 
 describe("constructClientManagerForConnection()", () => {
-  it("should return a DefaultClientManager instance", () => {
+  it("should return a DirectClientManager instance", () => {
     const manager = constructClientManagerForConnection(
       connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     );
-    expect(manager).toBeInstanceOf(DefaultClientManager);
+    expect(manager).toBeInstanceOf(DirectClientManager);
   });
 
   it("should always set client.id to mcp-confluent", () => {
@@ -159,7 +159,7 @@ describe("ServerRuntime", () => {
 
   describe("constructor", () => {
     it("should store config and clientManagers as-is", () => {
-      const cm = createMockInstance(DefaultClientManager);
+      const cm = createMockInstance(DirectClientManager);
       const runtime = new ServerRuntime(config, { "test-conn": cm });
       expect(runtime.config).toBe(config);
       expect(runtime.clientManagers).toStrictEqual({ "test-conn": cm });
@@ -168,7 +168,7 @@ describe("ServerRuntime", () => {
 
   describe("get clientManager()", () => {
     it("should return the sole client manager", () => {
-      const cm = createMockInstance(DefaultClientManager);
+      const cm = createMockInstance(DirectClientManager);
       const runtime = new ServerRuntime(config, { "test-conn": cm });
       expect(runtime.clientManager).toBe(cm);
     });
@@ -181,8 +181,8 @@ describe("ServerRuntime", () => {
     });
 
     it("should throw when clientManagers has more than one entry", () => {
-      const cm1 = createMockInstance(DefaultClientManager);
-      const cm2 = createMockInstance(DefaultClientManager);
+      const cm1 = createMockInstance(DirectClientManager);
+      const cm2 = createMockInstance(DirectClientManager);
       const runtime = new ServerRuntime(config, { conn1: cm1, conn2: cm2 });
       expect(() => runtime.clientManager).toThrow(
         "ServerRuntime has multiple client managers",
@@ -191,7 +191,7 @@ describe("ServerRuntime", () => {
   });
 
   describe("fromConfig()", () => {
-    it("should create a DefaultClientManager for each connection", () => {
+    it("should create a DirectClientManager for each connection", () => {
       const twoConnConfig = new MCPServerConfiguration({
         connections: {
           conn1: connWith({ kafka: { bootstrap_servers: "broker1:9092" } }),
@@ -209,10 +209,10 @@ describe("ServerRuntime", () => {
         "conn2",
       ]);
       expect(runtime.clientManagers["conn1"]).toBeInstanceOf(
-        DefaultClientManager,
+        DirectClientManager,
       );
       expect(runtime.clientManagers["conn2"]).toBeInstanceOf(
-        DefaultClientManager,
+        DirectClientManager,
       );
     });
 

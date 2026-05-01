@@ -1,4 +1,4 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/client-manager.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { createTestServer, TestServerContext } from "@tests/server.js";
 import { createMockInstance } from "@tests/stubs/index.js";
@@ -14,7 +14,7 @@ describe("MCP server", () => {
 
   beforeEach(async () => {
     // registers all tools by default
-    ctx = await createTestServer(createMockInstance(DefaultClientManager));
+    ctx = await createTestServer(createMockInstance(DirectClientManager));
   });
 
   afterEach(() => ctx.shutdown());

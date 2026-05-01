@@ -14,9 +14,14 @@ npm run dev            # watch mode: tsc + tsc-alias in parallel
 npm run lint           # eslint
 npm run lint:fix       # eslint --fix
 npm run format         # prettier --write
-npm run test           # vitest run
-npm run test:coverage  # vitest run --coverage
-npm run typecheck      # tsc --noEmit (type-check only, includes test suite)
+npm run test                       # unit + integration (live CCloud, builds first)
+npm run test:unit                  # unit tests only (fast, no build)
+npm run test:unit:watch            # unit tests in watch mode
+npm run test:unit:coverage         # unit tests with coverage
+npm run test:integration           # integration tests only (live CCloud, builds first)
+npm run test:integration:coverage  # integration tests with coverage
+npm run test:coverage              # unit + integration with coverage
+npm run typecheck                  # tsc --noEmit (type-check only, includes test suite)
 npm run start          # node dist/index.js --env-file .env (stdio transport)
 npm run start:http     # HTTP transport
 npm run start:all      # all transports (http, sse, stdio)
@@ -93,3 +98,12 @@ below affect source-code edits too, so they're called out here:
 - For handler-style tests that need a stubbed class instance, use `createMockInstance(Class)`
   from `@tests/stubs/index.js`; it returns a `Mocked<T>` with every method pre-stubbed as
   `vi.fn()`.
+
+## Integration Test Conventions
+
+Integration tests spawn the real MCP server as a child process and exercise it against a real Confluent Cloud account over both stdio and streamable HTTP transports. Full rule at `.claude/rules/integration-tests.md` (auto-loads when editing `*.integration.test.ts` or `tests/harness/**`).
+
+- Colocate next to the handler: `my-handler.integration.test.ts` alongside `my-handler.ts`; tag with `{ tags: ["@<group>"] }` on the outer describe.
+- Run with `npm run test:integration -- --tags-filter=@kafka`. Local creds live in `.env.integration` (gitignored; example in `.env.integration.example`).
+- Use the `startServer({ transport, env? })` harness from `@tests/harness/start-server.js`; it handles the `NODE_ENV=test` guard, HTTP auth disable, and free-port allocation.
+- Gate on creds with an early-return inside the describe body (`if (!hasCreds) { it.skip(reason); return; }`), **not** `describe.skipIf` — the latter still runs nested hooks in vitest 4.

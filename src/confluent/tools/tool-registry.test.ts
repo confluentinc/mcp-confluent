@@ -182,15 +182,9 @@ describe("tool-registry.ts", () => {
 
     /**
      * Wires every client getter on a fresh `Mocked<DefaultClientManager>` to a
-     * two-proxy pair. `callableProxy` (function target) absorbs any method chain
-     * or call without throwing; every call resolves to `responseProxy`.
-     * `responseProxy` (plain-object target) models the `{ data, error }` shape
-     * returned by openapi-fetch: `error` is `undefined`, and `data` returns
-     * `responseData` — supply a minimal valid shape to push a handler past schema
-     * validation into its real success branch (defaults to `{}`).
-     *
-     * A TypeError that escapes the proxy pair is therefore a genuine wiring
-     * failure — exactly what the smoke tests check for.
+     * two-proxy pair so handler bodies never throw a TypeError before reaching
+     * real logic. Supply `responseData` to push a specific handler past schema
+     * validation into its success branch (defaults to `{}`).
      *
      * Returns `{ clientManager, clientGetters }`. `clientGetters` is the canonical
      * list of all getter mocks; callers use it to assert that at least one was
@@ -199,9 +193,7 @@ describe("tool-registry.ts", () => {
     function stubClientGetters(responseData: unknown = {}) {
       // Two-proxy setup: callableProxy (function target) handles method chains
       // and calls; responseProxy (plain-object target) is what async calls
-      // resolve to, giving { data, error } destructuring a real object for `data`.
-      // responseData is returned for the `data` property — callers can supply a
-      // minimal valid shape to push a handler past validation into its success path.
+      // resolve to.
       let responseProxy: object = {};
       const callableProxy = new Proxy((() => {}) as () => Promise<object>, {
         get: (_t, prop) => {
@@ -211,9 +203,18 @@ describe("tool-registry.ts", () => {
         apply: () => Promise.resolve(responseProxy),
       });
       responseProxy = new Proxy({} as object, {
+        // Four properties are special-cased:
+        //   `then`            → undefined  (prevents JS treating this as a thenable)
+        //   `error`           → undefined  (openapi-fetch "success" signal)
+        //   `data`            → responseData  (caller-supplied; defaults to {})
+        //   Symbol.iterator   → empty-array iterator (handlers that iterate the
+        //                       resolved value directly get an empty loop, not a
+        //                       TypeError)
         get: (_t, prop) => {
           if (prop === "then" || prop === "error") return undefined;
           if (prop === "data") return responseData;
+          if (prop === Symbol.iterator)
+            return Array.prototype[Symbol.iterator].bind([]);
           return callableProxy;
         },
       });
@@ -304,7 +305,7 @@ describe("tool-registry.ts", () => {
       [ToolName.ALTER_TOPIC_CONFIG]: { throws: "ZodError" },
       [ToolName.GET_TOPIC_CONFIG]: { throws: "ZodError" },
       // Schema Registry
-      [ToolName.LIST_SCHEMAS]: { resolves: "Failed to list schemas" },
+      [ToolName.LIST_SCHEMAS]: { resolves: "{}" },
       [ToolName.DELETE_SCHEMA]: { throws: "ZodError" },
       // Flink
       [ToolName.LIST_FLINK_STATEMENTS]: {
@@ -340,7 +341,12 @@ describe("tool-registry.ts", () => {
       [ToolName.SEARCH_TOPICS_BY_NAME]: { throws: "ZodError" },
       // Environments
       [ToolName.LIST_ENVIRONMENTS]: {
-        resolves: "Invalid environment list data",
+        responseData: {
+          api_version: "org/v2",
+          kind: "EnvironmentList",
+          data: [],
+        },
+        resolves: "Successfully retrieved 0 environments",
       },
       [ToolName.READ_ENVIRONMENT]: { throws: "ZodError" },
       // Clusters

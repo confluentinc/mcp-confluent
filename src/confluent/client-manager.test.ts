@@ -12,9 +12,12 @@ const apiKeyAuth: ConfluentAuth = {
   apiSecret: "s",
 };
 
-function buildConfig(
-  overrides: Partial<ClientManagerConfig> = {},
-): ClientManagerConfig {
+interface ConfigOverrides {
+  endpoints?: Partial<ClientManagerConfig["endpoints"]>;
+  auth?: Partial<ClientManagerConfig["auth"]>;
+}
+
+function buildConfig(overrides: ConfigOverrides = {}): ClientManagerConfig {
   return {
     kafka: { "client.id": "test" },
     endpoints: {

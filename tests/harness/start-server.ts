@@ -310,7 +310,8 @@ function makeHttpStop(client: Client, child: ChildProcess) {
     await client.close();
     if (child.exitCode === null) {
       child.kill("SIGTERM");
-      await once(child, "exit");
+      // ignore: once() rejects if the child emits "error" during teardown
+      await once(child, "exit").catch(() => {});
     }
   };
 }

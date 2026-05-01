@@ -1,4 +1,14 @@
 export { createMockAdmin, type MockedAdmin } from "./admin.js";
+export {
+  assertHandleCase,
+  classifyThrown,
+  stubClientGetters,
+  type ClientGetters,
+  type HandleCase,
+  type HandleOutcome,
+  type Resolves,
+  type Throws,
+} from "./handler.js";
 export { createMockInstance } from "./mock-instance.js";
 export {
   createFsWrappers,

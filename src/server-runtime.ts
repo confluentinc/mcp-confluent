@@ -65,7 +65,7 @@ export class ServerRuntime {
     const cm = this.clientManager;
     if (!(cm instanceof DirectClientManager)) {
       throw new Error(
-        "Native Kafka tools require a direct (api_key) connection.",
+        "Native Kafka tools require a direct (non-OAuth) connection.",
       );
     }
     return cm;

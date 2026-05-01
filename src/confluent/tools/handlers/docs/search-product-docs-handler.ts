@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { nodeFetch } from "@src/confluent/node-deps.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
@@ -66,7 +65,7 @@ const searchProductDocsArguments = z.object({
 
 export class SearchProductDocsHandler extends BaseToolHandler {
   async handle(
-    _clientManager: ClientManager,
+    _runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const { query, limit } = searchProductDocsArguments.parse(toolArguments);
@@ -166,7 +165,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
         body: JSON.stringify({
           query,
           page: 1,
-          perPage: Math.min(50, limit * 2),
+          perPage: limit,
           contentTypes: DEVELOPER_CONTENT_TYPES,
         }),
       },
@@ -201,7 +200,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
   ): Promise<NormalizedResult[]> {
     const params = new URLSearchParams({
       query,
-      per_page: String(Math.min(50, limit * 2)),
+      per_page: String(limit),
     });
     const json = await fetchSourceJson<ZendeskSearchResponse>(
       `${SUPPORT_SEARCH_URL}?${params.toString()}`,
@@ -228,7 +227,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     return {
       name: ToolName.SEARCH_PRODUCT_DOCS,
       description:
-        "Search Confluent product documentation across docs.confluent.io, developer.confluent.io, and support.confluent.io. Returns ranked results with title, url, and a short description.",
+        "Search Confluent product documentation (docs.confluent.io, developer.confluent.io, support.confluent.io) by keyword.",
       inputSchema: searchProductDocsArguments.shape,
       annotations: READ_ONLY,
     };

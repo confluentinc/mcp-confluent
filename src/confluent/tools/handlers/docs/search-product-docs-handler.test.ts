@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -38,7 +37,7 @@ function getText(result: CallToolResult): string {
 describe("search-product-docs-handler.ts", () => {
   describe("SearchProductDocsHandler", () => {
     const handler = new SearchProductDocsHandler();
-    const clientManager = {} as ClientManager;
+    const runtime = bareRuntime();
     let fetchSpy: MockedFetch;
 
     beforeEach(() => {
@@ -86,13 +85,13 @@ describe("search-product-docs-handler.ts", () => {
     describe("handle()", () => {
       it("should reject blank queries", async () => {
         await expect(
-          handler.handle(clientManager, { query: "   " }),
+          handler.handle(runtime, { query: "   " }),
         ).rejects.toThrow();
       });
 
       it("should reject limits greater than 50", async () => {
         await expect(
-          handler.handle(clientManager, { query: "kafka", limit: 51 }),
+          handler.handle(runtime, { query: "kafka", limit: 51 }),
         ).rejects.toThrow();
       });
 
@@ -135,7 +134,7 @@ describe("search-product-docs-handler.ts", () => {
           },
         });
 
-        const result = await handler.handle(clientManager, {
+        const result = await handler.handle(runtime, {
           query: "kafka",
           limit: 10,
         });
@@ -196,7 +195,7 @@ describe("search-product-docs-handler.ts", () => {
           },
         });
 
-        const result = await handler.handle(clientManager, { query: "x" });
+        const result = await handler.handle(runtime, { query: "x" });
         const parsed = JSON.parse(getText(result)) as {
           results: Array<{ url: string; source: string }>;
         };
@@ -232,7 +231,7 @@ describe("search-product-docs-handler.ts", () => {
           },
         });
 
-        const result = await handler.handle(clientManager, { query: "dup" });
+        const result = await handler.handle(runtime, { query: "dup" });
         const parsed = JSON.parse(getText(result)) as {
           results: Array<{ url: string }>;
         };
@@ -261,7 +260,7 @@ describe("search-product-docs-handler.ts", () => {
           },
         });
 
-        const result = await handler.handle(clientManager, {
+        const result = await handler.handle(runtime, {
           query: "x",
           limit: 3,
         });
@@ -301,7 +300,7 @@ describe("search-product-docs-handler.ts", () => {
           },
         });
 
-        const result = await handler.handle(clientManager, {
+        const result = await handler.handle(runtime, {
           query: "x",
           limit: 6,
         });
@@ -324,7 +323,7 @@ describe("search-product-docs-handler.ts", () => {
       it("should return an empty result set with a friendly message when all sources return no hits", async () => {
         setupAllSources({});
 
-        const result = await handler.handle(clientManager, { query: "kafka" });
+        const result = await handler.handle(runtime, { query: "kafka" });
 
         expect(result.isError).toBeFalsy();
         const parsed = JSON.parse(getText(result)) as {
@@ -352,7 +351,7 @@ describe("search-product-docs-handler.ts", () => {
           developerStatus: 500,
         });
 
-        const result = await handler.handle(clientManager, { query: "x" });
+        const result = await handler.handle(runtime, { query: "x" });
         const parsed = JSON.parse(getText(result)) as {
           results: unknown[];
           warnings: string[];
@@ -375,7 +374,7 @@ describe("search-product-docs-handler.ts", () => {
           return jsonResponse({});
         });
 
-        const result = await handler.handle(clientManager, { query: "x" });
+        const result = await handler.handle(runtime, { query: "x" });
         const parsed = JSON.parse(getText(result)) as { warnings: string[] };
 
         expect(parsed.warnings).toHaveLength(1);
@@ -388,7 +387,7 @@ describe("search-product-docs-handler.ts", () => {
           throw new Error("network down");
         });
 
-        const result = await handler.handle(clientManager, { query: "kafka" });
+        const result = await handler.handle(runtime, { query: "kafka" });
 
         expect(result.isError).toBe(true);
         const parsed = JSON.parse(getText(result)) as {
@@ -404,7 +403,7 @@ describe("search-product-docs-handler.ts", () => {
       it("should send the expected query params to Swiftype", async () => {
         setupAllSources({});
 
-        await handler.handle(clientManager, {
+        await handler.handle(runtime, {
           query: "kafka topics",
           limit: 5,
         });
@@ -424,7 +423,7 @@ describe("search-product-docs-handler.ts", () => {
       it("should POST a JSON body to the developer.confluent.io search proxy", async () => {
         setupAllSources({});
 
-        await handler.handle(clientManager, { query: "flink", limit: 4 });
+        await handler.handle(runtime, { query: "flink", limit: 4 });
 
         const call = fetchSpy.mock.calls.find(
           ([input]) => input === DEVELOPER_URL,
@@ -440,7 +439,7 @@ describe("search-product-docs-handler.ts", () => {
         };
         expect(body.query).toBe("flink");
         expect(body.page).toBe(1);
-        expect(body.perPage).toBe(8);
+        expect(body.perPage).toBe(4);
         expect(body.contentTypes).toEqual(
           expect.arrayContaining(["documentation", "tutorial"]),
         );
@@ -449,7 +448,7 @@ describe("search-product-docs-handler.ts", () => {
       it("should send the expected query params to the Zendesk help center", async () => {
         setupAllSources({});
 
-        await handler.handle(clientManager, { query: "ssl", limit: 6 });
+        await handler.handle(runtime, { query: "ssl", limit: 6 });
 
         const call = fetchSpy.mock.calls.find(([input]) =>
           String(input).startsWith(SUPPORT_URL_PREFIX),
@@ -457,7 +456,7 @@ describe("search-product-docs-handler.ts", () => {
         expect(call).toBeDefined();
         const url = new URL(String(call![0]));
         expect(url.searchParams.get("query")).toBe("ssl");
-        expect(url.searchParams.get("per_page")).toBe("12");
+        expect(url.searchParams.get("per_page")).toBe("6");
       });
     });
   });

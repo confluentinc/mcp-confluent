@@ -1,4 +1,4 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
+import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 
 export interface FlinkSqlResult {
@@ -33,7 +33,7 @@ function generateStatementName(prefix: string = "mcp-query"): string {
  * then fetches all results.
  */
 export async function executeFlinkSql(
-  clientManager: ClientManager,
+  clientManager: BaseClientManager,
   sql: string,
   options: FlinkSqlOptions,
 ): Promise<FlinkSqlResult> {

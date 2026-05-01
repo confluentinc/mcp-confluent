@@ -34,7 +34,7 @@ export class CreateTopicsHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
+    const clientManager = runtime.requireDirectClientManager();
     const { topics } = createTopicArgs.parse(toolArguments);
     const success = await (
       await clientManager.getAdminClient()

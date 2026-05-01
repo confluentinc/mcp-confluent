@@ -1,4 +1,3 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -38,11 +37,9 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     const clientManager = runtime.clientManager;
     const { clusterId, topicName } =
       getTopicConfigArguments.parse(toolArguments);
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-      clusterId,
-    );
+    const conn = runtime.config.getSoleConnection();
+    const kafka_cluster_id = clusterId || conn.kafka?.cluster_id;
+    if (!kafka_cluster_id) throw new Error("Kafka Cluster ID is required");
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudKafkaRestClient(),

@@ -1,4 +1,4 @@
-import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
+import { DeleteFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/delete-flink-statement-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
@@ -31,9 +31,9 @@ type HandleCaseWithConn = HandleCase & {
   connectionConfig?: Parameters<typeof runtimeWith>[0];
 };
 
-describe("get-flink-exceptions-handler.ts", () => {
-  describe("GetFlinkExceptionsHandler", () => {
-    const handler = new GetFlinkExceptionsHandler();
+describe("delete-flink-statement-handler.ts", () => {
+  describe("DeleteFlinkStatementHandler", () => {
+    const handler = new DeleteFlinkStatementHandler();
 
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
@@ -61,21 +61,14 @@ describe("get-flink-exceptions-handler.ts", () => {
         {
           label: "uses org/env IDs from config when args absent",
           args: { statementName: STATEMENT_NAME },
-          responseData: { data: [] },
-          outcome: {
-            resolves: `No exceptions found for statement '${STATEMENT_NAME}'.`,
-          },
+          responseData: { response: { status: 204 } },
+          outcome: { resolves: "Flink SQL Statement Deletion Status Code" },
         },
         {
-          label:
-            "uses explicit org/env args over config and returns exception list",
+          label: "uses explicit org/env args over config",
           args: { statementName: STATEMENT_NAME, ...EXPLICIT_IDS },
-          responseData: {
-            data: [{ message: "OOM error" }, { message: "Timeout" }],
-          },
-          outcome: {
-            resolves: `Flink Statement Exceptions for '${STATEMENT_NAME}'`,
-          },
+          responseData: { response: { status: 204 } },
+          outcome: { resolves: "Flink SQL Statement Deletion Status Code" },
         },
       ];
 

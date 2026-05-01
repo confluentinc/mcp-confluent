@@ -115,3 +115,19 @@ export function telemetryRuntime(): ServerRuntime {
     },
   });
 }
+
+/**
+ * Runtime carrying a CCloud OAuth side-car config (no `confluent_cloud` block on the
+ * connection itself). Mirrors the env-var path's `--oauth --oauth-env=devel` shape:
+ * the `ccloudOAuth` field on `MCPServerConfiguration` flips on the OAuth-aware
+ * branch in handlers that opt in via `runtime.config.getCCloudOAuth()`.
+ */
+export function ccloudOAuthRuntime(): ServerRuntime {
+  return new ServerRuntime(
+    new MCPServerConfiguration({
+      connections: { [DEFAULT_CONNECTION_ID]: { type: "direct" } },
+      ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+    }),
+    { [DEFAULT_CONNECTION_ID]: createMockInstance(DirectClientManager) },
+  );
+}

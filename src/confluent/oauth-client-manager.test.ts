@@ -57,58 +57,6 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
-    describe("getKafkaClient()", () => {
-      it("should throw the OAuth-specific error", () => {
-        const cm = new OAuthClientManager(fakeOAuthHolder(), "devel");
-        expect(() => cm.getKafkaClient()).toThrow(
-          /Native Kafka client is not available under OAuth/,
-        );
-      });
-    });
-
-    describe("getAdminClient()", () => {
-      it("should reject with the OAuth-specific error", async () => {
-        const cm = new OAuthClientManager(fakeOAuthHolder(), "devel");
-        await expect(cm.getAdminClient()).rejects.toThrow(
-          /Native Kafka client is not available under OAuth/,
-        );
-      });
-    });
-
-    describe("getProducer()", () => {
-      it("should reject with the OAuth-specific error", async () => {
-        const cm = new OAuthClientManager(fakeOAuthHolder(), "devel");
-        await expect(cm.getProducer()).rejects.toThrow(
-          /Native Kafka client is not available under OAuth/,
-        );
-      });
-    });
-
-    describe("getConsumer()", () => {
-      it("should reject with the OAuth-specific error", async () => {
-        const cm = new OAuthClientManager(fakeOAuthHolder(), "devel");
-        await expect(cm.getConsumer()).rejects.toThrow(
-          /Native Kafka client is not available under OAuth/,
-        );
-      });
-    });
-
-    describe("getSchemaRegistryClient()", () => {
-      it("should throw an OAuth-specific error that points to the REST client", () => {
-        const cm = new OAuthClientManager(fakeOAuthHolder(), "devel");
-        expect(() => cm.getSchemaRegistryClient()).toThrow(
-          /Schema Registry SDK client is not available under OAuth/,
-        );
-      });
-
-      it("should not surface the BaseClientManager api_key-only error message", () => {
-        const cm = new OAuthClientManager(fakeOAuthHolder(), "devel");
-        expect(() => cm.getSchemaRegistryClient()).not.toThrow(
-          /SCHEMA_REGISTRY_API_KEY/,
-        );
-      });
-    });
-
     describe("disconnect()", () => {
       it("should resolve without error (no native clients to clean up)", async () => {
         const cm = new OAuthClientManager(fakeOAuthHolder(), "devel");

@@ -3,6 +3,7 @@ import { MCPServerConfiguration } from "@src/config/models.js";
 import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
+import type { Mocked } from "vitest";
 
 /** Connection ID used by the named runtime factories and their default single-connection runtimes. */
 export const DEFAULT_CONNECTION_ID = "default";
@@ -16,12 +17,15 @@ export const DEFAULT_CONNECTION_ID = "default";
 export function runtimeWith(
   connectionConfig: Omit<DirectConnectionConfig, "type"> = {},
   connectionId = DEFAULT_CONNECTION_ID,
+  clientManager: Mocked<DefaultClientManager> = createMockInstance(
+    DefaultClientManager,
+  ),
 ): ServerRuntime {
   return new ServerRuntime(
     new MCPServerConfiguration({
       connections: { [connectionId]: { type: "direct", ...connectionConfig } },
     }),
-    { [connectionId]: createMockInstance(DefaultClientManager) },
+    { [connectionId]: clientManager },
   );
 }
 

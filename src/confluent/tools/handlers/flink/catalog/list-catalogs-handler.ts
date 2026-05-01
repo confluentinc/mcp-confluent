@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
@@ -6,6 +5,7 @@ import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listCatalogsArguments = z.object({
@@ -28,9 +28,10 @@ const listCatalogsArguments = z.object({
 
 export class ListCatalogsHandler extends FlinkToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { organizationId, environmentId, computePoolId } =
       listCatalogsArguments.parse(toolArguments);
 

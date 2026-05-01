@@ -1,7 +1,6 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
-import { ClientManager } from "@src/confluent/client-manager.js";
 import {
   deserializeMessage,
   getLatestSchemaIfExists,
@@ -176,10 +175,11 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    * @returns A CallToolResult containing the consumed messages or error information
    */
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,
     sessionId?: string,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { topicNames, maxMessages, timeoutMs, value, key } =
       consumeKafkaMessagesArgs.parse(toolArguments);
 

@@ -1,6 +1,5 @@
 import { RecordMetadata } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
-import { ClientManager } from "@src/confluent/client-manager.js";
 import {
   checkSchemaNeeded,
   MessageOptions,
@@ -113,9 +112,10 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
    * @returns A CallToolResult describing the outcome of the produce operation
    */
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { topicName, value, key }: ProduceKafkaMessageArguments =
       produceKafkaMessageArguments.parse(toolArguments);
 

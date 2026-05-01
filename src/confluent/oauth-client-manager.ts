@@ -4,11 +4,19 @@
  * URL is auto-derived from the Auth0 environment via {@link getCloudRestUrlForEnv}.
  *
  * Inherits the abstract {@link BaseClientManager} and intentionally adds nothing
- * native-Kafka-shaped: no broker client, no SASL, no `KafkaJS`/SR-SDK imports.
- * Native-Kafka tools are gated to direct connections by their predicates and
- * narrow the runtime's `BaseClientManager` to a `DirectClientManager` via
- * {@link ServerRuntime.requireDirectClientManager}, so a missing-on-OAuth
- * Kafka method is a compile-time error rather than a runtime throw.
+ * native-Kafka-shaped: no broker client, no SASL, no `KafkaJS` import. Native
+ * Kafka methods are missing entirely from the class — a call to e.g.
+ * `getAdminClient` is a compile-time error rather than a runtime throw on a
+ * stub. Tool handlers that need them narrow the runtime's `BaseClientManager`
+ * to a `DirectClientManager` via {@link ServerRuntime.requireDirectClientManager},
+ * which (alongside the `hasKafka` predicate that gates those tools off for
+ * OAuth connections in the first place) keeps the path closed end-to-end.
+ *
+ * The Schema Registry SDK is similarly unsupported under OAuth, but its getter
+ * is part of `BaseClientManager`'s contract and stays inherited. A call to
+ * `getSchemaRegistryClient()` therefore still surfaces at runtime as the base
+ * class's existing OAuth-rejection throw — to be revisited once OAuth flows
+ * through the SDK.
  */
 
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";

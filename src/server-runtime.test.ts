@@ -198,6 +198,26 @@ describe("ServerRuntime", () => {
     });
   });
 
+  describe("requireDirectClientManager()", () => {
+    it("should return the sole client manager when it is a DirectClientManager", () => {
+      const cm = createMockInstance(DirectClientManager);
+      const runtime = new ServerRuntime(config, { "test-conn": cm });
+      expect(runtime.requireDirectClientManager()).toBe(cm);
+    });
+
+    it("should throw when the sole client manager is not a DirectClientManager (e.g., OAuth)", () => {
+      vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
+      const oauthConfig = new MCPServerConfiguration({
+        connections: { "env-connection": connWith({}) },
+        ccloudOAuth: { type: "ccloud_oauth", env: "stag" },
+      });
+      const runtime = ServerRuntime.fromConfig(oauthConfig);
+      expect(() => runtime.requireDirectClientManager()).toThrow(
+        "Native Kafka tools require a direct (non-OAuth) connection.",
+      );
+    });
+  });
+
   describe("fromConfig()", () => {
     it("should create a DirectClientManager for each connection", () => {
       const twoConnConfig = new MCPServerConfiguration({

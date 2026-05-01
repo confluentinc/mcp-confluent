@@ -3,7 +3,7 @@ import { MCPServerConfiguration } from "@src/config/models.js";
 import {
   constructClientManagerForConnection,
   DirectClientManager,
-} from "@src/confluent/client-manager.js";
+} from "@src/confluent/direct-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";

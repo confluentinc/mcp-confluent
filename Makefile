@@ -28,9 +28,13 @@ VAULT_PATH_FIELDS := \
 .PHONY: setup-test-env remove-test-env test-integration store-integration-test-results
 
 # Pull integration secrets into $(ENV_FILE). Fails fast if `vault` isn't on
-# PATH or the user isn't authed; tolerates empty per-field reads so missing
-# values surface as test skips rather than setup errors. chmod 600 keeps
-# secrets out of world-readable mode on shared machines.
+# PATH or the user isn't authed. Empty Vault reads (missing field, no
+# permission) are SKIPPED rather than written as empty strings — env-schema's
+# `.optional()` accepts undefined but rejects empty string, so writing empty
+# would crash the spawned server with a Zod error instead of letting tests
+# skip via their predicate gate. The `.env.integration.example` file
+# documents the full expected shape. chmod 600 keeps secrets out of
+# world-readable mode on shared machines.
 setup-test-env:
 	@command -v vault >/dev/null 2>&1 || { \
 		echo "ERROR: 'vault' CLI not found on PATH. Install it or populate $(ENV_FILE) manually (see CONTRIBUTING.md)."; \
@@ -48,7 +52,9 @@ setup-test-env:
 		fields=$${entry#*:}; \
 		for field in $$(echo $$fields | tr ',' ' '); do \
 			value=$$(vault kv get -field=$$field $(VAULT_SECRET_BASE)/$$path_suffix 2>/dev/null || true); \
-			echo "$$field=$$value" >> $(ENV_FILE); \
+			if [ -n "$$value" ]; then \
+				echo "$$field=$$value" >> $(ENV_FILE); \
+			fi; \
 		done; \
 	done
 

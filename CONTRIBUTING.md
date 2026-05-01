@@ -222,7 +222,7 @@ make setup-test-env                     # fetches secrets from Vault into .env.i
 npm run test:integration -- --tags-filter=@kafka
 ```
 
-`make setup-test-env` fails fast if the Vault CLI isn't on `PATH` or you're not authed. If an individual Vault field is empty, the command still writes it to `.env.integration`; tests that need that credential skip themselves with a clear reason instead of failing setup.
+`make setup-test-env` fails fast if the Vault CLI isn't on `PATH` or you're not authed. If an individual Vault field is missing or unreadable, the line is skipped rather than written with an empty value (writing empty would fail the spawned server's env validation); tests that need that credential skip themselves via their predicate gate. See `.env.integration.example` for the full expected shape.
 
 ##### Option B: Bring your own cluster (no Vault required)
 

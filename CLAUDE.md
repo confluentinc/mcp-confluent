@@ -30,7 +30,7 @@ Pre-commit hook runs `npx prettier` and `npx eslint` automatically via Husky on 
 
 ### Entry Point & Startup Flow
 
-`src/index.ts` → `parseCliArgs()` → `initEnv()` → branch on `cliOptions.config`: when `-c <path>` is supplied, `loadConfigFromYaml(path, process.env)` parses + interpolates + validates the YAML; otherwise `buildConfigFromEnvAndCli(env, ...)` synthesizes the same `MCPServerConfiguration` shape from env vars + CLI args (legacy path, see issue #151). Both branches converge into `ServerRuntime.fromConfig()`, which constructs a `DefaultClientManager` per connection → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
+`src/index.ts` → `parseCliArgs()` → `initEnv()` → branch on `cliOptions.config`: when `-c <path>` is supplied, `loadConfigFromYaml(path, process.env)` parses + interpolates + validates the YAML; otherwise `buildConfigFromEnvAndCli(env, ...)` synthesizes the same `MCPServerConfiguration` shape from env vars + CLI args (legacy path, see issue #151). Both branches converge into `ServerRuntime.fromConfig()`, which constructs a `DirectClientManager` per connection → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
 
 Tools are **auto-enabled/disabled** based on which **service blocks** are present in each connection (e.g., a tool requiring `flink` is enabled iff some connection's resolved config has a `flink:` block). The connection's blocks come from YAML when one is supplied via `-c <path>`; otherwise they're synthesized from env vars + CLI args for backwards compatibility during the migration. Each handler declares its requirement via `enabledConnectionIds(runtime)`, which returns the ids of connections satisfying a predicate from `src/confluent/tools/connection-predicates.ts`. An empty result disables the tool. Domain-wide gating (e.g., all Flink tools) lives on intermediate base classes such as `FlinkToolHandler`.
 
@@ -45,7 +45,9 @@ Tools are **auto-enabled/disabled** based on which **service blocks** are presen
   - `tool-registry.ts` — `ToolHandlerRegistry.handlers` map: `ToolName` → handler instance. Wire new tools here.
   - `handlers/<domain>/` — Organized by Confluent service (kafka, flink, connect, catalog, schema, tableflow, billing, search, metrics, environments, clusters). Some domains expose an intermediate base class (e.g., `flink-tool-handler.ts`) that implements `enabledConnectionIds()` once for the whole domain.
 
-- **`src/confluent/client-manager.ts`** — `DefaultClientManager` holds lazily-initialized Kafka clients (admin, producer, consumer via `@confluentinc/kafka-javascript`) and typed REST clients (`openapi-fetch`) for each Confluent Cloud API surface. One instance per connection, constructed from a `ConnectionConfig` (not directly from env vars).
+- **`src/confluent/client-manager.ts`** — public client-manager contracts: `ClientManager`, `KafkaClientManager`, `ConfluentCloudRestClientManager`, `SchemaRegistryClientHandler`. Implementations live in sibling files.
+- **`src/confluent/base-client-manager.ts`** — abstract `BaseClientManager` that owns every Confluent Cloud REST client (`openapi-fetch`) and the Schema Registry SDK client. No native Kafka broker.
+- **`src/confluent/direct-client-manager.ts`** — concrete `DirectClientManager` (extends `BaseClientManager`) that adds api-key-authenticated Kafka admin/producer/consumer via `@confluentinc/kafka-javascript`. Built once per connection from a `DirectConnectionConfig` by `constructDirectClientManager`.
 
 - **`src/confluent/openapi-schema.d.ts`** — Generated types from `openapi.json` using `openapi-typescript`. Provides type-safe REST calls throughout the codebase.
 

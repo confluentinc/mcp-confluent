@@ -168,10 +168,10 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
 
 /**
  * Merges `process.env` with caller overrides into a `Record<string, string>`
- * (`node:child_process` rejects undefined values). Forces
+ * (`node:child_process` rejects undefined values), forcing
  * `NODE_ENV=integration` so `src/index.ts`'s test-mode guard lets `main()`
- * run, and defaults `LOG_LEVEL=error` because vitest's `test.env` doesn't
- * propagate across the `pool: "forks"` worker boundary.
+ * run. Everything else the spawned server reads (transports, ports, auth,
+ * log level) lives in the YAML fixture, not in env vars.
  */
 function buildEnv(
   overrides: Record<string, string> = {},
@@ -182,9 +182,6 @@ function buildEnv(
   }
   // vitest sets NODE_ENV=test which trips src/index.ts's test guard, so override after the copy
   merged.NODE_ENV = "integration";
-  // real failures (Zod env validation, CCloud auth, token-refresh) still surface at error level;
-  // opt in to verbose via startServer({ env: { LOG_LEVEL: "debug" } })
-  if (!merged.LOG_LEVEL) merged.LOG_LEVEL = "error";
   for (const [key, value] of Object.entries(overrides)) {
     merged[key] = value;
   }
@@ -230,7 +227,7 @@ async function waitForPing(
       const response = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json", ...extraHeaders },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+        body: JSON.stringify({ jsonrpc: "2.0", id: "1", method: "ping" }),
       });
       if (response.ok) return;
       lastError = new Error(`ping returned ${response.status}`);
@@ -291,7 +288,13 @@ async function spawnHttpChild(
       options.auth ? authHeaders(options.auth.apiKey) : {},
     );
   } catch (error) {
-    if (child.exitCode === null) child.kill("SIGTERM");
+    if (child.exitCode === null) {
+      child.kill("SIGTERM");
+      // await actual exit so the next test file doesn't race with a
+      // lingering child holding the port; ignore errors emitted during
+      // teardown (e.g. once() rejecting on an "error" event)
+      await once(child, "exit").catch(() => {});
+    }
     throw error;
   }
   return child;

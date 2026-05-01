@@ -182,44 +182,66 @@ describe("tool-registry.ts", () => {
 
     /**
      * Wires every client getter on a fresh `Mocked<DefaultClientManager>` to a
-     * recursive Proxy: any property access or call on the returned client resolves
-     * to another instance of the same Proxy, so handler bodies never throw a
-     * TypeError before they reach real logic. A TypeError that escapes is therefore
-     * a genuine wiring failure — exactly what the smoke tests check for.
+     * two-proxy pair. `callableProxy` (function target) absorbs any method chain
+     * or call without throwing; every call resolves to `responseProxy`.
+     * `responseProxy` (plain-object target) models the `{ data, error }` shape
+     * returned by openapi-fetch: `error` is `undefined`, and `data` returns
+     * `responseData` — supply a minimal valid shape to push a handler past schema
+     * validation into its real success branch (defaults to `{}`).
+     *
+     * A TypeError that escapes the proxy pair is therefore a genuine wiring
+     * failure — exactly what the smoke tests check for.
      *
      * Returns `{ clientManager, clientGetters }`. `clientGetters` is the canonical
      * list of all getter mocks; callers use it to assert that at least one was
      * invoked when a handler resolves successfully.
      */
-    function stubClientGetters() {
-      const proxy = new Proxy(() => Promise.resolve(proxy), {
+    function stubClientGetters(responseData: unknown = {}) {
+      // Two-proxy setup: callableProxy (function target) handles method chains
+      // and calls; responseProxy (plain-object target) is what async calls
+      // resolve to, giving { data, error } destructuring a real object for `data`.
+      // responseData is returned for the `data` property — callers can supply a
+      // minimal valid shape to push a handler past validation into its success path.
+      let responseProxy: object = {};
+      const callableProxy = new Proxy((() => {}) as () => Promise<object>, {
         get: (_t, prop) => {
           if (prop === "then" || prop === "error") return undefined;
-          return () => Promise.resolve(proxy);
+          return callableProxy;
         },
-        apply: () => Promise.resolve(proxy),
+        apply: () => Promise.resolve(responseProxy),
+      });
+      responseProxy = new Proxy({} as object, {
+        get: (_t, prop) => {
+          if (prop === "then" || prop === "error") return undefined;
+          if (prop === "data") return responseData;
+          return callableProxy;
+        },
       });
       const clientManager = createMockInstance(DefaultClientManager);
-      clientManager.getAdminClient.mockResolvedValue(proxy as never);
-      clientManager.getProducer.mockResolvedValue(proxy as never);
-      clientManager.getConsumer.mockResolvedValue(proxy as never);
+      clientManager.getAdminClient.mockResolvedValue(callableProxy as never);
+      clientManager.getProducer.mockResolvedValue(callableProxy as never);
+      clientManager.getConsumer.mockResolvedValue(callableProxy as never);
       clientManager.getConfluentCloudFlinkRestClient.mockReturnValue(
-        proxy as never,
+        callableProxy as never,
       );
-      clientManager.getConfluentCloudRestClient.mockReturnValue(proxy as never);
+      clientManager.getConfluentCloudRestClient.mockReturnValue(
+        callableProxy as never,
+      );
       clientManager.getConfluentCloudTableflowRestClient.mockReturnValue(
-        proxy as never,
+        callableProxy as never,
       );
       clientManager.getConfluentCloudSchemaRegistryRestClient.mockReturnValue(
-        proxy as never,
+        callableProxy as never,
       );
       clientManager.getConfluentCloudKafkaRestClient.mockReturnValue(
-        proxy as never,
+        callableProxy as never,
       );
       clientManager.getConfluentCloudTelemetryRestClient.mockReturnValue(
-        proxy as never,
+        callableProxy as never,
       );
-      clientManager.getSchemaRegistryClient.mockReturnValue(proxy as never);
+      clientManager.getSchemaRegistryClient.mockReturnValue(
+        callableProxy as never,
+      );
       const clientGetters = [
         clientManager.getAdminClient,
         clientManager.getProducer,
@@ -235,12 +257,29 @@ describe("tool-registry.ts", () => {
       return { clientManager, clientGetters };
     }
 
-    /** Handler resolves: response text contains `resolves`. */
-    type Resolves = { resolves: string };
-    /** Handler throws: "ZodError" or error message contains `throws`. */
-    type Throws = { throws: string };
-    /** Placeholder: run the smoke test to discover and replace with the real outcome. */
-    type ZeroArgOutcome = Resolves | Throws | "TODO";
+    type Resolves = {
+      /** Minimal valid API response to feed into the proxy's `data` property.
+       *  Omit to use `{}` (sufficient when the handler just JSON-serialises the
+       *  response); supply `{ data: [] }` or a richer shape to push the handler
+       *  past schema validation into its real success branch. */
+      responseData?: unknown;
+      /** Substring that must appear in the resolved response text. */
+      resolves: string;
+    };
+    type Throws = {
+      /** Same as `Resolves.responseData` — set when the handler needs valid-ish
+       *  data before it reaches the code that throws. */
+      responseData?: unknown;
+      /** Substring that must appear in the thrown error message, or "ZodError"
+       *  to match any ZodError regardless of message. */
+      throws: string;
+    };
+    /** Complete smoke-test specification for one handler: what to feed in
+     *  (`responseData`) and what to expect out (`resolves` / `throws`).
+     *  The string sentinel value triggers a "golden file"-style discovery run:
+     *  the test executes the handler, reports the actual outcome, and asks you
+     *  to paste it in as the recorded expectation. */
+    type HandleSmokeCase = Resolves | Throws | "TODO";
 
     // Reverse map from enum value ("list-topics") → enum key ("LIST_TOPICS"),
     // used to generate helpful copy-paste suggestions in failure messages.
@@ -255,7 +294,7 @@ describe("tool-registry.ts", () => {
      * Use `"TODO"` as a placeholder — the smoke test will run the handler
      * and report the correct entry to paste in.
      */
-    const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, ZeroArgOutcome>> = {
+    const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, HandleSmokeCase>> = {
       // Kafka
       [ToolName.LIST_TOPICS]: { resolves: "Kafka topics:" },
       [ToolName.CREATE_TOPICS]: { throws: "ZodError" },
@@ -297,7 +336,7 @@ describe("tool-registry.ts", () => {
       [ToolName.ADD_TAGS_TO_TOPIC]: { throws: "ZodError" },
       [ToolName.LIST_TAGS]: { resolves: "Successfully retrieved tags" },
       // Search
-      [ToolName.SEARCH_TOPICS_BY_TAG]: { resolves: "undefined" },
+      [ToolName.SEARCH_TOPICS_BY_TAG]: { resolves: "{}" },
       [ToolName.SEARCH_TOPICS_BY_NAME]: { throws: "ZodError" },
       // Environments
       [ToolName.LIST_ENVIRONMENTS]: {
@@ -305,7 +344,10 @@ describe("tool-registry.ts", () => {
       },
       [ToolName.READ_ENVIRONMENT]: { throws: "ZodError" },
       // Clusters
-      [ToolName.LIST_CLUSTERS]: { resolves: "Invalid response format" },
+      [ToolName.LIST_CLUSTERS]: {
+        responseData: { data: [] },
+        resolves: "Successfully retrieved 0 clusters",
+      },
       // Tableflow
       [ToolName.CREATE_TABLEFLOW_TOPIC]: { throws: "ZodError" },
       [ToolName.LIST_TABLEFLOW_REGIONS]: { resolves: "Tableflow Regions" },
@@ -326,7 +368,10 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_BILLING_COSTS]: { throws: "ZodError" },
       // Metrics
       [ToolName.QUERY_METRICS]: { throws: "ZodError" },
-      [ToolName.LIST_METRICS]: { resolves: "No metrics descriptors available" },
+      [ToolName.LIST_METRICS]: {
+        responseData: { data: [] },
+        resolves: "No metrics descriptors available",
+      },
     };
 
     beforeAll(() => {
@@ -345,10 +390,15 @@ describe("tool-registry.ts", () => {
       },
     );
 
-    it.each(Object.entries(ZERO_ARG_OUTCOMES) as [ToolName, ZeroArgOutcome][])(
+    it.each(Object.entries(ZERO_ARG_OUTCOMES) as [ToolName, HandleSmokeCase][])(
       "%s: handle() should not crash before reaching the ClientManager",
       async (name, outcome) => {
-        const { clientManager, clientGetters } = stubClientGetters();
+        const responseData =
+          typeof outcome === "object" && "responseData" in outcome
+            ? outcome.responseData
+            : undefined;
+        const { clientManager, clientGetters } =
+          stubClientGetters(responseData);
 
         const runtime = allServicesRuntime(clientManager);
 

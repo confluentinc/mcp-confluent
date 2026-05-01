@@ -189,6 +189,10 @@ describe("tool-registry.ts", () => {
      * Returns `{ clientManager, clientGetters }`. `clientGetters` is the canonical
      * list of all getter mocks; callers use it to assert that at least one was
      * invoked when a handler resolves successfully.
+     *
+     * (No explicit return type: `clientGetters` is a heterogeneous array of mock
+     * method references whose element type is too verbose to write by hand — inference
+     * is clearer here than annotation would be.)
      */
     function stubClientGetters(responseData: unknown = {}) {
       // Two-proxy setup: callableProxy (function target) handles method chains

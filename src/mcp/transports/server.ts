@@ -2,7 +2,11 @@ import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import env from "@src/env.js";
 import { logger } from "@src/logger.js";
-import { AuthConfig, createAuthHook } from "@src/mcp/transports/auth.js";
+import {
+  AuthConfig,
+  CFLT_MCP_API_KEY_HEADER,
+  createAuthHook,
+} from "@src/mcp/transports/auth.js";
 import { ServerConfig } from "@src/mcp/transports/types.js";
 import {
   default as Fastify,
@@ -67,7 +71,7 @@ export class HttpServer {
           securitySchemes: {
             apiKey: {
               type: "apiKey",
-              name: "cflt-mcp-api-Key",
+              name: CFLT_MCP_API_KEY_HEADER,
               in: "header",
             },
           },

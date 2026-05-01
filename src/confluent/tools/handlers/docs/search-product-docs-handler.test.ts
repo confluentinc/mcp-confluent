@@ -171,21 +171,23 @@ describe("search-product-docs-handler.ts", () => {
         expect(parsed.warnings).toEqual([]);
       });
 
-      it("should drop hits whose URLs aren't on the allowlist", async () => {
+      it("should drop URLs outside the allowlist and bucket allowed cross-source URLs by hostname", async () => {
         setupAllSources({
           swiftype: {
             records: {
               page: [
+                { title: "External", url: "https://example.com/blog" },
                 {
-                  title: "External blog",
-                  url: "https://example.com/blog",
-                },
-                {
-                  title: "Insecure docs",
+                  title: "Insecure",
                   url: "http://docs.confluent.io/page.html",
                 },
                 {
-                  title: "Allowed",
+                  title: "Cross to dev",
+                  url: "https://developer.confluent.io/x.html",
+                  body: "x",
+                },
+                {
+                  title: "Docs",
                   url: "https://docs.confluent.io/ok.html",
                   body: "ok",
                 },
@@ -196,15 +198,26 @@ describe("search-product-docs-handler.ts", () => {
 
         const result = await handler.handle(clientManager, { query: "x" });
         const parsed = JSON.parse(getText(result)) as {
-          results: Array<{ url: string }>;
+          results: Array<{ url: string; source: string }>;
         };
 
-        expect(parsed.results.map((r) => r.url)).toEqual([
-          "https://docs.confluent.io/ok.html",
+        // example.com + http:// dropped; the Swiftype-returned developer URL
+        // is bucketed as developer (not as docs).
+        expect(
+          parsed.results.map((r) => ({ url: r.url, source: r.source })),
+        ).toEqual([
+          {
+            url: "https://docs.confluent.io/ok.html",
+            source: "docs.confluent.io",
+          },
+          {
+            url: "https://developer.confluent.io/x.html",
+            source: "developer.confluent.io",
+          },
         ]);
       });
 
-      it("should dedupe results that appear in multiple sources", async () => {
+      it("should dedupe results that appear in multiple backends", async () => {
         const sharedUrl = "https://developer.confluent.io/learn-kafka/";
         setupAllSources({
           swiftype: {
@@ -257,6 +270,55 @@ describe("search-product-docs-handler.ts", () => {
         };
 
         expect(parsed.results).toHaveLength(3);
+      });
+
+      it("should follow the docs/dev/dev/docs/support pickup pattern when docs has surplus", async () => {
+        setupAllSources({
+          swiftype: {
+            records: {
+              page: [
+                { title: "D0", url: "https://docs.confluent.io/d0.html" },
+                { title: "D1", url: "https://docs.confluent.io/d1.html" },
+                { title: "D2", url: "https://docs.confluent.io/d2.html" },
+              ],
+            },
+          },
+          developer: {
+            tutorial: {
+              items: [
+                { title: "V0", url: "https://developer.confluent.io/v0/" },
+                { title: "V1", url: "https://developer.confluent.io/v1/" },
+              ],
+            },
+          },
+          support: {
+            results: [
+              {
+                title: "S0",
+                html_url: "https://support.confluent.io/s0.html",
+              },
+            ],
+          },
+        });
+
+        const result = await handler.handle(clientManager, {
+          query: "x",
+          limit: 6,
+        });
+        const parsed = JSON.parse(getText(result)) as {
+          results: Array<{ title: string }>;
+        };
+
+        // Pattern [docs, dev, dev, docs, support] cycle 1 takes 5 slots
+        // (D0, V0, V1, D1, S0); cycle 2 fills the last with D2.
+        expect(parsed.results.map((r) => r.title)).toEqual([
+          "D0",
+          "V0",
+          "V1",
+          "D1",
+          "S0",
+          "D2",
+        ]);
       });
 
       it("should return an empty result set with a friendly message when all sources return no hits", async () => {

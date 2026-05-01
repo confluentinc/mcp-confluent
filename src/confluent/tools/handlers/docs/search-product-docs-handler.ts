@@ -11,8 +11,7 @@ import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
-// Public search-only key embedded in docs.confluent.io's frontend
-// (_static/js/swiftype-search.js). Safe to hardcode.
+// Public search-only key from docs.confluent.io frontend; safe to hardcode.
 const SWIFTYPE_ENGINE_KEY = "FbBthqzRNii8B32is9R2";
 const SWIFTYPE_SEARCH_URL =
   "https://search-api.swiftype.com/api/v1/public/engines/search.json";
@@ -80,13 +79,31 @@ export class SearchProductDocsHandler extends BaseToolHandler {
       ]);
 
     const warnings: string[] = [];
-    const sources: NormalizedResult[][] = [
-      extractResults(docsSettled, "docs.confluent.io", warnings),
-      extractResults(developerSettled, "developer.confluent.io", warnings),
-      extractResults(supportSettled, "support.confluent.io", warnings),
+    // Order matters — first into a bucket leads it. dev-proxy (DevRel-curated)
+    // outranks Swiftype's noisier full-text hits; Swiftype fills the gaps.
+    const all = [
+      ...extractResults(developerSettled, "developer.confluent.io", warnings),
+      ...extractResults(supportSettled, "support.confluent.io", warnings),
+      ...extractResults(docsSettled, "docs.confluent.io", warnings),
     ];
 
-    const merged = interleaveAndDedupe(sources, limit);
+    // Bucket by URL hostname, not backend: Swiftype indexes *.confluent.io
+    // and dev-proxy returns docs URLs, so backend→bucket would starve slots.
+    const buckets: Record<Source, NormalizedResult[]> = {
+      "docs.confluent.io": [],
+      "developer.confluent.io": [],
+      "support.confluent.io": [],
+    };
+    for (const r of all) buckets[r.source].push(r);
+
+    const merged = interleaveAndDedupe(
+      [
+        buckets["docs.confluent.io"],
+        buckets["developer.confluent.io"],
+        buckets["support.confluent.io"],
+      ],
+      limit,
+    );
     const payload: {
       results: NormalizedResult[];
       warnings: string[];
@@ -105,7 +122,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     query: string,
     limit: number,
   ): Promise<NormalizedResult[]> {
-    // Over-fetch so that host-filtering to allowed domains still yields `limit` results.
+    // Over-fetch: host-filtering may drop hits before we reach `limit`.
     const params = new URLSearchParams({
       engine_key: SWIFTYPE_ENGINE_KEY,
       q: query,
@@ -177,10 +194,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     return results;
   }
 
-  /**
-   * support.confluent.io runs on Zendesk Help Center, which exposes a
-   * documented public search API requiring no auth.
-   */
+  /** Zendesk Help Center public search API — no auth, support hits only. */
   private async searchSupportZendesk(
     query: string,
     limit: number,
@@ -221,8 +235,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    // Public docs search has no service-block requirement, so it's enabled
-    // whenever the runtime has at least one connection configured.
+    // No service-block requirement; enabled if any connection exists.
     return Object.keys(runtime.config.connections);
   }
 }
@@ -264,11 +277,7 @@ interface ZendeskSearchResponse {
   results?: ZendeskSearchHit[];
 }
 
-/**
- * Fetches JSON from `url`, bounded by `REQUEST_TIMEOUT_MS`. Any failure —
- * timeout, non-2xx response, or network error — is rethrown as an Error
- * prefixed with `label`, so the caller can tell which source failed.
- */
+/** Fetches JSON with a timeout. Errors are rethrown prefixed with `label`. */
 async function fetchSourceJson<T>(
   url: string,
   init: RequestInit,
@@ -307,10 +316,10 @@ function extractResults(
   return [];
 }
 
-/**
- * Interleave N ranked lists round-robin so each source contributes early
- * results. Dedupes by URL (different backends sometimes return the same page).
- */
+// Indices into [docs, developer, support]: docs and dev get 2× weight, support 1×.
+const PICKUP_PATTERN = [0, 1, 1, 0, 2] as const;
+
+/** Interleaves sources per PICKUP_PATTERN, dedupes by URL, stops at `limit`. */
 function interleaveAndDedupe(
   sources: NormalizedResult[][],
   limit: number,
@@ -321,7 +330,7 @@ function interleaveAndDedupe(
   let progressed = true;
   while (out.length < limit && progressed) {
     progressed = false;
-    for (let s = 0; s < sources.length; s++) {
+    for (const s of PICKUP_PATTERN) {
       if (out.length >= limit) break;
       const list = sources[s]!;
       while (indices[s]! < list.length) {
@@ -350,8 +359,8 @@ function sourceForUrl(url: string): Source | null {
 }
 
 /**
- * Swiftype and the dev proxy sometimes return titles as [long, short] tuples
- * (full SEO title and the display title). Prefer the shorter one.
+ * Title may be a string or a `[seo, display]` array; pick the shorter one
+ * (usually the cleaner display title). Returns null if no usable title.
  */
 function coerceTitle(title: unknown): string | null {
   if (typeof title === "string") return title.trim() || null;

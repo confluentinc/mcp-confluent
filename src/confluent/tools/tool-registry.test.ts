@@ -171,6 +171,15 @@ describe("tool-registry.ts", () => {
       );
     }
 
+    /** Classifies a thrown value into the string used for matching in ZERO_ARG_OUTCOMES. */
+    function classifyThrown(name: string, thrown: unknown): string {
+      if (thrown instanceof ZodError) return "ZodError";
+      if (thrown instanceof Error) return thrown.message;
+      throw new Error(
+        `Wacky -- ${name}: handler threw a non-Error value: ${JSON.stringify(thrown)}`,
+      );
+    }
+
     /**
      * Wires every client getter on a fresh `Mocked<DefaultClientManager>` to a
      * recursive Proxy: any property access or call on the returned client resolves
@@ -182,19 +191,10 @@ describe("tool-registry.ts", () => {
      * list of all getter mocks; callers use it to assert that at least one was
      * invoked when a handler resolves successfully.
      */
-    /** Classifies a thrown value into the string used for matching in ZERO_ARG_OUTCOMES. */
-    function classifyThrown(name: string, thrown: unknown): string {
-      if (thrown instanceof ZodError) return "ZodError";
-      if (thrown instanceof Error) return thrown.message;
-      throw new Error(
-        `Wacky -- ${name}: handler threw a non-Error value: ${JSON.stringify(thrown)}`,
-      );
-    }
-
     function stubClientGetters() {
       const proxy = new Proxy(() => Promise.resolve(proxy), {
         get: (_t, prop) => {
-          if (prop === "then") return undefined;
+          if (prop === "then" || prop === "error") return undefined;
           return () => Promise.resolve(proxy);
         },
         apply: () => Promise.resolve(proxy),
@@ -295,24 +295,20 @@ describe("tool-registry.ts", () => {
       [ToolName.DELETE_TAG]: { throws: "ZodError" },
       [ToolName.REMOVE_TAG_FROM_ENTITY]: { throws: "ZodError" },
       [ToolName.ADD_TAGS_TO_TOPIC]: { throws: "ZodError" },
-      [ToolName.LIST_TAGS]: { resolves: "Failed to list tags" },
+      [ToolName.LIST_TAGS]: { resolves: "Successfully retrieved tags" },
       // Search
-      [ToolName.SEARCH_TOPICS_BY_TAG]: {
-        resolves: "Failed to search for topics by tag",
-      },
+      [ToolName.SEARCH_TOPICS_BY_TAG]: { resolves: "undefined" },
       [ToolName.SEARCH_TOPICS_BY_NAME]: { throws: "ZodError" },
       // Environments
       [ToolName.LIST_ENVIRONMENTS]: {
-        resolves: "Failed to fetch environments",
+        resolves: "Invalid environment list data",
       },
       [ToolName.READ_ENVIRONMENT]: { throws: "ZodError" },
       // Clusters
-      [ToolName.LIST_CLUSTERS]: { resolves: "Failed to fetch clusters" },
+      [ToolName.LIST_CLUSTERS]: { resolves: "Invalid response format" },
       // Tableflow
       [ToolName.CREATE_TABLEFLOW_TOPIC]: { throws: "ZodError" },
-      [ToolName.LIST_TABLEFLOW_REGIONS]: {
-        resolves: "Failed to list Tableflow regions",
-      },
+      [ToolName.LIST_TABLEFLOW_REGIONS]: { resolves: "Tableflow Regions" },
       [ToolName.LIST_TABLEFLOW_TOPICS]: {
         throws: "Environment ID is required",
       },

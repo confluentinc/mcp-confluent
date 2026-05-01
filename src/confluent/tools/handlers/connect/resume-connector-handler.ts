@@ -1,0 +1,93 @@
+import { ClientManager } from "@src/confluent/client-manager.js";
+import { getEnsuredParam } from "@src/confluent/helpers.js";
+import { CallToolResult } from "@src/confluent/schema.js";
+import {
+  BaseToolHandler,
+  CREATE_UPDATE,
+  ToolConfig,
+} from "@src/confluent/tools/base-tools.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
+import {
+  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
+  EnvVar,
+} from "@src/env-schema.js";
+import { wrapAsPathBasedClient } from "openapi-fetch";
+import { z } from "zod";
+
+const resumeConnectorArguments = z.object({
+  environmentId: z
+    .string()
+    .optional()
+    .describe(
+      "The unique identifier for the environment this resource belongs to.",
+    ),
+  clusterId: z
+    .string()
+    .optional()
+    .describe("The unique identifier for the Kafka cluster."),
+  connectorName: z
+    .string()
+    .nonempty()
+    .describe("The name of the connector to resume."),
+});
+
+export class ResumeConnectorHandler extends BaseToolHandler {
+  async handle(
+    clientManager: ClientManager,
+    toolArguments: Record<string, unknown> | undefined,
+  ): Promise<CallToolResult> {
+    const { clusterId, environmentId, connectorName } =
+      resumeConnectorArguments.parse(toolArguments);
+    const environment_id = getEnsuredParam(
+      "KAFKA_ENV_ID",
+      "Environment ID is required",
+      environmentId,
+    );
+    const kafka_cluster_id = getEnsuredParam(
+      "KAFKA_CLUSTER_ID",
+      "Kafka Cluster ID is required",
+      clusterId,
+    );
+
+    const pathBasedClient = wrapAsPathBasedClient(
+      clientManager.getConfluentCloudRestClient(),
+    );
+    const { error } = await pathBasedClient[
+      "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}/resume"
+    ].PUT({
+      params: {
+        path: {
+          environment_id: environment_id,
+          kafka_cluster_id: kafka_cluster_id,
+          connector_name: connectorName,
+        },
+      },
+    });
+    if (error) {
+      return this.createResponse(
+        `Failed to resume connector ${connectorName}: ${JSON.stringify(error)}`,
+        true,
+      );
+    }
+    return this.createResponse(
+      `Resume requested for connector ${connectorName}.`,
+    );
+  }
+
+  getToolConfig(): ToolConfig {
+    return {
+      name: ToolName.RESUME_CONNECTOR,
+      description: "Resume a paused connector and its tasks. Idempotent.",
+      inputSchema: resumeConnectorArguments.shape,
+      annotations: CREATE_UPDATE,
+    };
+  }
+
+  getRequiredEnvVars(): readonly EnvVar[] {
+    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
+  }
+
+  isConfluentCloudOnly(): boolean {
+    return true;
+  }
+}

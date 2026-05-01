@@ -9,7 +9,11 @@ import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
+import { PauseConnectorHandler } from "@src/confluent/tools/handlers/connect/pause-connector-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
+import { RestartConnectorHandler } from "@src/confluent/tools/handlers/connect/restart-connector-handler.js";
+import { ResumeConnectorHandler } from "@src/confluent/tools/handlers/connect/resume-connector-handler.js";
+import { UpdateConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/update-connector-config-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
 import { DescribeTableHandler } from "@src/confluent/tools/handlers/flink/catalog/describe-table-handler.js";
@@ -76,6 +80,10 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_CONNECTORS, new ListConnectorsHandler()],
     [ToolName.READ_CONNECTOR, new ReadConnectorHandler()],
     [ToolName.CREATE_CONNECTOR, new CreateConnectorHandler()],
+    [ToolName.UPDATE_CONNECTOR_CONFIG, new UpdateConnectorConfigHandler()],
+    [ToolName.PAUSE_CONNECTOR, new PauseConnectorHandler()],
+    [ToolName.RESUME_CONNECTOR, new ResumeConnectorHandler()],
+    [ToolName.RESTART_CONNECTOR, new RestartConnectorHandler()],
     [ToolName.SEARCH_TOPICS_BY_TAG, new SearchTopicsByTagHandler()],
     [ToolName.CREATE_TOPIC_TAGS, new CreateTopicTagsHandler()],
     [ToolName.DELETE_TAG, new DeleteTagHandler()],

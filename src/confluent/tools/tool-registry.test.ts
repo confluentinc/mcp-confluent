@@ -86,6 +86,9 @@ describe("tool-registry.ts", () => {
           "add",
           "update",
           "alter",
+          "pause",
+          "resume",
+          "restart",
         ]);
         const destructivePrefixes = new Set(["delete", "remove"]);
 

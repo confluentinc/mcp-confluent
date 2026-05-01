@@ -382,6 +382,8 @@ describe("tool-registry.ts", () => {
         responseData: { data: [] },
         resolves: "No metrics descriptors available",
       },
+      // Documentation
+      [ToolName.SEARCH_PRODUCT_DOCS]: { throws: "ZodError" },
     };
 
     beforeAll(() => {

@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -31,9 +30,10 @@ const createTagsArguments = z.object({
 
 export class CreateTopicTagsHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { tags } = createTagsArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(

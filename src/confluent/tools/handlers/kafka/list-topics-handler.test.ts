@@ -6,6 +6,7 @@ import {
   DEFAULT_CONNECTION_ID,
   kafkaRestOnlyRuntime,
   kafkaRuntime,
+  runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
   createMockAdmin,
@@ -50,9 +51,16 @@ describe("list-topics-handler.ts", () => {
           new Error("connection refused"),
         );
 
-        await expect(handler.handle(clientManager, {})).rejects.toThrow(
-          "connection refused",
-        );
+        await expect(
+          handler.handle(
+            runtimeWith(
+              { kafka: { bootstrap_servers: "broker:9092" } },
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            {},
+          ),
+        ).rejects.toThrow("connection refused");
       });
     });
   });

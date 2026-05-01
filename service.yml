@@ -57,7 +57,7 @@ semaphore:
       parameters:
         - name: TOOL_GROUPS
           required: true
-          default_value: "@kafka"
+          default_value: "@smoke|@kafka"
           description: 'Pipe-separated tool-group tags to test.'
         - name: TRANSPORTS
           required: true

@@ -12,20 +12,21 @@ describe("list-organizations-handler.ts", () => {
     const handler = new ListOrganizationsHandler();
 
     describe("enabledConnectionIds()", () => {
-      it("should return the connection ID under an api_key (confluent_cloud) runtime", () => {
+      it("should return the connection ID for a connection with a confluent_cloud block", () => {
         expect(handler.enabledConnectionIds(confluentCloudRuntime())).toEqual([
           DEFAULT_CONNECTION_ID,
         ]);
       });
 
-      it("should return the connection ID under a ccloud-oauth runtime", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
+      it("should return an empty array for a connection without a confluent_cloud block", () => {
+        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });
 
-      it("should return an empty array when neither OAuth nor a confluent_cloud block is configured", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
+      it("should return an empty array under a ccloud-oauth runtime whose synth connection lacks a confluent_cloud block", () => {
+        // Known regression vs. the inline bypass that previously enabled the tool
+        // under any OAuth runtime — collapses once the connection-shape migration
+        // lets the OAuth synth carry a confluent_cloud block.
+        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
       });
     });
   });

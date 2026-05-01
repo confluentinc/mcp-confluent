@@ -152,19 +152,7 @@ Organization: ${org.name}
     };
   }
 
-  /**
-   * Server-wide OAuth (`ccloudOAuth`) makes every connection cloud-eligible
-   * regardless of its api_key blocks; absent OAuth, falls back to the
-   * `hasConfluentCloud` per-connection predicate. The OAuth-aware branch is
-   * intentionally retained until the connection-shape migration lets the
-   * synthesized OAuth connection carry a `confluent_cloud` block — at that
-   * point this collapses to a single `connectionIdsWhere` call (T3 in the
-   * OAuth REST tool migration plan).
-   */
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    if (runtime.config.getCCloudOAuth() !== undefined) {
-      return Object.keys(runtime.config.connections);
-    }
     return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 }

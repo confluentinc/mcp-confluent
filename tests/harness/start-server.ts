@@ -4,6 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { CFLT_MCP_API_KEY_HEADER } from "@src/mcp/transports/auth.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 import { findFreePort } from "@tests/harness/find-port.js";
 import { spawnConfigPath } from "@tests/harness/runtime.js";
@@ -21,9 +22,9 @@ export interface StartServerOptions {
   /**
    * Enable HTTP/SSE auth on the spawned server with the given API key. When
    * set, the harness writes `server.auth.api_key` into the YAML, propagates
-   * the `cflt-mcp-api-key` header through the `/ping` readiness probe and
-   * the SDK client transport. Used by the auth smoke test; routine tests
-   * omit this and run with auth disabled. Ignored for stdio.
+   * the {@linkcode CFLT_MCP_API_KEY_HEADER} through the `/ping` readiness
+   * probe and the SDK client transport. Used by the auth smoke test; routine
+   * tests omit this and run with auth disabled. Ignored for stdio.
    */
   auth?: { apiKey: string };
 }
@@ -71,8 +72,8 @@ export async function startServer(
  * at `/mcp`. Auth is disabled at the server level by default (DNS rebinding
  * protection still applies, so loopback + auth-disabled is safe). When
  * `options.auth` is supplied, the spawned server requires the matching
- * `cflt-mcp-api-key` header and the harness wires it into the SDK transport
- * so the connection still succeeds.
+ * {@linkcode CFLT_MCP_API_KEY_HEADER} value and the harness wires it into
+ * the SDK transport so the connection still succeeds.
  */
 async function startHttp(options: StartServerOptions): Promise<StartedServer> {
   const port = await findFreePort();
@@ -116,9 +117,9 @@ async function startSse(options: StartServerOptions): Promise<StartedServer> {
   return { client, baseUrl, stop: makeHttpStop(client, child) };
 }
 
-/** Header object the auth middleware checks (`cflt-mcp-api-key`). */
+/** Header object the auth middleware checks (see {@linkcode CFLT_MCP_API_KEY_HEADER}). */
 function authHeaders(apiKey: string): Record<string, string> {
-  return { "cflt-mcp-api-key": apiKey };
+  return { [CFLT_MCP_API_KEY_HEADER]: apiKey };
 }
 
 /**
@@ -206,7 +207,7 @@ function newClient(): Client {
  *
  * `extraHeaders` is forwarded to the fetch — the auth middleware is global,
  * so when the spawn enables auth the readiness probe needs to send the same
- * `cflt-mcp-api-key` header as the SDK transport.
+ * {@linkcode CFLT_MCP_API_KEY_HEADER} as the SDK transport.
  */
 async function waitForPing(
   url: string,

@@ -19,9 +19,18 @@ export interface SpawnConfigOptions {
   /**
    * Whether to disable HTTP/SSE auth. Defaults to `true` for HTTP/SSE
    * spawns since tests run on loopback with DNS-rebinding protection still
-   * active and don't exercise the API-key middleware.
+   * active and don't exercise the API-key middleware. When `apiKey` is
+   * supplied this is forced to `false` (the Zod schema rejects
+   * `disabled: true` alongside an `api_key`).
    */
   authDisabled?: boolean;
+  /**
+   * Sets `server.auth.api_key` in the spawned config. Implies auth-enabled.
+   * The auth smoke test uses this to exercise the API-key middleware
+   * end-to-end; the routine kafka tests leave it unset and run with auth
+   * disabled.
+   */
+  apiKey?: string;
 }
 
 /**
@@ -72,9 +81,16 @@ export function spawnConfigPath(options: SpawnConfigOptions): string {
     const http = (server.http as Record<string, unknown> | undefined) ?? {};
     server.http = { ...http, port: options.httpPort };
   }
-  if (options.authDisabled !== undefined) {
+  if (options.authDisabled !== undefined || options.apiKey !== undefined) {
     const auth = (server.auth as Record<string, unknown> | undefined) ?? {};
-    server.auth = { ...auth, disabled: options.authDisabled };
+    if (options.apiKey !== undefined) {
+      // Zod refine rejects disabled=true + api_key=set, so force disabled=false
+      auth.disabled = false;
+      auth.api_key = options.apiKey;
+    } else if (options.authDisabled !== undefined) {
+      auth.disabled = options.authDisabled;
+    }
+    server.auth = auth;
   }
   parsed.server = server;
   const dir = mkdtempSync(join(tmpdir(), "mcp-confluent-integration-"));

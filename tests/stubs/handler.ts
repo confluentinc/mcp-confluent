@@ -1,4 +1,4 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import type { CallToolResult } from "@src/confluent/schema.js";
 import type { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
@@ -42,10 +42,9 @@ export type Throws = {
 
 /** Complete specification for one `handle()` invocation: what to feed in
  *  (`responseData`) and what to expect out (`resolves` / `throws`).
- *  The `"TODO"` sentinel triggers discovery mode: the test executes the
- *  handler, reports the actual outcome, and asks you to paste it in as the
- *  recorded expectation. */
-export type HandleOutcome = Resolves | Throws | "TODO";
+ *  Pass `"DISCOVER"` as a sentinel to run the handler, report the actual
+ *  outcome, and get a copy-paste suggestion for the recorded expectation. */
+export type HandleOutcome = Resolves | Throws | "DISCOVER";
 
 /** The array of client-getter mock functions returned by `stubClientGetters()`.
  *  Each element is a Vitest mock whose `.mock.calls` records invocations. */
@@ -74,7 +73,7 @@ export function classifyThrown(label: string, thrown: unknown): string {
 }
 
 /**
- * Wires every client getter on a fresh `Mocked<DefaultClientManager>` to a
+ * Wires every client getter on a fresh `Mocked<DirectClientManager>` to a
  * two-proxy pair so handler bodies can traverse arbitrary method chains
  * (`.GET(...)`, `.POST(...)`, `.path(...).method(...)`, etc.) without throwing
  * a TypeError. Every async call resolves to a proxy that models the
@@ -165,7 +164,7 @@ export function stubClientGetters(responseData: unknown = {}) {
     });
   }
 
-  const clientManager = createMockInstance(DefaultClientManager);
+  const clientManager = createMockInstance(DirectClientManager);
   clientManager.getAdminClient.mockResolvedValue(callableProxy as never);
   clientManager.getProducer.mockResolvedValue(callableProxy as never);
   clientManager.getConsumer.mockResolvedValue(callableProxy as never);
@@ -261,7 +260,7 @@ export async function assertHandleCase(options: {
     thrown = err;
   }
 
-  if (outcome === "TODO") {
+  if (outcome === "DISCOVER") {
     let discovered: string;
     if (thrown !== undefined) {
       discovered = `{ throws: ${JSON.stringify(classifyThrown(name, thrown))} }`;

@@ -10,6 +10,7 @@ import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/cr
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
+import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
 import { DescribeTableHandler } from "@src/confluent/tools/handlers/flink/catalog/describe-table-handler.js";
@@ -121,6 +122,7 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_BILLING_COSTS, new ListBillingCostsHandler()],
     [ToolName.QUERY_METRICS, new QueryMetricsHandler()],
     [ToolName.LIST_METRICS, new ListMetricsHandler()],
+    [ToolName.SEARCH_PRODUCT_DOCS, new SearchProductDocsHandler()],
   ]);
 
   static getToolHandler(toolName: ToolName): ToolHandler {

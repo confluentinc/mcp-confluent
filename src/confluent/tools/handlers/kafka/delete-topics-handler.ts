@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -20,9 +19,10 @@ const deleteKafkaTopicsArguments = z.object({
 });
 export class DeleteTopicsHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { topicNames } = deleteKafkaTopicsArguments.parse(toolArguments);
     await (
       await clientManager.getAdminClient()

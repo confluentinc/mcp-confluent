@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -14,7 +13,8 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 
 export class ListTagsHandler extends BaseToolHandler {
-  async handle(clientManager: ClientManager): Promise<CallToolResult> {
+  async handle(runtime: ServerRuntime): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );

@@ -211,7 +211,7 @@ Integration tests exercise the real MCP server as a child process against a real
 
 ##### Prerequisites
 
-- A `.env.integration` file with credentials for the tool groups you want to run. `dist/` is rebuilt automatically by `test`, `test:integration`, and the `*:coverage` variants — if you're iterating rapidly on handler code, keep `npm run dev` running in a separate terminal so the build prefix becomes a no-op incremental check.
+- A `.env.integration` file with credentials for the tool groups you want to run. `dist/` is rebuilt automatically by `test`, `test:coverage`, `test:integration`, and `test:integration:coverage`. If you're iterating rapidly on handler code, keep `npm run dev` running in a separate terminal so the build prefix becomes a no-op incremental check.
 
 ##### Option A: Vault-backed setup (team workflow)
 
@@ -222,7 +222,7 @@ make setup-test-env                     # fetches secrets from Vault into .env.i
 npm run test:integration -- --tags-filter=@kafka
 ```
 
-`make setup-test-env` fails fast if the Vault CLI isn't on `PATH`, you're not authed, or any required field is empty — so you won't hit cryptic Zod errors downstream.
+`make setup-test-env` fails fast if the Vault CLI isn't on `PATH` or you're not authed. If an individual Vault field is empty, the command still writes it to `.env.integration`; tests that need that credential skip themselves with a clear reason instead of failing setup.
 
 ##### Option B: Bring your own cluster (no Vault required)
 

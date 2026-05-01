@@ -29,29 +29,24 @@ export const logger = pino(
   destination,
 );
 
-// Map Kafka log levels to Pino levels
-const levelMap: Record<KafkaJS.logLevel, pino.Level> = {
-  [KafkaJS.logLevel.NOTHING]: "trace",
-  [KafkaJS.logLevel.ERROR]: "error",
-  [KafkaJS.logLevel.WARN]: "warn",
-  [KafkaJS.logLevel.INFO]: "info",
-  [KafkaJS.logLevel.DEBUG]: "debug",
-};
-
-// Create a logger with the given namespace and level
+/**
+ * Wraps a pino child logger in the shape KafkaJS expects. Both the `logLevel`
+ * option on `namespace()` and the `setLogLevel` method are no-ops: KafkaJS
+ * uses them to announce its internal level (usually INFO), but the library
+ * still filters its own `.info/.debug/...` calls on its end before they reach
+ * us. Honoring them would let a KafkaJS default override the user's
+ * `env.LOG_LEVEL`; ignoring them keeps `env.LOG_LEVEL` the single floor for
+ * the whole app. The child logger just inherits `baseLogger.level`.
+ */
 const createKafkaLogger = (
   baseLogger: pino.Logger,
   namespace: string,
-  logLevel?: KafkaJS.logLevel,
 ): KafkaJS.Logger => {
   const childLogger = baseLogger.child({ namespace });
-  if (logLevel) {
-    childLogger.level = levelMap[logLevel] || "info";
-  }
 
   return {
-    namespace: (subNamespace: string, subLogLevel?: KafkaJS.logLevel) =>
-      createKafkaLogger(childLogger, subNamespace, subLogLevel),
+    namespace: (subNamespace: string) =>
+      createKafkaLogger(childLogger, subNamespace),
     error: (message: string, ...args: unknown[]) => {
       childLogger.error({ args }, message);
     },
@@ -64,9 +59,7 @@ const createKafkaLogger = (
     debug: (message: string, ...args: unknown[]) => {
       childLogger.debug({ args }, message);
     },
-    setLogLevel: (level: KafkaJS.logLevel) => {
-      childLogger.level = levelMap[level] || "info";
-    },
+    setLogLevel: () => {},
   };
 };
 

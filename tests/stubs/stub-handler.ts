@@ -1,4 +1,3 @@
-import type { ClientManager } from "@src/confluent/client-manager.js";
 import type { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -31,7 +30,7 @@ export class StubHandler extends BaseToolHandler {
   }
 
   handle(
-    _clientManager: ClientManager,
+    _runtime: ServerRuntime,
     _toolArguments: Record<string, unknown> | undefined,
     _sessionId?: string,
   ): CallToolResult {

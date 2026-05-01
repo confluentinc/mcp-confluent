@@ -1,7 +1,6 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { runtimeWith } from "@tests/factories/runtime.js";
 import { createTestServer, TestServerContext } from "@tests/server.js";
-import { createMockInstance } from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
@@ -14,7 +13,7 @@ describe("MCP server", () => {
 
   beforeEach(async () => {
     // registers all tools by default
-    ctx = await createTestServer(createMockInstance(DefaultClientManager));
+    ctx = await createTestServer(runtimeWith());
   });
 
   afterEach(() => ctx.shutdown());

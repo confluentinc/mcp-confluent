@@ -275,7 +275,9 @@ export async function assertHandleCase(options: {
         .slice(0, 60);
       discovered = `{ resolves: ${JSON.stringify(text)} }`;
     }
-    throw new Error(`${name}: outcome is TODO — replace with: ${discovered}`);
+    throw new Error(
+      `${name}: outcome is "DISCOVER" — replace with: ${discovered}`,
+    );
   }
 
   if (thrown === undefined) {

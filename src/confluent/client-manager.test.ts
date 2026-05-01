@@ -1,9 +1,9 @@
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
+import { type ConfluentCloudRestClientManager } from "@src/confluent/client-manager.js";
 import {
-  type ClientManagerConfig,
-  type ConfluentCloudRestClientManager,
-} from "@src/confluent/client-manager.js";
-import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
+  DirectClientManager,
+  type DirectClientManagerConfig,
+} from "@src/confluent/direct-client-manager.js";
 import type { ConfluentAuth } from "@src/confluent/middleware.js";
 import { describe, expect, it } from "vitest";
 
@@ -13,11 +13,13 @@ const apiKeyAuth: ConfluentAuth = {
 };
 
 interface ConfigOverrides {
-  endpoints?: Partial<ClientManagerConfig["endpoints"]>;
-  auth?: Partial<ClientManagerConfig["auth"]>;
+  endpoints?: Partial<DirectClientManagerConfig["endpoints"]>;
+  auth?: Partial<DirectClientManagerConfig["auth"]>;
 }
 
-function buildConfig(overrides: ConfigOverrides = {}): ClientManagerConfig {
+function buildConfig(
+  overrides: ConfigOverrides = {},
+): DirectClientManagerConfig {
   return {
     kafka: { "client.id": "test" },
     endpoints: {
@@ -46,7 +48,7 @@ describe("client-manager.ts", () => {
 
     const restCases: Array<{
       getter: RestGetterKey;
-      endpointKey: keyof ClientManagerConfig["endpoints"];
+      endpointKey: keyof DirectClientManagerConfig["endpoints"];
       url: string;
       errorFragment: string;
     }> = [

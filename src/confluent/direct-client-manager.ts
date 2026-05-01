@@ -10,11 +10,15 @@ import {
 } from "@src/config/models.js";
 import {
   BaseClientManager,
+  type BaseClientManagerConfig,
   type ClientManager,
-  type ClientManagerConfig,
 } from "@src/confluent/client-manager.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
 import { kafkaLogger, logger } from "@src/logger.js";
+
+export interface DirectClientManagerConfig extends BaseClientManagerConfig {
+  kafka: GlobalConfig;
+}
 
 /**
  * Direct API-key client manager. Adds a native Kafka client (admin, producer, consumer)
@@ -29,7 +33,7 @@ export class DirectClientManager
   private readonly adminClient: AsyncLazy<KafkaJS.Admin>;
   private readonly producer: AsyncLazy<KafkaJS.Producer>;
 
-  constructor(config: ClientManagerConfig) {
+  constructor(config: DirectClientManagerConfig) {
     super(config);
     this.kafkaConfig = config.kafka;
     this.kafkaClient = new Lazy(
@@ -108,7 +112,7 @@ export class DirectClientManager
 /**
  * Constructs a {@link DirectClientManager} from a single direct connection config.
  */
-export function constructClientManagerForConnection(
+export function constructDirectClientManager(
   conn: DirectConnectionConfig,
 ): DirectClientManager {
   const kafkaClientConfig: GlobalConfig = {

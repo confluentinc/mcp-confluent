@@ -27,7 +27,7 @@ import { type Mocked, vi } from "vitest";
 // TypeScript: rest-parameter contravariance means a `never[]` parameter list
 // is satisfied by every concrete constructor signature. `unknown[]` would be
 // stricter and would reject classes whose constructor takes specific types
-// (e.g., DirectClientManager's `ClientManagerConfig`).
+// (e.g., DirectClientManager's `DirectClientManagerConfig`).
 export function createMockInstance<T extends object>(
   Ctor: new (...args: never[]) => T,
 ): Mocked<T> {

@@ -1,6 +1,6 @@
 import { MCPServerConfiguration } from "@src/config/index.js";
 import { type ClientManager } from "@src/confluent/client-manager.js";
-import { constructClientManagerForConnection } from "@src/confluent/direct-client-manager.js";
+import { constructDirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 
 /**
@@ -61,7 +61,7 @@ export class ServerRuntime {
     const clientManagers = Object.fromEntries(
       Object.entries(config.connections).map(([id, conn]) => [
         id,
-        constructClientManagerForConnection(conn),
+        constructDirectClientManager(conn),
       ]),
     );
     return new ServerRuntime(config, clientManagers, oauthHolder);

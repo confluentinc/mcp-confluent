@@ -1,5 +1,7 @@
-import { type ClientManagerConfig } from "@src/confluent/client-manager.js";
-import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
+import {
+  DirectClientManager,
+  type DirectClientManagerConfig,
+} from "@src/confluent/direct-client-manager.js";
 import type {
   ConfluentAuth,
   ConfluentEndpoints,
@@ -8,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 const apiKeyAuth: ConfluentAuth = { apiKey: "k", apiSecret: "s" };
 
-function buildConfig(): ClientManagerConfig {
+function buildConfig(): DirectClientManagerConfig {
   const allUndefined: ConfluentEndpoints = {
     cloud: undefined,
     flink: undefined,

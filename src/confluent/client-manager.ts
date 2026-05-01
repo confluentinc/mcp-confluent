@@ -6,7 +6,7 @@
  * variant introduced in the OAuth wiring ticket).
  */
 
-import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { ClientConfig } from "@confluentinc/schemaregistry";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
@@ -80,10 +80,6 @@ export interface BaseClientManagerConfig {
     kafka: ConfluentAuth;
     telemetry: ConfluentAuth;
   };
-}
-
-export interface ClientManagerConfig extends BaseClientManagerConfig {
-  kafka: GlobalConfig;
 }
 
 /**

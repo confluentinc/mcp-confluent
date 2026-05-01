@@ -1,6 +1,6 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 
@@ -21,7 +21,7 @@ export function runtimeWith(
     new MCPServerConfiguration({
       connections: { [connectionId]: { type: "direct", ...connectionConfig } },
     }),
-    { [connectionId]: createMockInstance(DefaultClientManager) },
+    { [connectionId]: createMockInstance(DirectClientManager) },
   );
 }
 

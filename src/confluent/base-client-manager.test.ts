@@ -42,7 +42,7 @@ function buildConfig(
   };
 }
 
-describe("client-manager.ts", () => {
+describe("base-client-manager.ts", () => {
   describe("BaseClientManager", () => {
     type RestGetterKey = keyof ConfluentCloudRestClientManager;
 

@@ -1,0 +1,88 @@
+version: v1.0
+name: "Integration Tests"
+agent:
+  machine:
+    type: s1-prod-ubuntu24-04-amd64-1
+
+auto_cancel:
+  running:
+    when: "branch != 'main'"
+
+execution_time_limit:
+  hours: 1
+
+queue:
+  - when: "branch != 'main'"
+    processing: parallel
+
+global_job_config:
+  prologue:
+    commands:
+      - sem-version node 22
+      - checkout
+      - cache restore npm-cache-
+      - npm ci --prefer-offline --include=dev
+      - . vault-setup --version v3 --role mcp-confluent
+      - make setup-test-env
+      - npm run build
+  epilogue:
+    always:
+      commands:
+        - make remove-test-env
+
+blocks:
+  - name: "Integration Tests: stdio"
+    dependencies: []
+    # skip this block when the triggering parameters don't include stdio
+    skip:
+      when: "'${{parameters.TRANSPORTS}}' !~ 'stdio'"
+    task:
+      env_vars:
+        - name: TRANSPORT
+          value: stdio
+      # task-level epilogue so $TOOL_GROUP / $TRANSPORT from the matrix axis
+      # are unambiguously in scope when result-publishing runs.
+      epilogue: &transport-epilogue
+        always:
+          commands:
+            - make store-integration-test-results TAG="$TOOL_GROUP" TRANSPORT="$TRANSPORT"
+      jobs: &transport-jobs
+        # Semaphore auto-appends the matrix axis (e.g. " - TOOL_GROUP=@kafka")
+        # to the rendered job name, so we don't need to manually include here.
+        - name: "Integration tests"
+          commands:
+            - make test-integration TAG="$TOOL_GROUP" TRANSPORT="$TRANSPORT"
+          # matrix axis: pipe-split TOOL_GROUPS from pipeline parameters. one
+          # job per tool-group tag within this transport's block.
+          matrix:
+            - env_var: TOOL_GROUP
+              values: '%{{parameters.TOOL_GROUPS | splitList "|"}}'
+
+  - name: "Integration Tests: http"
+    dependencies: []
+    skip:
+      when: "'${{parameters.TRANSPORTS}}' !~ 'http'"
+    task:
+      env_vars:
+        - name: TRANSPORT
+          value: http
+      epilogue: *transport-epilogue
+      jobs: *transport-jobs
+
+  - name: "Integration Tests: sse"
+    dependencies: []
+    skip:
+      when: "'${{parameters.TRANSPORTS}}' !~ 'sse'"
+    task:
+      env_vars:
+        - name: TRANSPORT
+          value: sse
+      epilogue: *transport-epilogue
+      jobs: *transport-jobs
+
+after_pipeline:
+  task:
+    jobs:
+      - name: Publish Pipeline Report
+        commands:
+          - test-results gen-pipeline-report || true

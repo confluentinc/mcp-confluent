@@ -93,11 +93,16 @@ Three non-obvious things the harness does for you:
    `main()` with `if (process.env.NODE_ENV !== "test")` so the module can be
    imported by unit tests; without the override, vitest's default
    `NODE_ENV=test` would cause the child to exit without starting the server.
-2. For HTTP and SSE, sets `MCP_AUTH_DISABLED=true`. Tests run on 127.0.0.1
-   with DNS rebinding protection still active, so skipping the API-key header
-   exchange is safe and means you don't need `MCP_API_KEY` in
-   `.env.integration`. Both transports share the same Fastify auth hook, so
-   the same flag covers them.
+2. For HTTP and SSE, writes `server.auth.disabled = true` into the
+   per-spawn YAML config (via `spawnConfigPath` in
+   `tests/harness/runtime.ts`). Tests run on 127.0.0.1 with DNS rebinding
+   protection still active, so skipping the API-key middleware is safe and
+   means you don't need any auth secrets in `.env.integration`. Both
+   transports share the same Fastify auth hook, so one YAML field covers
+   them. The auth smoke test opts back in via
+   `startServer({ auth: { apiKey } })`, which writes `server.auth.api_key`
+   and propagates the matching `cflt-mcp-api-key` header to the SDK
+   transport.
 3. For HTTP and SSE, calls `findFreePort()` to allocate a fresh TCP port per
    test file. Tests can run in parallel even if `npm run start:http` is
    already bound to 8080 locally.
@@ -228,7 +233,7 @@ label per test:
   `"requires kafka.bootstrap_servers config"`.
 - Handlers gating on `hasKafkaRestWithAuth` (REST proxy: `get-topic-config`,
   `alter-topic-config`): `"requires kafka.rest_endpoint + kafka.auth config"`.
-  These tests also call `testClusterId()` from `@tests/harness/kafka-admin.js`
+  These tests also call `getTestClusterId()` from `@tests/harness/kafka-admin.js`
   to address the cluster — the helper throws (vs. silently returning
   `undefined`) if `kafka.cluster_id` is missing from the fixture.
 - Other tool groups (e.g. `@schema`, `@flink`) follow the same shape:
@@ -266,11 +271,11 @@ identifying test-created resources during cleanup of orphaned state.
 ```ts
 import {
   uniqueTopicName,
-  withSharedAdmin,
+  withSharedAdminClient,
 } from "@tests/harness/kafka-admin.js";
 
 // in the describe body, after the predicate gate:
-const { admin, createdTopics } = withSharedAdmin();
+const { admin, createdTopics } = withSharedAdminClient();
 
 // in an `it` block:
 const topic = uniqueTopicName("create"); // e.g. "int-create-1729123456789-a7f3b2"
@@ -278,7 +283,7 @@ createdTopics.push(topic);
 await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
 ```
 
-`withSharedAdmin()` registers `beforeAll`/`afterAll` at the calling describe
+`withSharedAdminClient()` registers `beforeAll`/`afterAll` at the calling describe
 scope — connecting one admin client up front, deleting any tracked topics
 after the suite, and disconnecting. Tests push names onto `createdTopics`
 as they create them. The `admin` getter is a function because the
@@ -286,7 +291,7 @@ underlying client is only assigned inside `beforeAll`, so a direct value
 captured at describe-body evaluation would be `undefined` when test bodies
 run.
 
-Call `withSharedAdmin()` at the **outer** describe level (before
+Call `withSharedAdminClient()` at the **outer** describe level (before
 `describe.each`) so all transport iterations share one admin connection
 (fewer CCloud round trips).
 
@@ -376,8 +381,11 @@ Schema Registry, Flink, Tableflow):
   real transport wiring.
 - **Don't require `CONFLUENT_CLOUD_*` for Kafka admin tests**: those handlers
   don't touch the control plane. Only gate on what the handler actually uses.
-- **Don't set `MCP_API_KEY`**: the HTTP and SSE transports both run with
-  `MCP_AUTH_DISABLED=true`.
+- **Don't set auth env vars in `.env.integration`**: routine integration
+  tests spawn with `server.auth.disabled = true` in the per-spawn YAML, so
+  the API-key middleware isn't exercised. The auth smoke test opts in via
+  the harness's `auth: { apiKey }` option (see `auth.integration.test.ts`
+  for the pattern).
 - **Don't use `vi.mock` or stubs**: integration tests exercise real code
   paths end-to-end. If you find yourself wanting to fake something, the test
   probably belongs in a colocated `*.test.ts` unit test instead.

@@ -1,5 +1,5 @@
 version: v1.0
-name: "MCP Integration Tests - ${{parameters.TOOL_GROUPS}} (${{parameters.TRANSPORTS}})"
+name: "Integration Tests"
 agent:
   machine:
     type: s1-prod-ubuntu24-04-amd64-1
@@ -47,7 +47,9 @@ blocks:
           commands:
             - make store-integration-test-results TAG="$TOOL_GROUP" TRANSPORT="$TRANSPORT"
       jobs: &transport-jobs
-        - name: "Integration: ${TOOL_GROUP} (${TRANSPORT})"
+        # Semaphore auto-appends the matrix axis (e.g. " - TOOL_GROUP=@kafka")
+        # to the rendered job name, so we don't need to manually include here.
+        - name: "Integration tests"
           commands:
             - make test-integration TAG="$TOOL_GROUP" TRANSPORT="$TRANSPORT"
           # matrix axis: pipe-split TOOL_GROUPS from pipeline parameters. one

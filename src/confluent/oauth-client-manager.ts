@@ -8,6 +8,7 @@
  */
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   BaseClientManager,
   type ClientManager,
@@ -18,6 +19,10 @@ import type { Auth0Environment } from "@src/confluent/oauth/types.js";
 
 const NO_NATIVE_KAFKA_UNDER_OAUTH =
   "Native Kafka client is not available under OAuth authentication";
+
+const NO_SR_SDK_UNDER_OAUTH =
+  "Schema Registry SDK client is not available under OAuth authentication. " +
+  "Use the Schema Registry REST client (`getConfluentCloudSchemaRegistryRestClient`) instead.";
 
 /**
  * Bearer-auth client manager. Wires every REST surface to the OAuth holder's
@@ -77,6 +82,15 @@ export class OAuthClientManager
   /** @inheritdoc */
   async getConsumer(): Promise<KafkaJS.Consumer> {
     throw new Error(NO_NATIVE_KAFKA_UNDER_OAUTH);
+  }
+
+  /**
+   * Override the inherited SDK getter so the OAuth-specific error reaches callers
+   * — `BaseClientManager`'s default message tells users to set
+   * `SCHEMA_REGISTRY_API_KEY`/`SECRET`, which is misleading inside an OAuth flow.
+   */
+  override getSchemaRegistryClient(): SchemaRegistryClient {
+    throw new Error(NO_SR_SDK_UNDER_OAUTH);
   }
 
   /** @inheritdoc */

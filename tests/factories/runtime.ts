@@ -117,10 +117,13 @@ export function telemetryRuntime(): ServerRuntime {
 }
 
 /**
- * Runtime carrying a CCloud OAuth side-car config (no `confluent_cloud` block on the
- * connection itself). Mirrors the env-var path's `--oauth --oauth-env=devel` shape:
- * the `ccloudOAuth` field on `MCPServerConfiguration` flips on the OAuth-aware
- * branch in handlers that opt in via `runtime.config.getCCloudOAuth()`.
+ * Runtime whose `MCPServerConfiguration` carries the `ccloudOAuth` side-car set
+ * (as the env-var `--oauth --oauth-env=devel` path produces) but whose connection
+ * has no `confluent_cloud` block. Used to assert that block-presence predicates
+ * (e.g. `hasConfluentCloud`) are *not* satisfied by the OAuth side-car alone —
+ * i.e. tools gated on `confluent_cloud` stay disabled until the connection itself
+ * carries the block. Does not populate `runtime.oauthHolder`; tests that need a
+ * holder should construct one explicitly.
  */
 export function ccloudOAuthRuntime(): ServerRuntime {
   return new ServerRuntime(

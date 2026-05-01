@@ -1,4 +1,4 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
+import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import env from "@src/env.js";
 
@@ -67,7 +67,7 @@ export interface SchemaMapping {
  * Returns a 1:1 mapping between environment IDs (CATALOG_ID) and friendly names (CATALOG_NAME).
  */
 export async function getCatalogMapping(
-  clientManager: ClientManager,
+  clientManager: BaseClientManager,
   catalogName: string,
   options: {
     organizationId: string;
@@ -127,7 +127,7 @@ export function resolveToCatalogName(
  * Returns a 1:1 mapping between cluster IDs (SCHEMA_ID) and friendly names (SCHEMA_NAME).
  */
 export async function getSchemaMapping(
-  clientManager: ClientManager,
+  clientManager: BaseClientManager,
   catalogName: string,
   options: {
     organizationId: string;

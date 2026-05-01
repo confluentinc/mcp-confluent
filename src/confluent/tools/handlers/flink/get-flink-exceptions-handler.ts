@@ -1,4 +1,3 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
@@ -39,15 +38,16 @@ export class GetFlinkExceptionsHandler extends FlinkToolHandler {
     const { statementName, environmentId, organizationId } =
       getFlinkExceptionsArguments.parse(toolArguments);
 
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const conn = runtime.config.getSoleConnection();
+    const organization_id = this.resolveParam(
       organizationId,
+      conn.flink?.organization_id,
+      "Organization ID",
     );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
+    const environment_id = this.resolveParam(
       environmentId,
+      conn.flink?.environment_id,
+      "Environment ID",
     );
 
     const pathBasedClient = wrapAsPathBasedClient(

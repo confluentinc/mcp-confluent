@@ -68,6 +68,22 @@ export abstract class BaseToolHandler implements ToolHandler {
    */
   abstract enabledConnectionIds(runtime: ServerRuntime): string[];
 
+  /**
+   * Resolves a required string from an explicit tool argument, falling back to
+   * a connection-config value. Throws if neither is present.
+   * `label` is the human-readable field name (e.g. `"Organization ID"`);
+   * the thrown message is `"${label} is required"`.
+   */
+  protected resolveParam(
+    argValue: string | undefined,
+    configValue: string | undefined,
+    label: string,
+  ): string {
+    const resolved = argValue || configValue;
+    if (!resolved) throw new Error(`${label} is required`);
+    return resolved;
+  }
+
   createResponse(
     message: string,
     isError: boolean = false,

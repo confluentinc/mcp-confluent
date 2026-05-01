@@ -1,4 +1,3 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
@@ -46,40 +45,35 @@ export class ListTablesHandler extends FlinkToolHandler {
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
-    const {
-      organizationId,
-      environmentId,
-      computePoolId,
-      catalogName,
-      databaseName,
-    } = listTablesArguments.parse(toolArguments);
+    const { organizationId, environmentId, computePoolId, catalogName } =
+      listTablesArguments.parse(toolArguments);
 
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const conn = runtime.config.getSoleConnection();
+    const organization_id = this.resolveParam(
       organizationId,
+      conn.flink?.organization_id,
+      "Organization ID",
     );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
+    const environment_id = this.resolveParam(
       environmentId,
+      conn.flink?.environment_id,
+      "Environment ID",
     );
-    const compute_pool_id = getEnsuredParam(
-      "FLINK_COMPUTE_POOL_ID",
-      "Compute Pool ID is required",
+    const compute_pool_id = this.resolveParam(
       computePoolId,
+      conn.flink?.compute_pool_id,
+      "Compute Pool ID",
     );
-    // Smart resolution: only accept env-* format, otherwise fall back to FLINK_ENV_ID
-    const catalog_name = resolveCatalogName(catalogName);
+    // Smart resolution: only accept env-* format, otherwise fall back to flink.environment_id from connection config
+    const catalog_name = resolveCatalogName(catalogName, conn);
     if (!catalog_name) {
       return this.createResponse(
-        "Catalog name could not be resolved. Set FLINK_ENV_ID or provide a valid environment ID (env-xxxxx).",
+        "Catalog name could not be resolved. Set flink.environment_id in config or provide a valid environment ID (env-xxxxx).",
         true,
       );
     }
-    // Note: databaseName parameter is currently unused - we fetch all tables and let the client filter
-    // This is because TABLE_SCHEMA may contain friendly names, not cluster IDs
-    void databaseName;
+    // databaseName is intentionally omitted — TABLE_SCHEMA contains friendly names, not cluster IDs,
+    // so we fetch all tables and let the client filter by TABLE_SCHEMA as needed.
 
     // Query INFORMATION_SCHEMA.TABLES for all tables
     // Must fully qualify with catalog and use backticks per Confluent Cloud requirements

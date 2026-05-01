@@ -1,4 +1,4 @@
-import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
+import { GetTableInfoHandler } from "@src/confluent/tools/handlers/flink/catalog/get-table-info-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
@@ -20,61 +20,67 @@ const FLINK_CONN = {
   },
 };
 
-const EXPLICIT_IDS = {
-  organizationId: "org-from-args",
-  environmentId: "env-from-args",
-};
-
-const STATEMENT_NAME = "my-statement";
+const TABLE_NAME = "my-table";
 
 type HandleCaseWithConn = HandleCase & {
   connectionConfig?: Parameters<typeof runtimeWith>[0];
 };
 
-describe("get-flink-exceptions-handler.ts", () => {
-  describe("GetFlinkExceptionsHandler", () => {
-    const handler = new GetFlinkExceptionsHandler();
+describe("get-table-info-handler.ts", () => {
+  describe("GetTableInfoHandler", () => {
+    const handler = new GetTableInfoHandler();
 
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
         {
-          label: "throws ZodError when statementName is absent",
+          label: "throws ZodError when tableName is absent",
           args: {},
           outcome: { throws: "ZodError" },
           connectionConfig: {},
         },
         {
           label: "throws when organizationId is absent and not in config",
-          args: { statementName: STATEMENT_NAME },
+          args: { tableName: TABLE_NAME },
           outcome: { throws: "Organization ID is required" },
           connectionConfig: {},
         },
         {
           label: "throws when environmentId is absent and not in config",
-          args: {
-            statementName: STATEMENT_NAME,
-            organizationId: "org-from-args",
-          },
+          args: { tableName: TABLE_NAME, organizationId: "org-from-args" },
           outcome: { throws: "Environment ID is required" },
           connectionConfig: {},
         },
         {
-          label: "uses org/env IDs from config when args absent",
-          args: { statementName: STATEMENT_NAME },
-          responseData: { data: [] },
-          outcome: {
-            resolves: `No exceptions found for statement '${STATEMENT_NAME}'.`,
+          label: "throws when computePoolId is absent and not in config",
+          args: {
+            tableName: TABLE_NAME,
+            organizationId: "org-from-args",
+            environmentId: "env-from-args",
+          },
+          outcome: { throws: "Compute Pool ID is required" },
+          connectionConfig: {},
+        },
+        {
+          label: "uses org/env/compute IDs from config when args absent",
+          args: { tableName: TABLE_NAME },
+          outcome: { resolves: `Table info for '${TABLE_NAME}'` },
+          responseData: {
+            status: { phase: "COMPLETED" },
+            results: { data: [{ TABLE_NAME, TABLE_TYPE: "BASE TABLE" }] },
           },
         },
         {
-          label:
-            "uses explicit org/env args over config and returns exception list",
-          args: { statementName: STATEMENT_NAME, ...EXPLICIT_IDS },
-          responseData: {
-            data: [{ message: "OOM error" }, { message: "Timeout" }],
+          label: "uses explicit org/env/compute args over config",
+          args: {
+            tableName: TABLE_NAME,
+            organizationId: "org-from-args",
+            environmentId: "env-from-args",
+            computePoolId: "lfcp-from-args",
           },
-          outcome: {
-            resolves: `Flink Statement Exceptions for '${STATEMENT_NAME}'`,
+          outcome: { resolves: `Table info for '${TABLE_NAME}'` },
+          responseData: {
+            status: { phase: "COMPLETED" },
+            results: { data: [{ TABLE_NAME, TABLE_TYPE: "BASE TABLE" }] },
           },
         },
       ];

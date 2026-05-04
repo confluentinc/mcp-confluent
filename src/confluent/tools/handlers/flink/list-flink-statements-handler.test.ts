@@ -6,7 +6,7 @@ import {
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 const EXPLICIT_IDS = {
   organizationId: "org-from-args",
@@ -93,6 +93,30 @@ describe("list-flink-statements-handler.ts", () => {
           });
         },
       );
+
+      it("should fall back to config computePoolId when arg is whitespace-only", async () => {
+        const { clientManager, clientGetters, capturedCalls } =
+          stubClientGetters({});
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { ...EXPLICIT_IDS, computePoolId: "   " },
+          outcome: { resolves: "{}" },
+          clientGetters,
+        });
+        expect(capturedCalls).toHaveLength(1);
+        expect(capturedCalls[0]!.args).toMatchObject({
+          params: expect.objectContaining({
+            query: expect.objectContaining({
+              "spec.compute_pool_id": FLINK_CONN.flink.compute_pool_id,
+            }),
+          }),
+        });
+      });
     });
   });
 });

@@ -3,6 +3,7 @@ export {
   assertHandleCase,
   classifyThrown,
   stubClientGetters,
+  type CapturedCall,
   type ClientGetters,
   type HandleCase,
   type HandleOutcome,

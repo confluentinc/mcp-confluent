@@ -1,4 +1,3 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
@@ -42,26 +41,18 @@ export class ListDatabasesHandler extends FlinkToolHandler {
     const { organizationId, environmentId, computePoolId, catalogName } =
       listDatabasesArguments.parse(toolArguments);
 
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const flink = this.getFlinkDirectConfig(runtime.config);
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      flink,
       organizationId,
-    );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
       environmentId,
     );
-    const compute_pool_id = getEnsuredParam(
-      "FLINK_COMPUTE_POOL_ID",
-      "Compute Pool ID is required",
-      computePoolId,
-    );
-    // Smart resolution: only accept env-* format, otherwise fall back to FLINK_ENV_ID
-    const catalog_name = resolveCatalogName(catalogName);
+    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    // Smart resolution: only accept env-* format, otherwise fall back to flink.environment_id from connection config
+    const catalog_name = resolveCatalogName(catalogName, environment_id);
     if (!catalog_name) {
       return this.createResponse(
-        "Catalog name could not be resolved. Set FLINK_ENV_ID or provide a valid environment ID (env-xxxxx).",
+        "Catalog name could not be resolved. Set flink.environment_id in config or provide a valid environment ID (env-xxxxx).",
         true,
       );
     }

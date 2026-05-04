@@ -24,4 +24,8 @@ export {
   type MockedHttpServer,
   type MockedOpen,
 } from "./node-deps.js";
+export {
+  createMockSdkTransport,
+  type MockedSdkTransport,
+} from "./sdk-transport.js";
 export { StubHandler } from "./stub-handler.js";

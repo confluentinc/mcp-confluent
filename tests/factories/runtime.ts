@@ -142,3 +142,22 @@ export const KAFKA_CONN = {
 export type HandleCaseWithConn = HandleCase & {
   connectionConfig?: Parameters<typeof runtimeWith>[0];
 };
+
+/**
+ * Runtime whose `MCPServerConfiguration` carries the `ccloudOAuth` side-car set
+ * (as the env-var `--oauth --oauth-env=devel` path produces) but whose connection
+ * has no `confluent_cloud` block. Used to assert that block-presence predicates
+ * (e.g. `hasConfluentCloud`) are *not* satisfied by the OAuth side-car alone —
+ * i.e. tools gated on `confluent_cloud` stay disabled until the connection itself
+ * carries the block. Does not populate `runtime.oauthHolder`; tests that need a
+ * holder should construct one explicitly.
+ */
+export function ccloudOAuthRuntime(): ServerRuntime {
+  return new ServerRuntime(
+    new MCPServerConfiguration({
+      connections: { [DEFAULT_CONNECTION_ID]: { type: "direct" } },
+      ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+    }),
+    { [DEFAULT_CONNECTION_ID]: createMockInstance(DirectClientManager) },
+  );
+}

@@ -21,7 +21,7 @@ export class ListTopicsHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     _toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
+    const clientManager = runtime.requireDirectClientManager();
     const topics = await (await clientManager.getAdminClient()).listTopics();
     return this.createResponse(`Kafka topics: ${topics.join(",")}`);
   }

@@ -29,13 +29,6 @@ const listTablesArguments = z.object({
     .describe(
       "The Flink catalog name (environment ID, e.g., env-xxxxx). Omit to use defaults.",
     ),
-  databaseName: z
-    .string()
-    .trim()
-    .optional()
-    .describe(
-      "The database/schema name (Kafka cluster ID, e.g., lkc-xxxxx). Omit to list all tables across the catalog.",
-    ),
 });
 
 export class ListTablesHandler extends FlinkCatalogToolHandler {
@@ -57,8 +50,6 @@ export class ListTablesHandler extends FlinkCatalogToolHandler {
     const catalog = this.resolveCatalogNameOrError(catalogName, environment_id);
     if (!catalog.ok) return catalog.error;
     const catalog_name = catalog.name;
-    // databaseName is intentionally omitted — TABLE_SCHEMA contains friendly names, not cluster IDs,
-    // so we fetch all tables and let the client filter by TABLE_SCHEMA as needed.
 
     // Query INFORMATION_SCHEMA.TABLES for all tables
     // Must fully qualify with catalog and use backticks per Confluent Cloud requirements

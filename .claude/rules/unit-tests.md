@@ -192,7 +192,7 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 
   ```typescript
   expect(capturedCalls).toHaveLength(1);
-  expect(capturedCalls[0].args).toMatchObject({
+  expect(capturedCalls[0]!.args).toMatchObject({
     body: expect.objectContaining({
       spec: expect.objectContaining({
         "sql.current-catalog": "env-name-from-config",
@@ -206,7 +206,7 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 
   ```typescript
   expect(capturedCalls).toHaveLength(1);
-  expect(capturedCalls[0].args).toBeUndefined();
+  expect(capturedCalls[0]!.args).toBeUndefined();
   ```
 
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only

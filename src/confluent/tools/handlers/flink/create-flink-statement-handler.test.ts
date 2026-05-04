@@ -74,7 +74,7 @@ describe("create-flink-statement-handler.ts", () => {
           clientGetters,
         });
         expect(capturedCalls).toHaveLength(1);
-        expect(capturedCalls[0].args).toMatchObject({
+        expect(capturedCalls[0]!.args).toMatchObject({
           body: expect.objectContaining({
             spec: expect.objectContaining({
               properties: {

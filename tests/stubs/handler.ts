@@ -161,29 +161,21 @@ export function stubClientGetters(responseData: unknown = {}) {
       return callableProxy;
     },
     apply: (_target, _thisArg, args) => {
-      // Currently only REST clients (wrapAsPathBasedClient) produce meaningful
-      // captured calls — PathCallForwarder always passes the path template string
-      // as the first argument. Kafka admin/producer/consumer chains fire apply
-      // with zero args (proxy-chain continuations); those are silently skipped.
-      //
-      // A non-zero, non-string first arg means something unexpected is driving
-      // the capture path (wrong client type, stray invocation, etc.) — raise.
+      // Only REST clients (wrapAsPathBasedClient) produce captured calls —
+      // PathCallForwarder always passes the path template string as the first
+      // argument. Non-REST calls (Kafka admin, producer, consumer) fire apply
+      // with zero args (proxy-chain continuations) or non-string first args
+      // (e.g. createTopics({ topics: [...] })); both are silently skipped.
+      // A test that tries to assert capturedCalls on a non-REST handler will
+      // see an empty array and fail the toHaveLength guard with a clear message.
       //
       // Future: if we ever need to inspect Kafka-client or other non-REST calls,
       // replace CapturedCall with a discriminated union:
       //   | { kind: "rest"; pathTemplate: string; args: unknown }
       //   | { kind: "raw"; args: unknown[] }
-      // and push accordingly here instead of throwing.
-      if (args.length === 0) {
-        // Zero-arg proxy-chain continuation — nothing to capture.
-      } else if (typeof args[0] === "string") {
+      // and push accordingly here.
+      if (typeof args[0] === "string") {
         capturedCalls.push({ pathTemplate: args[0], args: args[1] });
-      } else {
-        throw new TypeError(
-          `Wacky -- stubClientGetters: capturedCalls only supports REST (path-based) clients; ` +
-            `first arg was ${JSON.stringify(args[0])} (${typeof args[0]}). ` +
-            `See discriminated-union comment above if you need Kafka/non-REST capture.`,
-        );
       }
       const element = responses[Math.min(callIndex++, responses.length - 1)];
       return Promise.resolve(makeResponseProxy(element));

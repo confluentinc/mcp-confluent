@@ -1,4 +1,4 @@
-import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
+import { ListDatabasesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-databases-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -8,14 +8,9 @@ import {
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, it } from "vitest";
 
-const EXPLICIT_IDS = {
-  organizationId: "org-from-args",
-  environmentId: "env-from-args",
-};
-
-describe("list-flink-statements-handler.ts", () => {
-  describe("ListFlinkStatementsHandler", () => {
-    const handler = new ListFlinkStatementsHandler();
+describe("list-databases-handler.ts", () => {
+  describe("ListDatabasesHandler", () => {
+    const handler = new ListDatabasesHandler();
 
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
@@ -32,41 +27,35 @@ describe("list-flink-statements-handler.ts", () => {
           connectionConfig: {},
         },
         {
-          label:
-            "uses org/env IDs and computePoolId from config when args absent",
+          label: "throws when computePoolId is absent and not in config",
+          args: {
+            organizationId: "org-from-args",
+            environmentId: "env-from-args",
+          },
+          outcome: { throws: "Compute Pool ID is required" },
+          connectionConfig: {},
+        },
+        {
+          label: "uses org/env/compute IDs from config when args absent",
           args: {},
-          outcome: { resolves: "{}" },
-        },
-        {
-          label: "resolves when required IDs are supplied as explicit args",
-          args: EXPLICIT_IDS,
-          outcome: { resolves: "{}" },
-        },
-        {
-          label: "filters statements client-side by statusPhase",
-          args: {
-            ...EXPLICIT_IDS,
-            statusPhase: "RUNNING",
-          },
+          outcome: { resolves: "Databases" },
           responseData: {
-            data: [
-              { status: { phase: "RUNNING" } },
-              { status: { phase: "FAILED" } },
-            ],
+            status: { phase: "COMPLETED" },
+            results: { data: [{ SCHEMA_ID: "1", SCHEMA_NAME: "my-cluster" }] },
           },
-          outcome: { resolves: "Found 1 statement(s) with status 'RUNNING'" },
         },
         {
-          label:
-            "reports zero results when no statements match the statusPhase filter",
+          label: "uses explicit org/env/compute args over config",
           args: {
-            ...EXPLICIT_IDS,
-            statusPhase: "RUNNING",
+            organizationId: "org-from-args",
+            environmentId: "env-from-args",
+            computePoolId: "lfcp-from-args",
           },
+          outcome: { resolves: "Databases" },
           responseData: {
-            data: [{ status: { phase: "FAILED" } }],
+            status: { phase: "COMPLETED" },
+            results: { data: [{ SCHEMA_ID: "1", SCHEMA_NAME: "my-cluster" }] },
           },
-          outcome: { resolves: "Found 0 statement(s) with status 'RUNNING'" },
         },
       ];
 

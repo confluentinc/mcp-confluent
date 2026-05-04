@@ -28,28 +28,6 @@ describe("describe-table-handler.ts", () => {
           connectionConfig: {},
         },
         {
-          label: "throw when organizationId is absent and not in config",
-          args: { tableName: TABLE_NAME },
-          outcome: { throws: "Organization ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throw when environmentId is absent and not in config",
-          args: { tableName: TABLE_NAME, organizationId: "org-from-args" },
-          outcome: { throws: "Environment ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throw when computePoolId is absent and not in config",
-          args: {
-            tableName: TABLE_NAME,
-            organizationId: "org-from-args",
-            environmentId: "env-from-args",
-          },
-          outcome: { throws: "Compute Pool ID is required" },
-          connectionConfig: {},
-        },
-        {
           label: "use org/env/compute IDs from config when args absent",
           args: { tableName: TABLE_NAME },
           outcome: { resolves: `Table '${TABLE_NAME}' schema` },

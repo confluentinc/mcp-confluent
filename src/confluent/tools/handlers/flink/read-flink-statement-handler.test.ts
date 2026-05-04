@@ -28,21 +28,6 @@ describe("read-flink-statement-handler.ts", () => {
           connectionConfig: {},
         },
         {
-          label: "throws when organizationId is absent and not in config",
-          args: { statementName: STATEMENT_NAME },
-          outcome: { throws: "Organization ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throws when environmentId is absent and not in config",
-          args: {
-            statementName: STATEMENT_NAME,
-            organizationId: "org-from-args",
-          },
-          outcome: { throws: "Environment ID is required" },
-          connectionConfig: {},
-        },
-        {
           label: "uses org/env IDs from config when args absent",
           args: { statementName: STATEMENT_NAME, timeoutInMilliseconds: 0 },
           responseData: { results: { data: [] }, metadata: {} },

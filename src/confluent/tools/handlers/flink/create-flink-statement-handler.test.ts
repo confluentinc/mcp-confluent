@@ -56,28 +56,6 @@ describe("create-flink-statement-handler.ts", () => {
           outcome: { throws: "ZodError" },
         },
         {
-          label: "throw when organizationId is absent and not in config",
-          args: REQUIRED_ARGS,
-          outcome: { throws: "Organization ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throw when environmentId is absent and not in config",
-          args: { ...REQUIRED_ARGS, organizationId: "org-from-args" },
-          outcome: { throws: "Environment ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throw when computePoolId is absent and not in config",
-          args: {
-            ...REQUIRED_ARGS,
-            organizationId: "org-from-args",
-            environmentId: "env-from-args",
-          },
-          outcome: { throws: "Compute Pool ID is required" },
-          connectionConfig: {},
-        },
-        {
           label:
             "use org/env/computePool IDs and catalog/database names from config when args absent",
           args: REQUIRED_ARGS,

@@ -65,14 +65,14 @@ export class DetectIssuesHandler extends FlinkToolHandler {
       includeMetrics,
     } = detectIssuesArguments.parse(toolArguments);
 
-    const conn = runtime.config.getSoleConnection();
+    const flink = this.getFlinkDirectConfig(runtime.config);
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      conn,
+      flink,
       organizationId,
       environmentId,
     );
     const compute_pool_id = this.resolveOptionalComputePoolId(
-      conn,
+      flink,
       computePoolId,
     );
 

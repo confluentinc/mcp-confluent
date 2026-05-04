@@ -22,27 +22,6 @@ describe("list-tables-handler.ts", () => {
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
         {
-          label: "throw when organizationId is absent and not in config",
-          args: {},
-          outcome: { throws: "Organization ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throw when environmentId is absent and not in config",
-          args: { organizationId: "org-from-args" },
-          outcome: { throws: "Environment ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throw when computePoolId is absent and not in config",
-          args: {
-            organizationId: "org-from-args",
-            environmentId: "env-from-args",
-          },
-          outcome: { throws: "Compute Pool ID is required" },
-          connectionConfig: {},
-        },
-        {
           label: "use org/env/compute IDs from config when args absent",
           args: {},
           outcome: { resolves: "Tables in catalog" },

@@ -51,9 +51,9 @@ export class CheckHealthHandler extends FlinkToolHandler {
     const { statementName, environmentId, organizationId } =
       checkHealthArguments.parse(toolArguments);
 
-    const conn = runtime.config.getSoleConnection();
+    const flink = this.getFlinkDirectConfig(runtime.config);
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      conn,
+      flink,
       organizationId,
       environmentId,
     );

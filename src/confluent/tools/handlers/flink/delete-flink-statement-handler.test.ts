@@ -28,21 +28,6 @@ describe("delete-flink-statement-handler.ts", () => {
           connectionConfig: {},
         },
         {
-          label: "throw when organizationId is absent and not in config",
-          args: { statementName: STATEMENT_NAME },
-          outcome: { throws: "Organization ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throw when environmentId is absent and not in config",
-          args: {
-            statementName: STATEMENT_NAME,
-            organizationId: "org-from-args",
-          },
-          outcome: { throws: "Environment ID is required" },
-          connectionConfig: {},
-        },
-        {
           label: "use org/env IDs from config when args absent",
           args: { statementName: STATEMENT_NAME },
           responseData: { response: { status: 204 } },

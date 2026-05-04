@@ -39,9 +39,9 @@ export class DeleteFlinkStatementHandler extends FlinkToolHandler {
     const clientManager = runtime.clientManager;
     const { statementName, environmentId, organizationId } =
       deleteFlinkStatementArguments.parse(toolArguments);
-    const conn = runtime.config.getSoleConnection();
+    const flink = this.getFlinkDirectConfig(runtime.config);
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      conn,
+      flink,
       organizationId,
       environmentId,
     );

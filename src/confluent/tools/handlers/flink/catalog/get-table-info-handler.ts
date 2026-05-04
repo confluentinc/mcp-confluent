@@ -64,13 +64,14 @@ export class GetTableInfoHandler extends FlinkToolHandler {
       tableName,
     } = getTableInfoArguments.parse(toolArguments);
 
-    const conn = runtime.config.getSoleConnection();
+    const flink = this.getFlinkDirectConfig(runtime.config);
+    const conn = runtime.config.getSoleConnection(); // needed for kafka.cluster_id in resolveDatabaseName
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      conn,
+      flink,
       organizationId,
       environmentId,
     );
-    const compute_pool_id = this.resolveComputePoolId(conn, computePoolId);
+    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
     // Smart resolution: only accept env-* format, otherwise fall back to flink.environment_id from connection config
     const catalog_name = resolveCatalogName(catalogName, environment_id);
     if (!catalog_name) {

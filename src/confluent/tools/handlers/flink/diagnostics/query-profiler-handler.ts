@@ -124,13 +124,13 @@ export class QueryProfilerHandler extends FlinkToolHandler {
       includeAnalysis,
     } = queryProfilerArguments.parse(toolArguments);
 
-    const conn = runtime.config.getSoleConnection();
+    const flink = this.getFlinkDirectConfig(runtime.config);
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      conn,
+      flink,
       organizationId,
       environmentId,
     );
-    const compute_pool_id = this.resolveComputePoolId(conn, computePoolId);
+    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
 
     // Step 1: Fetch the task graph to get human-readable task/operator names
     const pathBasedClient = wrapAsPathBasedClient(

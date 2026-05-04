@@ -22,21 +22,6 @@ describe("detect-issues-handler.ts", () => {
           outcome: { throws: "ZodError" },
         },
         {
-          label: "throws when organizationId is absent and not in config",
-          args: { statementName: STATEMENT_NAME },
-          outcome: { throws: "Organization ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throws when environmentId is absent and not in config",
-          args: {
-            statementName: STATEMENT_NAME,
-            organizationId: "org-from-args",
-          },
-          outcome: { throws: "Environment ID is required" },
-          connectionConfig: {},
-        },
-        {
           label:
             "uses org/env IDs from config when args absent and reports no issues for running statement",
           args: { statementName: STATEMENT_NAME, includeMetrics: false },

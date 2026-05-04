@@ -1,4 +1,7 @@
-import { ConnectionConfig } from "@src/config/models.js";
+import {
+  FlinkDirectConfig,
+  MCPServerConfiguration,
+} from "@src/config/models.js";
 import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
@@ -13,43 +16,57 @@ export abstract class FlinkToolHandler extends BaseToolHandler {
     return connectionIdsWhere(runtime.config.connections, hasFlink);
   }
 
+  /**
+   * Extracts the Flink config block from the sole connection, asserting it exists.
+   * Throws "Wacky -- " if called on a connection without a flink block (should be
+   * impossible in production given the hasFlink gate, but caught here rather than
+   * silently propagating undefined).
+   */
+  protected getFlinkDirectConfig(
+    config: MCPServerConfiguration,
+  ): FlinkDirectConfig {
+    const flink = config.getSoleConnection().flink;
+    if (!flink)
+      throw new Error(
+        "Wacky -- FlinkToolHandler invoked on a connection without a flink block",
+      );
+    return flink;
+  }
+
   protected resolveOrgAndEnvIds(
-    conn: ConnectionConfig,
+    flink: FlinkDirectConfig,
     orgIdArg: string | undefined,
     envIdArg: string | undefined,
   ): { organization_id: string; environment_id: string } {
     return {
       organization_id: this.resolveParam(
         orgIdArg,
-        conn.flink?.organization_id,
+        flink.organization_id,
         "Organization ID",
       ),
       environment_id: this.resolveParam(
         envIdArg,
-        conn.flink?.environment_id,
+        flink.environment_id,
         "Environment ID",
       ),
     };
   }
 
   protected resolveComputePoolId(
-    conn: ConnectionConfig,
+    flink: FlinkDirectConfig,
     computePoolIdArg: string | undefined,
   ): string {
     return this.resolveParam(
       computePoolIdArg,
-      conn.flink?.compute_pool_id,
+      flink.compute_pool_id,
       "Compute Pool ID",
     );
   }
 
   protected resolveOptionalComputePoolId(
-    conn: ConnectionConfig,
+    flink: FlinkDirectConfig,
     computePoolIdArg: string | undefined,
   ): string | undefined {
-    return this.resolveOptionalParam(
-      computePoolIdArg,
-      conn.flink?.compute_pool_id,
-    );
+    return this.resolveOptionalParam(computePoolIdArg, flink.compute_pool_id);
   }
 }

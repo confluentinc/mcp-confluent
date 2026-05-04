@@ -34,13 +34,13 @@ export class ListCatalogsHandler extends FlinkToolHandler {
     const { organizationId, environmentId, computePoolId } =
       listCatalogsArguments.parse(toolArguments);
 
-    const conn = runtime.config.getSoleConnection();
+    const flink = this.getFlinkDirectConfig(runtime.config);
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      conn,
+      flink,
       organizationId,
       environmentId,
     );
-    const compute_pool_id = this.resolveComputePoolId(conn, computePoolId);
+    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
     // Smart resolution: use flink.environment_id from connection config as the catalog name
     const catalog_name = resolveCatalogName(undefined, environment_id);
     if (!catalog_name) {

@@ -50,9 +50,9 @@ export class ReadFlinkStatementHandler extends FlinkToolHandler {
       environmentId,
       organizationId,
     } = readFlinkStatementArguments.parse(toolArguments);
-    const conn = runtime.config.getSoleConnection();
+    const flink = this.getFlinkDirectConfig(runtime.config);
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      conn,
+      flink,
       organizationId,
       environmentId,
     );

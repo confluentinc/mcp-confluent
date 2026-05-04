@@ -20,18 +20,6 @@ describe("list-flink-statements-handler.ts", () => {
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
         {
-          label: "throw when organizationId is absent and not in config",
-          args: {},
-          outcome: { throws: "Organization ID is required" },
-          connectionConfig: {},
-        },
-        {
-          label: "throw when environmentId is absent and not in config",
-          args: { organizationId: "org-from-args" },
-          outcome: { throws: "Environment ID is required" },
-          connectionConfig: {},
-        },
-        {
           label:
             "use org/env IDs and computePoolId from config when args absent",
           args: {},

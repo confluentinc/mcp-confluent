@@ -1,9 +1,11 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
+import { createMcpServer } from "@src/mcp/server.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 export interface TestServerContext {
@@ -19,6 +21,9 @@ export interface TestServerContext {
  * Spins up an {@link McpServer} and {@link Client} connected via
  * {@link InMemoryTransport} for protocol-level integration tests.
  *
+ * Tool registration delegates to the production {@linkcode createMcpServer} so this helper can't
+ * drift from the real server's wiring.
+ *
  * @param runtime - {@link ServerRuntime} injected into every tool handler
  * @param toolNames - (Optional) Subset of tools to register (defaults to all
  *   {@link ToolName} values)
@@ -31,23 +36,16 @@ export async function createTestServer(
   // in tool schemas (e.g., env.FLINK_REST_ENDPOINT) don't throw
   await initEnv();
 
-  const server = new McpServer({
-    name: "confluent-test",
-    version: "0.0.0-test",
-  });
-
   const names = toolNames ?? Object.values(ToolName);
-  for (const toolName of names) {
-    const handler = ToolHandlerRegistry.getToolHandler(toolName);
-    const config = handler.getToolConfig();
-    server.registerTool(
-      toolName as string,
-      { description: config.description, inputSchema: config.inputSchema },
-      async (args, context) => {
-        return await handler.handle(runtime, args, context?.sessionId);
-      },
-    );
-  }
+  const toolHandlers = new Map<ToolName, ToolHandler>(
+    names.map((name) => [name, ToolHandlerRegistry.getToolHandler(name)]),
+  );
+
+  const server = createMcpServer({
+    serverVersion: "0.0.0-test",
+    toolHandlers,
+    runtime,
+  });
 
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();

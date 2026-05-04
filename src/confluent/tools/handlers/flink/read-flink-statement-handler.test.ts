@@ -1,4 +1,4 @@
-import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
+import { ReadFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/read-flink-statement-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -15,9 +15,9 @@ const EXPLICIT_IDS = {
 
 const STATEMENT_NAME = "my-statement";
 
-describe("get-flink-exceptions-handler.ts", () => {
-  describe("GetFlinkExceptionsHandler", () => {
-    const handler = new GetFlinkExceptionsHandler();
+describe("read-flink-statement-handler.ts", () => {
+  describe("ReadFlinkStatementHandler", () => {
+    const handler = new ReadFlinkStatementHandler();
 
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
@@ -44,22 +44,19 @@ describe("get-flink-exceptions-handler.ts", () => {
         },
         {
           label: "uses org/env IDs from config when args absent",
-          args: { statementName: STATEMENT_NAME },
-          responseData: { data: [] },
-          outcome: {
-            resolves: `No exceptions found for statement '${STATEMENT_NAME}'.`,
-          },
+          args: { statementName: STATEMENT_NAME, timeoutInMilliseconds: 0 },
+          responseData: { results: { data: [] }, metadata: {} },
+          outcome: { resolves: "Flink SQL Statement Results" },
         },
         {
-          label:
-            "uses explicit org/env args over config and returns exception list",
-          args: { statementName: STATEMENT_NAME, ...EXPLICIT_IDS },
-          responseData: {
-            data: [{ message: "OOM error" }, { message: "Timeout" }],
+          label: "uses explicit org/env args over config",
+          args: {
+            statementName: STATEMENT_NAME,
+            timeoutInMilliseconds: 0,
+            ...EXPLICIT_IDS,
           },
-          outcome: {
-            resolves: `Flink Statement Exceptions for '${STATEMENT_NAME}'`,
-          },
+          responseData: { results: { data: [] }, metadata: {} },
+          outcome: { resolves: "Flink SQL Statement Results" },
         },
       ];
 

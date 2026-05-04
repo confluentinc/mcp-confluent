@@ -79,7 +79,7 @@ export abstract class BaseToolHandler implements ToolHandler {
     configValue: string | undefined,
     label: string,
   ): string {
-    const resolved = argValue || configValue;
+    const resolved = argValue?.trim() || configValue?.trim();
     if (!resolved) throw new Error(`${label} is required`);
     return resolved;
   }

@@ -5,6 +5,44 @@ describe("base-tools.ts", () => {
   describe("BaseToolHandler", () => {
     const handler = new StubHandler();
 
+    describe("resolveParam()", () => {
+      // BaseToolHandler.resolveParam() is protected, so we have to work a little bit to get at
+      // it for this test suite.
+      const resolveParam = handler["resolveParam"].bind(
+        handler,
+      ) as (typeof handler)["resolveParam"];
+
+      it("should return argValue when both are present", () => {
+        expect(resolveParam("arg-val", "cfg-val", "X")).toBe("arg-val");
+      });
+
+      it("should fall back to configValue when argValue is absent", () => {
+        expect(resolveParam(undefined, "cfg-val", "X")).toBe("cfg-val");
+      });
+
+      it("should throw when both are absent", () => {
+        expect(() => resolveParam(undefined, undefined, "Org ID")).toThrow(
+          "Org ID is required",
+        );
+      });
+
+      it("should fall back to configValue when argValue is whitespace-only", () => {
+        expect(resolveParam("  ", "cfg-val", "X")).toBe("cfg-val");
+      });
+
+      it("should throw when argValue is whitespace-only and configValue is absent", () => {
+        expect(() => resolveParam("  ", undefined, "Org ID")).toThrow(
+          "Org ID is required",
+        );
+      });
+
+      it("should throw when configValue is whitespace-only and argValue is absent", () => {
+        expect(() => resolveParam(undefined, "  ", "Org ID")).toThrow(
+          "Org ID is required",
+        );
+      });
+    });
+
     describe("createResponse()", () => {
       it("should return a text content block with isError false by default", () => {
         const result = handler.createResponse("hello");

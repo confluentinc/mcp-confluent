@@ -2,31 +2,15 @@ import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagno
 import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
+  FLINK_CONN,
   flinkRuntime,
+  HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  assertHandleCase,
-  stubClientGetters,
-  type HandleCase,
-} from "@tests/stubs/index.js";
+import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-const FLINK_CONN = {
-  flink: {
-    endpoint: "https://flink.example.com",
-    auth: { type: "api_key" as const, key: "k", secret: "s" },
-    environment_id: "env-from-config",
-    organization_id: "org-from-config",
-    compute_pool_id: "lfcp-from-config",
-  },
-};
-
 const STATEMENT_NAME = "my-statement";
-
-type HandleCaseWithConn = HandleCase & {
-  connectionConfig?: Parameters<typeof runtimeWith>[0];
-};
 
 describe("query-profiler-handler.ts", () => {
   describe("QueryProfilerHandler", () => {

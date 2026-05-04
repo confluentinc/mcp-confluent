@@ -1,22 +1,16 @@
 import { CreateFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/create-flink-statement-handler.js";
 import {
+  FLINK_CONN as BASE_FLINK_CONN,
   DEFAULT_CONNECTION_ID,
+  HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  assertHandleCase,
-  stubClientGetters,
-  type HandleCase,
-} from "@tests/stubs/index.js";
+import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, it } from "vitest";
 
 const FLINK_CONN = {
   flink: {
-    endpoint: "https://flink.example.com",
-    auth: { type: "api_key" as const, key: "k", secret: "s" },
-    environment_id: "env-from-config",
-    organization_id: "org-from-config",
-    compute_pool_id: "lfcp-from-config",
+    ...BASE_FLINK_CONN.flink,
     environment_name: "env-name-from-config",
     database_name: "db-name-from-config",
   },
@@ -43,10 +37,6 @@ const EXPLICIT_IDS = {
   organizationId: "org-from-args",
   environmentId: "env-from-args",
   computePoolId: "lfcp-from-args",
-};
-
-type HandleCaseWithConn = HandleCase & {
-  connectionConfig?: Parameters<typeof runtimeWith>[0];
 };
 
 describe("create-flink-statement-handler.ts", () => {

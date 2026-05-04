@@ -2,7 +2,7 @@ import type { DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { createMockInstance } from "@tests/stubs/index.js";
+import { createMockInstance, type HandleCase } from "@tests/stubs/index.js";
 import type { Mocked } from "vitest";
 
 /** Connection ID used by the named runtime factories and their default single-connection runtimes. */
@@ -115,3 +115,30 @@ export function telemetryRuntime(): ServerRuntime {
     },
   });
 }
+
+/** Shared Flink connection config fixture for handle() tests. */
+export const FLINK_CONN = {
+  flink: {
+    endpoint: "https://flink.example.com",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+    environment_id: "env-from-config",
+    organization_id: "org-from-config",
+    compute_pool_id: "lfcp-from-config",
+  },
+};
+
+/** Shared Kafka connection config fixture for handle() tests. */
+export const KAFKA_CONN = {
+  kafka: {
+    bootstrap_servers: "broker:9092",
+    rest_endpoint: "https://kafka-rest.example.com",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+    cluster_id: "lkc-from-config",
+  },
+};
+
+/** Extends HandleCase with a per-case connection config for handle() tests
+ *  that need to vary the runtime shape (e.g. empty config for throw cases). */
+export type HandleCaseWithConn = HandleCase & {
+  connectionConfig?: Parameters<typeof runtimeWith>[0];
+};

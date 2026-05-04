@@ -1,20 +1,14 @@
 import { DetectIssuesHandler } from "@src/confluent/tools/handlers/flink/diagnostics/detect-issues-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
+  FLINK_CONN,
+  HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  assertHandleCase,
-  stubClientGetters,
-  type HandleCase,
-} from "@tests/stubs/index.js";
+import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, it } from "vitest";
 
 const STATEMENT_NAME = "my-statement";
-
-type HandleCaseWithConn = HandleCase & {
-  connectionConfig?: Parameters<typeof runtimeWith>[0];
-};
 
 describe("detect-issues-handler.ts", () => {
   describe("DetectIssuesHandler", () => {
@@ -28,14 +22,9 @@ describe("detect-issues-handler.ts", () => {
           outcome: { throws: "ZodError" },
         },
         {
-          label: "reports no issues for a running statement",
-          args: {
-            statementName: STATEMENT_NAME,
-            organizationId: "org-from-args",
-            environmentId: "env-from-args",
-            computePoolId: "lfcp-from-args",
-            includeMetrics: false,
-          },
+          label:
+            "uses org/env IDs from config when args absent and reports no issues for running statement",
+          args: { statementName: STATEMENT_NAME, includeMetrics: false },
           responseData: { status: { phase: "RUNNING" }, data: [] },
           outcome: {
             resolves: `No issues detected for statement '${STATEMENT_NAME}'. Statement is running normally.`,
@@ -47,7 +36,6 @@ describe("detect-issues-handler.ts", () => {
             statementName: STATEMENT_NAME,
             organizationId: "org-from-args",
             environmentId: "env-from-args",
-            computePoolId: "lfcp-from-args",
             includeMetrics: false,
           },
           responseData: {
@@ -61,13 +49,7 @@ describe("detect-issues-handler.ts", () => {
         {
           label:
             "runs metrics branch when includeMetrics is true and reports summary",
-          args: {
-            statementName: STATEMENT_NAME,
-            organizationId: "org-from-args",
-            environmentId: "env-from-args",
-            computePoolId: "lfcp-from-args",
-            includeMetrics: true,
-          },
+          args: { statementName: STATEMENT_NAME, includeMetrics: true },
           // Call 1: GET statement status; call 2: GET exceptions (reused for
           // all 13 subsequent telemetry POSTs since it is the last element).
           responseData: [{ status: { phase: "RUNNING" } }, { data: [] }],
@@ -77,7 +59,12 @@ describe("detect-issues-handler.ts", () => {
 
       it.each(cases)(
         "should $label",
-        async ({ args, outcome, responseData, connectionConfig = {} }) => {
+        async ({
+          args,
+          outcome,
+          responseData,
+          connectionConfig = FLINK_CONN,
+        }) => {
           const { clientManager, clientGetters } =
             stubClientGetters(responseData);
           await assertHandleCase({

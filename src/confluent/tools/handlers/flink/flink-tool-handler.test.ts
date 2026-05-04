@@ -6,6 +6,7 @@ import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
   flinkRuntime,
+  runtimeWith,
 } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
 
@@ -37,6 +38,26 @@ describe("flink-tool-handler.ts", () => {
 
       it("should return an empty array for a connection without a flink block", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
+      });
+    });
+
+    describe("getFlinkDirectConfig()", () => {
+      it("should return the flink block when present", () => {
+        const runtime = flinkRuntime();
+        const flink = handler["getFlinkDirectConfig"](runtime.config);
+        expect(flink).toBe(runtime.config.getSoleConnection().flink);
+      });
+
+      it("should throw Wacky when the connection has no flink block", () => {
+        expect(() =>
+          handler["getFlinkDirectConfig"](bareRuntime().config),
+        ).toThrow("Wacky --");
+      });
+
+      it("should throw Wacky when connection config is empty", () => {
+        expect(() =>
+          handler["getFlinkDirectConfig"](runtimeWith({}).config),
+        ).toThrow("Wacky --");
       });
     });
   });

@@ -28,6 +28,7 @@ Every tool handler follows this pattern:
 - Use `this.createResponse(message, isError, _meta?)` inherited from `BaseToolHandler`
 - `_meta` is an optional object for structured data the AI can use beyond the text message
 - Parse `toolArguments` with the Zod schema at the top of `handle()` for validation
+- `BaseToolHandler` and domain subclasses (e.g. `FlinkToolHandler`) expose protected convenience helpers for common parameter patterns (required vs. optional arg/config fallback, domain-specific ID resolution). Read those classes before writing inline fallback logic.
 
 ## Registration Checklist
 

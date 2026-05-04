@@ -144,14 +144,32 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   whose connection has the relevant service block (expect the connection id) and a bare runtime
   without that block (expect `[]`). Helper factories live in `tests/factories/runtime.ts`
   (`flinkRuntime()`, `tableflowRuntime()`, `bareRuntime()`, etc.).
-- Test `handle()` for typical and edge-case inputs. `handle()` now receives a `ServerRuntime`
-  instead of a bare `ClientManager`. Create the mock first, configure it, then inject it into
-  `runtimeWith()` as the third argument:
+- Test `handle()` for typical and edge-case inputs using `stubClientGetters` +
+  `assertHandleCase` from `@tests/stubs/index.js`. The standard three cases per
+  config-backed parameter: (1) throws when arg absent and not in config, (2) resolves
+  using config fallback, (3) resolves using explicit arg. Use `HandleCaseWithConn` to
+  carry a per-case runtime shape (`connectionConfig: {}` for throw cases; domain fixture
+  as default for success cases).
+  - Pass `"DISCOVER"` as the `outcome` sentinel to run the handler and get a copy-paste
+    suggestion for the correct expectation. Replace it before committing.
+  - `stubClientGetters(responseData)` accepts a single element or an array for sequential
+    per-call responses. See its JSDoc for the full element-shape contract (`data`, `response`,
+    `error` keys). The `handle()` now receives a `ServerRuntime`; inject via `runtimeWith()`:
   ```typescript
-  clientManager = createMockInstance(DirectClientManager);
-  clientManager.getSomeClient.mockResolvedValue(...);
-  const runtime = runtimeWith({ kafka: { bootstrap_servers: "..." } }, DEFAULT_CONNECTION_ID, clientManager);
-  handler.handle(runtime, args);
+  const { clientManager, clientGetters } = stubClientGetters({
+    status: { phase: "COMPLETED" },
+  });
+  await assertHandleCase({
+    handler,
+    runtime: runtimeWith(
+      connectionConfig,
+      DEFAULT_CONNECTION_ID,
+      clientManager,
+    ),
+    args,
+    outcome,
+    clientGetters,
+  });
   ```
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
   `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.

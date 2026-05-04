@@ -272,6 +272,15 @@ describe("tool-registry.ts", () => {
       },
       // Documentation
       [ToolName.SEARCH_PRODUCT_DOCS]: { throws: "ZodError" },
+      // Organizations
+      [ToolName.LIST_ORGANIZATIONS]: {
+        responseData: {
+          api_version: "org/v2",
+          kind: "OrganizationList",
+          data: [],
+        },
+        resolves: "Retrieved 0 organizations",
+      },
     };
 
     beforeAll(() => {

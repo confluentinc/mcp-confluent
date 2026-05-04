@@ -1,9 +1,7 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import env from "@src/env.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
@@ -46,16 +44,14 @@ const createFlinkStatementArguments = z.object({
   catalogName: z
     .string()
     .trim()
-    .nonempty()
-    .default(() => env.FLINK_ENV_NAME ?? "")
+    .optional()
     .describe(
       "The catalog name to be used for the statement. Typically the confluent environment name.",
     ),
   databaseName: z
     .string()
     .trim()
-    .nonempty()
-    .default(() => env.FLINK_DATABASE_NAME ?? "")
+    .optional()
     .describe(
       "The database name to be used for the statement. Typically the Kafka cluster name.",
     ),
@@ -76,20 +72,20 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
       environmentId,
       organizationId,
     } = createFlinkStatementArguments.parse(toolArguments);
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const conn = runtime.config.getSoleConnection();
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      conn,
       organizationId,
-    );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
       environmentId,
     );
-    const compute_pool_id = getEnsuredParam(
-      "FLINK_COMPUTE_POOL_ID",
-      "Compute Pool ID is required",
-      computePoolId,
+    const compute_pool_id = this.resolveComputePoolId(conn, computePoolId);
+    const resolvedCatalogName = this.resolveOptionalParam(
+      catalogName,
+      conn.flink?.environment_name,
+    );
+    const resolvedDatabaseName = this.resolveOptionalParam(
+      databaseName,
+      conn.flink?.database_name,
     );
 
     const pathBasedClient = wrapAsPathBasedClient(
@@ -113,9 +109,11 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
           statement: statement,
           properties: {
             // only include the catalog and database properties if they are defined
-            ...(catalogName && { "sql.current-catalog": catalogName }),
-            ...(databaseName && {
-              "sql.current-database": databaseName,
+            ...(resolvedCatalogName && {
+              "sql.current-catalog": resolvedCatalogName,
+            }),
+            ...(resolvedDatabaseName && {
+              "sql.current-database": resolvedDatabaseName,
             }),
           },
         },

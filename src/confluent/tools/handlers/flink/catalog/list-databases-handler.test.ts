@@ -20,19 +20,19 @@ describe("list-databases-handler.ts", () => {
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
         {
-          label: "throws when organizationId is absent and not in config",
+          label: "throw when organizationId is absent and not in config",
           args: {},
           outcome: { throws: "Organization ID is required" },
           connectionConfig: {},
         },
         {
-          label: "throws when environmentId is absent and not in config",
+          label: "throw when environmentId is absent and not in config",
           args: { organizationId: "org-from-args" },
           outcome: { throws: "Environment ID is required" },
           connectionConfig: {},
         },
         {
-          label: "throws when computePoolId is absent and not in config",
+          label: "throw when computePoolId is absent and not in config",
           args: {
             organizationId: "org-from-args",
             environmentId: "env-from-args",
@@ -41,13 +41,13 @@ describe("list-databases-handler.ts", () => {
           connectionConfig: {},
         },
         {
-          label: "uses org/env/compute IDs from config when args absent",
+          label: "use org/env/compute IDs from config when args absent",
           args: {},
           outcome: { resolves: "Databases" },
           responseData: SQL_RESPONSE,
         },
         {
-          label: "uses explicit org/env/compute args over config",
+          label: "use explicit org/env/compute args over config",
           args: {
             organizationId: "org-from-args",
             environmentId: "env-from-args",
@@ -82,31 +82,43 @@ describe("list-databases-handler.ts", () => {
         },
       );
 
-      it("should embed config environment_id as catalog name in the POST SQL statement", async () => {
-        const { clientManager, clientGetters, capturedCalls } =
-          stubClientGetters(SQL_RESPONSE);
-        await assertHandleCase({
-          handler,
-          runtime: runtimeWith(
-            FLINK_CONN,
-            DEFAULT_CONNECTION_ID,
-            clientManager,
-          ),
+      it.each([
+        {
+          label: "use config environment_id when catalogName arg is absent",
           args: {},
-          outcome: { resolves: "Databases" },
-          clientGetters,
-        });
-        expect(capturedCalls).toHaveLength(3);
-        expect(capturedCalls[0]!.args).toMatchObject({
-          body: expect.objectContaining({
-            spec: expect.objectContaining({
-              statement: expect.stringContaining(
-                FLINK_CONN.flink.environment_id,
-              ),
+          expectedCatalog: FLINK_CONN.flink.environment_id,
+        },
+        {
+          label: "use explicit catalogName arg when provided",
+          args: { catalogName: "env-explicit" },
+          expectedCatalog: "env-explicit",
+        },
+      ])(
+        "should $label in POST SQL statement",
+        async ({ args, expectedCatalog }) => {
+          const { clientManager, clientGetters, capturedCalls } =
+            stubClientGetters(SQL_RESPONSE);
+          await assertHandleCase({
+            handler,
+            runtime: runtimeWith(
+              FLINK_CONN,
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args,
+            outcome: { resolves: "Databases" },
+            clientGetters,
+          });
+          expect(capturedCalls).toHaveLength(3);
+          expect(capturedCalls[0]!.args).toMatchObject({
+            body: expect.objectContaining({
+              spec: expect.objectContaining({
+                statement: expect.stringContaining(expectedCatalog),
+              }),
             }),
-          }),
-        });
-      });
+          });
+        },
+      );
     });
   });
 });

@@ -20,30 +20,30 @@ describe("list-flink-statements-handler.ts", () => {
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
         {
-          label: "throws when organizationId is absent and not in config",
+          label: "throw when organizationId is absent and not in config",
           args: {},
           outcome: { throws: "Organization ID is required" },
           connectionConfig: {},
         },
         {
-          label: "throws when environmentId is absent and not in config",
+          label: "throw when environmentId is absent and not in config",
           args: { organizationId: "org-from-args" },
           outcome: { throws: "Environment ID is required" },
           connectionConfig: {},
         },
         {
           label:
-            "uses org/env IDs and computePoolId from config when args absent",
+            "use org/env IDs and computePoolId from config when args absent",
           args: {},
           outcome: { resolves: "{}" },
         },
         {
-          label: "resolves when required IDs are supplied as explicit args",
+          label: "resolve when required IDs are supplied as explicit args",
           args: EXPLICIT_IDS,
           outcome: { resolves: "{}" },
         },
         {
-          label: "filters statements client-side by statusPhase",
+          label: "filter statements client-side by statusPhase",
           args: {
             ...EXPLICIT_IDS,
             statusPhase: "RUNNING",
@@ -58,7 +58,7 @@ describe("list-flink-statements-handler.ts", () => {
         },
         {
           label:
-            "reports zero results when no statements match the statusPhase filter",
+            "report zero results when no statements match the statusPhase filter",
           args: {
             ...EXPLICIT_IDS,
             statusPhase: "RUNNING",

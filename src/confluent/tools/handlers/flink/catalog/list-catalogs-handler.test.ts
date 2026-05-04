@@ -20,19 +20,19 @@ describe("list-catalogs-handler.ts", () => {
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
         {
-          label: "throws when organizationId is absent and not in config",
+          label: "throw when organizationId is absent and not in config",
           args: {},
           outcome: { throws: "Organization ID is required" },
           connectionConfig: {},
         },
         {
-          label: "throws when environmentId is absent and not in config",
+          label: "throw when environmentId is absent and not in config",
           args: { organizationId: "org-from-args" },
           outcome: { throws: "Environment ID is required" },
           connectionConfig: {},
         },
         {
-          label: "throws when computePoolId is absent and not in config",
+          label: "throw when computePoolId is absent and not in config",
           args: {
             organizationId: "org-from-args",
             environmentId: "env-from-args",
@@ -41,13 +41,13 @@ describe("list-catalogs-handler.ts", () => {
           connectionConfig: {},
         },
         {
-          label: "uses org/env/compute IDs from config when args absent",
+          label: "use org/env/compute IDs from config when args absent",
           args: {},
           outcome: { resolves: "Catalogs" },
           responseData: SQL_RESPONSE,
         },
         {
-          label: "uses explicit org/env/compute args over config",
+          label: "use explicit org/env/compute args over config",
           args: {
             organizationId: "org-from-args",
             environmentId: "env-from-args",

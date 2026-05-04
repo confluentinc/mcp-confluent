@@ -46,29 +46,29 @@ describe("create-flink-statement-handler.ts", () => {
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
         {
-          label: "throws ZodError when statement is absent",
+          label: "throw ZodError when statement is absent",
           args: { statementName: "my-statement" },
           outcome: { throws: "ZodError" },
         },
         {
-          label: "throws ZodError when statementName is absent",
+          label: "throw ZodError when statementName is absent",
           args: { statement: "SELECT 1" },
           outcome: { throws: "ZodError" },
         },
         {
-          label: "throws when organizationId is absent and not in config",
+          label: "throw when organizationId is absent and not in config",
           args: REQUIRED_ARGS,
           outcome: { throws: "Organization ID is required" },
           connectionConfig: {},
         },
         {
-          label: "throws when environmentId is absent and not in config",
+          label: "throw when environmentId is absent and not in config",
           args: { ...REQUIRED_ARGS, organizationId: "org-from-args" },
           outcome: { throws: "Environment ID is required" },
           connectionConfig: {},
         },
         {
-          label: "throws when computePoolId is absent and not in config",
+          label: "throw when computePoolId is absent and not in config",
           args: {
             ...REQUIRED_ARGS,
             organizationId: "org-from-args",
@@ -79,19 +79,19 @@ describe("create-flink-statement-handler.ts", () => {
         },
         {
           label:
-            "uses org/env/computePool IDs and catalog/database names from config when args absent",
+            "use org/env/computePool IDs and catalog/database names from config when args absent",
           args: REQUIRED_ARGS,
           outcome: { resolves: "{}" },
         },
         {
           label:
-            "omits catalog and database from request when absent from both args and config",
+            "omit catalog and database from request when absent from both args and config",
           args: { ...REQUIRED_ARGS, ...EXPLICIT_IDS },
           outcome: { resolves: "{}" },
           connectionConfig: FLINK_CONN_NO_NAMES,
         },
         {
-          label: "explicit args take precedence over config values",
+          label: "prefer explicit args over config values",
           args: {
             ...REQUIRED_ARGS,
             ...EXPLICIT_IDS,
@@ -106,7 +106,7 @@ describe("create-flink-statement-handler.ts", () => {
           // whitespace, so "  " becomes "". Using || (not ??) ensures "" is treated as
           // absent and the connection config value is used instead.
           label:
-            "blank catalogName/databaseName fall back to connection config rather than passing empty string",
+            "fall back to config when catalogName/databaseName args are blank",
           args: {
             ...REQUIRED_ARGS,
             ...EXPLICIT_IDS,

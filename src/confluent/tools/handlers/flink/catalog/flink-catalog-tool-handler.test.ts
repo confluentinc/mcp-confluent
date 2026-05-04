@@ -24,9 +24,8 @@ describe("flink-catalog-tool-handler.ts", () => {
     const handler = new StubCatalogHandler();
 
     describe("resolveCatalogNameOrError()", () => {
-      const resolveCatalogNameOrError = handler[
-        "resolveCatalogNameOrError"
-      ].bind(handler) as (typeof handler)["resolveCatalogNameOrError"];
+      const resolveCatalogNameOrError =
+        handler["resolveCatalogNameOrError"].bind(handler);
 
       it("should return ok with catalogName when it looks like an env ID", () => {
         expect(
@@ -44,6 +43,15 @@ describe("flink-catalog-tool-handler.ts", () => {
         expect(
           resolveCatalogNameOrError("my-friendly-env", "env-from-config"),
         ).toMatchObject({ ok: true, name: "env-from-config" });
+      });
+
+      it("should return an error when environmentId is a friendly name, not an env ID", () => {
+        expect(
+          resolveCatalogNameOrError(undefined, "production"),
+        ).toMatchObject({
+          ok: false,
+          error: { isError: true },
+        });
       });
 
       it("should return an error when neither catalogName nor environmentId resolves", () => {

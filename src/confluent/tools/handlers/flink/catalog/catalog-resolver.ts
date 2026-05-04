@@ -12,7 +12,11 @@ import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-h
  *
  * Resolution order:
  * 1. If catalogName is provided and looks like an env ID (starts with "env-"), use it
- * 2. Otherwise, use fallbackEnvId
+ * 2. If fallbackEnvId looks like an env ID (starts with "env-"), use it
+ * 3. Otherwise return undefined — callers should surface a configuration/argument error
+ *
+ * Both inputs are validated against the "env-" prefix so a non-env-* environmentId arg
+ * (e.g. a friendly name) does not silently produce an invalid catalog name.
  *
  * @param catalogName - Optional catalog name from user/LLM input
  * @param fallbackEnvId - Already-resolved environment ID to use when catalogName is absent/invalid
@@ -25,8 +29,10 @@ export function resolveCatalogName(
   if (catalogName && catalogName.startsWith("env-")) {
     return catalogName;
   }
-
-  return fallbackEnvId;
+  if (fallbackEnvId?.startsWith("env-")) {
+    return fallbackEnvId;
+  }
+  return undefined;
 }
 
 /**

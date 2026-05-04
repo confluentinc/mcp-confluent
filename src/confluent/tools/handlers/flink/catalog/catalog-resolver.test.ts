@@ -23,6 +23,14 @@ describe("catalog-resolver.ts", () => {
     it("should return undefined when input is absent and fallbackEnvId is absent", () => {
       expect(resolveCatalogName()).toBeUndefined();
     });
+
+    it("should return undefined when fallbackEnvId is a friendly name, not an env ID", () => {
+      expect(resolveCatalogName(undefined, "production")).toBeUndefined();
+    });
+
+    it("should return undefined when both catalogName and fallbackEnvId are friendly names", () => {
+      expect(resolveCatalogName("my-catalog", "production")).toBeUndefined();
+    });
   });
 
   describe("resolveDatabaseName()", () => {

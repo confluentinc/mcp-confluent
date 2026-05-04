@@ -50,6 +50,25 @@ export type HandleOutcome = Resolves | Throws | "DISCOVER";
  *  Each element is a Vitest mock whose `.mock.calls` records invocations. */
 export type ClientGetters = Array<{ mock: { calls: unknown[] } }>;
 
+/**
+ * One intercepted call through the callable proxy returned by `stubClientGetters()`.
+ *
+ * For path-based REST clients (`wrapAsPathBasedClient`), `PathCallForwarder`
+ * resolves the path and calls the underlying client as
+ * `client.METHOD(pathTemplate, options)`, so the two fields are:
+ *   - `pathTemplate` — the raw OpenAPI path string, e.g.
+ *     `"/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements"`
+ *   - `args` — the `{ params, body, ... }` object passed as the second argument
+ *     to the HTTP method
+ *
+ * Use `capturedCalls[N].args` to assert POST body contents or query params
+ * that are not observable through the handler's return value alone.
+ */
+export interface CapturedCall {
+  pathTemplate: string;
+  args: unknown;
+}
+
 /** One entry in an `it.each` handler test suite. */
 export type HandleCase = {
   label: string;
@@ -115,9 +134,15 @@ export function classifyThrown(label: string, thrown: unknown): string {
  * ])
  * ```
  *
- * Returns `{ clientManager, clientGetters }`. Pass `clientGetters` to
- * `assertHandleCase` to assert the handler reached the client layer on a
- * successful resolve.
+ * Returns `{ clientManager, clientGetters, capturedCalls }`.
+ * - Pass `clientGetters` to `assertHandleCase` to assert the handler reached
+ *   the client layer on a successful resolve.
+ * - `capturedCalls` is a `CapturedCall[]`; each entry has `.pathTemplate` (the
+ *   raw OpenAPI path string) and `.args` (the `{ params, body, ... }` object).
+ *   Use it to assert what the handler actually sent to the REST layer, e.g.
+ *   POST body contents or query params. Only path-based REST calls produce
+ *   entries; any invocation whose first argument is not a string (Kafka admin,
+ *   producer, consumer, etc.) is silently skipped.
  */
 export function stubClientGetters(responseData: unknown = {}) {
   // Two-proxy setup: callableProxy (function target) handles method chains
@@ -129,12 +154,30 @@ export function stubClientGetters(responseData: unknown = {}) {
     throw new Error("stubClientGetters: responseData array must not be empty");
   let callIndex = 0;
 
+  const capturedCalls: CapturedCall[] = [];
+
   const callableProxy: object = new Proxy((() => {}) as () => Promise<object>, {
     get: (_t, prop) => {
       if (prop === "then" || prop === "error") return undefined;
       return callableProxy;
     },
-    apply: () => {
+    apply: (_target, _thisArg, args) => {
+      // Only REST clients (wrapAsPathBasedClient) produce captured calls —
+      // PathCallForwarder always passes the path template string as the first
+      // argument. Non-REST calls (Kafka admin, producer, consumer) fire apply
+      // with zero args (proxy-chain continuations) or non-string first args
+      // (e.g. createTopics({ topics: [...] })); both are silently skipped.
+      // A test that tries to assert capturedCalls on a non-REST handler will
+      // see an empty array and fail the toHaveLength guard with a clear message.
+      //
+      // Future: if we ever need to inspect Kafka-client or other non-REST calls,
+      // replace CapturedCall with a discriminated union:
+      //   | { kind: "rest"; pathTemplate: string; args: unknown }
+      //   | { kind: "raw"; args: unknown[] }
+      // and push accordingly here.
+      if (typeof args[0] === "string") {
+        capturedCalls.push({ pathTemplate: args[0], args: args[1] });
+      }
       const element = responses[Math.min(callIndex++, responses.length - 1)];
       return Promise.resolve(makeResponseProxy(element));
     },
@@ -203,7 +246,7 @@ export function stubClientGetters(responseData: unknown = {}) {
     clientManager.getSchemaRegistryClient,
   ];
 
-  return { clientManager, clientGetters };
+  return { clientManager, clientGetters, capturedCalls };
 }
 
 /**

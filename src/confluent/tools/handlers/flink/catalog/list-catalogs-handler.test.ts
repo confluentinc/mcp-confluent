@@ -1,4 +1,4 @@
-import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
+import { ListCatalogsHandler } from "@src/confluent/tools/handlers/flink/catalog/list-catalogs-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -8,14 +8,14 @@ import {
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-const EXPLICIT_IDS = {
-  organizationId: "org-from-args",
-  environmentId: "env-from-args",
+const SQL_RESPONSE = {
+  status: { phase: "COMPLETED" },
+  results: { data: [{ CATALOG_NAME: "env-from-config" }] },
 };
 
-describe("list-flink-statements-handler.ts", () => {
-  describe("ListFlinkStatementsHandler", () => {
-    const handler = new ListFlinkStatementsHandler();
+describe("list-catalogs-handler.ts", () => {
+  describe("ListCatalogsHandler", () => {
+    const handler = new ListCatalogsHandler();
 
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
@@ -32,41 +32,29 @@ describe("list-flink-statements-handler.ts", () => {
           connectionConfig: {},
         },
         {
-          label:
-            "use org/env IDs and computePoolId from config when args absent",
+          label: "throw when computePoolId is absent and not in config",
+          args: {
+            organizationId: "org-from-args",
+            environmentId: "env-from-args",
+          },
+          outcome: { throws: "Compute Pool ID is required" },
+          connectionConfig: {},
+        },
+        {
+          label: "use org/env/compute IDs from config when args absent",
           args: {},
-          outcome: { resolves: "{}" },
+          outcome: { resolves: "Catalogs" },
+          responseData: SQL_RESPONSE,
         },
         {
-          label: "resolve when required IDs are supplied as explicit args",
-          args: EXPLICIT_IDS,
-          outcome: { resolves: "{}" },
-        },
-        {
-          label: "filter statements client-side by statusPhase",
+          label: "use explicit org/env/compute args over config",
           args: {
-            ...EXPLICIT_IDS,
-            statusPhase: "RUNNING",
+            organizationId: "org-from-args",
+            environmentId: "env-from-args",
+            computePoolId: "lfcp-from-args",
           },
-          responseData: {
-            data: [
-              { status: { phase: "RUNNING" } },
-              { status: { phase: "FAILED" } },
-            ],
-          },
-          outcome: { resolves: "Found 1 statement(s) with status 'RUNNING'" },
-        },
-        {
-          label:
-            "report zero results when no statements match the statusPhase filter",
-          args: {
-            ...EXPLICIT_IDS,
-            statusPhase: "RUNNING",
-          },
-          responseData: {
-            data: [{ status: { phase: "FAILED" } }],
-          },
-          outcome: { resolves: "Found 0 statement(s) with status 'RUNNING'" },
+          outcome: { resolves: "Catalogs" },
+          responseData: SQL_RESPONSE,
         },
       ];
 
@@ -94,9 +82,9 @@ describe("list-flink-statements-handler.ts", () => {
         },
       );
 
-      it("should fall back to config computePoolId when arg is whitespace-only", async () => {
+      it("should embed config environment_id as catalog name in the POST SQL statement", async () => {
         const { clientManager, clientGetters, capturedCalls } =
-          stubClientGetters({});
+          stubClientGetters(SQL_RESPONSE);
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -104,15 +92,17 @@ describe("list-flink-statements-handler.ts", () => {
             DEFAULT_CONNECTION_ID,
             clientManager,
           ),
-          args: { ...EXPLICIT_IDS, computePoolId: "   " },
-          outcome: { resolves: "{}" },
+          args: {},
+          outcome: { resolves: "Catalogs" },
           clientGetters,
         });
-        expect(capturedCalls).toHaveLength(1);
+        expect(capturedCalls).toHaveLength(3);
         expect(capturedCalls[0]!.args).toMatchObject({
-          params: expect.objectContaining({
-            query: expect.objectContaining({
-              "spec.compute_pool_id": FLINK_CONN.flink.compute_pool_id,
+          body: expect.objectContaining({
+            spec: expect.objectContaining({
+              statement: expect.stringContaining(
+                FLINK_CONN.flink.environment_id,
+              ),
             }),
           }),
         });

@@ -55,7 +55,7 @@ export function resolveDatabaseName(
   }
 
   // Fall back to conn.kafka.cluster_id
-  return conn?.kafka?.cluster_id;
+  return conn?.kafka?.cluster_id?.trim() || undefined;
 }
 
 export interface CatalogMapping {

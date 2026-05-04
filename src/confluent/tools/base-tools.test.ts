@@ -43,6 +43,36 @@ describe("base-tools.ts", () => {
       });
     });
 
+    describe("resolveOptionalParam()", () => {
+      const resolveOptionalParam = handler["resolveOptionalParam"].bind(
+        handler,
+      ) as (typeof handler)["resolveOptionalParam"];
+
+      it("should return argValue when both are present", () => {
+        expect(resolveOptionalParam("arg-val", "cfg-val")).toBe("arg-val");
+      });
+
+      it("should fall back to configValue when argValue is absent", () => {
+        expect(resolveOptionalParam(undefined, "cfg-val")).toBe("cfg-val");
+      });
+
+      it("should return undefined when both are absent", () => {
+        expect(resolveOptionalParam(undefined, undefined)).toBeUndefined();
+      });
+
+      it("should fall back to configValue when argValue is whitespace-only", () => {
+        expect(resolveOptionalParam("  ", "cfg-val")).toBe("cfg-val");
+      });
+
+      it("should return undefined when argValue is whitespace-only and configValue is absent", () => {
+        expect(resolveOptionalParam("  ", undefined)).toBeUndefined();
+      });
+
+      it("should return undefined when configValue is whitespace-only and argValue is absent", () => {
+        expect(resolveOptionalParam(undefined, "  ")).toBeUndefined();
+      });
+    });
+
     describe("createResponse()", () => {
       it("should return a text content block with isError false by default", () => {
         const result = handler.createResponse("hello");

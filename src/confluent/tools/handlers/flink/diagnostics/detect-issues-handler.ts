@@ -71,7 +71,10 @@ export class DetectIssuesHandler extends FlinkToolHandler {
       organizationId,
       environmentId,
     );
-    const compute_pool_id = computePoolId || conn.flink?.compute_pool_id;
+    const compute_pool_id = this.resolveOptionalComputePoolId(
+      conn,
+      computePoolId,
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),

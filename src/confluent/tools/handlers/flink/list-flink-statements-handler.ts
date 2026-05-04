@@ -66,8 +66,10 @@ export class ListFlinkStatementsHandler extends FlinkToolHandler {
       organizationId,
       environmentId,
     );
-    const resolvedComputePoolId =
-      computePoolId?.trim() || conn.flink?.compute_pool_id;
+    const resolvedComputePoolId = this.resolveOptionalComputePoolId(
+      conn,
+      computePoolId,
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),

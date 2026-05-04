@@ -79,10 +79,14 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
       environmentId,
     );
     const compute_pool_id = this.resolveComputePoolId(conn, computePoolId);
-    const resolvedCatalogName =
-      catalogName || conn.flink?.environment_name || "";
-    const resolvedDatabaseName =
-      databaseName || conn.flink?.database_name || "";
+    const resolvedCatalogName = this.resolveOptionalParam(
+      catalogName,
+      conn.flink?.environment_name,
+    );
+    const resolvedDatabaseName = this.resolveOptionalParam(
+      databaseName,
+      conn.flink?.database_name,
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudFlinkRestClient(),

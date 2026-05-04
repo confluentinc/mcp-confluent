@@ -57,5 +57,30 @@ describe("catalog-resolver.ts", () => {
         resolveDatabaseName(undefined, { type: "direct" as const }),
       ).toBeUndefined();
     });
+
+    it("should fall back to conn.kafka.cluster_id when input is whitespace-only", () => {
+      expect(resolveDatabaseName("   ", CONN_WITH_KAFKA)).toBe(
+        "lkc-from-config",
+      );
+    });
+
+    it("should trim a whitespace-padded conn.kafka.cluster_id", () => {
+      const conn = {
+        type: "direct" as const,
+        kafka: {
+          bootstrap_servers: "broker:9092",
+          cluster_id: "  lkc-padded  ",
+        },
+      };
+      expect(resolveDatabaseName(undefined, conn)).toBe("lkc-padded");
+    });
+
+    it("should return undefined when input is absent and conn.kafka.cluster_id is whitespace-only", () => {
+      const conn = {
+        type: "direct" as const,
+        kafka: { bootstrap_servers: "broker:9092", cluster_id: "   " },
+      };
+      expect(resolveDatabaseName(undefined, conn)).toBeUndefined();
+    });
   });
 });

@@ -42,4 +42,14 @@ export abstract class FlinkToolHandler extends BaseToolHandler {
       "Compute Pool ID",
     );
   }
+
+  protected resolveOptionalComputePoolId(
+    conn: ConnectionConfig,
+    computePoolIdArg: string | undefined,
+  ): string | undefined {
+    return this.resolveOptionalParam(
+      computePoolIdArg,
+      conn.flink?.compute_pool_id,
+    );
+  }
 }

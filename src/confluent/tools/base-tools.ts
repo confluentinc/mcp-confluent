@@ -84,6 +84,14 @@ export abstract class BaseToolHandler implements ToolHandler {
     return resolved;
   }
 
+  /** Like resolveParam but returns undefined instead of throwing when both are absent or blank. */
+  protected resolveOptionalParam(
+    argValue: string | undefined,
+    configValue: string | undefined,
+  ): string | undefined {
+    return argValue?.trim() || configValue?.trim() || undefined;
+  }
+
   createResponse(
     message: string,
     isError: boolean = false,

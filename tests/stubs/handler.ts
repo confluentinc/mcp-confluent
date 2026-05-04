@@ -51,15 +51,17 @@ export type HandleOutcome = Resolves | Throws | "DISCOVER";
 export type ClientGetters = Array<{ mock: { calls: unknown[] } }>;
 
 /**
- * One intercepted call through the callable proxy returned by `stubClientGetters()`.
+ * One intercepted REST call captured by the proxy in `stubClientGetters()`.
  *
- * For path-based REST clients (`wrapAsPathBasedClient`), `PathCallForwarder`
- * resolves the path and calls the underlying client as
- * `client.METHOD(pathTemplate, options)`, so the two fields are:
+ * An entry is recorded for any invocation where the first argument is a string
+ * path — this covers both `wrapAsPathBasedClient` callers (where
+ * `PathCallForwarder` injects the path automatically) and handlers that call
+ * the REST client directly as `client.GET("/path", options)`.
+ *
  *   - `pathTemplate` — the raw OpenAPI path string, e.g.
  *     `"/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements"`
  *   - `args` — the `{ params, body, ... }` object passed as the second argument
- *     to the HTTP method
+ *     to the HTTP method (undefined when the handler passes no init object)
  *
  * Use `capturedCalls[N].args` to assert POST body contents or query params
  * that are not observable through the handler's return value alone.
@@ -140,9 +142,11 @@ export function classifyThrown(label: string, thrown: unknown): string {
  * - `capturedCalls` is a `CapturedCall[]`; each entry has `.pathTemplate` (the
  *   raw OpenAPI path string) and `.args` (the `{ params, body, ... }` object).
  *   Use it to assert what the handler actually sent to the REST layer, e.g.
- *   POST body contents or query params. Only path-based REST calls produce
- *   entries; any invocation whose first argument is not a string (Kafka admin,
- *   producer, consumer, etc.) is silently skipped.
+ *   POST body contents or query params. Any call whose first argument is a
+ *   string path is captured — this includes both `wrapAsPathBasedClient`
+ *   callers and direct `client.METHOD(path, options)` calls. Invocations whose
+ *   first argument is not a string (Kafka admin, producer, consumer, etc.) are
+ *   silently skipped.
  */
 export function stubClientGetters(responseData: unknown = {}) {
   // Two-proxy setup: callableProxy (function target) handles method chains

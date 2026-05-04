@@ -158,14 +158,18 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
     runtime.
   - `clientGetters` — pass to `assertHandleCase` to assert the handler reached the
     client layer on a successful resolve.
-  - `capturedCalls: CapturedCall[]` — each entry has `.pathTemplate` (the raw OpenAPI
-    path string) and `.args` (the `{ params, body, ... }` object passed to the HTTP
-    method). Use it to assert what the handler actually sent to the REST layer when
-    `outcome.resolves` alone is not sufficient — e.g. POST body contents or query
-    params. Only path-based REST calls produce entries; any invocation whose
-    first argument is not a string (Kafka admin, producer, consumer, etc.) is
-    silently skipped — a test that asserts `capturedCalls` on a non-REST handler
-    will see an empty array and fail the `toHaveLength` guard with a clear message.
+  - `capturedCalls: CapturedCall[]` — primarily for asserting what a handler sent to
+    an OpenAPI REST endpoint (POST body, query params, path params) when
+    `outcome.resolves` alone doesn't prove the payload. Each entry has `.pathTemplate`
+    and `.args` (the `{ params, body, ... }` object). The capture rule is
+    first-string-arg: for OpenAPI REST clients (both `wrapAsPathBasedClient` and
+    direct `client.GET("/path", options)` callers) the first argument is always a
+    path string. Note that SDK-based clients like Schema Registry may also produce
+    entries when their methods take a string as their first argument (e.g. subject
+    names in `getLatestSchemaMetadata(subject)`) — filter by
+    `capturedCalls.filter(c => c.pathTemplate.startsWith("/"))` to isolate REST
+    entries in mixed handlers. Non-string first-arg invocations (Kafka admin,
+    producer, consumer) are silently skipped.
 
   `responseData` accepts a single element or an array for sequential per-call responses;
   see the `stubClientGetters` JSDoc for the full element-shape contract (`data`,

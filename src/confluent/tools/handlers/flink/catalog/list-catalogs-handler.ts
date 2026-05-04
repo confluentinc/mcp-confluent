@@ -42,7 +42,7 @@ export class ListCatalogsHandler extends FlinkToolHandler {
     );
     const compute_pool_id = this.resolveComputePoolId(conn, computePoolId);
     // Smart resolution: use flink.environment_id from connection config as the catalog name
-    const catalog_name = resolveCatalogName(undefined, conn);
+    const catalog_name = resolveCatalogName(undefined, environment_id);
     if (!catalog_name) {
       return this.createResponse(
         "Catalog name could not be resolved. Set flink.environment_id in config.",

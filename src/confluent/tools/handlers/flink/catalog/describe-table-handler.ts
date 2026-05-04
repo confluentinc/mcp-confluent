@@ -72,7 +72,7 @@ export class DescribeTableHandler extends FlinkToolHandler {
     );
     const compute_pool_id = this.resolveComputePoolId(conn, computePoolId);
     // Smart resolution: only accept env-* format, otherwise fall back to flink.environment_id from connection config
-    const catalog_name = resolveCatalogName(catalogName, conn);
+    const catalog_name = resolveCatalogName(catalogName, environment_id);
     if (!catalog_name) {
       return this.createResponse(
         "Catalog name could not be resolved. Set flink.environment_id in config or provide a valid environment ID (env-xxxxx).",

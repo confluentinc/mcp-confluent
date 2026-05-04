@@ -6,27 +6,27 @@ import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-h
  * Resolves the Flink catalog name from various inputs.
  *
  * In Confluent Cloud Flink, the catalog name is always the environment ID (env-xxxxx).
- * This function handles cases where a friendly name or invalid value is provided,
- * falling back to the environment ID from config.
+ * Pass the already-resolved `environment_id` (from `resolveOrgAndEnvIds`) as
+ * `fallbackEnvId` so that an explicit `environmentId` tool arg takes precedence
+ * over the connection config value.
  *
  * Resolution order:
  * 1. If catalogName is provided and looks like an env ID (starts with "env-"), use it
- * 2. Otherwise, use flink.environment_id from connection config
+ * 2. Otherwise, use fallbackEnvId
  *
  * @param catalogName - Optional catalog name from user/LLM input
+ * @param fallbackEnvId - Already-resolved environment ID to use when catalogName is absent/invalid
  * @returns The resolved catalog name (environment ID), or undefined if not resolvable
  */
 export function resolveCatalogName(
   catalogName?: string,
-  conn?: DirectConnectionConfig,
+  fallbackEnvId?: string,
 ): string | undefined {
-  // If provided value looks like an environment ID, use it
   if (catalogName && catalogName.startsWith("env-")) {
     return catalogName;
   }
 
-  // Fall back to conn.flink.environment_id
-  return conn?.flink?.environment_id;
+  return fallbackEnvId;
 }
 
 /**

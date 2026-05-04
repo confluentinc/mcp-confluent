@@ -2,29 +2,14 @@ import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-t
 import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
+  HandleCaseWithConn,
+  KAFKA_CONN,
   kafkaRestOnlyRuntime,
   kafkaRestRuntime,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  assertHandleCase,
-  stubClientGetters,
-  type HandleCase,
-} from "@tests/stubs/index.js";
+import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
-
-const KAFKA_CONN = {
-  kafka: {
-    bootstrap_servers: "broker:9092",
-    rest_endpoint: "https://kafka-rest.example.com",
-    auth: { type: "api_key" as const, key: "k", secret: "s" },
-    cluster_id: "lkc-from-config",
-  },
-};
-
-type HandleCaseWithConn = HandleCase & {
-  connectionConfig?: Parameters<typeof runtimeWith>[0];
-};
 
 describe("get-topic-config.ts", () => {
   describe("GetTopicConfigHandler", () => {

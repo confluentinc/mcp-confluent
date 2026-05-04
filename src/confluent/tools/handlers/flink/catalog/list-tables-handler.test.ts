@@ -1,4 +1,4 @@
-import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
+import { ListTablesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-tables-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -8,14 +8,9 @@ import {
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, it } from "vitest";
 
-const EXPLICIT_IDS = {
-  organizationId: "org-from-args",
-  environmentId: "env-from-args",
-};
-
-describe("list-flink-statements-handler.ts", () => {
-  describe("ListFlinkStatementsHandler", () => {
-    const handler = new ListFlinkStatementsHandler();
+describe("list-tables-handler.ts", () => {
+  describe("ListTablesHandler", () => {
+    const handler = new ListTablesHandler();
 
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
@@ -32,41 +27,39 @@ describe("list-flink-statements-handler.ts", () => {
           connectionConfig: {},
         },
         {
-          label:
-            "uses org/env IDs and computePoolId from config when args absent",
+          label: "throws when computePoolId is absent and not in config",
+          args: {
+            organizationId: "org-from-args",
+            environmentId: "env-from-args",
+          },
+          outcome: { throws: "Compute Pool ID is required" },
+          connectionConfig: {},
+        },
+        {
+          label: "uses org/env/compute IDs from config when args absent",
           args: {},
-          outcome: { resolves: "{}" },
-        },
-        {
-          label: "resolves when required IDs are supplied as explicit args",
-          args: EXPLICIT_IDS,
-          outcome: { resolves: "{}" },
-        },
-        {
-          label: "filters statements client-side by statusPhase",
-          args: {
-            ...EXPLICIT_IDS,
-            statusPhase: "RUNNING",
-          },
+          outcome: { resolves: "Tables in catalog" },
           responseData: {
-            data: [
-              { status: { phase: "RUNNING" } },
-              { status: { phase: "FAILED" } },
-            ],
+            status: { phase: "COMPLETED" },
+            results: {
+              data: [{ TABLE_NAME: "my-table", TABLE_TYPE: "BASE TABLE" }],
+            },
           },
-          outcome: { resolves: "Found 1 statement(s) with status 'RUNNING'" },
         },
         {
-          label:
-            "reports zero results when no statements match the statusPhase filter",
+          label: "uses explicit org/env/compute args over config",
           args: {
-            ...EXPLICIT_IDS,
-            statusPhase: "RUNNING",
+            organizationId: "org-from-args",
+            environmentId: "env-from-args",
+            computePoolId: "lfcp-from-args",
           },
+          outcome: { resolves: "Tables in catalog" },
           responseData: {
-            data: [{ status: { phase: "FAILED" } }],
+            status: { phase: "COMPLETED" },
+            results: {
+              data: [{ TABLE_NAME: "my-table", TABLE_TYPE: "BASE TABLE" }],
+            },
           },
-          outcome: { resolves: "Found 0 statement(s) with status 'RUNNING'" },
         },
       ];
 

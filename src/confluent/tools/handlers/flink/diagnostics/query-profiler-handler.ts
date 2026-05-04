@@ -1,4 +1,3 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
@@ -125,21 +124,13 @@ export class QueryProfilerHandler extends FlinkToolHandler {
       includeAnalysis,
     } = queryProfilerArguments.parse(toolArguments);
 
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const conn = runtime.config.getSoleConnection();
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      conn,
       organizationId,
-    );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
       environmentId,
     );
-    const compute_pool_id = getEnsuredParam(
-      "FLINK_COMPUTE_POOL_ID",
-      "Compute Pool ID is required",
-      computePoolId,
-    );
+    const compute_pool_id = this.resolveComputePoolId(conn, computePoolId);
 
     // Step 1: Fetch the task graph to get human-readable task/operator names
     const pathBasedClient = wrapAsPathBasedClient(

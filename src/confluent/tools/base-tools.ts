@@ -79,9 +79,17 @@ export abstract class BaseToolHandler implements ToolHandler {
     configValue: string | undefined,
     label: string,
   ): string {
-    const resolved = argValue || configValue;
+    const resolved = argValue?.trim() || configValue?.trim();
     if (!resolved) throw new Error(`${label} is required`);
     return resolved;
+  }
+
+  /** Like resolveParam but returns undefined instead of throwing when both are absent or blank. */
+  protected resolveOptionalParam(
+    argValue: string | undefined,
+    configValue: string | undefined,
+  ): string | undefined {
+    return argValue?.trim() || configValue?.trim() || undefined;
   }
 
   createResponse(

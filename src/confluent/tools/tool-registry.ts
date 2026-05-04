@@ -35,6 +35,7 @@ import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topi
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
 import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
+import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organizations/list-organizations-handler.js";
 import { DeleteSchemaHandler } from "@src/confluent/tools/handlers/schema/delete-schema-handler.js";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
@@ -123,6 +124,7 @@ export class ToolHandlerRegistry {
     [ToolName.QUERY_METRICS, new QueryMetricsHandler()],
     [ToolName.LIST_METRICS, new ListMetricsHandler()],
     [ToolName.SEARCH_PRODUCT_DOCS, new SearchProductDocsHandler()],
+    [ToolName.LIST_ORGANIZATIONS, new ListOrganizationsHandler()],
   ]);
 
   static getToolHandler(toolName: ToolName): ToolHandler {

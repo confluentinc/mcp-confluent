@@ -61,6 +61,7 @@ handlers/
 ├── flink/        # Flink SQL + catalog/ + diagnostics/ (flink-tool-handler.ts is the domain base)
 ├── kafka/        # topics, produce, consume, config
 ├── metrics/      # telemetry metric discovery + query
+├── organizations/ # Confluent Cloud organization listing
 ├── schema/       # Schema Registry
 ├── search/       # topic search
 └── tableflow/    # Tableflow topics + catalog/ (tableflow-tool-handler.ts is the domain base)

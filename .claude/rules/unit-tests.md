@@ -162,8 +162,10 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
     path string) and `.args` (the `{ params, body, ... }` object passed to the HTTP
     method). Use it to assert what the handler actually sent to the REST layer when
     `outcome.resolves` alone is not sufficient — e.g. POST body contents or query
-    params. Only path-based REST calls produce entries; zero-arg proxy-chain
-    invocations (Kafka/consumer clients) are silently skipped.
+    params. Only path-based REST calls produce entries; any invocation whose
+    first argument is not a string (Kafka admin, producer, consumer, etc.) is
+    silently skipped — a test that asserts `capturedCalls` on a non-REST handler
+    will see an empty array and fail the `toHaveLength` guard with a clear message.
 
   `responseData` accepts a single element or an array for sequential per-call responses;
   see the `stubClientGetters` JSDoc for the full element-shape contract (`data`,

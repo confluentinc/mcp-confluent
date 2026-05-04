@@ -140,8 +140,9 @@ export function classifyThrown(label: string, thrown: unknown): string {
  * - `capturedCalls` is a `CapturedCall[]`; each entry has `.pathTemplate` (the
  *   raw OpenAPI path string) and `.args` (the `{ params, body, ... }` object).
  *   Use it to assert what the handler actually sent to the REST layer, e.g.
- *   POST body contents or query params. Only REST (path-based) clients produce
- *   entries; zero-arg proxy-chain calls are silently skipped.
+ *   POST body contents or query params. Only path-based REST calls produce
+ *   entries; any invocation whose first argument is not a string (Kafka admin,
+ *   producer, consumer, etc.) is silently skipped.
  */
 export function stubClientGetters(responseData: unknown = {}) {
   // Two-proxy setup: callableProxy (function target) handles method chains

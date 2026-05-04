@@ -125,6 +125,8 @@ export function stubClientGetters(responseData: unknown = {}) {
   // shape from openapi-fetch. When responseData is an array, each element is
   // consumed in order; the last element is reused once the array is exhausted.
   const responses = Array.isArray(responseData) ? responseData : [responseData];
+  if (responses.length === 0)
+    throw new Error("stubClientGetters: responseData array must not be empty");
   let callIndex = 0;
 
   const callableProxy: object = new Proxy((() => {}) as () => Promise<object>, {

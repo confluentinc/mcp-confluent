@@ -184,7 +184,7 @@ describe("tool-registry.ts", () => {
      * What each handler produces when called with no arguments against a
      * fully-wired universal client. Use `{ resolves }` when the handler
      * completes and `{ throws }` when it raises before returning.
-     * Use `"TODO"` as a placeholder — the smoke test will run the handler
+     * Use `"DISCOVER"` as a placeholder — the smoke test will run the handler
      * and report the correct entry to paste in.
      */
     const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, HandleOutcome>> = {
@@ -284,7 +284,7 @@ describe("tool-registry.ts", () => {
       (name) => {
         expect(
           name in ZERO_ARG_OUTCOMES,
-          `Add [ToolName.${TOOL_NAME_TO_KEY[name]}]: "TODO" to ZERO_ARG_OUTCOMES, ` +
+          `Add [ToolName.${TOOL_NAME_TO_KEY[name]}]: "DISCOVER" to ZERO_ARG_OUTCOMES, ` +
             `then run: npm test -- src/confluent/tools/tool-registry.test.ts`,
         ).toBe(true);
       },

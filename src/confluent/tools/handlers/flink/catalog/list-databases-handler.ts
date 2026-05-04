@@ -1,8 +1,7 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
+import { FlinkCatalogToolHandler } from "@src/confluent/tools/handlers/flink/catalog/flink-catalog-tool-handler.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
-import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -32,7 +31,7 @@ const listDatabasesArguments = z.object({
     ),
 });
 
-export class ListDatabasesHandler extends FlinkToolHandler {
+export class ListDatabasesHandler extends FlinkCatalogToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -48,14 +47,9 @@ export class ListDatabasesHandler extends FlinkToolHandler {
       environmentId,
     );
     const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
-    // Smart resolution: only accept env-* format, otherwise fall back to flink.environment_id from connection config
-    const catalog_name = resolveCatalogName(catalogName, environment_id);
-    if (!catalog_name) {
-      return this.createResponse(
-        "Catalog name could not be resolved. Set flink.environment_id in config or provide a valid environment ID (env-xxxxx).",
-        true,
-      );
-    }
+    const catalog = this.resolveCatalogNameOrError(catalogName, environment_id);
+    if (!catalog.ok) return catalog.error;
+    const catalog_name = catalog.name;
 
     // Build SQL query for INFORMATION_SCHEMA.SCHEMATA
     // Must fully qualify with catalog and use backticks per Confluent Cloud requirements

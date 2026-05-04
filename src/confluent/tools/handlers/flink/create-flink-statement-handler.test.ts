@@ -56,8 +56,7 @@ describe("create-flink-statement-handler.ts", () => {
           outcome: { throws: "ZodError" },
         },
         {
-          label:
-            "use org/env/computePool IDs and catalog/database names from config when args absent",
+          label: "resolve successfully when only required args are supplied",
           args: REQUIRED_ARGS,
           outcome: { resolves: "{}" },
         },

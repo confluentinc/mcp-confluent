@@ -1,3 +1,4 @@
+import { FlinkDirectConfig } from "@src/config/models.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
@@ -9,6 +10,14 @@ import {
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
+
+const FLINK_CONFIG: FlinkDirectConfig = {
+  endpoint: "https://flink.example.com",
+  auth: { type: "api_key", key: "k", secret: "s" },
+  environment_id: "env-from-config",
+  organization_id: "org-from-config",
+  compute_pool_id: "lfcp-from-config",
+};
 
 class StubFlinkHandler extends FlinkToolHandler {
   async handle(): Promise<CallToolResult> {
@@ -38,6 +47,32 @@ describe("flink-tool-handler.ts", () => {
 
       it("should return an empty array for a connection without a flink block", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
+      });
+    });
+
+    describe("resolveOrgAndEnvIds()", () => {
+      const resolveOrgAndEnvIds = handler["resolveOrgAndEnvIds"].bind(
+        handler,
+      ) as (typeof handler)["resolveOrgAndEnvIds"];
+
+      it("should use orgIdArg for organization_id and fall back to config for environment_id", () => {
+        const result = resolveOrgAndEnvIds(
+          FLINK_CONFIG,
+          "org-from-arg",
+          undefined,
+        );
+        expect(result.organization_id).toBe("org-from-arg");
+        expect(result.environment_id).toBe(FLINK_CONFIG.environment_id);
+      });
+
+      it("should use envIdArg for environment_id and fall back to config for organization_id", () => {
+        const result = resolveOrgAndEnvIds(
+          FLINK_CONFIG,
+          undefined,
+          "env-from-arg",
+        );
+        expect(result.organization_id).toBe(FLINK_CONFIG.organization_id);
+        expect(result.environment_id).toBe("env-from-arg");
       });
     });
 

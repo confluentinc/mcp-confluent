@@ -6,7 +6,7 @@ import {
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 const STATEMENT_NAME = "my-statement";
 
@@ -80,6 +80,43 @@ describe("detect-issues-handler.ts", () => {
           });
         },
       );
+
+      it("should use explicit computePoolId in metrics POST body when arg is provided", async () => {
+        const { clientManager, clientGetters, capturedCalls } =
+          stubClientGetters([{ status: { phase: "RUNNING" } }, { data: [] }]);
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            statementName: STATEMENT_NAME,
+            computePoolId: "lfcp-from-args",
+            includeMetrics: true,
+          },
+          outcome: { resolves: "Metrics: No metrics data available" },
+          clientGetters,
+        });
+        // calls 0+1 are the GET statement + GET exceptions; the telemetry POSTs follow
+        const metricsCall = capturedCalls.find((c) =>
+          c.pathTemplate.includes("/metrics/"),
+        );
+        expect(metricsCall).toBeDefined();
+        expect(metricsCall!.args).toMatchObject({
+          body: expect.objectContaining({
+            filter: expect.objectContaining({
+              filters: expect.arrayContaining([
+                expect.objectContaining({
+                  field: "resource.compute_pool.id",
+                  value: "lfcp-from-args",
+                }),
+              ]),
+            }),
+          }),
+        });
+      });
     });
   });
 });

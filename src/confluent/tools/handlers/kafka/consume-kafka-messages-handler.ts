@@ -179,7 +179,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,
     sessionId?: string,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
+    const clientManager = runtime.requireDirectClientManager();
     const { topicNames, maxMessages, timeoutMs, value, key } =
       consumeKafkaMessagesArgs.parse(toolArguments);
 

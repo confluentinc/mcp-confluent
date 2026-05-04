@@ -6,7 +6,14 @@ import {
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
+
+const SQL_RESPONSE = {
+  status: { phase: "COMPLETED" },
+  results: {
+    data: [{ TABLE_NAME: "my-table", TABLE_TYPE: "BASE TABLE" }],
+  },
+};
 
 describe("list-tables-handler.ts", () => {
   describe("ListTablesHandler", () => {
@@ -39,12 +46,7 @@ describe("list-tables-handler.ts", () => {
           label: "uses org/env/compute IDs from config when args absent",
           args: {},
           outcome: { resolves: "Tables in catalog" },
-          responseData: {
-            status: { phase: "COMPLETED" },
-            results: {
-              data: [{ TABLE_NAME: "my-table", TABLE_TYPE: "BASE TABLE" }],
-            },
-          },
+          responseData: SQL_RESPONSE,
         },
         {
           label: "uses explicit org/env/compute args over config",
@@ -54,12 +56,7 @@ describe("list-tables-handler.ts", () => {
             computePoolId: "lfcp-from-args",
           },
           outcome: { resolves: "Tables in catalog" },
-          responseData: {
-            status: { phase: "COMPLETED" },
-            results: {
-              data: [{ TABLE_NAME: "my-table", TABLE_TYPE: "BASE TABLE" }],
-            },
-          },
+          responseData: SQL_RESPONSE,
         },
       ];
 
@@ -86,6 +83,32 @@ describe("list-tables-handler.ts", () => {
           });
         },
       );
+
+      it("should embed config environment_id as catalog name in the POST SQL statement", async () => {
+        const { clientManager, clientGetters, capturedCalls } =
+          stubClientGetters(SQL_RESPONSE);
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: { resolves: "Tables in catalog" },
+          clientGetters,
+        });
+        expect(capturedCalls).toHaveLength(3);
+        expect(capturedCalls[0]!.args).toMatchObject({
+          body: expect.objectContaining({
+            spec: expect.objectContaining({
+              statement: expect.stringContaining(
+                FLINK_CONN.flink.environment_id,
+              ),
+            }),
+          }),
+        });
+      });
     });
   });
 });

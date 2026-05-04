@@ -6,7 +6,7 @@ import {
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 const FLINK_CONN = {
   flink: {
@@ -140,6 +140,121 @@ describe("create-flink-statement-handler.ts", () => {
           });
         },
       );
+
+      it("should include catalog/database names from config in POST spec.properties when absent from args", async () => {
+        const { clientManager, clientGetters, capturedCalls } =
+          stubClientGetters({});
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: REQUIRED_ARGS,
+          outcome: { resolves: "{}" },
+          clientGetters,
+        });
+        expect(capturedCalls).toHaveLength(1);
+        expect(capturedCalls[0]!.args).toMatchObject({
+          body: expect.objectContaining({
+            spec: expect.objectContaining({
+              properties: {
+                "sql.current-catalog": FLINK_CONN.flink.environment_name,
+                "sql.current-database": FLINK_CONN.flink.database_name,
+              },
+            }),
+          }),
+        });
+      });
+
+      it("should omit catalog/database keys from POST spec.properties when absent from both args and config", async () => {
+        const { clientManager, clientGetters, capturedCalls } =
+          stubClientGetters({});
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN_NO_NAMES,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { ...REQUIRED_ARGS, ...EXPLICIT_IDS },
+          outcome: { resolves: "{}" },
+          clientGetters,
+        });
+        expect(capturedCalls).toHaveLength(1);
+        expect(capturedCalls[0]!.args).toMatchObject({
+          body: expect.objectContaining({
+            spec: expect.objectContaining({
+              properties: {},
+            }),
+          }),
+        });
+      });
+
+      it("should use explicit catalogName/databaseName args over config values in POST spec.properties", async () => {
+        const { clientManager, clientGetters, capturedCalls } =
+          stubClientGetters({});
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            ...REQUIRED_ARGS,
+            ...EXPLICIT_IDS,
+            catalogName: "catalog-from-args",
+            databaseName: "db-from-args",
+          },
+          outcome: { resolves: "{}" },
+          clientGetters,
+        });
+        expect(capturedCalls).toHaveLength(1);
+        expect(capturedCalls[0]!.args).toMatchObject({
+          body: expect.objectContaining({
+            spec: expect.objectContaining({
+              properties: {
+                "sql.current-catalog": "catalog-from-args",
+                "sql.current-database": "db-from-args",
+              },
+            }),
+          }),
+        });
+      });
+
+      it("should fall back to config catalog/database in POST spec.properties when args are blank", async () => {
+        const { clientManager, clientGetters, capturedCalls } =
+          stubClientGetters({});
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            ...REQUIRED_ARGS,
+            ...EXPLICIT_IDS,
+            catalogName: "   ",
+            databaseName: "   ",
+          },
+          outcome: { resolves: "{}" },
+          clientGetters,
+        });
+        expect(capturedCalls).toHaveLength(1);
+        expect(capturedCalls[0]!.args).toMatchObject({
+          body: expect.objectContaining({
+            spec: expect.objectContaining({
+              properties: {
+                "sql.current-catalog": FLINK_CONN.flink.environment_name,
+                "sql.current-database": FLINK_CONN.flink.database_name,
+              },
+            }),
+          }),
+        });
+      });
     });
   });
 });

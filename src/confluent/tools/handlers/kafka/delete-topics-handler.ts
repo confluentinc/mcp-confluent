@@ -22,7 +22,7 @@ export class DeleteTopicsHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
+    const clientManager = runtime.requireDirectClientManager();
     const { topicNames } = deleteKafkaTopicsArguments.parse(toolArguments);
     await (
       await clientManager.getAdminClient()

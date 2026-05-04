@@ -93,10 +93,10 @@ describe("list-organizations-handler.ts", () => {
         },
         {
           label:
-            "resolve with an error response when the API returns an unexpected payload",
+            "resolve with a validation-error response when the API returns an unexpected payload",
           args: {},
           responseData: { not: "an OrganizationList" },
-          outcome: { resolves: "Failed to fetch organizations" },
+          outcome: { resolves: "Invalid organization list data" },
         },
       ];
 

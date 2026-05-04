@@ -97,40 +97,56 @@ export class ListOrganizationsHandler extends BaseToolHandler {
         );
       }
 
-      const validated = organizationListSchema.parse(response);
-      const organizations = validated.data.map((org) => ({
-        id: org.id,
-        name: org.display_name,
-        resource_name: org.metadata.resource_name,
-        created_at: org.metadata.created_at,
-        updated_at: org.metadata.updated_at,
-      }));
+      try {
+        const validated = organizationListSchema.parse(response);
+        const organizations = validated.data.map((org) => ({
+          id: org.id,
+          name: org.display_name,
+          resource_name: org.metadata.resource_name,
+          created_at: org.metadata.created_at,
+          updated_at: org.metadata.updated_at,
+        }));
 
-      const nextPageToken = validated.metadata?.next
-        ? (new URL(validated.metadata.next).searchParams.get("page_token") ??
-          undefined)
-        : undefined;
+        const nextPageToken = validated.metadata?.next
+          ? (new URL(validated.metadata.next).searchParams.get("page_token") ??
+            undefined)
+          : undefined;
 
-      const orgDetails = organizations
-        .map(
-          (org) => `
+        const orgDetails = organizations
+          .map(
+            (org) => `
 Organization: ${org.name}
   ID: ${org.id}
   Resource Name: ${org.resource_name}
   Created At: ${org.created_at}
   Updated At: ${org.updated_at}
 `,
-        )
-        .join("\n");
+          )
+          .join("\n");
 
-      const summary = `Retrieved ${organizations.length} organization${
-        organizations.length === 1 ? "" : "s"
-      }${nextPageToken ? " (more pages available — pass nextPageToken back as pageToken to fetch the next page)" : ""}:`;
+        const summary = `Retrieved ${organizations.length} organization${
+          organizations.length === 1 ? "" : "s"
+        }${nextPageToken ? " (more pages available — pass nextPageToken back as pageToken to fetch the next page)" : ""}:`;
 
-      return this.createResponse(`${summary}\n${orgDetails}`, false, {
-        organizations,
-        nextPageToken,
-      });
+        return this.createResponse(`${summary}\n${orgDetails}`, false, {
+          organizations,
+          nextPageToken,
+        });
+      } catch (validationError) {
+        logger.error(
+          { error: validationError },
+          "Organization list validation error",
+        );
+        const message =
+          validationError instanceof Error
+            ? validationError.message
+            : String(validationError);
+        return this.createResponse(
+          `Invalid organization list data: ${message}`,
+          true,
+          { error: validationError },
+        );
+      }
     } catch (error) {
       logger.error({ error }, "Error in ListOrganizationsHandler");
       const message = error instanceof Error ? error.message : String(error);

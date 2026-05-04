@@ -4,8 +4,27 @@ import {
   DEFAULT_CONNECTION_ID,
   kafkaRestOnlyRuntime,
   kafkaRestRuntime,
+  runtimeWith,
 } from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  stubClientGetters,
+  type HandleCase,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
+
+const KAFKA_CONN = {
+  kafka: {
+    bootstrap_servers: "broker:9092",
+    rest_endpoint: "https://kafka-rest.example.com",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+    cluster_id: "lkc-from-config",
+  },
+};
+
+type HandleCaseWithConn = HandleCase & {
+  connectionConfig?: Parameters<typeof runtimeWith>[0];
+};
 
 describe("get-topic-config.ts", () => {
   describe("GetTopicConfigHandler", () => {
@@ -27,6 +46,58 @@ describe("get-topic-config.ts", () => {
           [],
         );
       });
+    });
+
+    describe("handle()", () => {
+      const cases: HandleCaseWithConn[] = [
+        {
+          label: "throws ZodError when topicName is absent",
+          args: {},
+          outcome: { throws: "ZodError" },
+          connectionConfig: {},
+        },
+        {
+          label: "throws when clusterId is absent and not in connection config",
+          args: { topicName: "my-topic" },
+          outcome: { throws: "Kafka Cluster ID is required" },
+          connectionConfig: {},
+        },
+        {
+          label:
+            "uses cluster_id from connection config when clusterId arg is absent",
+          args: { topicName: "my-topic" },
+          outcome: { resolves: "Topic configuration for 'my-topic'" },
+        },
+        {
+          label: "uses clusterId arg over connection config cluster_id",
+          args: { topicName: "my-topic", clusterId: "lkc-from-args" },
+          outcome: { resolves: "Topic configuration for 'my-topic'" },
+        },
+      ];
+
+      it.each(cases)(
+        "should $label",
+        async ({
+          args,
+          outcome,
+          responseData,
+          connectionConfig = KAFKA_CONN,
+        }) => {
+          const { clientManager, clientGetters } =
+            stubClientGetters(responseData);
+          await assertHandleCase({
+            handler,
+            runtime: runtimeWith(
+              connectionConfig,
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args,
+            outcome,
+            clientGetters,
+          });
+        },
+      );
     });
   });
 });

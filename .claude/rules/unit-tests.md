@@ -197,7 +197,9 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   expect(capturedCalls[0]!.args).toMatchObject({
     body: expect.objectContaining({
       spec: expect.objectContaining({
-        "sql.current-catalog": "env-name-from-config",
+        properties: expect.objectContaining({
+          "sql.current-catalog": "env-name-from-config",
+        }),
       }),
     }),
   });

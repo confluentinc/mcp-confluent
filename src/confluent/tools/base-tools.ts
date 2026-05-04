@@ -73,6 +73,7 @@ export abstract class BaseToolHandler implements ToolHandler {
    * a connection-config value. Throws if neither is present.
    * `label` is the human-readable field name (e.g. `"Organization ID"`);
    * the thrown message is `"${label} is required"`.
+   * The returned value is always trimmed.
    */
   protected resolveParam(
     argValue: string | undefined,
@@ -84,7 +85,7 @@ export abstract class BaseToolHandler implements ToolHandler {
     return resolved;
   }
 
-  /** Like resolveParam but returns undefined instead of throwing when both are absent or blank. */
+  /** Like resolveParam but returns undefined instead of throwing when both are absent or blank. The returned value is always trimmed. */
   protected resolveOptionalParam(
     argValue: string | undefined,
     configValue: string | undefined,

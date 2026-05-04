@@ -20,12 +20,6 @@ describe("catalog-resolver.ts", () => {
       expect(resolveCatalogName(undefined, "env-abc123")).toBe("env-abc123");
     });
 
-    it("should prefer explicit fallbackEnvId over conn config — the bug case", () => {
-      expect(resolveCatalogName(undefined, "env-from-args")).toBe(
-        "env-from-args",
-      );
-    });
-
     it("should return undefined when input is absent and fallbackEnvId is absent", () => {
       expect(resolveCatalogName()).toBeUndefined();
     });

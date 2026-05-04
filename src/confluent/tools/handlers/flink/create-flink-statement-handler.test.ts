@@ -17,7 +17,8 @@ const FLINK_CONN = {
 };
 
 // Flink config without the optional environment_name / database_name fields,
-// used to exercise the ?? "" fallback in resolvedCatalogName / resolvedDatabaseName.
+// used to verify that resolveOptionalParam() returns undefined (omitting the keys from
+// spec.properties) when neither the arg nor the config value is present.
 const FLINK_CONN_NO_NAMES = {
   flink: {
     endpoint: "https://flink.example.com",

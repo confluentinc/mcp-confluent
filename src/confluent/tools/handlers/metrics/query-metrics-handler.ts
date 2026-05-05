@@ -104,7 +104,7 @@ export class QueryMetricsHandler extends BaseToolHandler {
       // Auto-inject resource.kafka.id for Kafka metrics if not provided
       const effectiveFilter = { ...filter };
       const connKafkaClusterId =
-        runtime.config.getSoleConnection().kafka?.cluster_id;
+        runtime.config.getSoleDirectConnection().kafka?.cluster_id;
       if (
         metric.startsWith("io.confluent.kafka.server/") &&
         !effectiveFilter["resource.kafka.id"] &&

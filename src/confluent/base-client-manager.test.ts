@@ -179,7 +179,7 @@ describe("base-client-manager.ts", () => {
           }),
         );
         expect(() => cm.getSchemaRegistryClient()).toThrow(
-          "Schema Registry OAuth authentication is not supported",
+          "Schema Registry OAuth authentication requires the cluster-aware accessor",
         );
       });
     });

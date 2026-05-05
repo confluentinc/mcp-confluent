@@ -102,6 +102,31 @@ export class DirectClientManager
   }
 
   /** @inheritdoc */
+  async getKafkaAdminClient(
+    _clusterId?: string,
+    _envId?: string,
+  ): Promise<KafkaJS.Admin> {
+    return this.getAdminClient();
+  }
+
+  /** @inheritdoc */
+  async getKafkaProducer(
+    _clusterId?: string,
+    _envId?: string,
+  ): Promise<KafkaJS.Producer> {
+    return this.getProducer();
+  }
+
+  /** @inheritdoc */
+  async buildKafkaConsumer(
+    _clusterId?: string,
+    _envId?: string,
+    groupId?: string,
+  ): Promise<KafkaJS.Consumer> {
+    return this.getConsumer(groupId);
+  }
+
+  /** @inheritdoc */
   async disconnect(): Promise<void> {
     await this.adminClient.close();
     await this.producer.close();

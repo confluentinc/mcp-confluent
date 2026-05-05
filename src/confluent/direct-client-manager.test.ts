@@ -40,5 +40,22 @@ describe("direct-client-manager.ts", () => {
         await expect(cm.disconnect()).resolves.toBeUndefined();
       });
     });
+
+    describe("cluster-aware Kafka accessors (direct ignores args)", () => {
+      it("should have getKafkaAdminClient method", () => {
+        const manager = new DirectClientManager(buildConfig());
+        expect(typeof manager.getKafkaAdminClient).toBe("function");
+      });
+
+      it("should have getKafkaProducer method", () => {
+        const manager = new DirectClientManager(buildConfig());
+        expect(typeof manager.getKafkaProducer).toBe("function");
+      });
+
+      it("should have buildKafkaConsumer method", () => {
+        const manager = new DirectClientManager(buildConfig());
+        expect(typeof manager.buildKafkaConsumer).toBe("function");
+      });
+    });
   });
 });

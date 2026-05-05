@@ -14,7 +14,9 @@ import {
 import {
   connectionIdsWhere,
   hasKafkaBootstrap,
+  isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
+import { resolveKafkaClusterArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -43,6 +45,21 @@ type ValueOptions = z.infer<typeof valueOptions>;
 type KeyOptions = z.infer<typeof keyOptions>;
 
 export const consumeKafkaMessagesArgs = z.object({
+  cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "The Confluent Cloud logical Kafka cluster ID (lkc-...). " +
+        "Required under --oauth; under a direct connection it is ignored " +
+        "(cluster fixed by configuration). Discover via list-clusters.",
+    ),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "The Confluent Cloud environment ID (env-...) that owns the cluster. " +
+        "Required alongside cluster_id under --oauth. Optional under direct.",
+    ),
   topicNames: z
     .array(z.string())
     .nonempty()
@@ -85,13 +102,6 @@ interface ProcessedMessage {
 export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
   /**
    * Processes a single Kafka message, handling deserialization of both key and value.
-   * @param topic - The topic the message was consumed from
-   * @param partition - The partition the message was consumed from
-   * @param message - The raw Kafka message
-   * @param registry - Optional Schema Registry client for deserialization
-   * @param valueOptions - Options for value deserialization
-   * @param keyOptions - Optional options for key deserialization
-   * @returns A processed message with deserialized key and value
    */
   async processMessage(
     topic: string,
@@ -169,30 +179,52 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
 
   /**
    * Main handler for consuming messages from Kafka topics.
-   * @param clientManager - The client manager for Kafka and registry clients
-   * @param toolArguments - The arguments for the tool, including topics, message limits, and deserialization options
-   * @param sessionId - Optional session ID for Kafka consumer
-   * @returns A CallToolResult containing the consumed messages or error information
    */
   async handle(
     runtime: ServerRuntime,
     toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,
     sessionId?: string,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.requireDirectClientManager();
-    const { topicNames, maxMessages, timeoutMs, value, key } =
-      consumeKafkaMessagesArgs.parse(toolArguments);
+    const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
+    const { topicNames, maxMessages, timeoutMs, value, key } = parsed;
+
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
+    const clientManager = runtime.clientManagers[connId]!;
+    const conn = runtime.config.connections[connId]!;
+
+    // Schema Registry deserialization is not yet exposed under --oauth: there
+    // is no MCP tool to discover the SR cluster ID (lsrc-...). Block the path
+    // here with a clear capability boundary rather than throw a discovery hint
+    // that points at a tool the agent can't call. SR-under-OAuth lands in the
+    // follow-up that adds list-schema-registry-clusters.
+    const needsRegistry =
+      value.useSchemaRegistry || (key && key.useSchemaRegistry);
+    if (needsRegistry && conn.type === "oauth") {
+      return this.createResponse(
+        "Schema Registry deserialization is not yet supported under --oauth. " +
+          "Set useSchemaRegistry: false (or omit it) to receive raw bytes, or " +
+          "use a direct connection with schema_registry configured for " +
+          "schema-aware deserialization.",
+        true,
+      );
+    }
+
+    let registry: SchemaRegistryClient | undefined;
+    if (needsRegistry) {
+      registry = await clientManager.getSchemaRegistrySdkClient();
+    }
 
     const consumedMessages: ProcessedMessage[] = [];
     let timeoutReached = false;
     let consumer: KafkaJS.Consumer | undefined;
-    const registry: SchemaRegistryClient | undefined =
-      value.useSchemaRegistry || (key && key.useSchemaRegistry)
-        ? clientManager.getSchemaRegistryClient()
-        : undefined;
 
     try {
-      consumer = await clientManager.getConsumer(sessionId);
+      consumer = await clientManager.buildKafkaConsumer(
+        resolved.clusterId,
+        resolved.envId,
+        sessionId,
+      );
       await consumer.connect();
       await consumer.subscribe({ topics: topicNames });
 
@@ -268,6 +300,9 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaBootstrap);
+    return connectionIdsWhere(
+      runtime.config.connections,
+      (c) => hasKafkaBootstrap(c) || isOAuth(c),
+    );
   }
 }

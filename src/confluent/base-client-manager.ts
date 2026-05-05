@@ -5,6 +5,7 @@
  * plus the OAuth variant introduced in the OAuth wiring ticket).
  */
 
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { ClientConfig } from "@confluentinc/schemaregistry";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
@@ -170,7 +171,10 @@ export abstract class BaseClientManager
       const schemaRegistryAuth = config.auth.schemaRegistry;
       if (schemaRegistryAuth.type === "oauth") {
         throw new Error(
-          "Schema Registry OAuth authentication is not supported for SchemaRegistryClient yet. Configure SCHEMA_REGISTRY_API_KEY and SCHEMA_REGISTRY_API_SECRET instead.",
+          "Schema Registry OAuth authentication requires the cluster-aware accessor: " +
+            "call getSchemaRegistrySdkClient(clusterId, envId) instead. The no-arg " +
+            "getSchemaRegistryClient() does not have access to the logical SR cluster ID " +
+            "(needed for the target-sr-cluster header) under OAuth.",
         );
       }
       const { apiKey, apiSecret } = schemaRegistryAuth;
@@ -231,6 +235,51 @@ export abstract class BaseClientManager
   getSchemaRegistryClient(): SchemaRegistryClient {
     return this.schemaRegistryClient.get();
   }
+
+  /**
+   * Cluster-aware Schema Registry SDK client accessor. Under direct, args are
+   * ignored and the existing single-instance Lazy is returned. Under OAuth,
+   * args are required: `clusterId` is `lsrc-...` and `envId` is `env-...`. The
+   * SR client itself is built per-call (no cache) because the DPAT is captured
+   * in the SDK's axios headers at construction time. Endpoint resolution is
+   * cached in `OAuthClientManager`.
+   */
+  async getSchemaRegistrySdkClient(
+    _clusterId?: string,
+    _envId?: string,
+  ): Promise<SchemaRegistryClient> {
+    return this.getSchemaRegistryClient();
+  }
+
+  /**
+   * Cluster-aware Kafka admin client. Under direct, args are ignored and the
+   * eagerly-built admin is returned. Under OAuth, args are required and the
+   * client is cached (idle-evicted) per `clusterId`.
+   */
+  abstract getKafkaAdminClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Admin>;
+
+  /**
+   * Cluster-aware Kafka producer. Same direct/OAuth asymmetry as
+   * {@link getKafkaAdminClient}.
+   */
+  abstract getKafkaProducer(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Producer>;
+
+  /**
+   * Build a fresh Kafka consumer (NOT cached, per the spec's group-membership
+   * analysis). The returned consumer is unconnected; the caller must call
+   * `connect()` and `disconnect()` (typically in a `try/finally`).
+   */
+  abstract buildKafkaConsumer(
+    clusterId?: string,
+    envId?: string,
+    groupId?: string,
+  ): Promise<KafkaJS.Consumer>;
 
   abstract disconnect(): Promise<void>;
 }

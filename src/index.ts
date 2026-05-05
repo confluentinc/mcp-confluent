@@ -135,6 +135,19 @@ async function main() {
       });
     }
 
+    // --oauth alongside a YAML that already declares an OAuth connection is a conflict —
+    // the user has expressed OAuth intent twice with potentially different envs. Reject.
+    if (cliOptions.oauth && cliOptions.config) {
+      const yamlHasOauth = Object.values(mcpConfig.connections).some(
+        (c) => c.type === "oauth",
+      );
+      if (yamlHasOauth) {
+        throw new Error(
+          "--oauth conflicts with the OAuth connection already declared in the YAML config; remove one or the other",
+        );
+      }
+    }
+
     setLogLevel(mcpConfig.server.log_level);
 
     // Transport selection: YAML config is authoritative when --config is used;

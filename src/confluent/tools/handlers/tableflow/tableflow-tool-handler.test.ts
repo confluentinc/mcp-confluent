@@ -7,6 +7,8 @@ import {
   bareRuntime,
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
+  runtimeWith,
+  TABLEFLOW_CONN,
   tableflowRuntime,
 } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
@@ -31,10 +33,14 @@ describe("tableflow-tool-handler.ts", () => {
     const handler = new StubTableflowHandler();
 
     describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a tableflow block", () => {
-        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
+      it("should return the connection ID for a connection with tableflow and kafka blocks", () => {
+        expect(
+          handler.enabledConnectionIds(runtimeWith(TABLEFLOW_CONN)),
+        ).toEqual([DEFAULT_CONNECTION_ID]);
+      });
+
+      it("should return an empty array for a tableflow-only connection without a kafka block", () => {
+        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([]);
       });
 
       it("should return an empty array for a connection without a tableflow block", () => {

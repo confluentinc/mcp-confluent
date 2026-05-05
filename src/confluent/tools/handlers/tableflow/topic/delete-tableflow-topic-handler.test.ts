@@ -23,10 +23,14 @@ describe("delete-tableflow-topic-handler.ts", () => {
     const handler = new DeleteTableFlowTopicHandler();
 
     describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a tableflow block", () => {
-        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
+      it("should return the connection ID for a connection with tableflow and kafka blocks", () => {
+        expect(
+          handler.enabledConnectionIds(runtimeWith(TABLEFLOW_CONN)),
+        ).toEqual([DEFAULT_CONNECTION_ID]);
+      });
+
+      it("should return an empty array for a tableflow-only connection without a kafka block", () => {
+        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([]);
       });
 
       it("should return an empty array for a connection without a tableflow block", () => {

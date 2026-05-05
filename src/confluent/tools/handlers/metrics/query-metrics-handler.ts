@@ -9,7 +9,6 @@ import {
   hasTelemetry,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -104,12 +103,14 @@ export class QueryMetricsHandler extends BaseToolHandler {
 
       // Auto-inject resource.kafka.id for Kafka metrics if not provided
       const effectiveFilter = { ...filter };
+      const connKafkaClusterId =
+        runtime.config.getSoleDirectConnection().kafka?.cluster_id;
       if (
         metric.startsWith("io.confluent.kafka.server/") &&
         !effectiveFilter["resource.kafka.id"] &&
-        env.KAFKA_CLUSTER_ID
+        connKafkaClusterId
       ) {
-        effectiveFilter["resource.kafka.id"] = env.KAFKA_CLUSTER_ID;
+        effectiveFilter["resource.kafka.id"] = connKafkaClusterId;
       }
 
       // Build filter object

@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { sdkTransports } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
 import {
   pingHandler,
@@ -7,6 +9,7 @@ import {
   pingResponseSchema,
 } from "@src/mcp/transports/ping.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
+import { SessionRegistry } from "@src/mcp/transports/session-registry.js";
 import { Transport } from "@src/mcp/transports/types.js";
 import { randomUUID } from "crypto";
 import { FastifyReply, FastifyRequest } from "fastify";
@@ -30,10 +33,10 @@ const mcpErrorSchema = {
 };
 
 export class HttpTransport implements Transport {
-  private sessions: Record<string, StreamableHTTPServerTransport> = {};
+  private sessions = new SessionRegistry<StreamableHTTPServerTransport>();
 
   constructor(
-    private server: McpServer,
+    private serverFactory: () => McpServer,
     private httpServer: HttpServer,
     private httpMcpEndpointPath: string = "/mcp",
   ) {}
@@ -56,6 +59,7 @@ export class HttpTransport implements Transport {
           },
           response: {
             200: mcpSessionSchema,
+            400: mcpErrorSchema,
             404: mcpErrorSchema,
           },
         },
@@ -65,21 +69,32 @@ export class HttpTransport implements Transport {
         reply: FastifyReply,
       ) => {
         const sessionId = request.headers["mcp-session-id"];
-        let transport: StreamableHTTPServerTransport;
 
-        if (sessionId && this.sessions[sessionId]) {
-          transport = this.sessions[sessionId];
-        } else {
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            onsessioninitialized: (sid: string) => {
-              this.sessions[sid] = transport;
-            },
-          });
-
-          await this.server.connect(transport);
+        if (sessionId) {
+          const entry = this.sessions.get(sessionId);
+          if (!entry) {
+            reply.status(404).send({ error: "Session not found" });
+            return;
+          }
+          await entry.transport.handleRequest(
+            request.raw,
+            reply.raw,
+            request.body,
+          );
+          return;
         }
 
+        // gate sessionless POSTs on init-body shape; the SDK's 400 path doesn't fire
+        // onsessioninitialized or close the transport, which would leak a per-session McpServer
+        if (!isInitializeRequest(request.body)) {
+          reply.status(400).send({
+            error:
+              "Bad Request: Mcp-Session-Id header is required for non-initialize requests",
+          });
+          return;
+        }
+
+        const transport = await this.createSession();
         await transport.handleRequest(request.raw, reply.raw, request.body);
       },
     );
@@ -109,13 +124,13 @@ export class HttpTransport implements Transport {
         reply: FastifyReply,
       ) => {
         const sessionId = request.headers["mcp-session-id"];
-        if (!sessionId || !this.sessions[sessionId]) {
+        const entry = sessionId ? this.sessions.get(sessionId) : undefined;
+        if (!entry) {
           reply.status(404).send({ error: "Session not found" });
           return;
         }
 
-        const transport = this.sessions[sessionId];
-        await transport.handleRequest(request.raw, reply.raw);
+        await entry.transport.handleRequest(request.raw, reply.raw);
       },
     );
 
@@ -144,15 +159,15 @@ export class HttpTransport implements Transport {
         reply: FastifyReply,
       ) => {
         const sessionId = request.headers["mcp-session-id"];
-        if (!sessionId || !this.sessions[sessionId]) {
+        const entry = sessionId ? this.sessions.get(sessionId) : undefined;
+        if (!entry) {
           reply.status(404).send({ error: "Session not found" });
           return;
         }
 
-        const transport = this.sessions[sessionId];
-        await transport.handleRequest(request.raw, reply.raw);
-        // Clean up the session
-        delete this.sessions[sessionId];
+        // the SDK's DELETE path closes the transport, which fires onclose (registered in POST)
+        // where session + per-session-server cleanup actually happen
+        await entry.transport.handleRequest(request.raw, reply.raw);
       },
     );
 
@@ -177,13 +192,36 @@ export class HttpTransport implements Transport {
 
   async disconnect(): Promise<void> {
     logger.info("Cleaning up HTTP transport sessions...");
-    // Clean up all active sessions
-    Object.values(this.sessions).forEach((transport) => {
-      const sessionId = transport.sessionId;
-      if (sessionId) {
-        delete this.sessions[sessionId];
-      }
-      transport.close();
+    await this.sessions.closeAll();
+  }
+
+  /**
+   * Creates a fresh {@link McpServer} + {@link StreamableHTTPServerTransport} pair for an incoming
+   * initialize POST, sets up session lifecycle callbacks, and binds the server.
+   * NOTE: callers are responsible for forwarding the request to the returned transport
+   */
+  private async createSession(): Promise<StreamableHTTPServerTransport> {
+    const perSessionServer = this.serverFactory();
+    const transport = new sdkTransports.StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (sid: string) => {
+        this.sessions.set(sid, { transport, server: perSessionServer });
+      },
     });
+    // fires on every close path (DELETE, network drop, server-initiated) so abandoned sessions
+    // don't leak
+    transport.onclose = () => {
+      const sid = transport.sessionId;
+      if (!sid) return;
+      this.sessions.closeAndRemove(sid).catch((err) => {
+        logger.error(
+          { err, sessionId: sid },
+          "Failed to close session on transport.onclose",
+        );
+      });
+    };
+
+    await this.sessions.bindServer(perSessionServer, transport);
+    return transport;
   }
 }

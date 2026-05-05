@@ -177,6 +177,19 @@ export const CONNECT_CONN_WITH_AUTH = {
   },
 };
 
+/**
+ * Shared Tableflow handler fixture: tableflow auth block + kafka block carrying
+ * `env_id` and `cluster_id` for `resolveTableflowEnvAndClusterId` fallback tests.
+ */
+export const TABLEFLOW_CONN = {
+  tableflow: { auth: { type: "api_key" as const, key: "k", secret: "s" } },
+  kafka: {
+    env_id: "env-from-config",
+    cluster_id: "lkc-from-config",
+    rest_endpoint: "https://pkc-example.confluent.cloud:443",
+  },
+};
+
 /** Extends HandleCase with a per-case connection config for handle() tests
  *  that need to vary the runtime shape (e.g. empty config for throw cases). */
 export type HandleCaseWithConn = HandleCase & {

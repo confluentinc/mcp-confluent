@@ -1,6 +1,7 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
+import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import type { Mocked } from "vitest";
@@ -117,12 +118,15 @@ export function telemetryRuntime(): ServerRuntime {
 }
 
 /**
- * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`. Used by
- * handler tests to assert that handlers widened for OAuth (e.g. via the
- * widened `hasConfluentCloud` predicate) see the connection as enabled, and
- * that handlers staying direct-only (e.g. native Kafka) see it as disabled.
- * Does not populate `runtime.oauthHolder`; tests that need a holder should
- * construct one explicitly.
+ * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`, paired
+ * with a mocked `OAuthClientManager` (matching what `ServerRuntime.fromConfig`
+ * actually constructs for OAuth connections). Used by handler tests to assert
+ * that handlers widened for OAuth (e.g. via the widened `hasConfluentCloud`
+ * predicate) see the connection as enabled, and that handlers staying
+ * direct-only (e.g. native Kafka) see it as disabled. Does not populate
+ * `runtime.oauthHolder`; tests that need a holder should construct one
+ * explicitly. `createMockInstance` doesn't invoke the real constructor, so the
+ * OAuthClientManager's eager cloud-REST client setup is sidestepped.
  */
 export function ccloudOAuthRuntime(): ServerRuntime {
   return new ServerRuntime(
@@ -131,6 +135,6 @@ export function ccloudOAuthRuntime(): ServerRuntime {
         [DEFAULT_CONNECTION_ID]: { type: "oauth", development_env: "devel" },
       },
     }),
-    { [DEFAULT_CONNECTION_ID]: createMockInstance(DirectClientManager) },
+    { [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager) },
   );
 }

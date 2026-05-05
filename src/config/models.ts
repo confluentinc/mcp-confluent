@@ -30,8 +30,9 @@ export interface DirectConnectionConfig {
  * inside the `ConnectionConfig` discriminated union. The CCloud REST URL is
  * derived from `development_env` via `getCloudRestUrlForEnv` inside
  * `OAuthClientManager`. No service blocks; OAuth-eligible tools auto-enable
- * via the `isOAuth` predicate, and resource IDs that direct connections supply
- * via blocks must be passed as tool arguments under OAuth.
+ * because `hasConfluentCloud` widens to return `true` for OAuth connections
+ * (see `connection-predicates.ts`). Resource IDs that direct connections
+ * supply via blocks must be passed as tool arguments under OAuth.
  *
  * `development_env` defaults to "prod" via the schema; only Confluent staff
  * testing against devel/stag set it explicitly.
@@ -116,8 +117,7 @@ export interface FlinkDirectConfig {
 }
 
 /**
- * Union of all connection types (future-proof discriminated union).
- * Currently only supports "direct" type.
+ * Discriminated union of all connection variants: direct (api-key) and oauth (PKCE).
  */
 export type ConnectionConfig = DirectConnectionConfig | OAuthConnectionConfig;
 

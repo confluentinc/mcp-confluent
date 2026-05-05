@@ -760,4 +760,78 @@ describe("config/models.ts", () => {
       }
     });
   });
+
+  describe("schema_registry block (cluster_id, env_id)", () => {
+    it("accepts schema_registry.cluster_id with lsrc- prefix", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: {
+            type: "direct",
+            schema_registry: {
+              endpoint: "https://psrc.example.com",
+              cluster_id: "lsrc-abc",
+            },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects schema_registry.cluster_id without lsrc- prefix", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: {
+            type: "direct",
+            schema_registry: {
+              endpoint: "https://psrc.example.com",
+              cluster_id: "abc-no-prefix",
+            },
+          },
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("accepts schema_registry.env_id with env- prefix", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: {
+            type: "direct",
+            schema_registry: {
+              endpoint: "https://psrc.example.com",
+              env_id: "env-123",
+            },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects schema_registry.env_id without env- prefix", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: {
+            type: "direct",
+            schema_registry: {
+              endpoint: "https://psrc.example.com",
+              env_id: "123-bad",
+            },
+          },
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("treats schema_registry.cluster_id and env_id as optional", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: {
+            type: "direct",
+            schema_registry: { endpoint: "https://psrc.example.com" },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+  });
 });

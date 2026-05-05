@@ -1,7 +1,6 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
+import { TableflowWithKafkaToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -23,7 +22,7 @@ const readTableflowTopicArguments = z.object({
     .describe("Scope the operation to the give Kafka cluster."),
 });
 
-export class ReadTableFlowTopicHandler extends TableflowToolHandler {
+export class ReadTableFlowTopicHandler extends TableflowWithKafkaToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -32,17 +31,9 @@ export class ReadTableFlowTopicHandler extends TableflowToolHandler {
     const { display_name, environmentId, clusterId } =
       readTableflowTopicArguments.parse(toolArguments);
 
-    const environment_id = getEnsuredParam(
-      "KAFKA_ENV_ID",
-      "Environment ID is required",
-      environmentId,
-    );
-
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-      clusterId,
-    );
+    const conn = runtime.config.getSoleDirectConnection();
+    const { environment_id, kafka_cluster_id } =
+      this.resolveTableflowEnvAndClusterId(conn, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

@@ -1,12 +1,61 @@
+import type { DirectConnectionConfig } from "@src/config/index.js";
 import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
   hasTableflow,
+  hasTableflowWithKafka,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
-export abstract class TableflowToolHandler extends BaseToolHandler {
+/**
+ * Base for Tableflow handlers that require only a tableflow auth block.
+ * Covers tools that either need no env/cluster IDs at all (e.g. list-regions)
+ * or receive them entirely from the caller's request body (e.g. update-topic).
+ */
+export abstract class TableflowOnlyToolHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasTableflow);
+  }
+}
+
+/**
+ * Base for Tableflow handlers that require both a tableflow auth block and a kafka
+ * block. The kafka block is required because `resolveTableflowEnvAndClusterId()`
+ * reads `conn.kafka.env_id` / `conn.kafka.cluster_id` as config fallbacks.
+ *
+ * The tool is intentionally enabled even when those fields are absent from config:
+ * callers can supply `environmentId` and `clusterId` as explicit tool arguments.
+ * The handler throws only when a required ID is absent from both the call arguments
+ * and the connection config — that is expected and not a misconfiguration signal.
+ */
+export abstract class TableflowWithKafkaToolHandler extends BaseToolHandler {
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(
+      runtime.config.connections,
+      hasTableflowWithKafka,
+    );
+  }
+
+  /**
+   * Resolves the environment ID and Kafka cluster ID for a Tableflow operation,
+   * preferring explicit tool arguments over connection config fallbacks.
+   */
+  protected resolveTableflowEnvAndClusterId(
+    conn: DirectConnectionConfig,
+    envIdArg: string | undefined,
+    clusterIdArg: string | undefined,
+  ): { environment_id: string; kafka_cluster_id: string } {
+    return {
+      environment_id: this.resolveParam(
+        envIdArg,
+        conn.kafka?.env_id,
+        "Environment ID",
+      ),
+      kafka_cluster_id: this.resolveParam(
+        clusterIdArg,
+        conn.kafka?.cluster_id,
+        "Kafka Cluster ID",
+      ),
+    };
   }
 }

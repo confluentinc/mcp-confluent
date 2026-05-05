@@ -293,6 +293,47 @@ describe("config/index.ts", () => {
       expect(conn.kafka).toBeUndefined();
     });
 
+    it("should parse a minimal oauth connection and apply the prod default", () => {
+      const yamlContent = `connections:
+  prod-oauth:
+    type: "oauth"
+`;
+
+      const config = parseYamlConfiguration(yamlContent, {});
+
+      expect(config.getSoleConnection()).toEqual({
+        type: "oauth",
+        development_env: "prod",
+      });
+    });
+
+    it("should parse an explicit oauth development_env value", () => {
+      const yamlContent = `connections:
+  stag-oauth:
+    type: "oauth"
+    development_env: "stag"
+`;
+
+      const config = parseYamlConfiguration(yamlContent, {});
+
+      expect(config.getSoleConnection()).toEqual({
+        type: "oauth",
+        development_env: "stag",
+      });
+    });
+
+    it("should reject an oauth connection with an unknown development_env", () => {
+      const yamlContent = `connections:
+  bad-oauth:
+    type: "oauth"
+    development_env: "bogus"
+`;
+
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+        /development_env/,
+      );
+    });
+
     it("should interpolate ${VAR} references using provided env before Zod validation", () => {
       const yamlContent = `connections:
   local:

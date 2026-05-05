@@ -5,9 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
 
-// server wiring (McpServer + tool registration) lives inline in src/index.ts
-// main() and isn't importable directly, so we use createTestServer() with an
-// in-memory transport to test the server lifecycle and protocol handling
+// covers protocol-level behavior that needs a connected client; pure registration shape lives
+// in the unit suite next to src/mcp/server.ts
 describe("MCP server", () => {
   let ctx: TestServerContext;
 

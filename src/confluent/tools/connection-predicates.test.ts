@@ -67,6 +67,11 @@ const CCLOUD_SR_CONN = conn({
   },
 });
 
+const OAUTH_CONN: ConnectionConfig = {
+  type: "oauth",
+  development_env: "devel",
+};
+
 describe("connection-predicates.ts", () => {
   describe("hasKafka()", () => {
     it("should return true when the kafka block is present", () => {
@@ -139,8 +144,13 @@ describe("connection-predicates.ts", () => {
       expect(hasConfluentCloud(CONFLUENT_CLOUD_CONN)).toBe(true);
     });
 
-    it("should return false when the confluent_cloud block is absent", () => {
+    it("should return false when the confluent_cloud block is absent on a direct connection", () => {
       expect(hasConfluentCloud(KAFKA_CONN)).toBe(false);
+    });
+
+    it("should return true unconditionally for an OAuth connection", () => {
+      // OAuth gets the CCloud REST URL from its Auth0 env, so it always reaches the CP surface.
+      expect(hasConfluentCloud(OAUTH_CONN)).toBe(true);
     });
   });
 

@@ -26,18 +26,19 @@ export interface DirectConnectionConfig {
 }
 
 /**
- * Connection-shaped configuration for a Confluent Cloud OAuth (PKCE) connection.
- * Peer to {@link DirectConnectionConfig}. For now this is held as a private
- * optional field on {@link MCPServerConfiguration} (see `#ccloudOAuth`); the
- * connections-record migration moves it into `connections` as a second member
- * of the discriminated `ConnectionConfig` union.
+ * OAuth (PKCE) connection variant. Peer arm of {@link DirectConnectionConfig}
+ * inside the `ConnectionConfig` discriminated union. The CCloud REST URL is
+ * derived from `development_env` via `getCloudRestUrlForEnv` inside
+ * `OAuthClientManager`. No service blocks; OAuth-eligible tools auto-enable
+ * via the `isOAuth` predicate, and resource IDs that direct connections supply
+ * via blocks must be passed as tool arguments under OAuth.
  *
- * Endpoints derive from `env` via the Auth0 environment table — the only data
- * needed to drive the PKCE flow and resolve REST base URLs.
+ * `development_env` defaults to "prod" via the schema; only Confluent staff
+ * testing against devel/stag set it explicitly.
  */
-export interface CCloudOAuthConfig {
-  readonly type: "ccloud_oauth";
-  readonly env: "devel" | "stag" | "prod";
+export interface OAuthConnectionConfig {
+  readonly type: "oauth";
+  readonly development_env: "devel" | "stag" | "prod";
 }
 
 /**
@@ -118,7 +119,7 @@ export interface FlinkDirectConfig {
  * Union of all connection types (future-proof discriminated union).
  * Currently only supports "direct" type.
  */
-export type ConnectionConfig = DirectConnectionConfig;
+export type ConnectionConfig = DirectConnectionConfig | OAuthConnectionConfig;
 
 /**
  * MCP server operational settings — transport, auth, and logging.
@@ -165,34 +166,15 @@ export class MCPServerConfiguration {
   readonly connections: Readonly<Record<string, ConnectionConfig>>;
   /** MCP server operational settings. Corresponds to the `server` block at the root of the YAML configuration. */
   readonly server: ServerConfig;
-  /**
-   * CCloud OAuth connection config, when configured via `--oauth` /
-   * `--oauth-env` on the env-var pathway. Held outside the `connections`
-   * record because the single-connection guard prohibits a second entry;
-   * the connections-record migration will move it inside the record and
-   * remove both this private field and {@link MCPServerConfiguration.getCCloudOAuth}.
-   */
-  readonly #ccloudOAuth: CCloudOAuthConfig | undefined;
 
   constructor(data: {
     connections: Record<string, ConnectionConfig>;
     server?: ServerConfig;
-    ccloudOAuth?: CCloudOAuthConfig;
   }) {
     this.connections = data.connections;
     // DEFAULT_SERVER_CONFIG is declared after the schemas below; it is always
     // initialized before any MCPServerConfiguration instance is created at runtime.
     this.server = data.server ?? DEFAULT_SERVER_CONFIG;
-    this.#ccloudOAuth = data.ccloudOAuth;
-  }
-
-  /**
-   * Returns the CCloud OAuth connection config when one was supplied at
-   * construction time; `undefined` otherwise. {@link ServerRuntime.fromConfig}
-   * uses this to decide whether to bootstrap an `OAuthHolder`.
-   */
-  getCCloudOAuth(): CCloudOAuthConfig | undefined {
-    return this.#ccloudOAuth;
   }
 
   /**
@@ -214,6 +196,22 @@ export class MCPServerConfiguration {
 
     // must be exactly one connection at this point, so return it.
     return this.connections[connectionNames[0]!]!;
+  }
+
+  /**
+   * Returns the sole connection narrowed to {@link DirectConnectionConfig}, throwing
+   * if it is OAuth-typed. Use from callers that need to read service-block fields
+   * (e.g., `kafka.cluster_id`, `flink.environment_id`) — the throw replaces what
+   * would otherwise be a `conn.type === "direct"` guard at every read site.
+   */
+  getSoleDirectConnection(): DirectConnectionConfig {
+    const conn = this.getSoleConnection();
+    if (conn.type !== "direct") {
+      throw new Error(
+        `Expected sole connection to be a direct connection; got type "${conn.type}"`,
+      );
+    }
+    return conn;
   }
 
   getConnectionNames(): string[] {
@@ -407,11 +405,19 @@ const directConnectionSchema = z
 export const CONFLUENT_CLOUD_DEFAULT_ENDPOINT = "https://api.confluent.cloud";
 const TELEMETRY_DEFAULT_ENDPOINT = "https://api.telemetry.confluent.cloud";
 
+/** Zod schema for the OAuth (PKCE) connection arm. */
+const oauthConnectionSchema = z
+  .object({
+    type: z.literal("oauth"),
+    development_env: z.enum(["devel", "stag", "prod"]).default("prod"),
+  })
+  .strict();
+
 /**
- * Discriminated union of all connection types (currently just direct).
+ * Discriminated union of all connection types: direct (api-key) and oauth (PKCE).
  */
 const connectionConfigSchema = z
-  .discriminatedUnion("type", [directConnectionSchema])
+  .discriminatedUnion("type", [directConnectionSchema, oauthConnectionSchema])
   // superRefine calls are placed here (after the union) rather than on directConnectionSchema
   // because wrapping a ZodObject in ZodEffects breaks z.discriminatedUnion's discriminant lookup.
   .superRefine((data, ctx) => {
@@ -451,6 +457,9 @@ const connectionConfigSchema = z
     }
   })
   .transform((data): ConnectionConfig => {
+    // OAuth connections carry no service blocks — pass through untouched so the
+    // direct-arm telemetry/cc resolution below doesn't spread `undefined` onto them.
+    if (data.type !== "direct") return data;
     // Resolve the raw (optional-field) telemetry input into a fully-populated
     // TelemetryDirectConfig or undefined, applying two normalisation rules:
     //   1. If telemetry.auth is absent, fall back to confluent_cloud.auth.
@@ -570,14 +579,6 @@ serverConfigSchema satisfies z.ZodType<ServerConfig>;
  * Derived from serverConfigSchema defaults — single source of truth.
  */
 export const DEFAULT_SERVER_CONFIG = serverConfigSchema.parse({});
-
-/** Zod schema for {@link CCloudOAuthConfig}. */
-export const ccloudOAuthConfigSchema = z
-  .object({
-    type: z.literal("ccloud_oauth"),
-    env: z.enum(["devel", "stag", "prod"]),
-  })
-  .strict();
 
 /**
  * Root configuration schema. This is the single validation and normalisation

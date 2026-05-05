@@ -45,7 +45,7 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
     const clientManager = runtime.clientManager;
     const { clusterId, topicName, topicConfigs, validateOnly } =
       alterTopicConfigArguments.parse(toolArguments);
-    const conn = runtime.config.getSoleConnection();
+    const conn = runtime.config.getSoleDirectConnection();
     const kafka_cluster_id = this.resolveParam(
       clusterId,
       conn.kafka?.cluster_id,

@@ -12,7 +12,6 @@ import {
   hasSchemaRegistry,
   hasTableflow,
   hasTableflowWithKafka,
-  hasTableflowWithKafkaEnvAndCluster,
   hasTelemetry,
 } from "@src/confluent/tools/connection-predicates.js";
 import { describe, expect, it } from "vitest";
@@ -260,57 +259,6 @@ describe("connection-predicates.ts", () => {
 
     it("should return false for an OAuth connection", () => {
       expect(hasTableflowWithKafka(OAUTH_CONN)).toBe(false);
-    });
-  });
-
-  describe("hasTableflowWithKafkaEnvAndCluster()", () => {
-    const TABLEFLOW_WITH_KAFKA_IDS_CONN = conn({
-      tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-      kafka: {
-        env_id: "env-abc",
-        cluster_id: "lkc-xyz",
-        rest_endpoint: "https://pkc-example.confluent.cloud:443",
-      },
-    });
-
-    it("should return true when tableflow, kafka.env_id, and kafka.cluster_id are all present", () => {
-      expect(
-        hasTableflowWithKafkaEnvAndCluster(TABLEFLOW_WITH_KAFKA_IDS_CONN),
-      ).toBe(true);
-    });
-
-    it("should return false when kafka.env_id is absent", () => {
-      const noEnv = conn({
-        tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-        kafka: {
-          cluster_id: "lkc-xyz",
-          rest_endpoint: "https://pkc-example.confluent.cloud:443",
-        },
-      });
-      expect(hasTableflowWithKafkaEnvAndCluster(noEnv)).toBe(false);
-    });
-
-    it("should return false when kafka.cluster_id is absent", () => {
-      const noCluster = conn({
-        tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-        kafka: {
-          env_id: "env-abc",
-          rest_endpoint: "https://pkc-example.confluent.cloud:443",
-        },
-      });
-      expect(hasTableflowWithKafkaEnvAndCluster(noCluster)).toBe(false);
-    });
-
-    it("should return false when the kafka block is absent", () => {
-      expect(hasTableflowWithKafkaEnvAndCluster(TABLEFLOW_CONN)).toBe(false);
-    });
-
-    it("should return false when the tableflow block is absent", () => {
-      expect(hasTableflowWithKafkaEnvAndCluster(KAFKA_CONN)).toBe(false);
-    });
-
-    it("should return false for an OAuth connection", () => {
-      expect(hasTableflowWithKafkaEnvAndCluster(OAUTH_CONN)).toBe(false);
     });
   });
 

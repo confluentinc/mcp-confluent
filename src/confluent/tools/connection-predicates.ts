@@ -75,25 +75,6 @@ export function hasTableflowWithKafka(conn: ConnectionConfig): boolean {
 }
 
 /**
- * True when a tableflow block is present and the kafka block carries both `env_id` and
- * `cluster_id`. This is a diagnostic predicate — it answers whether the zero-argument
- * config-fallback path through `resolveTableflowEnvAndClusterId()` is fully provisioned.
- * It is NOT used to gate tool enablement: the Tableflow handlers are enabled whenever
- * `hasTableflowWithKafka` is satisfied, because callers can supply `environmentId` and
- * `clusterId` as explicit tool arguments even when those fields are absent from config.
- */
-export function hasTableflowWithKafkaEnvAndCluster(
-  conn: ConnectionConfig,
-): boolean {
-  return (
-    conn.type === "direct" &&
-    conn.tableflow !== undefined &&
-    conn.kafka?.env_id !== undefined &&
-    conn.kafka?.cluster_id !== undefined
-  );
-}
-
-/**
  * True when the schema_registry block is present and carries api_key auth.
  * That combination is the reliable signal that the SR is CCloud-hosted and therefore
  * exposes the /catalog/v1/ endpoints. A vanilla CP SR has no auth block, so it returns

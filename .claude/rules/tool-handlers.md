@@ -43,7 +43,7 @@ When adding a new tool, touch exactly three files (plus optionally a fourth):
 
 Tool enablement is decided by inspecting which **service blocks** are present in each `ConnectionConfig` (Kafka, Flink, Schema Registry, Confluent Cloud, Tableflow, Telemetry). Predicates in `connection-predicates.ts` express those checks as pure functions; `connectionIdsWhere(connections, predicate)` walks `runtime.config.connections` and returns the matching ids.
 
-**Invariant: a predicate must guarantee that every config field `handle()` reads unconditionally is present.** If the handler calls `conn.kafka?.env_id` and throws when it is absent, the predicate must require `conn.kafka !== undefined`. The goal is that a tool advertised as enabled never throws due to missing configuration — the predicate is a pre-flight check, not just a feature flag.
+**Invariant: a predicate must guarantee the tool has at least one valid invocation path.** A tool should be advertised as enabled if callers can succeed — either because the required values are present in config, or because the handler accepts them as explicit tool arguments. A predicate that requires only a service block (e.g. `conn.kafka !== undefined`) is correct even if some fields within that block are optional, as long as callers can supply those fields as arguments. The goal is that no enabled tool _always_ throws regardless of how it is called — the predicate is a pre-flight check, not a guarantee of zero-argument success.
 
 - A tool whose predicate matches zero connections is automatically disabled.
 - A tool with no service-specific requirement (a rare case) returns `Object.keys(runtime.config.connections)` directly.

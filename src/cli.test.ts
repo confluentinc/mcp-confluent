@@ -420,67 +420,67 @@ describe("cli.ts", () => {
     );
 
     describe("--oauth flags", () => {
-      it("should parse --oauth alone with developmentEnv undefined", () => {
+      it("should parse --oauth alone with ccloudEnv undefined", () => {
         const result = parseCliArgs(["node", "mcp-confluent", "--oauth"]);
         expect(result.oauth).toBe(true);
-        expect(result.developmentEnv).toBeUndefined();
+        expect(result.ccloudEnv).toBeUndefined();
       });
 
-      it("should parse --oauth with --development-env=devel", () => {
+      it("should parse --oauth with --ccloud-env=devel", () => {
         const result = parseCliArgs([
           "node",
           "mcp-confluent",
           "--oauth",
-          "--development-env",
+          "--ccloud-env",
           "devel",
         ]);
         expect(result.oauth).toBe(true);
-        expect(result.developmentEnv).toBe("devel");
+        expect(result.ccloudEnv).toBe("devel");
       });
 
-      it("should accept stag and prod for --development-env", () => {
+      it("should accept stag and prod for --ccloud-env", () => {
         expect(
           parseCliArgs([
             "node",
             "mcp-confluent",
             "--oauth",
-            "--development-env",
+            "--ccloud-env",
             "stag",
-          ]).developmentEnv,
+          ]).ccloudEnv,
         ).toBe("stag");
         expect(
           parseCliArgs([
             "node",
             "mcp-confluent",
             "--oauth",
-            "--development-env",
+            "--ccloud-env",
             "prod",
-          ]).developmentEnv,
+          ]).ccloudEnv,
         ).toBe("prod");
       });
 
-      it("should reject --development-env without --oauth", () => {
+      it("should reject --ccloud-env without --oauth", () => {
         expect(() =>
-          parseCliArgs(["node", "mcp-confluent", "--development-env", "devel"]),
-        ).toThrow(/--development-env requires --oauth/);
+          parseCliArgs(["node", "mcp-confluent", "--ccloud-env", "devel"]),
+        ).toThrow(/--ccloud-env requires --oauth/);
       });
 
-      it("should reject --development-env with an unknown value", () => {
+      it("should reject --ccloud-env with an unknown value", () => {
         expect(() =>
           parseCliArgs([
             "node",
             "mcp-confluent",
             "--oauth",
-            "--development-env",
+            "--ccloud-env",
             "bogus",
           ]),
         ).toThrow();
       });
 
-      it("should accept --oauth combined with --config at parse time", () => {
-        // parseCliArgs no longer rejects the combination — the actual rejection
-        // (in either the YAML-has-OAuth or YAML-is-direct-only shape) is
-        // detected post-load in main(), where the parsed YAML is available.
+      it("should reject --oauth combined with --config at parse time", () => {
+        // The check fires at parse time so a malformed YAML can't mask the
+        // friendlier "--oauth and --config cannot be combined" message
+        // behind a generic YAML parse error.
         expect(() =>
           parseCliArgs([
             "node",
@@ -489,13 +489,13 @@ describe("cli.ts", () => {
             "--config",
             "/tmp/foo.yaml",
           ]),
-        ).not.toThrow();
+        ).toThrow(/--oauth and --config cannot be combined/);
       });
 
-      it("should leave oauth and developmentEnv undefined when neither flag is set", () => {
+      it("should leave oauth and ccloudEnv undefined when neither flag is set", () => {
         const result = parseCliArgs(["node", "mcp-confluent"]);
         expect(result.oauth).toBeUndefined();
-        expect(result.developmentEnv).toBeUndefined();
+        expect(result.ccloudEnv).toBeUndefined();
       });
     });
   });

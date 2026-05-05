@@ -28,18 +28,18 @@ export interface DirectConnectionConfig {
 /**
  * OAuth (PKCE) connection variant. Peer arm of {@link DirectConnectionConfig}
  * inside the `ConnectionConfig` discriminated union. The CCloud REST URL is
- * derived from `development_env` via `getCloudRestUrlForEnv` inside
+ * derived from `ccloud_env` via `getCloudRestUrlForEnv` inside
  * `OAuthClientManager`. No service blocks; OAuth-eligible tools auto-enable
  * because `hasConfluentCloud` widens to return `true` for OAuth connections
  * (see `connection-predicates.ts`). Resource IDs that direct connections
  * supply via blocks must be passed as tool arguments under OAuth.
  *
- * `development_env` defaults to "prod" via the schema; only Confluent staff
+ * `ccloud_env` defaults to "prod" via the schema; only Confluent staff
  * testing against devel/stag set it explicitly.
  */
 export interface OAuthConnectionConfig {
   readonly type: "oauth";
-  readonly development_env: "devel" | "stag" | "prod";
+  readonly ccloud_env: "devel" | "stag" | "prod";
 }
 
 /**
@@ -409,7 +409,7 @@ const TELEMETRY_DEFAULT_ENDPOINT = "https://api.telemetry.confluent.cloud";
 const oauthConnectionSchema = z
   .object({
     type: z.literal("oauth"),
-    development_env: z.enum(["devel", "stag", "prod"]).default("prod"),
+    ccloud_env: z.enum(["devel", "stag", "prod"]).default("prod"),
   })
   .strict();
 

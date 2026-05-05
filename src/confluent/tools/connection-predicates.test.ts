@@ -69,7 +69,7 @@ const CCLOUD_SR_CONN = conn({
 
 const OAUTH_CONN: ConnectionConfig = {
   type: "oauth",
-  development_env: "devel",
+  ccloud_env: "devel",
 };
 
 describe("connection-predicates.ts", () => {

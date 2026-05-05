@@ -132,7 +132,7 @@ export function ccloudOAuthRuntime(): ServerRuntime {
   return new ServerRuntime(
     new MCPServerConfiguration({
       connections: {
-        [DEFAULT_CONNECTION_ID]: { type: "oauth", development_env: "devel" },
+        [DEFAULT_CONNECTION_ID]: { type: "oauth", ccloud_env: "devel" },
       },
     }),
     { [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager) },

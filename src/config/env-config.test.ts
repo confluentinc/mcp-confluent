@@ -1044,19 +1044,19 @@ describe("config/env-config.ts", () => {
         expect(conn.type).toBe("direct");
       });
 
-      it("should produce an OAuth connection with development_env=prod when --oauth is alone", () => {
+      it("should produce an OAuth connection with ccloud_env=prod when --oauth is alone", () => {
         const config = buildConfigFromEnvAndCli(envWith({}), { oauth: true });
         const conn = config.getSoleConnection();
-        expect(conn).toEqual({ type: "oauth", development_env: "prod" });
+        expect(conn).toEqual({ type: "oauth", ccloud_env: "prod" });
       });
 
-      it("should propagate developmentEnv into the OAuth connection", () => {
+      it("should propagate ccloudEnv into the OAuth connection", () => {
         const config = buildConfigFromEnvAndCli(envWith({}), {
           oauth: true,
-          developmentEnv: "stag",
+          ccloudEnv: "stag",
         });
         const conn = config.getSoleConnection();
-        expect(conn).toEqual({ type: "oauth", development_env: "stag" });
+        expect(conn).toEqual({ type: "oauth", ccloud_env: "stag" });
       });
 
       it("should ignore api-key env vars when --oauth is set", () => {
@@ -1068,10 +1068,10 @@ describe("config/env-config.ts", () => {
             CONFLUENT_CLOUD_API_KEY: "k",
             CONFLUENT_CLOUD_API_SECRET: "s",
           }),
-          { oauth: true, developmentEnv: "devel" },
+          { oauth: true, ccloudEnv: "devel" },
         );
         const conn = config.getSoleConnection();
-        expect(conn).toEqual({ type: "oauth", development_env: "devel" });
+        expect(conn).toEqual({ type: "oauth", ccloud_env: "devel" });
       });
     });
   });

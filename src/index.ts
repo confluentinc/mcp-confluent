@@ -131,7 +131,7 @@ async function main() {
         allowedHosts: cliOptions.allowedHosts,
         kafkaConfig: cliOptions.kafkaConfig,
         oauth: cliOptions.oauth,
-        oauthEnv: cliOptions.oauthEnv,
+        developmentEnv: cliOptions.developmentEnv,
       });
     }
 

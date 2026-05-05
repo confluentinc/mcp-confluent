@@ -132,13 +132,13 @@ function buildConfigFromEnv(
   return new MCPServerConfiguration({ ...result.data, ccloudOAuth });
 }
 
-/** CLI flags that may override values in the env-var config path. Mutually exclusive with --config (YAML path). */
+/** CLI flags that may override values in the env-var config path. */
 export interface EnvPathCliOverrides {
   disableAuth?: boolean;
   allowedHosts?: string[];
   kafkaConfig?: KeyValuePairObject;
   oauth?: boolean;
-  oauthEnv?: "devel" | "stag" | "prod";
+  developmentEnv?: "devel" | "stag" | "prod";
 }
 
 /**
@@ -154,10 +154,14 @@ export function buildConfigFromEnvAndCli(
   env: Environment,
   overrides: EnvPathCliOverrides = {},
 ): MCPServerConfiguration {
-  const ccloudOAuth: CCloudOAuthConfig | undefined =
-    overrides.oauth && overrides.oauthEnv
-      ? { type: "ccloud_oauth" as const, env: overrides.oauthEnv }
-      : undefined;
+  // --oauth alone → defaults to prod. --development-env only takes effect when --oauth is set
+  // (parseCliArgs enforces this); defensively default the env here too.
+  const ccloudOAuth: CCloudOAuthConfig | undefined = overrides.oauth
+    ? {
+        type: "ccloud_oauth" as const,
+        env: overrides.developmentEnv ?? "prod",
+      }
+    : undefined;
   return buildConfigFromEnv(
     env,
     {

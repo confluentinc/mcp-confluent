@@ -17,7 +17,7 @@ export abstract class FlinkCatalogToolHandler extends FlinkToolHandler {
       return {
         ok: false,
         error: this.createResponse(
-          "Catalog name could not be resolved. Pass catalogName (env-xxxxx) explicitly, or set flink.environment_id in config.",
+          "Catalog name could not be resolved. Pass catalogName or environmentId as env-xxxxx, or set flink.environment_id in config.",
           true,
         ),
       };

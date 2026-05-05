@@ -184,9 +184,11 @@ export class QueryMetricsHandler extends BaseToolHandler {
   }
 }
 
-/** Normalises the caller-supplied interval to a "start/end" pair.
- *  Accepts an already-resolved range ("2024-01-01T00:00:00Z/...") unchanged,
- *  an ISO 8601 duration ("PT30M", "P1D"), or undefined (defaults to 1 hour). */
+/**
+ * Normalises the caller-supplied interval to a "start/end" pair.
+ * Accepts an already-resolved range ("2024-01-01T00:00:00Z/...") unchanged,
+ * an ISO 8601 duration ("PT30M", "P1D"), or undefined (defaults to 1 hour).
+ */
 export function resolveInterval(interval: string | undefined): string {
   if (interval?.includes("/")) return interval;
   const now = new Date();
@@ -195,9 +197,11 @@ export function resolveInterval(interval: string | undefined): string {
   return `${start.toISOString()}/${now.toISOString()}`;
 }
 
-/** Returns a copy of `filter` with `resource.kafka.id` trimmed (removing
- *  space-padded values) and, for `io.confluent.kafka.server/*` metrics,
- *  auto-injected from `connKafkaClusterId` when absent. */
+/**
+ * Returns a copy of `filter` with `resource.kafka.id` trimmed (removing
+ * space-padded values) and, for `io.confluent.kafka.server/*` metrics,
+ * auto-injected from `connKafkaClusterId` when absent.
+ */
 export function buildEffectiveFilter(
   filter: Record<string, string> | undefined,
   metric: string,
@@ -223,9 +227,11 @@ export function buildEffectiveFilter(
   return effectiveFilter;
 }
 
-/** Builds the Telemetry API request body.  A single filter entry is sent as a
- *  flat EQ object; multiple entries are wrapped in an AND.  Adds group_by and
- *  GROUPED format when group_by is non-empty. */
+/**
+ * Builds the Telemetry API request body. A single filter entry is sent as a
+ * flat EQ object; multiple entries are wrapped in an AND. Adds group_by and
+ * GROUPED format when group_by is non-empty.
+ */
 export function buildRequestBody(
   metric: string,
   aggregation: string,
@@ -270,6 +276,11 @@ export function buildRequestBody(
   return body;
 }
 
+/**
+ * Renders the Telemetry API response as a human-readable string. Detects flat
+ * vs. grouped format by inspecting whether the first element has a top-level
+ * `timestamp` field (flat) or a nested `points` array (grouped).
+ */
 function formatMetricsResponse(
   data: Array<Record<string, unknown>>,
   metric: string,
@@ -350,6 +361,9 @@ function formatMetricsResponse(
   return lines.join("\n").trimEnd();
 }
 
+/**
+ * Formats integers with locale separators; floats to 4 decimal places.
+ */
 function formatValue(value: number): string {
   if (Number.isInteger(value)) {
     return value.toLocaleString();
@@ -358,8 +372,8 @@ function formatValue(value: number): string {
 }
 
 /**
- * Parse an ISO 8601 duration string (e.g. "PT1H", "PT30M", "P1D") to milliseconds.
- * Returns undefined if the string is not a recognized duration.
+ * Parses an ISO 8601 duration string ("PT1H", "PT30M", "P1D") to milliseconds.
+ * Returns `undefined` for unrecognised strings so callers can apply a default.
  */
 function parseDuration(duration: string | undefined): number | undefined {
   if (!duration) return undefined;

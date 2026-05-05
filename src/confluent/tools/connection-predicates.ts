@@ -2,40 +2,50 @@ import type { ConnectionConfig } from "@src/config/models.js";
 
 export type ConnectionPredicate = (conn: ConnectionConfig) => boolean;
 
+// All block-presence predicates below check `conn.type === "direct"` first.
+// They answer "is this a direct connection with that block?" — OAuth connections
+// carry no service blocks, so every block-presence predicate is false for them.
+// Handler enablement under OAuth happens at the call site by composing with
+// `isOAuth` (e.g. `c => hasConfluentCloud(c) || isOAuth(c)`).
+
 export function hasKafka(conn: ConnectionConfig): boolean {
-  return conn.kafka !== undefined;
+  return conn.type === "direct" && conn.kafka !== undefined;
 }
 
 export function hasKafkaBootstrap(conn: ConnectionConfig): boolean {
-  return conn.kafka?.bootstrap_servers !== undefined;
+  return conn.type === "direct" && conn.kafka?.bootstrap_servers !== undefined;
 }
 
 export function hasKafkaAuth(conn: ConnectionConfig): boolean {
-  return conn.kafka?.auth !== undefined;
+  return conn.type === "direct" && conn.kafka?.auth !== undefined;
 }
 
 export function hasKafkaRestWithAuth(conn: ConnectionConfig): boolean {
-  return conn.kafka?.rest_endpoint !== undefined && hasKafkaAuth(conn);
+  return (
+    conn.type === "direct" &&
+    conn.kafka?.rest_endpoint !== undefined &&
+    hasKafkaAuth(conn)
+  );
 }
 
 export function hasSchemaRegistry(conn: ConnectionConfig): boolean {
-  return conn.schema_registry !== undefined;
+  return conn.type === "direct" && conn.schema_registry !== undefined;
 }
 
 export function hasConfluentCloud(conn: ConnectionConfig): boolean {
-  return conn.confluent_cloud !== undefined;
+  return conn.type === "direct" && conn.confluent_cloud !== undefined;
 }
 
 export function hasFlink(conn: ConnectionConfig): boolean {
-  return conn.flink !== undefined;
+  return conn.type === "direct" && conn.flink !== undefined;
 }
 
 export function hasTelemetry(conn: ConnectionConfig): boolean {
-  return conn.telemetry !== undefined;
+  return conn.type === "direct" && conn.telemetry !== undefined;
 }
 
 export function hasTableflow(conn: ConnectionConfig): boolean {
-  return conn.tableflow !== undefined;
+  return conn.type === "direct" && conn.tableflow !== undefined;
 }
 
 /**
@@ -45,7 +55,9 @@ export function hasTableflow(conn: ConnectionConfig): boolean {
  * false even when a schema_registry block is present.
  */
 export function hasCCloudCatalogSupport(conn: ConnectionConfig): boolean {
-  return conn.schema_registry?.auth?.type === "api_key";
+  return (
+    conn.type === "direct" && conn.schema_registry?.auth?.type === "api_key"
+  );
 }
 
 export function connectionIdsWhere(

@@ -12,7 +12,6 @@ import {
   hasSchemaRegistry,
   hasTableflow,
   hasTelemetry,
-  isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { describe, expect, it } from "vitest";
 
@@ -145,8 +144,13 @@ describe("connection-predicates.ts", () => {
       expect(hasConfluentCloud(CONFLUENT_CLOUD_CONN)).toBe(true);
     });
 
-    it("should return false when the confluent_cloud block is absent", () => {
+    it("should return false when the confluent_cloud block is absent on a direct connection", () => {
       expect(hasConfluentCloud(KAFKA_CONN)).toBe(false);
+    });
+
+    it("should return true unconditionally for an OAuth connection", () => {
+      // OAuth gets the CCloud REST URL from its Auth0 env, so it always reaches the CP surface.
+      expect(hasConfluentCloud(OAUTH_CONN)).toBe(true);
     });
   });
 
@@ -195,33 +199,6 @@ describe("connection-predicates.ts", () => {
 
     it("should return false when the tableflow block is absent", () => {
       expect(hasTableflow(KAFKA_CONN)).toBe(false);
-    });
-  });
-
-  describe("isOAuth()", () => {
-    it("should return true when the connection has type 'oauth'", () => {
-      expect(isOAuth(OAUTH_CONN)).toBe(true);
-    });
-
-    it("should return false for a direct connection", () => {
-      expect(isOAuth(KAFKA_CONN)).toBe(false);
-      expect(isOAuth(CONFLUENT_CLOUD_CONN)).toBe(false);
-    });
-
-    it("should leave block-presence predicates returning false on an oauth connection", () => {
-      // Block-presence predicates do NOT widen for OAuth — handler call sites
-      // compose `hasX || isOAuth` to opt in to OAuth, leaving the block-presence
-      // predicates focused on the direct-arm question they were designed for.
-      expect(hasConfluentCloud(OAUTH_CONN)).toBe(false);
-      expect(hasKafka(OAUTH_CONN)).toBe(false);
-      expect(hasKafkaBootstrap(OAUTH_CONN)).toBe(false);
-      expect(hasKafkaAuth(OAUTH_CONN)).toBe(false);
-      expect(hasKafkaRestWithAuth(OAUTH_CONN)).toBe(false);
-      expect(hasFlink(OAUTH_CONN)).toBe(false);
-      expect(hasSchemaRegistry(OAUTH_CONN)).toBe(false);
-      expect(hasTableflow(OAUTH_CONN)).toBe(false);
-      expect(hasTelemetry(OAUTH_CONN)).toBe(false);
-      expect(hasCCloudCatalogSupport(OAUTH_CONN)).toBe(false);
     });
   });
 

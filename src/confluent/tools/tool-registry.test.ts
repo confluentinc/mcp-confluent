@@ -190,7 +190,7 @@ describe("tool-registry.ts", () => {
     const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, HandleOutcome>> = {
       // Kafka
       [ToolName.LIST_TOPICS]: { resolves: "Kafka topics:" },
-      [ToolName.CREATE_TOPICS]: { resolves: "topics" },
+      [ToolName.CREATE_TOPICS]: { throws: "ZodError" },
       [ToolName.DELETE_TOPICS]: { throws: "ZodError" },
       [ToolName.PRODUCE_MESSAGE]: { throws: "ZodError" },
       [ToolName.CONSUME_MESSAGES]: { throws: "ZodError" },
@@ -307,9 +307,10 @@ describe("tool-registry.ts", () => {
     it.each(Object.entries(ZERO_ARG_OUTCOMES) as [ToolName, HandleOutcome][])(
       "%s: handle() should not crash before reaching the ClientManager",
       async (name, outcome) => {
-        const hasResponseData =
-          typeof outcome === "object" && "responseData" in outcome;
-        const responseData = hasResponseData ? outcome.responseData : undefined;
+        const responseData =
+          typeof outcome === "object" && "responseData" in outcome
+            ? outcome.responseData
+            : undefined;
         const { clientManager, clientGetters } =
           stubClientGetters(responseData);
         await assertHandleCase({
@@ -317,11 +318,7 @@ describe("tool-registry.ts", () => {
           runtime: allServicesRuntime(clientManager),
           args: {},
           outcome,
-          // Only assert that a client getter was called when `responseData` is
-          // explicitly set in the outcome — those entries exercise the happy
-          // path that reaches the client layer. Outcomes without `responseData`
-          // (e.g. validation-error short-circuits) resolve before any getter.
-          clientGetters: hasResponseData ? clientGetters : undefined,
+          clientGetters,
           name,
         });
       },

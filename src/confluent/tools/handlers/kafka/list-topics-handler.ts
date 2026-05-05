@@ -6,7 +6,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasKafka,
+  hasKafkaBootstrap,
   isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { resolveKafkaClusterArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
@@ -37,35 +37,9 @@ export class ListTopicsHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    let parsed: z.infer<typeof listTopicArgs>;
-    try {
-      parsed = listTopicArgs.parse(toolArguments);
-    } catch (err) {
-      return this.createResponse(
-        err instanceof Error ? err.message : String(err),
-        true,
-      );
-    }
-
-    const enabledIds = this.enabledConnectionIds(runtime);
-    const connId = enabledIds[0];
-    if (connId === undefined) {
-      return this.createResponse(
-        "list-topics is not enabled for any connection.",
-        true,
-      );
-    }
-
-    let resolved: { clusterId: string | undefined; envId: string | undefined };
-    try {
-      resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
-    } catch (err) {
-      return this.createResponse(
-        err instanceof Error ? err.message : String(err),
-        true,
-      );
-    }
-
+    const parsed = listTopicArgs.parse(toolArguments);
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
     const clientManager = runtime.clientManagers[connId]!;
     const admin = await clientManager.getKafkaAdminClient(
       resolved.clusterId,
@@ -87,7 +61,7 @@ export class ListTopicsHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(
       runtime.config.connections,
-      (c) => hasKafka(c) || isOAuth(c),
+      (c) => hasKafkaBootstrap(c) || isOAuth(c),
     );
   }
 }

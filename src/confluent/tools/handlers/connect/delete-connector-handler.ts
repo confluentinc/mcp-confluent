@@ -1,6 +1,14 @@
+import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import { DESTRUCTIVE, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
+import {
+  BaseToolHandler,
+  DESTRUCTIVE,
+  ToolConfig,
+} from "@src/confluent/tools/base-tools.js";
+import {
+  connectionIdsWhere,
+  hasConfluentCloud,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -23,8 +31,7 @@ const deleteConnectorArguments = z.object({
     .describe("The name of the connector to delete."),
 });
 
-/** Deletes a named connector from the given environment and cluster. */
-export class DeleteConnectorHandler extends ConnectToolHandler {
+export class DeleteConnectorHandler extends BaseToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -32,10 +39,16 @@ export class DeleteConnectorHandler extends ConnectToolHandler {
     const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName } =
       deleteConnectorArguments.parse(toolArguments);
-
-    const conn = runtime.config.getSoleDirectConnection();
-    const { environment_id, kafka_cluster_id } =
-      this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
+    const environment_id = getEnsuredParam(
+      "KAFKA_ENV_ID",
+      "Environment ID is required",
+      environmentId,
+    );
+    const kafka_cluster_id = getEnsuredParam(
+      "KAFKA_CLUSTER_ID",
+      "Kafka Cluster ID is required",
+      clusterId,
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudRestClient(),
@@ -45,8 +58,8 @@ export class DeleteConnectorHandler extends ConnectToolHandler {
     ].DELETE({
       params: {
         path: {
-          environment_id,
-          kafka_cluster_id,
+          environment_id: environment_id,
+          kafka_cluster_id: kafka_cluster_id,
           connector_name: connectorName,
         },
       },
@@ -71,5 +84,9 @@ export class DeleteConnectorHandler extends ConnectToolHandler {
       inputSchema: deleteConnectorArguments.shape,
       annotations: DESTRUCTIVE,
     };
+  }
+
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 }

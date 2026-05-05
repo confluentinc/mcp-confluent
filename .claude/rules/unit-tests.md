@@ -175,18 +175,6 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   see the `stubClientGetters` JSDoc for the full element-shape contract (`data`,
   `response`, `error` keys).
 
-  **When the endpoint returns a bare array** (e.g. list-connectors returns `string[]`),
-  the stub's single-vs-sequence detection fires on the outer array and each element would
-  be treated as a separate response. Wrap the array in a one-element outer array so the
-  inner array is delivered as `data` for the single call:
-
-  ```typescript
-  // handler does: const { data: response } = await client.GET(...); response.join(",")
-  stubClientGetters([["connector-a", "connector-b"]]);
-  //                 ↑ outer = "sequence of calls"
-  //                  ↑↑ inner = the array that becomes `data`
-  ```
-
   Basic usage:
 
   ```typescript

@@ -674,7 +674,7 @@ describe("config/models.ts", () => {
     });
   });
 
-  describe("oauth connection arm of mcpConfigSchema", () => {
+  describe("oauth connection arm", () => {
     it("should default development_env to 'prod' when omitted", () => {
       const result = mcpConfigSchema.safeParse({
         connections: { foo: { type: "oauth" } },

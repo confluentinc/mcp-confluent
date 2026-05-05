@@ -1034,7 +1034,7 @@ describe("config/env-config.ts", () => {
       ).toThrow(/MCP_AUTH_DISABLED.*MCP_API_KEY/);
     });
 
-    describe("oauth connection synthesis", () => {
+    describe("--oauth flag", () => {
       it("should produce a single direct connection when --oauth is not set", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),

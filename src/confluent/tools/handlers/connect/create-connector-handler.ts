@@ -84,6 +84,7 @@ export class CreateConnectorHandler extends ConnectToolHandler {
     const conn = runtime.config.getSoleDirectConnection();
     const { environment_id, kafka_cluster_id } =
       this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
+    // hasKafkaAuth in enabledConnectionIds() guarantees auth is present here.
     const kafkaApiKey = this.resolveParam(
       undefined,
       conn.kafka?.auth?.key,

@@ -243,10 +243,12 @@ export abstract class BaseClientManager
    * in the SDK's axios headers at construction time. Endpoint resolution is
    * cached in `OAuthClientManager`.
    */
-  abstract getSchemaRegistrySdkClient(
-    clusterId?: string,
-    envId?: string,
-  ): Promise<SchemaRegistryClient>;
+  async getSchemaRegistrySdkClient(
+    _clusterId?: string,
+    _envId?: string,
+  ): Promise<SchemaRegistryClient> {
+    return this.getSchemaRegistryClient();
+  }
 
   abstract disconnect(): Promise<void>;
 }

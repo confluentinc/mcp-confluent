@@ -4,7 +4,6 @@
  */
 
 import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
-import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
   type DirectConnectionConfig,
@@ -100,14 +99,6 @@ export class DirectClientManager
   /** @inheritdoc */
   async getProducer(): Promise<KafkaJS.Producer> {
     return this.producer.get();
-  }
-
-  /** @inheritdoc */
-  async getSchemaRegistrySdkClient(
-    _clusterId?: string,
-    _envId?: string,
-  ): Promise<SchemaRegistryClient> {
-    return this.getSchemaRegistryClient();
   }
 
   /** @inheritdoc */

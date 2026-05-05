@@ -1,4 +1,4 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import {
   CREATE_UPDATE,
   DESTRUCTIVE,
@@ -140,7 +140,7 @@ describe("tool-registry.ts", () => {
      * Builds a `ServerRuntime` with every service block populated, injecting
      * `clientManager` so callers can verify which client getters were invoked.
      */
-    function allServicesRuntime(clientManager: Mocked<DefaultClientManager>) {
+    function allServicesRuntime(clientManager: Mocked<DirectClientManager>) {
       return runtimeWith(
         {
           kafka: {
@@ -184,7 +184,7 @@ describe("tool-registry.ts", () => {
      * What each handler produces when called with no arguments against a
      * fully-wired universal client. Use `{ resolves }` when the handler
      * completes and `{ throws }` when it raises before returning.
-     * Use `"TODO"` as a placeholder — the smoke test will run the handler
+     * Use `"DISCOVER"` as a placeholder — the smoke test will run the handler
      * and report the correct entry to paste in.
      */
     const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, HandleOutcome>> = {
@@ -200,9 +200,7 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_SCHEMAS]: { resolves: "{}" },
       [ToolName.DELETE_SCHEMA]: { throws: "ZodError" },
       // Flink
-      [ToolName.LIST_FLINK_STATEMENTS]: {
-        throws: "Organization ID is required",
-      },
+      [ToolName.LIST_FLINK_STATEMENTS]: { resolves: "{}" },
       [ToolName.CREATE_FLINK_STATEMENT]: { throws: "ZodError" },
       [ToolName.READ_FLINK_STATEMENT]: { throws: "ZodError" },
       [ToolName.DELETE_FLINK_STATEMENTS]: { throws: "ZodError" },
@@ -210,11 +208,18 @@ describe("tool-registry.ts", () => {
       [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: { throws: "ZodError" },
       [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: { throws: "ZodError" },
       [ToolName.GET_FLINK_STATEMENT_PROFILE]: { throws: "ZodError" },
-      [ToolName.LIST_FLINK_CATALOGS]: { throws: "Organization ID is required" },
-      [ToolName.LIST_FLINK_DATABASES]: {
-        throws: "Organization ID is required",
+      [ToolName.LIST_FLINK_CATALOGS]: {
+        responseData: { status: { phase: "COMPLETED" }, results: { data: [] } },
+        resolves: "No catalogs found.",
       },
-      [ToolName.LIST_FLINK_TABLES]: { throws: "Organization ID is required" },
+      [ToolName.LIST_FLINK_DATABASES]: {
+        responseData: { status: { phase: "COMPLETED" }, results: { data: [] } },
+        resolves: "No databases found.",
+      },
+      [ToolName.LIST_FLINK_TABLES]: {
+        responseData: { status: { phase: "COMPLETED" }, results: { data: [] } },
+        resolves: "No tables found in catalog",
+      },
       [ToolName.DESCRIBE_FLINK_TABLE]: { throws: "ZodError" },
       [ToolName.GET_FLINK_TABLE_INFO]: { throws: "ZodError" },
       // Connect
@@ -273,6 +278,15 @@ describe("tool-registry.ts", () => {
       // Documentation
       [ToolName.SEARCH_PRODUCT_DOCS]: { throws: "ZodError" },
       [ToolName.GET_PRODUCT_DOC_PAGES]: { throws: "ZodError" },
+      // Organizations
+      [ToolName.LIST_ORGANIZATIONS]: {
+        responseData: {
+          api_version: "org/v2",
+          kind: "OrganizationList",
+          data: [],
+        },
+        resolves: "Retrieved 0 organizations",
+      },
     };
 
     beforeAll(() => {
@@ -285,7 +299,7 @@ describe("tool-registry.ts", () => {
       (name) => {
         expect(
           name in ZERO_ARG_OUTCOMES,
-          `Add [ToolName.${TOOL_NAME_TO_KEY[name]}]: "TODO" to ZERO_ARG_OUTCOMES, ` +
+          `Add [ToolName.${TOOL_NAME_TO_KEY[name]}]: "DISCOVER" to ZERO_ARG_OUTCOMES, ` +
             `then run: npm test -- src/confluent/tools/tool-registry.test.ts`,
         ).toBe(true);
       },

@@ -115,7 +115,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
+    const clientManager = runtime.requireDirectClientManager();
     const { topicName, value, key }: ProduceKafkaMessageArguments =
       produceKafkaMessageArguments.parse(toolArguments);
 

@@ -1,4 +1,14 @@
 {
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(.env.integration)",
+      "Read(config.yaml)",
+      "Write(.env)",
+      "Write(.env.integration)",
+      "Write(config.yaml)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {

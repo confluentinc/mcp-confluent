@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logger } from "@src/logger.js";
+import { createMcpServer, CreateMcpServerOptions } from "@src/mcp/server.js";
 import { AuthConfig } from "@src/mcp/transports/auth.js";
 import { HttpTransport } from "@src/mcp/transports/http.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
@@ -19,23 +20,51 @@ export interface TransportManagerConfig {
   readonly apiKey?: string;
 }
 
+/** HTTP/SSE bind config; ignored for stdio-only setups. */
+export interface HttpStartOptions {
+  readonly port: number;
+  readonly host: string;
+  readonly mcpEndpointPath?: string;
+  readonly sseEndpointPath?: string;
+  readonly sseMessageEndpointPath?: string;
+}
+
+export interface TransportStartOptions {
+  readonly serverOptions: CreateMcpServerOptions;
+  readonly types: readonly TransportType[];
+  /** Required when {@linkcode types} includes HTTP or SSE. */
+  readonly http?: HttpStartOptions;
+}
+
 export class TransportManager {
   private readonly transports: Map<TransportType, Transport> = new Map();
   private httpServer: HttpServer | null = null;
+  private stdioServer: McpServer | null = null;
+  private sseServer: McpServer | null = null;
 
-  constructor(
-    private readonly server: McpServer,
-    private readonly config?: TransportManagerConfig,
-  ) {}
+  constructor(private readonly config?: TransportManagerConfig) {}
 
-  async start(
-    types: readonly TransportType[],
-    port?: number,
-    host?: string,
-    httpMcpEndpointPath?: string,
-    sseMcpEndpointPath?: string,
-    sseMcpMessageEndpointPath?: string,
-  ): Promise<void> {
+  /**
+   * Returns the cached {@link McpServer} for {@linkcode transport}, creating it lazily on first
+   * call. Only stdio/SSE are cached; HTTP creates a fresh server per session inside the transport.
+   *
+   * @internal Production callers go through {@linkcode TransportManager.start}; exposed so unit
+   *   tests can assert the per-transport invariant directly.
+   */
+  getServer(
+    transport: TransportType.STDIO | TransportType.SSE,
+    serverOptions: CreateMcpServerOptions,
+  ): McpServer {
+    switch (transport) {
+      case TransportType.STDIO:
+        return (this.stdioServer ??= createMcpServer(serverOptions));
+      case TransportType.SSE:
+        return (this.sseServer ??= createMcpServer(serverOptions));
+    }
+  }
+
+  async start(options: TransportStartOptions): Promise<void> {
+    const { serverOptions, types, http } = options;
     try {
       const needsHttpServer = types.some(
         (type) => type === TransportType.HTTP || type === TransportType.SSE,
@@ -43,6 +72,11 @@ export class TransportManager {
 
       // Initialize and prepare HTTP server if needed
       if (needsHttpServer) {
+        if (!http) {
+          throw new Error(
+            "HTTP/SSE transports require `http` start options (port, host)",
+          );
+        }
         // Prepare auth configuration
         const authEnabled = !this.config?.disableAuth;
         const apiKey = this.config?.apiKey;
@@ -72,28 +106,15 @@ export class TransportManager {
       // Create and connect all transports
       await Promise.all(
         types.map(async (type) => {
-          const transport = await this.createTransport(
-            type,
-            httpMcpEndpointPath,
-            sseMcpEndpointPath,
-            sseMcpMessageEndpointPath,
-          );
+          const transport = this.createTransport(type, serverOptions, http);
           this.transports.set(type, transport);
           await transport.connect();
         }),
       );
 
       // Start HTTP server if needed (after routes are registered)
-      if (needsHttpServer && this.httpServer) {
-        if (port && host) {
-          await this.httpServer.start({
-            port,
-            host,
-          });
-        } else {
-          logger.error("Port and host are required");
-          throw new Error("Port and host are required");
-        }
+      if (needsHttpServer && this.httpServer && http) {
+        await this.httpServer.start({ port: http.port, host: http.host });
       }
 
       logger.info("All transports started successfully");
@@ -127,36 +148,47 @@ export class TransportManager {
 
     this.transports.clear();
     this.httpServer = null;
+
+    // close cached stdio/SSE McpServers; HTTP per-session ones were closed by HttpTransport above
+    if (this.stdioServer) {
+      await this.stdioServer.close();
+      this.stdioServer = null;
+    }
+    if (this.sseServer) {
+      await this.sseServer.close();
+      this.sseServer = null;
+    }
   }
 
-  private async createTransport(
+  private createTransport(
     type: TransportType,
-    httpMcpEndpointPath?: string,
-    sseMcpEndpointPath?: string,
-    sseMcpMessageEndpointPath?: string,
-  ): Promise<Transport> {
+    serverOptions: CreateMcpServerOptions,
+    http: HttpStartOptions | undefined,
+  ): Transport {
     switch (type) {
-      case "http":
+      case TransportType.HTTP:
         if (!this.httpServer) {
           throw new Error("HTTP server not initialized");
         }
         return new HttpTransport(
-          this.server,
+          () => createMcpServer(serverOptions),
           this.httpServer,
-          httpMcpEndpointPath,
+          http?.mcpEndpointPath,
         );
-      case "sse":
+      case TransportType.SSE:
         if (!this.httpServer) {
           throw new Error("HTTP server not initialized");
         }
         return new SseTransport(
-          this.server,
+          this.getServer(TransportType.SSE, serverOptions),
           this.httpServer,
-          sseMcpEndpointPath,
-          sseMcpMessageEndpointPath,
+          http?.sseEndpointPath,
+          http?.sseMessageEndpointPath,
         );
-      case "stdio":
-        return new StdioTransport(this.server);
+      case TransportType.STDIO:
+        return new StdioTransport(
+          this.getServer(TransportType.STDIO, serverOptions),
+        );
       default:
         throw new Error(`Unsupported transport type: ${type}`);
     }

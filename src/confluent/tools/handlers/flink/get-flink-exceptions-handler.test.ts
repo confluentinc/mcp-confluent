@@ -1,25 +1,12 @@
 import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
-import { initEnv } from "@src/env.js";
 import {
   DEFAULT_CONNECTION_ID,
+  FLINK_CONN,
+  HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  assertHandleCase,
-  stubClientGetters,
-  type HandleCase,
-} from "@tests/stubs/index.js";
-import { beforeAll, describe, it } from "vitest";
-
-const FLINK_CONN = {
-  flink: {
-    endpoint: "https://flink.example.com",
-    auth: { type: "api_key" as const, key: "k", secret: "s" },
-    environment_id: "env-from-config",
-    organization_id: "org-from-config",
-    compute_pool_id: "lfcp-from-config",
-  },
-};
+import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import { describe, it } from "vitest";
 
 const EXPLICIT_IDS = {
   organizationId: "org-from-args",
@@ -32,42 +19,25 @@ describe("get-flink-exceptions-handler.ts", () => {
   describe("GetFlinkExceptionsHandler", () => {
     const handler = new GetFlinkExceptionsHandler();
 
-    // Required while the handler reads env vars via getEnsuredParam.
-    // Remove after issue #231 migrates those reads to conn.flink config fields.
-    beforeAll(() => {
-      initEnv();
-    });
-
     describe("handle()", () => {
-      const cases: HandleCase[] = [
+      const cases: HandleCaseWithConn[] = [
         {
-          label: "throws when statementName is absent",
+          label: "throws ZodError when statementName is absent",
           args: {},
           outcome: { throws: "ZodError" },
+          connectionConfig: {},
         },
         {
-          label: "throws when organizationId is absent and not in env",
+          label: "uses org/env IDs from config when args absent",
           args: { statementName: STATEMENT_NAME },
-          outcome: { throws: "Organization ID is required" },
-        },
-        {
-          label: "throws when environmentId is absent and not in env",
-          args: {
-            statementName: STATEMENT_NAME,
-            organizationId: "org-from-args",
-          },
-          outcome: { throws: "Environment ID is required" },
-        },
-        {
-          label: "resolves with no-exceptions message when data is empty",
-          args: { statementName: STATEMENT_NAME, ...EXPLICIT_IDS },
           responseData: { data: [] },
           outcome: {
             resolves: `No exceptions found for statement '${STATEMENT_NAME}'.`,
           },
         },
         {
-          label: "resolves with exception list when exceptions are present",
+          label:
+            "uses explicit org/env args over config and returns exception list",
           args: { statementName: STATEMENT_NAME, ...EXPLICIT_IDS },
           responseData: {
             data: [{ message: "OOM error" }, { message: "Timeout" }],
@@ -80,13 +50,18 @@ describe("get-flink-exceptions-handler.ts", () => {
 
       it.each(cases)(
         "should $label",
-        async ({ args, outcome, responseData }) => {
+        async ({
+          args,
+          outcome,
+          responseData,
+          connectionConfig = FLINK_CONN,
+        }) => {
           const { clientManager, clientGetters } =
             stubClientGetters(responseData);
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
-              FLINK_CONN,
+              connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
             ),

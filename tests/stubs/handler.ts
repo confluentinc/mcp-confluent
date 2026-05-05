@@ -1,4 +1,4 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import type { CallToolResult } from "@src/confluent/schema.js";
 import type { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
@@ -7,18 +7,33 @@ import { ZodError } from "zod";
 import { createMockInstance } from "./mock-instance.js";
 
 export type Resolves = {
-  /** Minimal valid API response to feed into the proxy's `data` property.
-   *  Omit to use `{}` (sufficient when the handler just JSON-serialises the
-   *  response); supply `{ data: [] }` or a richer shape to push the handler
-   *  past guard checks into its real success branch. */
+  /**
+   * Controls what each stubbed API call resolves to. Forwarded directly to
+   * `stubClientGetters()` — see its JSDoc for the full element-shape contract.
+   *
+   * Quick reference:
+   * - Omit (or `{}`) when the handler short-circuits before reading the result.
+   * - Plain object → becomes `(await call()).data`. Match the shape the handler
+   *   reads: e.g. `{ status: { phase: "COMPLETED" }, results: { data: [...] } }`.
+   * - `{ response: { status: N } }` → for handlers that destructure `response`
+   *   (e.g. DELETE endpoints: `const { response } = await client.DELETE(...)`).
+   * - `{ error: { ... } }` → makes `(await call()).error` truthy, triggering
+   *   error-branch code.
+   * - Array of the above → consumed in call order; last element reused when
+   *   the array is exhausted (needed for poll-then-fetch handlers).
+   */
   responseData?: unknown;
   /** Substring that must appear in the resolved response text. */
   resolves: string;
 };
 
 export type Throws = {
-  /** Same as `Resolves.responseData` — set when the handler needs valid-ish
-   *  data before it reaches the code that throws. */
+  /**
+   * Same contract as `Resolves.responseData`. Supply when the handler must
+   * complete one or more successful API calls before reaching the code that
+   * throws (e.g. a handler that fetches data and then validates it).
+   * Omit when the throw happens before any client call.
+   */
   responseData?: unknown;
   /** Substring that must appear in the thrown error message, or "ZodError"
    *  to match any ZodError regardless of message. */
@@ -27,21 +42,45 @@ export type Throws = {
 
 /** Complete specification for one `handle()` invocation: what to feed in
  *  (`responseData`) and what to expect out (`resolves` / `throws`).
- *  The `"TODO"` sentinel triggers discovery mode: the test executes the
- *  handler, reports the actual outcome, and asks you to paste it in as the
- *  recorded expectation. */
-export type HandleOutcome = Resolves | Throws | "TODO";
+ *  Pass `"DISCOVER"` as a sentinel to run the handler, report the actual
+ *  outcome, and get a copy-paste suggestion for the recorded expectation. */
+export type HandleOutcome = Resolves | Throws | "DISCOVER";
 
 /** The array of client-getter mock functions returned by `stubClientGetters()`.
  *  Each element is a Vitest mock whose `.mock.calls` records invocations. */
 export type ClientGetters = Array<{ mock: { calls: unknown[] } }>;
 
-/** One entry in an `it.each` handler test suite. Supply `responseData` to push
- *  the handler past guard checks; omit to use the default `{}` response. */
+/**
+ * One intercepted REST call captured by the proxy in `stubClientGetters()`.
+ *
+ * An entry is recorded for any invocation where the first argument is a string
+ * path — this covers both `wrapAsPathBasedClient` callers (where
+ * `PathCallForwarder` injects the path automatically) and handlers that call
+ * the REST client directly as `client.GET("/path", options)`.
+ *
+ *   - `pathTemplate` — the raw OpenAPI path string, e.g.
+ *     `"/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements"`
+ *   - `args` — the `{ params, body, ... }` object passed as the second argument
+ *     to the HTTP method (undefined when the handler passes no init object)
+ *
+ * Use `capturedCalls[N].args` to assert POST body contents or query params
+ * that are not observable through the handler's return value alone.
+ */
+export interface CapturedCall {
+  pathTemplate: string;
+  args: unknown;
+}
+
+/** One entry in an `it.each` handler test suite. */
 export type HandleCase = {
   label: string;
   args: Record<string, unknown>;
   outcome: HandleOutcome;
+  /**
+   * Forwarded to `stubClientGetters()`. Omit for cases that throw or
+   * short-circuit before touching the client. See `Resolves.responseData`
+   * for the element-shape contract and array usage.
+   */
   responseData?: unknown;
 };
 
@@ -55,47 +94,126 @@ export function classifyThrown(label: string, thrown: unknown): string {
 }
 
 /**
- * Wires every client getter on a fresh `Mocked<DefaultClientManager>` to a
- * two-proxy pair so handler bodies never throw a TypeError before reaching
- * real logic. Supply `responseData` to push a specific handler past schema
- * validation into its success branch (defaults to `{}`).
+ * Wires every client getter on a fresh `Mocked<DirectClientManager>` to a
+ * two-proxy pair so handler bodies can traverse arbitrary method chains
+ * (`.GET(...)`, `.POST(...)`, `.path(...).method(...)`, etc.) without throwing
+ * a TypeError. Every async call resolves to a proxy that models the
+ * `{ data, error, response }` shape returned by `openapi-fetch`.
  *
- * Returns `{ clientManager, clientGetters }`. `clientGetters` is the
- * canonical list of all getter mocks; pass it to `assertHandleCase` to
- * assert that at least one was invoked when a handler resolves successfully.
+ * ## `responseData` — single value
+ *
+ * Pass a plain object; it becomes `(await call()).data`. Shape it to match
+ * what the handler reads:
+ * ```typescript
+ * // handler does: const { data } = await client.GET(...); data.status.phase
+ * stubClientGetters({ status: { phase: "COMPLETED" }, results: { data: [] } })
+ * ```
+ *
+ * Two special top-level keys override the defaults:
+ * - `response` — surfaced as `(await call()).response`. Use for handlers that
+ *   destructure `response` directly, e.g. DELETE endpoints that check
+ *   `response?.status`:
+ *   ```typescript
+ *   stubClientGetters({ response: { status: 204 } })
+ *   ```
+ * - `error` — surfaced as `(await call()).error`. Use to exercise a handler's
+ *   error branch (`if (error) return this.createResponse(..., true)`):
+ *   ```typescript
+ *   stubClientGetters({ error: { message: "not found" } })
+ *   ```
+ *
+ * ## `responseData` — array of elements
+ *
+ * Pass an array to feed different data to successive calls. Each element
+ * follows the same shape contract above. The last element is reused once the
+ * array is exhausted, so you only need to enumerate the calls that differ:
+ * ```typescript
+ * // handler: POST to create → GET to poll status → GET to fetch results
+ * stubClientGetters([
+ *   {},                                                    // POST (ignored)
+ *   { status: { phase: "COMPLETED" } },                   // GET poll
+ *   { results: { data: [{ COLUMN_NAME: "id" }] } },       // GET results
+ * ])
+ * ```
+ *
+ * Returns `{ clientManager, clientGetters, capturedCalls }`.
+ * - Pass `clientGetters` to `assertHandleCase` to assert the handler reached
+ *   the client layer on a successful resolve.
+ * - `capturedCalls` is a `CapturedCall[]`; each entry has `.pathTemplate` (the
+ *   raw OpenAPI path string) and `.args` (the `{ params, body, ... }` object).
+ *   Use it to assert what the handler actually sent to the REST layer, e.g.
+ *   POST body contents or query params. Any call whose first argument is a
+ *   string path is captured — this includes both `wrapAsPathBasedClient`
+ *   callers and direct `client.METHOD(path, options)` calls. Invocations whose
+ *   first argument is not a string (Kafka admin, producer, consumer, etc.) are
+ *   silently skipped.
  */
 export function stubClientGetters(responseData: unknown = {}) {
   // Two-proxy setup: callableProxy (function target) handles method chains
-  // and calls; responseProxy (plain-object target) is what async calls
-  // resolve to, modelling the { data, error } shape from openapi-fetch.
-  // Future refinement: accept responseData as an array to support sequential
-  // per-call responses (needed for multi-call handlers). The apply trap would
-  // become index-aware, constructing a fresh responseProxy per invocation.
-  let responseProxy: object = {};
-  const callableProxy = new Proxy((() => {}) as () => Promise<object>, {
+  // and calls; per-call responseProxies model the { data, error, response }
+  // shape from openapi-fetch. When responseData is an array, each element is
+  // consumed in order; the last element is reused once the array is exhausted.
+  const responses = Array.isArray(responseData) ? responseData : [responseData];
+  if (responses.length === 0)
+    throw new Error("stubClientGetters: responseData array must not be empty");
+  let callIndex = 0;
+
+  const capturedCalls: CapturedCall[] = [];
+
+  const callableProxy: object = new Proxy((() => {}) as () => Promise<object>, {
     get: (_t, prop) => {
       if (prop === "then" || prop === "error") return undefined;
       return callableProxy;
     },
-    apply: () => Promise.resolve(responseProxy),
-  });
-  responseProxy = new Proxy({} as object, {
-    // Four properties are special-cased:
-    //   `then`          → undefined  (prevents JS treating this as a thenable)
-    //   `error`         → undefined  (openapi-fetch "success" signal)
-    //   `data`          → responseData  (caller-supplied; defaults to {})
-    //   Symbol.iterator → empty-array iterator (handlers that iterate the
-    //                     resolved value directly get an empty loop, not a TypeError)
-    get: (_t, prop) => {
-      if (prop === "then" || prop === "error") return undefined;
-      if (prop === "data") return responseData;
-      if (prop === Symbol.iterator)
-        return Array.prototype[Symbol.iterator].bind([]);
-      return callableProxy;
+    apply: (_target, _thisArg, args) => {
+      // Only REST clients (wrapAsPathBasedClient) produce captured calls —
+      // PathCallForwarder always passes the path template string as the first
+      // argument. Non-REST calls (Kafka admin, producer, consumer) fire apply
+      // with zero args (proxy-chain continuations) or non-string first args
+      // (e.g. createTopics({ topics: [...] })); both are silently skipped.
+      // A test that tries to assert capturedCalls on a non-REST handler will
+      // see an empty array and fail the toHaveLength guard with a clear message.
+      //
+      // Future: if we ever need to inspect Kafka-client or other non-REST calls,
+      // replace CapturedCall with a discriminated union:
+      //   | { kind: "rest"; pathTemplate: string; args: unknown }
+      //   | { kind: "raw"; args: unknown[] }
+      // and push accordingly here.
+      if (typeof args[0] === "string") {
+        capturedCalls.push({ pathTemplate: args[0], args: args[1] });
+      }
+      const element = responses[Math.min(callIndex++, responses.length - 1)];
+      return Promise.resolve(makeResponseProxy(element));
     },
   });
 
-  const clientManager = createMockInstance(DefaultClientManager);
+  function makeResponseProxy(element: unknown): object {
+    const elem =
+      element !== null && typeof element === "object"
+        ? (element as Record<string | symbol, unknown>)
+        : null;
+    return new Proxy({} as object, {
+      // Special-cased properties:
+      //   `then`          → undefined  (prevents JS treating this as a thenable)
+      //   `error`         → element.error if present, else undefined
+      //   `data`          → element  (backward compat: element IS the data)
+      //   `response`      → element.response if present, else callableProxy
+      //   Symbol.iterator → empty-array iterator
+      get: (_t, prop) => {
+        if (prop === "then") return undefined;
+        if (prop === Symbol.iterator)
+          return Array.prototype[Symbol.iterator].bind([]);
+        if (prop === "error")
+          return elem && "error" in elem ? elem["error"] : undefined;
+        if (prop === "data") return element;
+        if (prop === "response")
+          return elem && "response" in elem ? elem["response"] : callableProxy;
+        return callableProxy;
+      },
+    });
+  }
+
+  const clientManager = createMockInstance(DirectClientManager);
   clientManager.getAdminClient.mockResolvedValue(callableProxy as never);
   clientManager.getProducer.mockResolvedValue(callableProxy as never);
   clientManager.getConsumer.mockResolvedValue(callableProxy as never);
@@ -132,7 +250,7 @@ export function stubClientGetters(responseData: unknown = {}) {
     clientManager.getSchemaRegistryClient,
   ];
 
-  return { clientManager, clientGetters };
+  return { clientManager, clientGetters, capturedCalls };
 }
 
 /**
@@ -191,7 +309,7 @@ export async function assertHandleCase(options: {
     thrown = err;
   }
 
-  if (outcome === "TODO") {
+  if (outcome === "DISCOVER") {
     let discovered: string;
     if (thrown !== undefined) {
       discovered = `{ throws: ${JSON.stringify(classifyThrown(name, thrown))} }`;
@@ -206,7 +324,9 @@ export async function assertHandleCase(options: {
         .slice(0, 60);
       discovered = `{ resolves: ${JSON.stringify(text)} }`;
     }
-    throw new Error(`${name}: outcome is TODO — replace with: ${discovered}`);
+    throw new Error(
+      `${name}: outcome is "DISCOVER" — replace with: ${discovered}`,
+    );
   }
 
   if (thrown === undefined) {

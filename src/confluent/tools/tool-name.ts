@@ -51,4 +51,5 @@ export enum ToolName {
   LIST_METRICS = "list-available-metrics",
   SEARCH_PRODUCT_DOCS = "search-product-docs",
   GET_PRODUCT_DOC_PAGES = "get-product-doc-pages",
+  LIST_ORGANIZATIONS = "list-organizations",
 }

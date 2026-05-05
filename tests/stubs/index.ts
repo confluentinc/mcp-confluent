@@ -3,6 +3,7 @@ export {
   assertHandleCase,
   classifyThrown,
   stubClientGetters,
+  type CapturedCall,
   type ClientGetters,
   type HandleCase,
   type HandleOutcome,
@@ -23,4 +24,13 @@ export {
   type MockedHttpServer,
   type MockedOpen,
 } from "./node-deps.js";
+export {
+  createMockSdkTransport,
+  type MockedSdkTransport,
+} from "./sdk-transport.js";
+export { createMockSessionRegistry } from "./session-registry.js";
+export {
+  MOCK_SESSION_ID,
+  createMockHttpServerTransport,
+} from "./streamable-http-transport.js";
 export { StubHandler } from "./stub-handler.js";

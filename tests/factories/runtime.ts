@@ -1,8 +1,9 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
+import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { createMockInstance } from "@tests/stubs/index.js";
+import { createMockInstance, type HandleCase } from "@tests/stubs/index.js";
 import type { Mocked } from "vitest";
 
 /** Connection ID used by the named runtime factories and their default single-connection runtimes. */
@@ -17,8 +18,8 @@ export const DEFAULT_CONNECTION_ID = "default";
 export function runtimeWith(
   connectionConfig: Omit<DirectConnectionConfig, "type"> = {},
   connectionId = DEFAULT_CONNECTION_ID,
-  clientManager: Mocked<DefaultClientManager> = createMockInstance(
-    DefaultClientManager,
+  clientManager: Mocked<DirectClientManager> = createMockInstance(
+    DirectClientManager,
   ),
 ): ServerRuntime {
   return new ServerRuntime(
@@ -114,4 +115,92 @@ export function telemetryRuntime(): ServerRuntime {
       auth: { type: "api_key", key: "k", secret: "s" },
     },
   });
+}
+
+/** Shared Confluent Cloud control-plane connection config fixture for handle() tests. */
+export const CCLOUD_CONN = {
+  confluent_cloud: {
+    endpoint: "https://api.confluent.cloud",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+  },
+};
+
+/** Shared Flink connection config fixture for handle() tests. */
+export const FLINK_CONN = {
+  flink: {
+    endpoint: "https://flink.example.com",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+    environment_id: "env-from-config",
+    organization_id: "org-from-config",
+    compute_pool_id: "lfcp-from-config",
+  },
+};
+
+/** Shared Kafka connection config fixture for handle() tests. */
+export const KAFKA_CONN = {
+  kafka: {
+    bootstrap_servers: "broker:9092",
+    rest_endpoint: "https://kafka-rest.example.com",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+    cluster_id: "lkc-from-config",
+  },
+};
+
+/**
+ * Shared Connect handler fixture: CCloud control-plane + kafka block carrying
+ * `env_id` and `cluster_id` for `resolveConnectEnvAndClusterId` fallback tests.
+ */
+export const CONNECT_CONN = {
+  ...CCLOUD_CONN,
+  kafka: {
+    env_id: "env-from-config",
+    cluster_id: "lkc-from-config",
+    rest_endpoint: "https://pkc-example.confluent.cloud:443",
+  },
+};
+
+/**
+ * Like `CONNECT_CONN` but with `kafka.auth` — required by `CreateConnectorHandler`
+ * which embeds Kafka API credentials in the connector body.
+ */
+export const CONNECT_CONN_WITH_AUTH = {
+  ...CCLOUD_CONN,
+  kafka: {
+    env_id: "env-from-config",
+    cluster_id: "lkc-from-config",
+    rest_endpoint: "https://pkc-example.confluent.cloud:443",
+    auth: {
+      type: "api_key" as const,
+      key: "kafka-key",
+      secret: "kafka-secret",
+    },
+  },
+};
+
+/** Extends HandleCase with a per-case connection config for handle() tests
+ *  that need to vary the runtime shape (e.g. empty config for throw cases). */
+export type HandleCaseWithConn = HandleCase & {
+  connectionConfig?: Parameters<typeof runtimeWith>[0];
+};
+
+/**
+ * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`, paired
+ * with a mocked `OAuthClientManager` (matching what `ServerRuntime.fromConfig`
+ * actually constructs for OAuth connections). Used by handler tests to assert
+ * that handlers widened for OAuth (e.g. via the widened `hasConfluentCloud`
+ * predicate) see the connection as enabled, and that handlers staying
+ * direct-only (e.g. native Kafka) see it as disabled. Does not populate
+ * `runtime.oauthHolder`; tests that need a holder should construct one
+ * explicitly. `createMockInstance` doesn't invoke the real constructor, so the
+ * OAuthClientManager's eager cloud-REST client setup is sidestepped.
+ */
+export function ccloudOAuthRuntime(): ServerRuntime {
+  return new ServerRuntime(
+    new MCPServerConfiguration({
+      connections: {
+        [DEFAULT_CONNECTION_ID]: { type: "oauth", ccloud_env: "devel" },
+      },
+    }),
+    { [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager) },
+  );
 }

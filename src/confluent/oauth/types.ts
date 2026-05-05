@@ -4,6 +4,8 @@ export interface Auth0Config {
   clientId: string;
   domain: string;
   apiUrl: string;
+  /** Confluent Cloud REST API base URL for this environment (e.g. https://api.confluent.cloud for prod). */
+  cloudRestUrl: string;
   callbackUrl: string;
   scopes: string;
 }

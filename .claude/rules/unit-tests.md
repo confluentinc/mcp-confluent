@@ -32,8 +32,8 @@ paths:
 
 ## Key Patterns
 
-- Use `createMockInstance(DefaultClientManager)` (from `@tests/stubs/index.js`) for handler tests
-  with one class dependency. The returned object is typed as `Mocked<DefaultClientManager>` so
+- Use `createMockInstance(DirectClientManager)` (from `@tests/stubs/index.js`) for handler tests
+  with one class dependency. The returned object is typed as `Mocked<DirectClientManager>` so
   method-chain autocomplete works (`.mockResolvedValue`, etc.)
 - Don't wrap simple one-liners in helper functions
 - Use `createTestServer()` from `@tests/server` for integration-style tests that need a full MCP
@@ -144,15 +144,91 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   whose connection has the relevant service block (expect the connection id) and a bare runtime
   without that block (expect `[]`). Helper factories live in `tests/factories/runtime.ts`
   (`flinkRuntime()`, `tableflowRuntime()`, `bareRuntime()`, etc.).
-- Test `handle()` for typical and edge-case inputs. `handle()` now receives a `ServerRuntime`
-  instead of a bare `ClientManager`. Create the mock first, configure it, then inject it into
-  `runtimeWith()` as the third argument:
+- Test `handle()` for typical and edge-case inputs using `stubClientGetters` +
+  `assertHandleCase` from `@tests/stubs/index.js`. The standard three cases per
+  config-backed parameter: (1) throws when arg absent and not in config, (2) resolves
+  using config fallback, (3) resolves using explicit arg. Use `HandleCaseWithConn` to
+  carry a per-case runtime shape (`connectionConfig: {}` for throw cases; domain fixture
+  as default for success cases). Pass `"DISCOVER"` as the `outcome` sentinel to run the
+  handler and get a copy-paste suggestion for the correct expectation; replace before
+  committing.
+
+  `stubClientGetters(responseData)` returns three co-equal values:
+  - `clientManager` — inject into `runtimeWith()` to wire the mock into the handler's
+    runtime.
+  - `clientGetters` — pass to `assertHandleCase` to assert the handler reached the
+    client layer on a successful resolve.
+  - `capturedCalls: CapturedCall[]` — primarily for asserting what a handler sent to
+    an OpenAPI REST endpoint (POST body, query params, path params) when
+    `outcome.resolves` alone doesn't prove the payload. Each entry has `.pathTemplate`
+    and `.args` (the `{ params, body, ... }` object). The capture rule is
+    first-string-arg: for OpenAPI REST clients (both `wrapAsPathBasedClient` and
+    direct `client.GET("/path", options)` callers) the first argument is always a
+    path string. Note that SDK-based clients like Schema Registry may also produce
+    entries when their methods take a string as their first argument (e.g. subject
+    names in `getLatestSchemaMetadata(subject)`) — filter by
+    `capturedCalls.filter(c => c.pathTemplate.startsWith("/"))` to isolate REST
+    entries in mixed handlers. Non-string first-arg invocations (Kafka admin,
+    producer, consumer) are silently skipped.
+
+  `responseData` accepts a single element or an array for sequential per-call responses;
+  see the `stubClientGetters` JSDoc for the full element-shape contract (`data`,
+  `response`, `error` keys).
+
+  **When the endpoint returns a bare array** (e.g. list-connectors returns `string[]`),
+  the stub's single-vs-sequence detection fires on the outer array and each element would
+  be treated as a separate response. Wrap the array in a one-element outer array so the
+  inner array is delivered as `data` for the single call:
+
   ```typescript
-  clientManager = createMockInstance(DefaultClientManager);
-  clientManager.getSomeClient.mockResolvedValue(...);
-  const runtime = runtimeWith({ kafka: { bootstrap_servers: "..." } }, DEFAULT_CONNECTION_ID, clientManager);
-  handler.handle(runtime, args);
+  // handler does: const { data: response } = await client.GET(...); response.join(",")
+  stubClientGetters([["connector-a", "connector-b"]]);
+  //                 ↑ outer = "sequence of calls"
+  //                  ↑↑ inner = the array that becomes `data`
   ```
+
+  Basic usage:
+
+  ```typescript
+  const { clientManager, clientGetters, capturedCalls } = stubClientGetters({
+    status: { phase: "COMPLETED" },
+  });
+  await assertHandleCase({
+    handler,
+    runtime: runtimeWith(
+      connectionConfig,
+      DEFAULT_CONNECTION_ID,
+      clientManager,
+    ),
+    args,
+    outcome,
+    clientGetters,
+  });
+  ```
+
+  Asserting a POST body (when `outcome.resolves` doesn't prove the payload):
+
+  ```typescript
+  expect(capturedCalls).toHaveLength(1);
+  expect(capturedCalls[0]!.args).toMatchObject({
+    body: expect.objectContaining({
+      spec: expect.objectContaining({
+        properties: expect.objectContaining({
+          "sql.current-catalog": "env-name-from-config",
+        }),
+      }),
+    }),
+  });
+  ```
+
+  Proving a zero-arg REST call was made (`wrapAsPathBasedClient` always injects the
+  path, so the call is still captured even when the handler passes no init object):
+
+  ```typescript
+  expect(capturedCalls).toHaveLength(1);
+  expect(capturedCalls[0]!.args).toBeUndefined();
+  ```
+
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
   `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.
 

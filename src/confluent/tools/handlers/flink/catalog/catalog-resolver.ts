@@ -1,29 +1,38 @@
+import type { DirectConnectionConfig } from "@src/config/index.js";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
-import env from "@src/env.js";
 
 /**
  * Resolves the Flink catalog name from various inputs.
  *
  * In Confluent Cloud Flink, the catalog name is always the environment ID (env-xxxxx).
- * This function handles cases where a friendly name or invalid value is provided,
- * falling back to the environment ID from config.
+ * Pass the already-resolved `environment_id` (from `resolveOrgAndEnvIds`) as
+ * `fallbackEnvId` so that an explicit `environmentId` tool arg takes precedence
+ * over the connection config value.
  *
  * Resolution order:
  * 1. If catalogName is provided and looks like an env ID (starts with "env-"), use it
- * 2. Otherwise, use FLINK_ENV_ID from environment
+ * 2. If fallbackEnvId looks like an env ID (starts with "env-"), use it
+ * 3. Otherwise return undefined — callers should surface a configuration/argument error
+ *
+ * Both inputs are validated against the "env-" prefix so a non-env-* environmentId arg
+ * (e.g. a friendly name) does not silently produce an invalid catalog name.
  *
  * @param catalogName - Optional catalog name from user/LLM input
+ * @param fallbackEnvId - Already-resolved environment ID to use when catalogName is absent/invalid
  * @returns The resolved catalog name (environment ID), or undefined if not resolvable
  */
-export function resolveCatalogName(catalogName?: string): string | undefined {
-  // If provided value looks like an environment ID, use it
+export function resolveCatalogName(
+  catalogName?: string,
+  fallbackEnvId?: string,
+): string | undefined {
   if (catalogName && catalogName.startsWith("env-")) {
     return catalogName;
   }
-
-  // Fall back to FLINK_ENV_ID (the actual environment ID)
-  return env.FLINK_ENV_ID;
+  if (fallbackEnvId?.startsWith("env-")) {
+    return fallbackEnvId;
+  }
+  return undefined;
 }
 
 /**
@@ -37,19 +46,22 @@ export function resolveCatalogName(catalogName?: string): string | undefined {
  *
  * Resolution order:
  * 1. If databaseName is provided and non-empty, use it (could be cluster ID or friendly name)
- * 2. Otherwise, use KAFKA_CLUSTER_ID from environment
+ * 2. Otherwise, use kafka.cluster_id from connection config
  *
  * @param databaseName - Optional database name from user/LLM input
  * @returns The resolved database name, or undefined if not resolvable
  */
-export function resolveDatabaseName(databaseName?: string): string | undefined {
+export function resolveDatabaseName(
+  databaseName?: string,
+  conn?: DirectConnectionConfig,
+): string | undefined {
   // If any non-empty value is provided, use it (could be lkc-* or friendly name)
   if (databaseName && databaseName.trim()) {
     return databaseName.trim();
   }
 
-  // Fall back to KAFKA_CLUSTER_ID
-  return env.KAFKA_CLUSTER_ID;
+  // Fall back to conn.kafka.cluster_id
+  return conn?.kafka?.cluster_id?.trim() || undefined;
 }
 
 export interface CatalogMapping {

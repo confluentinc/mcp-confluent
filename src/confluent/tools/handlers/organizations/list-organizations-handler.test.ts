@@ -1,6 +1,7 @@
 import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organizations/list-organizations-handler.js";
 import {
   bareRuntime,
+  CCLOUD_CONN,
   ccloudOAuthRuntime,
   confluentCloudRuntime,
   DEFAULT_CONNECTION_ID,
@@ -12,13 +13,6 @@ import {
   type HandleCase,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
-
-const CCLOUD_CONN = {
-  confluent_cloud: {
-    endpoint: "https://api.confluent.cloud",
-    auth: { type: "api_key" as const, key: "k", secret: "s" },
-  },
-};
 
 const ORG_FIXTURE = {
   api_version: "org/v2",

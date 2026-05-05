@@ -45,26 +45,8 @@ Tool enablement is decided by inspecting which **service blocks** are present in
 
 - A tool whose predicate matches zero connections is automatically disabled.
 - A tool with no service-specific requirement (a rare case) returns `Object.keys(runtime.config.connections)` directly.
+- Cloud-only-ness is expressed as `hasConfluentCloud` (or a conjunction like `hasCCloudCatalogSupport`), not a separate boolean override.
 - New predicates should be additive and pure; they read the YAML/config shape only.
-
-### `hasConfluentCloud` vs `hasDirectConfluentCloud` — pick carefully
-
-`hasConfluentCloud` returns `true` for **both** direct connections with a `confluent_cloud`
-block **and** OAuth connections. `hasDirectConfluentCloud` returns `true` only for direct
-connections.
-
-**If `handle()` calls `runtime.config.getSoleDirectConnection()`** (which narrows to
-`DirectConnectionConfig` and throws for OAuth connections), the predicate **must** be
-`hasDirectConfluentCloud`. Using `hasConfluentCloud` here enables the tool for OAuth
-connections but then crashes at call time — the tool is advertised as available but always
-throws. This mismatch has burned us more than once.
-
-Rule of thumb: reach for `hasDirectConfluentCloud` when the handler reads service-block
-fields (`.kafka`, `.flink`, `.confluent_cloud`, etc.) from the connection. Only widen to
-`hasConfluentCloud` once the handler is genuinely OAuth-capable (i.e. it no longer calls
-`getSoleDirectConnection()` and doesn't read direct-only fields). When widening, add an
-`enabledConnectionIds()` test against `ccloudOAuthRuntime()` that confirms the tool is
-enabled for OAuth.
 
 ## File Organization
 

@@ -42,6 +42,15 @@ export function hasConfluentCloud(conn: ConnectionConfig): boolean {
   return conn.confluent_cloud !== undefined;
 }
 
+/**
+ * True only for direct connections that carry a `confluent_cloud` block.
+ * Use this instead of `hasConfluentCloud` for handlers that are not yet
+ * OAuth-capable and call `getSoleDirectConnection()` inside `handle()`.
+ */
+export function hasDirectConfluentCloud(conn: ConnectionConfig): boolean {
+  return conn.type === "direct" && conn.confluent_cloud !== undefined;
+}
+
 export function hasFlink(conn: ConnectionConfig): boolean {
   return conn.type === "direct" && conn.flink !== undefined;
 }

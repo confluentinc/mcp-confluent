@@ -117,6 +117,14 @@ export function telemetryRuntime(): ServerRuntime {
   });
 }
 
+/** Shared Confluent Cloud control-plane connection config fixture for handle() tests. */
+export const CCLOUD_CONN = {
+  confluent_cloud: {
+    endpoint: "https://api.confluent.cloud",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+  },
+};
+
 /** Shared Flink connection config fixture for handle() tests. */
 export const FLINK_CONN = {
   flink: {

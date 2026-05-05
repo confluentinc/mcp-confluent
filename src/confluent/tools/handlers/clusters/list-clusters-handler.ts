@@ -6,10 +6,9 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasConfluentCloud,
+  hasDirectConfluentCloud,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -81,7 +80,10 @@ export class ListClustersHandler extends BaseToolHandler {
       ].GET({
         params: {
           query: {
-            environment: environmentId ?? env.KAFKA_ENV_ID ?? "",
+            environment:
+              environmentId ??
+              runtime.config.getSoleDirectConnection().kafka?.env_id ??
+              "",
             page_size: 100,
           },
         },
@@ -192,6 +194,9 @@ Cluster: ${cluster.name}
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
+    return connectionIdsWhere(
+      runtime.config.connections,
+      hasDirectConfluentCloud,
+    );
   }
 }

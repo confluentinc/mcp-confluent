@@ -1,6 +1,5 @@
 import {
   type AuthConfig,
-  type CCloudOAuthConfig,
   type KafkaDirectConfig,
   formatZodIssues,
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
@@ -78,8 +77,37 @@ function buildConfigFromEnv(
   env: Environment,
   authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
   kafkaConfig?: KeyValuePairObject,
-  ccloudOAuth?: CCloudOAuthConfig,
+  oauth?: { ccloudEnv?: "devel" | "stag" | "prod" },
 ): MCPServerConfiguration {
+  // OAuth path: synthesize a single OAuth-typed connection. No surface blocks,
+  // no auth fields. ccloud_env defaults to "prod" via the schema.
+  if (oauth) {
+    const rawDocument: Record<string, unknown> = {
+      connections: {
+        [ENV_CONNECTION_NAME]: {
+          type: "oauth",
+          ...(oauth.ccloudEnv && {
+            ccloud_env: oauth.ccloudEnv,
+          }),
+        },
+      },
+      ...buildServerBlock(env, authOverrides),
+    };
+    const result = mcpConfigSchema.safeParse(rawDocument);
+    if (!result.success) {
+      // Server-config validation can still fail on the OAuth path
+      // (e.g., MCP_API_KEY length / disabled+api_key conflict). Run the
+      // env-var humanizer so users see env-var names, not schema paths.
+      const formattedIssues = humanizeEnvConfigPaths(
+        formatZodIssues(result.error.issues),
+      );
+      throw new Error(
+        `Failed to construct OAuth MCPServerConfiguration from environment variables:\n${formattedIssues}`,
+      );
+    }
+    return new MCPServerConfiguration(result.data);
+  }
+
   const connection: Record<string, unknown> = { type: "direct" };
 
   // Each connection builder returns { <blockKey>: { ...fields } } or null — the key is owned
@@ -129,16 +157,16 @@ function buildConfigFromEnv(
     );
   }
 
-  return new MCPServerConfiguration({ ...result.data, ccloudOAuth });
+  return new MCPServerConfiguration(result.data);
 }
 
-/** CLI flags that may override values in the env-var config path. Mutually exclusive with --config (YAML path). */
+/** CLI flags that may override values in the env-var config path. */
 export interface EnvPathCliOverrides {
   disableAuth?: boolean;
   allowedHosts?: string[];
   kafkaConfig?: KeyValuePairObject;
   oauth?: boolean;
-  oauthEnv?: "devel" | "stag" | "prod";
+  ccloudEnv?: "devel" | "stag" | "prod";
 }
 
 /**
@@ -154,10 +182,6 @@ export function buildConfigFromEnvAndCli(
   env: Environment,
   overrides: EnvPathCliOverrides = {},
 ): MCPServerConfiguration {
-  const ccloudOAuth: CCloudOAuthConfig | undefined =
-    overrides.oauth && overrides.oauthEnv
-      ? { type: "ccloud_oauth" as const, env: overrides.oauthEnv }
-      : undefined;
   return buildConfigFromEnv(
     env,
     {
@@ -165,7 +189,7 @@ export function buildConfigFromEnvAndCli(
       allowedHosts: overrides.allowedHosts,
     },
     overrides.kafkaConfig,
-    ccloudOAuth,
+    overrides.oauth ? { ccloudEnv: overrides.ccloudEnv } : undefined,
   );
 }
 

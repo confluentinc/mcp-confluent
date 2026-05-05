@@ -208,8 +208,9 @@ describe("ServerRuntime", () => {
     it("should throw when the sole client manager is not a DirectClientManager (e.g., OAuth)", () => {
       vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
       const oauthConfig = new MCPServerConfiguration({
-        connections: { "env-connection": connWith({}) },
-        ccloudOAuth: { type: "ccloud_oauth", env: "stag" },
+        connections: {
+          "env-connection": { type: "oauth", ccloud_env: "stag" },
+        },
       });
       const runtime = ServerRuntime.fromConfig(oauthConfig);
       expect(() => runtime.requireDirectClientManager()).toThrow(
@@ -261,7 +262,7 @@ describe("ServerRuntime", () => {
       expect(runtime.oauthHolder).toBeUndefined();
     });
 
-    it("should call OAuthHolder.start and expose oauthHolder when the config has ccloud-oauth", () => {
+    it("should call OAuthHolder.start and expose oauthHolder when a connection has type 'oauth'", () => {
       const fakeHolder = fakeOAuthHolder();
       const startSpy = vi
         .spyOn(OAuthHolder, "start")
@@ -269,11 +270,8 @@ describe("ServerRuntime", () => {
 
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": connWith({
-            kafka: { bootstrap_servers: "broker:9092" },
-          }),
+          "env-connection": { type: "oauth", ccloud_env: "devel" },
         },
-        ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
       });
 
       const runtime = ServerRuntime.fromConfig(oauthConfig);
@@ -282,21 +280,35 @@ describe("ServerRuntime", () => {
       expect(runtime.oauthHolder).toBe(fakeHolder);
     });
 
-    it("should construct OAuthClientManager instances for every connection when ccloud-oauth is set", () => {
+    it("should construct OAuthClientManager instances for every connection when an oauth connection is present", () => {
       vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": connWith({
-            kafka: { bootstrap_servers: "broker:9092" },
-          }),
+          "env-connection": { type: "oauth", ccloud_env: "stag" },
         },
-        ccloudOAuth: { type: "ccloud_oauth", env: "stag" },
       });
 
       const runtime = ServerRuntime.fromConfig(oauthConfig);
 
       expect(runtime.clientManagers["env-connection"]).toBeInstanceOf(
         OAuthClientManager,
+      );
+    });
+
+    it("should throw when more than one OAuth connection is defined", () => {
+      // enforceSingleConnectionOnly() prevents multi-connection records today,
+      // so this case is reached only by callers that bypass the schema (tests
+      // constructing MCPServerConfiguration directly). The defensive throw
+      // becomes load-bearing when multi-connection support lands (#151).
+      const multiOauthConfig = new MCPServerConfiguration({
+        connections: {
+          "oauth-1": { type: "oauth", ccloud_env: "devel" },
+          "oauth-2": { type: "oauth", ccloud_env: "stag" },
+        },
+      });
+
+      expect(() => ServerRuntime.fromConfig(multiOauthConfig)).toThrow(
+        /Multiple OAuth connections defined/,
       );
     });
   });

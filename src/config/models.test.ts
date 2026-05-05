@@ -672,6 +672,38 @@ describe("config/models.ts", () => {
         );
       });
     });
+
+    describe("getSoleDirectConnection", () => {
+      it("should return the connection narrowed to direct when sole connection is direct", () => {
+        const config = new MCPServerConfiguration({
+          connections: { local: directConnection },
+        });
+
+        const conn = config.getSoleDirectConnection();
+        expect(conn).toBe(directConnection);
+        expect(conn.type).toBe("direct");
+      });
+
+      it("should throw when the sole connection is OAuth-typed", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            "env-connection": { type: "oauth", development_env: "devel" },
+          },
+        });
+
+        expect(() => config.getSoleDirectConnection()).toThrow(
+          /Expected sole connection to be a direct connection; got type "oauth"/,
+        );
+      });
+
+      it("should propagate the underlying getSoleConnection throw on zero connections", () => {
+        const config = new MCPServerConfiguration({ connections: {} });
+
+        expect(() => config.getSoleDirectConnection()).toThrow(
+          /No connections defined/,
+        );
+      });
+    });
   });
 
   describe("oauth connection arm", () => {

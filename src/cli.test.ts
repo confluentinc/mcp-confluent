@@ -477,9 +477,10 @@ describe("cli.ts", () => {
         ).toThrow();
       });
 
-      it("should accept --oauth combined with --config", () => {
-        // The unconditional --oauth + --config mutex is removed; an actual conflict
-        // (YAML declaring its own oauth connection) is detected post-load.
+      it("should accept --oauth combined with --config at parse time", () => {
+        // parseCliArgs no longer rejects the combination — the actual rejection
+        // (in either the YAML-has-OAuth or YAML-is-direct-only shape) is
+        // detected post-load in main(), where the parsed YAML is available.
         expect(() =>
           parseCliArgs([
             "node",

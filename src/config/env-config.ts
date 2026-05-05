@@ -95,8 +95,14 @@ function buildConfigFromEnv(
     };
     const result = mcpConfigSchema.safeParse(rawDocument);
     if (!result.success) {
+      // Server-config validation can still fail on the OAuth path
+      // (e.g., MCP_API_KEY length / disabled+api_key conflict). Run the
+      // env-var humanizer so users see env-var names, not schema paths.
+      const formattedIssues = humanizeEnvConfigPaths(
+        formatZodIssues(result.error.issues),
+      );
       throw new Error(
-        `Failed to construct OAuth MCPServerConfiguration:\n${formatZodIssues(result.error.issues)}`,
+        `Failed to construct OAuth MCPServerConfiguration from environment variables:\n${formattedIssues}`,
       );
     }
     return new MCPServerConfiguration(result.data);

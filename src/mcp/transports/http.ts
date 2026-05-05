@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { sdkTransports } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
 import {
   pingHandler,
@@ -95,7 +96,7 @@ export class HttpTransport implements Transport {
         }
 
         const perSessionServer = this.serverFactory();
-        const transport = new StreamableHTTPServerTransport({
+        const transport = new sdkTransports.StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (sid: string) => {
             this.sessions.set(sid, {

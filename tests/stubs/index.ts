@@ -28,6 +28,7 @@ export {
   createMockSdkTransport,
   type MockedSdkTransport,
 } from "./sdk-transport.js";
+export { createMockSessionRegistry } from "./session-registry.js";
 export {
   MOCK_SESSION_ID,
   createMockHttpServerTransport,

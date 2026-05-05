@@ -33,8 +33,7 @@ const mcpErrorSchema = {
 };
 
 export class HttpTransport implements Transport {
-  private readonly sessions =
-    new SessionRegistry<StreamableHTTPServerTransport>();
+  private sessions = new SessionRegistry<StreamableHTTPServerTransport>();
 
   constructor(
     private serverFactory: () => McpServer,

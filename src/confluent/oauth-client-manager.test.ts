@@ -131,16 +131,21 @@ describe("oauth-client-manager.ts", () => {
       lastAdmin: () => {
         connect: ReturnType<typeof vi.fn>;
         disconnect: ReturnType<typeof vi.fn>;
+        listTopics: ReturnType<typeof vi.fn>;
       };
     } {
       let capturedAdmin = {
         connect: vi.fn().mockResolvedValue(undefined),
         disconnect: vi.fn().mockResolvedValue(undefined),
+        listTopics: vi.fn().mockResolvedValue([]),
       };
       vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function () {
         const instanceAdmin = {
           connect: vi.fn().mockResolvedValue(undefined),
           disconnect: vi.fn().mockResolvedValue(undefined),
+          // Warmup uses listTopics with a short timeout; resolve quickly so
+          // the cache builder skips the retry path in unit tests.
+          listTopics: vi.fn().mockResolvedValue([]),
         };
         capturedAdmin = instanceAdmin;
         return {

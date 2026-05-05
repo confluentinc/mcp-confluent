@@ -27,6 +27,7 @@ import {
 import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
+import { kafkaLogger, logger } from "@src/logger.js";
 
 /**
  * Bearer-auth client manager. Wires every REST surface to the OAuth holder's
@@ -130,6 +131,28 @@ export class OAuthClientManager extends BaseClientManager {
       const kafka = await this.buildOAuthKafkaClient(clusterId, envId);
       const admin = kafka.admin();
       await admin.connect();
+      // Workaround: the first admin op against a freshly-connected OAUTHBEARER
+      // session reliably hangs to the request timeout — the kafkaJS-compat
+      // wrapper's async `oauthBearerProvider` races librdkafka's SASL state
+      // machine, the broker never receives a valid bearer token, and both sides
+      // wait silently. The timeout itself resets librdkafka's connection state;
+      // the *second* op authenticates fast. We absorb that first failure here,
+      // with a short bounded timeout, so the user's first real request lands on
+      // the warm second connection. If even the second metadata fetch fails,
+      // surface the error — it's no longer a race, it's a real problem.
+      try {
+        await admin.listTopics({ timeout: 5_000 });
+      } catch (firstErr) {
+        logger.info(
+          {
+            clusterId,
+            err:
+              firstErr instanceof Error ? firstErr.message : String(firstErr),
+          },
+          "[oauth-kafka] first metadata fetch failed (expected); retrying to warm connection",
+        );
+        await admin.listTopics({ timeout: 30_000 });
+      }
       return admin;
     });
   }
@@ -177,6 +200,17 @@ export class OAuthClientManager extends BaseClientManager {
     clusterId: string,
     envId: string,
   ): Promise<KafkaJS.Kafka> {
+    // Wait for OAuth login to finish so the data-plane token is populated before
+    // librdkafka starts the SASL/OAUTHBEARER handshake. Without this, the provider
+    // closure returns an empty token on the first invocation and the broker times
+    // out the connection (~60s) instead of failing fast with a clear auth error.
+    await this.holder.bootstrapPromise;
+    if (!this.holder.getDataPlaneToken()) {
+      throw new Error(
+        "OAuth login did not produce a data-plane token; cannot connect to Kafka. " +
+          "Check the OAuth login flow status (browser sign-in must complete).",
+      );
+    }
     const bootstrap = await this.bootstrapResolutionCache.get(clusterId, () =>
       resolveKafkaBootstrap(
         this.getConfluentCloudRestClient(),
@@ -184,10 +218,23 @@ export class OAuthClientManager extends BaseClientManager {
         envId,
       ),
     );
+    // librdkafka debug logs — gated by env var so they don't pollute normal
+    // server stderr. Set OAUTH_KAFKA_DEBUG=security,broker,protocol (or
+    // "all") to see the full SASL/OAUTHBEARER handshake and broker traffic.
+    // Useful when the first admin op stalls until the request timeout fires
+    // instead of failing fast — it usually means librdkafka is waiting on a
+    // response that never arrives, and the debug logs show why.
+    const debug = process.env.OAUTH_KAFKA_DEBUG;
     return new kafkaDeps.Kafka({
+      ...(debug ? { debug } : {}),
       kafkaJS: {
         brokers: [bootstrap],
         ssl: true,
+        // Critical for stdio MCP: route KafkaJS / librdkafka logs through pino
+        // (which writes to stderr). Without this, the default logger prints to
+        // stdout in pretty format, corrupting the stdio JSON-RPC stream and
+        // crashing the MCP client with "Unexpected token" parse errors.
+        logger: kafkaLogger,
         sasl: {
           mechanism: "oauthbearer",
           oauthBearerProvider: async () => ({

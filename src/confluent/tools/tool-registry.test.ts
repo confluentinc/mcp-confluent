@@ -147,6 +147,7 @@ describe("tool-registry.ts", () => {
             bootstrap_servers: "broker:9092",
             rest_endpoint: "https://rest.example.com",
             auth: { type: "api_key", key: "k", secret: "s" },
+            env_id: "env-1",
           },
           flink: {
             endpoint: "https://flink.example.com",

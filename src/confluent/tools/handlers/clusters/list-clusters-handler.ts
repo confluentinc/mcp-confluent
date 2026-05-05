@@ -6,7 +6,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasDirectConfluentCloud,
+  hasConfluentCloud,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
@@ -18,7 +18,11 @@ const listClustersArguments = z.object({
   environmentId: z
     .string()
     .optional()
-    .describe("The environment ID to filter clusters by"),
+    .describe(
+      "The environment ID (env-...) to filter clusters by. Required under " +
+        "--oauth (the cmk endpoint requires it). Under a direct connection it " +
+        "falls back to kafka.env_id from the YAML config.",
+    ),
 });
 
 /**
@@ -67,8 +71,23 @@ export class ListClustersHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { environmentId } = listClustersArguments.parse(toolArguments);
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const conn = runtime.config.connections[connId]!;
+    const clientManager = runtime.clientManagers[connId]!;
+
+    // Resolve environment: arg wins; under direct, fall back to kafka.env_id;
+    // under OAuth there is no fallback, so the arg must be provided.
+    const resolvedEnv =
+      environmentId ??
+      (conn.type === "direct" ? conn.kafka?.env_id : undefined);
+    if (!resolvedEnv) {
+      return this.createResponse(
+        "environmentId is required under --oauth. Pass it as an argument, " +
+          "or call list-environments to discover available environments.",
+        true,
+      );
+    }
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(
@@ -80,10 +99,7 @@ export class ListClustersHandler extends BaseToolHandler {
       ].GET({
         params: {
           query: {
-            environment:
-              environmentId ??
-              runtime.config.getSoleDirectConnection().kafka?.env_id ??
-              "",
+            environment: resolvedEnv,
             page_size: 100,
           },
         },
@@ -194,9 +210,6 @@ Cluster: ${cluster.name}
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      hasDirectConfluentCloud,
-    );
+    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 }

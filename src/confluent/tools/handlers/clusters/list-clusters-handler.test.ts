@@ -2,6 +2,7 @@ import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list
 import {
   bareRuntime,
   CCLOUD_CONN,
+  ccloudOAuthRuntime,
   confluentCloudRuntime,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
@@ -27,6 +28,10 @@ describe("list-clusters-handler.ts", () => {
 
       it("should return an empty array for a connection without a confluent_cloud block", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
+      });
+
+      it("should return an empty array for an OAuth-typed connection", () => {
+        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
       });
     });
 

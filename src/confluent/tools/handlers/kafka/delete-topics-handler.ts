@@ -48,7 +48,8 @@ export class DeleteTopicsHandler extends BaseToolHandler {
       resolved.clusterId,
       resolved.envId,
     );
-    await admin.deleteTopics({ topics: parsed.topicNames });
+    // 30s broker-side timeout. See create-topics-handler for rationale.
+    await admin.deleteTopics({ timeout: 30_000, topics: parsed.topicNames });
     return this.createResponse(
       `Deleted Kafka topics: ${parsed.topicNames.join(",")}`,
     );

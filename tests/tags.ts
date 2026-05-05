@@ -20,4 +20,7 @@ export enum Tag {
   SCHEMA = "@schema",
   SEARCH = "@search",
   TABLEFLOW = "@tableflow",
+
+  // Self-managed Confluent Platform (local CP stack via docker-compose.cp-test.yml)
+  CP = "@cp",
 }

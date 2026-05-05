@@ -64,14 +64,25 @@ export function hasTableflow(conn: ConnectionConfig): boolean {
 }
 
 /**
- * True when the schema_registry block is present and carries api_key auth.
- * That combination is the reliable signal that the SR is CCloud-hosted and therefore
- * exposes the /catalog/v1/ endpoints. A vanilla CP SR has no auth block, so it returns
- * false even when a schema_registry block is present.
+ * True when the connection points at a Confluent Cloud-hosted Schema Registry that
+ * exposes the `/catalog/v1/` Stream Catalog endpoints.
+ *
+ * The reliable signal is the combination of:
+ *   - a `schema_registry` block carrying api_key auth, AND
+ *   - a `confluent_cloud` block (the Cloud control plane creds).
+ *
+ * Both signals together are required because the api_key auth shape alone is ambiguous:
+ * a self-managed Confluent Platform deployment with HTTP Basic Auth in front of its SR
+ * also models as `auth.type === "api_key"` in the YAML schema, even though that SR does
+ * not serve `/catalog/v1/`. Without the `confluent_cloud` requirement, this predicate
+ * would over-enable Stream Catalog tools on CP deployments and they would 404 at
+ * runtime.
  */
 export function hasCCloudCatalogSupport(conn: ConnectionConfig): boolean {
   return (
-    conn.type === "direct" && conn.schema_registry?.auth?.type === "api_key"
+    conn.type === "direct" &&
+    conn.schema_registry?.auth?.type === "api_key" &&
+    conn.confluent_cloud !== undefined
   );
 }
 

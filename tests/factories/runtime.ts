@@ -52,11 +52,23 @@ export function confluentCloudRuntime(): ServerRuntime {
   });
 }
 
-/** Runtime with a CCloud-hosted schema_registry (api_key auth) — the minimal enabled case for catalog-API tools. */
+/**
+ * Runtime with a CCloud-hosted schema_registry (api_key auth) AND the
+ * Cloud control plane block — the minimal enabled case for Stream Catalog
+ * tools. Both signals are required because the schema_registry api_key
+ * shape alone is ambiguous: a self-managed Confluent Platform deployment
+ * with HTTP Basic Auth in front of its SR has the same shape but does not
+ * serve `/catalog/v1/`. See `hasCCloudCatalogSupport` in
+ * `src/confluent/tools/connection-predicates.ts` for the predicate.
+ */
 export function ccloudSchemaRegistryRuntime(): ServerRuntime {
   return runtimeWith({
     schema_registry: {
       endpoint: "https://psrc-abc.us-east-1.aws.confluent.cloud",
+      auth: { type: "api_key", key: "k", secret: "s" },
+    },
+    confluent_cloud: {
+      endpoint: "https://api.confluent.cloud",
       auth: { type: "api_key", key: "k", secret: "s" },
     },
   });

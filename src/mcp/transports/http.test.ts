@@ -1,5 +1,4 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { HttpTransport } from "@src/mcp/transports/http.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
@@ -34,9 +33,7 @@ describe("HttpTransport", () => {
     fastify = Fastify();
     httpServer = createMockInstance(HttpServer);
     httpServer.getInstance.mockReturnValue(fastify);
-    serverFactory = vi.fn<() => McpServer>(
-      () => createMockInstance(McpServer) as unknown as McpServer,
-    );
+    serverFactory = vi.fn<() => McpServer>(() => createMockInstance(McpServer));
     httpTransport = new HttpTransport(serverFactory, httpServer);
     await httpTransport.connect();
   });
@@ -72,7 +69,7 @@ describe("HttpTransport", () => {
     it("should forward to the existing transport when the session id is known", async () => {
       const knownTransport = createMockHttpServerTransport();
       httpTransport["sessions"].set(MOCK_SESSION_ID, {
-        transport: knownTransport as unknown as StreamableHTTPServerTransport,
+        transport: knownTransport,
         server: createMockInstance(McpServer),
       });
 
@@ -95,7 +92,7 @@ describe("HttpTransport", () => {
         .mockImplementation(function MockStreamableHTTPServerTransport(
           this: unknown,
         ) {
-          return newTransport as unknown as StreamableHTTPServerTransport;
+          return newTransport;
         });
       const bindServerSpy = vi.spyOn(httpTransport["sessions"], "bindServer");
 
@@ -138,7 +135,7 @@ describe("HttpTransport", () => {
     it("should forward to the existing transport when the session id is known", async () => {
       const knownTransport = createMockHttpServerTransport();
       httpTransport["sessions"].set(MOCK_SESSION_ID, {
-        transport: knownTransport as unknown as StreamableHTTPServerTransport,
+        transport: knownTransport,
         server: createMockInstance(McpServer),
       });
 
@@ -167,7 +164,7 @@ describe("HttpTransport", () => {
     it("should delegate cleanup to the SDK transport when the session id is known", async () => {
       const knownTransport = createMockHttpServerTransport();
       httpTransport["sessions"].set(MOCK_SESSION_ID, {
-        transport: knownTransport as unknown as StreamableHTTPServerTransport,
+        transport: knownTransport,
         server: createMockInstance(McpServer),
       });
 

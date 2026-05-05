@@ -77,13 +77,18 @@ describe("tableflow-tool-handler.ts", () => {
         ).toEqual([DEFAULT_CONNECTION_ID]);
       });
 
-      it("should return an empty array for a tableflow+kafka connection missing env_id and cluster_id", () => {
+      it("should return the connection ID for a tableflow+kafka connection even when env_id and cluster_id are absent from config", () => {
+        // The tool is intentionally enabled without those fields: callers can supply
+        // environmentId and clusterId as explicit arguments. The handler only throws
+        // when a required ID is absent from both call arguments and connection config.
         const noIds: DirectConnectionConfig = {
           type: "direct",
           tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
           kafka: { rest_endpoint: "https://pkc-example.confluent.cloud:443" },
         };
-        expect(handler.enabledConnectionIds(runtimeWith(noIds))).toEqual([]);
+        expect(handler.enabledConnectionIds(runtimeWith(noIds))).toEqual([
+          DEFAULT_CONNECTION_ID,
+        ]);
       });
 
       it("should return an empty array for a tableflow-only connection without a kafka block", () => {
@@ -162,6 +167,11 @@ describe("tableflow-tool-handler.ts", () => {
         });
       });
 
+      // The following two cases document intentional failure behaviour: the tool is
+      // enabled on a connection whose kafka block lacks env_id / cluster_id (see
+      // enabledConnectionIds tests above), but the handler throws when a required ID
+      // is absent from both the call arguments and the connection config. Callers on
+      // such a connection must supply the missing IDs as explicit arguments.
       it("should throw when environment_id is absent from both arg and config", () => {
         const connNoEnv: DirectConnectionConfig = {
           type: "direct",

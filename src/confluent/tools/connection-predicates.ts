@@ -76,9 +76,11 @@ export function hasTableflowWithKafka(conn: ConnectionConfig): boolean {
 
 /**
  * True when a tableflow block is present and the kafka block carries both `env_id` and
- * `cluster_id`. Required by the eight Tableflow handlers that call
- * `resolveTableflowEnvAndClusterId()`: without both IDs available in config, those handlers
- * throw whenever the caller omits them as explicit arguments.
+ * `cluster_id`. This is a diagnostic predicate — it answers whether the zero-argument
+ * config-fallback path through `resolveTableflowEnvAndClusterId()` is fully provisioned.
+ * It is NOT used to gate tool enablement: the Tableflow handlers are enabled whenever
+ * `hasTableflowWithKafka` is satisfied, because callers can supply `environmentId` and
+ * `clusterId` as explicit tool arguments even when those fields are absent from config.
  */
 export function hasTableflowWithKafkaEnvAndCluster(
   conn: ConnectionConfig,

@@ -3,7 +3,7 @@ import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
   hasTableflow,
-  hasTableflowWithKafkaEnvAndCluster,
+  hasTableflowWithKafka,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
@@ -19,16 +19,20 @@ export abstract class TableflowOnlyToolHandler extends BaseToolHandler {
 }
 
 /**
- * Base for Tableflow handlers that also require a kafka block with `env_id` and
- * `cluster_id` configured. Those fields are the config fallbacks for
- * `resolveTableflowEnvAndClusterId()`; without them callers that omit the explicit
- * args would always receive a runtime throw.
+ * Base for Tableflow handlers that require both a tableflow auth block and a kafka
+ * block. The kafka block is required because `resolveTableflowEnvAndClusterId()`
+ * reads `conn.kafka.env_id` / `conn.kafka.cluster_id` as config fallbacks.
+ *
+ * The tool is intentionally enabled even when those fields are absent from config:
+ * callers can supply `environmentId` and `clusterId` as explicit tool arguments.
+ * The handler throws only when a required ID is absent from both the call arguments
+ * and the connection config — that is expected and not a misconfiguration signal.
  */
 export abstract class TableflowWithKafkaToolHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(
       runtime.config.connections,
-      hasTableflowWithKafkaEnvAndCluster,
+      hasTableflowWithKafka,
     );
   }
 

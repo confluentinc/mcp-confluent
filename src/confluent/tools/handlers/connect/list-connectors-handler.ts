@@ -1,6 +1,14 @@
+import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
+import {
+  BaseToolHandler,
+  READ_ONLY,
+  ToolConfig,
+} from "@src/confluent/tools/base-tools.js";
+import {
+  connectionIdsWhere,
+  hasConfluentCloud,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -21,8 +29,7 @@ const listConnectorArguments = z.object({
     .describe("The unique identifier for the Kafka cluster."),
 });
 
-/** Lists the names of active connectors for a given environment and cluster. */
-export class ListConnectorsHandler extends ConnectToolHandler {
+export class ListConnectorsHandler extends BaseToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -31,9 +38,16 @@ export class ListConnectorsHandler extends ConnectToolHandler {
     const { clusterId, environmentId } =
       listConnectorArguments.parse(toolArguments);
 
-    const conn = runtime.config.getSoleDirectConnection();
-    const { environment_id, kafka_cluster_id } =
-      this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
+    const environment_id = getEnsuredParam(
+      "KAFKA_ENV_ID",
+      "Environment ID is required",
+      environmentId,
+    );
+    const kafka_cluster_id = getEnsuredParam(
+      "KAFKA_CLUSTER_ID",
+      "Kafka Cluster ID is required",
+      clusterId,
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudRestClient(),
@@ -43,14 +57,14 @@ export class ListConnectorsHandler extends ConnectToolHandler {
     ].GET({
       params: {
         path: {
-          environment_id,
-          kafka_cluster_id,
+          environment_id: environment_id,
+          kafka_cluster_id: kafka_cluster_id,
         },
       },
     });
     if (error) {
       return this.createResponse(
-        `Failed to list Confluent Cloud connectors for ${kafka_cluster_id}: ${JSON.stringify(error)}`,
+        `Failed to list Confluent Cloud connectors for ${clusterId}: ${JSON.stringify(error)}`,
         true,
       );
     }
@@ -58,7 +72,6 @@ export class ListConnectorsHandler extends ConnectToolHandler {
       `Active Connectors: ${JSON.stringify(response?.join(","))}`,
     );
   }
-
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.LIST_CONNECTORS,
@@ -67,5 +80,9 @@ export class ListConnectorsHandler extends ConnectToolHandler {
       inputSchema: listConnectorArguments.shape,
       annotations: READ_ONLY,
     };
+  }
+
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 }

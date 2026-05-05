@@ -272,6 +272,7 @@ describe("tool-registry.ts", () => {
       },
       // Documentation
       [ToolName.SEARCH_PRODUCT_DOCS]: { throws: "ZodError" },
+      [ToolName.GET_PRODUCT_DOC_PAGES]: { throws: "ZodError" },
     };
 
     beforeAll(() => {

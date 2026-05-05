@@ -1,10 +1,32 @@
 import { logger } from "@src/logger.js";
 
 export interface ClientCacheOptions<V> {
+  /** If set, entries idle longer than this are evicted and disposed. */
   idleTimeoutMs?: number;
+  /** Called with the value when an entry is evicted, fails to fully build, or
+   *  when the cache is shut down. Errors are caught and logged. */
   dispose?: (value: V) => Promise<void>;
 }
 
+/**
+ * Single-flight, idle-evicting promise cache for heavy resources (Kafka
+ * clients, REST clients, resolved endpoint URLs). Concurrent `get(key, build)`
+ * calls for the same key share a single in-flight build. Successfully built
+ * entries are kept until their idle timer fires (if configured) or
+ * `shutdown()` is called; both paths invoke the optional `dispose` callback.
+ *
+ * Invariants:
+ *   - At most one `build()` runs per key at a time (single-flight).
+ *   - On `build()` rejection, the entry is evicted and the rejection
+ *     re-thrown to the caller. The cache cannot dispose a value the build
+ *     function never returned: if `build()` constructs heavy resources before
+ *     throwing, the build function itself is responsible for cleaning them up
+ *     (typically via a try/catch around the inner construction). Disposal
+ *     here is reserved for successfully-built values that later evict.
+ *   - `dispose` errors are swallowed (logged at warn) — failing to clean up
+ *     one resource must not block the cache from cleaning up the rest.
+ *   - `shutdown()` is idempotent.
+ */
 export class ClientCache<K, V> {
   private readonly entries = new Map<K, Promise<V>>();
   private readonly idleTimers = new Map<K, NodeJS.Timeout>();
@@ -24,6 +46,10 @@ export class ClientCache<K, V> {
       try {
         await entry;
       } catch (err) {
+        // Failed build: evict and re-throw. The cache cannot dispose a value
+        // the build function never produced — if `build()` constructed heavy
+        // resources before throwing, that cleanup is the build function's
+        // responsibility (see invariants in the class docstring).
         this.entries.delete(key);
         throw err;
       }
@@ -63,7 +89,13 @@ export class ClientCache<K, V> {
       const value = await entry;
       await this.dispose(value);
     } catch (err) {
-      logger.warn({ err }, "ClientCache dispose failed; entry already removed");
+      // Includes both rejected build promises (no value to dispose) and
+      // genuine dispose failures. Log and move on; the entry is already
+      // gone from the cache.
+      logger.warn(
+        { err },
+        "ClientCache dispose failed; resource may not be fully cleaned up",
+      );
     }
   }
 }

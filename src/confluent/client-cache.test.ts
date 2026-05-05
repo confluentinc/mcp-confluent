@@ -89,6 +89,19 @@ describe("ClientCache", () => {
     expect(build).toHaveBeenCalledTimes(2);
   });
 
+  it("does not call dispose when build() rejects (no value to dispose)", async () => {
+    // The cache contract: dispose only runs for successfully-built values
+    // that later evict. If build() rejects, the cache evicts the entry but
+    // calls dispose with nothing — there is no resolved value to pass.
+    // Cleanup of partially-constructed resources is the build function's
+    // own responsibility (see ClientCache class docstring).
+    const dispose = vi.fn().mockResolvedValue(undefined);
+    const cache = new ClientCache<string, string>({ dispose });
+    const build = vi.fn().mockRejectedValue(new Error("boom"));
+    await expect(cache.get("k", build)).rejects.toThrow("boom");
+    expect(dispose).not.toHaveBeenCalled();
+  });
+
   it("shutdown disposes every present entry and is idempotent", async () => {
     const dispose = vi.fn().mockResolvedValue(undefined);
     const cache = new ClientCache<string, string>({ dispose });

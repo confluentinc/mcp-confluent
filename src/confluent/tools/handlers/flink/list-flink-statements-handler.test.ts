@@ -1,25 +1,12 @@
 import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
-import { initEnv } from "@src/env.js";
 import {
   DEFAULT_CONNECTION_ID,
+  FLINK_CONN,
+  HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  assertHandleCase,
-  stubClientGetters,
-  type HandleCase,
-} from "@tests/stubs/index.js";
-import { beforeAll, describe, it } from "vitest";
-
-const FLINK_CONN = {
-  flink: {
-    endpoint: "https://flink.example.com",
-    auth: { type: "api_key" as const, key: "k", secret: "s" },
-    environment_id: "env-from-config",
-    organization_id: "org-from-config",
-    compute_pool_id: "lfcp-from-config",
-  },
-};
+import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import { describe, expect, it } from "vitest";
 
 const EXPLICIT_IDS = {
   organizationId: "org-from-args",
@@ -30,26 +17,21 @@ describe("list-flink-statements-handler.ts", () => {
   describe("ListFlinkStatementsHandler", () => {
     const handler = new ListFlinkStatementsHandler();
 
-    // Required while the handler reads env vars via getEnsuredParam/Zod defaults.
-    // Remove after issue #231 migrates those reads to conn.flink config fields.
-    beforeAll(() => {
-      initEnv();
-    });
-
     describe("handle()", () => {
-      const cases: HandleCase[] = [
+      const cases: HandleCaseWithConn[] = [
         {
-          label: "throws when organizationId is absent and not in env",
+          label:
+            "use org/env IDs and computePoolId from config when args absent",
           args: {},
-          outcome: { throws: "Organization ID is required" },
+          outcome: { resolves: "{}" },
         },
         {
-          label: "resolves when required IDs are supplied as explicit args",
+          label: "resolve when required IDs are supplied as explicit args",
           args: EXPLICIT_IDS,
           outcome: { resolves: "{}" },
         },
         {
-          label: "filters statements client-side by statusPhase",
+          label: "filter statements client-side by statusPhase",
           args: {
             ...EXPLICIT_IDS,
             statusPhase: "RUNNING",
@@ -64,7 +46,7 @@ describe("list-flink-statements-handler.ts", () => {
         },
         {
           label:
-            "reports zero results when no statements match the statusPhase filter",
+            "report zero results when no statements match the statusPhase filter",
           args: {
             ...EXPLICIT_IDS,
             statusPhase: "RUNNING",
@@ -78,13 +60,18 @@ describe("list-flink-statements-handler.ts", () => {
 
       it.each(cases)(
         "should $label",
-        async ({ args, outcome, responseData }) => {
+        async ({
+          args,
+          outcome,
+          responseData,
+          connectionConfig = FLINK_CONN,
+        }) => {
           const { clientManager, clientGetters } =
             stubClientGetters(responseData);
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
-              FLINK_CONN,
+              connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
             ),
@@ -94,6 +81,30 @@ describe("list-flink-statements-handler.ts", () => {
           });
         },
       );
+
+      it("should fall back to config computePoolId when arg is whitespace-only", async () => {
+        const { clientManager, clientGetters, capturedCalls } =
+          stubClientGetters({});
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { ...EXPLICIT_IDS, computePoolId: "   " },
+          outcome: { resolves: "{}" },
+          clientGetters,
+        });
+        expect(capturedCalls).toHaveLength(1);
+        expect(capturedCalls[0]!.args).toMatchObject({
+          params: expect.objectContaining({
+            query: expect.objectContaining({
+              "spec.compute_pool_id": FLINK_CONN.flink.compute_pool_id,
+            }),
+          }),
+        });
+      });
     });
   });
 });

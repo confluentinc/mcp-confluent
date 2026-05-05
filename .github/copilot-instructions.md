@@ -140,6 +140,7 @@ and how the AI assistant uses the tool. Reviewers should verify each of these:
 - Never silently swallow exceptions.
 - Log via the pino logger in `src/logger.ts`, or rethrow after enrichment.
 - Return errors through `this.createResponse(message, isError, _meta?)` on `BaseToolHandler`.
+- `BaseToolHandler` and domain subclasses (e.g. `FlinkToolHandler`) expose protected convenience helpers for common parameter patterns (required vs. optional arg/config fallback, domain-specific ID resolution). Read those classes before writing inline fallback logic.
 - Set `isError: true` on error results.
 - Write actionable error messages: say what happened and, where useful, how to resolve it.
 - Name the missing or invalid config in auth/configuration errors, so users don't have to read

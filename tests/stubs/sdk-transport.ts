@@ -4,10 +4,7 @@ import { type Mocked, vi } from "vitest";
 /** {@link SdkTransport} where each method is replaced with a {@linkcode vi.fn}. */
 export type MockedSdkTransport = Mocked<SdkTransport>;
 
-/**
- * Creates a {@link MockedSdkTransport}: a {@link SdkTransport} instance
- * where each method is a {@linkcode vi.fn} stub.
- */
+/** Creates a {@link MockedSdkTransport}. */
 export function createMockSdkTransport(): MockedSdkTransport {
   return {
     start: vi.fn().mockResolvedValue(undefined),

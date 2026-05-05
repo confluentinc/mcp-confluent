@@ -144,7 +144,7 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   whose connection has the relevant service block (expect the connection id) and a bare runtime
   without that block (expect `[]`). Helper factories live in `tests/factories/runtime.ts`
   (`flinkRuntime()`, `tableflowRuntime()`, `bareRuntime()`, etc.).
-- Test `handle()` for typical and edge-case inputs using `stubClientGetters` +
+- Test `handle()` for typical and edge-case inputs using `getMockedClientManager` +
   `assertHandleCase` from `@tests/stubs/index.js`. The standard three cases per
   config-backed parameter: (1) throws when arg absent and not in config, (2) resolves
   using config fallback, (3) resolves using explicit arg. Use `HandleCaseWithConn` to
@@ -153,46 +153,29 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   handler and get a copy-paste suggestion for the correct expectation; replace before
   committing.
 
-  `stubClientGetters(responseData)` returns three co-equal values:
-  - `clientManager` — inject into `runtimeWith()` to wire the mock into the handler's
-    runtime.
-  - `clientGetters` — pass to `assertHandleCase` to assert the handler reached the
-    client layer on a successful resolve.
-  - `capturedCalls: CapturedCall[]` — primarily for asserting what a handler sent to
-    an OpenAPI REST endpoint (POST body, query params, path params) when
-    `outcome.resolves` alone doesn't prove the payload. Each entry has `.pathTemplate`
-    and `.args` (the `{ params, body, ... }` object). The capture rule is
-    first-string-arg: for OpenAPI REST clients (both `wrapAsPathBasedClient` and
-    direct `client.GET("/path", options)` callers) the first argument is always a
-    path string. Note that SDK-based clients like Schema Registry may also produce
-    entries when their methods take a string as their first argument (e.g. subject
-    names in `getLatestSchemaMetadata(subject)`) — filter by
-    `capturedCalls.filter(c => c.pathTemplate.startsWith("/"))` to isolate REST
-    entries in mixed handlers. Non-string first-arg invocations (Kafka admin,
-    producer, consumer) are silently skipped.
-
-  `responseData` accepts a single element or an array for sequential per-call responses;
-  see the `stubClientGetters` JSDoc for the full element-shape contract (`data`,
-  `response`, `error` keys).
-
-  **When the endpoint returns a bare array** (e.g. list-connectors returns `string[]`),
-  the stub's single-vs-sequence detection fires on the outer array and each element would
-  be treated as a separate response. Wrap the array in a one-element outer array so the
-  inner array is delivered as `data` for the single call:
+  `getMockedClientManager()` returns a `MockedClientManager` (a
+  `Mocked<DirectClientManager>` whose client-getters are narrowed to return
+  `Mocked<...>` of the corresponding production client). Tests retrieve a typed
+  mock from the manager and configure return values per-method on the
+  specific client(s) the handler exercises. Sync getters (the six REST clients
+  and Schema Registry) return the mock directly; async Kafka getters need an
+  `await`:
 
   ```typescript
-  // handler does: const { data: response } = await client.GET(...); response.join(",")
-  stubClientGetters([["connector-a", "connector-b"]]);
-  //                 ↑ outer = "sequence of calls"
-  //                  ↑↑ inner = the array that becomes `data`
-  ```
+  const clientManager = getMockedClientManager();
 
-  Basic usage:
+  // openapi-fetch (sync getter):
+  clientManager
+    .getConfluentCloudFlinkRestClient()
+    .GET.mockResolvedValue({ data: { items: [] } });
 
-  ```typescript
-  const { clientManager, clientGetters, capturedCalls } = stubClientGetters({
-    status: { phase: "COMPLETED" },
-  });
+  // KafkaJS (async getter):
+  const admin = await clientManager.getAdminClient();
+  admin.listTopics.mockResolvedValue(["topic-a"]);
+
+  // SchemaRegistryClient (sync getter):
+  clientManager.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
+
   await assertHandleCase({
     handler,
     runtime: runtimeWith(
@@ -202,32 +185,56 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
     ),
     args,
     outcome,
-    clientGetters,
+    clientManager,
   });
+  ```
+
+  For poll-then-fetch flows or any case where a method returns different data
+  on successive calls, chain `mockResolvedValueOnce`:
+
+  ```typescript
+  const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+  flinkRest.GET.mockResolvedValueOnce({
+    data: { status: { phase: "RUNNING" } },
+  }).mockResolvedValue({ data: { data: [] } });
   ```
 
   Asserting a POST body (when `outcome.resolves` doesn't prove the payload):
 
   ```typescript
-  expect(capturedCalls).toHaveLength(1);
-  expect(capturedCalls[0]!.args).toMatchObject({
-    body: expect.objectContaining({
-      spec: expect.objectContaining({
-        properties: expect.objectContaining({
-          "sql.current-catalog": "env-name-from-config",
+  const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+  expect(flinkRest.POST).toHaveBeenCalledOnce();
+  expect(flinkRest.POST).toHaveBeenCalledWith(
+    expect.stringContaining("/statements"),
+    expect.objectContaining({
+      body: expect.objectContaining({
+        spec: expect.objectContaining({
+          properties: expect.objectContaining({
+            "sql.current-catalog": "env-name-from-config",
+          }),
         }),
       }),
     }),
-  });
+  );
   ```
 
-  Proving a zero-arg REST call was made (`wrapAsPathBasedClient` always injects the
-  path, so the call is still captured even when the handler passes no init object):
+  Asserting that a different client was not touched (negative assertions are
+  first-class because each seam has its own mock):
 
   ```typescript
-  expect(capturedCalls).toHaveLength(1);
-  expect(capturedCalls[0]!.args).toBeUndefined();
+  expect(
+    clientManager.getConfluentCloudKafkaRestClient().POST,
+  ).not.toHaveBeenCalled();
+  expect(
+    clientManager.getConfluentCloudFlinkRestClient().GET,
+  ).not.toHaveBeenCalled();
   ```
+
+  For tests that need a single typed mock without the full
+  `getMockedClientManager` wiring (e.g., focused unit tests against one seam),
+  the per-client helpers are exported directly: `getMockedRestClient()`,
+  `getMockedAdmin()`, `getMockedProducer()`, `getMockedConsumer()`,
+  `getMockedSchemaRegistry()`.
 
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
   `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.

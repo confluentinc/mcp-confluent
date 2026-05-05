@@ -1034,38 +1034,44 @@ describe("config/env-config.ts", () => {
       ).toThrow(/MCP_AUTH_DISABLED.*MCP_API_KEY/);
     });
 
-    describe("ccloudOAuth", () => {
-      it("should leave ccloudOAuth undefined when --oauth is not set", () => {
+    describe("oauth connection synthesis", () => {
+      it("should produce a single direct connection when --oauth is not set", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
           {},
         );
-        expect(config.getCCloudOAuth()).toBeUndefined();
+        const conn = config.getSoleConnection();
+        expect(conn.type).toBe("direct");
       });
 
-      it("should default development_env to prod when --oauth is set without --development-env", () => {
-        const config = buildConfigFromEnvAndCli(
-          envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
-          { oauth: true },
-        );
-        expect(config.getCCloudOAuth()).toEqual({
-          type: "ccloud_oauth",
-          env: "prod",
-        });
+      it("should produce an OAuth connection with development_env=prod when --oauth is alone", () => {
+        const config = buildConfigFromEnvAndCli(envWith({}), { oauth: true });
+        const conn = config.getSoleConnection();
+        expect(conn).toEqual({ type: "oauth", development_env: "prod" });
       });
 
-      it("should propagate developmentEnv into ccloudOAuth when both flags are set", () => {
-        const config = buildConfigFromEnvAndCli(
-          envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
-          {
-            oauth: true,
-            developmentEnv: "devel",
-          },
-        );
-        expect(config.getCCloudOAuth()).toEqual({
-          type: "ccloud_oauth",
-          env: "devel",
+      it("should propagate developmentEnv into the OAuth connection", () => {
+        const config = buildConfigFromEnvAndCli(envWith({}), {
+          oauth: true,
+          developmentEnv: "stag",
         });
+        const conn = config.getSoleConnection();
+        expect(conn).toEqual({ type: "oauth", development_env: "stag" });
+      });
+
+      it("should ignore api-key env vars when --oauth is set", () => {
+        // OAuth is a top-level switch; the connections record carries a single OAuth
+        // entry regardless of which api-key env vars happen to be present.
+        const config = buildConfigFromEnvAndCli(
+          envWith({
+            BOOTSTRAP_SERVERS: "broker:9092",
+            CONFLUENT_CLOUD_API_KEY: "k",
+            CONFLUENT_CLOUD_API_SECRET: "s",
+          }),
+          { oauth: true, developmentEnv: "devel" },
+        );
+        const conn = config.getSoleConnection();
+        expect(conn).toEqual({ type: "oauth", development_env: "devel" });
       });
     });
   });

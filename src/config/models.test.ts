@@ -1,11 +1,7 @@
-import type {
-  CCloudOAuthConfig,
-  DirectConnectionConfig,
-} from "@src/config/models.js";
+import type { DirectConnectionConfig } from "@src/config/models.js";
 import {
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
   MCPServerConfiguration,
-  ccloudOAuthConfigSchema,
   formatZodIssues,
   mcpConfigSchema,
 } from "@src/config/models.js";
@@ -675,87 +671,6 @@ describe("config/models.ts", () => {
           /Multiple connections defined/,
         );
       });
-    });
-
-    describe("getCCloudOAuth()", () => {
-      it("should return undefined when no oauth config is supplied", () => {
-        const config = new MCPServerConfiguration({
-          connections: {},
-        });
-        expect(config.getCCloudOAuth()).toBeUndefined();
-      });
-
-      it("should return the supplied config", () => {
-        const oauth: CCloudOAuthConfig = { type: "ccloud_oauth", env: "stag" };
-        const config = new MCPServerConfiguration({
-          connections: {},
-          ccloudOAuth: oauth,
-        });
-        expect(config.getCCloudOAuth()).toEqual(oauth);
-      });
-
-      it("should not expose ccloudOAuth as an enumerable property", () => {
-        const config = new MCPServerConfiguration({
-          connections: {},
-          ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
-        });
-        // Private fields should not appear on Object.keys.
-        expect(Object.keys(config)).not.toContain("ccloudOAuth");
-        expect(Object.keys(config)).not.toContain("#ccloudOAuth");
-      });
-    });
-  });
-
-  describe("ccloudOAuthConfigSchema", () => {
-    it("should accept a valid devel config", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "ccloud_oauth",
-        env: "devel",
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it("should accept stag and prod environments", () => {
-      expect(
-        ccloudOAuthConfigSchema.safeParse({ type: "ccloud_oauth", env: "stag" })
-          .success,
-      ).toBe(true);
-      expect(
-        ccloudOAuthConfigSchema.safeParse({ type: "ccloud_oauth", env: "prod" })
-          .success,
-      ).toBe(true);
-    });
-
-    it("should reject an unknown env value", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "ccloud_oauth",
-        env: "bogus",
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("should reject a wrong discriminator", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "direct",
-        env: "devel",
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("should reject when env is missing", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "ccloud_oauth",
-      });
-      expect(result.success).toBe(false);
-    });
-
-    it("should reject unknown extra keys", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "ccloud_oauth",
-        env: "devel",
-        clientId: "should-not-be-here",
-      });
-      expect(result.success).toBe(false);
     });
   });
 

@@ -1,6 +1,5 @@
 import {
   type AuthConfig,
-  type CCloudOAuthConfig,
   type KafkaDirectConfig,
   formatZodIssues,
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
@@ -78,8 +77,31 @@ function buildConfigFromEnv(
   env: Environment,
   authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
   kafkaConfig?: KeyValuePairObject,
-  ccloudOAuth?: CCloudOAuthConfig,
+  oauth?: { developmentEnv?: "devel" | "stag" | "prod" },
 ): MCPServerConfiguration {
+  // OAuth path: synthesize a single OAuth-typed connection. No surface blocks,
+  // no auth fields. development_env defaults to "prod" via the schema.
+  if (oauth) {
+    const rawDocument: Record<string, unknown> = {
+      connections: {
+        [ENV_CONNECTION_NAME]: {
+          type: "oauth",
+          ...(oauth.developmentEnv && {
+            development_env: oauth.developmentEnv,
+          }),
+        },
+      },
+      ...buildServerBlock(env, authOverrides),
+    };
+    const result = mcpConfigSchema.safeParse(rawDocument);
+    if (!result.success) {
+      throw new Error(
+        `Failed to construct OAuth MCPServerConfiguration:\n${formatZodIssues(result.error.issues)}`,
+      );
+    }
+    return new MCPServerConfiguration(result.data);
+  }
+
   const connection: Record<string, unknown> = { type: "direct" };
 
   // Each connection builder returns { <blockKey>: { ...fields } } or null — the key is owned
@@ -129,7 +151,7 @@ function buildConfigFromEnv(
     );
   }
 
-  return new MCPServerConfiguration({ ...result.data, ccloudOAuth });
+  return new MCPServerConfiguration(result.data);
 }
 
 /** CLI flags that may override values in the env-var config path. */
@@ -154,14 +176,6 @@ export function buildConfigFromEnvAndCli(
   env: Environment,
   overrides: EnvPathCliOverrides = {},
 ): MCPServerConfiguration {
-  // --oauth alone → defaults to prod. --development-env only takes effect when --oauth is set
-  // (parseCliArgs enforces this); defensively default the env here too.
-  const ccloudOAuth: CCloudOAuthConfig | undefined = overrides.oauth
-    ? {
-        type: "ccloud_oauth" as const,
-        env: overrides.developmentEnv ?? "prod",
-      }
-    : undefined;
   return buildConfigFromEnv(
     env,
     {
@@ -169,7 +183,7 @@ export function buildConfigFromEnvAndCli(
       allowedHosts: overrides.allowedHosts,
     },
     overrides.kafkaConfig,
-    ccloudOAuth,
+    overrides.oauth ? { developmentEnv: overrides.developmentEnv } : undefined,
   );
 }
 

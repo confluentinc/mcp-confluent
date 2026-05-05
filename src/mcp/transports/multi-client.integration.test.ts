@@ -32,7 +32,7 @@ describe("HTTP multi-client", { tags: [Tag.SMOKE] }, () => {
 
   it("should let a second client connect to an active server", async () => {
     // per-session McpServer wiring in HttpTransport is what makes the second handshake succeed
-    // (pre-#116 this connect() throws "Already connected to a transport")
+    // (a single shared server would throw "Already connected to a transport" here)
     secondClient = new Client({
       name: "mcp-confluent-multi-client-2",
       version: "0.0.0-test",

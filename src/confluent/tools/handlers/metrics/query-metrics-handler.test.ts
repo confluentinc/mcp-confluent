@@ -71,6 +71,13 @@ describe("query-metrics-handler.ts", () => {
             value: "lkc-explicit",
           },
         },
+        {
+          label:
+            "not inject a filter for non-Kafka-server metrics even when cluster_id is in config",
+          connectionConfig: WITH_KAFKA_CLUSTER_ID,
+          args: { metric: "io.confluent.flink/num_records_in" },
+          outcome: { resolves: "No data returned for metric" },
+        },
       ];
 
       it.each(cases)(

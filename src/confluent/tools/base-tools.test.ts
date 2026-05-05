@@ -43,6 +43,32 @@ describe("base-tools.ts", () => {
       });
     });
 
+    describe("requireParam()", () => {
+      const requireParam = handler["requireParam"].bind(
+        handler,
+      ) as (typeof handler)["requireParam"];
+
+      it("should return the value when present", () => {
+        expect(requireParam("cfg-val", "X")).toBe("cfg-val");
+      });
+
+      it("should throw when value is absent", () => {
+        expect(() => requireParam(undefined, "Kafka API Key")).toThrow(
+          "Kafka API Key is required",
+        );
+      });
+
+      it("should throw when value is whitespace-only", () => {
+        expect(() => requireParam("  ", "Kafka API Key")).toThrow(
+          "Kafka API Key is required",
+        );
+      });
+
+      it("should trim whitespace from the value", () => {
+        expect(requireParam("  cfg-val  ", "X")).toBe("cfg-val");
+      });
+    });
+
     describe("resolveOptionalParam()", () => {
       const resolveOptionalParam = handler["resolveOptionalParam"].bind(
         handler,

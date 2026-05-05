@@ -175,6 +175,19 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   see the `stubClientGetters` JSDoc for the full element-shape contract (`data`,
   `response`, `error` keys).
 
+  **Bare-array routes.** A handful of Confluent Cloud endpoints return a bare JSON array
+  rather than a paginated envelope (e.g. `GET /connect/v1/.../connectors` returns
+  `["ConnectorA", "ConnectorB"]`). Because a top-level array argument is always
+  interpreted as sequential-call responses, wrap the array in an outer array so that the
+  single element IS the array:
+
+  ```typescript
+  stubClientGetters([["ConnectorA", "ConnectorB"]]);
+  //               ^one response   ^the data value
+  ```
+
+  Handlers whose source file contains a comment "returns a bare JSON array" use this pattern.
+
   Basic usage:
 
   ```typescript

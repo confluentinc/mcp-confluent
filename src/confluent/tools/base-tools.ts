@@ -85,6 +85,21 @@ export abstract class BaseToolHandler implements ToolHandler {
     return resolved;
   }
 
+  /**
+   * Asserts that a single required string value is present and non-blank.
+   * Throws `"${label} is required"` if absent or whitespace-only.
+   * The returned value is always trimmed.
+   *
+   * Use when there is no tool-argument counterpart and the value comes from
+   * a single source (e.g. connection config). For the two-source arg-or-config
+   * pattern, use `resolveParam` instead.
+   */
+  protected requireParam(value: string | undefined, label: string): string {
+    const resolved = value?.trim();
+    if (!resolved) throw new Error(`${label} is required`);
+    return resolved;
+  }
+
   /** Like resolveParam but returns undefined instead of throwing when both are absent or blank. The returned value is always trimmed. */
   protected resolveOptionalParam(
     argValue: string | undefined,

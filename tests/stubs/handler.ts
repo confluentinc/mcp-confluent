@@ -122,7 +122,7 @@ export function classifyThrown(label: string, thrown: unknown): string {
  *   stubClientGetters({ error: { message: "not found" } })
  *   ```
  *
- * ## `responseData` — array of elements
+ * ## `responseData` — array of elements (sequential calls)
  *
  * Pass an array to feed different data to successive calls. Each element
  * follows the same shape contract above. The last element is reused once the
@@ -134,6 +134,19 @@ export function classifyThrown(label: string, thrown: unknown): string {
  *   { status: { phase: "COMPLETED" } },                   // GET poll
  *   { results: { data: [{ COLUMN_NAME: "id" }] } },       // GET results
  * ])
+ * ```
+ *
+ * ## Bare-array routes (response IS an array)
+ *
+ * Some Confluent Cloud routes return a bare JSON array rather than a paginated
+ * envelope object (e.g. `GET /connect/v1/.../connectors` returns
+ * `["ConnectorA", "ConnectorB"]`). Because a top-level array is always
+ * interpreted as sequential-call responses, you must wrap it in an outer array
+ * so the single element is the array itself:
+ * ```typescript
+ * // handler does: const { data: names } = await client.GET(...); names.join(",")
+ * stubClientGetters([["ConnectorA", "ConnectorB"]])
+ * //               ^outer array = one response  ^inner array = the data value
  * ```
  *
  * Returns `{ clientManager, clientGetters, capturedCalls }`.

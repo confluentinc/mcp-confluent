@@ -34,8 +34,8 @@ export async function connectTestProducer(): Promise<KafkaJS.Producer> {
  * `undefined` and produce a confusing downstream error.
  */
 export function getTestClusterId(): string {
-  const conn = Object.values(integrationRuntime().config.connections)[0];
-  if (!conn?.kafka?.cluster_id) {
+  const conn = integrationRuntime().config.getSoleDirectConnection();
+  if (!conn.kafka?.cluster_id) {
     throw new Error(
       "test-side cluster id requires kafka.cluster_id in test-fixtures/yaml_configs/integration.yaml",
     );
@@ -106,8 +106,8 @@ function newKafkaClient(clientId: string): KafkaJS.Kafka {
 // resolve from the same YAML fixture the server reads, so the test-side admin and the MCP server
 // can never disagree on which cluster they're talking to
 function kafkaConfig(clientId: string): GlobalConfig {
-  const conn = Object.values(integrationRuntime().config.connections)[0];
-  if (!conn?.kafka?.bootstrap_servers || !conn.kafka.auth) {
+  const conn = integrationRuntime().config.getSoleDirectConnection();
+  if (!conn.kafka?.bootstrap_servers || !conn.kafka.auth) {
     throw new Error(
       "test-side kafka admin requires kafka.bootstrap_servers + kafka.auth in test-fixtures/yaml_configs/integration.yaml",
     );

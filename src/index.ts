@@ -131,8 +131,24 @@ async function main() {
         allowedHosts: cliOptions.allowedHosts,
         kafkaConfig: cliOptions.kafkaConfig,
         oauth: cliOptions.oauth,
-        oauthEnv: cliOptions.oauthEnv,
+        developmentEnv: cliOptions.developmentEnv,
       });
+    }
+
+    // --oauth + --config is rejected in both shapes the combination can take.
+    // (a) YAML already declares an OAuth connection: ambiguous which env wins.
+    // (b) YAML is direct-only: --oauth would be silently ignored, since we don't
+    //     yet merge a synthesized OAuth connection into a multi-connection YAML.
+    // When multi-connection support lands (#151), case (b) can become a merge.
+    if (cliOptions.oauth && cliOptions.config) {
+      const yamlHasOauth = Object.values(mcpConfig.connections).some(
+        (c) => c.type === "oauth",
+      );
+      throw new Error(
+        yamlHasOauth
+          ? "--oauth conflicts with the OAuth connection already declared in the YAML config; remove one or the other"
+          : "--oauth and --config cannot be combined: declare OAuth as a connection inside the YAML (type: oauth) instead of passing --oauth",
+      );
     }
 
     setLogLevel(mcpConfig.server.log_level);

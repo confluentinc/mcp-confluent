@@ -32,7 +32,7 @@ export interface CLIOptions {
   allowedHosts?: string[];
   generateKey?: boolean;
   oauth?: boolean;
-  oauthEnv?: "devel" | "stag" | "prod";
+  developmentEnv?: "devel" | "stag" | "prod";
 }
 
 /**
@@ -210,13 +210,15 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       "--generate-key",
       "Generate a secure API key for MCP_API_KEY and print it to stdout, then exit. Use this to set MCP_API_KEY in your .env file.",
     )
-    .option("--oauth", "Enable OAuth (PKCE) auth against Confluent Cloud")
+    .option(
+      "--oauth",
+      "Enable OAuth (PKCE) auth against Confluent Cloud (defaults to prod)",
+    )
     .addOption(
-      new Option("--oauth-env <env>", "Auth0 environment for --oauth").choices([
-        "devel",
-        "stag",
-        "prod",
-      ] as const),
+      new Option(
+        "--development-env <env>",
+        "Override the Auth0 environment for --oauth (devel/stag/prod). Defaults to prod when omitted.",
+      ).choices(["devel", "stag", "prod"] as const),
     )
     .allowExcessArguments(false)
     .exitOverride();
@@ -232,16 +234,8 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       program.getOptionValueSource("transport") === "cli",
     );
 
-    if (opts.oauth && !opts.oauthEnv) {
-      throw new Error("--oauth requires --oauth-env <devel|stag|prod>");
-    }
-    if (opts.oauthEnv && !opts.oauth) {
-      throw new Error("--oauth-env requires --oauth");
-    }
-    if (opts.oauth && opts.config) {
-      throw new Error(
-        "--oauth and --config are mutually exclusive in this release; YAML-driven OAuth is tracked as a follow-up",
-      );
+    if (opts.developmentEnv && !opts.oauth) {
+      throw new Error("--development-env requires --oauth");
     }
 
     // Precedence: CLI > file > undefined
@@ -277,7 +271,7 @@ export function parseCliArgs(argv: string[]): CLIOptions {
         : undefined,
       generateKey: !!opts.generateKey,
       oauth: opts.oauth,
-      oauthEnv: opts.oauthEnv,
+      developmentEnv: opts.developmentEnv,
     };
   } catch (error: unknown) {
     if (

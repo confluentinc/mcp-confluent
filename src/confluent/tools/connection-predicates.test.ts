@@ -11,7 +11,6 @@ import {
   hasKafkaRestWithAuth,
   hasSchemaRegistry,
   hasTableflow,
-  hasTableflowWithKafka,
   hasTelemetry,
 } from "@src/confluent/tools/connection-predicates.js";
 import { describe, expect, it } from "vitest";
@@ -59,11 +58,6 @@ const TELEMETRY_CONN = conn({
 
 const TABLEFLOW_CONN = conn({
   tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-});
-
-const TABLEFLOW_WITH_KAFKA_CONN = conn({
-  tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-  kafka: { rest_endpoint: "https://pkc-example.confluent.cloud:443" },
 });
 
 const CCLOUD_SR_CONN = conn({
@@ -241,24 +235,6 @@ describe("connection-predicates.ts", () => {
 
     it("should return false for an OAuth connection", () => {
       expect(hasTableflow(OAUTH_CONN)).toBe(false);
-    });
-  });
-
-  describe("hasTableflowWithKafka()", () => {
-    it("should return true when both tableflow and kafka blocks are present", () => {
-      expect(hasTableflowWithKafka(TABLEFLOW_WITH_KAFKA_CONN)).toBe(true);
-    });
-
-    it("should return false when tableflow is present but kafka is absent", () => {
-      expect(hasTableflowWithKafka(TABLEFLOW_CONN)).toBe(false);
-    });
-
-    it("should return false when kafka is present but tableflow is absent", () => {
-      expect(hasTableflowWithKafka(KAFKA_CONN)).toBe(false);
-    });
-
-    it("should return false for an OAuth connection", () => {
-      expect(hasTableflowWithKafka(OAUTH_CONN)).toBe(false);
     });
   });
 

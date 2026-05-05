@@ -64,17 +64,6 @@ export function hasTableflow(conn: ConnectionConfig): boolean {
 }
 
 /**
- * True when both a tableflow block and a kafka block are present on a direct connection.
- */
-export function hasTableflowWithKafka(conn: ConnectionConfig): boolean {
-  return (
-    conn.type === "direct" &&
-    conn.tableflow !== undefined &&
-    conn.kafka !== undefined
-  );
-}
-
-/**
  * True when the schema_registry block is present and carries api_key auth.
  * That combination is the reliable signal that the SR is CCloud-hosted and therefore
  * exposes the /catalog/v1/ endpoints. A vanilla CP SR has no auth block, so it returns

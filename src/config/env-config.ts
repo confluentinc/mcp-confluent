@@ -34,6 +34,7 @@ const ENV_VAR_TO_ZPATH = {
   CONFLUENT_CLOUD_REST_ENDPOINT: `${CONN}.confluent_cloud.endpoint`,
   CONFLUENT_CLOUD_API_KEY: `${CONN}.confluent_cloud.auth.key`,
   CONFLUENT_CLOUD_API_SECRET: `${CONN}.confluent_cloud.auth.secret`,
+  CONFLUENT_CLOUD_ORG_ID: `${CONN}.confluent_cloud.organization_id`,
   // Tableflow parameters
   TABLEFLOW_API_KEY: `${CONN}.tableflow.auth.key`,
   TABLEFLOW_API_SECRET: `${CONN}.tableflow.auth.secret`,

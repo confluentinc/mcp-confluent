@@ -1,22 +1,18 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import {
-  TableflowOnlyToolHandler,
-  TableflowWithKafkaToolHandler,
-} from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
+import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   bareRuntime,
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
-  TABLEFLOW_CONN,
   tableflowRuntime,
 } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
 
-class StubTableflowOnlyHandler extends TableflowOnlyToolHandler {
+class StubTableflowHandler extends TableflowToolHandler {
   async handle(): Promise<CallToolResult> {
     return this.createResponse("stub");
   }
@@ -31,68 +27,26 @@ class StubTableflowOnlyHandler extends TableflowOnlyToolHandler {
   }
 }
 
-class StubTableflowWithKafkaHandler extends TableflowWithKafkaToolHandler {
-  async handle(): Promise<CallToolResult> {
-    return this.createResponse("stub");
-  }
-
-  getToolConfig(): ToolConfig {
-    return {
-      name: ToolName.LIST_TABLEFLOW_TOPICS,
-      description: "stub",
-      inputSchema: {},
-      annotations: READ_ONLY,
-    };
-  }
-}
-
 describe("tableflow-tool-handler.ts", () => {
-  describe("TableflowOnlyToolHandler", () => {
-    const handler = new StubTableflowOnlyHandler();
+  describe("TableflowToolHandler", () => {
+    const handler = new StubTableflowHandler();
 
     describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a tableflow block", () => {
+      it("should return the connection ID for a tableflow-only connection", () => {
         expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
           DEFAULT_CONNECTION_ID,
         ]);
       });
 
-      it("should return an empty array for a connection without a tableflow block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
-      });
-    });
-  });
-
-  describe("TableflowWithKafkaToolHandler", () => {
-    const handler = new StubTableflowWithKafkaHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with tableflow and kafka blocks", () => {
-        expect(
-          handler.enabledConnectionIds(runtimeWith(TABLEFLOW_CONN)),
-        ).toEqual([DEFAULT_CONNECTION_ID]);
-      });
-
-      it("should return the connection ID for a tableflow+kafka connection even when env_id and cluster_id are absent from config", () => {
-        // The tool is intentionally enabled without those fields: callers can supply
-        // environmentId and clusterId as explicit arguments. The handler only throws
-        // when a required ID is absent from both call arguments and connection config.
-        const noIds: DirectConnectionConfig = {
+      it("should return the connection ID for a tableflow+kafka connection", () => {
+        const conn: DirectConnectionConfig = {
           type: "direct",
           tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
           kafka: { rest_endpoint: "https://pkc-example.confluent.cloud:443" },
         };
-        expect(handler.enabledConnectionIds(runtimeWith(noIds))).toEqual([
+        expect(handler.enabledConnectionIds(runtimeWith(conn))).toEqual([
           DEFAULT_CONNECTION_ID,
         ]);
-      });
-
-      it("should return an empty array for a tableflow-only connection without a kafka block", () => {
-        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([]);
       });
 
       it("should return an empty array for a connection without a tableflow block", () => {
@@ -168,10 +122,10 @@ describe("tableflow-tool-handler.ts", () => {
       });
 
       // The following two cases document intentional failure behaviour: the tool is
-      // enabled on a connection whose kafka block lacks env_id / cluster_id (see
-      // enabledConnectionIds tests above), but the handler throws when a required ID
-      // is absent from both the call arguments and the connection config. Callers on
-      // such a connection must supply the missing IDs as explicit arguments.
+      // enabled on a tableflow-only connection (see enabledConnectionIds tests above),
+      // but the handler throws when a required ID is absent from both the call arguments
+      // and the connection config. Callers on such a connection must supply the missing
+      // IDs as explicit arguments.
       it("should throw when environment_id is absent from both arg and config", () => {
         const connNoEnv: DirectConnectionConfig = {
           type: "direct",

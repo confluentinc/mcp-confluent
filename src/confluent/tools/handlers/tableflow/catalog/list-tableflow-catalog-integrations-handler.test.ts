@@ -27,8 +27,10 @@ describe("list-tableflow-catalog-integrations-handler.ts", () => {
         ).toEqual([DEFAULT_CONNECTION_ID]);
       });
 
-      it("should return an empty array for a tableflow-only connection without a kafka block", () => {
-        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([]);
+      it("should return the connection ID for a tableflow-only connection without a kafka block", () => {
+        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
+          DEFAULT_CONNECTION_ID,
+        ]);
       });
 
       it("should return an empty array for a connection without a tableflow block", () => {

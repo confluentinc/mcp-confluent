@@ -3,37 +3,22 @@ import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
   hasTableflow,
-  hasTableflowWithKafka,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
- * Base for Tableflow handlers that require only a tableflow auth block.
- * Covers tools that either need no env/cluster IDs at all (e.g. list-regions)
- * or receive them entirely from the caller's request body (e.g. update-topic).
+ * Base for all Tableflow handlers. Requires only a tableflow auth block.
+ *
+ * Handlers that resolve `environmentId`/`clusterId` via
+ * `resolveTableflowEnvAndClusterId()` are enabled here too: the kafka block is
+ * optional at enablement time because callers can supply those IDs as explicit
+ * tool arguments. When a kafka block is present its `env_id`/`cluster_id` fields
+ * serve as config fallbacks; the handler throws only when a required ID is absent
+ * from both the call arguments and the connection config.
  */
-export abstract class TableflowOnlyToolHandler extends BaseToolHandler {
+export abstract class TableflowToolHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasTableflow);
-  }
-}
-
-/**
- * Base for Tableflow handlers that require both a tableflow auth block and a kafka
- * block. The kafka block is required because `resolveTableflowEnvAndClusterId()`
- * reads `conn.kafka.env_id` / `conn.kafka.cluster_id` as config fallbacks.
- *
- * The tool is intentionally enabled even when those fields are absent from config:
- * callers can supply `environmentId` and `clusterId` as explicit tool arguments.
- * The handler throws only when a required ID is absent from both the call arguments
- * and the connection config — that is expected and not a misconfiguration signal.
- */
-export abstract class TableflowWithKafkaToolHandler extends BaseToolHandler {
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      hasTableflowWithKafka,
-    );
   }
 
   /**

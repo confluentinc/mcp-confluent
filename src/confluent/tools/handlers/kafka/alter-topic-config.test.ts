@@ -8,7 +8,10 @@ import {
   kafkaRestRuntime,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 const VALID_CONFIGS = [
@@ -70,14 +73,12 @@ describe("alter-topic-config.ts", () => {
 
       it.each(cases)(
         "should $label",
-        async ({
-          args,
-          outcome,
-          responseData,
-          connectionConfig = KAFKA_CONN,
-        }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+        async ({ args, outcome, connectionConfig = KAFKA_CONN }) => {
+          const clientManager = getMockedClientManager();
+          // handler POSTs to alter-configs and returns success on no error
+          clientManager
+            .getConfluentCloudKafkaRestClient()
+            .POST.mockResolvedValue({ data: undefined });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -87,7 +88,7 @@ describe("alter-topic-config.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );

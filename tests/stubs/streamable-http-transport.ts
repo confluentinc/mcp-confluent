@@ -1,30 +1,19 @@
-import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import {
-  createMockSdkTransport,
-  type MockedSdkTransport,
-} from "@tests/stubs/sdk-transport.js";
-import { type Mock, vi } from "vitest";
-
-/**
- * Stub-shape for a {@link StreamableHTTPServerTransport}: extends {@link MockedSdkTransport}
- * with the HTTP-only surface ({@linkcode handleRequest}, {@linkcode sessionId}, {@linkcode onclose}).
- */
-export interface MockedHttpServerTransport extends MockedSdkTransport {
-  handleRequest: Mock;
-  sessionId: string | undefined;
-  onclose: (() => void) | undefined;
-}
+import { type StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createMockSdkTransport } from "@tests/stubs/sdk-transport.js";
+import { type Mocked, vi } from "vitest";
 
 /** Sentinel UUID for stubbed HTTP sessions; pair with any other UUID for "unknown" cases. */
 export const MOCK_SESSION_ID = "11111111-1111-1111-1111-111111111111";
 
 /**
- * Creates a {@link MockedHttpServerTransport}. {@linkcode handleRequest} writes a 200 to the
- * raw response so {@linkcode fastify.inject} resolves; {@linkcode close} is a resolved no-op.
+ * Creates a {@linkcode Mocked} {@link StreamableHTTPServerTransport} stub. {@linkcode handleRequest}
+ * writes a 200 to the raw response so {@linkcode fastify.inject} resolves; {@linkcode sessionId}
+ * and {@linkcode onclose} land as plain data props (the SDK class declares them as accessors,
+ * which {@linkcode createMockInstance} can't auto-stub).
  */
 export function createMockHttpServerTransport(
   sessionId: string | undefined = MOCK_SESSION_ID,
-): MockedHttpServerTransport {
+): Mocked<StreamableHTTPServerTransport> {
   return {
     ...createMockSdkTransport(),
     handleRequest: vi.fn().mockImplementation((_req, res) => {
@@ -32,7 +21,9 @@ export function createMockHttpServerTransport(
       res.end();
       return Promise.resolve();
     }),
+    closeSSEStream: vi.fn(),
+    closeStandaloneSSEStream: vi.fn(),
     sessionId,
     onclose: undefined,
-  };
+  } as unknown as Mocked<StreamableHTTPServerTransport>;
 }

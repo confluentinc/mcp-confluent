@@ -1,15 +1,11 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  CREATE_UPDATE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasConfluentCloud,
+  hasDirectConfluentCloud,
   hasKafkaAuth,
 } from "@src/confluent/tools/connection-predicates.js";
+import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -71,7 +67,12 @@ const createConnectorArguments = z.object({
     .catchall(z.string()),
 });
 
-export class CreateConnectorHandler extends BaseToolHandler {
+/**
+ * Creates a new Confluent Cloud connector.
+ * Requires `kafka.auth` in the connection config to supply the Kafka API
+ * credentials embedded in the connector body.
+ */
+export class CreateConnectorHandler extends ConnectToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -79,15 +80,19 @@ export class CreateConnectorHandler extends BaseToolHandler {
     const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName, connectorConfig } =
       createConnectorArguments.parse(toolArguments);
-    const environment_id = getEnsuredParam(
-      "KAFKA_ENV_ID",
-      "Environment ID is required",
-      environmentId,
+
+    const conn = runtime.config.getSoleDirectConnection();
+    const { environment_id, kafka_cluster_id } =
+      this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
+    const kafkaApiKey = this.resolveParam(
+      undefined,
+      conn.kafka?.auth?.key,
+      "Kafka API Key",
     );
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-      clusterId,
+    const kafkaApiSecret = this.resolveParam(
+      undefined,
+      conn.kafka?.auth?.secret,
+      "Kafka API Secret",
     );
 
     const pathBasedClient = wrapAsPathBasedClient(
@@ -98,22 +103,16 @@ export class CreateConnectorHandler extends BaseToolHandler {
     ].POST({
       params: {
         path: {
-          environment_id: environment_id,
-          kafka_cluster_id: kafka_cluster_id,
+          environment_id,
+          kafka_cluster_id,
         },
       },
       body: {
         name: connectorName,
         config: {
           name: connectorName,
-          "kafka.api.key": getEnsuredParam(
-            "KAFKA_API_KEY",
-            "Kafka API Key is required to create the connector. Check if env vars are properly set",
-          ),
-          "kafka.api.secret": getEnsuredParam(
-            "KAFKA_API_SECRET",
-            "Kafka API Secret is required to create the connector. Check if env vars are properly set",
-          ),
+          "kafka.api.key": kafkaApiKey,
+          "kafka.api.secret": kafkaApiSecret,
           ...connectorConfig,
         },
       },
@@ -128,6 +127,7 @@ export class CreateConnectorHandler extends BaseToolHandler {
       `${connectorName} created: ${JSON.stringify(response)}`,
     );
   }
+
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.CREATE_CONNECTOR,
@@ -139,12 +139,9 @@ export class CreateConnectorHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    // Known gap: handle() still reads KAFKA_API_KEY/KAFKA_API_SECRET from global env via
-    // getEnsuredParam(). A YAML-configured connection with kafka.auth but no env vars will
-    // pass this predicate yet throw at call time. Resolves when handle() is migrated in #230.
     return connectionIdsWhere(
       runtime.config.connections,
-      (conn) => hasConfluentCloud(conn) && hasKafkaAuth(conn),
+      (conn) => hasDirectConfluentCloud(conn) && hasKafkaAuth(conn),
     );
   }
 }

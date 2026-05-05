@@ -74,8 +74,6 @@ export interface KafkaDirectConfig {
 export interface SchemaRegistryDirectConfig {
   readonly endpoint: string;
   readonly auth?: AuthConfig;
-  readonly cluster_id?: string;
-  readonly env_id?: string;
 }
 
 /**
@@ -343,19 +341,6 @@ const directConnectionSchema = z
             z.url({ error: "schema_registry.endpoint must be a valid URL" }),
           ),
         auth: authConfigSchema.optional(),
-        cluster_id: z
-          .string()
-          .trim()
-          .startsWith(
-            "lsrc-",
-            "schema_registry.cluster_id must start with 'lsrc-'",
-          )
-          .optional(),
-        env_id: z
-          .string()
-          .trim()
-          .startsWith("env-", "schema_registry.env_id must start with 'env-'")
-          .optional(),
       })
       .strict()
       .optional(),

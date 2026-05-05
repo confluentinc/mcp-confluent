@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logger } from "@src/logger.js";
+import { createMcpServer, CreateMcpServerOptions } from "@src/mcp/server.js";
 import { AuthConfig } from "@src/mcp/transports/auth.js";
 import { HttpTransport } from "@src/mcp/transports/http.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
@@ -22,13 +23,38 @@ export interface TransportManagerConfig {
 export class TransportManager {
   private readonly transports: Map<TransportType, Transport> = new Map();
   private httpServer: HttpServer | null = null;
+  // single-instance transports each cache their own McpServer; HTTP mints fresh per session
+  // inside HttpTransport (see SessionRegistry for the multi-instance rationale)
+  private stdioServer: McpServer | null = null;
+  private sseServer: McpServer | null = null;
 
-  constructor(
-    private readonly server: McpServer,
-    private readonly config?: TransportManagerConfig,
-  ) {}
+  constructor(private readonly config?: TransportManagerConfig) {}
+
+  /**
+   * Returns the {@link McpServer} for {@linkcode transport}. stdio/SSE share a single lazy
+   * instance; HTTP returns a fresh instance per call.
+   *
+   * @internal Production callers go through {@linkcode TransportManager.start}; exposed so unit
+   *   tests can assert the per-transport invariant directly.
+   */
+  getServer(
+    transport: TransportType,
+    serverOptions: CreateMcpServerOptions,
+  ): McpServer {
+    switch (transport) {
+      case TransportType.STDIO:
+        return (this.stdioServer ??= createMcpServer(serverOptions));
+      case TransportType.SSE:
+        return (this.sseServer ??= createMcpServer(serverOptions));
+      case TransportType.HTTP:
+        return createMcpServer(serverOptions);
+      default:
+        throw new Error(`Unsupported transport type: ${transport}`);
+    }
+  }
 
   async start(
+    serverOptions: CreateMcpServerOptions,
     types: readonly TransportType[],
     port?: number,
     host?: string,
@@ -74,6 +100,7 @@ export class TransportManager {
         types.map(async (type) => {
           const transport = await this.createTransport(
             type,
+            serverOptions,
             httpMcpEndpointPath,
             sseMcpEndpointPath,
             sseMcpMessageEndpointPath,
@@ -127,36 +154,49 @@ export class TransportManager {
 
     this.transports.clear();
     this.httpServer = null;
+
+    // close cached stdio/SSE McpServers; HTTP per-session ones were closed by HttpTransport above
+    if (this.stdioServer) {
+      await this.stdioServer.close();
+      this.stdioServer = null;
+    }
+    if (this.sseServer) {
+      await this.sseServer.close();
+      this.sseServer = null;
+    }
   }
 
   private async createTransport(
     type: TransportType,
+    serverOptions: CreateMcpServerOptions,
     httpMcpEndpointPath?: string,
     sseMcpEndpointPath?: string,
     sseMcpMessageEndpointPath?: string,
   ): Promise<Transport> {
     switch (type) {
-      case "http":
+      case TransportType.HTTP:
         if (!this.httpServer) {
           throw new Error("HTTP server not initialized");
         }
         return new HttpTransport(
-          this.server,
+          () => this.getServer(TransportType.HTTP, serverOptions),
           this.httpServer,
           httpMcpEndpointPath,
         );
-      case "sse":
+      case TransportType.SSE:
         if (!this.httpServer) {
           throw new Error("HTTP server not initialized");
         }
         return new SseTransport(
-          this.server,
+          this.getServer(TransportType.SSE, serverOptions),
           this.httpServer,
           sseMcpEndpointPath,
           sseMcpMessageEndpointPath,
         );
-      case "stdio":
-        return new StdioTransport(this.server);
+      case TransportType.STDIO:
+        return new StdioTransport(
+          this.getServer(TransportType.STDIO, serverOptions),
+        );
       default:
         throw new Error(`Unsupported transport type: ${type}`);
     }

@@ -9,7 +9,6 @@ import {
   hasTelemetry,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -88,66 +87,33 @@ export class QueryMetricsHandler extends BaseToolHandler {
       limit = 100,
     } = args;
 
-    // Resolve interval to a proper "start/end" range
-    let interval = args.interval;
-    if (!interval || !interval.includes("/")) {
-      // No interval provided, or a duration like "PT1H" was passed instead of a range
-      const now = new Date();
-      const durationMs = parseDuration(interval) ?? 60 * 60 * 1000; // default 1 hour
-      const start = new Date(now.getTime() - durationMs);
-      interval = `${start.toISOString()}/${now.toISOString()}`;
-    }
+    const interval = resolveInterval(args.interval);
 
     try {
       const telemetryClient =
         clientManager.getConfluentCloudTelemetryRestClient();
-
-      // Auto-inject resource.kafka.id for Kafka metrics if not provided
-      const effectiveFilter = { ...filter };
-      if (
-        metric.startsWith("io.confluent.kafka.server/") &&
-        !effectiveFilter["resource.kafka.id"] &&
-        env.KAFKA_CLUSTER_ID
-      ) {
-        effectiveFilter["resource.kafka.id"] = env.KAFKA_CLUSTER_ID;
-      }
-
-      // Build filter object
-      const filters = Object.entries(effectiveFilter).map(([field, value]) => ({
-        field,
-        op: "EQ" as const,
-        value,
-      }));
-
-      const filterObj =
-        filters.length > 0
-          ? filters.length === 1
-            ? filters[0]
-            : { op: "AND" as const, filters }
-          : undefined;
+      const connKafkaClusterId =
+        runtime.config.getSoleDirectConnection().kafka?.cluster_id;
+      const effectiveFilter = buildEffectiveFilter(
+        filter,
+        metric,
+        connKafkaClusterId,
+      );
 
       logger.debug(
         { metric, filter: effectiveFilter, granularity, interval },
         "Querying metrics",
       );
 
-      // Build request body
-      const useGrouped = group_by && group_by.length > 0;
-      const body: Record<string, unknown> = {
-        aggregations: [{ metric, agg: aggregation }],
+      const body = buildRequestBody(
+        metric,
+        aggregation,
         granularity,
-        intervals: [interval],
+        interval,
         limit,
-      };
-
-      if (filterObj) {
-        body.filter = filterObj;
-      }
-
-      if (useGrouped) {
-        body.group_by = group_by;
-        body.format = "GROUPED";
-      }
+        effectiveFilter,
+        group_by,
+      );
 
       const response = (await telemetryClient.POST(
         "/v2/metrics/{dataset}/query" as never,
@@ -176,7 +142,6 @@ export class QueryMetricsHandler extends BaseToolHandler {
         );
       }
 
-      // Format the response
       const output = formatMetricsResponse(
         data.data,
         metric,
@@ -217,6 +182,77 @@ export class QueryMetricsHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(runtime.config.connections, hasTelemetry);
   }
+}
+
+function resolveInterval(interval: string | undefined): string {
+  if (interval?.includes("/")) return interval;
+  const now = new Date();
+  const durationMs = parseDuration(interval) ?? 60 * 60 * 1000;
+  const start = new Date(now.getTime() - durationMs);
+  return `${start.toISOString()}/${now.toISOString()}`;
+}
+
+function buildEffectiveFilter(
+  filter: Record<string, string> | undefined,
+  metric: string,
+  connKafkaClusterId: string | undefined,
+): Record<string, string> {
+  const effectiveFilter = { ...filter };
+  if (!effectiveFilter["resource.kafka.id"]?.trim()) {
+    delete effectiveFilter["resource.kafka.id"];
+  }
+  if (
+    metric.startsWith("io.confluent.kafka.server/") &&
+    !effectiveFilter["resource.kafka.id"] &&
+    connKafkaClusterId
+  ) {
+    effectiveFilter["resource.kafka.id"] = connKafkaClusterId;
+  }
+  return effectiveFilter;
+}
+
+function buildRequestBody(
+  metric: string,
+  aggregation: string,
+  granularity: string,
+  interval: string,
+  limit: number,
+  effectiveFilter: Record<string, string>,
+  group_by: string[] | undefined,
+): Record<string, unknown> {
+  const filters = Object.entries(effectiveFilter).map(([field, value]) => ({
+    field,
+    op: "EQ" as const,
+    value,
+  }));
+
+  let filterObj:
+    | (typeof filters)[0]
+    | { op: "AND"; filters: typeof filters }
+    | undefined;
+  if (filters.length === 1) {
+    filterObj = filters[0];
+  } else if (filters.length > 1) {
+    filterObj = { op: "AND" as const, filters };
+  }
+
+  const body: Record<string, unknown> = {
+    aggregations: [{ metric, agg: aggregation }],
+    granularity,
+    intervals: [interval],
+    limit,
+  };
+
+  if (filterObj) {
+    body.filter = filterObj;
+  }
+
+  if (group_by && group_by.length > 0) {
+    body.group_by = group_by;
+    body.format = "GROUPED";
+  }
+
+  return body;
 }
 
 function formatMetricsResponse(

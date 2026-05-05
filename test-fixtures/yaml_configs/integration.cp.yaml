@@ -1,0 +1,40 @@
+# Integration test fixture for self-managed Confluent Platform.
+#
+# Mirrors integration.yaml but targets the local docker-compose.cp-test.yml
+# stack: Kafka on SASL_PLAINTEXT/PLAIN at localhost:9092 and an
+# unauthenticated Schema Registry at localhost:8081.
+#
+# Secrets are interpolated from .env.integration (via dotenv in
+# tests/harness/setup.ts). Non-secret connection details (bootstrap servers,
+# SR endpoint) are literals here; update them if your CP stack uses different
+# coordinates.
+#
+# Start the stack first:
+#   docker compose -f docker-compose.cp-test.yml up -d
+# Then run CP integration tests:
+#   npm run test:integration -- --tags-filter=@cp
+server:
+  log_level: error
+
+connections:
+  cp:
+    type: direct
+
+    # --- @cp (Kafka) ---
+    # SASL_PLAINTEXT is used instead of SASL_SSL to avoid cert setup.
+    # The extra_properties block overrides the default security.protocol
+    # from SASL_SSL to SASL_PLAINTEXT for the local CP stack.
+    kafka:
+      bootstrap_servers: "localhost:9092"
+      auth:
+        type: api_key
+        key: "${CP_KAFKA_USERNAME}"
+        secret: "${CP_KAFKA_PASSWORD}"
+      extra_properties:
+        security.protocol: "SASL_PLAINTEXT"
+        sasl.mechanisms: "PLAIN"
+
+    # --- @cp (Schema Registry) ---
+    # The local SR runs unauthenticated; no auth block is needed.
+    schema_registry:
+      endpoint: "http://localhost:8081"

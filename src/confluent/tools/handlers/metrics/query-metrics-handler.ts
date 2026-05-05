@@ -184,7 +184,10 @@ export class QueryMetricsHandler extends BaseToolHandler {
   }
 }
 
-function resolveInterval(interval: string | undefined): string {
+/** Normalises the caller-supplied interval to a "start/end" pair.
+ *  Accepts an already-resolved range ("2024-01-01T00:00:00Z/...") unchanged,
+ *  an ISO 8601 duration ("PT30M", "P1D"), or undefined (defaults to 1 hour). */
+export function resolveInterval(interval: string | undefined): string {
   if (interval?.includes("/")) return interval;
   const now = new Date();
   const durationMs = parseDuration(interval) ?? 60 * 60 * 1000;
@@ -192,7 +195,10 @@ function resolveInterval(interval: string | undefined): string {
   return `${start.toISOString()}/${now.toISOString()}`;
 }
 
-function buildEffectiveFilter(
+/** Returns a copy of `filter` with `resource.kafka.id` trimmed (removing
+ *  space-padded values) and, for `io.confluent.kafka.server/*` metrics,
+ *  auto-injected from `connKafkaClusterId` when absent. */
+export function buildEffectiveFilter(
   filter: Record<string, string> | undefined,
   metric: string,
   connKafkaClusterId: string | undefined,
@@ -217,7 +223,10 @@ function buildEffectiveFilter(
   return effectiveFilter;
 }
 
-function buildRequestBody(
+/** Builds the Telemetry API request body.  A single filter entry is sent as a
+ *  flat EQ object; multiple entries are wrapped in an AND.  Adds group_by and
+ *  GROUPED format when group_by is non-empty. */
+export function buildRequestBody(
   metric: string,
   aggregation: string,
   granularity: string,

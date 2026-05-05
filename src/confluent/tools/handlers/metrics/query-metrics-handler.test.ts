@@ -1,4 +1,9 @@
-import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
+import {
+  buildEffectiveFilter,
+  buildRequestBody,
+  QueryMetricsHandler,
+  resolveInterval,
+} from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
@@ -7,7 +12,7 @@ import {
   telemetryRuntime,
 } from "@tests/factories/runtime.js";
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const KAFKA_SERVER_METRIC = "io.confluent.kafka.server/received_bytes";
 
@@ -43,6 +48,126 @@ describe("query-metrics-handler.ts", () => {
 
       it("should return an empty array for a connection without a telemetry block", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
+      });
+    });
+
+    describe("resolveInterval()", () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("should pass through an already-resolved start/end interval unchanged", () => {
+        const interval = "2024-01-01T00:00:00Z/2024-01-02T00:00:00Z";
+        expect(resolveInterval(interval)).toBe(interval);
+      });
+
+      it("should default to the last 1 hour when interval is undefined", () => {
+        vi.setSystemTime(new Date("2024-06-01T12:00:00.000Z"));
+        expect(resolveInterval(undefined)).toBe(
+          "2024-06-01T11:00:00.000Z/2024-06-01T12:00:00.000Z",
+        );
+      });
+
+      it("should resolve an ISO 8601 duration to a start/end range ending now", () => {
+        vi.setSystemTime(new Date("2024-06-01T12:00:00.000Z"));
+        expect(resolveInterval("PT30M")).toBe(
+          "2024-06-01T11:30:00.000Z/2024-06-01T12:00:00.000Z",
+        );
+      });
+    });
+
+    describe("buildEffectiveFilter()", () => {
+      it("should inject cluster ID for Kafka server metrics when no filter is provided", () => {
+        expect(
+          buildEffectiveFilter(undefined, KAFKA_SERVER_METRIC, "lkc-abc"),
+        ).toEqual({ "resource.kafka.id": "lkc-abc" });
+      });
+
+      it("should trim a space-padded resource.kafka.id and keep it over the config value", () => {
+        const result = buildEffectiveFilter(
+          { "resource.kafka.id": " lkc-explicit " },
+          KAFKA_SERVER_METRIC,
+          "lkc-from-config",
+        );
+        expect(result["resource.kafka.id"]).toBe("lkc-explicit");
+      });
+
+      it("should remove a whitespace-only resource.kafka.id and fall back to config", () => {
+        const result = buildEffectiveFilter(
+          { "resource.kafka.id": "   " },
+          KAFKA_SERVER_METRIC,
+          "lkc-from-config",
+        );
+        expect(result["resource.kafka.id"]).toBe("lkc-from-config");
+      });
+
+      it("should not inject for non-Kafka-server metrics even when cluster ID is in config", () => {
+        const result = buildEffectiveFilter(
+          undefined,
+          "io.confluent.flink/num_records_in",
+          "lkc-abc",
+        );
+        expect(result).not.toHaveProperty("resource.kafka.id");
+      });
+    });
+
+    describe("buildRequestBody()", () => {
+      const BASE_ARGS = [
+        KAFKA_SERVER_METRIC,
+        "SUM",
+        "PT1M",
+        "2024-01-01T00:00:00Z/2024-01-02T00:00:00Z",
+        100,
+      ] as const;
+
+      it("should produce a flat EQ filter for a single filter entry", () => {
+        const body = buildRequestBody(
+          ...BASE_ARGS,
+          { "resource.kafka.id": "lkc-abc" },
+          undefined,
+        );
+        expect(body.filter).toEqual({
+          field: "resource.kafka.id",
+          op: "EQ",
+          value: "lkc-abc",
+        });
+      });
+
+      it("should wrap multiple filter entries in an AND object", () => {
+        const body = buildRequestBody(
+          ...BASE_ARGS,
+          { "resource.kafka.id": "lkc-abc", "metric.topic": "my-topic" },
+          undefined,
+        );
+        expect(body.filter).toMatchObject({
+          op: "AND",
+          filters: expect.arrayContaining([
+            { field: "resource.kafka.id", op: "EQ", value: "lkc-abc" },
+            { field: "metric.topic", op: "EQ", value: "my-topic" },
+          ]),
+        });
+      });
+
+      it("should omit filter when effectiveFilter is empty", () => {
+        const body = buildRequestBody(...BASE_ARGS, {}, undefined);
+        expect(body).not.toHaveProperty("filter");
+      });
+
+      it("should set GROUPED format when group_by is provided", () => {
+        const body = buildRequestBody(...BASE_ARGS, {}, ["metric.topic"]);
+        expect(body).toMatchObject({
+          group_by: ["metric.topic"],
+          format: "GROUPED",
+        });
+      });
+
+      it("should not set format when group_by is absent", () => {
+        const body = buildRequestBody(...BASE_ARGS, {}, undefined);
+        expect(body).not.toHaveProperty("format");
       });
     });
 

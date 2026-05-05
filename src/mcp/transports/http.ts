@@ -95,30 +95,7 @@ export class HttpTransport implements Transport {
           return;
         }
 
-        const perSessionServer = this.serverFactory();
-        const transport = new sdkTransports.StreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-          onsessioninitialized: (sid: string) => {
-            this.sessions.set(sid, {
-              transport,
-              server: perSessionServer,
-            });
-          },
-        });
-        // fires on every close path (DELETE, network drop, server-initiated) so abandoned
-        // sessions can't leak; mirrors the SDK's simpleStreamableHttp.ts example
-        transport.onclose = () => {
-          const sid = transport.sessionId;
-          if (!sid) return;
-          this.sessions.closeAndRemove(sid).catch((err) => {
-            logger.error(
-              { err, sessionId: sid },
-              "Failed to close session on transport.onclose",
-            );
-          });
-        };
-
-        await this.sessions.bindServer(perSessionServer, transport);
+        const transport = await this.createSession();
         await transport.handleRequest(request.raw, reply.raw, request.body);
       },
     );
@@ -217,5 +194,35 @@ export class HttpTransport implements Transport {
   async disconnect(): Promise<void> {
     logger.info("Cleaning up HTTP transport sessions...");
     await this.sessions.closeAll();
+  }
+
+  /**
+   * Creates a fresh {@link McpServer} + {@link StreamableHTTPServerTransport} pair for an incoming
+   * initialize POST, sets up session lifecycle callbacks, and binds the server.
+   * NOTE: callers are responsible for forwarding the request to the returned transport
+   */
+  private async createSession(): Promise<StreamableHTTPServerTransport> {
+    const perSessionServer = this.serverFactory();
+    const transport = new sdkTransports.StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (sid: string) => {
+        this.sessions.set(sid, { transport, server: perSessionServer });
+      },
+    });
+    // fires on every close path (DELETE, network drop, server-initiated) so abandoned sessions
+    // don't leak
+    transport.onclose = () => {
+      const sid = transport.sessionId;
+      if (!sid) return;
+      this.sessions.closeAndRemove(sid).catch((err) => {
+        logger.error(
+          { err, sessionId: sid },
+          "Failed to close session on transport.onclose",
+        );
+      });
+    };
+
+    await this.sessions.bindServer(perSessionServer, transport);
+    return transport;
   }
 }

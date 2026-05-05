@@ -177,7 +177,6 @@ async function main() {
       );
     }
 
-    // McpServer construction inputs flow through start(), not the TransportManager constructor
     const transportManager = new TransportManager({
       disableAuth: mcpConfig.server.auth.disabled,
       allowedHosts: mcpConfig.server.auth.allowed_hosts,
@@ -196,21 +195,22 @@ async function main() {
 
     // Start all transports with a single call
     logger.info(`Starting transports: ${transports.join(", ")}`);
-    await transportManager.start(
+    await transportManager.start({
       serverOptions,
-      transports,
-      mcpConfig.server.http.port,
-      mcpConfig.server.http.host,
-      mcpConfig.server.http.mcp_endpoint,
-      mcpConfig.server.http.sse_endpoint,
-      mcpConfig.server.http.sse_message_endpoint,
-    );
+      types: transports,
+      http: {
+        port: mcpConfig.server.http.port,
+        host: mcpConfig.server.http.host,
+        mcpEndpointPath: mcpConfig.server.http.mcp_endpoint,
+        sseEndpointPath: mcpConfig.server.http.sse_endpoint,
+        sseMessageEndpointPath: mcpConfig.server.http.sse_message_endpoint,
+      },
+    });
 
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
       await TelemetryService.getInstance().shutdown();
-      // stop() transitively closes every McpServer it owns; no manual close() needed here
       await transportManager.stop();
       // shutdown() is race-safe with an in-flight bootstrap.
       runtime.oauthHolder?.shutdown();

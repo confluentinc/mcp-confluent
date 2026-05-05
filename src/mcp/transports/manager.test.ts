@@ -33,12 +33,5 @@ describe("TransportManager", () => {
 
       expect(second).toBe(first);
     });
-
-    it("should return distinct instances on repeated calls for http", () => {
-      const first = manager.getServer(TransportType.HTTP, serverOptions);
-      const second = manager.getServer(TransportType.HTTP, serverOptions);
-
-      expect(second).not.toBe(first);
-    });
   });
 });

@@ -26,7 +26,7 @@ const AUTH0_CONFIGS: Record<Auth0Environment, Auth0Config> = {
     scopes: OAUTH_SCOPES,
   },
   prod: {
-    clientId: "", // TBD: not yet registered in identity-login-static
+    clientId: "cZ0wejEDJLNocYDJ54mAmGK21klrv21h",
     domain: "login.confluent.io",
     apiUrl: "https://confluent.cloud",
     cloudRestUrl: "https://api.confluent.cloud",

@@ -65,15 +65,29 @@ export function hasTableflow(conn: ConnectionConfig): boolean {
 
 /**
  * True when both a tableflow block and a kafka block are present on a direct connection.
- * Required by the eight Tableflow handlers that resolve environment/cluster IDs from
- * `conn.kafka.env_id` / `conn.kafka.cluster_id`; without the kafka block those handlers
- * would always throw at runtime.
  */
 export function hasTableflowWithKafka(conn: ConnectionConfig): boolean {
   return (
     conn.type === "direct" &&
     conn.tableflow !== undefined &&
     conn.kafka !== undefined
+  );
+}
+
+/**
+ * True when a tableflow block is present and the kafka block carries both `env_id` and
+ * `cluster_id`. Required by the eight Tableflow handlers that call
+ * `resolveTableflowEnvAndClusterId()`: without both IDs available in config, those handlers
+ * throw whenever the caller omits them as explicit arguments.
+ */
+export function hasTableflowWithKafkaEnvAndCluster(
+  conn: ConnectionConfig,
+): boolean {
+  return (
+    conn.type === "direct" &&
+    conn.tableflow !== undefined &&
+    conn.kafka?.env_id !== undefined &&
+    conn.kafka?.cluster_id !== undefined
   );
 }
 

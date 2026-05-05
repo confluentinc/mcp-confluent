@@ -77,6 +77,15 @@ describe("tableflow-tool-handler.ts", () => {
         ).toEqual([DEFAULT_CONNECTION_ID]);
       });
 
+      it("should return an empty array for a tableflow+kafka connection missing env_id and cluster_id", () => {
+        const noIds: DirectConnectionConfig = {
+          type: "direct",
+          tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
+          kafka: { rest_endpoint: "https://pkc-example.confluent.cloud:443" },
+        };
+        expect(handler.enabledConnectionIds(runtimeWith(noIds))).toEqual([]);
+      });
+
       it("should return an empty array for a tableflow-only connection without a kafka block", () => {
         expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([]);
       });
@@ -124,6 +133,32 @@ describe("tableflow-tool-handler.ts", () => {
         ).toEqual({
           environment_id: "env-from-config",
           kafka_cluster_id: "lkc-from-config",
+        });
+      });
+
+      it("should use the env arg and fall back to config for cluster_id when only env arg is supplied", () => {
+        expect(
+          handler["resolveTableflowEnvAndClusterId"](
+            connWithBoth,
+            "env-from-arg",
+            undefined,
+          ),
+        ).toEqual({
+          environment_id: "env-from-arg",
+          kafka_cluster_id: "lkc-from-config",
+        });
+      });
+
+      it("should fall back to config for env_id and use the cluster arg when only cluster arg is supplied", () => {
+        expect(
+          handler["resolveTableflowEnvAndClusterId"](
+            connWithBoth,
+            undefined,
+            "lkc-from-arg",
+          ),
+        ).toEqual({
+          environment_id: "env-from-config",
+          kafka_cluster_id: "lkc-from-arg",
         });
       });
 

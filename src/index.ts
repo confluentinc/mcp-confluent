@@ -177,8 +177,7 @@ async function main() {
       );
     }
 
-    // server construction inputs flow in via start(), keeping transport config and McpServer
-    // config separated on the TransportManager constructor
+    // McpServer construction inputs flow through start(), not the TransportManager constructor
     const transportManager = new TransportManager({
       disableAuth: mcpConfig.server.auth.disabled,
       allowedHosts: mcpConfig.server.auth.allowed_hosts,

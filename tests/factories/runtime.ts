@@ -146,6 +146,37 @@ export const KAFKA_CONN = {
   },
 };
 
+/**
+ * Shared Connect handler fixture: CCloud control-plane + kafka block carrying
+ * `env_id` and `cluster_id` for `resolveConnectEnvAndClusterId` fallback tests.
+ */
+export const CONNECT_CONN = {
+  ...CCLOUD_CONN,
+  kafka: {
+    env_id: "env-from-config",
+    cluster_id: "lkc-from-config",
+    rest_endpoint: "https://pkc-example.confluent.cloud:443",
+  },
+};
+
+/**
+ * Like `CONNECT_CONN` but with `kafka.auth` — required by `CreateConnectorHandler`
+ * which embeds Kafka API credentials in the connector body.
+ */
+export const CONNECT_CONN_WITH_AUTH = {
+  ...CCLOUD_CONN,
+  kafka: {
+    env_id: "env-from-config",
+    cluster_id: "lkc-from-config",
+    rest_endpoint: "https://pkc-example.confluent.cloud:443",
+    auth: {
+      type: "api_key" as const,
+      key: "kafka-key",
+      secret: "kafka-secret",
+    },
+  },
+};
+
 /** Extends HandleCase with a per-case connection config for handle() tests
  *  that need to vary the runtime shape (e.g. empty config for throw cases). */
 export type HandleCaseWithConn = HandleCase & {

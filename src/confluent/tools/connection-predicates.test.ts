@@ -12,6 +12,7 @@ import {
   hasSchemaRegistry,
   hasTableflow,
   hasTelemetry,
+  isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { describe, expect, it } from "vitest";
 
@@ -66,6 +67,11 @@ const CCLOUD_SR_CONN = conn({
     auth: { type: "api_key", key: "k", secret: "s" },
   },
 });
+
+const OAUTH_CONN: ConnectionConfig = {
+  type: "oauth",
+  development_env: "devel",
+};
 
 describe("connection-predicates.ts", () => {
   describe("hasKafka()", () => {
@@ -189,6 +195,33 @@ describe("connection-predicates.ts", () => {
 
     it("should return false when the tableflow block is absent", () => {
       expect(hasTableflow(KAFKA_CONN)).toBe(false);
+    });
+  });
+
+  describe("isOAuth()", () => {
+    it("should return true when the connection has type 'oauth'", () => {
+      expect(isOAuth(OAUTH_CONN)).toBe(true);
+    });
+
+    it("should return false for a direct connection", () => {
+      expect(isOAuth(KAFKA_CONN)).toBe(false);
+      expect(isOAuth(CONFLUENT_CLOUD_CONN)).toBe(false);
+    });
+
+    it("should leave block-presence predicates returning false on an oauth connection", () => {
+      // Block-presence predicates do NOT widen for OAuth — handler call sites
+      // compose `hasX || isOAuth` to opt in to OAuth, leaving the block-presence
+      // predicates focused on the direct-arm question they were designed for.
+      expect(hasConfluentCloud(OAUTH_CONN)).toBe(false);
+      expect(hasKafka(OAUTH_CONN)).toBe(false);
+      expect(hasKafkaBootstrap(OAUTH_CONN)).toBe(false);
+      expect(hasKafkaAuth(OAUTH_CONN)).toBe(false);
+      expect(hasKafkaRestWithAuth(OAUTH_CONN)).toBe(false);
+      expect(hasFlink(OAUTH_CONN)).toBe(false);
+      expect(hasSchemaRegistry(OAUTH_CONN)).toBe(false);
+      expect(hasTableflow(OAUTH_CONN)).toBe(false);
+      expect(hasTelemetry(OAUTH_CONN)).toBe(false);
+      expect(hasCCloudCatalogSupport(OAUTH_CONN)).toBe(false);
     });
   });
 

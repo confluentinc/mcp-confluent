@@ -60,6 +60,16 @@ export function hasCCloudCatalogSupport(conn: ConnectionConfig): boolean {
   );
 }
 
+/**
+ * True when the connection is the OAuth (PKCE) variant. Used at handler call
+ * sites alongside a block-presence predicate to widen enablement, e.g.
+ * `c => hasConfluentCloud(c) || isOAuth(c)`. Block-presence predicates stay
+ * focused on the direct-arm question and do not widen for OAuth.
+ */
+export function isOAuth(conn: ConnectionConfig): boolean {
+  return conn.type === "oauth";
+}
+
 export function connectionIdsWhere(
   connections: Readonly<Record<string, ConnectionConfig>>,
   predicate: ConnectionPredicate,

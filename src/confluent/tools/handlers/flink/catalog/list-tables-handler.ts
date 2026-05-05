@@ -1,9 +1,7 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
+import { FlinkCatalogToolHandler } from "@src/confluent/tools/handlers/flink/catalog/flink-catalog-tool-handler.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
-import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -31,55 +29,27 @@ const listTablesArguments = z.object({
     .describe(
       "The Flink catalog name (environment ID, e.g., env-xxxxx). Omit to use defaults.",
     ),
-  databaseName: z
-    .string()
-    .trim()
-    .optional()
-    .describe(
-      "The database/schema name (Kafka cluster ID, e.g., lkc-xxxxx). Omit to list all tables across the catalog.",
-    ),
 });
 
-export class ListTablesHandler extends FlinkToolHandler {
+export class ListTablesHandler extends FlinkCatalogToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
-    const {
-      organizationId,
-      environmentId,
-      computePoolId,
-      catalogName,
-      databaseName,
-    } = listTablesArguments.parse(toolArguments);
+    const { organizationId, environmentId, computePoolId, catalogName } =
+      listTablesArguments.parse(toolArguments);
 
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const flink = this.getFlinkDirectConfig(runtime.config);
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      flink,
       organizationId,
-    );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
       environmentId,
     );
-    const compute_pool_id = getEnsuredParam(
-      "FLINK_COMPUTE_POOL_ID",
-      "Compute Pool ID is required",
-      computePoolId,
-    );
-    // Smart resolution: only accept env-* format, otherwise fall back to FLINK_ENV_ID
-    const catalog_name = resolveCatalogName(catalogName);
-    if (!catalog_name) {
-      return this.createResponse(
-        "Catalog name could not be resolved. Set FLINK_ENV_ID or provide a valid environment ID (env-xxxxx).",
-        true,
-      );
-    }
-    // Note: databaseName parameter is currently unused - we fetch all tables and let the client filter
-    // This is because TABLE_SCHEMA may contain friendly names, not cluster IDs
-    void databaseName;
+    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    const catalog = this.resolveCatalogNameOrError(catalogName, environment_id);
+    if (!catalog.ok) return catalog.error;
+    const catalog_name = catalog.name;
 
     // Query INFORMATION_SCHEMA.TABLES for all tables
     // Must fully qualify with catalog and use backticks per Confluent Cloud requirements

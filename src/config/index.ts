@@ -13,6 +13,7 @@ export {
   CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
   MCPServerConfiguration,
   type DirectConnectionConfig,
+  type OAuthConnectionConfig,
 } from "@src/config/models.js";
 
 /**

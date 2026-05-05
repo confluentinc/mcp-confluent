@@ -82,12 +82,23 @@ export class ServerRuntime {
     // When OAuth is in play, every connection's manager is bearer-auth-backed by
     // the shared holder; otherwise, fall back to the per-connection direct factory.
     const clientManagers = Object.fromEntries(
-      Object.entries(config.connections).map(([id, conn]) => [
-        id,
-        oauthHolder && ccloudOAuth
-          ? new OAuthClientManager(oauthHolder, ccloudOAuth.env)
-          : constructDirectClientManager(conn),
-      ]),
+      Object.entries(config.connections).map(([id, conn]) => {
+        if (oauthHolder && ccloudOAuth) {
+          return [
+            id,
+            new OAuthClientManager(oauthHolder, ccloudOAuth.env),
+          ] as const;
+        }
+        // Without an OAuth side-car, every connection in the record is direct.
+        // (Task 6 replaces the side-car with a connections-record OAuth entry
+        // and removes this guard altogether.)
+        if (conn.type !== "direct") {
+          throw new Error(
+            `Internal error: connection ${id} is not direct but no OAuth holder was constructed`,
+          );
+        }
+        return [id, constructDirectClientManager(conn)] as const;
+      }),
     );
     return new ServerRuntime(config, clientManagers, oauthHolder);
   }

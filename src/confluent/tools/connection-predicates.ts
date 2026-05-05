@@ -2,11 +2,10 @@ import type { ConnectionConfig } from "@src/config/models.js";
 
 export type ConnectionPredicate = (conn: ConnectionConfig) => boolean;
 
-// All block-presence predicates below check `conn.type === "direct"` first.
-// They answer "is this a direct connection with that block?" — OAuth connections
-// carry no service blocks, so every block-presence predicate is false for them.
-// Handler enablement under OAuth happens at the call site by composing with
-// `isOAuth` (e.g. `c => hasConfluentCloud(c) || isOAuth(c)`).
+// Block-presence predicates below check `conn.type === "direct"` first; OAuth
+// connections carry no service blocks, so they answer false for every block.
+// `hasConfluentCloud` is the single exception: it widens for OAuth because the
+// CCloud REST URL is reachable via the Auth0 environment without a block.
 
 export function hasKafka(conn: ConnectionConfig): boolean {
   return conn.type === "direct" && conn.kafka !== undefined;
@@ -32,8 +31,15 @@ export function hasSchemaRegistry(conn: ConnectionConfig): boolean {
   return conn.type === "direct" && conn.schema_registry !== undefined;
 }
 
+/**
+ * True when the connection can reach the Confluent Cloud control-plane REST
+ * surface. Direct connections satisfy this when they carry a `confluent_cloud`
+ * block; OAuth connections satisfy it unconditionally (the cloud REST URL is
+ * derived from the Auth0 environment).
+ */
 export function hasConfluentCloud(conn: ConnectionConfig): boolean {
-  return conn.type === "direct" && conn.confluent_cloud !== undefined;
+  if (conn.type === "oauth") return true;
+  return conn.confluent_cloud !== undefined;
 }
 
 export function hasFlink(conn: ConnectionConfig): boolean {
@@ -58,16 +64,6 @@ export function hasCCloudCatalogSupport(conn: ConnectionConfig): boolean {
   return (
     conn.type === "direct" && conn.schema_registry?.auth?.type === "api_key"
   );
-}
-
-/**
- * True when the connection is the OAuth (PKCE) variant. Used at handler call
- * sites alongside a block-presence predicate to widen enablement, e.g.
- * `c => hasConfluentCloud(c) || isOAuth(c)`. Block-presence predicates stay
- * focused on the direct-arm question and do not widen for OAuth.
- */
-export function isOAuth(conn: ConnectionConfig): boolean {
-  return conn.type === "oauth";
 }
 
 export function connectionIdsWhere(

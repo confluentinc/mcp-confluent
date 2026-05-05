@@ -1,67 +1,107 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { MCPServerConfiguration } from "@src/config/index.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
+import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
-import {
-  bareRuntime,
-  DEFAULT_CONNECTION_ID,
-  kafkaRestOnlyRuntime,
-  kafkaRuntime,
-  runtimeWith,
-} from "@tests/factories/runtime.js";
-import {
-  createMockAdmin,
-  createMockInstance,
-  type MockedAdmin,
-} from "@tests/stubs/index.js";
-import { beforeEach, describe, expect, it, type Mocked } from "vitest";
+import { ServerRuntime } from "@src/server-runtime.js";
+import { createMockInstance } from "@tests/stubs/index.js";
+import { describe, expect, it, vi } from "vitest";
 
-describe("list-topics-handler.ts", () => {
-  describe("ListTopicsHandler", () => {
-    const handler = new ListTopicsHandler();
-    let clientManager: Mocked<DirectClientManager>;
-    let admin: MockedAdmin;
+const CONN_ID = "env-connection";
 
-    beforeEach(() => {
-      admin = createMockAdmin();
-      clientManager = createMockInstance(DirectClientManager);
-      clientManager.getAdminClient.mockResolvedValue(admin as KafkaJS.Admin);
+function directRuntime() {
+  const manager = createMockInstance(DirectClientManager);
+  const config = new MCPServerConfiguration({
+    connections: {
+      [CONN_ID]: {
+        type: "direct",
+        kafka: {
+          bootstrap_servers: "broker:9092",
+          cluster_id: "lkc-direct",
+          env_id: "env-direct",
+        },
+      } as never,
+    },
+  });
+  return {
+    runtime: new ServerRuntime(config, { [CONN_ID]: manager }),
+    manager,
+  };
+}
+
+function oauthRuntime() {
+  const manager = createMockInstance(OAuthClientManager);
+  const config = new MCPServerConfiguration({
+    connections: {
+      [CONN_ID]: { type: "oauth", development_env: "devel" } as never,
+    },
+  });
+  return {
+    runtime: new ServerRuntime(config, { [CONN_ID]: manager }),
+    manager,
+  };
+}
+
+describe("ListTopicsHandler", () => {
+  describe("enabledConnectionIds", () => {
+    it("includes the connection id when kafka block is present (direct)", () => {
+      const { runtime } = directRuntime();
+      expect(new ListTopicsHandler().enabledConnectionIds(runtime)).toEqual([
+        CONN_ID,
+      ]);
     });
 
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with kafka.bootstrap_servers", () => {
-        expect(handler.enabledConnectionIds(kafkaRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
+    it("includes the connection id under OAuth", () => {
+      const { runtime } = oauthRuntime();
+      expect(new ListTopicsHandler().enabledConnectionIds(runtime)).toEqual([
+        CONN_ID,
+      ]);
+    });
+  });
 
-      it("should return an empty array for a connection without a kafka block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
+  describe("handle", () => {
+    it("under direct, calls getKafkaAdminClient with undefined args (manager ignores them)", async () => {
+      const { runtime, manager } = directRuntime();
+      const fakeAdmin = {
+        listTopics: vi.fn().mockResolvedValue(["t1"]),
+      } as never;
+      manager.getKafkaAdminClient.mockResolvedValue(fakeAdmin);
 
-      it("should return an empty array for a kafka block without bootstrap_servers", () => {
-        expect(handler.enabledConnectionIds(kafkaRestOnlyRuntime())).toEqual(
-          [],
-        );
-      });
+      const result = await new ListTopicsHandler().handle(runtime, {});
+
+      expect(manager.getKafkaAdminClient).toHaveBeenCalledWith(
+        undefined,
+        undefined,
+      );
+      const item = result.content[0]!;
+      if (item.type !== "text") throw new Error("expected text content");
+      expect(item.text).toContain("t1");
     });
 
-    describe("handle()", () => {
-      it("should propagate errors from the admin client", async () => {
-        clientManager.getAdminClient.mockRejectedValue(
-          new Error("connection refused"),
-        );
+    it("under OAuth, calls getKafkaAdminClient with arg-provided cluster_id/env_id", async () => {
+      const { runtime, manager } = oauthRuntime();
+      const fakeAdmin = {
+        listTopics: vi.fn().mockResolvedValue(["t1"]),
+      } as never;
+      manager.getKafkaAdminClient.mockResolvedValue(fakeAdmin);
 
-        await expect(
-          handler.handle(
-            runtimeWith(
-              { kafka: { bootstrap_servers: "broker:9092" } },
-              DEFAULT_CONNECTION_ID,
-              clientManager,
-            ),
-            {},
-          ),
-        ).rejects.toThrow("connection refused");
+      await new ListTopicsHandler().handle(runtime, {
+        cluster_id: "lkc-abc",
+        environment_id: "env-1",
       });
+
+      expect(manager.getKafkaAdminClient).toHaveBeenCalledWith(
+        "lkc-abc",
+        "env-1",
+      );
+    });
+
+    it("under OAuth with missing args, returns an error response with discovery hint", async () => {
+      const { runtime } = oauthRuntime();
+      const result = await new ListTopicsHandler().handle(runtime, {});
+      expect(result.isError).toBe(true);
+      const item = result.content[0]!;
+      if (item.type !== "text") throw new Error("expected text content");
+      expect(item.text).toMatch(/cluster_id.*environment_id.*list-clusters/i);
     });
   });
 });

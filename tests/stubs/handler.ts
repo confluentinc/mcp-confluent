@@ -215,6 +215,7 @@ export function stubClientGetters(responseData: unknown = {}) {
 
   const clientManager = createMockInstance(DirectClientManager);
   clientManager.getAdminClient.mockResolvedValue(callableProxy as never);
+  clientManager.getKafkaAdminClient.mockResolvedValue(callableProxy as never);
   clientManager.getProducer.mockResolvedValue(callableProxy as never);
   clientManager.getConsumer.mockResolvedValue(callableProxy as never);
   clientManager.getConfluentCloudFlinkRestClient.mockReturnValue(
@@ -239,6 +240,7 @@ export function stubClientGetters(responseData: unknown = {}) {
 
   const clientGetters = [
     clientManager.getAdminClient,
+    clientManager.getKafkaAdminClient,
     clientManager.getProducer,
     clientManager.getConsumer,
     clientManager.getConfluentCloudFlinkRestClient,

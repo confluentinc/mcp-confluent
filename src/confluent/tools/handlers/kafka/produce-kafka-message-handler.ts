@@ -15,7 +15,12 @@ import {
 import {
   connectionIdsWhere,
   hasKafkaBootstrap,
+  isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
+import {
+  resolveKafkaClusterArgs,
+  resolveSchemaRegistryClusterArgs,
+} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -56,6 +61,30 @@ const valueOptions = z.object({}).extend(messageOptions.shape);
 const keyOptions = z.object({}).extend(messageOptions.shape);
 
 const produceKafkaMessageArguments = z.object({
+  cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "The Confluent Cloud logical Kafka cluster ID (lkc-...). " +
+        "Required under --oauth; under a direct connection it is ignored " +
+        "(cluster fixed by configuration). Discover via list-clusters.",
+    ),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "The Confluent Cloud environment ID (env-...) that owns the cluster. " +
+        "Required alongside cluster_id under --oauth (and alongside " +
+        "schema_registry_cluster_id when serializing). Optional under direct.",
+    ),
+  schema_registry_cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "The Confluent Cloud Schema Registry cluster ID (lsrc-...). " +
+        "Required under --oauth when useSchemaRegistry is true on value or key. " +
+        "Discover via list-schema-registry-clusters. Ignored under direct.",
+    ),
   topicName: z
     .string()
     .nonempty()
@@ -107,24 +136,34 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
   /**
    * Main handler for producing a message to a Kafka topic, including schema registry logic and serialization.
    * Handles both value and key, and returns a CallToolResult with the outcome.
-   * @param clientManager - The client manager for Kafka and registry clients
-   * @param toolArguments - The arguments for the tool, including topic, value, and key
-   * @returns A CallToolResult describing the outcome of the produce operation
    */
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.requireDirectClientManager();
-    const { topicName, value, key }: ProduceKafkaMessageArguments =
+    const parsed: ProduceKafkaMessageArguments =
       produceKafkaMessageArguments.parse(toolArguments);
+    const { topicName, value, key } = parsed;
+
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
+    const clientManager = runtime.clientManagers[connId]!;
 
     // Only create registry if needed
     const needsRegistry =
       value.useSchemaRegistry || (key && key.useSchemaRegistry);
-    const registry: SchemaRegistryClient | undefined = needsRegistry
-      ? clientManager.getSchemaRegistryClient()
-      : undefined;
+    let registry: SchemaRegistryClient | undefined;
+    if (needsRegistry) {
+      const srResolved = resolveSchemaRegistryClusterArgs(
+        parsed,
+        runtime,
+        connId,
+      );
+      registry = await clientManager.getSchemaRegistrySdkClient(
+        srResolved.clusterId,
+        srResolved.envId,
+      );
+    }
 
     // Check for latest schema if needed (value)
     const valueSchemaCheck = await checkSchemaNeeded(
@@ -175,9 +214,11 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     // Send the message
     let deliveryReport: RecordMetadata[];
     try {
-      deliveryReport = await (
-        await clientManager.getProducer()
-      ).send({
+      const producer = await clientManager.getKafkaProducer(
+        resolved.clusterId,
+        resolved.envId,
+      );
+      deliveryReport = await producer.send({
         topic: topicName,
         messages: [
           typeof keyToSend !== "undefined"
@@ -217,6 +258,9 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaBootstrap);
+    return connectionIdsWhere(
+      runtime.config.connections,
+      (c) => hasKafkaBootstrap(c) || isOAuth(c),
+    );
   }
 }

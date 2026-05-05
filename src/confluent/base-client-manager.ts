@@ -5,6 +5,7 @@
  * plus the OAuth variant introduced in the OAuth wiring ticket).
  */
 
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { ClientConfig } from "@confluentinc/schemaregistry";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
@@ -249,6 +250,36 @@ export abstract class BaseClientManager
   ): Promise<SchemaRegistryClient> {
     return this.getSchemaRegistryClient();
   }
+
+  /**
+   * Cluster-aware Kafka admin client. Under direct, args are ignored and the
+   * eagerly-built admin is returned. Under OAuth, args are required and the
+   * client is cached (idle-evicted) per `clusterId`.
+   */
+  abstract getKafkaAdminClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Admin>;
+
+  /**
+   * Cluster-aware Kafka producer. Same direct/OAuth asymmetry as
+   * {@link getKafkaAdminClient}.
+   */
+  abstract getKafkaProducer(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Producer>;
+
+  /**
+   * Build a fresh Kafka consumer (NOT cached, per the spec's group-membership
+   * analysis). The returned consumer is unconnected; the caller must call
+   * `connect()` and `disconnect()` (typically in a `try/finally`).
+   */
+  abstract buildKafkaConsumer(
+    clusterId?: string,
+    envId?: string,
+    groupId?: string,
+  ): Promise<KafkaJS.Consumer>;
 
   abstract disconnect(): Promise<void>;
 }

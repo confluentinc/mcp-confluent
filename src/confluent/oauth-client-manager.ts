@@ -103,6 +103,37 @@ export class OAuthClientManager extends BaseClientManager {
   }
 
   /** @inheritdoc */
+  async getKafkaAdminClient(
+    _clusterId?: string,
+    _envId?: string,
+  ): Promise<never> {
+    throw new Error(
+      "Native Kafka clients (admin, producer, consumer) are not supported under --oauth. " +
+        "The OAuth flow requires per-tool cluster-awareness, which is still under development.",
+    );
+  }
+
+  /** @inheritdoc */
+  async getKafkaProducer(_clusterId?: string, _envId?: string): Promise<never> {
+    throw new Error(
+      "Native Kafka clients (admin, producer, consumer) are not supported under --oauth. " +
+        "The OAuth flow requires per-tool cluster-awareness, which is still under development.",
+    );
+  }
+
+  /** @inheritdoc */
+  async buildKafkaConsumer(
+    _clusterId?: string,
+    _envId?: string,
+    _groupId?: string,
+  ): Promise<never> {
+    throw new Error(
+      "Native Kafka clients (admin, producer, consumer) are not supported under --oauth. " +
+        "The OAuth flow requires per-tool cluster-awareness, which is still under development.",
+    );
+  }
+
+  /** @inheritdoc */
   async disconnect(): Promise<void> {
     await Promise.allSettled([this.srEndpointResolutionCache.shutdown()]);
   }

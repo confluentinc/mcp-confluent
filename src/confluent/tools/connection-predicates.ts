@@ -64,6 +64,34 @@ export function hasTableflow(conn: ConnectionConfig): boolean {
 }
 
 /**
+ * True when both a tableflow block and a kafka block are present on a direct connection.
+ */
+export function hasTableflowWithKafka(conn: ConnectionConfig): boolean {
+  return (
+    conn.type === "direct" &&
+    conn.tableflow !== undefined &&
+    conn.kafka !== undefined
+  );
+}
+
+/**
+ * True when a tableflow block is present and the kafka block carries both `env_id` and
+ * `cluster_id`. Required by the eight Tableflow handlers that call
+ * `resolveTableflowEnvAndClusterId()`: without both IDs available in config, those handlers
+ * throw whenever the caller omits them as explicit arguments.
+ */
+export function hasTableflowWithKafkaEnvAndCluster(
+  conn: ConnectionConfig,
+): boolean {
+  return (
+    conn.type === "direct" &&
+    conn.tableflow !== undefined &&
+    conn.kafka?.env_id !== undefined &&
+    conn.kafka?.cluster_id !== undefined
+  );
+}
+
+/**
  * True when the schema_registry block is present and carries api_key auth.
  * That combination is the reliable signal that the SR is CCloud-hosted and therefore
  * exposes the /catalog/v1/ endpoints. A vanilla CP SR has no auth block, so it returns

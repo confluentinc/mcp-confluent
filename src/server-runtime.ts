@@ -1,4 +1,7 @@
-import { MCPServerConfiguration } from "@src/config/index.js";
+import {
+  type OAuthConnectionConfig,
+  MCPServerConfiguration,
+} from "@src/config/index.js";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import {
   constructDirectClientManager,
@@ -16,12 +19,11 @@ export class ServerRuntime {
   readonly config: MCPServerConfiguration;
   readonly clientManagers: Record<string, BaseClientManager>;
   /**
-   * The active OAuth holder when the config carries a CCloud OAuth connection.
-   * Constructed by {@link ServerRuntime.fromConfig} when `config.getCCloudOAuth()`
-   * returns a value; `undefined` on api_key paths. The holder runs PKCE in the
-   * background — callers can await `holder.bootstrapPromise` to know the
-   * bootstrap attempt has finished, then inspect the token accessors to
-   * determine whether tokens are available.
+   * The active OAuth holder when any connection in the config has `type === "oauth"`.
+   * Constructed by {@link ServerRuntime.fromConfig}; `undefined` on api_key paths.
+   * The holder runs PKCE in the background — callers can await
+   * `holder.bootstrapPromise` to know the bootstrap attempt has finished, then
+   * inspect the token accessors to determine whether tokens are available.
    */
   readonly oauthHolder: OAuthHolder | undefined;
 
@@ -72,9 +74,11 @@ export class ServerRuntime {
   }
 
   static fromConfig(config: MCPServerConfiguration): ServerRuntime {
-    const ccloudOAuth = config.getCCloudOAuth();
-    const oauthHolder = ccloudOAuth
-      ? OAuthHolder.start(ccloudOAuth.env)
+    const oauthConn = Object.values(config.connections).find(
+      (c): c is OAuthConnectionConfig => c.type === "oauth",
+    );
+    const oauthHolder = oauthConn
+      ? OAuthHolder.start(oauthConn.development_env)
       : undefined;
 
     // Construct a client manager for each connection in the config.
@@ -83,15 +87,13 @@ export class ServerRuntime {
     // the shared holder; otherwise, fall back to the per-connection direct factory.
     const clientManagers = Object.fromEntries(
       Object.entries(config.connections).map(([id, conn]) => {
-        if (oauthHolder && ccloudOAuth) {
+        if (oauthHolder && oauthConn) {
           return [
             id,
-            new OAuthClientManager(oauthHolder, ccloudOAuth.env),
+            new OAuthClientManager(oauthHolder, oauthConn.development_env),
           ] as const;
         }
-        // Without an OAuth side-car, every connection in the record is direct.
-        // (Task 6 replaces the side-car with a connections-record OAuth entry
-        // and removes this guard altogether.)
+        // No OAuth connection found, so every connection is direct.
         if (conn.type !== "direct") {
           throw new Error(
             `Internal error: connection ${id} is not direct but no OAuth holder was constructed`,

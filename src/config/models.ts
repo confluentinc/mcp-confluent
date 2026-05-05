@@ -26,21 +26,6 @@ export interface DirectConnectionConfig {
 }
 
 /**
- * Connection-shaped configuration for a Confluent Cloud OAuth (PKCE) connection.
- * Peer to {@link DirectConnectionConfig}. For now this is held as a private
- * optional field on {@link MCPServerConfiguration} (see `#ccloudOAuth`); the
- * connections-record migration moves it into `connections` as a second member
- * of the discriminated `ConnectionConfig` union.
- *
- * Endpoints derive from `env` via the Auth0 environment table — the only data
- * needed to drive the PKCE flow and resolve REST base URLs.
- */
-export interface CCloudOAuthConfig {
-  readonly type: "ccloud_oauth";
-  readonly env: "devel" | "stag" | "prod";
-}
-
-/**
  * OAuth (PKCE) connection variant. Peer arm of {@link DirectConnectionConfig}
  * inside the `ConnectionConfig` discriminated union. The CCloud REST URL is
  * derived from `development_env` via `getCloudRestUrlForEnv` inside
@@ -181,34 +166,15 @@ export class MCPServerConfiguration {
   readonly connections: Readonly<Record<string, ConnectionConfig>>;
   /** MCP server operational settings. Corresponds to the `server` block at the root of the YAML configuration. */
   readonly server: ServerConfig;
-  /**
-   * CCloud OAuth connection config, when configured via `--oauth` /
-   * `--oauth-env` on the env-var pathway. Held outside the `connections`
-   * record because the single-connection guard prohibits a second entry;
-   * the connections-record migration will move it inside the record and
-   * remove both this private field and {@link MCPServerConfiguration.getCCloudOAuth}.
-   */
-  readonly #ccloudOAuth: CCloudOAuthConfig | undefined;
 
   constructor(data: {
     connections: Record<string, ConnectionConfig>;
     server?: ServerConfig;
-    ccloudOAuth?: CCloudOAuthConfig;
   }) {
     this.connections = data.connections;
     // DEFAULT_SERVER_CONFIG is declared after the schemas below; it is always
     // initialized before any MCPServerConfiguration instance is created at runtime.
     this.server = data.server ?? DEFAULT_SERVER_CONFIG;
-    this.#ccloudOAuth = data.ccloudOAuth;
-  }
-
-  /**
-   * Returns the CCloud OAuth connection config when one was supplied at
-   * construction time; `undefined` otherwise. {@link ServerRuntime.fromConfig}
-   * uses this to decide whether to bootstrap an `OAuthHolder`.
-   */
-  getCCloudOAuth(): CCloudOAuthConfig | undefined {
-    return this.#ccloudOAuth;
   }
 
   /**
@@ -613,14 +579,6 @@ serverConfigSchema satisfies z.ZodType<ServerConfig>;
  * Derived from serverConfigSchema defaults — single source of truth.
  */
 export const DEFAULT_SERVER_CONFIG = serverConfigSchema.parse({});
-
-/** Zod schema for {@link CCloudOAuthConfig}. */
-export const ccloudOAuthConfigSchema = z
-  .object({
-    type: z.literal("ccloud_oauth"),
-    env: z.enum(["devel", "stag", "prod"]),
-  })
-  .strict();
 
 /**
  * Root configuration schema. This is the single validation and normalisation

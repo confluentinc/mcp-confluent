@@ -117,19 +117,19 @@ export function telemetryRuntime(): ServerRuntime {
 }
 
 /**
- * Runtime whose `MCPServerConfiguration` carries the `ccloudOAuth` side-car set
- * (as the env-var `--oauth --oauth-env=devel` path produces) but whose connection
- * has no `confluent_cloud` block. Used to assert that block-presence predicates
- * (e.g. `hasConfluentCloud`) are *not* satisfied by the OAuth side-car alone —
- * i.e. tools gated on `confluent_cloud` stay disabled until the connection itself
- * carries the block. Does not populate `runtime.oauthHolder`; tests that need a
- * holder should construct one explicitly.
+ * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`. Used by
+ * handler tests to assert that handlers widened for OAuth (e.g. via the
+ * widened `hasConfluentCloud` predicate) see the connection as enabled, and
+ * that handlers staying direct-only (e.g. native Kafka) see it as disabled.
+ * Does not populate `runtime.oauthHolder`; tests that need a holder should
+ * construct one explicitly.
  */
 export function ccloudOAuthRuntime(): ServerRuntime {
   return new ServerRuntime(
     new MCPServerConfiguration({
-      connections: { [DEFAULT_CONNECTION_ID]: { type: "direct" } },
-      ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
+      connections: {
+        [DEFAULT_CONNECTION_ID]: { type: "oauth", development_env: "devel" },
+      },
     }),
     { [DEFAULT_CONNECTION_ID]: createMockInstance(DirectClientManager) },
   );

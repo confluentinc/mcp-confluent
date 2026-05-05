@@ -687,7 +687,7 @@ describe("config/models.ts", () => {
       it("should throw when the sole connection is OAuth-typed", () => {
         const config = new MCPServerConfiguration({
           connections: {
-            "env-connection": { type: "oauth", development_env: "devel" },
+            "env-connection": { type: "oauth", ccloud_env: "devel" },
           },
         });
 
@@ -707,7 +707,7 @@ describe("config/models.ts", () => {
   });
 
   describe("oauth connection arm", () => {
-    it("should default development_env to 'prod' when omitted", () => {
+    it("should default ccloud_env to 'prod' when omitted", () => {
       const result = mcpConfigSchema.safeParse({
         connections: { foo: { type: "oauth" } },
       });
@@ -715,23 +715,23 @@ describe("config/models.ts", () => {
       if (result.success) {
         expect(result.data.connections.foo).toEqual({
           type: "oauth",
-          development_env: "prod",
+          ccloud_env: "prod",
         });
       }
     });
 
-    it("should accept explicit devel/stag/prod for development_env", () => {
+    it("should accept explicit devel/stag/prod for ccloud_env", () => {
       for (const env of ["devel", "stag", "prod"] as const) {
         const result = mcpConfigSchema.safeParse({
-          connections: { foo: { type: "oauth", development_env: env } },
+          connections: { foo: { type: "oauth", ccloud_env: env } },
         });
         expect(result.success).toBe(true);
       }
     });
 
-    it("should reject an unknown development_env value", () => {
+    it("should reject an unknown ccloud_env value", () => {
       const result = mcpConfigSchema.safeParse({
-        connections: { foo: { type: "oauth", development_env: "bogus" } },
+        connections: { foo: { type: "oauth", ccloud_env: "bogus" } },
       });
       expect(result.success).toBe(false);
     });
@@ -739,7 +739,7 @@ describe("config/models.ts", () => {
     it("should reject unknown extra keys on the oauth arm", () => {
       const result = mcpConfigSchema.safeParse({
         connections: {
-          foo: { type: "oauth", development_env: "devel", clientId: "x" },
+          foo: { type: "oauth", ccloud_env: "devel", clientId: "x" },
         },
       });
       expect(result.success).toBe(false);

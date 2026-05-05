@@ -77,17 +77,17 @@ function buildConfigFromEnv(
   env: Environment,
   authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
   kafkaConfig?: KeyValuePairObject,
-  oauth?: { developmentEnv?: "devel" | "stag" | "prod" },
+  oauth?: { ccloudEnv?: "devel" | "stag" | "prod" },
 ): MCPServerConfiguration {
   // OAuth path: synthesize a single OAuth-typed connection. No surface blocks,
-  // no auth fields. development_env defaults to "prod" via the schema.
+  // no auth fields. ccloud_env defaults to "prod" via the schema.
   if (oauth) {
     const rawDocument: Record<string, unknown> = {
       connections: {
         [ENV_CONNECTION_NAME]: {
           type: "oauth",
-          ...(oauth.developmentEnv && {
-            development_env: oauth.developmentEnv,
+          ...(oauth.ccloudEnv && {
+            ccloud_env: oauth.ccloudEnv,
           }),
         },
       },
@@ -166,7 +166,7 @@ export interface EnvPathCliOverrides {
   allowedHosts?: string[];
   kafkaConfig?: KeyValuePairObject;
   oauth?: boolean;
-  developmentEnv?: "devel" | "stag" | "prod";
+  ccloudEnv?: "devel" | "stag" | "prod";
 }
 
 /**
@@ -189,7 +189,7 @@ export function buildConfigFromEnvAndCli(
       allowedHosts: overrides.allowedHosts,
     },
     overrides.kafkaConfig,
-    overrides.oauth ? { developmentEnv: overrides.developmentEnv } : undefined,
+    overrides.oauth ? { ccloudEnv: overrides.ccloudEnv } : undefined,
   );
 }
 

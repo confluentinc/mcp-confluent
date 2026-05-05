@@ -209,7 +209,7 @@ describe("ServerRuntime", () => {
       vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": { type: "oauth", development_env: "stag" },
+          "env-connection": { type: "oauth", ccloud_env: "stag" },
         },
       });
       const runtime = ServerRuntime.fromConfig(oauthConfig);
@@ -270,7 +270,7 @@ describe("ServerRuntime", () => {
 
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": { type: "oauth", development_env: "devel" },
+          "env-connection": { type: "oauth", ccloud_env: "devel" },
         },
       });
 
@@ -284,7 +284,7 @@ describe("ServerRuntime", () => {
       vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": { type: "oauth", development_env: "stag" },
+          "env-connection": { type: "oauth", ccloud_env: "stag" },
         },
       });
 
@@ -292,6 +292,23 @@ describe("ServerRuntime", () => {
 
       expect(runtime.clientManagers["env-connection"]).toBeInstanceOf(
         OAuthClientManager,
+      );
+    });
+
+    it("should throw when more than one OAuth connection is defined", () => {
+      // enforceSingleConnectionOnly() prevents multi-connection records today,
+      // so this case is reached only by callers that bypass the schema (tests
+      // constructing MCPServerConfiguration directly). The defensive throw
+      // becomes load-bearing when multi-connection support lands (#151).
+      const multiOauthConfig = new MCPServerConfiguration({
+        connections: {
+          "oauth-1": { type: "oauth", ccloud_env: "devel" },
+          "oauth-2": { type: "oauth", ccloud_env: "stag" },
+        },
+      });
+
+      expect(() => ServerRuntime.fromConfig(multiOauthConfig)).toThrow(
+        /Multiple OAuth connections defined/,
       );
     });
   });

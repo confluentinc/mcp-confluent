@@ -32,7 +32,7 @@ export interface CLIOptions {
   allowedHosts?: string[];
   generateKey?: boolean;
   oauth?: boolean;
-  developmentEnv?: "devel" | "stag" | "prod";
+  ccloudEnv?: "devel" | "stag" | "prod";
 }
 
 /**
@@ -216,7 +216,7 @@ export function parseCliArgs(argv: string[]): CLIOptions {
     )
     .addOption(
       new Option(
-        "--development-env <env>",
+        "--ccloud-env <env>",
         "Override the Auth0 environment for --oauth (devel/stag/prod). Defaults to prod when omitted.",
       ).choices(["devel", "stag", "prod"] as const),
     )
@@ -234,8 +234,13 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       program.getOptionValueSource("transport") === "cli",
     );
 
-    if (opts.developmentEnv && !opts.oauth) {
-      throw new Error("--development-env requires --oauth");
+    if (opts.ccloudEnv && !opts.oauth) {
+      throw new Error("--ccloud-env requires --oauth");
+    }
+    if (opts.oauth && opts.config) {
+      throw new Error(
+        "--oauth and --config cannot be combined: declare OAuth as a connection inside the YAML (type: oauth) instead of passing --oauth",
+      );
     }
 
     // Precedence: CLI > file > undefined
@@ -271,7 +276,7 @@ export function parseCliArgs(argv: string[]): CLIOptions {
         : undefined,
       generateKey: !!opts.generateKey,
       oauth: opts.oauth,
-      developmentEnv: opts.developmentEnv,
+      ccloudEnv: opts.ccloudEnv,
     };
   } catch (error: unknown) {
     if (

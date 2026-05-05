@@ -303,34 +303,34 @@ describe("config/index.ts", () => {
 
       expect(config.getSoleConnection()).toEqual({
         type: "oauth",
-        development_env: "prod",
+        ccloud_env: "prod",
       });
     });
 
-    it("should parse an explicit oauth development_env value", () => {
+    it("should parse an explicit oauth ccloud_env value", () => {
       const yamlContent = `connections:
   stag-oauth:
     type: "oauth"
-    development_env: "stag"
+    ccloud_env: "stag"
 `;
 
       const config = parseYamlConfiguration(yamlContent, {});
 
       expect(config.getSoleConnection()).toEqual({
         type: "oauth",
-        development_env: "stag",
+        ccloud_env: "stag",
       });
     });
 
-    it("should reject an oauth connection with an unknown development_env", () => {
+    it("should reject an oauth connection with an unknown ccloud_env", () => {
       const yamlContent = `connections:
   bad-oauth:
     type: "oauth"
-    development_env: "bogus"
+    ccloud_env: "bogus"
 `;
 
       expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /development_env/,
+        /ccloud_env/,
       );
     });
 

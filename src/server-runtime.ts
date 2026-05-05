@@ -74,11 +74,20 @@ export class ServerRuntime {
   }
 
   static fromConfig(config: MCPServerConfiguration): ServerRuntime {
-    const oauthConn = Object.values(config.connections).find(
+    const oauthConns = Object.values(config.connections).filter(
       (c): c is OAuthConnectionConfig => c.type === "oauth",
     );
+    if (oauthConns.length > 1) {
+      // `enforceSingleConnectionOnly()` already prevents this today; keep the
+      // defensive check so that when multi-connection support lands (#151),
+      // multi-OAuth is rejected explicitly rather than silently picking one.
+      throw new Error(
+        `Multiple OAuth connections defined in configuration; only one is supported`,
+      );
+    }
+    const oauthConn = oauthConns[0];
     const oauthHolder = oauthConn
-      ? OAuthHolder.start(oauthConn.development_env)
+      ? OAuthHolder.start(oauthConn.ccloud_env)
       : undefined;
 
     // Construct a client manager for each connection in the config.
@@ -90,7 +99,7 @@ export class ServerRuntime {
         if (oauthHolder && oauthConn) {
           return [
             id,
-            new OAuthClientManager(oauthHolder, oauthConn.development_env),
+            new OAuthClientManager(oauthHolder, oauthConn.ccloud_env),
           ] as const;
         }
         // No OAuth connection found, so every connection is direct.

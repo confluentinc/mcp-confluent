@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   DisplayedCommandLineUsageError,
   getFilteredToolNames,
@@ -19,6 +18,7 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
+import { CreateMcpServerOptions } from "@src/mcp/server.js";
 import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
@@ -156,24 +156,11 @@ async function main() {
     const runtime = ServerRuntime.fromConfig(mcpConfig);
 
     const serverVersion = getPackageVersion();
-    const server = new McpServer({
-      name: "confluent",
-      version: serverVersion,
-    });
 
     TelemetryService.getInstance().setCommonProperties({
       serverVersion,
       transportType: transports.join(","),
     });
-
-    // Capture MCP client info when the handshake completes.
-    server.server.oninitialized = () => {
-      const clientInfo = server.server.getClientVersion();
-      TelemetryService.getInstance().setCommonProperties({
-        clientName: clientInfo?.name,
-        clientVersion: clientInfo?.version,
-      });
-    };
 
     const toolHandlers = getToolHandlersToRegister(filteredToolNames, runtime);
 
@@ -181,39 +168,6 @@ async function main() {
       { enabledTools: [...toolHandlers.keys()] },
       `${toolHandlers.size} tool(s) enabled`,
     );
-
-    toolHandlers.forEach((handler, name) => {
-      const config = handler.getToolConfig();
-
-      server.registerTool(
-        name as string,
-        {
-          description: config.description,
-          inputSchema: config.inputSchema,
-          annotations: config.annotations,
-        },
-        async (args, context) => {
-          const sessionId = context?.sessionId;
-          const startTime = Date.now();
-          try {
-            const result = await handler.handle(runtime, args, sessionId);
-            TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
-              toolName: name,
-              durationMs: Date.now() - startTime,
-              status: result.isError ? "error" : "success",
-            });
-            return result;
-          } catch (error) {
-            TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
-              toolName: name,
-              durationMs: Date.now() - startTime,
-              status: "error",
-            });
-            throw error;
-          }
-        },
-      );
-    });
 
     // Warn if auth is disabled
     if (mcpConfig.server.auth.disabled) {
@@ -223,22 +177,35 @@ async function main() {
       );
     }
 
-    const transportManager = new TransportManager(server, {
+    const transportManager = new TransportManager({
       disableAuth: mcpConfig.server.auth.disabled,
       allowedHosts: mcpConfig.server.auth.allowed_hosts,
       apiKey: mcpConfig.server.auth.api_key,
     });
 
+    const serverOptions: CreateMcpServerOptions = {
+      serverVersion,
+      toolHandlers,
+      runtime,
+      track: (props) =>
+        TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
+          ...props,
+        }),
+    };
+
     // Start all transports with a single call
     logger.info(`Starting transports: ${transports.join(", ")}`);
-    await transportManager.start(
-      transports,
-      mcpConfig.server.http.port,
-      mcpConfig.server.http.host,
-      mcpConfig.server.http.mcp_endpoint,
-      mcpConfig.server.http.sse_endpoint,
-      mcpConfig.server.http.sse_message_endpoint,
-    );
+    await transportManager.start({
+      serverOptions,
+      types: transports,
+      http: {
+        port: mcpConfig.server.http.port,
+        host: mcpConfig.server.http.host,
+        mcpEndpointPath: mcpConfig.server.http.mcp_endpoint,
+        sseEndpointPath: mcpConfig.server.http.sse_endpoint,
+        sseMessageEndpointPath: mcpConfig.server.http.sse_message_endpoint,
+      },
+    });
 
     // Set up cleanup handlers
     const performCleanup = async () => {
@@ -248,7 +215,6 @@ async function main() {
       // shutdown() is race-safe with an in-flight bootstrap.
       runtime.oauthHolder?.shutdown();
       await runtime.clientManager.disconnect();
-      await server.close();
       process.exit(0);
     };
 

@@ -1035,7 +1035,7 @@ describe("config/env-config.ts", () => {
     });
 
     describe("ccloudOAuth", () => {
-      it("should leave ccloudOAuth undefined when neither flag is set", () => {
+      it("should leave ccloudOAuth undefined when --oauth is not set", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
           {},
@@ -1043,28 +1043,29 @@ describe("config/env-config.ts", () => {
         expect(config.getCCloudOAuth()).toBeUndefined();
       });
 
-      it("should populate ccloudOAuth when oauth and oauthEnv are set", () => {
+      it("should default development_env to prod when --oauth is set without --development-env", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
+          { oauth: true },
+        );
+        expect(config.getCCloudOAuth()).toEqual({
+          type: "ccloud_oauth",
+          env: "prod",
+        });
+      });
+
+      it("should propagate developmentEnv into ccloudOAuth when both flags are set", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
           {
             oauth: true,
-            oauthEnv: "devel",
+            developmentEnv: "devel",
           },
         );
         expect(config.getCCloudOAuth()).toEqual({
           type: "ccloud_oauth",
           env: "devel",
         });
-      });
-
-      it("should leave ccloudOAuth undefined when oauth is set but oauthEnv is not", () => {
-        // Defensive: parseCliArgs would reject this combination, but the env-config
-        // builder must not silently invent an env value.
-        const config = buildConfigFromEnvAndCli(
-          envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
-          { oauth: true },
-        );
-        expect(config.getCCloudOAuth()).toBeUndefined();
       });
     });
   });

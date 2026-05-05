@@ -170,7 +170,10 @@ export abstract class BaseClientManager
       const schemaRegistryAuth = config.auth.schemaRegistry;
       if (schemaRegistryAuth.type === "oauth") {
         throw new Error(
-          "Schema Registry OAuth authentication is not supported for SchemaRegistryClient yet. Configure SCHEMA_REGISTRY_API_KEY and SCHEMA_REGISTRY_API_SECRET instead.",
+          "Schema Registry OAuth authentication requires the cluster-aware accessor: " +
+            "call getSchemaRegistrySdkClient(clusterId, envId) instead. The no-arg " +
+            "getSchemaRegistryClient() does not have access to the logical SR cluster ID " +
+            "(needed for the target-sr-cluster header) under OAuth.",
         );
       }
       const { apiKey, apiSecret } = schemaRegistryAuth;

@@ -58,7 +58,7 @@ describe("config/env-config.ts", () => {
           }),
         );
 
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.type).toBe("direct");
         expect(conn.kafka?.bootstrap_servers).toBe("localhost:9092");
         expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
@@ -77,7 +77,7 @@ describe("config/env-config.ts", () => {
           envWith({ BOOTSTRAP_SERVERS: "broker1:9092,broker2:9092" }),
         );
 
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.kafka?.bootstrap_servers).toBe("broker1:9092,broker2:9092");
         expect(conn.schema_registry).toBeUndefined();
       });
@@ -87,7 +87,7 @@ describe("config/env-config.ts", () => {
           envWith({ SCHEMA_REGISTRY_ENDPOINT: "https://sr.example.com:8081" }),
         );
 
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.schema_registry?.endpoint).toBe(
           "https://sr.example.com:8081",
         );
@@ -128,7 +128,7 @@ describe("config/env-config.ts", () => {
             KAFKA_API_SECRET: "mysecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.kafka?.auth).toEqual({
           type: "api_key",
           key: "mykey",
@@ -144,7 +144,7 @@ describe("config/env-config.ts", () => {
             SCHEMA_REGISTRY_API_SECRET: "srsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.schema_registry?.auth).toEqual({
           type: "api_key",
           key: "srkey",
@@ -163,7 +163,7 @@ describe("config/env-config.ts", () => {
             SCHEMA_REGISTRY_API_SECRET: "srsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.kafka?.auth).toEqual({
           type: "api_key",
           key: "kafkakey",
@@ -267,7 +267,7 @@ describe("config/env-config.ts", () => {
             CONFLUENT_CLOUD_API_SECRET: "ccsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.confluent_cloud?.auth).toEqual({
           type: "api_key",
           key: "cckey",
@@ -285,7 +285,7 @@ describe("config/env-config.ts", () => {
             CONFLUENT_CLOUD_REST_ENDPOINT: "https://custom.confluent.cloud",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.confluent_cloud).toBeUndefined();
       });
 
@@ -297,7 +297,7 @@ describe("config/env-config.ts", () => {
             CONFLUENT_CLOUD_API_SECRET: "ccsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.confluent_cloud?.endpoint).toBe(
           "https://custom.confluent.cloud",
         );
@@ -315,7 +315,7 @@ describe("config/env-config.ts", () => {
             CONFLUENT_CLOUD_API_SECRET: "ccsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.confluent_cloud?.auth).toBeDefined();
         expect(conn.kafka).toBeUndefined();
         expect(conn.schema_registry).toBeUndefined();
@@ -352,7 +352,7 @@ describe("config/env-config.ts", () => {
         const config = buildConfigFromEnvAndCli(
           envWith(allRequiredFlinkEnvVars),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.flink?.endpoint).toBe(
           "https://flink.us-east-1.aws.confluent.cloud",
         );
@@ -374,7 +374,7 @@ describe("config/env-config.ts", () => {
             FLINK_DATABASE_NAME: "my-cluster",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.flink?.environment_name).toBe("my-environment");
         expect(conn.flink?.database_name).toBe("my-cluster");
       });
@@ -383,7 +383,7 @@ describe("config/env-config.ts", () => {
         const config = buildConfigFromEnvAndCli(
           envWith(allRequiredFlinkEnvVars),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.flink).toBeDefined();
         expect(conn.kafka).toBeUndefined();
         expect(conn.schema_registry).toBeUndefined();
@@ -431,7 +431,7 @@ describe("config/env-config.ts", () => {
               "https://pkc-abc123.us-east-1.aws.confluent.cloud:443",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.kafka?.rest_endpoint).toBe(
           "https://pkc-abc123.us-east-1.aws.confluent.cloud:443",
         );
@@ -444,7 +444,7 @@ describe("config/env-config.ts", () => {
             KAFKA_CLUSTER_ID: "lkc-abc123",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.kafka?.cluster_id).toBe("lkc-abc123");
       });
 
@@ -455,7 +455,7 @@ describe("config/env-config.ts", () => {
             KAFKA_ENV_ID: "env-xyz789",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.kafka?.env_id).toBe("env-xyz789");
       });
 
@@ -469,7 +469,7 @@ describe("config/env-config.ts", () => {
             KAFKA_ENV_ID: "env-xyz789",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.kafka?.rest_endpoint).toBe(
           "https://pkc-abc123.us-east-1.aws.confluent.cloud:443",
         );
@@ -495,7 +495,7 @@ describe("config/env-config.ts", () => {
               "https://pkc-abc123.us-east-1.aws.confluent.cloud:443",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.kafka?.rest_endpoint).toBe(
           "https://pkc-abc123.us-east-1.aws.confluent.cloud:443",
         );
@@ -511,7 +511,7 @@ describe("config/env-config.ts", () => {
             TABLEFLOW_API_SECRET: "tfsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.tableflow?.auth).toEqual({
           type: "api_key",
           key: "tfkey",
@@ -526,7 +526,7 @@ describe("config/env-config.ts", () => {
             TABLEFLOW_API_SECRET: "tfsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.tableflow?.auth).toBeDefined();
         expect(conn.kafka).toBeUndefined();
         expect(conn.schema_registry).toBeUndefined();
@@ -727,7 +727,7 @@ describe("config/env-config.ts", () => {
             TELEMETRY_API_SECRET: "telsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.telemetry).toEqual({
           endpoint: "https://custom.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "telkey", secret: "telsecret" },
@@ -741,7 +741,7 @@ describe("config/env-config.ts", () => {
             TELEMETRY_API_SECRET: "telsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.telemetry).toEqual({
           endpoint: "https://api.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "telkey", secret: "telsecret" },
@@ -766,7 +766,7 @@ describe("config/env-config.ts", () => {
             CONFLUENT_CLOUD_API_SECRET: "ccsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.telemetry).toEqual({
           endpoint: "https://custom.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
@@ -780,7 +780,7 @@ describe("config/env-config.ts", () => {
             CONFLUENT_CLOUD_API_SECRET: "ccsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.telemetry).toEqual({
           endpoint: "https://api.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
@@ -794,7 +794,7 @@ describe("config/env-config.ts", () => {
             TELEMETRY_API_SECRET: "telsecret",
           }),
         );
-        const conn = config.getSoleConnection();
+        const conn = config.getSoleDirectConnection();
         expect(conn.telemetry?.endpoint).toBe(
           "https://api.telemetry.confluent.cloud",
         );
@@ -836,7 +836,7 @@ describe("config/env-config.ts", () => {
         "localhost",
         "127.0.0.1",
       ]);
-      expect(config.getSoleConnection().kafka?.bootstrap_servers).toBe(
+      expect(config.getSoleDirectConnection().kafka?.bootstrap_servers).toBe(
         "localhost:9092",
       );
     });
@@ -873,7 +873,7 @@ describe("config/env-config.ts", () => {
         envWith({ BOOTSTRAP_SERVERS: "localhost:9092" }),
         { kafkaConfig: { "ssl.ca.location": "/etc/ssl/certs/ca.pem" } },
       );
-      expect(config.getSoleConnection().kafka?.extra_properties).toEqual({
+      expect(config.getSoleDirectConnection().kafka?.extra_properties).toEqual({
         "ssl.ca.location": "/etc/ssl/certs/ca.pem",
       });
     });
@@ -883,7 +883,7 @@ describe("config/env-config.ts", () => {
         envWith({ BOOTSTRAP_SERVERS: "original:9092" }),
         { kafkaConfig: { "bootstrap.servers": "override:9092" } },
       );
-      expect(config.getSoleConnection().kafka?.bootstrap_servers).toBe(
+      expect(config.getSoleDirectConnection().kafka?.bootstrap_servers).toBe(
         "override:9092",
       );
     });
@@ -896,11 +896,11 @@ describe("config/env-config.ts", () => {
         }),
         { kafkaConfig: { "bootstrap.servers": "broker:9092" } },
       );
-      expect(config.getSoleConnection().kafka?.bootstrap_servers).toBe(
+      expect(config.getSoleDirectConnection().kafka?.bootstrap_servers).toBe(
         "broker:9092",
       );
       expect(
-        config.getSoleConnection().kafka?.extra_properties,
+        config.getSoleDirectConnection().kafka?.extra_properties,
       ).toBeUndefined();
     });
 
@@ -918,7 +918,7 @@ describe("config/env-config.ts", () => {
           },
         },
       );
-      const kafka = config.getSoleConnection().kafka;
+      const kafka = config.getSoleDirectConnection().kafka;
       expect(kafka?.bootstrap_servers).toBe("broker:9092");
       expect(kafka?.auth).toEqual({
         type: "api_key",
@@ -941,7 +941,7 @@ describe("config/env-config.ts", () => {
           },
         },
       );
-      const kafka = config.getSoleConnection().kafka;
+      const kafka = config.getSoleDirectConnection().kafka;
       expect(kafka?.bootstrap_servers).toBe("broker:9092");
       expect(kafka?.extra_properties).toEqual({ "socket.timeout.ms": "30000" });
     });
@@ -960,7 +960,7 @@ describe("config/env-config.ts", () => {
           },
         },
       );
-      const kafka = config.getSoleConnection().kafka;
+      const kafka = config.getSoleDirectConnection().kafka;
       expect(kafka?.auth).toEqual({
         type: "api_key",
         key: "k-key",
@@ -1034,37 +1034,44 @@ describe("config/env-config.ts", () => {
       ).toThrow(/MCP_AUTH_DISABLED.*MCP_API_KEY/);
     });
 
-    describe("ccloudOAuth", () => {
-      it("should leave ccloudOAuth undefined when neither flag is set", () => {
+    describe("--oauth flag", () => {
+      it("should produce a single direct connection when --oauth is not set", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
           {},
         );
-        expect(config.getCCloudOAuth()).toBeUndefined();
+        const conn = config.getSoleConnection();
+        expect(conn.type).toBe("direct");
       });
 
-      it("should populate ccloudOAuth when oauth and oauthEnv are set", () => {
-        const config = buildConfigFromEnvAndCli(
-          envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
-          {
-            oauth: true,
-            oauthEnv: "devel",
-          },
-        );
-        expect(config.getCCloudOAuth()).toEqual({
-          type: "ccloud_oauth",
-          env: "devel",
+      it("should produce an OAuth connection with ccloud_env=prod when --oauth is alone", () => {
+        const config = buildConfigFromEnvAndCli(envWith({}), { oauth: true });
+        const conn = config.getSoleConnection();
+        expect(conn).toEqual({ type: "oauth", ccloud_env: "prod" });
+      });
+
+      it("should propagate ccloudEnv into the OAuth connection", () => {
+        const config = buildConfigFromEnvAndCli(envWith({}), {
+          oauth: true,
+          ccloudEnv: "stag",
         });
+        const conn = config.getSoleConnection();
+        expect(conn).toEqual({ type: "oauth", ccloud_env: "stag" });
       });
 
-      it("should leave ccloudOAuth undefined when oauth is set but oauthEnv is not", () => {
-        // Defensive: parseCliArgs would reject this combination, but the env-config
-        // builder must not silently invent an env value.
+      it("should ignore api-key env vars when --oauth is set", () => {
+        // OAuth is a top-level switch; the connections record carries a single OAuth
+        // entry regardless of which api-key env vars happen to be present.
         const config = buildConfigFromEnvAndCli(
-          envWith({ BOOTSTRAP_SERVERS: "broker:9092" }),
-          { oauth: true },
+          envWith({
+            BOOTSTRAP_SERVERS: "broker:9092",
+            CONFLUENT_CLOUD_API_KEY: "k",
+            CONFLUENT_CLOUD_API_SECRET: "s",
+          }),
+          { oauth: true, ccloudEnv: "devel" },
         );
-        expect(config.getCCloudOAuth()).toBeUndefined();
+        const conn = config.getSoleConnection();
+        expect(conn).toEqual({ type: "oauth", ccloud_env: "devel" });
       });
     });
   });

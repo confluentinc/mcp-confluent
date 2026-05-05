@@ -1,8 +1,7 @@
-import type { CCloudOAuthConfig } from "@src/config/models.js";
+import type { DirectConnectionConfig } from "@src/config/models.js";
 import {
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
   MCPServerConfiguration,
-  ccloudOAuthConfigSchema,
   formatZodIssues,
   mcpConfigSchema,
 } from "@src/config/models.js";
@@ -219,7 +218,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.telemetry).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.telemetry,
+        ).toEqual({
           endpoint: "https://api.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "k", secret: "s" },
         });
@@ -257,7 +262,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.telemetry).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.telemetry,
+        ).toEqual({
           endpoint: "https://custom.telemetry.example.com",
           auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
         });
@@ -278,7 +289,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.telemetry).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.telemetry,
+        ).toEqual({
           endpoint: "https://api.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "k", secret: "s" },
         });
@@ -298,7 +315,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.telemetry).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.telemetry,
+        ).toEqual({
           endpoint: "https://api.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
         });
@@ -546,7 +569,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.confluent_cloud).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.confluent_cloud,
+        ).toEqual({
           endpoint: "https://api.confluent.cloud",
           auth: { type: "api_key", key: "k", secret: "s" },
         });
@@ -568,7 +597,11 @@ describe("config/models.ts", () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(
-          result.data.connections["production"]?.confluent_cloud?.endpoint,
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.confluent_cloud?.endpoint,
         ).toBe("https://custom.confluent.cloud");
       }
     });
@@ -640,85 +673,91 @@ describe("config/models.ts", () => {
       });
     });
 
-    describe("getCCloudOAuth()", () => {
-      it("should return undefined when no oauth config is supplied", () => {
+    describe("getSoleDirectConnection", () => {
+      it("should return the connection narrowed to direct when sole connection is direct", () => {
         const config = new MCPServerConfiguration({
-          connections: {},
+          connections: { local: directConnection },
         });
-        expect(config.getCCloudOAuth()).toBeUndefined();
+
+        const conn = config.getSoleDirectConnection();
+        expect(conn).toBe(directConnection);
+        expect(conn.type).toBe("direct");
       });
 
-      it("should return the supplied config", () => {
-        const oauth: CCloudOAuthConfig = { type: "ccloud_oauth", env: "stag" };
+      it("should throw when the sole connection is OAuth-typed", () => {
         const config = new MCPServerConfiguration({
-          connections: {},
-          ccloudOAuth: oauth,
+          connections: {
+            "env-connection": { type: "oauth", ccloud_env: "devel" },
+          },
         });
-        expect(config.getCCloudOAuth()).toEqual(oauth);
+
+        expect(() => config.getSoleDirectConnection()).toThrow(
+          /Expected sole connection to be a direct connection; got type "oauth"/,
+        );
       });
 
-      it("should not expose ccloudOAuth as an enumerable property", () => {
-        const config = new MCPServerConfiguration({
-          connections: {},
-          ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
-        });
-        // Private fields should not appear on Object.keys.
-        expect(Object.keys(config)).not.toContain("ccloudOAuth");
-        expect(Object.keys(config)).not.toContain("#ccloudOAuth");
+      it("should propagate the underlying getSoleConnection throw on zero connections", () => {
+        const config = new MCPServerConfiguration({ connections: {} });
+
+        expect(() => config.getSoleDirectConnection()).toThrow(
+          /No connections defined/,
+        );
       });
     });
   });
 
-  describe("ccloudOAuthConfigSchema", () => {
-    it("should accept a valid devel config", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "ccloud_oauth",
-        env: "devel",
+  describe("oauth connection arm", () => {
+    it("should default ccloud_env to 'prod' when omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth" } },
       });
       expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.connections.foo).toEqual({
+          type: "oauth",
+          ccloud_env: "prod",
+        });
+      }
     });
 
-    it("should accept stag and prod environments", () => {
-      expect(
-        ccloudOAuthConfigSchema.safeParse({ type: "ccloud_oauth", env: "stag" })
-          .success,
-      ).toBe(true);
-      expect(
-        ccloudOAuthConfigSchema.safeParse({ type: "ccloud_oauth", env: "prod" })
-          .success,
-      ).toBe(true);
+    it("should accept explicit devel/stag/prod for ccloud_env", () => {
+      for (const env of ["devel", "stag", "prod"] as const) {
+        const result = mcpConfigSchema.safeParse({
+          connections: { foo: { type: "oauth", ccloud_env: env } },
+        });
+        expect(result.success).toBe(true);
+      }
     });
 
-    it("should reject an unknown env value", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "ccloud_oauth",
-        env: "bogus",
+    it("should reject an unknown ccloud_env value", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth", ccloud_env: "bogus" } },
       });
       expect(result.success).toBe(false);
     });
 
-    it("should reject a wrong discriminator", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "direct",
-        env: "devel",
+    it("should reject unknown extra keys on the oauth arm", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: { type: "oauth", ccloud_env: "devel", clientId: "x" },
+        },
       });
       expect(result.success).toBe(false);
     });
 
-    it("should reject when env is missing", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "ccloud_oauth",
+    it("should not spread direct-arm fields onto an oauth connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth" } },
       });
-      expect(result.success).toBe(false);
-    });
-
-    it("should reject unknown extra keys", () => {
-      const result = ccloudOAuthConfigSchema.safeParse({
-        type: "ccloud_oauth",
-        env: "devel",
-        clientId: "should-not-be-here",
-      });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const conn = result.data.connections.foo as unknown as Record<
+          string,
+          unknown
+        >;
+        expect(conn).not.toHaveProperty("confluent_cloud");
+        expect(conn).not.toHaveProperty("telemetry");
+      }
     });
   });
 });

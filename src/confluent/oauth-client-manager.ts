@@ -19,7 +19,10 @@
  * through the SDK.
  */
 
+import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import { ClientCache } from "@src/confluent/client-cache.js";
+import { resolveSchemaRegistryEndpoint } from "@src/confluent/oauth-resource-resolvers.js";
 import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
@@ -34,6 +37,12 @@ import type { Auth0Environment } from "@src/confluent/oauth/types.js";
  * access if a tool somehow gets enabled with one missing.
  */
 export class OAuthClientManager extends BaseClientManager {
+  private readonly holder: OAuthHolder;
+  private readonly srEndpointResolutionCache = new ClientCache<
+    string,
+    string
+  >();
+
   constructor(holder: OAuthHolder, env: Auth0Environment) {
     const cpToken = (): string | undefined => holder.getControlPlaneToken();
     const dpToken = (): string | undefined => holder.getDataPlaneToken();
@@ -56,13 +65,45 @@ export class OAuthClientManager extends BaseClientManager {
       },
     });
 
+    this.holder = holder;
+
     // Eager construction: surface the cloud REST client at startup so a bad
     // endpoint or middleware wiring fails fast rather than at first tool call.
     this.getConfluentCloudRestClient();
   }
 
   /** @inheritdoc */
+  async getSchemaRegistrySdkClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<SchemaRegistryClient> {
+    if (clusterId === undefined || envId === undefined) {
+      throw new Error(
+        "cluster_id and environment_id are required under --oauth for Schema Registry SDK access. " +
+          "Call list-schema-registry-clusters and pass the cluster's `id` plus the environment_id.",
+      );
+    }
+    const endpoint = await this.srEndpointResolutionCache.get(clusterId, () =>
+      resolveSchemaRegistryEndpoint(
+        this.getConfluentCloudRestClient(),
+        clusterId,
+        envId,
+      ),
+    );
+    const dpat = this.holder.getDataPlaneToken() ?? "";
+    return new SchemaRegistryClient({
+      baseURLs: [endpoint],
+      createAxiosDefaults: {
+        headers: {
+          Authorization: `Bearer ${dpat}`,
+          "target-sr-cluster": clusterId,
+        },
+      },
+    });
+  }
+
+  /** @inheritdoc */
   async disconnect(): Promise<void> {
-    // No native Kafka client to clean up; REST clients have no disconnect.
+    await Promise.allSettled([this.srEndpointResolutionCache.shutdown()]);
   }
 }

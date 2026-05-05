@@ -1,5 +1,6 @@
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
+import * as resolvers from "@src/confluent/oauth-resource-resolvers.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { describe, expect, it, vi } from "vitest";
 
@@ -62,6 +63,65 @@ describe("oauth-client-manager.ts", () => {
         const cm = new OAuthClientManager(fakeOAuthHolder(), "devel");
         await expect(cm.disconnect()).resolves.toBeUndefined();
       });
+    });
+  });
+
+  describe("getSchemaRegistrySdkClient (cluster-aware, OAuth, per-call build)", () => {
+    it("resolves the SR endpoint once per cluster_id and reuses it across builds", async () => {
+      const fakeHolder = {
+        getControlPlaneToken: () => "cp-tok",
+        getDataPlaneToken: () => "dp-tok",
+      } as unknown as OAuthHolder;
+
+      const resolverSpy = vi
+        .spyOn(resolvers, "resolveSchemaRegistryEndpoint")
+        .mockResolvedValue("https://psrc-abc.example.com");
+
+      const manager = new OAuthClientManager(fakeHolder, "devel");
+      const c1 = await manager.getSchemaRegistrySdkClient("lsrc-abc", "env-1");
+      const c2 = await manager.getSchemaRegistrySdkClient("lsrc-abc", "env-1");
+      // Per-call build — c1 and c2 should not be the same instance.
+      expect(c1).not.toBe(c2);
+      // But endpoint resolution is cached → resolver called once.
+      expect(resolverSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-resolves the endpoint for a different cluster_id", async () => {
+      const fakeHolder = {
+        getControlPlaneToken: () => "cp-tok",
+        getDataPlaneToken: () => "dp-tok",
+      } as unknown as OAuthHolder;
+      const resolverSpy = vi
+        .spyOn(resolvers, "resolveSchemaRegistryEndpoint")
+        .mockResolvedValue("https://psrc.example.com");
+      const manager = new OAuthClientManager(fakeHolder, "devel");
+      await manager.getSchemaRegistrySdkClient("lsrc-a", "env-1");
+      await manager.getSchemaRegistrySdkClient("lsrc-b", "env-1");
+      expect(resolverSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("throws when args are missing under OAuth", async () => {
+      const fakeHolder = {
+        getControlPlaneToken: () => "cp-tok",
+        getDataPlaneToken: () => "dp-tok",
+      } as unknown as OAuthHolder;
+      const manager = new OAuthClientManager(fakeHolder, "devel");
+      await expect(
+        manager.getSchemaRegistrySdkClient(undefined, undefined),
+      ).rejects.toThrow(/cluster_id.*environment_id.*required/i);
+    });
+
+    it("disconnect() drains the SR endpoint resolution cache", async () => {
+      vi.spyOn(resolvers, "resolveSchemaRegistryEndpoint").mockResolvedValue(
+        "https://psrc.example.com",
+      );
+      const fakeHolder = {
+        getControlPlaneToken: () => "cp-tok",
+        getDataPlaneToken: () => "dp-tok",
+      } as unknown as OAuthHolder;
+      const manager = new OAuthClientManager(fakeHolder, "devel");
+      await manager.getSchemaRegistrySdkClient("lsrc-abc", "env-1");
+      await expect(manager.disconnect()).resolves.toBeUndefined();
     });
   });
 });

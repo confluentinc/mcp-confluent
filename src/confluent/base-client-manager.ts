@@ -235,5 +235,18 @@ export abstract class BaseClientManager
     return this.schemaRegistryClient.get();
   }
 
+  /**
+   * Cluster-aware Schema Registry SDK client accessor. Under direct, args are
+   * ignored and the existing single-instance Lazy is returned. Under OAuth,
+   * args are required: `clusterId` is `lsrc-...` and `envId` is `env-...`. The
+   * SR client itself is built per-call (no cache) because the DPAT is captured
+   * in the SDK's axios headers at construction time. Endpoint resolution is
+   * cached in `OAuthClientManager`.
+   */
+  abstract getSchemaRegistrySdkClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<SchemaRegistryClient>;
+
   abstract disconnect(): Promise<void>;
 }

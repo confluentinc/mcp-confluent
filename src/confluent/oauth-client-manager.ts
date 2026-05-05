@@ -3,14 +3,10 @@
  * surfaces to bearer tokens supplied by an {@link OAuthHolder}; the cloud REST
  * URL is auto-derived from the Auth0 environment via {@link getCloudRestUrlForEnv}.
  *
- * Inherits the abstract {@link BaseClientManager} and intentionally adds nothing
- * native-Kafka-shaped: no broker client, no SASL, no `KafkaJS` import. Native
- * Kafka methods are missing entirely from the class — a call to e.g.
- * `getAdminClient` is a compile-time error rather than a runtime throw on a
- * stub. Tool handlers that need them narrow the runtime's `BaseClientManager`
- * to a `DirectClientManager` via {@link ServerRuntime.requireDirectClientManager},
- * which (alongside the `hasKafka` predicate that gates those tools off for
- * OAuth connections in the first place) keeps the path closed end-to-end.
+ * Inherits the abstract {@link BaseClientManager} and implements cluster-aware
+ * native Kafka accessors backed by {@link KafkaJS} with an `oauthBearerProvider`
+ * closure that reads the holder's current data-plane token at auth time, making
+ * token rotation transparent to cached clients.
  *
  * The Schema Registry SDK is similarly unsupported under OAuth, but its getter
  * is part of `BaseClientManager`'s contract and stays inherited. A call to
@@ -19,10 +15,15 @@
  * through the SDK.
  */
 
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { ClientCache } from "@src/confluent/client-cache.js";
-import { resolveSchemaRegistryEndpoint } from "@src/confluent/oauth-resource-resolvers.js";
+import { kafkaDeps } from "@src/confluent/node-deps.js";
+import {
+  resolveKafkaBootstrap,
+  resolveSchemaRegistryEndpoint,
+} from "@src/confluent/oauth-resource-resolvers.js";
 import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
@@ -42,6 +43,18 @@ export class OAuthClientManager extends BaseClientManager {
     string,
     string
   >();
+  private readonly kafkaAdminCache = new ClientCache<string, KafkaJS.Admin>({
+    idleTimeoutMs: 10 * 60 * 1000,
+    dispose: (admin) => admin.disconnect(),
+  });
+  private readonly kafkaProducerCache = new ClientCache<
+    string,
+    KafkaJS.Producer
+  >({
+    idleTimeoutMs: 10 * 60 * 1000,
+    dispose: (producer) => producer.disconnect(),
+  });
+  private readonly bootstrapResolutionCache = new ClientCache<string, string>();
 
   constructor(holder: OAuthHolder, env: Auth0Environment) {
     const cpToken = (): string | undefined => holder.getControlPlaneToken();
@@ -104,37 +117,97 @@ export class OAuthClientManager extends BaseClientManager {
 
   /** @inheritdoc */
   async getKafkaAdminClient(
-    _clusterId?: string,
-    _envId?: string,
-  ): Promise<never> {
-    throw new Error(
-      "Native Kafka clients (admin, producer, consumer) are not supported under --oauth. " +
-        "The OAuth flow requires per-tool cluster-awareness, which is still under development.",
-    );
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Admin> {
+    if (clusterId === undefined || envId === undefined) {
+      throw new Error(
+        "cluster_id and environment_id are required under --oauth for native Kafka access. " +
+          "Call list-clusters with environment_id and pass the cluster's `id` and `spec.environment.id`.",
+      );
+    }
+    return this.kafkaAdminCache.get(clusterId, async () => {
+      const kafka = await this.buildOAuthKafkaClient(clusterId, envId);
+      const admin = kafka.admin();
+      await admin.connect();
+      return admin;
+    });
   }
 
   /** @inheritdoc */
-  async getKafkaProducer(_clusterId?: string, _envId?: string): Promise<never> {
-    throw new Error(
-      "Native Kafka clients (admin, producer, consumer) are not supported under --oauth. " +
-        "The OAuth flow requires per-tool cluster-awareness, which is still under development.",
-    );
+  async getKafkaProducer(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Producer> {
+    if (clusterId === undefined || envId === undefined) {
+      throw new Error(
+        "cluster_id and environment_id are required under --oauth for native Kafka access.",
+      );
+    }
+    return this.kafkaProducerCache.get(clusterId, async () => {
+      const kafka = await this.buildOAuthKafkaClient(clusterId, envId);
+      const producer = kafka.producer();
+      await producer.connect();
+      return producer;
+    });
   }
 
   /** @inheritdoc */
   async buildKafkaConsumer(
-    _clusterId?: string,
-    _envId?: string,
-    _groupId?: string,
-  ): Promise<never> {
-    throw new Error(
-      "Native Kafka clients (admin, producer, consumer) are not supported under --oauth. " +
-        "The OAuth flow requires per-tool cluster-awareness, which is still under development.",
+    clusterId?: string,
+    envId?: string,
+    groupId?: string,
+  ): Promise<KafkaJS.Consumer> {
+    if (clusterId === undefined || envId === undefined) {
+      throw new Error(
+        "cluster_id and environment_id are required under --oauth for native Kafka access.",
+      );
+    }
+    const kafka = await this.buildOAuthKafkaClient(clusterId, envId);
+    return kafka.consumer({
+      kafkaJS: {
+        groupId: groupId ?? "mcp-confluent",
+        autoCommit: false,
+        fromBeginning: true,
+      },
+    });
+  }
+
+  private async buildOAuthKafkaClient(
+    clusterId: string,
+    envId: string,
+  ): Promise<KafkaJS.Kafka> {
+    const bootstrap = await this.bootstrapResolutionCache.get(clusterId, () =>
+      resolveKafkaBootstrap(
+        this.getConfluentCloudRestClient(),
+        clusterId,
+        envId,
+      ),
     );
+    return new kafkaDeps.Kafka({
+      kafkaJS: {
+        brokers: [bootstrap],
+        ssl: true,
+        sasl: {
+          mechanism: "oauthbearer",
+          oauthBearerProvider: async () => ({
+            value: this.holder.getDataPlaneToken() ?? "",
+            principal: clusterId,
+            lifetime: Date.now() + 10 * 60 * 1000,
+            extensions: { logicalCluster: clusterId },
+          }),
+        },
+      },
+    });
   }
 
   /** @inheritdoc */
   async disconnect(): Promise<void> {
-    await Promise.allSettled([this.srEndpointResolutionCache.shutdown()]);
+    await Promise.allSettled([
+      this.kafkaAdminCache.shutdown(),
+      this.kafkaProducerCache.shutdown(),
+      this.bootstrapResolutionCache.shutdown(),
+      this.srEndpointResolutionCache.shutdown(),
+    ]);
   }
 }

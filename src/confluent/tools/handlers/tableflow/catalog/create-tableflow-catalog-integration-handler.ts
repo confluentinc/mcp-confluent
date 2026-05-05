@@ -1,6 +1,6 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
+import { TableflowWithKafkaToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -44,7 +44,7 @@ const createTableflowCatalogIntegrationArguments = z.object({
   }),
 });
 
-export class CreateTableFlowCatalogIntegrationHandler extends TableflowToolHandler {
+export class CreateTableFlowCatalogIntegrationHandler extends TableflowWithKafkaToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,

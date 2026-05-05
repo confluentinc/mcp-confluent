@@ -1,7 +1,10 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
+import {
+  TableflowOnlyToolHandler,
+  TableflowWithKafkaToolHandler,
+} from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   bareRuntime,
@@ -13,7 +16,22 @@ import {
 } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
 
-class StubTableflowHandler extends TableflowToolHandler {
+class StubTableflowOnlyHandler extends TableflowOnlyToolHandler {
+  async handle(): Promise<CallToolResult> {
+    return this.createResponse("stub");
+  }
+
+  getToolConfig(): ToolConfig {
+    return {
+      name: ToolName.LIST_TABLEFLOW_REGIONS,
+      description: "stub",
+      inputSchema: {},
+      annotations: READ_ONLY,
+    };
+  }
+}
+
+class StubTableflowWithKafkaHandler extends TableflowWithKafkaToolHandler {
   async handle(): Promise<CallToolResult> {
     return this.createResponse("stub");
   }
@@ -29,8 +47,28 @@ class StubTableflowHandler extends TableflowToolHandler {
 }
 
 describe("tableflow-tool-handler.ts", () => {
-  describe("TableflowToolHandler", () => {
-    const handler = new StubTableflowHandler();
+  describe("TableflowOnlyToolHandler", () => {
+    const handler = new StubTableflowOnlyHandler();
+
+    describe("enabledConnectionIds()", () => {
+      it("should return the connection ID for a connection with a tableflow block", () => {
+        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
+          DEFAULT_CONNECTION_ID,
+        ]);
+      });
+
+      it("should return an empty array for a connection without a tableflow block", () => {
+        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
+      });
+
+      it("should return an empty array for an OAuth-typed connection", () => {
+        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
+      });
+    });
+  });
+
+  describe("TableflowWithKafkaToolHandler", () => {
+    const handler = new StubTableflowWithKafkaHandler();
 
     describe("enabledConnectionIds()", () => {
       it("should return the connection ID for a connection with tableflow and kafka blocks", () => {

@@ -1,6 +1,6 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
+import { TableflowWithKafkaToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -20,7 +20,7 @@ const readTableflowCatalogIntegrationArguments = z.object({
     .describe("Scope the operation to the give Kafka cluster."),
 });
 
-export class ReadTableFlowCatalogIntegrationHandler extends TableflowToolHandler {
+export class ReadTableFlowCatalogIntegrationHandler extends TableflowWithKafkaToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,

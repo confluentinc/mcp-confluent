@@ -1,10 +1,6 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasTableflow,
-} from "@src/confluent/tools/connection-predicates.js";
-import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
+import { TableflowOnlyToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -30,11 +26,7 @@ const listTableFlowRegionsArguments = z.object({
     .describe("An opaque pagination token for collection requests."),
 });
 
-export class ListTableFlowRegionsHandler extends TableflowToolHandler {
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasTableflow);
-  }
-
+export class ListTableFlowRegionsHandler extends TableflowOnlyToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,

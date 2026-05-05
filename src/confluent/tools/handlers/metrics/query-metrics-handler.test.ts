@@ -11,7 +11,15 @@ import { describe, expect, it } from "vitest";
 
 const KAFKA_SERVER_METRIC = "io.confluent.kafka.server/received_bytes";
 
-const WITH_KAFKA_CLUSTER_ID = {
+const TELEMETRY_CONN = {
+  telemetry: {
+    endpoint: "https://api.telemetry.confluent.cloud",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+  },
+};
+
+const TELEMETRY_WITH_KAFKA_CONN = {
+  ...TELEMETRY_CONN,
   kafka: { cluster_id: "lkc-from-config" },
 };
 
@@ -40,7 +48,7 @@ describe("query-metrics-handler.ts", () => {
         {
           label:
             "auto-inject resource.kafka.id from config when no explicit filter is supplied",
-          connectionConfig: WITH_KAFKA_CLUSTER_ID,
+          connectionConfig: TELEMETRY_WITH_KAFKA_CONN,
           args: { metric: KAFKA_SERVER_METRIC },
           outcome: { resolves: "No data returned for metric" },
           expectedFilter: {
@@ -52,14 +60,14 @@ describe("query-metrics-handler.ts", () => {
         {
           label:
             "not inject a filter when both the arg filter and conn kafka.cluster_id are absent",
-          connectionConfig: {},
+          connectionConfig: TELEMETRY_CONN,
           args: { metric: KAFKA_SERVER_METRIC },
           outcome: { resolves: "No data returned for metric" },
         },
         {
           label:
             "prefer an explicit resource.kafka.id filter arg over the connection config value",
-          connectionConfig: WITH_KAFKA_CLUSTER_ID,
+          connectionConfig: TELEMETRY_WITH_KAFKA_CONN,
           args: {
             metric: KAFKA_SERVER_METRIC,
             filter: { "resource.kafka.id": "lkc-explicit" },
@@ -74,9 +82,24 @@ describe("query-metrics-handler.ts", () => {
         {
           label:
             "not inject a filter for non-Kafka-server metrics even when cluster_id is in config",
-          connectionConfig: WITH_KAFKA_CLUSTER_ID,
+          connectionConfig: TELEMETRY_WITH_KAFKA_CONN,
           args: { metric: "io.confluent.flink/num_records_in" },
           outcome: { resolves: "No data returned for metric" },
+        },
+        {
+          label:
+            "fall back to config when resource.kafka.id filter arg is whitespace-only",
+          connectionConfig: TELEMETRY_WITH_KAFKA_CONN,
+          args: {
+            metric: KAFKA_SERVER_METRIC,
+            filter: { "resource.kafka.id": "   " },
+          },
+          outcome: { resolves: "No data returned for metric" },
+          expectedFilter: {
+            field: "resource.kafka.id",
+            op: "EQ",
+            value: "lkc-from-config",
+          },
         },
       ];
 

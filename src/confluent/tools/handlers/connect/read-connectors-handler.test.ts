@@ -4,6 +4,7 @@ import {
   CCLOUD_CONN,
   ccloudOAuthRuntime,
   confluentCloudRuntime,
+  CONNECT_CONN,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   runtimeWith,
@@ -11,13 +12,9 @@ import {
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-const CONNECT_CONN = {
-  ...CCLOUD_CONN,
-  kafka: {
-    env_id: "env-from-config",
-    cluster_id: "lkc-from-config",
-    rest_endpoint: "https://pkc-example.confluent.cloud:443",
-  },
+type ConnectHandleCase = HandleCaseWithConn & {
+  expectedEnvId?: string;
+  expectedClusterId?: string;
 };
 
 describe("read-connectors-handler.ts", () => {
@@ -41,7 +38,7 @@ describe("read-connectors-handler.ts", () => {
     });
 
     describe("handle()", () => {
-      const cases: HandleCaseWithConn[] = [
+      const cases: ConnectHandleCase[] = [
         {
           label:
             "fall back to conn kafka env_id and cluster_id when args are absent",
@@ -49,6 +46,8 @@ describe("read-connectors-handler.ts", () => {
           args: { connectorName: "my-connector" },
           responseData: { name: "my-connector", type: "SOURCE" },
           outcome: { resolves: "Connector Details for my-connector" },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
         },
         {
           label:
@@ -61,6 +60,8 @@ describe("read-connectors-handler.ts", () => {
           },
           responseData: { name: "my-connector" },
           outcome: { resolves: "Connector Details for my-connector" },
+          expectedEnvId: "env-from-arg",
+          expectedClusterId: "lkc-from-arg",
         },
         {
           label: "throw when environment_id is absent from both arg and config",
@@ -69,11 +70,32 @@ describe("read-connectors-handler.ts", () => {
           responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
+        {
+          label:
+            "throw when kafka_cluster_id is absent from both arg and config",
+          connectionConfig: {
+            ...CCLOUD_CONN,
+            kafka: {
+              env_id: "env-from-config",
+              rest_endpoint: "https://pkc-example.confluent.cloud:443",
+            },
+          },
+          args: { connectorName: "my-connector" },
+          responseData: {},
+          outcome: { throws: "Kafka Cluster ID is required" },
+        },
       ];
 
       it.each(cases)(
         "should $label",
-        async ({ connectionConfig = {}, args, responseData, outcome }) => {
+        async ({
+          connectionConfig = {},
+          args,
+          responseData,
+          outcome,
+          expectedEnvId,
+          expectedClusterId,
+        }) => {
           const { clientManager, clientGetters, capturedCalls } =
             stubClientGetters(responseData);
           await assertHandleCase({
@@ -93,6 +115,8 @@ describe("read-connectors-handler.ts", () => {
               params: expect.objectContaining({
                 path: expect.objectContaining({
                   connector_name: "my-connector",
+                  environment_id: expectedEnvId,
+                  kafka_cluster_id: expectedClusterId,
                 }),
               }),
             });

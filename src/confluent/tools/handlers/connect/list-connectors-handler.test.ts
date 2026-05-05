@@ -4,6 +4,7 @@ import {
   CCLOUD_CONN,
   ccloudOAuthRuntime,
   confluentCloudRuntime,
+  CONNECT_CONN,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   runtimeWith,
@@ -11,13 +12,9 @@ import {
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-const CONNECT_CONN = {
-  ...CCLOUD_CONN,
-  kafka: {
-    env_id: "env-from-config",
-    cluster_id: "lkc-from-config",
-    rest_endpoint: "https://pkc-example.confluent.cloud:443",
-  },
+type ConnectHandleCase = HandleCaseWithConn & {
+  expectedEnvId?: string;
+  expectedClusterId?: string;
 };
 
 describe("list-connectors-handler.ts", () => {
@@ -41,7 +38,7 @@ describe("list-connectors-handler.ts", () => {
     });
 
     describe("handle()", () => {
-      const cases: HandleCaseWithConn[] = [
+      const cases: ConnectHandleCase[] = [
         {
           label:
             "fall back to conn kafka env_id and cluster_id when args are absent",
@@ -49,6 +46,8 @@ describe("list-connectors-handler.ts", () => {
           args: {},
           responseData: [["connector-a", "connector-b"]],
           outcome: { resolves: "Active Connectors" },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
         },
         {
           label:
@@ -57,6 +56,8 @@ describe("list-connectors-handler.ts", () => {
           args: { environmentId: "env-from-arg", clusterId: "lkc-from-arg" },
           responseData: [["connector-a"]],
           outcome: { resolves: "Active Connectors" },
+          expectedEnvId: "env-from-arg",
+          expectedClusterId: "lkc-from-arg",
         },
         {
           label: "throw when environment_id is absent from both arg and config",
@@ -65,11 +66,32 @@ describe("list-connectors-handler.ts", () => {
           responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
+        {
+          label:
+            "throw when kafka_cluster_id is absent from both arg and config",
+          connectionConfig: {
+            ...CCLOUD_CONN,
+            kafka: {
+              env_id: "env-from-config",
+              rest_endpoint: "https://pkc-example.confluent.cloud:443",
+            },
+          },
+          args: {},
+          responseData: {},
+          outcome: { throws: "Kafka Cluster ID is required" },
+        },
       ];
 
       it.each(cases)(
         "should $label",
-        async ({ connectionConfig = {}, args, responseData, outcome }) => {
+        async ({
+          connectionConfig = {},
+          args,
+          responseData,
+          outcome,
+          expectedEnvId,
+          expectedClusterId,
+        }) => {
           const { clientManager, clientGetters, capturedCalls } =
             stubClientGetters(responseData);
           await assertHandleCase({
@@ -85,31 +107,17 @@ describe("list-connectors-handler.ts", () => {
           });
           if (typeof outcome === "object" && "resolves" in outcome) {
             expect(capturedCalls).toHaveLength(1);
+            expect(capturedCalls[0]!.args).toMatchObject({
+              params: expect.objectContaining({
+                path: expect.objectContaining({
+                  environment_id: expectedEnvId,
+                  kafka_cluster_id: expectedClusterId,
+                }),
+              }),
+            });
           }
         },
       );
-
-      it("should route the request with the resolved environment_id and kafka_cluster_id", async () => {
-        const { clientManager, capturedCalls } = stubClientGetters([[]]);
-        await assertHandleCase({
-          handler,
-          runtime: runtimeWith(
-            CONNECT_CONN,
-            DEFAULT_CONNECTION_ID,
-            clientManager,
-          ),
-          args: { environmentId: "env-explicit", clusterId: "lkc-explicit" },
-          outcome: { resolves: "Active Connectors" },
-        });
-        expect(capturedCalls[0]!.args).toMatchObject({
-          params: expect.objectContaining({
-            path: expect.objectContaining({
-              environment_id: "env-explicit",
-              kafka_cluster_id: "lkc-explicit",
-            }),
-          }),
-        });
-      });
     });
   });
 });

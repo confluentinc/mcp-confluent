@@ -4,6 +4,7 @@ import {
   CCLOUD_CONN,
   ccloudOAuthRuntime,
   confluentCloudRuntime,
+  CONNECT_CONN_WITH_AUTH,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   runtimeWith,
@@ -11,18 +12,9 @@ import {
 import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-const CONNECT_CONN_WITH_AUTH = {
-  ...CCLOUD_CONN,
-  kafka: {
-    env_id: "env-from-config",
-    cluster_id: "lkc-from-config",
-    rest_endpoint: "https://pkc-example.confluent.cloud:443",
-    auth: {
-      type: "api_key" as const,
-      key: "kafka-key",
-      secret: "kafka-secret",
-    },
-  },
+type ConnectHandleCase = HandleCaseWithConn & {
+  expectedEnvId?: string;
+  expectedClusterId?: string;
 };
 
 const MINIMAL_CONNECTOR_ARGS = {
@@ -57,7 +49,7 @@ describe("create-connector-handler.ts", () => {
     });
 
     describe("handle()", () => {
-      const cases: HandleCaseWithConn[] = [
+      const cases: ConnectHandleCase[] = [
         {
           label:
             "fall back to conn kafka env_id and cluster_id when args are absent",
@@ -65,6 +57,8 @@ describe("create-connector-handler.ts", () => {
           args: MINIMAL_CONNECTOR_ARGS,
           responseData: { name: "my-connector" },
           outcome: { resolves: "my-connector created" },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
         },
         {
           label:
@@ -77,6 +71,8 @@ describe("create-connector-handler.ts", () => {
           },
           responseData: { name: "my-connector" },
           outcome: { resolves: "my-connector created" },
+          expectedEnvId: "env-from-arg",
+          expectedClusterId: "lkc-from-arg",
         },
         {
           label: "throw when environment_id is absent from both arg and config",
@@ -92,11 +88,33 @@ describe("create-connector-handler.ts", () => {
           responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
+        {
+          label:
+            "throw when kafka_cluster_id is absent from both arg and config",
+          connectionConfig: {
+            ...CCLOUD_CONN,
+            kafka: {
+              env_id: "env-from-config",
+              rest_endpoint: "https://pkc-example.confluent.cloud:443",
+              auth: { type: "api_key" as const, key: "k", secret: "s" },
+            },
+          },
+          args: MINIMAL_CONNECTOR_ARGS,
+          responseData: {},
+          outcome: { throws: "Kafka Cluster ID is required" },
+        },
       ];
 
       it.each(cases)(
         "should $label",
-        async ({ connectionConfig = {}, args, responseData, outcome }) => {
+        async ({
+          connectionConfig = {},
+          args,
+          responseData,
+          outcome,
+          expectedEnvId,
+          expectedClusterId,
+        }) => {
           const { clientManager, clientGetters, capturedCalls } =
             stubClientGetters(responseData);
           await assertHandleCase({
@@ -112,6 +130,14 @@ describe("create-connector-handler.ts", () => {
           });
           if (typeof outcome === "object" && "resolves" in outcome) {
             expect(capturedCalls).toHaveLength(1);
+            expect(capturedCalls[0]!.args).toMatchObject({
+              params: expect.objectContaining({
+                path: expect.objectContaining({
+                  environment_id: expectedEnvId,
+                  kafka_cluster_id: expectedClusterId,
+                }),
+              }),
+            });
           }
         },
       );

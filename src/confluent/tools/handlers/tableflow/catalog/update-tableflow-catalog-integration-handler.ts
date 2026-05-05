@@ -1,5 +1,9 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import {
+  connectionIdsWhere,
+  hasTableflow,
+} from "@src/confluent/tools/connection-predicates.js";
 import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -43,6 +47,10 @@ const updateTableflowCatalogIntegrationArguments = z.object({
 });
 
 export class UpdateTableFlowCatalogIntegrationHandler extends TableflowToolHandler {
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return connectionIdsWhere(runtime.config.connections, hasTableflow);
+  }
+
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,

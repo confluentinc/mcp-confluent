@@ -103,6 +103,15 @@ describe("create-connector-handler.ts", () => {
           responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
+        {
+          label: "resolve with an error message when the API returns an error",
+          connectionConfig: CONNECT_CONN_WITH_AUTH,
+          args: MINIMAL_CONNECTOR_ARGS,
+          responseData: { error: { message: "connector already exists" } },
+          outcome: { resolves: "Failed to create connector my-connector" },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
+        },
       ];
 
       it.each(cases)(

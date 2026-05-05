@@ -80,6 +80,15 @@ describe("list-connectors-handler.ts", () => {
           responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
+        {
+          label: "resolve with an error message when the API returns an error",
+          connectionConfig: CONNECT_CONN,
+          args: {},
+          responseData: { error: { message: "unauthorized" } },
+          outcome: { resolves: "Failed to list Confluent Cloud connectors" },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
+        },
       ];
 
       it.each(cases)(

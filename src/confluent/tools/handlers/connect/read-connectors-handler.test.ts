@@ -84,6 +84,17 @@ describe("read-connectors-handler.ts", () => {
           responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
+        {
+          label: "resolve with an error message when the API returns an error",
+          connectionConfig: CONNECT_CONN,
+          args: { connectorName: "my-connector" },
+          responseData: { error: { message: "not found" } },
+          outcome: {
+            resolves: "Failed to get information about connector my-connector",
+          },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
+        },
       ];
 
       it.each(cases)(

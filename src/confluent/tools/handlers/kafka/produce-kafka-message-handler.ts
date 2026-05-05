@@ -17,10 +17,7 @@ import {
   hasKafkaBootstrap,
   isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
-import {
-  resolveKafkaClusterArgs,
-  resolveSchemaRegistryClusterArgs,
-} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+import { resolveKafkaClusterArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -74,16 +71,7 @@ const produceKafkaMessageArguments = z.object({
     .optional()
     .describe(
       "The Confluent Cloud environment ID (env-...) that owns the cluster. " +
-        "Required alongside cluster_id under --oauth (and alongside " +
-        "schema_registry_cluster_id when serializing). Optional under direct.",
-    ),
-  schema_registry_cluster_id: z
-    .string()
-    .optional()
-    .describe(
-      "The Confluent Cloud Schema Registry cluster ID (lsrc-...). " +
-        "Required under --oauth when useSchemaRegistry is true on value or key. " +
-        "Discover via list-schema-registry-clusters. Ignored under direct.",
+        "Required alongside cluster_id under --oauth. Optional under direct.",
     ),
   topicName: z
     .string()
@@ -148,21 +136,28 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     const connId = this.enabledConnectionIds(runtime)[0]!;
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
     const clientManager = runtime.clientManagers[connId]!;
+    const conn = runtime.config.connections[connId]!;
 
-    // Only create registry if needed
+    // Schema Registry serialization is not yet exposed under --oauth: there is
+    // no MCP tool to discover the SR cluster ID (lsrc-...). Block the path here
+    // with a clear capability boundary rather than throw a discovery hint that
+    // points at a tool the agent can't call. SR-under-OAuth lands in the
+    // follow-up that adds list-schema-registry-clusters.
     const needsRegistry =
       value.useSchemaRegistry || (key && key.useSchemaRegistry);
+    if (needsRegistry && conn.type === "oauth") {
+      return this.createResponse(
+        "Schema Registry serialization is not yet supported under --oauth. " +
+          "Set useSchemaRegistry: false (or omit it) to produce raw bytes, or " +
+          "use a direct connection with schema_registry configured for " +
+          "schema-aware serialization.",
+        true,
+      );
+    }
+
     let registry: SchemaRegistryClient | undefined;
     if (needsRegistry) {
-      const srResolved = resolveSchemaRegistryClusterArgs(
-        parsed,
-        runtime,
-        connId,
-      );
-      registry = await clientManager.getSchemaRegistrySdkClient(
-        srResolved.clusterId,
-        srResolved.envId,
-      );
+      registry = await clientManager.getSchemaRegistrySdkClient();
     }
 
     // Check for latest schema if needed (value)

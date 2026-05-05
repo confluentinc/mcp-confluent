@@ -1,9 +1,6 @@
 import { MCPServerConfiguration } from "@src/config/index.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
-import {
-  resolveKafkaClusterArgs,
-  resolveSchemaRegistryClusterArgs,
-} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+import { resolveKafkaClusterArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
@@ -77,45 +74,5 @@ describe("resolveKafkaClusterArgs", () => {
     expect(() =>
       resolveKafkaClusterArgs({ cluster_id: "lkc-abc" }, runtime, CONN_ID),
     ).toThrow(/cluster_id.*environment_id.*required.*list-clusters/i);
-  });
-});
-
-describe("resolveSchemaRegistryClusterArgs", () => {
-  it("under direct, returns undefined regardless of args", () => {
-    const runtime = directRuntime();
-    expect(
-      resolveSchemaRegistryClusterArgs(
-        { schema_registry_cluster_id: "lsrc-arg", environment_id: "env-arg" },
-        runtime,
-        CONN_ID,
-      ),
-    ).toEqual({ clusterId: undefined, envId: undefined });
-    expect(resolveSchemaRegistryClusterArgs({}, runtime, CONN_ID)).toEqual({
-      clusterId: undefined,
-      envId: undefined,
-    });
-  });
-
-  it("under OAuth with both args, returns them", () => {
-    const runtime = oauthRuntime();
-    expect(
-      resolveSchemaRegistryClusterArgs(
-        {
-          schema_registry_cluster_id: "lsrc-abc",
-          environment_id: "env-1",
-        },
-        runtime,
-        CONN_ID,
-      ),
-    ).toEqual({ clusterId: "lsrc-abc", envId: "env-1" });
-  });
-
-  it("under OAuth with missing args, throws discovery hint", () => {
-    const runtime = oauthRuntime();
-    expect(() =>
-      resolveSchemaRegistryClusterArgs({}, runtime, CONN_ID),
-    ).toThrow(
-      /schema_registry_cluster_id.*environment_id.*required.*list-schema-registry-clusters/i,
-    );
   });
 });

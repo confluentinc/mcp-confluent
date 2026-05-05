@@ -19,7 +19,10 @@ describe("config/index.ts", () => {
       bootstrap_servers: "localhost:9092"
 `;
 
-      const conn = parseYamlConfiguration(yamlContent, {}).getSoleConnection();
+      const conn = parseYamlConfiguration(
+        yamlContent,
+        {},
+      ).getSoleDirectConnection();
 
       expect(conn.type).toBe("direct");
       expect(conn.kafka!.bootstrap_servers).toBe("localhost:9092");
@@ -36,7 +39,10 @@ describe("config/index.ts", () => {
       endpoint: "http://localhost:8081"
 `;
 
-      const conn = parseYamlConfiguration(yamlContent, {}).getSoleConnection();
+      const conn = parseYamlConfiguration(
+        yamlContent,
+        {},
+      ).getSoleDirectConnection();
 
       expect(conn.schema_registry).toBeDefined();
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
@@ -50,7 +56,10 @@ describe("config/index.ts", () => {
       bootstrap_servers: "broker1:9092,broker2:9092,broker3:9092"
 `;
 
-      const conn = parseYamlConfiguration(yamlContent, {}).getSoleConnection();
+      const conn = parseYamlConfiguration(
+        yamlContent,
+        {},
+      ).getSoleDirectConnection();
 
       expect(conn.kafka!.bootstrap_servers).toBe(
         "broker1:9092,broker2:9092,broker3:9092",
@@ -264,7 +273,7 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      expect(config.getSoleConnection().schema_registry?.endpoint).toBe(
+      expect(config.getSoleDirectConnection().schema_registry?.endpoint).toBe(
         "https://schema-registry.example.com:8081",
       );
     });
@@ -279,7 +288,7 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
       expect(conn.kafka).toBeUndefined();
     });
@@ -299,7 +308,7 @@ describe("config/index.ts", () => {
         SR_URL: "http://localhost:8081",
       });
 
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.kafka!.bootstrap_servers).toBe("broker1:9092");
       expect(conn.schema_registry!.endpoint).toBe("http://localhost:8081");
     });
@@ -418,7 +427,7 @@ describe("config/index.ts", () => {
 
       const config = loadConfigFromYaml("/path/to/config.yaml", {});
 
-      expect(config.getSoleConnection().kafka!.bootstrap_servers).toBe(
+      expect(config.getSoleDirectConnection().kafka!.bootstrap_servers).toBe(
         "localhost:9092",
       );
     });
@@ -437,7 +446,7 @@ describe("config/index.ts", () => {
         BOOTSTRAP_SERVERS: "broker1:9092",
       });
 
-      expect(config.getSoleConnection().kafka!.bootstrap_servers).toBe(
+      expect(config.getSoleDirectConnection().kafka!.bootstrap_servers).toBe(
         "broker1:9092",
       );
     });

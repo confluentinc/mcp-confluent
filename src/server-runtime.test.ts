@@ -208,8 +208,9 @@ describe("ServerRuntime", () => {
     it("should throw when the sole client manager is not a DirectClientManager (e.g., OAuth)", () => {
       vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
       const oauthConfig = new MCPServerConfiguration({
-        connections: { "env-connection": connWith({}) },
-        ccloudOAuth: { type: "ccloud_oauth", env: "stag" },
+        connections: {
+          "env-connection": { type: "oauth", development_env: "stag" },
+        },
       });
       const runtime = ServerRuntime.fromConfig(oauthConfig);
       expect(() => runtime.requireDirectClientManager()).toThrow(
@@ -261,7 +262,7 @@ describe("ServerRuntime", () => {
       expect(runtime.oauthHolder).toBeUndefined();
     });
 
-    it("should call OAuthHolder.start and expose oauthHolder when the config has ccloud-oauth", () => {
+    it("should call OAuthHolder.start and expose oauthHolder when a connection has type 'oauth'", () => {
       const fakeHolder = fakeOAuthHolder();
       const startSpy = vi
         .spyOn(OAuthHolder, "start")
@@ -269,11 +270,8 @@ describe("ServerRuntime", () => {
 
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": connWith({
-            kafka: { bootstrap_servers: "broker:9092" },
-          }),
+          "env-connection": { type: "oauth", development_env: "devel" },
         },
-        ccloudOAuth: { type: "ccloud_oauth", env: "devel" },
       });
 
       const runtime = ServerRuntime.fromConfig(oauthConfig);
@@ -282,15 +280,12 @@ describe("ServerRuntime", () => {
       expect(runtime.oauthHolder).toBe(fakeHolder);
     });
 
-    it("should construct OAuthClientManager instances for every connection when ccloud-oauth is set", () => {
+    it("should construct OAuthClientManager instances for every connection when an oauth connection is present", () => {
       vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": connWith({
-            kafka: { bootstrap_servers: "broker:9092" },
-          }),
+          "env-connection": { type: "oauth", development_env: "stag" },
         },
-        ccloudOAuth: { type: "ccloud_oauth", env: "stag" },
       });
 
       const runtime = ServerRuntime.fromConfig(oauthConfig);

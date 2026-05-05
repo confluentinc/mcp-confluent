@@ -37,7 +37,7 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     const clientManager = runtime.clientManager;
     const { clusterId, topicName } =
       getTopicConfigArguments.parse(toolArguments);
-    const conn = runtime.config.getSoleConnection();
+    const conn = runtime.config.getSoleDirectConnection();
     const kafka_cluster_id = this.resolveParam(
       clusterId,
       conn.kafka?.cluster_id,

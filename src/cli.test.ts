@@ -420,81 +420,82 @@ describe("cli.ts", () => {
     );
 
     describe("--oauth flags", () => {
-      it("should parse --oauth and --oauth-env into cliOptions", () => {
+      it("should parse --oauth alone with developmentEnv undefined", () => {
+        const result = parseCliArgs(["node", "mcp-confluent", "--oauth"]);
+        expect(result.oauth).toBe(true);
+        expect(result.developmentEnv).toBeUndefined();
+      });
+
+      it("should parse --oauth with --development-env=devel", () => {
         const result = parseCliArgs([
           "node",
           "mcp-confluent",
           "--oauth",
-          "--oauth-env",
+          "--development-env",
           "devel",
         ]);
         expect(result.oauth).toBe(true);
-        expect(result.oauthEnv).toBe("devel");
+        expect(result.developmentEnv).toBe("devel");
       });
 
-      it("should accept stag and prod for --oauth-env", () => {
+      it("should accept stag and prod for --development-env", () => {
         expect(
           parseCliArgs([
             "node",
             "mcp-confluent",
             "--oauth",
-            "--oauth-env",
+            "--development-env",
             "stag",
-          ]).oauthEnv,
+          ]).developmentEnv,
         ).toBe("stag");
         expect(
           parseCliArgs([
             "node",
             "mcp-confluent",
             "--oauth",
-            "--oauth-env",
+            "--development-env",
             "prod",
-          ]).oauthEnv,
+          ]).developmentEnv,
         ).toBe("prod");
       });
 
-      it("should reject --oauth without --oauth-env", () => {
+      it("should reject --development-env without --oauth", () => {
         expect(() =>
-          parseCliArgs(["node", "mcp-confluent", "--oauth"]),
-        ).toThrow(/--oauth-env/);
+          parseCliArgs(["node", "mcp-confluent", "--development-env", "devel"]),
+        ).toThrow(/--development-env requires --oauth/);
       });
 
-      it("should reject --oauth-env without --oauth", () => {
-        expect(() =>
-          parseCliArgs(["node", "mcp-confluent", "--oauth-env", "devel"]),
-        ).toThrow(/--oauth-env requires --oauth/);
-      });
-
-      it("should reject --oauth-env with an unknown environment", () => {
+      it("should reject --development-env with an unknown value", () => {
         expect(() =>
           parseCliArgs([
             "node",
             "mcp-confluent",
             "--oauth",
-            "--oauth-env",
+            "--development-env",
             "bogus",
           ]),
         ).toThrow();
       });
 
-      it("should reject --oauth combined with --config", () => {
+      it("should accept --oauth combined with --config at parse time", () => {
+        // parseCliArgs no longer rejects the combination — the actual rejection
+        // (in either the YAML-has-OAuth or YAML-is-direct-only shape) is
+        // detected post-load in main(), where the parsed YAML is available.
         expect(() =>
           parseCliArgs([
             "node",
             "mcp-confluent",
             "--oauth",
-            "--oauth-env",
-            "devel",
             "--config",
             "/tmp/foo.yaml",
           ]),
-        ).toThrow(/oauth.*config|config.*oauth/i);
+        ).not.toThrow();
       });
 
-      it("should leave oauth and oauthEnv undefined when neither flag is set", () => {
+      it("should leave oauth and developmentEnv undefined when neither flag is set", () => {
         const result = parseCliArgs(["node", "mcp-confluent"]);
         expect(result.oauth).toBeUndefined();
-        expect(result.oauthEnv).toBeUndefined();
+        expect(result.developmentEnv).toBeUndefined();
       });
     });
   });

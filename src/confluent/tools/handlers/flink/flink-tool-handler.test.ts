@@ -80,7 +80,7 @@ describe("flink-tool-handler.ts", () => {
       it("should return the flink block when present", () => {
         const runtime = flinkRuntime();
         const flink = handler["getFlinkDirectConfig"](runtime.config);
-        expect(flink).toBe(runtime.config.getSoleConnection().flink);
+        expect(flink).toBe(runtime.config.getSoleDirectConnection().flink);
       });
 
       it("should throw Wacky when the connection has no flink block", () => {

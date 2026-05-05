@@ -25,7 +25,7 @@ export abstract class FlinkToolHandler extends BaseToolHandler {
   protected getFlinkDirectConfig(
     config: MCPServerConfiguration,
   ): FlinkDirectConfig {
-    const flink = config.getSoleConnection().flink;
+    const flink = config.getSoleDirectConnection().flink;
     if (!flink)
       throw new Error(
         "Wacky -- FlinkToolHandler invoked on a connection without a flink block",

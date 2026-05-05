@@ -64,7 +64,7 @@ export class DescribeTableHandler extends FlinkCatalogToolHandler {
     } = describeTableArguments.parse(toolArguments);
 
     const flink = this.getFlinkDirectConfig(runtime.config);
-    const conn = runtime.config.getSoleConnection(); // needed for kafka.cluster_id in resolveDatabaseName
+    const conn = runtime.config.getSoleDirectConnection(); // needed for kafka.cluster_id in resolveDatabaseName
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
       flink,
       organizationId,

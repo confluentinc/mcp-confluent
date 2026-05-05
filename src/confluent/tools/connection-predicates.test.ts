@@ -67,6 +67,11 @@ const CCLOUD_SR_CONN = conn({
   },
 });
 
+const OAUTH_CONN: ConnectionConfig = {
+  type: "oauth",
+  ccloud_env: "devel",
+};
+
 describe("connection-predicates.ts", () => {
   describe("hasKafka()", () => {
     it("should return true when the kafka block is present", () => {
@@ -75,6 +80,10 @@ describe("connection-predicates.ts", () => {
 
     it("should return false when the kafka block is absent", () => {
       expect(hasKafka(SCHEMA_REGISTRY_CONN)).toBe(false);
+    });
+
+    it("should return false for an OAuth connection", () => {
+      expect(hasKafka(OAUTH_CONN)).toBe(false);
     });
   });
 
@@ -90,6 +99,10 @@ describe("connection-predicates.ts", () => {
     it("should return false when kafka block is present but bootstrap_servers is absent", () => {
       expect(hasKafkaBootstrap(KAFKA_REST_CONN)).toBe(false);
     });
+
+    it("should return false for an OAuth connection", () => {
+      expect(hasKafkaBootstrap(OAUTH_CONN)).toBe(false);
+    });
   });
 
   describe("hasKafkaAuth()", () => {
@@ -103,6 +116,10 @@ describe("connection-predicates.ts", () => {
 
     it("should return false when the kafka block has no auth", () => {
       expect(hasKafkaAuth(KAFKA_CONN)).toBe(false);
+    });
+
+    it("should return false for an OAuth connection", () => {
+      expect(hasKafkaAuth(OAUTH_CONN)).toBe(false);
     });
   });
 
@@ -122,6 +139,10 @@ describe("connection-predicates.ts", () => {
     it("should return false when rest_endpoint is present but auth is absent", () => {
       expect(hasKafkaRestWithAuth(KAFKA_REST_CONN)).toBe(false);
     });
+
+    it("should return false for an OAuth connection", () => {
+      expect(hasKafkaRestWithAuth(OAUTH_CONN)).toBe(false);
+    });
   });
 
   describe("hasSchemaRegistry()", () => {
@@ -132,6 +153,10 @@ describe("connection-predicates.ts", () => {
     it("should return false when the schema_registry block is absent", () => {
       expect(hasSchemaRegistry(KAFKA_CONN)).toBe(false);
     });
+
+    it("should return false for an OAuth connection", () => {
+      expect(hasSchemaRegistry(OAUTH_CONN)).toBe(false);
+    });
   });
 
   describe("hasConfluentCloud()", () => {
@@ -139,8 +164,13 @@ describe("connection-predicates.ts", () => {
       expect(hasConfluentCloud(CONFLUENT_CLOUD_CONN)).toBe(true);
     });
 
-    it("should return false when the confluent_cloud block is absent", () => {
+    it("should return false when the confluent_cloud block is absent on a direct connection", () => {
       expect(hasConfluentCloud(KAFKA_CONN)).toBe(false);
+    });
+
+    it("should return true unconditionally for an OAuth connection", () => {
+      // OAuth gets the CCloud REST URL from its Auth0 env, so it always reaches the CP surface.
+      expect(hasConfluentCloud(OAUTH_CONN)).toBe(true);
     });
   });
 
@@ -152,6 +182,10 @@ describe("connection-predicates.ts", () => {
     it("should return false when the flink block is absent", () => {
       expect(hasFlink(KAFKA_CONN)).toBe(false);
     });
+
+    it("should return false for an OAuth connection", () => {
+      expect(hasFlink(OAUTH_CONN)).toBe(false);
+    });
   });
 
   describe("hasTelemetry()", () => {
@@ -161,6 +195,10 @@ describe("connection-predicates.ts", () => {
 
     it("should return false when the telemetry block is absent", () => {
       expect(hasTelemetry(KAFKA_CONN)).toBe(false);
+    });
+
+    it("should return false for an OAuth connection", () => {
+      expect(hasTelemetry(OAUTH_CONN)).toBe(false);
     });
   });
 
@@ -180,6 +218,10 @@ describe("connection-predicates.ts", () => {
     it("should return false when neither block is present", () => {
       expect(hasCCloudCatalogSupport(KAFKA_CONN)).toBe(false);
     });
+
+    it("should return false for an OAuth connection", () => {
+      expect(hasCCloudCatalogSupport(OAUTH_CONN)).toBe(false);
+    });
   });
 
   describe("hasTableflow()", () => {
@@ -189,6 +231,10 @@ describe("connection-predicates.ts", () => {
 
     it("should return false when the tableflow block is absent", () => {
       expect(hasTableflow(KAFKA_CONN)).toBe(false);
+    });
+
+    it("should return false for an OAuth connection", () => {
+      expect(hasTableflow(OAUTH_CONN)).toBe(false);
     });
   });
 

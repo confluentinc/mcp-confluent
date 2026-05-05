@@ -20,7 +20,10 @@ const TELEMETRY_CONN = {
 
 const TELEMETRY_WITH_KAFKA_CONN = {
   ...TELEMETRY_CONN,
-  kafka: { cluster_id: "lkc-from-config" },
+  kafka: {
+    cluster_id: "lkc-from-config",
+    rest_endpoint: "https://pkc-xxxxx.us-east-1.aws.confluent.cloud:443",
+  },
 };
 
 type FilterCase = HandleCaseWithConn & {
@@ -99,6 +102,21 @@ describe("query-metrics-handler.ts", () => {
             field: "resource.kafka.id",
             op: "EQ",
             value: "lkc-from-config",
+          },
+        },
+        {
+          label:
+            "send trimmed resource.kafka.id when caller passes a space-padded value",
+          connectionConfig: TELEMETRY_WITH_KAFKA_CONN,
+          args: {
+            metric: KAFKA_SERVER_METRIC,
+            filter: { "resource.kafka.id": " lkc-explicit " },
+          },
+          outcome: { resolves: "No data returned for metric" },
+          expectedFilter: {
+            field: "resource.kafka.id",
+            op: "EQ",
+            value: "lkc-explicit",
           },
         },
       ];

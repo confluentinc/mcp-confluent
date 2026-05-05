@@ -198,8 +198,14 @@ function buildEffectiveFilter(
   connKafkaClusterId: string | undefined,
 ): Record<string, string> {
   const effectiveFilter = { ...filter };
-  if (!effectiveFilter["resource.kafka.id"]?.trim()) {
-    delete effectiveFilter["resource.kafka.id"];
+  const rawKafkaId = effectiveFilter["resource.kafka.id"];
+  if (rawKafkaId !== undefined) {
+    const trimmed = rawKafkaId.trim();
+    if (trimmed) {
+      effectiveFilter["resource.kafka.id"] = trimmed;
+    } else {
+      delete effectiveFilter["resource.kafka.id"];
+    }
   }
   if (
     metric.startsWith("io.confluent.kafka.server/") &&

@@ -1,15 +1,13 @@
 import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  uniqueTopicName,
-  withSharedAdminClient,
-} from "@tests/harness/kafka-admin.js";
+import { withSharedAdminClient } from "@tests/harness/kafka-admin.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { activeTransports } from "@tests/harness/transports.js";
+import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -37,7 +35,7 @@ describe("create-topics-handler", { tags: [Tag.KAFKA] }, () => {
     });
 
     it("should create the requested Kafka topic", async () => {
-      const topic = uniqueTopicName(`create-${transport}`);
+      const topic = uniqueName(`create-${transport}`);
       // track for cleanup before the call so a thrown callTool still enqueues
       // the topic for afterAll deletion if creation partially succeeded
       createdTopics.push(topic);

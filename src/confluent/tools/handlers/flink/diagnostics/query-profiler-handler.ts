@@ -535,9 +535,10 @@ export class QueryProfilerHandler extends FlinkToolHandler {
 
   /** Overrides FlinkToolHandler: also requires a telemetry block because profiling fetches metrics from the Telemetry API in addition to the Flink REST API. */
   override enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      (conn) => hasFlink(conn) && hasTelemetry(conn),
-    );
+    return connectionIdsWhere(runtime.config.connections, (conn) => {
+      const flinkVerdict = hasFlink(conn);
+      if (!flinkVerdict.enabled) return flinkVerdict;
+      return hasTelemetry(conn);
+    });
   }
 }

@@ -7,6 +7,7 @@ export {
   getMockedRestClient,
   getMockedSchemaRegistry,
   type MockedClientManager,
+  type MockedRestClient,
 } from "./clients.js";
 export {
   assertHandleCase,

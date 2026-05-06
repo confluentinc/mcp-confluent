@@ -7,7 +7,7 @@ import { type Mock, type Mocked, vi } from "vitest";
 import { createMockInstance } from "./mock-instance.js";
 
 // shared shape for the six openapi-fetch REST seams (they differ only in `paths`).
-type MockedRestClient = Mocked<Client<paths, `${string}/${string}`>>;
+export type MockedRestClient = Mocked<Client<paths, `${string}/${string}`>>;
 
 /** Returns a bare-mocked openapi-fetch {@link Client} with every HTTP-verb
  *  method as a `vi.fn()`. */
@@ -128,6 +128,22 @@ export interface MockedClientManager extends Mocked<DirectClientManager> {
  * cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({ data: ... });
  * (await cm.getAdminClient()).listTopics.mockResolvedValue(["topic-a"]);
  * ```
+ *
+ * Two invariants are load-bearing:
+ *
+ * - **Same getter, same mock.** Getters use `mockReturnValue` (not
+ *   `mockReturnValueOnce`), so every call to `cm.getXxx()` returns the same
+ *   underlying mock. A reference captured in setup stays valid for
+ *   assertions after the handler runs, and the handler's own getter call
+ *   lands on the same mock the test wired.
+ * - **Build per test, not per suite.** Invoke this once per test — either
+ *   inline in each `it` body or by reassigning a suite-scope `let` from a
+ *   `beforeEach`. The anti-pattern is a suite-scope `const cm =
+ *   getMockedClientManager()` that runs once, since Vitest's
+ *   `restoreMocks: true` only restores `vi.spyOn` originals and `vi.fn()`
+ *   call histories and configured return values would then leak across
+ *   tests.
+ *   {@see https://vitest.dev/config/restoremocks}
  */
 export function getMockedClientManager(): MockedClientManager {
   const cm = createMockInstance(DirectClientManager) as MockedClientManager;

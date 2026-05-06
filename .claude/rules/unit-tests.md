@@ -189,6 +189,37 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   });
   ```
 
+  Two invariants are load-bearing:
+  - **Same getter, same mock.** Each `cm.getXxx()` getter is wired with
+    `mockReturnValue`, so every call returns the same mock instance. A
+    `const flinkRest = cm.getConfluentCloudFlinkRestClient()` captured in
+    setup stays valid for assertions after the handler runs, and the
+    handler's own getter call lands on the same mock the test configured.
+  - **Build per test, not per suite.** Invoke `getMockedClientManager()`
+    once per test — either inline in each `it` body or by reassigning a
+    suite-scope `let` from a `beforeEach`. The anti-pattern is a
+    suite-scope `const cm = getMockedClientManager()` that runs once: with
+    that shape, vitest's
+    [`restoreMocks: true`](https://vitest.dev/config/restoremocks) (which
+    only restores `vi.spyOn` originals) won't touch the manager's
+    `vi.fn()`s, so call histories and configured return values leak across
+    tests in the suite. To share setup across tests, rebuild in
+    `beforeEach`:
+
+    ```typescript
+    let clientManager: MockedClientManager;
+
+    beforeEach(() => {
+      clientManager = getMockedClientManager();
+    });
+
+    it("...", async () => {
+      const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+      flinkRest.GET.mockResolvedValue({ data: { items: [] } });
+      // ...
+    });
+    ```
+
   For poll-then-fetch flows or any case where a method returns different data
   on successive calls, chain `mockResolvedValueOnce`:
 

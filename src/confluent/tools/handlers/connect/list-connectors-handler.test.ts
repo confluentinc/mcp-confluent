@@ -9,12 +9,19 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 type ConnectHandleCase = HandleCaseWithConn & {
   expectedEnvId?: string;
   expectedClusterId?: string;
+  /** Response object the cloud REST GET resolves with. Use { data } for the
+   *  success path or { error } for the API-error path. Omit for cases that
+   *  throw before reaching the client. */
+  mockResponse?: { data?: unknown; error?: unknown };
 };
 
 describe("list-connectors-handler.ts", () => {
@@ -44,7 +51,7 @@ describe("list-connectors-handler.ts", () => {
             "fall back to conn kafka env_id and cluster_id when args are absent",
           connectionConfig: CONNECT_CONN,
           args: {},
-          responseData: [["connector-a", "connector-b"]],
+          mockResponse: { data: ["connector-a", "connector-b"] },
           outcome: { resolves: "Active Connectors" },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -54,7 +61,7 @@ describe("list-connectors-handler.ts", () => {
             "prefer explicit environmentId and clusterId args over conn config",
           connectionConfig: CONNECT_CONN,
           args: { environmentId: "env-from-arg", clusterId: "lkc-from-arg" },
-          responseData: [["connector-a"]],
+          mockResponse: { data: ["connector-a"] },
           outcome: { resolves: "Active Connectors" },
           expectedEnvId: "env-from-arg",
           expectedClusterId: "lkc-from-arg",
@@ -63,7 +70,6 @@ describe("list-connectors-handler.ts", () => {
           label: "throw when environment_id is absent from both arg and config",
           connectionConfig: CCLOUD_CONN,
           args: {},
-          responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
         {
@@ -77,14 +83,13 @@ describe("list-connectors-handler.ts", () => {
             },
           },
           args: {},
-          responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
         {
           label: "resolve with an error message when the API returns an error",
           connectionConfig: CONNECT_CONN,
           args: {},
-          responseData: { error: { message: "unauthorized" } },
+          mockResponse: { error: { message: "unauthorized" } },
           outcome: { resolves: "Failed to list Confluent Cloud connectors" },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -96,13 +101,17 @@ describe("list-connectors-handler.ts", () => {
         async ({
           connectionConfig = {},
           args,
-          responseData,
+          mockResponse,
           outcome,
           expectedEnvId,
           expectedClusterId,
         }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          const cloudRest = clientManager.getConfluentCloudRestClient();
+          if (mockResponse !== undefined) {
+            cloudRest.GET.mockResolvedValue(mockResponse);
+          }
+
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -112,18 +121,22 @@ describe("list-connectors-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
+
           if (typeof outcome === "object" && "resolves" in outcome) {
-            expect(capturedCalls).toHaveLength(1);
-            expect(capturedCalls[0]!.args).toMatchObject({
-              params: expect.objectContaining({
-                path: expect.objectContaining({
-                  environment_id: expectedEnvId,
-                  kafka_cluster_id: expectedClusterId,
+            expect(cloudRest.GET).toHaveBeenCalledOnce();
+            expect(cloudRest.GET).toHaveBeenCalledWith(
+              expect.any(String),
+              expect.objectContaining({
+                params: expect.objectContaining({
+                  path: expect.objectContaining({
+                    environment_id: expectedEnvId,
+                    kafka_cluster_id: expectedClusterId,
+                  }),
                 }),
               }),
-            });
+            );
           }
         },
       );

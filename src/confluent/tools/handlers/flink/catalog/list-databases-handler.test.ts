@@ -5,8 +5,13 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+  type MockedClientManager,
+  type MockedRestClient,
+} from "@tests/stubs/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 
 const SQL_RESPONSE = {
   status: { phase: "COMPLETED" },
@@ -18,12 +23,21 @@ describe("list-databases-handler.ts", () => {
     const handler = new ListDatabasesHandler();
 
     describe("handle()", () => {
+      let clientManager: MockedClientManager;
+      let flinkRest: MockedRestClient;
+
+      beforeEach(() => {
+        clientManager = getMockedClientManager();
+        flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.POST.mockResolvedValue({ data: SQL_RESPONSE });
+        flinkRest.GET.mockResolvedValue({ data: SQL_RESPONSE });
+      });
+
       const cases: HandleCaseWithConn[] = [
         {
           label: "use org/env/compute IDs from config when args absent",
           args: {},
           outcome: { resolves: "Databases" },
-          responseData: SQL_RESPONSE,
         },
         {
           label: "use explicit org/env/compute args over config",
@@ -33,20 +47,12 @@ describe("list-databases-handler.ts", () => {
             computePoolId: "lfcp-from-args",
           },
           outcome: { resolves: "Databases" },
-          responseData: SQL_RESPONSE,
         },
       ];
 
       it.each(cases)(
         "should $label",
-        async ({
-          args,
-          outcome,
-          responseData,
-          connectionConfig = FLINK_CONN,
-        }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+        async ({ args, outcome, connectionConfig = FLINK_CONN }) => {
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -56,7 +62,7 @@ describe("list-databases-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );
@@ -75,8 +81,6 @@ describe("list-databases-handler.ts", () => {
       ])(
         "should $label in POST SQL statement",
         async ({ args, expectedCatalog }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(SQL_RESPONSE);
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -86,16 +90,20 @@ describe("list-databases-handler.ts", () => {
             ),
             args,
             outcome: { resolves: "Databases" },
-            clientGetters,
+            clientManager,
           });
-          expect(capturedCalls).toHaveLength(3);
-          expect(capturedCalls[0]!.args).toMatchObject({
-            body: expect.objectContaining({
-              spec: expect.objectContaining({
-                statement: expect.stringContaining(expectedCatalog),
+
+          expect(flinkRest.POST).toHaveBeenCalledOnce();
+          expect(flinkRest.POST).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({
+              body: expect.objectContaining({
+                spec: expect.objectContaining({
+                  statement: expect.stringContaining(expectedCatalog),
+                }),
               }),
             }),
-          });
+          );
         },
       );
     });

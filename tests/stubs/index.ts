@@ -1,10 +1,17 @@
 export { createMockAdmin, type MockedAdmin } from "./admin.js";
 export {
+  getMockedAdmin,
+  getMockedClientManager,
+  getMockedConsumer,
+  getMockedProducer,
+  getMockedRestClient,
+  getMockedSchemaRegistry,
+  type MockedClientManager,
+  type MockedRestClient,
+} from "./clients.js";
+export {
   assertHandleCase,
   classifyThrown,
-  stubClientGetters,
-  type CapturedCall,
-  type ClientGetters,
   type HandleCase,
   type HandleOutcome,
   type Resolves,

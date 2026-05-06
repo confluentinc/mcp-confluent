@@ -9,12 +9,19 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 type ConnectHandleCase = HandleCaseWithConn & {
   expectedEnvId?: string;
   expectedClusterId?: string;
+  /** Response object the cloud REST GET resolves with. Use { data } for the
+   *  success path or { error } for the API-error path. Omit for cases that
+   *  throw before reaching the client. */
+  mockResponse?: { data?: unknown; error?: unknown };
 };
 
 describe("read-connectors-handler.ts", () => {
@@ -44,7 +51,7 @@ describe("read-connectors-handler.ts", () => {
             "fall back to conn kafka env_id and cluster_id when args are absent",
           connectionConfig: CONNECT_CONN,
           args: { connectorName: "my-connector" },
-          responseData: { name: "my-connector", type: "SOURCE" },
+          mockResponse: { data: { name: "my-connector", type: "SOURCE" } },
           outcome: { resolves: "Connector Details for my-connector" },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -58,7 +65,7 @@ describe("read-connectors-handler.ts", () => {
             environmentId: "env-from-arg",
             clusterId: "lkc-from-arg",
           },
-          responseData: { name: "my-connector" },
+          mockResponse: { data: { name: "my-connector" } },
           outcome: { resolves: "Connector Details for my-connector" },
           expectedEnvId: "env-from-arg",
           expectedClusterId: "lkc-from-arg",
@@ -67,7 +74,6 @@ describe("read-connectors-handler.ts", () => {
           label: "throw when environment_id is absent from both arg and config",
           connectionConfig: CCLOUD_CONN,
           args: { connectorName: "my-connector" },
-          responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
         {
@@ -81,14 +87,13 @@ describe("read-connectors-handler.ts", () => {
             },
           },
           args: { connectorName: "my-connector" },
-          responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
         {
           label: "resolve with an error message when the API returns an error",
           connectionConfig: CONNECT_CONN,
           args: { connectorName: "my-connector" },
-          responseData: { error: { message: "not found" } },
+          mockResponse: { error: { message: "not found" } },
           outcome: {
             resolves: "Failed to get information about connector my-connector",
           },
@@ -102,13 +107,17 @@ describe("read-connectors-handler.ts", () => {
         async ({
           connectionConfig = {},
           args,
-          responseData,
+          mockResponse,
           outcome,
           expectedEnvId,
           expectedClusterId,
         }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          const cloudRest = clientManager.getConfluentCloudRestClient();
+          if (mockResponse !== undefined) {
+            cloudRest.GET.mockResolvedValue(mockResponse);
+          }
+
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -118,19 +127,23 @@ describe("read-connectors-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
+
           if (typeof outcome === "object" && "resolves" in outcome) {
-            expect(capturedCalls).toHaveLength(1);
-            expect(capturedCalls[0]!.args).toMatchObject({
-              params: expect.objectContaining({
-                path: expect.objectContaining({
-                  connector_name: "my-connector",
-                  environment_id: expectedEnvId,
-                  kafka_cluster_id: expectedClusterId,
+            expect(cloudRest.GET).toHaveBeenCalledOnce();
+            expect(cloudRest.GET).toHaveBeenCalledWith(
+              expect.any(String),
+              expect.objectContaining({
+                params: expect.objectContaining({
+                  path: expect.objectContaining({
+                    connector_name: "my-connector",
+                    environment_id: expectedEnvId,
+                    kafka_cluster_id: expectedClusterId,
+                  }),
                 }),
               }),
-            });
+            );
           }
         },
       );

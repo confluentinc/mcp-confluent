@@ -7,10 +7,19 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 const STATEMENT_NAME = "my-statement";
+
+type QueryProfilerCase = HandleCaseWithConn & {
+  /** Body returned by the Flink REST GET (the statement's exec graph). Omit for
+   *  cases that throw before reaching the client. */
+  flinkGetData?: unknown;
+};
 
 describe("query-profiler-handler.ts", () => {
   describe("QueryProfilerHandler", () => {
@@ -46,7 +55,7 @@ describe("query-profiler-handler.ts", () => {
     });
 
     describe("handle()", () => {
-      const cases: HandleCaseWithConn[] = [
+      const cases: QueryProfilerCase[] = [
         {
           label: "throws ZodError when statementName is absent",
           args: {},
@@ -56,7 +65,7 @@ describe("query-profiler-handler.ts", () => {
         {
           label: "uses org/env/compute IDs from config when args absent",
           args: { statementName: STATEMENT_NAME },
-          responseData: { Graph: '{"tasks":[]}' },
+          flinkGetData: { Graph: '{"tasks":[]}' },
           outcome: { resolves: `Query Profiler for '${STATEMENT_NAME}'` },
         },
         {
@@ -67,7 +76,7 @@ describe("query-profiler-handler.ts", () => {
             environmentId: "env-from-args",
             computePoolId: "lfcp-from-args",
           },
-          responseData: { Graph: '{"tasks":[]}' },
+          flinkGetData: { Graph: '{"tasks":[]}' },
           outcome: { resolves: `Query Profiler for '${STATEMENT_NAME}'` },
         },
       ];
@@ -77,11 +86,20 @@ describe("query-profiler-handler.ts", () => {
         async ({
           args,
           outcome,
-          responseData,
+          flinkGetData,
           connectionConfig = FLINK_CONN,
         }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          if (flinkGetData !== undefined) {
+            // handler GETs the statement graph from Flink REST and POSTs telemetry
+            // queries afterwards; both clients need a usable response
+            clientManager
+              .getConfluentCloudFlinkRestClient()
+              .GET.mockResolvedValue({ data: flinkGetData });
+            clientManager
+              .getConfluentCloudTelemetryRestClient()
+              .POST.mockResolvedValue({ data: { data: [] } });
+          }
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -91,7 +109,7 @@ describe("query-profiler-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );

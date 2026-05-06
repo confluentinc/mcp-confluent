@@ -32,8 +32,8 @@ connections:
 
     # --- @schema (Schema Registry) ---
     schema_registry:
-      endpoint: "https://psrc-4xmdo33.us-east-2.aws.confluent.cloud"
       auth:
         type: api_key
         key: "${SCHEMA_REGISTRY_API_KEY}"
         secret: "${SCHEMA_REGISTRY_API_SECRET}"
+      endpoint: "https://psrc-4xmdo33.us-east-2.aws.confluent.cloud"

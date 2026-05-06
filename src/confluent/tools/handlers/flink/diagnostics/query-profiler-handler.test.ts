@@ -3,8 +3,8 @@ import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
+  FlinkGetCase,
   flinkRuntime,
-  HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
@@ -14,12 +14,6 @@ import {
 import { describe, expect, it } from "vitest";
 
 const STATEMENT_NAME = "my-statement";
-
-type QueryProfilerCase = HandleCaseWithConn & {
-  /** Body returned by the Flink REST GET (the statement's exec graph). Omit for
-   *  cases that throw before reaching the client. */
-  flinkGetData?: unknown;
-};
 
 describe("query-profiler-handler.ts", () => {
   describe("QueryProfilerHandler", () => {
@@ -55,7 +49,7 @@ describe("query-profiler-handler.ts", () => {
     });
 
     describe("handle()", () => {
-      const cases: QueryProfilerCase[] = [
+      const cases: FlinkGetCase[] = [
         {
           label: "throws ZodError when statementName is absent",
           args: {},

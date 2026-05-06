@@ -5,8 +5,8 @@ import {
   ccloudOAuthRuntime,
   confluentCloudRuntime,
   CONNECT_CONN,
+  ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
-  HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
@@ -14,15 +14,6 @@ import {
   getMockedClientManager,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
-
-type ConnectHandleCase = HandleCaseWithConn & {
-  expectedEnvId?: string;
-  expectedClusterId?: string;
-  /** Response object the cloud REST DELETE resolves with. Use {} for success
-   *  (handler only reads `error`) or { error } for the API-error path. Omit
-   *  for cases that throw before reaching the client. */
-  mockResponse?: { data?: unknown; error?: unknown };
-};
 
 describe("delete-connector-handler.ts", () => {
   describe("DeleteConnectorHandler", () => {

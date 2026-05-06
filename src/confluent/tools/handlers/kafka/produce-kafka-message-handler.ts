@@ -15,7 +15,13 @@ import {
 import {
   connectionIdsWhere,
   hasKafkaBootstrap,
+  isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
+import {
+  disposeIfOAuth,
+  formatKafkaError,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -62,6 +68,18 @@ const produceKafkaMessageArguments = z.object({
     .describe("Name of the kafka topic to produce the message to"),
   value: valueOptions,
   key: keyOptions.optional(),
+  cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+    ),
 });
 type ProduceKafkaMessageArguments = z.infer<
   typeof produceKafkaMessageArguments
@@ -115,16 +133,34 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.requireDirectClientManager();
-    const { topicName, value, key }: ProduceKafkaMessageArguments =
+    const parsed: ProduceKafkaMessageArguments =
       produceKafkaMessageArguments.parse(toolArguments);
+    const { topicName, value, key } = parsed;
 
-    // Only create registry if needed
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
+    const clientManager = runtime.clientManagers[connId]!;
+    const conn = runtime.config.connections[connId]!;
+
+    // Schema Registry deserialization is not yet exposed under OAuth connection type
+    // Block the path here with a clear capability boundary rather than throw a discovery hint
+    // that points at a tool the agent can't call.
     const needsRegistry =
       value.useSchemaRegistry || (key && key.useSchemaRegistry);
-    const registry: SchemaRegistryClient | undefined = needsRegistry
-      ? clientManager.getSchemaRegistryClient()
-      : undefined;
+    if (needsRegistry && conn.type === "oauth") {
+      return this.createResponse(
+        "Schema Registry deserialization is not yet supported under OAuth connection type. " +
+          "Set useSchemaRegistry: false (or omit it) to receive raw bytes, or " +
+          "use a direct connection with schema_registry configured for " +
+          "schema-aware deserialization.",
+        true,
+      );
+    }
+
+    let registry: SchemaRegistryClient | undefined;
+    if (needsRegistry) {
+      registry = await clientManager.getSchemaRegistrySdkClient();
+    }
 
     // Check for latest schema if needed (value)
     const valueSchemaCheck = await checkSchemaNeeded(
@@ -166,41 +202,51 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
         );
       }
     } catch (err) {
+      // Serialization errors come from user input (bad payload shape vs schema),
+      // not the Kafka client — keep the simpler formatter here.
       return this.createResponse(
         `Failed to serialize: ${err instanceof Error ? err.message : err}`,
         true,
       );
     }
 
-    // Send the message
-    let deliveryReport: RecordMetadata[];
+    const producer = await clientManager.getKafkaProducer(
+      resolved.clusterId,
+      resolved.envId,
+    );
     try {
-      deliveryReport = await (
-        await clientManager.getProducer()
-      ).send({
-        topic: topicName,
-        messages: [
-          typeof keyToSend !== "undefined"
-            ? { key: keyToSend, value: valueToSend }
-            : { value: valueToSend },
-        ],
-      });
-    } catch (err) {
-      return this.createResponse(
-        `Failed to produce message: ${err instanceof Error ? err.message : err}`,
-        true,
+      // Send the message
+      let deliveryReport: RecordMetadata[];
+      try {
+        deliveryReport = await producer.send({
+          topic: topicName,
+          messages: [
+            typeof keyToSend !== "undefined"
+              ? { key: keyToSend, value: valueToSend }
+              : { value: valueToSend },
+          ],
+        });
+      } catch (err) {
+        return this.createResponse(
+          `Failed to produce message: ${formatKafkaError(err)}`,
+          true,
+        );
+      }
+      const formattedResponse = deliveryReport
+        .map((metadata) => {
+          if (metadata.errorCode !== 0) {
+            return `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`;
+          }
+          return `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`;
+        })
+        .join("\n");
+      const isError = deliveryReport.some(
+        (metadata) => metadata.errorCode !== 0,
       );
+      return this.createResponse(formattedResponse, isError);
+    } finally {
+      await disposeIfOAuth(runtime, connId, producer);
     }
-    const formattedResponse = deliveryReport
-      .map((metadata) => {
-        if (metadata.errorCode !== 0) {
-          return `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`;
-        }
-        return `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`;
-      })
-      .join("\n");
-    const isError = deliveryReport.some((metadata) => metadata.errorCode !== 0);
-    return this.createResponse(formattedResponse, isError);
   }
 
   /**
@@ -217,6 +263,9 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaBootstrap);
+    return connectionIdsWhere(
+      runtime.config.connections,
+      (c) => hasKafkaBootstrap(c) || isOAuth(c),
+    );
   }
 }

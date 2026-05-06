@@ -2,7 +2,7 @@ import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
-  HandleCaseWithConn,
+  FlinkGetCase,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
@@ -16,17 +16,12 @@ const EXPLICIT_IDS = {
   environmentId: "env-from-args",
 };
 
-type ListStatementsCase = HandleCaseWithConn & {
-  /** Body returned by the Flink REST GET. */
-  flinkGetData: unknown;
-};
-
 describe("list-flink-statements-handler.ts", () => {
   describe("ListFlinkStatementsHandler", () => {
     const handler = new ListFlinkStatementsHandler();
 
     describe("handle()", () => {
-      const cases: ListStatementsCase[] = [
+      const cases: FlinkGetCase[] = [
         {
           label:
             "use org/env IDs and computePoolId from config when args absent",

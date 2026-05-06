@@ -3,9 +3,9 @@ import {
   bareRuntime,
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
-  HandleCaseWithConn,
   runtimeWith,
   TABLEFLOW_CONN,
+  TableflowHandleCase,
   tableflowRuntime,
 } from "@tests/factories/runtime.js";
 import {
@@ -13,12 +13,6 @@ import {
   getMockedClientManager,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
-
-type TableflowHandleCase = HandleCaseWithConn & {
-  mockResponse?: unknown;
-  expectedEnvId?: string;
-  expectedClusterId?: string;
-};
 
 describe("list-tableflow-topics-handler.ts", () => {
   describe("ListTableFlowTopicsHandler", () => {

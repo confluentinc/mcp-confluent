@@ -61,15 +61,14 @@ limitation (Sinon had the same constraint).
 
 ### ESM Live Bindings and `node-deps.ts`
 
-`@src/confluent/node-deps.js` re-exports Node builtins, third-party constructors, and env access
-as plain objects whose properties Vitest can spy on:
+`@src/confluent/node-deps.js` re-exports Node builtins and third-party constructors as plain
+objects whose properties Vitest can spy on:
 
 ```typescript
 // source file
-import { fs, os, segment, config } from "@src/confluent/node-deps.js";
+import { fs, os, segment } from "@src/confluent/node-deps.js";
 fs.readFileSync(path); // node builtins
 new segment.Analytics({ key }); // third-party constructors
-config.env.DO_NOT_TRACK; // env proxy
 
 // test file
 import * as nodeDeps from "@src/confluent/node-deps.js";
@@ -77,10 +76,12 @@ vi.spyOn(nodeDeps.fs, "readFileSync").mockReturnValue("content");
 vi.spyOn(nodeDeps.segment, "Analytics").mockImplementation(function () {
   return { track: trackStub };
 } as any);
-vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue({
-  DO_NOT_TRACK: false,
-} as any);
 ```
+
+The env proxy is intentionally **not** wrapped in `node-deps.ts`. Production code receives an
+already-validated `Environment` as an explicit parameter from the bootstrap; it doesn't reach
+into a global. Tests therefore don't need to stub the env — if a code path under test reads
+process state, that state should be a parameter you pass in.
 
 **Constructor note**: `vi.spyOn` on a `new`-called function requires `mockImplementation` with a
 **regular function** (not arrow — arrows can't be constructors). Return the instance from inside
@@ -125,8 +126,9 @@ The project settled on the `vi.spyOn` + namespace-object combination because it 
 - **Type safety on the real boundary.** Spies land on the actual imported value, so if the
   real module's API changes, TypeScript flags the test immediately. `vi.mock` factories drift
   silently when the real module's shape changes.
-- **Accessor-mode spies for getters.** `vi.spyOn(obj, "prop", "get")` powers the `config.env`
-  and `buildConfig` patterns; there's no clean `vi.mock` equivalent for per-test value changes.
+- **Accessor-mode spies for getters.** `vi.spyOn(obj, "prop", "get")` powers the `buildConfig`
+  pattern (and any future getter-on-namespace seam); there's no clean `vi.mock` equivalent for
+  per-test value changes.
 - **No hoisting surprises.** Execution order in tests matches source order. `vi.mock` is
   hoisted by the Vitest transformer, which can confuse readers trying to trace setup.
 - **Integration tests stay simple.** `*.integration.test.ts` files default to real I/O. A
@@ -266,6 +268,14 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   the per-client helpers are exported directly: `getMockedRestClient()`,
   `getMockedAdmin()`, `getMockedProducer()`, `getMockedConsumer()`,
   `getMockedSchemaRegistry()`.
+
+- When a test would otherwise extend `HandleCaseWithConn` with extra per-case fields (e.g.
+  `mockResponse`, `expectedEnvId`, body-of-the-mocked-GET), check the existing exports in
+  `tests/factories/runtime.ts` first — common shapes are already shared there. If the same
+  extension would appear (or already does) in another test file, hoist it next to the
+  existing exports rather than declaring a fresh per-file alias; future readers grepping
+  for the right type to import shouldn't be greeted by N differently-named copies of the
+  same shape.
 
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
   `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.

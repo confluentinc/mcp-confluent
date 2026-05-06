@@ -21,7 +21,6 @@ export { createMockInstance } from "./mock-instance.js";
 export {
   createFsWrappers,
   mockDotenv,
-  mockEnv,
   mockFetch,
   mockHttpServer,
   mockOpen,

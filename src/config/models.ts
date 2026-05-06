@@ -240,9 +240,10 @@ export const KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS = [
  * Requires at least one primary connectivity field (`bootstrap_servers` or `rest_endpoint`).
  *
  * (`cluster_id` and `env_id` are intentionally excluded: they are per-call defaults
- * resolved at handler runtime via `getEnsuredParam`, which checks (in order) the tool
- * argument supplied by the LLM, then the env var, then throws. Either field can be
- * omitted from config and supplied at call time, so partial presence is valid.)
+ * resolved at handler runtime. Each handler accepts the value as a tool argument and
+ * falls back to this block when the argument is absent, throwing only if neither
+ * source supplies it. Either field can therefore be omitted from config and supplied
+ * at call time, so partial presence is valid.)
  */
 function kafkaBlockHasConnectivity(k: {
   bootstrap_servers?: string;

@@ -8,8 +8,10 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  type MockedClientManager,
+  type MockedRestClient,
 } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 const TABLE_NAME = "my-table";
 
@@ -23,6 +25,16 @@ describe("get-table-info-handler.ts", () => {
     const handler = new GetTableInfoHandler();
 
     describe("handle()", () => {
+      let clientManager: MockedClientManager;
+      let flinkRest: MockedRestClient;
+
+      beforeEach(() => {
+        clientManager = getMockedClientManager();
+        flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.POST.mockResolvedValue({ data: SQL_RESPONSE });
+        flinkRest.GET.mockResolvedValue({ data: SQL_RESPONSE });
+      });
+
       const cases: HandleCaseWithConn[] = [
         {
           label: "throw ZodError when tableName is absent",
@@ -50,10 +62,6 @@ describe("get-table-info-handler.ts", () => {
       it.each(cases)(
         "should $label",
         async ({ args, outcome, connectionConfig = FLINK_CONN }) => {
-          const clientManager = getMockedClientManager();
-          const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-          flinkRest.POST.mockResolvedValue({ data: SQL_RESPONSE });
-          flinkRest.GET.mockResolvedValue({ data: SQL_RESPONSE });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -82,11 +90,6 @@ describe("get-table-info-handler.ts", () => {
       ])(
         "should $label in POST SQL statement",
         async ({ args, expectedCatalog }) => {
-          const clientManager = getMockedClientManager();
-          const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-          flinkRest.POST.mockResolvedValue({ data: SQL_RESPONSE });
-          flinkRest.GET.mockResolvedValue({ data: SQL_RESPONSE });
-
           await assertHandleCase({
             handler,
             runtime: runtimeWith(

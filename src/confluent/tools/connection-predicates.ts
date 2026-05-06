@@ -75,6 +75,10 @@ export function hasCCloudCatalogSupport(conn: ConnectionConfig): boolean {
   );
 }
 
+export function isOAuth(conn: ConnectionConfig): boolean {
+  return conn.type === "oauth";
+}
+
 export function connectionIdsWhere(
   connections: Readonly<Record<string, ConnectionConfig>>,
   predicate: ConnectionPredicate,

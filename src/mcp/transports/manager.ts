@@ -96,7 +96,7 @@ export class TransportManager {
         };
 
         this.httpServer = new HttpServer({ auth: authConfig });
-        await this.httpServer.prepare();
+        await this.httpServer.prepare(http);
 
         if (authEnabled) {
           logger.info("MCP Server authentication enabled");
@@ -114,7 +114,7 @@ export class TransportManager {
 
       // Start HTTP server if needed (after routes are registered)
       if (needsHttpServer && this.httpServer && http) {
-        await this.httpServer.start({ port: http.port, host: http.host });
+        await this.httpServer.start(http);
       }
 
       logger.info("All transports started successfully");

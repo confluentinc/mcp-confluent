@@ -9,7 +9,7 @@ import {
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
-  stubClientGetters,
+  getMockedClientManager,
   type HandleCase,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
@@ -50,12 +50,13 @@ describe("list-organizations-handler.ts", () => {
     });
 
     describe("handle()", () => {
-      const cases: HandleCase[] = [
+      type OrgsCase = HandleCase & { cloudGetData: unknown };
+      const cases: OrgsCase[] = [
         {
           label:
             "resolve with 'Retrieved 0 organizations' when the API returns an empty list",
           args: {},
-          responseData: {
+          cloudGetData: {
             api_version: "org/v2",
             kind: "OrganizationList",
             data: [],
@@ -66,7 +67,7 @@ describe("list-organizations-handler.ts", () => {
           label:
             "resolve with the organization's display name when the API returns one entry",
           args: {},
-          responseData: {
+          cloudGetData: {
             api_version: "org/v2",
             kind: "OrganizationList",
             data: [ORG_FIXTURE],
@@ -77,7 +78,7 @@ describe("list-organizations-handler.ts", () => {
           label:
             "include a 'more pages available' hint when metadata.next is present",
           args: { pageSize: 1 },
-          responseData: {
+          cloudGetData: {
             api_version: "org/v2",
             kind: "OrganizationList",
             metadata: {
@@ -91,16 +92,18 @@ describe("list-organizations-handler.ts", () => {
           label:
             "resolve with a validation-error response when the API returns an unexpected payload",
           args: {},
-          responseData: { not: "an OrganizationList" },
+          cloudGetData: { not: "an OrganizationList" },
           outcome: { resolves: "Invalid organization list data" },
         },
       ];
 
       it.each(cases)(
         "should $label",
-        async ({ args, outcome, responseData }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+        async ({ args, outcome, cloudGetData }) => {
+          const clientManager = getMockedClientManager();
+          clientManager
+            .getConfluentCloudRestClient()
+            .GET.mockResolvedValue({ data: cloudGetData });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -110,7 +113,7 @@ describe("list-organizations-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );

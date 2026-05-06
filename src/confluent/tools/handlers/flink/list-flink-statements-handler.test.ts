@@ -5,7 +5,10 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 const EXPLICIT_IDS = {
@@ -13,30 +16,34 @@ const EXPLICIT_IDS = {
   environmentId: "env-from-args",
 };
 
+type ListStatementsCase = HandleCaseWithConn & {
+  /** Body returned by the Flink REST GET. */
+  flinkGetData: unknown;
+};
+
 describe("list-flink-statements-handler.ts", () => {
   describe("ListFlinkStatementsHandler", () => {
     const handler = new ListFlinkStatementsHandler();
 
     describe("handle()", () => {
-      const cases: HandleCaseWithConn[] = [
+      const cases: ListStatementsCase[] = [
         {
           label:
             "use org/env IDs and computePoolId from config when args absent",
           args: {},
+          flinkGetData: {},
           outcome: { resolves: "{}" },
         },
         {
           label: "resolve when required IDs are supplied as explicit args",
           args: EXPLICIT_IDS,
+          flinkGetData: {},
           outcome: { resolves: "{}" },
         },
         {
           label: "filter statements client-side by statusPhase",
-          args: {
-            ...EXPLICIT_IDS,
-            statusPhase: "RUNNING",
-          },
-          responseData: {
+          args: { ...EXPLICIT_IDS, statusPhase: "RUNNING" },
+          flinkGetData: {
             data: [
               { status: { phase: "RUNNING" } },
               { status: { phase: "FAILED" } },
@@ -47,13 +54,8 @@ describe("list-flink-statements-handler.ts", () => {
         {
           label:
             "report zero results when no statements match the statusPhase filter",
-          args: {
-            ...EXPLICIT_IDS,
-            statusPhase: "RUNNING",
-          },
-          responseData: {
-            data: [{ status: { phase: "FAILED" } }],
-          },
+          args: { ...EXPLICIT_IDS, statusPhase: "RUNNING" },
+          flinkGetData: { data: [{ status: { phase: "FAILED" } }] },
           outcome: { resolves: "Found 0 statement(s) with status 'RUNNING'" },
         },
       ];
@@ -63,11 +65,13 @@ describe("list-flink-statements-handler.ts", () => {
         async ({
           args,
           outcome,
-          responseData,
+          flinkGetData,
           connectionConfig = FLINK_CONN,
         }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          clientManager
+            .getConfluentCloudFlinkRestClient()
+            .GET.mockResolvedValue({ data: flinkGetData });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -77,14 +81,16 @@ describe("list-flink-statements-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );
 
       it("should fall back to config computePoolId when arg is whitespace-only", async () => {
-        const { clientManager, clientGetters, capturedCalls } =
-          stubClientGetters({});
+        const clientManager = getMockedClientManager();
+        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.GET.mockResolvedValue({ data: {} });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -94,16 +100,20 @@ describe("list-flink-statements-handler.ts", () => {
           ),
           args: { ...EXPLICIT_IDS, computePoolId: "   " },
           outcome: { resolves: "{}" },
-          clientGetters,
+          clientManager,
         });
-        expect(capturedCalls).toHaveLength(1);
-        expect(capturedCalls[0]!.args).toMatchObject({
-          params: expect.objectContaining({
-            query: expect.objectContaining({
-              "spec.compute_pool_id": FLINK_CONN.flink.compute_pool_id,
+
+        expect(flinkRest.GET).toHaveBeenCalledOnce();
+        expect(flinkRest.GET).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            params: expect.objectContaining({
+              query: expect.objectContaining({
+                "spec.compute_pool_id": FLINK_CONN.flink.compute_pool_id,
+              }),
             }),
           }),
-        });
+        );
       });
     });
   });

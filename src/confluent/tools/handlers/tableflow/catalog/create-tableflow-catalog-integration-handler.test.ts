@@ -15,7 +15,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 type TableflowHandleCase = HandleCaseWithConn & {
-  mockResponse?: { data?: unknown; error?: unknown };
+  mockResponse?: unknown;
   expectedEnvId?: string;
   expectedClusterId?: string;
 };

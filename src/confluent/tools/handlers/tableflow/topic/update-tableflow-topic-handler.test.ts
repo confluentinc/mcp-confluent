@@ -54,11 +54,18 @@ describe("update-tableflow-topic-handler.ts", () => {
     });
 
     describe("handle()", () => {
+      // PATCH's openapi-fetch FetchResponse requires `response: Response` in every variant, and the
+      // 200 success data is a complex generated intersection type. Satisfying either in a test
+      // fixture is not worth the noise — the tests only care about the handler's branch logic.
+      // The handler source has the same constraint and documents the same root cause.
       it("should resolve with an updated message on success", async () => {
         const clientManager = getMockedClientManager();
         clientManager
           .getConfluentCloudTableflowRestClient()
-          .PATCH.mockResolvedValue({ data: { display_name: TOPIC_NAME } });
+          .PATCH.mockResolvedValue(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            { data: { display_name: TOPIC_NAME } } as any,
+          );
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
@@ -72,7 +79,8 @@ describe("update-tableflow-topic-handler.ts", () => {
         const clientManager = getMockedClientManager();
         clientManager
           .getConfluentCloudTableflowRestClient()
-          .PATCH.mockResolvedValue({ error: { message: "not found" } });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .PATCH.mockResolvedValue({ error: { message: "not found" } } as any);
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
@@ -88,9 +96,10 @@ describe("update-tableflow-topic-handler.ts", () => {
         const clientManager = getMockedClientManager();
         const tableflowRest: MockedRestClient =
           clientManager.getConfluentCloudTableflowRestClient();
-        tableflowRest.PATCH.mockResolvedValue({
-          data: { display_name: TOPIC_NAME },
-        });
+        tableflowRest.PATCH.mockResolvedValue(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          { data: { display_name: TOPIC_NAME } } as any,
+        );
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),

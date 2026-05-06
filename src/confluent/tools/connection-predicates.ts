@@ -4,12 +4,11 @@
 // so callers can explain why a tool is absent rather than silently dropping
 // it from the catalogue.
 //
-// Tool handlers reach this module via `connectionIdsWhere` from their
-// `enabledConnectionIds()` method — the returned id list drives whether MCP
-// advertises the tool to its clients. `connectionReasonsWhere` returns the
-// full per-connection verdict map, the canonical shape for diagnostics that
-// need to render the verdict (group disabled tools by reason, surface
-// availability per connection) rather than just filter on it.
+// Tool handlers consume predicates indirectly: each handler declares a
+// `predicate` property, and `BaseToolHandler` derives both
+// `enabledConnectionIds()` and `connectionVerdicts()` from it. Compose
+// compound requirements with `allOf(...)` and use `alwaysEnabled` for
+// tools with no service-block requirement.
 //
 // OAuth note: while OAuth support is being built out, most predicates
 // currently short-circuit on `conn.type === "oauth"` and answer disabled
@@ -200,11 +199,18 @@ export function hasCCloudCatalogSupport(
 }
 
 /**
+ * Predicate that returns {@linkcode ENABLED} for every connection. Use as
+ * the {@linkcode BaseToolHandler.predicate} for tools with no service-block
+ * requirement (e.g., generic docs search).
+ */
+export const alwaysEnabled: ConnectionPredicate = () => ENABLED;
+
+/**
  * Combine predicates with logical AND, short-circuiting on the first
  * failure. Returns {@linkcode ENABLED} only when every predicate passes for
  * the given connection; otherwise returns the first failing verdict so the
- * specific reason propagates to {@linkcode connectionReasonsWhere} and
- * downstream diagnostics.
+ * specific reason propagates downstream to startup logging and the
+ * diagnostic-tool surface.
  *
  * Use this — never raw `predA(conn) && predB(conn)`. JavaScript boolean
  * composition silently drops the first operand because every
@@ -220,29 +226,6 @@ export function allOf(
     }
     return ENABLED;
   };
-}
-
-export function connectionIdsWhere(
-  connections: Readonly<Record<string, ConnectionConfig>>,
-  predicate: ConnectionPredicate,
-): string[] {
-  return Object.entries(connections)
-    .filter(([, conn]) => predicate(conn).enabled)
-    .map(([id]) => id);
-}
-
-/**
- * Returns the full predicate verdict for every connection, preserving
- * insertion order — the canonical shape for diagnostics that need to group
- * disabled connections by reason or render per-connection availability.
- */
-export function connectionReasonsWhere(
-  connections: Readonly<Record<string, ConnectionConfig>>,
-  predicate: ConnectionPredicate,
-): Map<string, PredicateResult> {
-  return new Map(
-    Object.entries(connections).map(([id, conn]) => [id, predicate(conn)]),
-  );
 }
 
 /**

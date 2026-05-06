@@ -1,5 +1,9 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { CallToolResult } from "@src/confluent/schema.js";
+import {
+  ConnectionPredicate,
+  PredicateResult,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { ZodRawShape } from "zod";
@@ -32,15 +36,19 @@ export interface ToolHandler {
   getToolConfig(): ToolConfig;
 
   /**
-   * Returns the IDs of connections that satisfy this tool's service requirements.
-   * A non-empty result enables the tool; an empty result disables it. Implementations
-   * should return a subset of the keys in runtime.config.connections.
-   *
-   * Each handler implements this by applying the appropriate predicate from
-   * connection-predicates.ts via connectionIdsWhere(), e.g.:
-   *   return connectionIdsWhere(runtime.config.connections, hasKafka);
+   * IDs of connections that satisfy this tool's service requirements. A
+   * non-empty result enables the tool; an empty result disables it. Always a
+   * subset of `runtime.config.connections` keys.
    */
   enabledConnectionIds(runtime: ServerRuntime): string[];
+
+  /**
+   * Per-connection verdict map for this tool: `{ enabled: true }` for
+   * connections that satisfy its requirements, `{ enabled: false; reason }`
+   * for those that don't. Powers startup-log grouping and the
+   * `describe-tool-availability` diagnostic tool.
+   */
+  connectionVerdicts(runtime: ServerRuntime): Map<string, PredicateResult>;
 }
 
 export interface ToolConfig {
@@ -60,13 +68,48 @@ export abstract class BaseToolHandler implements ToolHandler {
   abstract getToolConfig(): ToolConfig;
 
   /**
-   * Determines which configured connections can serve this tool by inspecting
-   * their service blocks. If returns an empty array, the tool is disabled.
-   *
-   * The canonical implementation is a one-liner:
-   *   return connectionIdsWhere(runtime.config.connections, some-predicate-function);
+   * The connection predicate that gates this tool. Subclasses declare it as
+   * a readonly property; {@linkcode enabledConnectionIds} and
+   * {@linkcode connectionVerdicts} are derived from it. Use a
+   * predicate from `connection-predicates.ts` (e.g. `hasKafka`), or compose
+   * with `allOf(...)` for compound requirements; use `alwaysEnabled` for
+   * tools with no service-block requirement.
    */
-  abstract enabledConnectionIds(runtime: ServerRuntime): string[];
+  abstract readonly predicate: ConnectionPredicate;
+
+  /**
+   * IDs of connections that satisfy this tool's {@linkcode predicate}. A
+   * non-empty result enables the tool; an empty result disables it.
+   *
+   * Customize tool gating by declaring {@linkcode predicate}, never by
+   * replacing this derivation.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
+   */
+  enabledConnectionIds(runtime: ServerRuntime): string[] {
+    return Object.entries(runtime.config.connections)
+      .filter(([, conn]) => this.predicate(conn).enabled)
+      .map(([id]) => id);
+  }
+
+  /**
+   * Per-connection verdict map for this tool, derived from
+   * {@linkcode predicate}. Powers grouped startup logging and
+   * the diagnostic-tool surface.
+   *
+   * Customize tool gating by declaring {@linkcode predicate}, never by
+   * replacing this derivation.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
+   */
+  connectionVerdicts(runtime: ServerRuntime): Map<string, PredicateResult> {
+    return new Map(
+      Object.entries(runtime.config.connections).map(([id, conn]) => [
+        id,
+        this.predicate(conn),
+      ]),
+    );
+  }
 
   /**
    * Resolves a required string from an explicit tool argument, falling back to

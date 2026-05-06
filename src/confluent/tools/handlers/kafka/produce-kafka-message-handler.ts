@@ -12,10 +12,7 @@ import {
   CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasKafkaBootstrap,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasKafkaBootstrap } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -215,8 +212,5 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       annotations: CREATE_UPDATE,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaBootstrap);
-  }
+  readonly predicate = hasKafkaBootstrap;
 }

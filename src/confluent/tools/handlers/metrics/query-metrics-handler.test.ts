@@ -11,7 +11,10 @@ import {
   runtimeWith,
   telemetryRuntime,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const KAFKA_SERVER_METRIC = "io.confluent.kafka.server/received_bytes";
@@ -249,8 +252,11 @@ describe("query-metrics-handler.ts", () => {
       it.each(cases)(
         "should $label",
         async ({ connectionConfig = {}, args, outcome, expectedFilter }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters({});
+          const clientManager = getMockedClientManager();
+          const telemetryRest =
+            clientManager.getConfluentCloudTelemetryRestClient();
+          telemetryRest.POST.mockResolvedValue({ data: {} });
+
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -260,17 +266,20 @@ describe("query-metrics-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
-          expect(capturedCalls).toHaveLength(1);
-          const body = (
-            capturedCalls[0]!.args as { body: Record<string, unknown> }
-          ).body;
-          if (expectedFilter) {
-            expect(body).toMatchObject({ filter: expectedFilter });
-          } else {
-            expect(body).not.toHaveProperty("filter");
-          }
+
+          expect(telemetryRest.POST).toHaveBeenCalledOnce();
+          // expect.not.objectContaining lets us assert filter-absent without
+          // reaching into mock.calls, which openapi-fetch's overloaded POST
+          // collapses to `never` for TypeScript
+          const expectedBody = expectedFilter
+            ? expect.objectContaining({ filter: expectedFilter })
+            : expect.not.objectContaining({ filter: expect.anything() });
+          expect(telemetryRest.POST).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ body: expectedBody }),
+          );
         },
       );
     });

@@ -5,7 +5,10 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 const TABLE_NAME = "my-table";
@@ -31,7 +34,6 @@ describe("describe-table-handler.ts", () => {
           label: "use org/env/compute IDs from config when args absent",
           args: { tableName: TABLE_NAME },
           outcome: { resolves: `Table '${TABLE_NAME}' schema` },
-          responseData: SQL_RESPONSE,
         },
         {
           label: "use explicit org/env/compute args over config",
@@ -42,20 +44,16 @@ describe("describe-table-handler.ts", () => {
             computePoolId: "lfcp-from-args",
           },
           outcome: { resolves: `Table '${TABLE_NAME}' schema` },
-          responseData: SQL_RESPONSE,
         },
       ];
 
       it.each(cases)(
         "should $label",
-        async ({
-          args,
-          outcome,
-          responseData,
-          connectionConfig = FLINK_CONN,
-        }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+        async ({ args, outcome, connectionConfig = FLINK_CONN }) => {
+          const clientManager = getMockedClientManager();
+          const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+          flinkRest.POST.mockResolvedValue({ data: SQL_RESPONSE });
+          flinkRest.GET.mockResolvedValue({ data: SQL_RESPONSE });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -65,7 +63,7 @@ describe("describe-table-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );
@@ -84,8 +82,11 @@ describe("describe-table-handler.ts", () => {
       ])(
         "should $label in POST SQL statement",
         async ({ args, expectedCatalog }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(SQL_RESPONSE);
+          const clientManager = getMockedClientManager();
+          const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+          flinkRest.POST.mockResolvedValue({ data: SQL_RESPONSE });
+          flinkRest.GET.mockResolvedValue({ data: SQL_RESPONSE });
+
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -95,16 +96,20 @@ describe("describe-table-handler.ts", () => {
             ),
             args,
             outcome: { resolves: `Table '${TABLE_NAME}' schema` },
-            clientGetters,
+            clientManager,
           });
-          expect(capturedCalls).toHaveLength(3);
-          expect(capturedCalls[0]!.args).toMatchObject({
-            body: expect.objectContaining({
-              spec: expect.objectContaining({
-                statement: expect.stringContaining(expectedCatalog),
+
+          expect(flinkRest.POST).toHaveBeenCalledOnce();
+          expect(flinkRest.POST).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({
+              body: expect.objectContaining({
+                spec: expect.objectContaining({
+                  statement: expect.stringContaining(expectedCatalog),
+                }),
               }),
             }),
-          });
+          );
         },
       );
     });

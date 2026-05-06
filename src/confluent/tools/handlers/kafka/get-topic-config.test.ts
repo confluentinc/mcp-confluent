@@ -8,7 +8,10 @@ import {
   kafkaRestRuntime,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 describe("get-topic-config.ts", () => {
@@ -62,14 +65,13 @@ describe("get-topic-config.ts", () => {
 
       it.each(cases)(
         "should $label",
-        async ({
-          args,
-          outcome,
-          responseData,
-          connectionConfig = KAFKA_CONN,
-        }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+        async ({ args, outcome, connectionConfig = KAFKA_CONN }) => {
+          const clientManager = getMockedClientManager();
+          // handler does two GETs (topic details, then topic config) and stringifies the combined
+          // result, so an empty object is fine here
+          clientManager
+            .getConfluentCloudKafkaRestClient()
+            .GET.mockResolvedValue({ data: {} });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -79,7 +81,7 @@ describe("get-topic-config.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );

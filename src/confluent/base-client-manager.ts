@@ -35,9 +35,17 @@ export interface BaseClientManagerConfig {
 }
 
 /**
- * Holds every Confluent Cloud REST client (cloud, tableflow, flink, schema-registry REST,
- * kafka REST, telemetry) and the Schema Registry SDK client. Does not own a native Kafka
- * broker client — subclasses add that when they need one.
+ * Holds every Confluent Cloud REST client (cloud, tableflow, flink,
+ * schema-registry REST, kafka REST, telemetry) and the Schema Registry SDK
+ * client. Native Kafka admin/producer/consumer clients are declared abstract
+ * here so subclasses can supply the implementation that fits their auth model:
+ * api-key + SASL/PLAIN in {@link DirectClientManager}, or DPAT +
+ * SASL/OAUTHBEARER in OAuthClientManager.
+ *
+ * The `getSchemaRegistrySdkClient(clusterId?, envId?)` accessor has a default
+ * implementation that delegates to the no-arg `getSchemaRegistryClient()`.
+ * That covers direct connections (the args are ignored). OAuth subclasses
+ * override it to build per-cluster SR SDK clients with bearer auth.
  */
 export abstract class BaseClientManager
   implements ConfluentCloudRestClientManager, SchemaRegistryClientHandler

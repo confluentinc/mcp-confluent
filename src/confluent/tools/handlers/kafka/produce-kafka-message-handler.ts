@@ -246,7 +246,18 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.PRODUCE_MESSAGE,
-      description: `Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value.\n\nBefore producing, check if the topic has a registered schema for <topicName>-value and <topicName>-key. If a schema exists, set useSchemaRegistry to true and specify the appropriate schemaType. If the topic does not exist, it can be created via the ${ToolName.CREATE_TOPICS} tool.`,
+      description:
+        `Produce records to a Kafka topic. Supports Confluent Schema Registry ` +
+        `serialization (AVRO, JSON, PROTOBUF) for both key and value on direct ` +
+        `connections. Under --oauth, schema serialization is not yet supported — ` +
+        `set useSchemaRegistry: false (or omit it) to send raw bytes/JSON.\n\n` +
+        `Before producing with schema registry, check if the topic has a ` +
+        `registered schema for <topicName>-value and <topicName>-key. If a ` +
+        `schema exists, set useSchemaRegistry to true and specify the ` +
+        `appropriate schemaType. If the topic does not exist, it can be ` +
+        `created via the ${ToolName.CREATE_TOPICS} tool.\n\n` +
+        `Under --oauth, requires cluster_id and environment_id (call ` +
+        `list-clusters first to discover them).`,
       inputSchema: produceKafkaMessageArguments.shape,
       annotations: CREATE_UPDATE,
     };

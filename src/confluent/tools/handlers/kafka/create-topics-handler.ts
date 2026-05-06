@@ -121,7 +121,10 @@ export class CreateTopicsHandler extends BaseToolHandler {
     return {
       name: ToolName.CREATE_TOPICS,
       description:
-        "Create one or more Kafka topics with an optional partition count.",
+        "Create one or more Kafka topics with an optional partition count. " +
+        "Under --oauth, requires cluster_id and environment_id (call " +
+        "list-clusters first to discover them). Under a direct connection, " +
+        "the cluster is fixed by config.",
       inputSchema: createTopicArgs.shape,
       annotations: CREATE_UPDATE,
     };

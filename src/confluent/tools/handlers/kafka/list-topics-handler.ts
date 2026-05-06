@@ -52,7 +52,10 @@ export class ListTopicsHandler extends BaseToolHandler {
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.LIST_TOPICS,
-      description: "List all topics in the Kafka cluster.",
+      description:
+        "List all topics in the Kafka cluster. Under --oauth, requires " +
+        "cluster_id and environment_id (call list-clusters first to discover " +
+        "them). Under a direct connection, the cluster is fixed by config.",
       inputSchema: listTopicArgs.shape,
       annotations: READ_ONLY,
     };

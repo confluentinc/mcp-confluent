@@ -293,7 +293,12 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     return {
       name: ToolName.CONSUME_MESSAGES,
       description:
-        "Consumes messages from one or more Kafka topics. Supports automatic deserialization of Schema Registry encoded messages (AVRO, JSON, PROTOBUF).",
+        "Consumes messages from one or more Kafka topics. Supports automatic " +
+        "deserialization of Schema Registry encoded messages (AVRO, JSON, " +
+        "PROTOBUF) on direct connections. Under --oauth, schema deserialization " +
+        "is not yet supported — set useSchemaRegistry: false (or omit it) to " +
+        "receive raw bytes. Under --oauth, requires cluster_id and " +
+        "environment_id (call list-clusters first to discover them).",
       inputSchema: consumeKafkaMessagesArgs.shape,
       annotations: READ_ONLY,
     };

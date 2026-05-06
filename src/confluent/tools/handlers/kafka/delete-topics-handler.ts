@@ -1,3 +1,4 @@
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -48,17 +49,43 @@ export class DeleteTopicsHandler extends BaseToolHandler {
       resolved.clusterId,
       resolved.envId,
     );
-    // 30s broker-side timeout. See create-topics-handler for rationale.
-    await admin.deleteTopics({ timeout: 30_000, topics: parsed.topicNames });
-    return this.createResponse(
-      `Deleted Kafka topics: ${parsed.topicNames.join(",")}`,
-    );
+    const topicNames = parsed.topicNames.join(",");
+    try {
+      // 30s broker-side timeout. See create-topics-handler for rationale.
+      await admin.deleteTopics({ timeout: 30_000, topics: parsed.topicNames });
+    } catch (err) {
+      // KafkaJSAggregateError wraps per-topic failures (auth denial, topic
+      // not found, etc.). Surface each one so the agent sees the real reason
+      // instead of just the aggregate's generic top-level message.
+      if (err instanceof KafkaJS.KafkaJSAggregateError) {
+        const details = err.errors
+          .map((inner) =>
+            inner instanceof KafkaJS.KafkaJSError
+              ? `- ${inner.message}`
+              : `- ${typeof inner === "string" ? inner : String(inner)}`,
+          )
+          .join("\n");
+        return this.createResponse(
+          `Failed to delete Kafka topics: ${err.message}\n${details}`,
+          true,
+        );
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      return this.createResponse(
+        `Failed to delete Kafka topics (${topicNames}): ${message}`,
+        true,
+      );
+    }
+    return this.createResponse(`Deleted Kafka topics: ${topicNames}`);
   }
 
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.DELETE_TOPICS,
-      description: "Delete the topic with the given names.",
+      description:
+        "Delete the topic with the given names. Under --oauth, requires " +
+        "cluster_id and environment_id (call list-clusters first to discover " +
+        "them). Under a direct connection, the cluster is fixed by config.",
       inputSchema: deleteKafkaTopicsArguments.shape,
       annotations: DESTRUCTIVE,
     };

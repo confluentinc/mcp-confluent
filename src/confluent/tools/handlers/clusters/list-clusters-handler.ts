@@ -203,7 +203,11 @@ Cluster: ${cluster.name}
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.LIST_CLUSTERS,
-      description: "Get all clusters in the Confluent Cloud environment",
+      description:
+        "Get all clusters in a Confluent Cloud environment. Under --oauth, " +
+        "environmentId is required (call list-environments first to discover " +
+        "available environments). Under a direct connection, environmentId " +
+        "falls back to kafka.env_id from the YAML config when omitted.",
       inputSchema: listClustersArguments.shape,
       annotations: READ_ONLY,
     };

@@ -118,6 +118,18 @@ describe("get-product-doc-pages-handler.ts", () => {
           );
         });
 
+        it("should append .md to extension-less URLs", async () => {
+          fetchSpy.mockResolvedValueOnce(markdownResponse("hello"));
+
+          await handler.handle(runtime, {
+            url: "https://docs.confluent.io/platform/quickstart",
+          });
+
+          expect(String(fetchSpy.mock.calls[0]![0])).toBe(
+            "https://docs.confluent.io/platform/quickstart.md",
+          );
+        });
+
         it("should fall back to HTML rendering when the .md twin is unavailable", async () => {
           fetchSpy
             .mockResolvedValueOnce(new Response("not found", { status: 404 }))

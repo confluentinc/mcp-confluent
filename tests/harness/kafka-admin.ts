@@ -44,17 +44,6 @@ export function getTestClusterId(): string {
 }
 
 /**
- * Generates a unique topic name with an `int-` prefix so stale resources from
- * failed test runs can be distinguished from production topics during
- * cleanup. Format: `int-<slug>-<timestamp>-<random>`, matching the `e2e-`
- * prefix convention used by confluentinc/vscode.
- */
-export function uniqueTopicName(slug: string): string {
-  const random = Math.random().toString(36).slice(2, 8);
-  return `int-${slug}-${Date.now()}-${random}`;
-}
-
-/**
  * Registers `beforeAll`/`afterAll` hooks at the calling describe scope to
  * manage a shared {@link KafkaJS.Admin} client across the tests in that
  * scope. Tests push topic names onto `createdTopics` as they create them;

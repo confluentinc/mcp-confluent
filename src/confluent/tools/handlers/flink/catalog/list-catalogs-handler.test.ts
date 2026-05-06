@@ -5,7 +5,10 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 const SQL_RESPONSE = {
@@ -23,7 +26,6 @@ describe("list-catalogs-handler.ts", () => {
           label: "use org/env/compute IDs from config when args absent",
           args: {},
           outcome: { resolves: "Catalogs" },
-          responseData: SQL_RESPONSE,
         },
         {
           label: "use explicit org/env/compute args over config",
@@ -33,20 +35,17 @@ describe("list-catalogs-handler.ts", () => {
             computePoolId: "lfcp-from-args",
           },
           outcome: { resolves: "Catalogs" },
-          responseData: SQL_RESPONSE,
         },
       ];
 
       it.each(cases)(
         "should $label",
-        async ({
-          args,
-          outcome,
-          responseData,
-          connectionConfig = FLINK_CONN,
-        }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+        async ({ args, outcome, connectionConfig = FLINK_CONN }) => {
+          const clientManager = getMockedClientManager();
+          // executeFlinkSql does POST (submit) → GET (poll status) → GET (results)
+          const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+          flinkRest.POST.mockResolvedValue({ data: SQL_RESPONSE });
+          flinkRest.GET.mockResolvedValue({ data: SQL_RESPONSE });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -56,14 +55,17 @@ describe("list-catalogs-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );
 
       it("should embed config environment_id as catalog name in the POST SQL statement", async () => {
-        const { clientManager, clientGetters, capturedCalls } =
-          stubClientGetters(SQL_RESPONSE);
+        const clientManager = getMockedClientManager();
+        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.POST.mockResolvedValue({ data: SQL_RESPONSE });
+        flinkRest.GET.mockResolvedValue({ data: SQL_RESPONSE });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -73,18 +75,22 @@ describe("list-catalogs-handler.ts", () => {
           ),
           args: {},
           outcome: { resolves: "Catalogs" },
-          clientGetters,
+          clientManager,
         });
-        expect(capturedCalls).toHaveLength(3);
-        expect(capturedCalls[0]!.args).toMatchObject({
-          body: expect.objectContaining({
-            spec: expect.objectContaining({
-              statement: expect.stringContaining(
-                FLINK_CONN.flink.environment_id,
-              ),
+
+        expect(flinkRest.POST).toHaveBeenCalledOnce();
+        expect(flinkRest.POST).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            body: expect.objectContaining({
+              spec: expect.objectContaining({
+                statement: expect.stringContaining(
+                  FLINK_CONN.flink.environment_id,
+                ),
+              }),
             }),
           }),
-        });
+        );
       });
     });
   });

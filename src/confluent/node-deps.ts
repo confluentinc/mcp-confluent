@@ -3,7 +3,6 @@
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Analytics } from "@segment/analytics-node";
 import { TELEMETRY_WRITE_KEY } from "@src/build-config.js";
-import envProxy from "@src/env.js";
 import * as dotenv from "dotenv";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -17,7 +16,6 @@ export const fs = { existsSync, readFileSync, writeFileSync, mkdirSync };
 export const os = { homedir, platform, release, arch };
 export const path = { join, resolve };
 export const segment = { Analytics };
-export const config = { env: envProxy };
 export const nodeFetch = { fetch: globalThis.fetch };
 // Wrapped as a single-signature arrow so spies don't have to disambiguate
 // between the sync and callback overloads of the underlying `node:crypto`

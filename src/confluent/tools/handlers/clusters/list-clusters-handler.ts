@@ -6,7 +6,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasDirectConfluentCloud,
+  hasConfluentCloud,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
@@ -18,7 +18,9 @@ const listClustersArguments = z.object({
   environmentId: z
     .string()
     .optional()
-    .describe("The environment ID to filter clusters by"),
+    .describe(
+      "Environment ID (env-...) to filter clusters by. Falls back to kafka.env_id from the YAML config when omitted.",
+    ),
 });
 
 /**
@@ -67,8 +69,28 @@ export class ListClustersHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { environmentId } = listClustersArguments.parse(toolArguments);
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const conn = runtime.config.connections[connId]!;
+    const clientManager = runtime.clientManagers[connId]!;
+
+    // Resolve environment: arg wins; under direct, fall back to kafka.env_id
+    // (preserving main's behavior of passing "" to the cmk endpoint when
+    // unset — the endpoint handles the empty case). Under OAuth, the arg
+    // must be supplied since there is no service-block fallback.
+    let resolvedEnv: string;
+    if (conn.type === "oauth") {
+      if (!environmentId) {
+        return this.createResponse(
+          "environmentId is required under --oauth. Pass it as an argument, " +
+            "or call list-environments to discover available environments.",
+          true,
+        );
+      }
+      resolvedEnv = environmentId;
+    } else {
+      resolvedEnv = environmentId ?? conn.kafka?.env_id ?? "";
+    }
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(
@@ -80,10 +102,7 @@ export class ListClustersHandler extends BaseToolHandler {
       ].GET({
         params: {
           query: {
-            environment:
-              environmentId ??
-              runtime.config.getSoleDirectConnection().kafka?.env_id ??
-              "",
+            environment: resolvedEnv,
             page_size: 100,
           },
         },
@@ -187,16 +206,17 @@ Cluster: ${cluster.name}
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.LIST_CLUSTERS,
-      description: "Get all clusters in the Confluent Cloud environment",
+      description:
+        "Get all clusters in a Confluent Cloud environment. Under --oauth, " +
+        "environmentId is required (call list-environments first to discover " +
+        "available environments). Under a direct connection, environmentId " +
+        "falls back to kafka.env_id from the YAML config when omitted.",
       inputSchema: listClustersArguments.shape,
       annotations: READ_ONLY,
     };
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      hasDirectConfluentCloud,
-    );
+    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 }

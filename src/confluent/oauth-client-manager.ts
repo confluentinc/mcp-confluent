@@ -99,12 +99,24 @@ export class OAuthClientManager extends BaseClientManager {
     envId?: string,
   ): Promise<SchemaRegistryClient> {
     this.requireClusterArgs(clusterId, envId);
+    // Wait for OAuth login to populate the DPAT before constructing the SDK
+    // client. The SR SDK captures `Authorization: Bearer <token>` in its
+    // axios `createAxiosDefaults` at construction time, so a build during
+    // initial login or a broken refresh would freeze an empty bearer into
+    // every subsequent request. Symmetric with `buildOAuthKafkaClient`.
+    await this.holder.bootstrapPromise;
+    const dpat = this.holder.getDataPlaneToken();
+    if (!dpat) {
+      throw new Error(
+        "OAuth login did not produce a data-plane token; cannot build a Schema Registry SDK client. " +
+          "Check the OAuth login flow status (browser sign-in must complete).",
+      );
+    }
     const endpoint = await resolveSchemaRegistryEndpoint(
       this.getConfluentCloudRestClient(),
       clusterId!,
       envId!,
     );
-    const dpat = this.holder.getDataPlaneToken() ?? "";
     return new SchemaRegistryClient({
       baseURLs: [endpoint],
       createAxiosDefaults: {

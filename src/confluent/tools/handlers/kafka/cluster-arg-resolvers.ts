@@ -6,10 +6,9 @@
  *   `DirectClientManager` ignores cluster args and uses its eagerly-built
  *   single-instance client(s); the handler passes the undefineds through.
  * - OAuth: requires the args; throws with a discovery hint if missing.
- *
- * The Schema Registry counterpart was removed when SR-under-OAuth was scoped
- * out of the initial #313/#312 ship. It will return alongside the
- * list-schema-registry-clusters tool that closes the discovery gap.
+ *   Handlers catch the throw at entry and convert to a `CallToolResult`
+ *   with `isError: true` so the agent receives a normal tool-call error
+ *   rather than an RPC failure.
  */
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
@@ -78,7 +77,7 @@ export function formatKafkaError(err: unknown): string {
     return `${err.message}\n${details}`;
   }
   if (err instanceof KafkaJS.KafkaJSError) {
-    return `Kafka error (${err.code}): ${err.message}`;
+    return `Kafka error (${err.code ?? "unknown"}): ${err.message}`;
   }
   if (err instanceof Error) return err.message;
   return String(err);

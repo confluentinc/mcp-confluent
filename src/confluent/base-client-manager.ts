@@ -249,8 +249,8 @@ export abstract class BaseClientManager
    * ignored and the existing single-instance Lazy is returned. Under OAuth,
    * args are required: `clusterId` is `lsrc-...` and `envId` is `env-...`. The
    * SR client itself is built per-call (no cache) because the DPAT is captured
-   * in the SDK's axios headers at construction time. Endpoint resolution is
-   * cached in `OAuthClientManager`.
+   * in the SDK's axios headers at construction time; endpoint resolution
+   * happens fresh on every call too.
    */
   async getSchemaRegistrySdkClient(
     _clusterId?: string,

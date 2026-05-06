@@ -46,6 +46,9 @@ describe("oauth-client-manager.ts", () => {
         const fakeAdmin = {
           connect: vi.fn().mockResolvedValue(undefined),
           disconnect: vi.fn().mockResolvedValue(undefined),
+          // listTopics is invoked once per call as a metadata warmup —
+          // see comment in OAuthClientManager.getKafkaAdminClient.
+          listTopics: vi.fn().mockResolvedValue([]),
         };
         const fakeKafka = { admin: () => fakeAdmin };
         const kafkaSpy = vi
@@ -74,6 +77,9 @@ describe("oauth-client-manager.ts", () => {
         const fakeAdmin = {
           connect: vi.fn().mockResolvedValue(undefined),
           disconnect: vi.fn().mockResolvedValue(undefined),
+          // listTopics is invoked once per call as a metadata warmup —
+          // see comment in OAuthClientManager.getKafkaAdminClient.
+          listTopics: vi.fn().mockResolvedValue([]),
         };
         let capturedConfig: Record<string, unknown> | undefined;
         vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function (

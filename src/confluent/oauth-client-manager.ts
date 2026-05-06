@@ -146,8 +146,23 @@ export class OAuthClientManager extends BaseClientManager {
     this.requireClusterArgs(clusterId, envId);
     const kafka = await this.buildOAuthKafkaClient(clusterId!, envId!);
     const admin = kafka.admin();
-    await admin.connect();
-    return admin;
+    try {
+      await admin.connect();
+      // Metadata warmup: `admin.connect()` returns before librdkafka has
+      // discovered the controller broker. The first non-list operation
+      // (createTopics, deleteTopics) needs the controller and times out
+      // locally if metadata isn't yet cached. listTopics is a cheap
+      // metadata-only roundtrip that primes the broker map; subsequent
+      // ops on this admin instance reuse it. Costs ~50-200ms per OAuth
+      // admin call; acceptable given clients are per-call by design.
+      await admin.listTopics();
+      return admin;
+    } catch (err) {
+      // Disconnect the half-built admin so we don't leak the broker
+      // connection on a failed warmup.
+      await admin.disconnect().catch(() => undefined);
+      throw err;
+    }
   }
 
   /** @inheritdoc */

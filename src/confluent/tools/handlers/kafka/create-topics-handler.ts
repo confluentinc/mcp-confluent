@@ -7,7 +7,7 @@ import {
 import {
   connectionIdsWhere,
   hasKafkaBootstrap,
-  isOAuth,
+  widenForOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import {
   disposeIfOAuth,
@@ -104,7 +104,7 @@ export class CreateTopicsHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(
       runtime.config.connections,
-      (c) => hasKafkaBootstrap(c) || isOAuth(c),
+      widenForOAuth(hasKafkaBootstrap),
     );
   }
 }

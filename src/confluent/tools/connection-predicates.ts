@@ -226,6 +226,25 @@ export function isOAuth(conn: ConnectionConfig): boolean {
   return conn.type === "oauth";
 }
 
+/**
+ * Wrap a predicate so OAuth connections always answer enabled. Use this on
+ * tool handlers that have been migrated to support OAuth — the underlying
+ * predicate keeps its block-based verdict for direct connections, while
+ * OAuth's "no service blocks" early-exit is overridden because the handler
+ * resolves identity (cluster_id, environment_id) at call time instead of
+ * from config.
+ *
+ * The reviewer on #369 asked whether predicates need to stop early-exiting
+ * once handlers migrate; answer: yes, but per-handler — the predicate
+ * defaults stay strict, and each OAuth-capable handler opts in via
+ * {@linkcode widenForOAuth} at its `enabledConnectionIds` site.
+ */
+export function widenForOAuth(
+  predicate: ConnectionPredicate,
+): ConnectionPredicate {
+  return (conn) => (conn.type === "oauth" ? ENABLED : predicate(conn));
+}
+
 export function connectionIdsWhere(
   connections: Readonly<Record<string, ConnectionConfig>>,
   predicate: ConnectionPredicate,

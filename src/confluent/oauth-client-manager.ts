@@ -19,6 +19,31 @@
  * (`list-schema-registry-clusters`).
  */
 
+// SASL spike findings (2026-05-06):
+// - KafkaJS.Kafka accepts top-level librdkafka config keys (GlobalConfig) alongside
+//   the `kafkaJS:` block. We bypass the kafkaJS-compat `sasl.oauthBearerProvider`
+//   shape because it wraps our callback in `.then(...)` which returns a Promise to
+//   librdkafka — the resulting microtask deferral is the race that previously
+//   required a warmup retry workaround.
+// - Set the OAUTHBEARER mechanism via top-level keys:
+//     "security.protocol": "sasl_ssl"
+//     "sasl.mechanisms": "OAUTHBEARER"
+// - Plumb the token via `oauthbearer_token_refresh_cb`. The library wraps user
+//   callbacks at lib/client.js:135-180. Callback signature is:
+//     (oauthbearer_config: string, postProcessTokenRefresh: PostProcessFn) => void | Promise
+//   where PostProcessFn = (err: Error|null, token?: TokenShape) => void
+//   and TokenShape = { tokenValue: string; lifetime: number /* absolute epoch ms */;
+//                       principal: string; extensions?: Record<string, string> | Map }
+// - Synchronous (race-free) usage: call `postProcessTokenRefresh(null, token)` inline.
+//   The library detects the callback either returned a Promise OR the postProcess
+//   function was invoked synchronously, and proceeds with the SASL handshake using
+//   the token already passed to librdkafka via setOAuthBearerToken (called inside
+//   postProcessTokenRefresh — see lib/client.js:163).
+// - Fallback if any of the above is wrong: keep `kafkaJS.sasl.oauthBearerProvider`
+//   but make the closure read holder.getDataPlaneToken() synchronously and return
+//   an already-resolved Promise (`Promise.resolve(...)`); race window narrows but
+//   doesn't disappear, so this is only a fallback.
+
 import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";

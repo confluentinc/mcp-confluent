@@ -560,45 +560,44 @@ describe("oauth/auth-context.ts", () => {
       vi.useRealTimers();
     });
 
-    it("should throw on invalid intervalMs", () => {
-      expect(() => ctx.startRefreshLoop(0)).toThrow(RangeError);
-      expect(() => ctx.startRefreshLoop(-1)).toThrow(RangeError);
-      expect(() => ctx.startRefreshLoop(NaN)).toThrow(RangeError);
-      expect(() => ctx.startRefreshLoop(Infinity)).toThrow(RangeError);
-    });
+    // The self-rescheduling loop schedules its first fire at
+    // `controlPlaneExpiresAt - REFRESH_WINDOW_MS` (~270s after a fresh login,
+    // given 5min lifetime + 30s window). Mocked refresh paths don't update
+    // `controlPlaneExpiresAt`, so subsequent fires hit the 1s floor.
+    const FIRST_FIRE_MS = 270_000;
+    const SUBSEQUENT_FIRE_MS = 1_000;
 
     it("should warn and skip when already running", () => {
-      ctx.startRefreshLoop(60_000);
-      ctx.startRefreshLoop(60_000);
+      ctx.startRefreshLoop();
+      ctx.startRefreshLoop();
     });
 
     it("should be a no-op when the context is already cleared", async () => {
       ctx.clear();
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       // No timer was ever created → no ticks fired.
       expect(refreshSpy).not.toHaveBeenCalled();
     });
 
-    it("should call refresh when CP is inside the refresh window", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+    it("should call refresh when the scheduled fire arrives", async () => {
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       expect(refreshSpy).toHaveBeenCalledOnce();
     });
 
-    it("should not call refresh when CP is still fresh", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(false);
+    it("should not call refresh before the scheduled fire arrives", async () => {
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      // Advance to just before the scheduled fire — refresh should not run yet.
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS - 1);
 
       expect(refreshSpy).not.toHaveBeenCalled();
     });
@@ -607,74 +606,55 @@ describe("oauth/auth-context.ts", () => {
       vi.spyOn(ctx, "refreshTokenExpired").mockReturnValue(true);
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
-      // Clear stops the loop, so subsequent ticks are no-ops.
-      await vi.advanceTimersByTimeAsync(60_000);
+      // refreshTokenExpired() is checked at scheduling time; if true at
+      // start-time, the loop clears and never schedules a timer.
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       expect(refreshSpy).not.toHaveBeenCalled();
     });
 
-    it("should skip a tick when the previous tick is still running", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
-      let resolveRefresh: () => void = () => {};
-      const refreshSpy = vi.spyOn(ctx, "refresh").mockReturnValue(
-        new Promise<void>((r) => {
-          resolveRefresh = r;
-        }),
-      );
-
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
-
-      expect(refreshSpy).toHaveBeenCalledOnce();
-      resolveRefresh();
-    });
-
-    it("should fire on every interval when no tick is in flight", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+    it("should fire repeatedly when no fire is in flight", async () => {
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
       expect(refreshSpy).toHaveBeenCalledOnce();
-      await vi.advanceTimersByTimeAsync(60_000);
+      // Mocked refresh didn't update tokens, so the next schedule hits the 1s
+      // floor and fires immediately.
+      await vi.advanceTimersByTimeAsync(SUBSEQUENT_FIRE_MS);
       expect(refreshSpy).toHaveBeenCalledTimes(2);
     });
 
     it("should swallow errors thrown by refresh and keep looping", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
       const refreshSpy = vi
         .spyOn(ctx, "refresh")
         .mockRejectedValueOnce(new Error("boom"))
         .mockResolvedValueOnce();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
+      await vi.advanceTimersByTimeAsync(SUBSEQUENT_FIRE_MS);
 
       expect(refreshSpy).toHaveBeenCalledTimes(2);
     });
 
     it("should stop the loop when stopRefreshLoop is called", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
-      ctx.startRefreshLoop(60_000);
+      ctx.startRefreshLoop();
 
       ctx.stopRefreshLoop();
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       expect(refreshSpy).not.toHaveBeenCalled();
     });
 
     it("should stop the loop when clear() is called", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
-      ctx.startRefreshLoop(60_000);
+      ctx.startRefreshLoop();
 
       ctx.clear();
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       expect(refreshSpy).not.toHaveBeenCalled();
     });

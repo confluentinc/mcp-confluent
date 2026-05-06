@@ -13,7 +13,6 @@ import {
   CONTROL_PLANE_REFRESH_WINDOW_MS,
   CONTROL_PLANE_TOKEN_LIFETIME_MS,
   DATA_PLANE_TOKEN_LIFETIME_MS,
-  DEFAULT_REFRESH_INTERVAL_MS,
   MAX_CONSECUTIVE_TRANSIENT_FAILURES,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
@@ -50,7 +49,7 @@ function isKnownNonTransient(error: unknown): boolean {
 export class AuthContext {
   private internalTokens: ConfluentTokenSet;
   private cleared = false;
-  private refreshInterval: ReturnType<typeof setInterval> | null = null;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private inflightRefresh: Promise<void> | null = null;
   private errors: AuthErrors = {};
   private failedRefreshAttempts = 0;
@@ -300,55 +299,65 @@ export class AuthContext {
   }
 
   /**
-   * Starts a background loop that checks this context every `intervalMs`.
-   * If the refresh token has expired, the context is cleared (loop stops).
-   * If the CP token is within the refresh window, `refresh()` is invoked.
-   * Ticks are single-flight — a tick that fires while another is in flight
-   * is skipped.
+   * Starts a background loop that refreshes the CP/DP token pair just before
+   * the CP token expires. The loop self-reschedules: each fire sets the next
+   * `setTimeout` at `controlPlaneExpiresAt - REFRESH_WINDOW_MS` from the
+   * post-refresh state, so the schedule tracks the actual token expiry rather
+   * than drifting against a fixed `setInterval` cadence. If the refresh token
+   * has expired (or expires while we're sleeping), the context clears itself
+   * and the loop stops.
    */
-  startRefreshLoop(intervalMs: number = DEFAULT_REFRESH_INTERVAL_MS): void {
-    if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
-      throw new RangeError("intervalMs must be a finite number greater than 0");
-    }
+  startRefreshLoop(): void {
     if (this.cleared) {
-      // A cleared context is terminal. Starting a loop here would create a
-      // timer that can never do useful work — guard against the leak.
+      // A cleared context is terminal. Scheduling a timer here would create
+      // a callback that can never do useful work — guard against the leak.
       logger.warn("Refresh loop not started: context is cleared");
       return;
     }
-    if (this.refreshInterval) {
+    if (this.refreshTimer) {
       logger.warn("Refresh loop already running, skipping");
       return;
     }
-    let tickInProgress = false;
-    this.refreshInterval = setInterval(async () => {
-      if (this.cleared || tickInProgress) return;
-      // Single `now` per tick so the two predicates can't disagree at an
-      // expiry boundary within the same evaluation.
-      const now = Date.now();
-      if (this.refreshTokenExpired(now)) {
-        logger.info("Refresh token expired; clearing context");
-        this.clear();
-        return;
-      }
-      if (!this.shouldAttemptRefresh(now)) return;
-      tickInProgress = true;
+    this.scheduleNextRefresh();
+    logger.info("Token refresh loop started");
+  }
+
+  private scheduleNextRefresh(): void {
+    if (this.cleared) return;
+    if (this.refreshTokenExpired()) {
+      logger.info("Refresh token expired; clearing context");
+      this.clear();
+      return;
+    }
+    // Target: fire `REFRESH_WINDOW_MS` before CP expiry. Floor at 1s so a
+    // permanent transient-error loop doesn't spin without the event loop
+    // breathing — refresh failures bump `failedRefreshAttempts`, which
+    // eventually flips `shouldAttemptRefresh` to false via
+    // `hasNonTransientError` and the next fire is a no-op clear.
+    const now = Date.now();
+    const targetDelay = Math.max(
+      this.internalTokens.controlPlaneExpiresAt -
+        now -
+        CONTROL_PLANE_REFRESH_WINDOW_MS,
+      1_000,
+    );
+    this.refreshTimer = setTimeout(async () => {
+      this.refreshTimer = null;
+      if (this.cleared) return;
       try {
         await this.refresh();
       } catch (error) {
         logger.error({ error }, "Token refresh loop error");
-      } finally {
-        tickInProgress = false;
       }
-    }, intervalMs);
-    logger.info({ intervalMs }, "Token refresh loop started");
+      this.scheduleNextRefresh();
+    }, targetDelay);
   }
 
   /** Stops the background refresh loop. Safe to call even if not started. */
   stopRefreshLoop(): void {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-      this.refreshInterval = null;
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
       logger.info("Token refresh loop stopped");
     }
   }

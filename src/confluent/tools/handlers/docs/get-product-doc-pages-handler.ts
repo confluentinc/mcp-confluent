@@ -248,16 +248,24 @@ function toMarkdownTwin(parsed: URL): string {
 }
 
 // Wraps fetch with a 10s deadline; relabels TimeoutError so the message
-// includes the URL and budget instead of just "aborted".
+// includes the URL and budget instead of just "aborted". Also re-checks the
+// post-redirect host against ALLOWED_HOSTS so a 3xx can't escape the allowlist.
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
 ): Promise<Response> {
   try {
-    return await nodeFetch.fetch(url, {
+    const response = await nodeFetch.fetch(url, {
       ...init,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
+    const finalHost = new URL(response.url || url).hostname;
+    if (!ALLOWED_HOSTS.has(finalHost as Source)) {
+      throw new Error(
+        `Request to ${url} redirected to disallowed host ${finalHost}`,
+      );
+    }
+    return response;
   } catch (err) {
     if (err instanceof Error && err.name === "TimeoutError") {
       throw new Error(

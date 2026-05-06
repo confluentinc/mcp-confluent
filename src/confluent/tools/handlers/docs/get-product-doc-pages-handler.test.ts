@@ -394,6 +394,23 @@ describe("get-product-doc-pages-handler.ts", () => {
           expect(result.isError).toBe(true);
           expect(getText(result)).toMatch(/502/);
         });
+
+        it("should reject when fetch redirects to a disallowed host", async () => {
+          fetchSpy.mockImplementationOnce(async () => {
+            const r = markdownResponse("compromised");
+            Object.defineProperty(r, "url", {
+              value: "https://attacker.com/page.md",
+            });
+            return r;
+          });
+
+          const result = await handler.handle(runtime, {
+            url: "https://docs.confluent.io/platform/quickstart.html",
+          });
+
+          expect(result.isError).toBe(true);
+          expect(getText(result)).toMatch(/disallowed host attacker\.com/);
+        });
       });
     });
   });

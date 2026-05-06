@@ -2,7 +2,7 @@ import { CheckHealthHandler } from "@src/confluent/tools/handlers/flink/diagnost
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
-  HandleCaseWithConn,
+  FlinkGetCase,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
@@ -18,18 +18,12 @@ const EXPLICIT_IDS = {
 
 const STATEMENT_NAME = "my-statement";
 
-type CheckHealthCase = HandleCaseWithConn & {
-  /** Body returned by the Flink REST GET. Omit for cases that throw before
-   *  reaching the client. */
-  flinkGetData?: unknown;
-};
-
 describe("check-health-handler.ts", () => {
   describe("CheckHealthHandler", () => {
     const handler = new CheckHealthHandler();
 
     describe("handle()", () => {
-      const cases: CheckHealthCase[] = [
+      const cases: FlinkGetCase[] = [
         {
           label: "throws ZodError when statementName is absent",
           args: {},

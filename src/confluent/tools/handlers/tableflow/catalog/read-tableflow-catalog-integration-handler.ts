@@ -29,9 +29,8 @@ export class ReadTableFlowCatalogIntegrationHandler extends TableflowToolHandler
     const { id, environmentId, clusterId } =
       readTableflowCatalogIntegrationArguments.parse(toolArguments);
 
-    const conn = runtime.config.getSoleDirectConnection();
     const { environment_id, kafka_cluster_id } =
-      this.resolveTableflowEnvAndClusterId(conn, environmentId, clusterId);
+      this.resolveTableflowEnvAndClusterId(runtime, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

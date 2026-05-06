@@ -1,4 +1,3 @@
-import type { DirectConnectionConfig } from "@src/config/index.js";
 import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
@@ -26,10 +25,11 @@ export abstract class TableflowToolHandler extends BaseToolHandler {
    * preferring explicit tool arguments over connection config fallbacks.
    */
   protected resolveTableflowEnvAndClusterId(
-    conn: DirectConnectionConfig,
+    runtime: ServerRuntime,
     envIdArg: string | undefined,
     clusterIdArg: string | undefined,
   ): { environment_id: string; kafka_cluster_id: string } {
+    const conn = runtime.config.getSoleDirectConnection();
     return {
       environment_id: this.resolveParam(
         envIdArg,

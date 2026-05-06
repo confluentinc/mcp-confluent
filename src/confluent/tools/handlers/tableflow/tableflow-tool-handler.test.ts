@@ -72,7 +72,7 @@ describe("tableflow-tool-handler.ts", () => {
       it("should prefer explicit args over connection config", () => {
         expect(
           handler["resolveTableflowEnvAndClusterId"](
-            connWithBoth,
+            runtimeWith(connWithBoth),
             "env-from-arg",
             "lkc-from-arg",
           ),
@@ -85,7 +85,7 @@ describe("tableflow-tool-handler.ts", () => {
       it("should fall back to connection config when args are absent", () => {
         expect(
           handler["resolveTableflowEnvAndClusterId"](
-            connWithBoth,
+            runtimeWith(connWithBoth),
             undefined,
             undefined,
           ),
@@ -98,7 +98,7 @@ describe("tableflow-tool-handler.ts", () => {
       it("should use the env arg and fall back to config for cluster_id when only env arg is supplied", () => {
         expect(
           handler["resolveTableflowEnvAndClusterId"](
-            connWithBoth,
+            runtimeWith(connWithBoth),
             "env-from-arg",
             undefined,
           ),
@@ -111,7 +111,7 @@ describe("tableflow-tool-handler.ts", () => {
       it("should fall back to config for env_id and use the cluster arg when only cluster arg is supplied", () => {
         expect(
           handler["resolveTableflowEnvAndClusterId"](
-            connWithBoth,
+            runtimeWith(connWithBoth),
             undefined,
             "lkc-from-arg",
           ),
@@ -137,7 +137,7 @@ describe("tableflow-tool-handler.ts", () => {
         };
         expect(() =>
           handler["resolveTableflowEnvAndClusterId"](
-            connNoEnv,
+            runtimeWith(connNoEnv),
             undefined,
             undefined,
           ),
@@ -155,7 +155,7 @@ describe("tableflow-tool-handler.ts", () => {
         };
         expect(() =>
           handler["resolveTableflowEnvAndClusterId"](
-            connNoCluster,
+            runtimeWith(connNoCluster),
             undefined,
             undefined,
           ),

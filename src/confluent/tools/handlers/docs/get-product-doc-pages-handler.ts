@@ -76,8 +76,7 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
     }
   }
 
-  // docs.confluent.io (Sphinx) exposes the source markdown at the same path
-  // with .md instead of .html. Falls back to HTML rendering if unavailable.
+  // Sphinx publishes a .md twin at the same path; HTML scrape is the fallback.
   private async fetchFromDocsConfluent(parsed: URL): Promise<CallToolResult> {
     const mdResponse = await fetchWithTimeout(toMarkdownTwin(parsed), {
       headers: { "user-agent": USER_AGENT, accept: "text/markdown,text/plain" },
@@ -103,13 +102,19 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
     );
   }
 
-  // developer.confluent.io (Gatsby) ships hashed CSS classes but stable
-  // data-swiftype-* attributes — use those to find the article body.
+  // Gatsby site has hashed CSS classes; key off stable data-swiftype-* attributes.
   private async fetchFromDeveloperConfluent(
     parsed: URL,
   ): Promise<CallToolResult> {
     const html = await this.fetchHtml(parsed);
     const $ = cheerio.load(html);
+
+    // <section data-test-id="section"> wraps both content and footer chrome
+    // (Cloud promo, newsletter). Real content is 3KB+ text; chrome is < 1KB.
+    $('section[data-test-id="section"]').each((_, el) => {
+      if ($(el).text().trim().length < 1500) $(el).remove();
+    });
+
     const title = $('[data-swiftype-name="title"]').first().text().trim();
 
     let bodyHtml: string | null = null;
@@ -118,8 +123,7 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
       swiftypeBody.find('[data-swiftype-index="false"]').remove();
       bodyHtml = swiftypeBody.html();
     } else {
-      // Quickstart pages have no Swiftype body marker; content lives in
-      // <section data-test-id="section"> blocks.
+      // Quickstart pages have no Swiftype body — content lives in <section> blocks.
       const sections = $('section[data-test-id="section"]');
       if (sections.length > 0) {
         sections.find('[data-swiftype-index="false"]').remove();
@@ -128,8 +132,8 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
           .get()
           .join("\n");
       } else {
-        // Tutorial pages (/confluent-tutorials/...) have neither marker.
-        // Strip header/footer/nav from <body> and keep the rest.
+        // Tutorial pages (/confluent-tutorials/...) have neither marker —
+        // strip <body> chrome and keep the rest.
         const body = $("body");
         body
           .find(
@@ -154,8 +158,7 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
     );
   }
 
-  // support.confluent.io is a Zendesk Help Center — articles have a public
-  // JSON API that returns clean body HTML. Falls back to scraping if it fails.
+  // Zendesk Help Center: prefer the public JSON API for clean body; HTML scrape is the fallback.
   private async fetchFromSupportZendesk(parsed: URL): Promise<CallToolResult> {
     const articleId = parsed.pathname.match(/\/articles\/(\d+)/)?.[1];
     if (articleId) {
@@ -247,9 +250,8 @@ function toMarkdownTwin(parsed: URL): string {
   return twin.toString();
 }
 
-// Wraps fetch with a 10s deadline; relabels TimeoutError so the message
-// includes the URL and budget instead of just "aborted". Also re-checks the
-// post-redirect host against ALLOWED_HOSTS so a 3xx can't escape the allowlist.
+// Adds a 10s deadline and re-checks the post-redirect host so a 3xx
+// can't escape ALLOWED_HOSTS. Relabels TimeoutError with URL and budget.
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,

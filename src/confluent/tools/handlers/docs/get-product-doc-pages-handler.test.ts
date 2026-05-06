@@ -199,12 +199,15 @@ describe("get-product-doc-pages-handler.ts", () => {
         });
 
         it("should fall back to data-test-id sections on quickstart-style pages", async () => {
+          // Real article sections are kilobytes; pad past the chrome-filter
+          // threshold so this fixture exercises the Tier-2 path (not Tier-3).
+          const filler = "Lesson detail. ".repeat(150);
           fetchSpy.mockResolvedValueOnce(
             htmlResponse(`
               <html>
                 <body>
-                  <section data-test-id="section"><p>Step one.</p></section>
-                  <section data-test-id="section"><p>Step two.</p></section>
+                  <section data-test-id="section"><p>Step one. ${filler}</p></section>
+                  <section data-test-id="section"><p>Step two. ${filler}</p></section>
                 </body>
               </html>
             `),
@@ -218,6 +221,39 @@ describe("get-product-doc-pages-handler.ts", () => {
           const text = getText(result);
           expect(text).toContain("Step one.");
           expect(text).toContain("Step two.");
+        });
+
+        it("should drop short data-test-id sections used as Cloud-promo/newsletter chrome", async () => {
+          // /get-started/<lang>/ pages have only chrome inside <section data-test-id="section">;
+          // real content lives outside in nav cards. Without filtering, the handler would
+          // return the Cloud promo as if it were the article body.
+          fetchSpy.mockResolvedValueOnce(
+            htmlResponse(`
+              <html>
+                <body>
+                  <h1 data-swiftype-name="title">Get Started with Java</h1>
+                  <ul>
+                    <li><a href="/get-started/spring-boot/">Spring Boot</a></li>
+                    <li><a href="/get-started/javascript/">JavaScript</a></li>
+                  </ul>
+                  <section data-test-id="section">
+                    <p>Confluent Cloud is a fully managed Apache Kafka service.</p>
+                  </section>
+                </body>
+              </html>
+            `),
+          );
+
+          const result = await handler.handle(runtime, {
+            url: "https://developer.confluent.io/get-started/java/",
+          });
+
+          expect(result.isError).toBeFalsy();
+          const text = getText(result);
+          expect(text).toContain("# Get Started with Java");
+          expect(text).toContain("Spring Boot");
+          expect(text).toContain("JavaScript");
+          expect(text).not.toContain("Confluent Cloud is a fully managed");
         });
 
         it("should fall back to <body> minus chrome on tutorial-style pages", async () => {

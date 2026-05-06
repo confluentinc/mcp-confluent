@@ -39,13 +39,12 @@ export default [
       ],
       // Production code reads service config from `ConnectionConfig`, not the
       // process env. The env singleton in `@src/env.js` only legitimately
-      // serves the bootstrap (`initEnv` named export from `src/index.ts`),
+      // serves the bootstrap (`initEnv` named export from `src/index.ts`) and
       // the legacy YAML-vs-env-config bridge (`Environment` type from
-      // `src/config/env-config.ts`), and the test-stubbing wrapper in
-      // `src/confluent/node-deps.ts` (which imports the proxy as a named
-      // export). The default export was retired in #234; this rule slams the
-      // door so any future regression surfaces with a useful message rather
-      // than a generic TypeScript "no default export" error.
+      // `src/config/env-config.ts`). The default export was retired in #234;
+      // this rule slams the door so any future regression surfaces with a
+      // useful message rather than a generic TypeScript "no default export"
+      // error.
       "no-restricted-imports": [
         "error",
         {
@@ -54,7 +53,7 @@ export default [
               name: "@src/env.js",
               importNames: ["default"],
               message:
-                "Use ConnectionConfig instead. The env singleton is only consumed by the bootstrap and by node-deps.ts (named import); production code should not read it directly.",
+                "Use ConnectionConfig instead. The env singleton is consumed only by the bootstrap (initEnv) and the legacy env-config bridge; production code should not read it directly.",
             },
           ],
         },

@@ -14,7 +14,9 @@ import {
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-type EnvIdCase = HandleCaseWithConn & { expectedEnvId: string };
+type EnvIdCase = HandleCaseWithConn & {
+  expectedEnvId: string;
+};
 
 describe("list-clusters-handler.ts", () => {
   describe("ListClustersHandler", () => {
@@ -31,10 +33,8 @@ describe("list-clusters-handler.ts", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });
 
-      it("should return the connection id when the connection is OAuth-typed", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
+      it("should return an empty array for an OAuth-typed connection", () => {
+        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
       });
     });
 
@@ -62,6 +62,14 @@ describe("list-clusters-handler.ts", () => {
           args: { environmentId: "env-explicit" },
           outcome: { resolves: "Successfully retrieved 0 clusters" },
           expectedEnvId: "env-explicit",
+        },
+        {
+          label:
+            "use empty string when both environmentId arg and conn kafka.env_id are absent",
+          connectionConfig: CCLOUD_CONN,
+          args: {},
+          outcome: { resolves: "Successfully retrieved 0 clusters" },
+          expectedEnvId: "",
         },
       ];
 
@@ -95,35 +103,6 @@ describe("list-clusters-handler.ts", () => {
           );
         },
       );
-
-      it("should fall through to empty environment under direct when arg + kafka.env_id are absent", async () => {
-        // Preserves pre-PR-359 main behavior: the cmk endpoint receives the
-        // empty string and returns no clusters. The handler is happy.
-        const clientManager = getMockedClientManager();
-        const cloudRest = clientManager.getConfluentCloudRestClient();
-        cloudRest.GET.mockResolvedValue({ data: { data: [] } });
-
-        await assertHandleCase({
-          handler,
-          runtime: runtimeWith(
-            CCLOUD_CONN,
-            DEFAULT_CONNECTION_ID,
-            clientManager,
-          ),
-          args: {},
-          outcome: { resolves: "Successfully retrieved 0 clusters" },
-          clientManager,
-        });
-
-        expect(cloudRest.GET).toHaveBeenCalledWith(
-          expect.any(String),
-          expect.objectContaining({
-            params: expect.objectContaining({
-              query: expect.objectContaining({ environment: "" }),
-            }),
-          }),
-        );
-      });
     });
   });
 });

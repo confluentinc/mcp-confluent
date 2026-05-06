@@ -49,16 +49,13 @@ export const consumeKafkaMessagesArgs = z.object({
     .string()
     .optional()
     .describe(
-      "The Confluent Cloud logical Kafka cluster ID (lkc-...). " +
-        "Required under --oauth; under a direct connection it is ignored " +
-        "(cluster fixed by configuration). Discover via list-clusters.",
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
     ),
   environment_id: z
     .string()
     .optional()
     .describe(
-      "The Confluent Cloud environment ID (env-...) that owns the cluster. " +
-        "Required alongside cluster_id under --oauth. Optional under direct.",
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
     ),
   topicNames: z
     .array(z.string())

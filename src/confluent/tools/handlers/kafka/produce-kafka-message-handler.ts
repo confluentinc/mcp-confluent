@@ -17,7 +17,10 @@ import {
   hasKafkaBootstrap,
   isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
-import { resolveKafkaClusterArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+import {
+  disposeIfOAuth,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -62,16 +65,13 @@ const produceKafkaMessageArguments = z.object({
     .string()
     .optional()
     .describe(
-      "The Confluent Cloud logical Kafka cluster ID (lkc-...). " +
-        "Required under --oauth; under a direct connection it is ignored " +
-        "(cluster fixed by configuration). Discover via list-clusters.",
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
     ),
   environment_id: z
     .string()
     .optional()
     .describe(
-      "The Confluent Cloud environment ID (env-...) that owns the cluster. " +
-        "Required alongside cluster_id under --oauth. Optional under direct.",
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
     ),
   topicName: z
     .string()
@@ -97,8 +97,6 @@ type ProduceKafkaMessageArguments = z.infer<
 export class ProduceKafkaMessageHandler extends BaseToolHandler {
   /**
    * Handles the result of a schema check, returning a CallToolResult if a schema issue is found, or null otherwise.
-   * @param result - The schema check result to handle
-   * @returns A CallToolResult if a schema issue is found, or null otherwise
    */
   handleSchemaCheckResult(result: SchemaCheckResult): CallToolResult | null {
     if (!result) return null;
@@ -121,10 +119,6 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     }
   }
 
-  /**
-   * Main handler for producing a message to a Kafka topic, including schema registry logic and serialization.
-   * Handles both value and key, and returns a CallToolResult with the outcome.
-   */
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
@@ -140,9 +134,8 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
 
     // Schema Registry serialization is not yet exposed under --oauth: there is
     // no MCP tool to discover the SR cluster ID (lsrc-...). Block the path here
-    // with a clear capability boundary rather than throw a discovery hint that
-    // points at a tool the agent can't call. SR-under-OAuth lands in the
-    // follow-up that adds list-schema-registry-clusters.
+    // with a clear capability boundary; SR-under-OAuth lands in the follow-up
+    // that adds list-schema-registry-clusters.
     const needsRegistry =
       value.useSchemaRegistry || (key && key.useSchemaRegistry);
     if (needsRegistry && conn.type === "oauth") {
@@ -160,7 +153,6 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       registry = await clientManager.getSchemaRegistrySdkClient();
     }
 
-    // Check for latest schema if needed (value)
     const valueSchemaCheck = await checkSchemaNeeded(
       topicName,
       value as MessageOptions,
@@ -170,7 +162,6 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     const valueSchemaResult = this.handleSchemaCheckResult(valueSchemaCheck);
     if (valueSchemaResult) return valueSchemaResult;
 
-    // Check for latest schema if needed (key)
     if (key) {
       const keySchemaCheck = await checkSchemaNeeded(
         topicName,
@@ -206,58 +197,48 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       );
     }
 
-    // Send the message
-    let deliveryReport: RecordMetadata[];
+    const producer = await clientManager.getKafkaProducer(
+      resolved.clusterId,
+      resolved.envId,
+    );
     try {
-      const producer = await clientManager.getKafkaProducer(
-        resolved.clusterId,
-        resolved.envId,
+      let deliveryReport: RecordMetadata[];
+      try {
+        deliveryReport = await producer.send({
+          topic: topicName,
+          messages: [
+            typeof keyToSend !== "undefined"
+              ? { key: keyToSend, value: valueToSend }
+              : { value: valueToSend },
+          ],
+        });
+      } catch (err) {
+        return this.createResponse(
+          `Failed to produce message: ${err instanceof Error ? err.message : err}`,
+          true,
+        );
+      }
+      const formattedResponse = deliveryReport
+        .map((metadata) => {
+          if (metadata.errorCode !== 0) {
+            return `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`;
+          }
+          return `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`;
+        })
+        .join("\n");
+      const isError = deliveryReport.some(
+        (metadata) => metadata.errorCode !== 0,
       );
-      deliveryReport = await producer.send({
-        topic: topicName,
-        messages: [
-          typeof keyToSend !== "undefined"
-            ? { key: keyToSend, value: valueToSend }
-            : { value: valueToSend },
-        ],
-      });
-    } catch (err) {
-      return this.createResponse(
-        `Failed to produce message: ${err instanceof Error ? err.message : err}`,
-        true,
-      );
+      return this.createResponse(formattedResponse, isError);
+    } finally {
+      await disposeIfOAuth(runtime, connId, producer);
     }
-    const formattedResponse = deliveryReport
-      .map((metadata) => {
-        if (metadata.errorCode !== 0) {
-          return `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`;
-        }
-        return `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`;
-      })
-      .join("\n");
-    const isError = deliveryReport.some((metadata) => metadata.errorCode !== 0);
-    return this.createResponse(formattedResponse, isError);
   }
 
-  /**
-   * Returns the tool configuration including name, description, and input schema.
-   * @returns The tool configuration
-   */
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.PRODUCE_MESSAGE,
-      description:
-        `Produce records to a Kafka topic. Supports Confluent Schema Registry ` +
-        `serialization (AVRO, JSON, PROTOBUF) for both key and value on direct ` +
-        `connections. Under --oauth, schema serialization is not yet supported — ` +
-        `set useSchemaRegistry: false (or omit it) to send raw bytes/JSON.\n\n` +
-        `Before producing with schema registry, check if the topic has a ` +
-        `registered schema for <topicName>-value and <topicName>-key. If a ` +
-        `schema exists, set useSchemaRegistry to true and specify the ` +
-        `appropriate schemaType. If the topic does not exist, it can be ` +
-        `created via the ${ToolName.CREATE_TOPICS} tool.\n\n` +
-        `Under --oauth, requires cluster_id and environment_id (call ` +
-        `list-clusters first to discover them).`,
+      description: `Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value.\n\nBefore producing, check if the topic has a registered schema for <topicName>-value and <topicName>-key. If a schema exists, set useSchemaRegistry to true and specify the appropriate schemaType. If the topic does not exist, it can be created via the ${ToolName.CREATE_TOPICS} tool.`,
       inputSchema: produceKafkaMessageArguments.shape,
       annotations: CREATE_UPDATE,
     };

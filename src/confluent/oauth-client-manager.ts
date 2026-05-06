@@ -1,39 +1,91 @@
 /**
- * @fileoverview OAuth (bearer-auth) client manager. Wires Confluent Cloud REST
- * surfaces to bearer tokens supplied by an {@link OAuthHolder}; the cloud REST
- * URL is auto-derived from the Auth0 environment via {@link getCloudRestUrlForEnv}.
+ * @fileoverview OAuth (bearer-auth) client manager. Wires Confluent Cloud
+ * REST surfaces, native Kafka admin/producer/consumer (via KafkaJS +
+ * SASL/OAUTHBEARER), and the Schema Registry SDK to bearer tokens supplied
+ * by an {@link OAuthHolder}. REST endpoint URLs and Kafka bootstrap servers
+ * are resolved at call time from the Auth0 environment + cluster IDs the
+ * agent supplies as tool args.
  *
- * Inherits the abstract {@link BaseClientManager} and intentionally adds nothing
- * native-Kafka-shaped: no broker client, no SASL, no `KafkaJS` import. Native
- * Kafka methods are missing entirely from the class — a call to e.g.
- * `getAdminClient` is a compile-time error rather than a runtime throw on a
- * stub. Tool handlers that need them narrow the runtime's `BaseClientManager`
- * to a `DirectClientManager` via {@link ServerRuntime.requireDirectClientManager},
- * which (alongside the `hasKafka` predicate that gates those tools off for
- * OAuth connections in the first place) keeps the path closed end-to-end.
+ * Native Kafka clients are built fresh per call; handlers wrap usage in
+ * `try { ... } finally { await disposeIfOAuth(...) }` for caller-owned
+ * disposal. SASL/OAUTHBEARER is configured via librdkafka's synchronous
+ * token-refresh callback (no kafkaJS-compat async-provider race), so no
+ * warmup workaround is needed.
  *
- * The Schema Registry SDK is similarly unsupported under OAuth, but its getter
- * is part of `BaseClientManager`'s contract and stays inherited. A call to
- * `getSchemaRegistryClient()` therefore still surfaces at runtime as the base
- * class's existing OAuth-rejection throw — to be revisited once OAuth flows
- * through the SDK.
+ * Schema Registry serialization under OAuth is wired at the manager level
+ * but not yet exposed through the produce/consume tools — those handlers
+ * return a clear "not yet supported" error. The accessor + endpoint
+ * resolver stay in place ready for the follow-up PR that adds the discovery
+ * tool (`list-schema-registry-clusters`).
  */
 
+// SASL spike findings (2026-05-06):
+// - KafkaJS.Kafka accepts top-level librdkafka config keys (GlobalConfig) alongside
+//   the `kafkaJS:` block. We bypass the kafkaJS-compat `sasl.oauthBearerProvider`
+//   shape because it wraps our callback in `.then(...)` which returns a Promise to
+//   librdkafka — the resulting microtask deferral is the race that previously
+//   required a warmup retry workaround.
+// - Set the OAUTHBEARER mechanism via top-level keys:
+//     "security.protocol": "sasl_ssl"
+//     "sasl.mechanisms": "OAUTHBEARER"
+// - Plumb the token via `oauthbearer_token_refresh_cb`. The library wraps user
+//   callbacks at lib/client.js:135-180. Callback signature is:
+//     (oauthbearer_config: string, postProcessTokenRefresh: PostProcessFn) => void | Promise
+//   where PostProcessFn = (err: Error|null, token?: TokenShape) => void
+//   and TokenShape = { tokenValue: string; lifetime: number /* absolute epoch ms */;
+//                       principal: string; extensions?: Record<string, string> | Map }
+// - Synchronous (race-free) usage: call `postProcessTokenRefresh(null, token)` inline.
+//   The library detects the callback either returned a Promise OR the postProcess
+//   function was invoked synchronously, and proceeds with the SASL handshake using
+//   the token already passed to librdkafka via setOAuthBearerToken (called inside
+//   postProcessTokenRefresh — see lib/client.js:163).
+
+import type { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
+import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import { kafkaDeps } from "@src/confluent/node-deps.js";
+import {
+  resolveKafkaBootstrap,
+  resolveSchemaRegistryEndpoint,
+} from "@src/confluent/oauth-resource-resolvers.js";
 import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
+import { kafkaLogger } from "@src/logger.js";
+
+/**
+ * Lifetime hint passed to librdkafka inside the OAUTHBEARER refresh callback.
+ * librdkafka uses this to schedule its next refresh callback; 10 minutes lines
+ * up with CCloud's typical DPAT lifetime. Within a single tool call, only the
+ * first invocation actually matters (the call completes well before the next
+ * scheduled refresh).
+ */
+const OAUTHBEARER_TOKEN_LIFETIME_MS = 10 * 60 * 1000;
+
+type PostProcessTokenRefresh = (
+  err: Error | null,
+  token?: {
+    tokenValue: string;
+    lifetime: number;
+    principal: string;
+    extensions?: Record<string, string>;
+  },
+) => void;
 
 /**
  * Bearer-auth client manager. Wires every REST surface to the OAuth holder's
  * tokens — control plane (cloud / tableflow / telemetry) reads
  * {@link OAuthHolder.getControlPlaneToken}; data plane (flink / schema-registry
  * REST / kafka REST) reads {@link OAuthHolder.getDataPlaneToken}. Cloud REST URL
- * is auto-derived from the Auth0 env; data-plane endpoints stay unset until T4
- * introduces per-endpoint resolution, and their lazy clients throw at first
- * access if a tool somehow gets enabled with one missing.
+ * is auto-derived from the Auth0 env. Native Kafka clients (admin, producer,
+ * consumer) are built fresh per call against bootstrap endpoints resolved
+ * via the cmk REST API; SASL/OAUTHBEARER is configured via librdkafka's
+ * synchronous token-refresh callback to avoid the kafkaJS-compat
+ * async-provider race that previously required a warmup workaround.
  */
 export class OAuthClientManager extends BaseClientManager {
+  private readonly holder: OAuthHolder;
+
   constructor(holder: OAuthHolder, env: Auth0Environment) {
     const cpToken = (): string | undefined => holder.getControlPlaneToken();
     const dpToken = (): string | undefined => holder.getDataPlaneToken();
@@ -56,13 +108,160 @@ export class OAuthClientManager extends BaseClientManager {
       },
     });
 
+    this.holder = holder;
+
     // Eager construction: surface the cloud REST client at startup so a bad
     // endpoint or middleware wiring fails fast rather than at first tool call.
     this.getConfluentCloudRestClient();
   }
 
   /** @inheritdoc */
+  async getSchemaRegistrySdkClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<SchemaRegistryClient> {
+    this.requireClusterArgs(clusterId, envId);
+    const endpoint = await resolveSchemaRegistryEndpoint(
+      this.getConfluentCloudRestClient(),
+      clusterId!,
+      envId!,
+    );
+    const dpat = this.holder.getDataPlaneToken() ?? "";
+    return new SchemaRegistryClient({
+      baseURLs: [endpoint],
+      createAxiosDefaults: {
+        headers: {
+          Authorization: `Bearer ${dpat}`,
+          "target-sr-cluster": clusterId,
+        },
+      },
+    });
+  }
+
+  /** @inheritdoc */
+  async getKafkaAdminClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Admin> {
+    this.requireClusterArgs(clusterId, envId);
+    const kafka = await this.buildOAuthKafkaClient(clusterId!, envId!);
+    const admin = kafka.admin();
+    try {
+      await admin.connect();
+      // Metadata warmup: `admin.connect()` returns before librdkafka has
+      // discovered the controller broker. The first non-list operation
+      // (createTopics, deleteTopics) needs the controller and times out
+      // locally if metadata isn't yet cached. listTopics is a cheap
+      // metadata-only roundtrip that primes the broker map; subsequent
+      // ops on this admin instance reuse it. Costs ~50-200ms per OAuth
+      // admin call; acceptable given clients are per-call by design.
+      await admin.listTopics();
+      return admin;
+    } catch (err) {
+      // Disconnect the half-built admin so we don't leak the broker
+      // connection on a failed warmup.
+      await admin.disconnect().catch(() => undefined);
+      throw err;
+    }
+  }
+
+  /** @inheritdoc */
+  async getKafkaProducer(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Producer> {
+    this.requireClusterArgs(clusterId, envId);
+    const kafka = await this.buildOAuthKafkaClient(clusterId!, envId!);
+    const producer = kafka.producer();
+    await producer.connect();
+    return producer;
+  }
+
+  /** @inheritdoc */
+  async buildKafkaConsumer(
+    clusterId?: string,
+    envId?: string,
+    groupId?: string,
+  ): Promise<KafkaJS.Consumer> {
+    this.requireClusterArgs(clusterId, envId);
+    const kafka = await this.buildOAuthKafkaClient(clusterId!, envId!);
+    return kafka.consumer({
+      kafkaJS: {
+        groupId: groupId ?? "mcp-confluent",
+        autoCommit: false,
+        fromBeginning: true,
+      },
+    });
+  }
+
+  /** @inheritdoc */
   async disconnect(): Promise<void> {
-    // No native Kafka client to clean up; REST clients have no disconnect.
+    // No state to drain — every Kafka client is caller-owned and disposed
+    // by the handler's `finally` block via `disposeIfOAuth`.
+  }
+
+  private requireClusterArgs(
+    clusterId: string | undefined,
+    envId: string | undefined,
+  ): void {
+    if (clusterId === undefined || envId === undefined) {
+      throw new Error(
+        "cluster_id and environment_id are required under --oauth for native Kafka access. " +
+          "Call list-clusters with environment_id and pass the cluster's `id` and `spec.environment.id`.",
+      );
+    }
+  }
+
+  private async buildOAuthKafkaClient(
+    clusterId: string,
+    envId: string,
+  ): Promise<KafkaJS.Kafka> {
+    // Wait for OAuth login to finish so the data-plane token is populated
+    // before librdkafka starts the SASL handshake.
+    await this.holder.bootstrapPromise;
+    if (!this.holder.getDataPlaneToken()) {
+      throw new Error(
+        "OAuth login did not produce a data-plane token; cannot connect to Kafka. " +
+          "Check the OAuth login flow status (browser sign-in must complete).",
+      );
+    }
+    // librdkafka debug logs — gated by env var so they don't pollute normal
+    // server stderr. Set OAUTH_KAFKA_DEBUG=security,broker,protocol (or
+    // "all") to see the full SASL/OAUTHBEARER handshake and broker traffic.
+    const debug = process.env.OAUTH_KAFKA_DEBUG;
+    const bootstrap = await resolveKafkaBootstrap(
+      this.getConfluentCloudRestClient(),
+      clusterId,
+      envId,
+    );
+    const config: GlobalConfig = {
+      "bootstrap.servers": bootstrap,
+      "security.protocol": "sasl_ssl",
+      "sasl.mechanisms": "OAUTHBEARER",
+      // Synchronous librdkafka-native refresh callback. Reads the holder's
+      // current DPAT and pushes it into librdkafka via postProcessTokenRefresh
+      // inline — no async, no microtask race with the SASL state machine.
+      // See "SASL spike findings" comment at the top of this file.
+      oauthbearer_token_refresh_cb: (
+        _oauthbearerConfig: string,
+        postProcessTokenRefresh: PostProcessTokenRefresh,
+      ): void => {
+        postProcessTokenRefresh(null, {
+          tokenValue: this.holder.getDataPlaneToken() ?? "",
+          lifetime: Date.now() + OAUTHBEARER_TOKEN_LIFETIME_MS,
+          principal: clusterId,
+          extensions: { logicalCluster: clusterId },
+        });
+      },
+      ...(debug ? { debug } : {}),
+    };
+    // Critical for stdio MCP: route KafkaJS / librdkafka logs through pino
+    // (which writes to stderr). Without this, the default logger prints to
+    // stdout in pretty format, corrupting the stdio JSON-RPC stream.
+    return new kafkaDeps.Kafka({
+      ...config,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      kafkaJS: { logger: kafkaLogger } as any,
+    });
   }
 }

@@ -7,12 +7,30 @@ import {
 import {
   connectionIdsWhere,
   hasKafkaBootstrap,
+  isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
+import {
+  disposeIfOAuth,
+  formatKafkaError,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const createTopicArgs = z.object({
+  cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+    ),
   topics: z
     .array(
       z.object({
@@ -29,29 +47,48 @@ const createTopicArgs = z.object({
     )
     .nonempty(),
 });
+
 export class CreateTopicsHandler extends BaseToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.requireDirectClientManager();
-    const { topics } = createTopicArgs.parse(toolArguments);
-    const success = await (
-      await clientManager.getAdminClient()
-    ).createTopics({
-      topics: topics.map(({ topic, numPartitions }) => ({
-        topic,
-        numPartitions,
-      })),
-    });
-    const topicNames = topics.map((t) => t.topic).join(",");
-    if (!success) {
-      return this.createResponse(
-        `Failed to create Kafka topics: ${topicNames}`,
-        true,
-      );
+    const parsed = createTopicArgs.parse(toolArguments);
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
+    const clientManager = runtime.clientManagers[connId]!;
+    const admin = await clientManager.getKafkaAdminClient(
+      resolved.clusterId,
+      resolved.envId,
+    );
+    const topicNames = parsed.topics.map((t) => t.topic).join(",");
+    try {
+      let success: boolean;
+      try {
+        // 30s timeout — the broker confirms topic creation within this window.
+        success = await admin.createTopics({
+          timeout: 30_000,
+          topics: parsed.topics.map(({ topic, numPartitions }) => ({
+            topic,
+            numPartitions,
+          })),
+        });
+      } catch (err) {
+        return this.createResponse(
+          `Failed to create Kafka topics (${topicNames}): ${formatKafkaError(err)}`,
+          true,
+        );
+      }
+      if (!success) {
+        return this.createResponse(
+          `Failed to create Kafka topics: ${topicNames}`,
+          true,
+        );
+      }
+      return this.createResponse(`Created Kafka topics: ${topicNames}`);
+    } finally {
+      await disposeIfOAuth(runtime, connId, admin);
     }
-    return this.createResponse(`Created Kafka topics: ${topicNames}`);
   }
 
   getToolConfig(): ToolConfig {
@@ -65,6 +102,9 @@ export class CreateTopicsHandler extends BaseToolHandler {
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaBootstrap);
+    return connectionIdsWhere(
+      runtime.config.connections,
+      (c) => hasKafkaBootstrap(c) || isOAuth(c),
+    );
   }
 }

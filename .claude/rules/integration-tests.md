@@ -283,21 +283,22 @@ Handlers that mutate state (`create-topics`, `delete-topics`,
 runs and retried CI jobs don't collide.
 
 **Naming convention**: `int-<slug>-<timestamp>-<random>` via the
-`uniqueTopicName(slug)` helper in `@tests/harness/kafka-admin.js`. The `int-`
+`uniqueName(slug)` helper in `@tests/harness/unique-name.js`. The `int-`
 prefix matches what the confluentinc/vscode repo uses (`e2e-`) for
-identifying test-created resources during cleanup of orphaned state.
+identifying test-created resources during cleanup of orphaned state. The
+helper is resource-agnostic: kafka topics, schema-registry subjects, and
+any future test-side resource share the same generator so naming stays
+consistent across tool groups.
 
 ```ts
-import {
-  uniqueTopicName,
-  withSharedAdminClient,
-} from "@tests/harness/kafka-admin.js";
+import { withSharedAdminClient } from "@tests/harness/kafka-admin.js";
+import { uniqueName } from "@tests/harness/unique-name.js";
 
 // in the describe body, after the predicate gate:
 const { admin, createdTopics } = withSharedAdminClient();
 
 // in an `it` block:
-const topic = uniqueTopicName("create"); // e.g. "int-create-1729123456789-a7f3b2"
+const topic = uniqueName("create"); // e.g. "int-create-1729123456789-a7f3b2"
 createdTopics.push(topic);
 await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
 ```

@@ -1,10 +1,7 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  connectTestAdmin,
-  uniqueTopicName,
-} from "@tests/harness/kafka-admin.js";
+import { connectTestAdmin } from "@tests/harness/kafka-admin.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
@@ -12,6 +9,7 @@ import {
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
 import { activeTransports } from "@tests/harness/transports.js";
+import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -26,7 +24,7 @@ describe("produce-kafka-message-handler", { tags: [Tag.KAFKA] }, () => {
 
   // single shared topic for all transports (cheaper than creating one per transport)
   let admin: KafkaJS.Admin;
-  const topic = uniqueTopicName("produce");
+  const topic = uniqueName("produce");
 
   beforeAll(async () => {
     admin = await connectTestAdmin();

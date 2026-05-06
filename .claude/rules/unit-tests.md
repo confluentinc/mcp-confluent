@@ -267,6 +267,14 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   `getMockedAdmin()`, `getMockedProducer()`, `getMockedConsumer()`,
   `getMockedSchemaRegistry()`.
 
+- When a test would otherwise extend `HandleCaseWithConn` with extra per-case fields (e.g.
+  `mockResponse`, `expectedEnvId`, body-of-the-mocked-GET), check the existing exports in
+  `tests/factories/runtime.ts` first — common shapes are already shared there. If the same
+  extension would appear (or already does) in another test file, hoist it next to the
+  existing exports rather than declaring a fresh per-file alias; future readers grepping
+  for the right type to import shouldn't be greeted by N differently-named copies of the
+  same shape.
+
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
   `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.
 

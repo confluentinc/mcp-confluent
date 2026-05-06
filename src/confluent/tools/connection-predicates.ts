@@ -199,6 +199,29 @@ export function hasCCloudCatalogSupport(
   return ENABLED;
 }
 
+/**
+ * Combine predicates with logical AND, short-circuiting on the first
+ * failure. Returns {@linkcode ENABLED} only when every predicate passes for
+ * the given connection; otherwise returns the first failing verdict so the
+ * specific reason propagates to {@linkcode connectionReasonsWhere} and
+ * downstream diagnostics.
+ *
+ * Use this — never raw `predA(conn) && predB(conn)`. JavaScript boolean
+ * composition silently drops the first operand because every
+ * `PredicateResult` is a truthy object.
+ */
+export function allOf(
+  ...predicates: ConnectionPredicate[]
+): ConnectionPredicate {
+  return (conn) => {
+    for (const predicate of predicates) {
+      const verdict = predicate(conn);
+      if (!verdict.enabled) return verdict;
+    }
+    return ENABLED;
+  };
+}
+
 export function connectionIdsWhere(
   connections: Readonly<Record<string, ConnectionConfig>>,
   predicate: ConnectionPredicate,

@@ -1,6 +1,7 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
+  allOf,
   connectionIdsWhere,
   hasDirectConfluentCloud,
   hasKafkaAuth,
@@ -142,7 +143,7 @@ export class CreateConnectorHandler extends ConnectToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(
       runtime.config.connections,
-      (conn) => hasDirectConfluentCloud(conn) && hasKafkaAuth(conn),
+      allOf(hasDirectConfluentCloud, hasKafkaAuth),
     );
   }
 }

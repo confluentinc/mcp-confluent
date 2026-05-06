@@ -4,6 +4,7 @@ import {
   ENABLED,
   type PredicateResult,
   ToolDisabledReason,
+  allOf,
   connectionIdsWhere,
   connectionReasonsWhere,
   hasCCloudCatalogSupport,
@@ -18,7 +19,7 @@ import {
   hasTableflow,
   hasTelemetry,
 } from "@src/confluent/tools/connection-predicates.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 function conn(
   fields: Omit<DirectConnectionConfig, "type">,
@@ -390,6 +391,42 @@ describe("connection-predicates.ts", () => {
           ["oauth", disabledFor(ToolDisabledReason.OAuthNoServiceBlocks)],
         ]),
       );
+    });
+  });
+
+  describe("allOf()", () => {
+    it("should return ENABLED when every predicate passes", () => {
+      const combined = allOf(hasKafka, hasKafkaAuth);
+      expect(combined(KAFKA_REST_WITH_AUTH_CONN)).toEqual(ENABLED);
+    });
+
+    it("should return the first failing verdict when an early predicate fails", () => {
+      // hasFlink fails on KAFKA_CONN before hasKafkaAuth gets a chance.
+      const combined = allOf(hasFlink, hasKafkaAuth);
+      expect(combined(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingFlinkBlock),
+      );
+    });
+
+    it("should return the failing verdict from a later predicate when earlier predicates pass", () => {
+      // hasKafka passes on KAFKA_CONN; hasKafkaAuth then fails because
+      // KAFKA_CONN has no auth.
+      const combined = allOf(hasKafka, hasKafkaAuth);
+      expect(combined(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaAuth),
+      );
+    });
+
+    it("should short-circuit and not evaluate predicates after the first failure", () => {
+      const laterPredicate = vi.fn(() => ENABLED);
+      const combined = allOf(hasFlink, laterPredicate);
+      combined(KAFKA_CONN);
+      expect(laterPredicate).not.toHaveBeenCalled();
+    });
+
+    it("should return ENABLED when called with zero predicates", () => {
+      const combined = allOf();
+      expect(combined(KAFKA_CONN)).toEqual(ENABLED);
     });
   });
 });

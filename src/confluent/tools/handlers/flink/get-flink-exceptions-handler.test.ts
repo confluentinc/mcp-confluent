@@ -5,22 +5,31 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, it } from "vitest";
+
+const STATEMENT_NAME = "my-statement";
 
 const EXPLICIT_IDS = {
   organizationId: "org-from-args",
   environmentId: "env-from-args",
 };
 
-const STATEMENT_NAME = "my-statement";
+type ExceptionsCase = HandleCaseWithConn & {
+  /** Body returned by the Flink REST GET. Omit for cases that throw before
+   *  reaching the client. */
+  flinkGetData?: unknown;
+};
 
 describe("get-flink-exceptions-handler.ts", () => {
   describe("GetFlinkExceptionsHandler", () => {
     const handler = new GetFlinkExceptionsHandler();
 
     describe("handle()", () => {
-      const cases: HandleCaseWithConn[] = [
+      const cases: ExceptionsCase[] = [
         {
           label: "throws ZodError when statementName is absent",
           args: {},
@@ -30,7 +39,7 @@ describe("get-flink-exceptions-handler.ts", () => {
         {
           label: "uses org/env IDs from config when args absent",
           args: { statementName: STATEMENT_NAME },
-          responseData: { data: [] },
+          flinkGetData: { data: [] },
           outcome: {
             resolves: `No exceptions found for statement '${STATEMENT_NAME}'.`,
           },
@@ -39,7 +48,7 @@ describe("get-flink-exceptions-handler.ts", () => {
           label:
             "uses explicit org/env args over config and returns exception list",
           args: { statementName: STATEMENT_NAME, ...EXPLICIT_IDS },
-          responseData: {
+          flinkGetData: {
             data: [{ message: "OOM error" }, { message: "Timeout" }],
           },
           outcome: {
@@ -53,11 +62,15 @@ describe("get-flink-exceptions-handler.ts", () => {
         async ({
           args,
           outcome,
-          responseData,
+          flinkGetData,
           connectionConfig = FLINK_CONN,
         }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          if (flinkGetData !== undefined) {
+            clientManager
+              .getConfluentCloudFlinkRestClient()
+              .GET.mockResolvedValue({ data: flinkGetData });
+          }
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -67,7 +80,7 @@ describe("get-flink-exceptions-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );

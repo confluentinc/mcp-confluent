@@ -1,4 +1,3 @@
-import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import {
   CREATE_UPDATE,
   DESTRUCTIVE,
@@ -13,10 +12,11 @@ import {
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
-  stubClientGetters,
+  getMockedClientManager,
   type HandleOutcome,
+  type MockedClientManager,
 } from "@tests/stubs/index.js";
-import { beforeAll, describe, expect, it, type Mocked } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
 
@@ -140,7 +140,7 @@ describe("tool-registry.ts", () => {
      * Builds a `ServerRuntime` with every service block populated, injecting
      * `clientManager` so callers can verify which client getters were invoked.
      */
-    function allServicesRuntime(clientManager: Mocked<DirectClientManager>) {
+    function allServicesRuntime(clientManager: MockedClientManager) {
       return runtimeWith(
         {
           kafka: {
@@ -181,110 +181,204 @@ describe("tool-registry.ts", () => {
     ) as Record<ToolName, string>;
 
     /**
-     * What each handler produces when called with no arguments against a
-     * fully-wired universal client. Use `{ resolves }` when the handler
-     * completes and `{ throws }` when it raises before returning.
-     * Use `"DISCOVER"` as a placeholder — the smoke test will run the handler
-     * and report the correct entry to paste in.
+     * Per-tool fixture: what each handler produces when called with no
+     * arguments, plus an optional `setup` that mocks the specific client
+     * method(s) the handler exercises. Tools that throw before reaching the
+     * client layer (ZodError, missing-ID errors) need no `setup`. Tools that
+     * resolve must `setup` whichever client they call so the bare `vi.fn()`
+     * mocks returned by {@linkcode getMockedClientManager} produce a usable
+     * response.
+     *
+     * Use `"DISCOVER"` as the outcome placeholder; the smoke test will run
+     * the handler and report the correct entry to paste in.
      */
-    const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, HandleOutcome>> = {
+    type SmokeFixture = {
+      outcome: HandleOutcome;
+      setup?: (cm: MockedClientManager) => Promise<void> | void;
+    };
+
+    /** Stubs the Flink REST client to return a completed empty SQL query result.
+     *  Shared by the catalog/database/table listing tools that all run a SQL
+     *  query and stringify the empty result set. */
+    function mockFlinkSqlEmpty(cm: MockedClientManager) {
+      const flinkRest = cm.getConfluentCloudFlinkRestClient();
+      const sqlResponse = {
+        data: { status: { phase: "COMPLETED" }, results: { data: [] } },
+      };
+      flinkRest.POST.mockResolvedValue(sqlResponse);
+      flinkRest.GET.mockResolvedValue(sqlResponse);
+    }
+
+    const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, SmokeFixture>> = {
       // Kafka
-      [ToolName.LIST_TOPICS]: { resolves: "Kafka topics:" },
-      [ToolName.CREATE_TOPICS]: { throws: "ZodError" },
-      [ToolName.DELETE_TOPICS]: { throws: "ZodError" },
-      [ToolName.PRODUCE_MESSAGE]: { throws: "ZodError" },
-      [ToolName.CONSUME_MESSAGES]: { throws: "ZodError" },
-      [ToolName.ALTER_TOPIC_CONFIG]: { throws: "ZodError" },
-      [ToolName.GET_TOPIC_CONFIG]: { throws: "ZodError" },
+      [ToolName.LIST_TOPICS]: {
+        outcome: { resolves: "Kafka topics:" },
+        setup: async (cm) => {
+          (await cm.getAdminClient()).listTopics.mockResolvedValue([]);
+        },
+      },
+      [ToolName.CREATE_TOPICS]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_TOPICS]: { outcome: { throws: "ZodError" } },
+      [ToolName.PRODUCE_MESSAGE]: { outcome: { throws: "ZodError" } },
+      [ToolName.CONSUME_MESSAGES]: { outcome: { throws: "ZodError" } },
+      [ToolName.ALTER_TOPIC_CONFIG]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_TOPIC_CONFIG]: { outcome: { throws: "ZodError" } },
       // Schema Registry
-      [ToolName.LIST_SCHEMAS]: { resolves: "{}" },
-      [ToolName.DELETE_SCHEMA]: { throws: "ZodError" },
+      [ToolName.LIST_SCHEMAS]: {
+        outcome: { resolves: "{}" },
+        setup: (cm) => {
+          cm.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
+        },
+      },
+      [ToolName.DELETE_SCHEMA]: { outcome: { throws: "ZodError" } },
       // Flink
-      [ToolName.LIST_FLINK_STATEMENTS]: { resolves: "{}" },
-      [ToolName.CREATE_FLINK_STATEMENT]: { throws: "ZodError" },
-      [ToolName.READ_FLINK_STATEMENT]: { throws: "ZodError" },
-      [ToolName.DELETE_FLINK_STATEMENTS]: { throws: "ZodError" },
-      [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: { throws: "ZodError" },
-      [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: { throws: "ZodError" },
-      [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: { throws: "ZodError" },
-      [ToolName.GET_FLINK_STATEMENT_PROFILE]: { throws: "ZodError" },
+      [ToolName.LIST_FLINK_STATEMENTS]: {
+        outcome: { resolves: "{}" },
+        setup: (cm) => {
+          cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+            data: {},
+          });
+        },
+      },
+      [ToolName.CREATE_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
+      [ToolName.READ_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_FLINK_STATEMENTS]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.GET_FLINK_STATEMENT_PROFILE]: {
+        outcome: { throws: "ZodError" },
+      },
       [ToolName.LIST_FLINK_CATALOGS]: {
-        responseData: { status: { phase: "COMPLETED" }, results: { data: [] } },
-        resolves: "No catalogs found.",
+        outcome: { resolves: "No catalogs found." },
+        setup: mockFlinkSqlEmpty,
       },
       [ToolName.LIST_FLINK_DATABASES]: {
-        responseData: { status: { phase: "COMPLETED" }, results: { data: [] } },
-        resolves: "No databases found.",
+        outcome: { resolves: "No databases found." },
+        setup: mockFlinkSqlEmpty,
       },
       [ToolName.LIST_FLINK_TABLES]: {
-        responseData: { status: { phase: "COMPLETED" }, results: { data: [] } },
-        resolves: "No tables found in catalog",
+        outcome: { resolves: "No tables found in catalog" },
+        setup: mockFlinkSqlEmpty,
       },
-      [ToolName.DESCRIBE_FLINK_TABLE]: { throws: "ZodError" },
-      [ToolName.GET_FLINK_TABLE_INFO]: { throws: "ZodError" },
+      [ToolName.DESCRIBE_FLINK_TABLE]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_FLINK_TABLE_INFO]: { outcome: { throws: "ZodError" } },
       // Connect
-      [ToolName.LIST_CONNECTORS]: { throws: "Environment ID is required" },
-      [ToolName.READ_CONNECTOR]: { throws: "ZodError" },
-      [ToolName.CREATE_CONNECTOR]: { throws: "ZodError" },
-      [ToolName.DELETE_CONNECTOR]: { throws: "ZodError" },
+      [ToolName.LIST_CONNECTORS]: {
+        outcome: { throws: "Environment ID is required" },
+      },
+      [ToolName.READ_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.CREATE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_CONNECTOR]: { outcome: { throws: "ZodError" } },
       // Catalog
-      [ToolName.CREATE_TOPIC_TAGS]: { throws: "ZodError" },
-      [ToolName.DELETE_TAG]: { throws: "ZodError" },
-      [ToolName.REMOVE_TAG_FROM_ENTITY]: { throws: "ZodError" },
-      [ToolName.ADD_TAGS_TO_TOPIC]: { throws: "ZodError" },
-      [ToolName.LIST_TAGS]: { resolves: "Successfully retrieved tags" },
+      [ToolName.CREATE_TOPIC_TAGS]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_TAG]: { outcome: { throws: "ZodError" } },
+      [ToolName.REMOVE_TAG_FROM_ENTITY]: { outcome: { throws: "ZodError" } },
+      [ToolName.ADD_TAGS_TO_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.LIST_TAGS]: {
+        outcome: { resolves: "Successfully retrieved tags" },
+        setup: (cm) => {
+          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
+            data: [],
+          });
+        },
+      },
       // Search
-      [ToolName.SEARCH_TOPICS_BY_TAG]: { resolves: "{}" },
-      [ToolName.SEARCH_TOPICS_BY_NAME]: { throws: "ZodError" },
+      [ToolName.SEARCH_TOPICS_BY_TAG]: {
+        outcome: { resolves: "{}" },
+        setup: (cm) => {
+          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
+            data: {},
+          });
+        },
+      },
+      [ToolName.SEARCH_TOPICS_BY_NAME]: { outcome: { throws: "ZodError" } },
       // Environments
       [ToolName.LIST_ENVIRONMENTS]: {
-        responseData: {
-          api_version: "org/v2",
-          kind: "EnvironmentList",
-          data: [],
+        outcome: { resolves: "Successfully retrieved 0 environments" },
+        setup: (cm) => {
+          cm.getConfluentCloudRestClient().GET.mockResolvedValue({
+            data: {
+              api_version: "org/v2",
+              kind: "EnvironmentList",
+              data: [],
+            },
+          });
         },
-        resolves: "Successfully retrieved 0 environments",
       },
-      [ToolName.READ_ENVIRONMENT]: { throws: "ZodError" },
+      [ToolName.READ_ENVIRONMENT]: { outcome: { throws: "ZodError" } },
       // Clusters
       [ToolName.LIST_CLUSTERS]: {
-        responseData: { data: [] },
-        resolves: "Successfully retrieved 0 clusters",
+        outcome: { resolves: "Successfully retrieved 0 clusters" },
+        setup: (cm) => {
+          cm.getConfluentCloudRestClient().GET.mockResolvedValue({
+            data: { data: [] },
+          });
+        },
       },
       // Tableflow
-      [ToolName.CREATE_TABLEFLOW_TOPIC]: { throws: "ZodError" },
-      [ToolName.LIST_TABLEFLOW_REGIONS]: { resolves: "Tableflow Regions" },
+      [ToolName.CREATE_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.LIST_TABLEFLOW_REGIONS]: {
+        outcome: { resolves: "Tableflow Regions" },
+        setup: (cm) => {
+          cm.getConfluentCloudTableflowRestClient().GET.mockResolvedValue({
+            data: { data: [] },
+          });
+        },
+      },
       [ToolName.LIST_TABLEFLOW_TOPICS]: {
-        throws: "Environment ID is required",
+        outcome: { throws: "Environment ID is required" },
       },
-      [ToolName.READ_TABLEFLOW_TOPIC]: { throws: "ZodError" },
-      [ToolName.UPDATE_TABLEFLOW_TOPIC]: { throws: "ZodError" },
-      [ToolName.DELETE_TABLEFLOW_TOPIC]: { throws: "ZodError" },
-      [ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION]: { throws: "ZodError" },
+      [ToolName.READ_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.UPDATE_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION]: {
+        outcome: { throws: "ZodError" },
+      },
       [ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS]: {
-        throws: "Environment ID is required",
+        outcome: { throws: "Environment ID is required" },
       },
-      [ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION]: { throws: "ZodError" },
-      [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION]: { throws: "ZodError" },
-      [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION]: { throws: "ZodError" },
+      [ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION]: {
+        outcome: { throws: "ZodError" },
+      },
       // Billing
-      [ToolName.LIST_BILLING_COSTS]: { throws: "ZodError" },
+      [ToolName.LIST_BILLING_COSTS]: { outcome: { throws: "ZodError" } },
       // Metrics
-      [ToolName.QUERY_METRICS]: { throws: "ZodError" },
+      [ToolName.QUERY_METRICS]: { outcome: { throws: "ZodError" } },
       [ToolName.LIST_METRICS]: {
-        responseData: { data: [] },
-        resolves: "No metrics descriptors available",
+        outcome: { resolves: "No metrics descriptors available" },
+        setup: (cm) => {
+          cm.getConfluentCloudTelemetryRestClient().GET.mockResolvedValue({
+            data: { data: [] },
+          });
+        },
       },
       // Documentation
-      [ToolName.SEARCH_PRODUCT_DOCS]: { throws: "ZodError" },
+      [ToolName.SEARCH_PRODUCT_DOCS]: { outcome: { throws: "ZodError" } },
       // Organizations
       [ToolName.LIST_ORGANIZATIONS]: {
-        responseData: {
-          api_version: "org/v2",
-          kind: "OrganizationList",
-          data: [],
+        outcome: { resolves: "Retrieved 0 organizations" },
+        setup: (cm) => {
+          cm.getConfluentCloudRestClient().GET.mockResolvedValue({
+            data: {
+              api_version: "org/v2",
+              kind: "OrganizationList",
+              data: [],
+            },
+          });
         },
-        resolves: "Retrieved 0 organizations",
       },
     };
 
@@ -304,21 +398,17 @@ describe("tool-registry.ts", () => {
       },
     );
 
-    it.each(Object.entries(ZERO_ARG_OUTCOMES) as [ToolName, HandleOutcome][])(
+    it.each(Object.entries(ZERO_ARG_OUTCOMES) as [ToolName, SmokeFixture][])(
       "%s: handle() should not crash before reaching the ClientManager",
-      async (name, outcome) => {
-        const responseData =
-          typeof outcome === "object" && "responseData" in outcome
-            ? outcome.responseData
-            : undefined;
-        const { clientManager, clientGetters } =
-          stubClientGetters(responseData);
+      async (name, fixture) => {
+        const clientManager = getMockedClientManager();
+        await fixture.setup?.(clientManager);
         await assertHandleCase({
           handler: ToolHandlerRegistry.getToolHandler(name),
           runtime: allServicesRuntime(clientManager),
           args: {},
-          outcome,
-          clientGetters,
+          outcome: fixture.outcome,
+          clientManager,
           name,
         });
       },

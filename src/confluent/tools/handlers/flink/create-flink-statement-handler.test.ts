@@ -5,7 +5,10 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 const FLINK_CONN = {
@@ -97,14 +100,11 @@ describe("create-flink-statement-handler.ts", () => {
 
       it.each(cases)(
         "should $label",
-        async ({
-          args,
-          outcome,
-          responseData,
-          connectionConfig = FLINK_CONN,
-        }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+        async ({ args, outcome, connectionConfig = FLINK_CONN }) => {
+          const clientManager = getMockedClientManager();
+          clientManager
+            .getConfluentCloudFlinkRestClient()
+            .POST.mockResolvedValue({ data: {} });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -114,14 +114,16 @@ describe("create-flink-statement-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );
 
       it("should include catalog/database names from config in POST spec.properties when absent from args", async () => {
-        const { clientManager, clientGetters, capturedCalls } =
-          stubClientGetters({});
+        const clientManager = getMockedClientManager();
+        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.POST.mockResolvedValue({ data: {} });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -131,24 +133,30 @@ describe("create-flink-statement-handler.ts", () => {
           ),
           args: REQUIRED_ARGS,
           outcome: { resolves: "{}" },
-          clientGetters,
+          clientManager,
         });
-        expect(capturedCalls).toHaveLength(1);
-        expect(capturedCalls[0]!.args).toMatchObject({
-          body: expect.objectContaining({
-            spec: expect.objectContaining({
-              properties: {
-                "sql.current-catalog": FLINK_CONN.flink.environment_name,
-                "sql.current-database": FLINK_CONN.flink.database_name,
-              },
+
+        expect(flinkRest.POST).toHaveBeenCalledOnce();
+        expect(flinkRest.POST).toHaveBeenCalledWith(
+          expect.stringContaining("/statements"),
+          expect.objectContaining({
+            body: expect.objectContaining({
+              spec: expect.objectContaining({
+                properties: {
+                  "sql.current-catalog": FLINK_CONN.flink.environment_name,
+                  "sql.current-database": FLINK_CONN.flink.database_name,
+                },
+              }),
             }),
           }),
-        });
+        );
       });
 
       it("should omit catalog/database keys from POST spec.properties when absent from both args and config", async () => {
-        const { clientManager, clientGetters, capturedCalls } =
-          stubClientGetters({});
+        const clientManager = getMockedClientManager();
+        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.POST.mockResolvedValue({ data: {} });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -158,21 +166,27 @@ describe("create-flink-statement-handler.ts", () => {
           ),
           args: { ...REQUIRED_ARGS, ...EXPLICIT_IDS },
           outcome: { resolves: "{}" },
-          clientGetters,
+          clientManager,
         });
-        expect(capturedCalls).toHaveLength(1);
-        expect(capturedCalls[0]!.args).toMatchObject({
-          body: expect.objectContaining({
-            spec: expect.objectContaining({
-              properties: {},
+
+        expect(flinkRest.POST).toHaveBeenCalledOnce();
+        expect(flinkRest.POST).toHaveBeenCalledWith(
+          expect.stringContaining("/statements"),
+          expect.objectContaining({
+            body: expect.objectContaining({
+              spec: expect.objectContaining({
+                properties: {},
+              }),
             }),
           }),
-        });
+        );
       });
 
       it("should use explicit catalogName/databaseName args over config values in POST spec.properties", async () => {
-        const { clientManager, clientGetters, capturedCalls } =
-          stubClientGetters({});
+        const clientManager = getMockedClientManager();
+        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.POST.mockResolvedValue({ data: {} });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -187,24 +201,30 @@ describe("create-flink-statement-handler.ts", () => {
             databaseName: "db-from-args",
           },
           outcome: { resolves: "{}" },
-          clientGetters,
+          clientManager,
         });
-        expect(capturedCalls).toHaveLength(1);
-        expect(capturedCalls[0]!.args).toMatchObject({
-          body: expect.objectContaining({
-            spec: expect.objectContaining({
-              properties: {
-                "sql.current-catalog": "catalog-from-args",
-                "sql.current-database": "db-from-args",
-              },
+
+        expect(flinkRest.POST).toHaveBeenCalledOnce();
+        expect(flinkRest.POST).toHaveBeenCalledWith(
+          expect.stringContaining("/statements"),
+          expect.objectContaining({
+            body: expect.objectContaining({
+              spec: expect.objectContaining({
+                properties: {
+                  "sql.current-catalog": "catalog-from-args",
+                  "sql.current-database": "db-from-args",
+                },
+              }),
             }),
           }),
-        });
+        );
       });
 
       it("should fall back to config catalog/database in POST spec.properties when args are blank", async () => {
-        const { clientManager, clientGetters, capturedCalls } =
-          stubClientGetters({});
+        const clientManager = getMockedClientManager();
+        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.POST.mockResolvedValue({ data: {} });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -219,19 +239,23 @@ describe("create-flink-statement-handler.ts", () => {
             databaseName: "   ",
           },
           outcome: { resolves: "{}" },
-          clientGetters,
+          clientManager,
         });
-        expect(capturedCalls).toHaveLength(1);
-        expect(capturedCalls[0]!.args).toMatchObject({
-          body: expect.objectContaining({
-            spec: expect.objectContaining({
-              properties: {
-                "sql.current-catalog": FLINK_CONN.flink.environment_name,
-                "sql.current-database": FLINK_CONN.flink.database_name,
-              },
+
+        expect(flinkRest.POST).toHaveBeenCalledOnce();
+        expect(flinkRest.POST).toHaveBeenCalledWith(
+          expect.stringContaining("/statements"),
+          expect.objectContaining({
+            body: expect.objectContaining({
+              spec: expect.objectContaining({
+                properties: {
+                  "sql.current-catalog": FLINK_CONN.flink.environment_name,
+                  "sql.current-database": FLINK_CONN.flink.database_name,
+                },
+              }),
             }),
           }),
-        });
+        );
       });
     });
   });

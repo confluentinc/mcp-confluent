@@ -48,18 +48,6 @@ type ValueOptions = z.infer<typeof valueOptions>;
 type KeyOptions = z.infer<typeof keyOptions>;
 
 export const consumeKafkaMessagesArgs = z.object({
-  cluster_id: z
-    .string()
-    .optional()
-    .describe(
-      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
-    ),
-  environment_id: z
-    .string()
-    .optional()
-    .describe(
-      "Confluent Cloud environment ID (env-...) that owns the cluster.",
-    ),
   topicNames: z
     .array(z.string())
     .nonempty()
@@ -82,6 +70,16 @@ export const consumeKafkaMessagesArgs = z.object({
     ),
   value: valueOptions,
   key: keyOptions.optional(),
+  cluster_id: z
+    .string()
+    .optional()
+    .describe("Confluent Cloud logical Kafka cluster ID (lkc-...)."),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+    ),
 });
 
 interface ProcessedMessage {
@@ -102,6 +100,13 @@ interface ProcessedMessage {
 export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
   /**
    * Processes a single Kafka message, handling deserialization of both key and value.
+   * @param topic - The topic the message was consumed from
+   * @param partition - The partition the message was consumed from
+   * @param message - The raw Kafka message
+   * @param registry - Optional Schema Registry client for deserialization
+   * @param valueOptions - Options for value deserialization
+   * @param keyOptions - Optional options for key deserialization
+   * @returns A processed message with deserialized key and value
    */
   async processMessage(
     topic: string,
@@ -179,6 +184,10 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
 
   /**
    * Main handler for consuming messages from Kafka topics.
+   * @param clientManager - The client manager for Kafka and registry clients
+   * @param toolArguments - The arguments for the tool, including topics, message limits, and deserialization options
+   * @param sessionId - Optional session ID for Kafka consumer
+   * @returns A CallToolResult containing the consumed messages or error information
    */
   async handle(
     runtime: ServerRuntime,
@@ -193,16 +202,14 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     const clientManager = runtime.clientManagers[connId]!;
     const conn = runtime.config.connections[connId]!;
 
-    // Schema Registry deserialization is not yet exposed under --oauth: there
-    // is no MCP tool to discover the SR cluster ID (lsrc-...). Block the path
-    // here with a clear capability boundary rather than throw a discovery hint
-    // that points at a tool the agent can't call. SR-under-OAuth lands in the
-    // follow-up that adds list-schema-registry-clusters.
+    // Schema Registry deserialization is not yet exposed under OAuth connection type
+    // Block the path here with a clear capability boundary rather than throw a discovery hint
+    // that points at a tool the agent can't call.
     const needsRegistry =
       value.useSchemaRegistry || (key && key.useSchemaRegistry);
     if (needsRegistry && conn.type === "oauth") {
       return this.createResponse(
-        "Schema Registry deserialization is not yet supported under --oauth. " +
+        "Schema Registry deserialization is not yet supported under OAuth connection type. " +
           "Set useSchemaRegistry: false (or omit it) to receive raw bytes, or " +
           "use a direct connection with schema_registry configured for " +
           "schema-aware deserialization.",
@@ -287,12 +294,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     return {
       name: ToolName.CONSUME_MESSAGES,
       description:
-        "Consumes messages from one or more Kafka topics. Supports automatic " +
-        "deserialization of Schema Registry encoded messages (AVRO, JSON, " +
-        "PROTOBUF) on direct connections. Under --oauth, schema deserialization " +
-        "is not yet supported — set useSchemaRegistry: false (or omit it) to " +
-        "receive raw bytes. Under --oauth, requires cluster_id and " +
-        "environment_id (call list-clusters first to discover them).",
+        "Consumes messages from one or more Kafka topics. Supports automatic deserialization of Schema Registry encoded messages (AVRO, JSON, PROTOBUF).",
       inputSchema: consumeKafkaMessagesArgs.shape,
       annotations: READ_ONLY,
     };

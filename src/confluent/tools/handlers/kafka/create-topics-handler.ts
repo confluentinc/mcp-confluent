@@ -19,18 +19,6 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const createTopicArgs = z.object({
-  cluster_id: z
-    .string()
-    .optional()
-    .describe(
-      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
-    ),
-  environment_id: z
-    .string()
-    .optional()
-    .describe(
-      "Confluent Cloud environment ID (env-...) that owns the cluster.",
-    ),
   topics: z
     .array(
       z.object({
@@ -46,6 +34,18 @@ const createTopicArgs = z.object({
       }),
     )
     .nonempty(),
+  cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+    ),
 });
 
 export class CreateTopicsHandler extends BaseToolHandler {

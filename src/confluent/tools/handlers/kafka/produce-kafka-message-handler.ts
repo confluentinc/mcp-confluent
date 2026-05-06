@@ -62,6 +62,12 @@ const valueOptions = z.object({}).extend(messageOptions.shape);
 const keyOptions = z.object({}).extend(messageOptions.shape);
 
 const produceKafkaMessageArguments = z.object({
+  topicName: z
+    .string()
+    .nonempty()
+    .describe("Name of the kafka topic to produce the message to"),
+  value: valueOptions,
+  key: keyOptions.optional(),
   cluster_id: z
     .string()
     .optional()
@@ -74,12 +80,6 @@ const produceKafkaMessageArguments = z.object({
     .describe(
       "Confluent Cloud environment ID (env-...) that owns the cluster.",
     ),
-  topicName: z
-    .string()
-    .nonempty()
-    .describe("Name of the kafka topic to produce the message to"),
-  value: valueOptions,
-  key: keyOptions.optional(),
 });
 type ProduceKafkaMessageArguments = z.infer<
   typeof produceKafkaMessageArguments
@@ -98,6 +98,8 @@ type ProduceKafkaMessageArguments = z.infer<
 export class ProduceKafkaMessageHandler extends BaseToolHandler {
   /**
    * Handles the result of a schema check, returning a CallToolResult if a schema issue is found, or null otherwise.
+   * @param result - The schema check result to handle
+   * @returns A CallToolResult if a schema issue is found, or null otherwise
    */
   handleSchemaCheckResult(result: SchemaCheckResult): CallToolResult | null {
     if (!result) return null;
@@ -120,6 +122,13 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     }
   }
 
+  /**
+   * Main handler for producing a message to a Kafka topic, including schema registry logic and serialization.
+   * Handles both value and key, and returns a CallToolResult with the outcome.
+   * @param clientManager - The client manager for Kafka and registry clients
+   * @param toolArguments - The arguments for the tool, including topic, value, and key
+   * @returns A CallToolResult describing the outcome of the produce operation
+   */
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
@@ -133,18 +142,17 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     const clientManager = runtime.clientManagers[connId]!;
     const conn = runtime.config.connections[connId]!;
 
-    // Schema Registry serialization is not yet exposed under --oauth: there is
-    // no MCP tool to discover the SR cluster ID (lsrc-...). Block the path here
-    // with a clear capability boundary; SR-under-OAuth lands in the follow-up
-    // that adds list-schema-registry-clusters.
+    // Schema Registry deserialization is not yet exposed under OAuth connection type
+    // Block the path here with a clear capability boundary rather than throw a discovery hint
+    // that points at a tool the agent can't call.
     const needsRegistry =
       value.useSchemaRegistry || (key && key.useSchemaRegistry);
     if (needsRegistry && conn.type === "oauth") {
       return this.createResponse(
-        "Schema Registry serialization is not yet supported under --oauth. " +
-          "Set useSchemaRegistry: false (or omit it) to produce raw bytes, or " +
+        "Schema Registry deserialization is not yet supported under OAuth connection type. " +
+          "Set useSchemaRegistry: false (or omit it) to receive raw bytes, or " +
           "use a direct connection with schema_registry configured for " +
-          "schema-aware serialization.",
+          "schema-aware deserialization.",
         true,
       );
     }
@@ -154,6 +162,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       registry = await clientManager.getSchemaRegistrySdkClient();
     }
 
+    // Check for latest schema if needed (value)
     const valueSchemaCheck = await checkSchemaNeeded(
       topicName,
       value as MessageOptions,
@@ -163,6 +172,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     const valueSchemaResult = this.handleSchemaCheckResult(valueSchemaCheck);
     if (valueSchemaResult) return valueSchemaResult;
 
+    // Check for latest schema if needed (key)
     if (key) {
       const keySchemaCheck = await checkSchemaNeeded(
         topicName,
@@ -205,6 +215,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       resolved.envId,
     );
     try {
+      // Send the message
       let deliveryReport: RecordMetadata[];
       try {
         deliveryReport = await producer.send({
@@ -238,6 +249,10 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     }
   }
 
+  /**
+   * Returns the tool configuration including name, description, and input schema.
+   * @returns The tool configuration
+   */
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.PRODUCE_MESSAGE,

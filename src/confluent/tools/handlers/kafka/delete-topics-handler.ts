@@ -18,6 +18,9 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const deleteKafkaTopicsArguments = z.object({
+  topicNames: z
+    .array(z.string().describe("Names of kafka topics to delete"))
+    .nonempty(),
   cluster_id: z
     .string()
     .optional()
@@ -30,9 +33,6 @@ const deleteKafkaTopicsArguments = z.object({
     .describe(
       "Confluent Cloud environment ID (env-...) that owns the cluster.",
     ),
-  topicNames: z
-    .array(z.string().describe("Names of kafka topics to delete"))
-    .nonempty(),
 });
 
 export class DeleteTopicsHandler extends BaseToolHandler {

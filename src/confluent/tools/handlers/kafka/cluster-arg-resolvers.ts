@@ -1,13 +1,11 @@
 /**
- * Cluster-arg resolver for #313 native Kafka handlers. Asymmetric by connection
+ * Cluster-arg resolver for native Kafka handlers. Asymmetric by connection
  * type:
  *
  * - Direct: returns `{ clusterId: undefined, envId: undefined }`. The
  *   `DirectClientManager` ignores cluster args and uses its eagerly-built
  *   single-instance client(s); the handler passes the undefineds through.
  * - OAuth: requires the args; throws with a discovery hint if missing.
- *
- * Spec: docs/superpowers/specs/2026-05-05-oauth-client-lifecycle-design.md
  *
  * The Schema Registry counterpart was removed when SR-under-OAuth was scoped
  * out of the initial #313/#312 ship. It will return alongside the
@@ -31,7 +29,7 @@ export function resolveKafkaClusterArgs(
 
   if (args.cluster_id === undefined || args.environment_id === undefined) {
     throw new Error(
-      "cluster_id and environment_id are required under --oauth. Call list-clusters " +
+      "cluster_id and environment_id are required under OAuth connection type. Call list-clusters " +
         "with environment_id and pass the cluster's `id` and `spec.environment.id`.",
     );
   }
@@ -61,8 +59,7 @@ export async function disposeIfOAuth(
 /**
  * Renders any error thrown from a Kafka admin/producer/consumer call into a
  * single agent-readable string. Preserves per-topic-cause unwrapping for
- * `KafkaJSAggregateError` (the whole reason `create-topics` previously
- * hand-rolled this logic), surfaces `KafkaJSError.code` when present, and
+ * `KafkaJSAggregateError`, surfaces `KafkaJSError.code` when present, and
  * falls back gracefully for unknown shapes.
  */
 export function formatKafkaError(err: unknown): string {

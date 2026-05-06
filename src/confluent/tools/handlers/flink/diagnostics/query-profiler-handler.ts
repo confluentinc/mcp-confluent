@@ -1,6 +1,7 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
+  allOf,
   connectionIdsWhere,
   hasFlink,
   hasTelemetry,
@@ -537,7 +538,7 @@ export class QueryProfilerHandler extends FlinkToolHandler {
   override enabledConnectionIds(runtime: ServerRuntime): string[] {
     return connectionIdsWhere(
       runtime.config.connections,
-      (conn) => hasFlink(conn) && hasTelemetry(conn),
+      allOf(hasFlink, hasTelemetry),
     );
   }
 }

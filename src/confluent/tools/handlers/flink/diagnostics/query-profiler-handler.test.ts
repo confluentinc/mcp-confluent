@@ -43,6 +43,20 @@ describe("query-profiler-handler.ts", () => {
         expect(handler.enabledConnectionIds(flinkRuntime())).toEqual([]);
       });
 
+      it("should return an empty array for a connection with telemetry but no flink block", () => {
+        // Pins that hasFlink and hasTelemetry are AND'd, not just OR'd or
+        // collapsed to the second predicate. A naive `&&` of two
+        // `PredicateResult` objects (both truthy) silently drops the first
+        // predicate; this case keeps that regression honest.
+        const runtime = runtimeWith({
+          telemetry: {
+            endpoint: "https://api.telemetry.confluent.cloud",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
+        });
+        expect(handler.enabledConnectionIds(runtime)).toEqual([]);
+      });
+
       it("should return an empty array for a connection without a flink block", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });

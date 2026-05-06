@@ -86,6 +86,18 @@ export async function assertHandleCase(options: {
     ).not.toBe("");
   }
 
+  // Snapshot getter call counts before the handler runs so the dynamic walk
+  // below only counts deltas from the handler itself, not from test setup
+  // calls like `const flinkRest = cm.getConfluentCloudFlinkRestClient()`.
+  const callCountsBefore = new Map<string, number>();
+  if (clientManager) {
+    for (const [key, value] of Object.entries(clientManager)) {
+      if (typeof value === "function" && "mock" in value) {
+        callCountsBefore.set(key, (value as Mock).mock.calls.length);
+      }
+    }
+  }
+
   let result: CallToolResult | undefined;
   let thrown: unknown;
   try {
@@ -130,14 +142,15 @@ export async function assertHandleCase(options: {
     ).toContain(resolves);
 
     if (clientManager) {
-      // dynamic walk: every method on a `Mocked<DirectClientManager>` is a `vi.fn()` assigned as an
-      // enumerable property by `createMockInstance`, so any of them having `mock.calls.length > 0`
-      // proves the handler touched the client layer
-      const anyMockCalled = Object.values(clientManager).some(
-        (v) =>
-          typeof v === "function" &&
-          "mock" in v &&
-          (v as Mock).mock.calls.length > 0,
+      // every getter on a `Mocked<DirectClientManager>` is a `vi.fn()` assigned
+      // as an enumerable property by `createMockInstance`; comparing
+      // post-handler counts against the pre-handler snapshot proves the
+      // handler (not test setup) touched the client layer
+      const anyMockCalled = Object.entries(clientManager).some(
+        ([key, value]) =>
+          typeof value === "function" &&
+          "mock" in value &&
+          (value as Mock).mock.calls.length > (callCountsBefore.get(key) ?? 0),
       );
       expect(
         anyMockCalled,

@@ -32,20 +32,25 @@ export function groupDisabledToolsByReason(
   const groups = new Map<string, DisabledToolGroup>();
   for (const [toolName, handler] of handlers) {
     const verdicts = handler.connectionVerdicts(runtime);
-    const fullyDisabled = Array.from(verdicts.values()).every(
-      (v) => !v.enabled,
-    );
-    if (!fullyDisabled) continue;
+    // Single pass over the verdicts: collect disabled entries, abort on
+    // the first enabled one (the tool is partially-enabled and doesn't
+    // belong in a disabled-tool group).
+    const disabledEntries: Array<readonly [string, ToolDisabledReason]> = [];
+    let partiallyEnabled = false;
     for (const [connectionId, verdict] of verdicts) {
-      if (verdict.enabled) continue;
-      const key = `${connectionId}::${verdict.reason}`;
+      if (verdict.enabled) {
+        partiallyEnabled = true;
+        break;
+      }
+      disabledEntries.push([connectionId, verdict.reason]);
+    }
+    if (partiallyEnabled) continue;
+
+    for (const [connectionId, reason] of disabledEntries) {
+      const key = `${connectionId}::${reason}`;
       let group = groups.get(key);
       if (!group) {
-        group = {
-          connectionId,
-          reason: verdict.reason,
-          toolNames: [],
-        };
+        group = { connectionId, reason, toolNames: [] };
         groups.set(key, group);
       }
       group.toolNames.push(toolName);

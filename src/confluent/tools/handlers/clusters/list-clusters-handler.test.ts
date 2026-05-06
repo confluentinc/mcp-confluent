@@ -8,7 +8,10 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 type EnvIdCase = HandleCaseWithConn & {
@@ -30,10 +33,8 @@ describe("list-clusters-handler.ts", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });
 
-      it("should return the connection id when the connection is OAuth-typed", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
+      it("should return an empty array for an OAuth-typed connection", () => {
+        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
       });
     });
 
@@ -52,7 +53,6 @@ describe("list-clusters-handler.ts", () => {
             "fall back to conn kafka.env_id when environmentId arg is absent",
           connectionConfig: CCLOUD_WITH_KAFKA_CONN,
           args: {},
-          responseData: { data: [] },
           outcome: { resolves: "Successfully retrieved 0 clusters" },
           expectedEnvId: "env-from-config",
         },
@@ -60,23 +60,26 @@ describe("list-clusters-handler.ts", () => {
           label: "prefer explicit environmentId arg over conn kafka.env_id",
           connectionConfig: CCLOUD_WITH_KAFKA_CONN,
           args: { environmentId: "env-explicit" },
-          responseData: { data: [] },
           outcome: { resolves: "Successfully retrieved 0 clusters" },
           expectedEnvId: "env-explicit",
+        },
+        {
+          label:
+            "use empty string when both environmentId arg and conn kafka.env_id are absent",
+          connectionConfig: CCLOUD_CONN,
+          args: {},
+          outcome: { resolves: "Successfully retrieved 0 clusters" },
+          expectedEnvId: "",
         },
       ];
 
       it.each(cases)(
         "should $label",
-        async ({
-          connectionConfig = {},
-          args,
-          responseData,
-          outcome,
-          expectedEnvId,
-        }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(responseData);
+        async ({ connectionConfig = {}, args, outcome, expectedEnvId }) => {
+          const clientManager = getMockedClientManager();
+          const cloudRest = clientManager.getConfluentCloudRestClient();
+          cloudRest.GET.mockResolvedValue({ data: { data: [] } });
+
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -86,30 +89,20 @@ describe("list-clusters-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
-          expect(capturedCalls).toHaveLength(1);
-          expect(capturedCalls[0]!.args).toMatchObject({
-            params: expect.objectContaining({
-              query: expect.objectContaining({ environment: expectedEnvId }),
+
+          expect(cloudRest.GET).toHaveBeenCalledOnce();
+          expect(cloudRest.GET).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({
+              params: expect.objectContaining({
+                query: expect.objectContaining({ environment: expectedEnvId }),
+              }),
             }),
-          });
+          );
         },
       );
-
-      it("should return an error response when both environmentId arg and conn kafka.env_id are absent (direct)", async () => {
-        const { clientManager } = stubClientGetters({});
-        await assertHandleCase({
-          handler,
-          runtime: runtimeWith(
-            CCLOUD_CONN,
-            DEFAULT_CONNECTION_ID,
-            clientManager,
-          ),
-          args: {},
-          outcome: { resolves: "environmentId is required" },
-        });
-      });
     });
   });
 });

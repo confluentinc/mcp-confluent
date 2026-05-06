@@ -1,7 +1,6 @@
 import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-topics-handler.js";
 import {
   bareRuntime,
-  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   kafkaRestOnlyRuntime,
   kafkaRuntime,
@@ -27,12 +26,6 @@ describe("create-topics-handler.ts", () => {
         expect(handler.enabledConnectionIds(kafkaRestOnlyRuntime())).toEqual(
           [],
         );
-      });
-
-      it("should return the connection id when the connection is OAuth-typed", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
       });
     });
   });

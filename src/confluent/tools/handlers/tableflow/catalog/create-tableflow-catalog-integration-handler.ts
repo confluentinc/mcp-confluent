@@ -1,4 +1,3 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
@@ -8,6 +7,18 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const createTableflowCatalogIntegrationArguments = z.object({
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "The unique identifier for the environment this resource belongs to.",
+    ),
+  clusterId: z
+    .string()
+    .trim()
+    .optional()
+    .describe("The unique identifier for the Kafka Cluster."),
   tableflowCatalogIntegrationConfig: z.object({
     // Required fields
     display_name: z
@@ -39,18 +50,12 @@ export class CreateTableFlowCatalogIntegrationHandler extends TableflowToolHandl
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
-    const { tableflowCatalogIntegrationConfig } =
+    const { environmentId, clusterId, tableflowCatalogIntegrationConfig } =
       createTableflowCatalogIntegrationArguments.parse(toolArguments);
 
-    const environment_id = getEnsuredParam(
-      "KAFKA_ENV_ID",
-      "Environment ID is required",
-    );
-
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-    );
+    const conn = runtime.config.getSoleDirectConnection();
+    const { environment_id, kafka_cluster_id } =
+      this.resolveTableflowEnvAndClusterId(conn, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

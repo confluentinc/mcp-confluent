@@ -1,4 +1,3 @@
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { DESTRUCTIVE, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
@@ -32,17 +31,9 @@ export class DeleteTableFlowTopicHandler extends TableflowToolHandler {
     const { display_name, environmentId, clusterId } =
       deleteTableflowTopicArguments.parse(toolArguments);
 
-    const environment_id = getEnsuredParam(
-      "KAFKA_ENV_ID",
-      "Environment ID is required",
-      environmentId,
-    );
-
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-      clusterId,
-    );
+    const conn = runtime.config.getSoleDirectConnection();
+    const { environment_id, kafka_cluster_id } =
+      this.resolveTableflowEnvAndClusterId(conn, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

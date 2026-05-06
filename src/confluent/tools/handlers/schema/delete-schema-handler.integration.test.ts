@@ -24,6 +24,7 @@ describe("delete-schema-handler", { tags: [Tag.SCHEMA] }, () => {
     return;
   }
 
+  // installs beforeAll/afterAll at this describe scope (shared SR client, subject cleanup)
   const { client, createdSubjects } = withSharedSrClient();
 
   describe.each(activeTransports)("via %s transport", (transport) => {
@@ -38,6 +39,7 @@ describe("delete-schema-handler", { tags: [Tag.SCHEMA] }, () => {
     });
 
     it("should soft-delete a registered subject", async () => {
+      // create a new schema+subject before we try to delete it
       const subject = uniqueName(`delete-${transport}`);
       createdSubjects.push(subject);
       await client().register(subject, { schema: TEST_AVRO_SCHEMA });

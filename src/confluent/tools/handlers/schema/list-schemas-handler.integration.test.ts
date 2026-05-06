@@ -24,6 +24,7 @@ describe("list-schemas-handler", { tags: [Tag.SCHEMA] }, () => {
     return;
   }
 
+  // installs beforeAll/afterAll at this describe scope (shared SR client, subject cleanup)
   const { client, createdSubjects } = withSharedSrClient();
   const subject = uniqueName("list");
 

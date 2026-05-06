@@ -86,50 +86,66 @@ describe("detect-issues-handler.ts", () => {
         },
       );
 
-      it("should pass explicit computePoolId to metrics POST body when arg is provided", async () => {
-        // first GET returns the RUNNING statement; the exceptions GET and any further
-        // fallthroughs return an empty list so the metrics summary is the only output
-        const clientManager = getMockedClientManager();
-        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-        flinkRest.GET.mockResolvedValueOnce({
-          data: { status: { phase: "RUNNING" } },
-        }).mockResolvedValue({ data: { data: [] } });
-        const telemetryRest =
-          clientManager.getConfluentCloudTelemetryRestClient();
-        telemetryRest.POST.mockResolvedValue({ data: { data: [] } });
-
-        await assertHandleCase({
-          handler,
-          runtime: runtimeWith(
-            FLINK_CONN,
-            DEFAULT_CONNECTION_ID,
-            clientManager,
-          ),
+      // Metrics branch: includeMetrics: true triggers a poll-then-fetch on the
+      // Flink REST client (RUNNING status → empty exceptions list) followed by
+      // telemetry POSTs. The cases below cover both the config-fallback and
+      // explicit-arg paths for resource.compute_pool.id in the POST body.
+      it.each([
+        {
+          label: "use config computePoolId when arg is absent",
+          args: { statementName: STATEMENT_NAME, includeMetrics: true },
+          expectedComputePoolId: FLINK_CONN.flink.compute_pool_id,
+        },
+        {
+          label: "use explicit computePoolId arg over config",
           args: {
             statementName: STATEMENT_NAME,
             computePoolId: "lfcp-from-args",
             includeMetrics: true,
           },
-          outcome: { resolves: "Metrics: No metrics data available" },
-          clientManager,
-        });
+          expectedComputePoolId: "lfcp-from-args",
+        },
+      ])(
+        "should $label in metrics POST body",
+        async ({ args, expectedComputePoolId }) => {
+          const clientManager = getMockedClientManager();
+          const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+          flinkRest.GET.mockResolvedValueOnce({
+            data: { status: { phase: "RUNNING" } },
+          }).mockResolvedValue({ data: { data: [] } });
+          const telemetryRest =
+            clientManager.getConfluentCloudTelemetryRestClient();
+          telemetryRest.POST.mockResolvedValue({ data: { data: [] } });
 
-        expect(telemetryRest.POST).toHaveBeenCalledWith(
-          expect.stringContaining("/metrics/"),
-          expect.objectContaining({
-            body: expect.objectContaining({
-              filter: expect.objectContaining({
-                filters: expect.arrayContaining([
-                  expect.objectContaining({
-                    field: "resource.compute_pool.id",
-                    value: "lfcp-from-args",
-                  }),
-                ]),
+          await assertHandleCase({
+            handler,
+            runtime: runtimeWith(
+              FLINK_CONN,
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args,
+            outcome: { resolves: "Metrics: No metrics data available" },
+            clientManager,
+          });
+
+          expect(telemetryRest.POST).toHaveBeenCalledWith(
+            expect.stringContaining("/metrics/"),
+            expect.objectContaining({
+              body: expect.objectContaining({
+                filter: expect.objectContaining({
+                  filters: expect.arrayContaining([
+                    expect.objectContaining({
+                      field: "resource.compute_pool.id",
+                      value: expectedComputePoolId,
+                    }),
+                  ]),
+                }),
               }),
             }),
-          }),
-        );
-      });
+          );
+        },
+      );
     });
   });
 });

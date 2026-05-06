@@ -5,7 +5,10 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, it } from "vitest";
 
 const EXPLICIT_IDS = {
@@ -15,12 +18,18 @@ const EXPLICIT_IDS = {
 
 const STATEMENT_NAME = "my-statement";
 
+type DeleteStatementCase = HandleCaseWithConn & {
+  /** HTTP status returned by the Flink REST DELETE. Omit for cases that
+   *  throw before reaching the client. */
+  deleteStatus?: number;
+};
+
 describe("delete-flink-statement-handler.ts", () => {
   describe("DeleteFlinkStatementHandler", () => {
     const handler = new DeleteFlinkStatementHandler();
 
     describe("handle()", () => {
-      const cases: HandleCaseWithConn[] = [
+      const cases: DeleteStatementCase[] = [
         {
           label: "throw ZodError when statementName is absent",
           args: {},
@@ -30,13 +39,13 @@ describe("delete-flink-statement-handler.ts", () => {
         {
           label: "use org/env IDs from config when args absent",
           args: { statementName: STATEMENT_NAME },
-          responseData: { response: { status: 204 } },
+          deleteStatus: 204,
           outcome: { resolves: "Flink SQL Statement Deletion Status Code" },
         },
         {
           label: "use explicit org/env args over config",
           args: { statementName: STATEMENT_NAME, ...EXPLICIT_IDS },
-          responseData: { response: { status: 204 } },
+          deleteStatus: 204,
           outcome: { resolves: "Flink SQL Statement Deletion Status Code" },
         },
       ];
@@ -46,11 +55,17 @@ describe("delete-flink-statement-handler.ts", () => {
         async ({
           args,
           outcome,
-          responseData,
+          deleteStatus,
           connectionConfig = FLINK_CONN,
         }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          if (deleteStatus !== undefined) {
+            clientManager
+              .getConfluentCloudFlinkRestClient()
+              .DELETE.mockResolvedValue({
+                response: { status: deleteStatus },
+              });
+          }
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -60,7 +75,7 @@ describe("delete-flink-statement-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );

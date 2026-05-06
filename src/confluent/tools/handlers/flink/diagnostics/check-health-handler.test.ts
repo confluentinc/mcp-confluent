@@ -5,7 +5,10 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, it } from "vitest";
 
 const EXPLICIT_IDS = {
@@ -15,12 +18,18 @@ const EXPLICIT_IDS = {
 
 const STATEMENT_NAME = "my-statement";
 
+type CheckHealthCase = HandleCaseWithConn & {
+  /** Body returned by the Flink REST GET. Omit for cases that throw before
+   *  reaching the client. */
+  flinkGetData?: unknown;
+};
+
 describe("check-health-handler.ts", () => {
   describe("CheckHealthHandler", () => {
     const handler = new CheckHealthHandler();
 
     describe("handle()", () => {
-      const cases: HandleCaseWithConn[] = [
+      const cases: CheckHealthCase[] = [
         {
           label: "throws ZodError when statementName is absent",
           args: {},
@@ -31,13 +40,13 @@ describe("check-health-handler.ts", () => {
           label:
             "uses org/env IDs from config and reports healthy for running statement",
           args: { statementName: STATEMENT_NAME },
-          responseData: { status: { phase: "RUNNING" }, data: [] },
+          flinkGetData: { status: { phase: "RUNNING" }, data: [] },
           outcome: { resolves: `Health check for '${STATEMENT_NAME}'` },
         },
         {
           label: "uses explicit org/env args over config",
           args: { statementName: STATEMENT_NAME, ...EXPLICIT_IDS },
-          responseData: { status: { phase: "RUNNING" }, data: [] },
+          flinkGetData: { status: { phase: "RUNNING" }, data: [] },
           outcome: { resolves: `Health check for '${STATEMENT_NAME}'` },
         },
       ];
@@ -47,11 +56,15 @@ describe("check-health-handler.ts", () => {
         async ({
           args,
           outcome,
-          responseData,
+          flinkGetData,
           connectionConfig = FLINK_CONN,
         }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          if (flinkGetData !== undefined) {
+            clientManager
+              .getConfluentCloudFlinkRestClient()
+              .GET.mockResolvedValue({ data: flinkGetData });
+          }
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -61,7 +74,7 @@ describe("check-health-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );

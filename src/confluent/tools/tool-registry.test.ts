@@ -367,6 +367,7 @@ describe("tool-registry.ts", () => {
       },
       // Documentation
       [ToolName.SEARCH_PRODUCT_DOCS]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_PRODUCT_DOC_PAGES]: { outcome: { throws: "ZodError" } },
       // Organizations
       [ToolName.LIST_ORGANIZATIONS]: {
         outcome: { resolves: "Retrieved 0 organizations" },

@@ -170,16 +170,8 @@ export class AuthContext {
 
   private async doRefresh(): Promise<void> {
     // Capture rotationTime BEFORE the auth0 exchange so the new CP/DP
-    // expiries we stamp are conservative — i.e., slightly earlier than the
-    // server's actual issuance time. If we captured it AFTER the await, the
-    // auth0 latency (~1-3s of HTTP roundtrip) would push our local
-    // controlPlaneExpiresAt forward of the setInterval tick schedule, and
-    // the next refresh tick would skip the now-shifted refresh window
-    // (e.g., interval=270s + 2s of drift → next tick sees CP-now=32s,
-    // which is >30s window → skip → CP expires unrefreshed for a full
-    // cycle until the tick after catches up). Capturing at the start makes
-    // our estimate conservative; we refresh slightly sooner than strictly
-    // necessary instead of slightly later.
+    // expiries we stamp are conservative - we refresh slightly sooner
+    // than strictly necessary instead of slightly later.
     const rotationTime = Date.now();
     let auth0Response: Auth0TokenResponse;
     try {
@@ -302,10 +294,7 @@ export class AuthContext {
    * Starts a background loop that refreshes the CP/DP token pair just before
    * the CP token expires. The loop self-reschedules: each fire sets the next
    * `setTimeout` at `controlPlaneExpiresAt - REFRESH_WINDOW_MS` from the
-   * post-refresh state, so the schedule tracks the actual token expiry rather
-   * than drifting against a fixed `setInterval` cadence. If the refresh token
-   * has expired (or expires while we're sleeping), the context clears itself
-   * and the loop stops.
+   * post-refresh state, so the schedule tracks the actual token expiry.
    */
   startRefreshLoop(): void {
     if (this.cleared) {

@@ -14,6 +14,7 @@
  * list-schema-registry-clusters tool that closes the discovery gap.
  */
 
+import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 export function resolveKafkaClusterArgs(
@@ -34,4 +35,24 @@ export function resolveKafkaClusterArgs(
     );
   }
   return { clusterId: args.cluster_id, envId: args.environment_id };
+}
+
+/**
+ * Disposes a Kafka client (admin or producer) iff the connection is OAuth-typed.
+ * On direct connections this is a no-op — direct's `AsyncLazy` admin/producer
+ * are manager-owned singletons and must not be disconnected by handlers. On
+ * OAuth, calls `client.disconnect()` and swallows + logs any error so disposal
+ * failure never masks the handler's own error.
+ */
+export async function disposeIfOAuth(
+  runtime: ServerRuntime,
+  connId: string,
+  client: { disconnect: () => Promise<void> },
+): Promise<void> {
+  if (runtime.config.connections[connId]!.type !== "oauth") return;
+  try {
+    await client.disconnect();
+  } catch (err) {
+    logger.warn({ err, connId }, "OAuth Kafka client disconnect failed");
+  }
 }

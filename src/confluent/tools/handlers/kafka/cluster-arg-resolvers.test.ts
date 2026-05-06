@@ -1,9 +1,13 @@
 import { MCPServerConfiguration } from "@src/config/index.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
-import { resolveKafkaClusterArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+import {
+  disposeIfOAuth,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const CONN_ID = "env-connection";
 
@@ -74,5 +78,35 @@ describe("resolveKafkaClusterArgs", () => {
     expect(() =>
       resolveKafkaClusterArgs({ cluster_id: "lkc-abc" }, runtime, CONN_ID),
     ).toThrow(/cluster_id.*environment_id.*required.*list-clusters/i);
+  });
+});
+
+describe("disposeIfOAuth", () => {
+  it("should not call disconnect on a direct connection", async () => {
+    const runtime = directRuntime();
+    const disconnect = vi.fn().mockResolvedValue(undefined);
+    await disposeIfOAuth(runtime, CONN_ID, { disconnect });
+    expect(disconnect).not.toHaveBeenCalled();
+  });
+
+  it("should call disconnect on an OAuth connection", async () => {
+    const runtime = oauthRuntime();
+    const disconnect = vi.fn().mockResolvedValue(undefined);
+    await disposeIfOAuth(runtime, CONN_ID, { disconnect });
+    expect(disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("should swallow and log disconnect errors", async () => {
+    const runtime = oauthRuntime();
+    const warnSpy = vi
+      .spyOn(logger, "warn")
+      .mockImplementation(() => undefined);
+    const disconnect = vi
+      .fn()
+      .mockRejectedValue(new Error("broker connection lost"));
+    await expect(
+      disposeIfOAuth(runtime, CONN_ID, { disconnect }),
+    ).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledOnce();
   });
 });

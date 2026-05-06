@@ -1,4 +1,3 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -10,7 +9,10 @@ import {
   hasKafkaBootstrap,
   isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
-import { resolveKafkaClusterArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+import {
+  disposeIfOAuth,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -20,16 +22,13 @@ const deleteKafkaTopicsArguments = z.object({
     .string()
     .optional()
     .describe(
-      "The Confluent Cloud logical Kafka cluster ID (lkc-...). " +
-        "Required under --oauth; under a direct connection it is ignored " +
-        "(cluster fixed by configuration). Discover via list-clusters.",
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
     ),
   environment_id: z
     .string()
     .optional()
     .describe(
-      "The Confluent Cloud environment ID (env-...) that owns the cluster. " +
-        "Required alongside cluster_id under --oauth. Optional under direct.",
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
     ),
   topicNames: z
     .array(z.string().describe("Names of kafka topics to delete"))
@@ -49,43 +48,21 @@ export class DeleteTopicsHandler extends BaseToolHandler {
       resolved.clusterId,
       resolved.envId,
     );
-    const topicNames = parsed.topicNames.join(",");
     try {
       // 30s broker-side timeout. See create-topics-handler for rationale.
       await admin.deleteTopics({ timeout: 30_000, topics: parsed.topicNames });
-    } catch (err) {
-      // KafkaJSAggregateError wraps per-topic failures (auth denial, topic
-      // not found, etc.). Surface each one so the agent sees the real reason
-      // instead of just the aggregate's generic top-level message.
-      if (err instanceof KafkaJS.KafkaJSAggregateError) {
-        const details = err.errors
-          .map((inner) =>
-            inner instanceof KafkaJS.KafkaJSError
-              ? `- ${inner.message}`
-              : `- ${typeof inner === "string" ? inner : String(inner)}`,
-          )
-          .join("\n");
-        return this.createResponse(
-          `Failed to delete Kafka topics: ${err.message}\n${details}`,
-          true,
-        );
-      }
-      const message = err instanceof Error ? err.message : String(err);
       return this.createResponse(
-        `Failed to delete Kafka topics (${topicNames}): ${message}`,
-        true,
+        `Deleted Kafka topics: ${parsed.topicNames.join(",")}`,
       );
+    } finally {
+      await disposeIfOAuth(runtime, connId, admin);
     }
-    return this.createResponse(`Deleted Kafka topics: ${topicNames}`);
   }
 
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.DELETE_TOPICS,
-      description:
-        "Delete the topic with the given names. Under --oauth, requires " +
-        "cluster_id and environment_id (call list-clusters first to discover " +
-        "them). Under a direct connection, the cluster is fixed by config.",
+      description: "Delete the topic with the given names.",
       inputSchema: deleteKafkaTopicsArguments.shape,
       annotations: DESTRUCTIVE,
     };

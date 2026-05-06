@@ -55,22 +55,6 @@ export function createFsWrappers(): MockedFsWrappers {
 }
 
 /**
- * Spy on the env-proxy getter ({@linkcode nodeDeps.config.env}) and return
- * the supplied partial as the full env object. Lets tests express only the
- * env vars they actually care about without listing every other field.
- *
- * @example
- * ```ts
- * mockEnv({ DO_NOT_TRACK: true });
- * ```
- */
-export function mockEnv(overrides: Partial<typeof nodeDeps.config.env>): void {
-  vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue(
-    overrides as unknown as typeof nodeDeps.config.env,
-  );
-}
-
-/**
  * Spy returned by {@linkcode mockFetch}. Auto-restored between tests by the
  * `restoreMocks: true` setting in `vitest.config.ts`.
  */

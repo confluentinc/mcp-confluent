@@ -1,6 +1,5 @@
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
-import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import {
   AuthConfig,
@@ -39,7 +38,7 @@ export class HttpServer {
     }
   }
 
-  async prepare(): Promise<void> {
+  async prepare(config: ServerConfig): Promise<void> {
     if (this.isSwaggerConfigured) {
       return;
     }
@@ -63,7 +62,7 @@ export class HttpServer {
         },
         servers: [
           {
-            url: `http://${env.HTTP_HOST}:${env.HTTP_PORT}`,
+            url: `http://${config.host}:${config.port}`,
             description: "Local development server",
           },
         ],

@@ -261,8 +261,11 @@ export abstract class BaseClientManager
 
   /**
    * Cluster-aware Kafka admin client. Under direct, args are ignored and the
-   * eagerly-built admin is returned. Under OAuth, args are required and the
-   * client is cached (idle-evicted) per `clusterId`.
+   * manager-owned `AsyncLazy` singleton admin is returned (manager controls
+   * its lifetime). Under OAuth, args are required and a fresh admin is built
+   * per call — the caller owns the lifetime and must dispose via
+   * `disposeIfOAuth(runtime, connId, admin)` in a `try { ... } finally { ... }`
+   * block (helper at `@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js`).
    */
   abstract getKafkaAdminClient(
     clusterId?: string,
@@ -270,7 +273,7 @@ export abstract class BaseClientManager
   ): Promise<KafkaJS.Admin>;
 
   /**
-   * Cluster-aware Kafka producer. Same direct/OAuth asymmetry as
+   * Cluster-aware Kafka producer. Same direct/OAuth lifecycle asymmetry as
    * {@link getKafkaAdminClient}.
    */
   abstract getKafkaProducer(
@@ -279,9 +282,10 @@ export abstract class BaseClientManager
   ): Promise<KafkaJS.Producer>;
 
   /**
-   * Build a fresh Kafka consumer (NOT cached, per the spec's group-membership
-   * analysis). The returned consumer is unconnected; the caller must call
-   * `connect()` and `disconnect()` (typically in a `try/finally`).
+   * Build a fresh Kafka consumer (per-call on both direct and OAuth — group
+   * membership has its own server-side lifecycle that doesn't compose with
+   * cached clients). The returned consumer is unconnected; the caller must
+   * call `connect()` and `disconnect()` (typically in a `try/finally`).
    */
   abstract buildKafkaConsumer(
     clusterId?: string,

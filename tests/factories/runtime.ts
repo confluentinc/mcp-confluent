@@ -194,6 +194,43 @@ export type HandleCaseWithConn = HandleCase & {
 };
 
 /**
+ * Shared per-case shape for Tableflow handle() tests. `mockResponse` is the
+ * value the Tableflow REST client resolves with (omit for cases that throw
+ * before reaching the client). `expectedEnvId` / `expectedClusterId` carry
+ * the values the test asserts on the API call's env/cluster path — populated
+ * for resolve-cases, omitted for throw-cases.
+ */
+export type TableflowHandleCase = HandleCaseWithConn & {
+  mockResponse?: unknown;
+  expectedEnvId?: string;
+  expectedClusterId?: string;
+};
+
+/**
+ * Shared per-case shape for Connect handle() tests. `mockResponse` is the value
+ * the Confluent Cloud REST client resolves with — use `{ data }` for the
+ * success path or `{ error }` for the API-error path; omit for cases that
+ * throw before reaching the client. `expectedEnvId` / `expectedClusterId`
+ * carry the values the test asserts on the API call's env/cluster path —
+ * populated for resolve-cases, omitted for throw-cases.
+ */
+export type ConnectHandleCase = HandleCaseWithConn & {
+  mockResponse?: { data?: unknown; error?: unknown };
+  expectedEnvId?: string;
+  expectedClusterId?: string;
+};
+
+/**
+ * Shared per-case shape for Flink handle() tests whose handler reads a body
+ * from a single Flink REST GET. `flinkGetData` is the value the Flink REST
+ * client's GET resolves with — populated for resolve-cases, omitted for cases
+ * that throw before reaching the client.
+ */
+export type FlinkGetCase = HandleCaseWithConn & {
+  flinkGetData?: unknown;
+};
+
+/**
  * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`, paired
  * with a mocked `OAuthClientManager` (matching what `ServerRuntime.fromConfig`
  * actually constructs for OAuth connections). Used by handler tests to assert

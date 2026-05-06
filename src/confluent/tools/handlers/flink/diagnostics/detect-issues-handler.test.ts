@@ -2,7 +2,7 @@ import { DetectIssuesHandler } from "@src/confluent/tools/handlers/flink/diagnos
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
-  HandleCaseWithConn,
+  FlinkGetCase,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
@@ -13,18 +13,12 @@ import { describe, expect, it } from "vitest";
 
 const STATEMENT_NAME = "my-statement";
 
-type IssuesCase = HandleCaseWithConn & {
-  /** Body returned by the Flink REST GET. Omit for cases that throw before
-   *  reaching the client. */
-  flinkGetData?: unknown;
-};
-
 describe("detect-issues-handler.ts", () => {
   describe("DetectIssuesHandler", () => {
     const handler = new DetectIssuesHandler();
 
     describe("handle()", () => {
-      const cases: IssuesCase[] = [
+      const cases: FlinkGetCase[] = [
         {
           label: "throws ZodError when statementName is absent",
           args: {},

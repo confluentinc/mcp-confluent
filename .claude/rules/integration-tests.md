@@ -284,11 +284,10 @@ runs and retried CI jobs don't collide.
 
 **Naming convention**: `int-<slug>-<timestamp>-<random>` via the
 `uniqueName(slug)` helper in `@tests/harness/unique-name.js`. The `int-`
-prefix matches what the confluentinc/vscode repo uses (`e2e-`) for
-identifying test-created resources during cleanup of orphaned state. The
-helper is resource-agnostic: kafka topics, schema-registry subjects, and
-any future test-side resource share the same generator so naming stays
-consistent across tool groups.
+prefix marks resources as test-created so orphan cleanup of leaked state
+can identify them by name. The helper is resource-agnostic: kafka topics,
+schema-registry subjects, and any future test-side resource share the
+same generator so naming stays consistent across tool groups.
 
 ```ts
 import { withSharedAdminClient } from "@tests/harness/kafka-admin.js";
@@ -354,11 +353,11 @@ sets it per-block (see CI Matrix below).
 
 ## CI Matrix
 
-`.semaphore/integration.yml` is structured like vscode's `playwright-e2e.yml`:
-one block per MCP transport (stdio, http, and sse), each skippable via the
-`TRANSPORTS` pipeline parameter. Within a block, jobs parallelize across
-tool groups (the `TOOL_GROUP` matrix axis). The matrix axis picks up new
-tags automatically — no block or anchor changes needed.
+`.semaphore/integration.yml` has one block per MCP transport (stdio, http,
+and sse), each skippable via the `TRANSPORTS` pipeline parameter. Within a
+block, jobs parallelize across tool groups (the `TOOL_GROUP` matrix axis).
+The matrix axis picks up new tags automatically - no block or anchor
+changes needed.
 
 ## Adding a New Tool Group
 

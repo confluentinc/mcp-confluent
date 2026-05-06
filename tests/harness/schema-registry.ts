@@ -8,7 +8,7 @@ import { afterAll, beforeAll } from "vitest";
  * client and server can never disagree on which registry they're talking to.
  */
 export function newTestSrClient(): SchemaRegistryClient {
-  const conn = integrationRuntime().config.getSoleConnection();
+  const conn = integrationRuntime().config.getSoleDirectConnection();
   if (!conn.schema_registry?.endpoint || !conn.schema_registry.auth) {
     throw new Error(
       "test-side schema registry client requires schema_registry.endpoint + schema_registry.auth in test-fixtures/yaml_configs/integration.yaml",

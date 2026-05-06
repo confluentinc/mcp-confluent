@@ -8,10 +8,14 @@ import {
   TABLEFLOW_CONN,
   tableflowRuntime,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 type TableflowHandleCase = HandleCaseWithConn & {
+  mockResponse?: { data?: unknown; error?: unknown };
   expectedEnvId?: string;
   expectedClusterId?: string;
 };
@@ -51,7 +55,7 @@ describe("read-tableflow-topic-handler.ts", () => {
             "fall back to conn kafka env_id and cluster_id when args are absent",
           connectionConfig: TABLEFLOW_CONN,
           args: { display_name: TOPIC_NAME },
-          responseData: { display_name: TOPIC_NAME },
+          mockResponse: { data: { display_name: TOPIC_NAME } },
           outcome: { resolves: "Tableflow Topic" },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -65,7 +69,7 @@ describe("read-tableflow-topic-handler.ts", () => {
             environmentId: "env-from-arg",
             clusterId: "lkc-from-arg",
           },
-          responseData: { display_name: TOPIC_NAME },
+          mockResponse: { data: { display_name: TOPIC_NAME } },
           outcome: { resolves: "Tableflow Topic" },
           expectedEnvId: "env-from-arg",
           expectedClusterId: "lkc-from-arg",
@@ -78,7 +82,6 @@ describe("read-tableflow-topic-handler.ts", () => {
             },
           },
           args: { display_name: TOPIC_NAME },
-          responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
         {
@@ -94,14 +97,13 @@ describe("read-tableflow-topic-handler.ts", () => {
             },
           },
           args: { display_name: TOPIC_NAME },
-          responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
         {
           label: "resolve with an error message when the API returns an error",
           connectionConfig: TABLEFLOW_CONN,
           args: { display_name: TOPIC_NAME },
-          responseData: { error: { message: "not found" } },
+          mockResponse: { error: { message: "not found" } },
           outcome: { resolves: `Failed to read Tableflow topic ${TOPIC_NAME}` },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -113,13 +115,17 @@ describe("read-tableflow-topic-handler.ts", () => {
         async ({
           connectionConfig = {},
           args,
-          responseData,
+          mockResponse,
           outcome,
           expectedEnvId,
           expectedClusterId,
         }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          const tableflowRest =
+            clientManager.getConfluentCloudTableflowRestClient();
+          if (mockResponse !== undefined) {
+            tableflowRest.GET.mockResolvedValue(mockResponse);
+          }
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -129,18 +135,20 @@ describe("read-tableflow-topic-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
           if (typeof outcome === "object" && "resolves" in outcome) {
-            expect(capturedCalls).toHaveLength(1);
-            expect(capturedCalls[0]!.args).toMatchObject({
-              params: expect.objectContaining({
-                path: expect.objectContaining({
-                  environment_id: expectedEnvId,
-                  kafka_cluster_id: expectedClusterId,
+            expect(tableflowRest.GET).toHaveBeenCalledWith(
+              expect.any(String),
+              expect.objectContaining({
+                params: expect.objectContaining({
+                  path: expect.objectContaining({
+                    environment_id: expectedEnvId,
+                    kafka_cluster_id: expectedClusterId,
+                  }),
                 }),
               }),
-            });
+            );
           }
         },
       );

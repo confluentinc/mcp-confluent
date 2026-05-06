@@ -6,7 +6,11 @@ import {
   runtimeWith,
   tableflowRuntime,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+  type MockedRestClient,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 const TOPIC_NAME = "my-topic";
@@ -51,22 +55,24 @@ describe("update-tableflow-topic-handler.ts", () => {
 
     describe("handle()", () => {
       it("should resolve with an updated message on success", async () => {
-        const { clientManager, clientGetters } = stubClientGetters({
-          display_name: TOPIC_NAME,
-        });
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTableflowRestClient()
+          .PATCH.mockResolvedValue({ data: { display_name: TOPIC_NAME } });
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
           args: UPDATE_ARGS,
           outcome: { resolves: `Tableflow Topic ${TOPIC_NAME} updated` },
-          clientGetters,
+          clientManager,
         });
       });
 
       it("should resolve with an error message when the API returns an error", async () => {
-        const { clientManager } = stubClientGetters({
-          error: { message: "not found" },
-        });
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTableflowRestClient()
+          .PATCH.mockResolvedValue({ error: { message: "not found" } });
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
@@ -74,34 +80,42 @@ describe("update-tableflow-topic-handler.ts", () => {
           outcome: {
             resolves: `Failed to update Tableflow topic for  ${TOPIC_NAME}`,
           },
+          clientManager,
         });
       });
 
       it("should PATCH the correct topic and pass only environment.id in the body spec", async () => {
-        const { clientManager, capturedCalls } = stubClientGetters({
-          display_name: TOPIC_NAME,
+        const clientManager = getMockedClientManager();
+        const tableflowRest: MockedRestClient =
+          clientManager.getConfluentCloudTableflowRestClient();
+        tableflowRest.PATCH.mockResolvedValue({
+          data: { display_name: TOPIC_NAME },
         });
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
           args: UPDATE_ARGS,
           outcome: { resolves: `Tableflow Topic ${TOPIC_NAME} updated` },
+          clientManager,
         });
-        expect(capturedCalls).toHaveLength(1);
-        expect(capturedCalls[0]!.args).toMatchObject({
-          params: expect.objectContaining({
-            path: expect.objectContaining({ display_name: TOPIC_NAME }),
-          }),
-          body: expect.objectContaining({
-            spec: expect.objectContaining({
-              environment: { id: "env-abc123" },
-              kafka_cluster: expect.objectContaining({
-                id: "lkc-abc123",
-                environment: "env-abc123",
+        expect(tableflowRest.PATCH).toHaveBeenCalledOnce();
+        expect(tableflowRest.PATCH).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            params: expect.objectContaining({
+              path: expect.objectContaining({ display_name: TOPIC_NAME }),
+            }),
+            body: expect.objectContaining({
+              spec: expect.objectContaining({
+                environment: { id: "env-abc123" },
+                kafka_cluster: expect.objectContaining({
+                  id: "lkc-abc123",
+                  environment: "env-abc123",
+                }),
               }),
             }),
           }),
-        });
+        );
       });
     });
   });

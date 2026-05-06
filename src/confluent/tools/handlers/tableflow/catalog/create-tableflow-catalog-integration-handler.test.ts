@@ -8,10 +8,14 @@ import {
   TABLEFLOW_CONN,
   tableflowRuntime,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 type TableflowHandleCase = HandleCaseWithConn & {
+  mockResponse?: { data?: unknown; error?: unknown };
   expectedEnvId?: string;
   expectedClusterId?: string;
 };
@@ -61,7 +65,7 @@ describe("create-tableflow-catalog-integration-handler.ts", () => {
             "fall back to conn kafka env_id and cluster_id when args are absent",
           connectionConfig: TABLEFLOW_CONN,
           args: MINIMAL_CREATE_ARGS,
-          responseData: { display_name: "my-catalog" },
+          mockResponse: { data: { display_name: "my-catalog" } },
           outcome: {
             resolves: "Tableflow Catalog Integration my-catalog created",
           },
@@ -77,7 +81,7 @@ describe("create-tableflow-catalog-integration-handler.ts", () => {
             environmentId: "env-from-arg",
             clusterId: "lkc-from-arg",
           },
-          responseData: { display_name: "my-catalog" },
+          mockResponse: { data: { display_name: "my-catalog" } },
           outcome: {
             resolves: "Tableflow Catalog Integration my-catalog created",
           },
@@ -92,7 +96,6 @@ describe("create-tableflow-catalog-integration-handler.ts", () => {
             },
           },
           args: MINIMAL_CREATE_ARGS,
-          responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
         {
@@ -108,14 +111,13 @@ describe("create-tableflow-catalog-integration-handler.ts", () => {
             },
           },
           args: MINIMAL_CREATE_ARGS,
-          responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
         {
           label: "resolve with an error message when the API returns an error",
           connectionConfig: TABLEFLOW_CONN,
           args: MINIMAL_CREATE_ARGS,
-          responseData: { error: { message: "conflict" } },
+          mockResponse: { error: { message: "conflict" } },
           outcome: {
             resolves:
               "Failed to create Tableflow Catalog Integration for  my-catalog",
@@ -130,13 +132,17 @@ describe("create-tableflow-catalog-integration-handler.ts", () => {
         async ({
           connectionConfig = {},
           args,
-          responseData,
+          mockResponse,
           outcome,
           expectedEnvId,
           expectedClusterId,
         }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          const tableflowRest =
+            clientManager.getConfluentCloudTableflowRestClient();
+          if (mockResponse !== undefined) {
+            tableflowRest.POST.mockResolvedValue(mockResponse);
+          }
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -146,20 +152,22 @@ describe("create-tableflow-catalog-integration-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
           if (typeof outcome === "object" && "resolves" in outcome) {
-            expect(capturedCalls).toHaveLength(1);
-            expect(capturedCalls[0]!.args).toMatchObject({
-              body: expect.objectContaining({
-                spec: expect.objectContaining({
-                  environment: expect.objectContaining({ id: expectedEnvId }),
-                  kafka_cluster: expect.objectContaining({
-                    id: expectedClusterId,
+            expect(tableflowRest.POST).toHaveBeenCalledWith(
+              expect.any(String),
+              expect.objectContaining({
+                body: expect.objectContaining({
+                  spec: expect.objectContaining({
+                    environment: expect.objectContaining({ id: expectedEnvId }),
+                    kafka_cluster: expect.objectContaining({
+                      id: expectedClusterId,
+                    }),
                   }),
                 }),
               }),
-            });
+            );
           }
         },
       );

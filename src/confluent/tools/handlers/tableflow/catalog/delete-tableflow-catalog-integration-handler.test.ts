@@ -8,10 +8,14 @@ import {
   TABLEFLOW_CONN,
   tableflowRuntime,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 type TableflowHandleCase = HandleCaseWithConn & {
+  mockResponse?: { data?: unknown; error?: unknown };
   expectedEnvId?: string;
   expectedClusterId?: string;
 };
@@ -51,7 +55,7 @@ describe("delete-tableflow-catalog-integration-handler.ts", () => {
             "fall back to conn kafka env_id and cluster_id when args are absent",
           connectionConfig: TABLEFLOW_CONN,
           args: { id: INTEGRATION_ID },
-          responseData: {},
+          mockResponse: {},
           outcome: {
             resolves: `Tableflow catalog integration ${INTEGRATION_ID} deleted`,
           },
@@ -67,7 +71,7 @@ describe("delete-tableflow-catalog-integration-handler.ts", () => {
             environmentId: "env-from-arg",
             clusterId: "lkc-from-arg",
           },
-          responseData: {},
+          mockResponse: {},
           outcome: {
             resolves: `Tableflow catalog integration ${INTEGRATION_ID} deleted`,
           },
@@ -82,7 +86,6 @@ describe("delete-tableflow-catalog-integration-handler.ts", () => {
             },
           },
           args: { id: INTEGRATION_ID },
-          responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
         {
@@ -98,14 +101,13 @@ describe("delete-tableflow-catalog-integration-handler.ts", () => {
             },
           },
           args: { id: INTEGRATION_ID },
-          responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
         {
           label: "resolve with an error message when the API returns an error",
           connectionConfig: TABLEFLOW_CONN,
           args: { id: INTEGRATION_ID },
-          responseData: { error: { message: "not found" } },
+          mockResponse: { error: { message: "not found" } },
           outcome: {
             resolves: `Failed to delete Tableflow catalog integration ${INTEGRATION_ID}`,
           },
@@ -119,13 +121,17 @@ describe("delete-tableflow-catalog-integration-handler.ts", () => {
         async ({
           connectionConfig = {},
           args,
-          responseData,
+          mockResponse,
           outcome,
           expectedEnvId,
           expectedClusterId,
         }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          const tableflowRest =
+            clientManager.getConfluentCloudTableflowRestClient();
+          if (mockResponse !== undefined) {
+            tableflowRest.DELETE.mockResolvedValue(mockResponse);
+          }
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -135,18 +141,20 @@ describe("delete-tableflow-catalog-integration-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
           if (typeof outcome === "object" && "resolves" in outcome) {
-            expect(capturedCalls).toHaveLength(1);
-            expect(capturedCalls[0]!.args).toMatchObject({
-              params: expect.objectContaining({
-                path: expect.objectContaining({
-                  environment_id: expectedEnvId,
-                  kafka_cluster_id: expectedClusterId,
+            expect(tableflowRest.DELETE).toHaveBeenCalledWith(
+              expect.any(String),
+              expect.objectContaining({
+                params: expect.objectContaining({
+                  path: expect.objectContaining({
+                    environment_id: expectedEnvId,
+                    kafka_cluster_id: expectedClusterId,
+                  }),
                 }),
               }),
-            });
+            );
           }
         },
       );

@@ -6,7 +6,11 @@ import {
   runtimeWith,
   tableflowRuntime,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+  type MockedRestClient,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 const UPDATE_ARGS = {
@@ -40,9 +44,10 @@ describe("update-tableflow-catalog-integration-handler.ts", () => {
 
     describe("handle()", () => {
       it("should resolve with an updated message on success", async () => {
-        const { clientManager, clientGetters } = stubClientGetters({
-          display_name: "my-catalog",
-        });
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTableflowRestClient()
+          .POST.mockResolvedValue({ data: { display_name: "my-catalog" } });
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
@@ -50,14 +55,15 @@ describe("update-tableflow-catalog-integration-handler.ts", () => {
           outcome: {
             resolves: "Tableflow Catalog Integration my-catalog updated",
           },
-          clientGetters,
+          clientManager,
         });
       });
 
       it("should resolve with an error message when the API returns an error", async () => {
-        const { clientManager } = stubClientGetters({
-          error: { message: "not found" },
-        });
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTableflowRestClient()
+          .POST.mockResolvedValue({ error: { message: "not found" } });
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
@@ -66,12 +72,16 @@ describe("update-tableflow-catalog-integration-handler.ts", () => {
             resolves:
               "Failed to update Tableflow Catalog Integration for  my-catalog",
           },
+          clientManager,
         });
       });
 
       it("should pass only environment.id in the POST body spec, not the full environment object", async () => {
-        const { clientManager, capturedCalls } = stubClientGetters({
-          display_name: "my-catalog",
+        const clientManager = getMockedClientManager();
+        const tableflowRest: MockedRestClient =
+          clientManager.getConfluentCloudTableflowRestClient();
+        tableflowRest.POST.mockResolvedValue({
+          data: { display_name: "my-catalog" },
         });
         await assertHandleCase({
           handler,
@@ -80,19 +90,23 @@ describe("update-tableflow-catalog-integration-handler.ts", () => {
           outcome: {
             resolves: "Tableflow Catalog Integration my-catalog updated",
           },
+          clientManager,
         });
-        expect(capturedCalls).toHaveLength(1);
-        expect(capturedCalls[0]!.args).toMatchObject({
-          body: expect.objectContaining({
-            spec: expect.objectContaining({
-              environment: { id: "env-abc123" },
-              kafka_cluster: expect.objectContaining({
-                id: "lkc-abc123",
-                environment: "env-abc123",
+        expect(tableflowRest.POST).toHaveBeenCalledOnce();
+        expect(tableflowRest.POST).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            body: expect.objectContaining({
+              spec: expect.objectContaining({
+                environment: { id: "env-abc123" },
+                kafka_cluster: expect.objectContaining({
+                  id: "lkc-abc123",
+                  environment: "env-abc123",
+                }),
               }),
             }),
           }),
-        });
+        );
       });
     });
   });

@@ -1,13 +1,12 @@
-import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
+import { ReadTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/read-tableflow-topic-handler.js";
 import {
   bareRuntime,
-  CCLOUD_CONN,
   ccloudOAuthRuntime,
-  confluentCloudRuntime,
-  CONNECT_CONN,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   runtimeWith,
+  TABLEFLOW_CONN,
+  tableflowRuntime,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -15,27 +14,32 @@ import {
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-type ConnectHandleCase = HandleCaseWithConn & {
+type TableflowHandleCase = HandleCaseWithConn & {
+  mockResponse?: unknown;
   expectedEnvId?: string;
   expectedClusterId?: string;
-  /** Response object the cloud REST GET resolves with. Use { data } for the
-   *  success path or { error } for the API-error path. Omit for cases that
-   *  throw before reaching the client. */
-  mockResponse?: { data?: unknown; error?: unknown };
 };
 
-describe("read-connectors-handler.ts", () => {
-  describe("ReadConnectorHandler", () => {
-    const handler = new ReadConnectorHandler();
+const TOPIC_NAME = "my-topic";
+
+describe("read-tableflow-topic-handler.ts", () => {
+  describe("ReadTableFlowTopicHandler", () => {
+    const handler = new ReadTableFlowTopicHandler();
 
     describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a confluent_cloud block", () => {
-        expect(handler.enabledConnectionIds(confluentCloudRuntime())).toEqual([
+      it("should return the connection ID for a connection with tableflow and kafka blocks", () => {
+        expect(
+          handler.enabledConnectionIds(runtimeWith(TABLEFLOW_CONN)),
+        ).toEqual([DEFAULT_CONNECTION_ID]);
+      });
+
+      it("should return the connection ID for a tableflow-only connection without a kafka block", () => {
+        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
           DEFAULT_CONNECTION_ID,
         ]);
       });
 
-      it("should return an empty array for a connection without a confluent_cloud block", () => {
+      it("should return an empty array for a connection without a tableflow block", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });
 
@@ -45,58 +49,62 @@ describe("read-connectors-handler.ts", () => {
     });
 
     describe("handle()", () => {
-      const cases: ConnectHandleCase[] = [
+      const cases: TableflowHandleCase[] = [
         {
           label:
             "fall back to conn kafka env_id and cluster_id when args are absent",
-          connectionConfig: CONNECT_CONN,
-          args: { connectorName: "my-connector" },
-          mockResponse: { data: { name: "my-connector", type: "SOURCE" } },
-          outcome: { resolves: "Connector Details for my-connector" },
+          connectionConfig: TABLEFLOW_CONN,
+          args: { display_name: TOPIC_NAME },
+          mockResponse: { data: { display_name: TOPIC_NAME } },
+          outcome: { resolves: "Tableflow Topic" },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
         },
         {
           label:
             "prefer explicit environmentId and clusterId args over conn config",
-          connectionConfig: CONNECT_CONN,
+          connectionConfig: TABLEFLOW_CONN,
           args: {
-            connectorName: "my-connector",
+            display_name: TOPIC_NAME,
             environmentId: "env-from-arg",
             clusterId: "lkc-from-arg",
           },
-          mockResponse: { data: { name: "my-connector" } },
-          outcome: { resolves: "Connector Details for my-connector" },
+          mockResponse: { data: { display_name: TOPIC_NAME } },
+          outcome: { resolves: "Tableflow Topic" },
           expectedEnvId: "env-from-arg",
           expectedClusterId: "lkc-from-arg",
         },
         {
           label: "throw when environment_id is absent from both arg and config",
-          connectionConfig: CCLOUD_CONN,
-          args: { connectorName: "my-connector" },
+          connectionConfig: {
+            tableflow: {
+              auth: { type: "api_key" as const, key: "k", secret: "s" },
+            },
+          },
+          args: { display_name: TOPIC_NAME },
           outcome: { throws: "Environment ID is required" },
         },
         {
           label:
             "throw when kafka_cluster_id is absent from both arg and config",
           connectionConfig: {
-            ...CCLOUD_CONN,
+            tableflow: {
+              auth: { type: "api_key" as const, key: "k", secret: "s" },
+            },
             kafka: {
               env_id: "env-from-config",
               rest_endpoint: "https://pkc-example.confluent.cloud:443",
             },
           },
-          args: { connectorName: "my-connector" },
+          args: { display_name: TOPIC_NAME },
           outcome: { throws: "Kafka Cluster ID is required" },
         },
         {
           label: "resolve with an error message when the API returns an error",
-          connectionConfig: CONNECT_CONN,
-          args: { connectorName: "my-connector" },
+          connectionConfig: TABLEFLOW_CONN,
+          args: { display_name: TOPIC_NAME },
           mockResponse: { error: { message: "not found" } },
-          outcome: {
-            resolves: "Failed to get information about connector my-connector",
-          },
+          outcome: { resolves: `Failed to read Tableflow topic ${TOPIC_NAME}` },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
         },
@@ -113,11 +121,11 @@ describe("read-connectors-handler.ts", () => {
           expectedClusterId,
         }) => {
           const clientManager = getMockedClientManager();
-          const cloudRest = clientManager.getConfluentCloudRestClient();
+          const tableflowRest =
+            clientManager.getConfluentCloudTableflowRestClient();
           if (mockResponse !== undefined) {
-            cloudRest.GET.mockResolvedValue(mockResponse);
+            tableflowRest.GET.mockResolvedValue(mockResponse);
           }
-
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -129,15 +137,12 @@ describe("read-connectors-handler.ts", () => {
             outcome,
             clientManager,
           });
-
           if (typeof outcome === "object" && "resolves" in outcome) {
-            expect(cloudRest.GET).toHaveBeenCalledOnce();
-            expect(cloudRest.GET).toHaveBeenCalledWith(
+            expect(tableflowRest.GET).toHaveBeenCalledWith(
               expect.any(String),
               expect.objectContaining({
                 params: expect.objectContaining({
                   path: expect.objectContaining({
-                    connector_name: "my-connector",
                     environment_id: expectedEnvId,
                     kafka_cluster_id: expectedClusterId,
                   }),

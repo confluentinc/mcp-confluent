@@ -5,8 +5,13 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+  type MockedClientManager,
+  type MockedRestClient,
+} from "@tests/stubs/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 
 const TABLE_NAME = "my-table";
 
@@ -20,6 +25,16 @@ describe("get-table-info-handler.ts", () => {
     const handler = new GetTableInfoHandler();
 
     describe("handle()", () => {
+      let clientManager: MockedClientManager;
+      let flinkRest: MockedRestClient;
+
+      beforeEach(() => {
+        clientManager = getMockedClientManager();
+        flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.POST.mockResolvedValue({ data: SQL_RESPONSE });
+        flinkRest.GET.mockResolvedValue({ data: SQL_RESPONSE });
+      });
+
       const cases: HandleCaseWithConn[] = [
         {
           label: "throw ZodError when tableName is absent",
@@ -31,7 +46,6 @@ describe("get-table-info-handler.ts", () => {
           label: "use org/env/compute IDs from config when args absent",
           args: { tableName: TABLE_NAME },
           outcome: { resolves: `Table info for '${TABLE_NAME}'` },
-          responseData: SQL_RESPONSE,
         },
         {
           label: "use explicit org/env/compute args over config",
@@ -42,20 +56,12 @@ describe("get-table-info-handler.ts", () => {
             computePoolId: "lfcp-from-args",
           },
           outcome: { resolves: `Table info for '${TABLE_NAME}'` },
-          responseData: SQL_RESPONSE,
         },
       ];
 
       it.each(cases)(
         "should $label",
-        async ({
-          args,
-          outcome,
-          responseData,
-          connectionConfig = FLINK_CONN,
-        }) => {
-          const { clientManager, clientGetters } =
-            stubClientGetters(responseData);
+        async ({ args, outcome, connectionConfig = FLINK_CONN }) => {
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -65,7 +71,7 @@ describe("get-table-info-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
         },
       );
@@ -84,8 +90,6 @@ describe("get-table-info-handler.ts", () => {
       ])(
         "should $label in POST SQL statement",
         async ({ args, expectedCatalog }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(SQL_RESPONSE);
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -95,16 +99,20 @@ describe("get-table-info-handler.ts", () => {
             ),
             args,
             outcome: { resolves: `Table info for '${TABLE_NAME}'` },
-            clientGetters,
+            clientManager,
           });
-          expect(capturedCalls).toHaveLength(3);
-          expect(capturedCalls[0]!.args).toMatchObject({
-            body: expect.objectContaining({
-              spec: expect.objectContaining({
-                statement: expect.stringContaining(expectedCatalog),
+
+          expect(flinkRest.POST).toHaveBeenCalledOnce();
+          expect(flinkRest.POST).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({
+              body: expect.objectContaining({
+                spec: expect.objectContaining({
+                  statement: expect.stringContaining(expectedCatalog),
+                }),
               }),
             }),
-          });
+          );
         },
       );
     });

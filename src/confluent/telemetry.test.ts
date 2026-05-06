@@ -4,7 +4,6 @@ import {
   TelemetryEvent,
   TelemetryService,
 } from "@src/confluent/telemetry.js";
-import { mockEnv } from "@tests/stubs/index.js";
 import {
   afterEach,
   beforeEach,
@@ -66,9 +65,6 @@ describe("TelemetryService", () => {
         () => undefined as ReturnType<typeof nodeDeps.fs.mkdirSync>,
       );
     vi.spyOn(nodeDeps.os, "homedir").mockReturnValue("/tmp/test-home");
-
-    // env stub (replaces Proxy that would throw before initEnv)
-    mockEnv({ DO_NOT_TRACK: false });
 
     // default: no built-in write key (simulates unpacked/dev build)
     vi.spyOn(

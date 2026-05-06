@@ -7,6 +7,7 @@ import {
   CONNECT_CONN_WITH_AUTH,
   ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
+  KAFKA_CONN,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
@@ -37,6 +38,16 @@ describe("create-connector-handler.ts", () => {
 
       it("should return an empty array for a connection with confluent_cloud but no kafka.auth", () => {
         expect(handler.enabledConnectionIds(confluentCloudRuntime())).toEqual(
+          [],
+        );
+      });
+
+      it("should return an empty array for a connection with kafka.auth but no confluent_cloud block", () => {
+        // Pins that hasDirectConfluentCloud and hasKafkaAuth are AND'd, not
+        // collapsed to the second predicate. A naive `&&` of two
+        // `PredicateResult` objects (both truthy) silently drops the first
+        // predicate; this case keeps that regression honest.
+        expect(handler.enabledConnectionIds(runtimeWith(KAFKA_CONN))).toEqual(
           [],
         );
       });

@@ -2,7 +2,7 @@ import { ReadFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/r
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
-  HandleCaseWithConn,
+  FlinkGetCase,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
@@ -18,18 +18,12 @@ const EXPLICIT_IDS = {
 
 const STATEMENT_NAME = "my-statement";
 
-type ReadStatementCase = HandleCaseWithConn & {
-  /** Body returned by the Flink REST GET. Omit for cases that throw before
-   *  reaching the client. */
-  flinkGetData?: unknown;
-};
-
 describe("read-flink-statement-handler.ts", () => {
   describe("ReadFlinkStatementHandler", () => {
     const handler = new ReadFlinkStatementHandler();
 
     describe("handle()", () => {
-      const cases: ReadStatementCase[] = [
+      const cases: FlinkGetCase[] = [
         {
           label: "throws ZodError when statementName is absent",
           args: {},

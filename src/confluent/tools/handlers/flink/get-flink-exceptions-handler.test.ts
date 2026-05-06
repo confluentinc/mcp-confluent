@@ -2,7 +2,7 @@ import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/g
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
-  HandleCaseWithConn,
+  FlinkGetCase,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
@@ -18,18 +18,12 @@ const EXPLICIT_IDS = {
   environmentId: "env-from-args",
 };
 
-type ExceptionsCase = HandleCaseWithConn & {
-  /** Body returned by the Flink REST GET. Omit for cases that throw before
-   *  reaching the client. */
-  flinkGetData?: unknown;
-};
-
 describe("get-flink-exceptions-handler.ts", () => {
   describe("GetFlinkExceptionsHandler", () => {
     const handler = new GetFlinkExceptionsHandler();
 
     describe("handle()", () => {
-      const cases: ExceptionsCase[] = [
+      const cases: FlinkGetCase[] = [
         {
           label: "throws ZodError when statementName is absent",
           args: {},

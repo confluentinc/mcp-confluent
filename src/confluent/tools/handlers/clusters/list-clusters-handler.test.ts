@@ -96,8 +96,13 @@ describe("list-clusters-handler.ts", () => {
         },
       );
 
-      it("should return an error response when both environmentId arg and conn kafka.env_id are absent", async () => {
+      it("should fall through to empty environment under direct when arg + kafka.env_id are absent", async () => {
+        // Preserves pre-PR-359 main behavior: the cmk endpoint receives the
+        // empty string and returns no clusters. The handler is happy.
         const clientManager = getMockedClientManager();
+        const cloudRest = clientManager.getConfluentCloudRestClient();
+        cloudRest.GET.mockResolvedValue({ data: { data: [] } });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -106,8 +111,18 @@ describe("list-clusters-handler.ts", () => {
             clientManager,
           ),
           args: {},
-          outcome: { resolves: "environmentId is required" },
+          outcome: { resolves: "Successfully retrieved 0 clusters" },
+          clientManager,
         });
+
+        expect(cloudRest.GET).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            params: expect.objectContaining({
+              query: expect.objectContaining({ environment: "" }),
+            }),
+          }),
+        );
       });
     });
   });

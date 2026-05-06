@@ -74,17 +74,22 @@ export class ListClustersHandler extends BaseToolHandler {
     const conn = runtime.config.connections[connId]!;
     const clientManager = runtime.clientManagers[connId]!;
 
-    // Resolve environment: arg wins; under direct, fall back to kafka.env_id;
-    // under OAuth there is no fallback, so the arg must be provided.
-    const resolvedEnv =
-      environmentId ??
-      (conn.type === "direct" ? conn.kafka?.env_id : undefined);
-    if (!resolvedEnv) {
-      return this.createResponse(
-        "environmentId is required under --oauth. Pass it as an argument, " +
-          "or call list-environments to discover available environments.",
-        true,
-      );
+    // Resolve environment: arg wins; under direct, fall back to kafka.env_id
+    // (preserving main's behavior of passing "" to the cmk endpoint when
+    // unset — the endpoint handles the empty case). Under OAuth, the arg
+    // must be supplied since there is no service-block fallback.
+    let resolvedEnv: string;
+    if (conn.type === "oauth") {
+      if (!environmentId) {
+        return this.createResponse(
+          "environmentId is required under --oauth. Pass it as an argument, " +
+            "or call list-environments to discover available environments.",
+          true,
+        );
+      }
+      resolvedEnv = environmentId;
+    } else {
+      resolvedEnv = environmentId ?? conn.kafka?.env_id ?? "";
     }
 
     try {

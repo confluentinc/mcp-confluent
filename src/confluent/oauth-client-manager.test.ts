@@ -9,7 +9,12 @@ import { describe, expect, it, vi } from "vitest";
 describe("oauth-client-manager.ts", () => {
   describe("OAuthClientManager", () => {
     function buildManager(): OAuthClientManager {
-      const holder = createMockInstance(OAuthHolder);
+      // OAuthHolder has a private constructor (factory pattern via .start()),
+      // so we widen the constructor signature for createMockInstance which
+      // expects an externally-callable ctor.
+      const holder = createMockInstance(
+        OAuthHolder as unknown as new (...args: never[]) => OAuthHolder,
+      );
       // OAuthHolder.bootstrapPromise is an instance field set in the real
       // constructor, which createMockInstance bypasses. Define it here so
       // the OAuth manager's `await this.holder.bootstrapPromise` resolves.

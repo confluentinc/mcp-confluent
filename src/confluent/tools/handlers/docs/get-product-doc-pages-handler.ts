@@ -125,6 +125,9 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
       swiftypeBody.find('[data-swiftype-index="false"]').remove();
       bodyHtml = swiftypeBody.html();
     } else {
+      const fromPageData = await this.fetchFromGatsbyPageData(parsed);
+      if (fromPageData) return fromPageData;
+
       // Quickstart pages have no Swiftype body — content lives in <section> blocks.
       const sections = $('section[data-test-id="section"]');
       if (sections.length > 0) {
@@ -197,6 +200,40 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
       parsed,
       undefined,
       this.toMarkdown(article.html()),
+    );
+  }
+
+  // CSR pages (e.g. /get-started/<lang>/) expose their real content as JSON
+  // at /page-data/<path>/page-data.json instead of in the SSR HTML.
+  private async fetchFromGatsbyPageData(
+    parsed: URL,
+  ): Promise<CallToolResult | null> {
+    const pageDataUrl = `${parsed.origin}/page-data${parsed.pathname.replace(/\/?$/, "/")}page-data.json`;
+    const resp = await fetchWithTimeout(pageDataUrl, {
+      headers: { "user-agent": USER_AGENT, accept: "application/json" },
+    });
+    if (!resp.ok) return null;
+    let data: GatsbyPageData;
+    try {
+      data = (await resp.json()) as GatsbyPageData;
+    } catch {
+      return null;
+    }
+    const ctx = data?.result?.pageContext;
+    const cm = ctx?.contentMappings;
+    if (!cm || typeof cm !== "object") return null;
+
+    // If the URL has a fragment (e.g. #produce-events), return only that section.
+    const sections =
+      parsed.hash && cm[parsed.hash] ? [cm[parsed.hash]] : Object.values(cm);
+    const html = sections.join("\n");
+    if (!html) return null;
+
+    const title = ctx?.hero?.title ?? ctx?.seo?.title;
+    return this.formatResponse(
+      parsed,
+      title || undefined,
+      this.toMarkdown(html),
     );
   }
 
@@ -295,5 +332,15 @@ interface ZendeskArticleResponse {
   article?: {
     title?: string;
     body?: string;
+  };
+}
+
+interface GatsbyPageData {
+  result?: {
+    pageContext?: {
+      contentMappings?: Record<string, string>;
+      hero?: { title?: string };
+      seo?: { title?: string };
+    };
   };
 }

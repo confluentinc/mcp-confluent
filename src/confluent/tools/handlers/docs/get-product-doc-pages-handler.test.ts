@@ -229,16 +229,18 @@ describe("get-product-doc-pages-handler.ts", () => {
           // Real article sections are kilobytes; pad past the chrome-filter
           // threshold so this fixture exercises the Tier-2 path (not Tier-3).
           const filler = "Lesson detail. ".repeat(150);
-          fetchSpy.mockResolvedValueOnce(
-            htmlResponse(`
-              <html>
-                <body>
-                  <section data-test-id="section"><p>Step one. ${filler}</p></section>
-                  <section data-test-id="section"><p>Step two. ${filler}</p></section>
-                </body>
-              </html>
-            `),
-          );
+          fetchSpy
+            .mockResolvedValueOnce(
+              htmlResponse(`
+                <html>
+                  <body>
+                    <section data-test-id="section"><p>Step one. ${filler}</p></section>
+                    <section data-test-id="section"><p>Step two. ${filler}</p></section>
+                  </body>
+                </html>
+              `),
+            )
+            .mockResolvedValueOnce(jsonResponse({}));
 
           const result = await handler.handle(runtime, {
             url: "https://developer.confluent.io/quickstart/",
@@ -250,26 +252,121 @@ describe("get-product-doc-pages-handler.ts", () => {
           expect(text).toContain("Step two.");
         });
 
+        it("should fall back to Gatsby page-data.json when Swiftype body is missing", async () => {
+          fetchSpy
+            .mockResolvedValueOnce(
+              htmlResponse(
+                '<html><body><h1 data-swiftype-name="title">Get Started Java</h1></body></html>',
+              ),
+            )
+            .mockResolvedValueOnce(
+              jsonResponse({
+                result: {
+                  pageContext: {
+                    hero: { title: "Get Started with Java" },
+                    contentMappings: {
+                      "#introduction":
+                        "<p>In this tutorial, you will run a Java client.</p>",
+                      "#produce-events":
+                        "<p>Run gradle shadowJar to build the producer.</p>",
+                    },
+                  },
+                },
+              }),
+            );
+
+          const result = await handler.handle(runtime, {
+            url: "https://developer.confluent.io/get-started/java/",
+          });
+
+          expect(result.isError).toBeFalsy();
+          const text = getText(result);
+          expect(text).toContain("# Get Started with Java");
+          expect(text).toContain(
+            "In this tutorial, you will run a Java client.",
+          );
+          expect(text).toContain("Run gradle shadowJar");
+          expect(String(fetchSpy.mock.calls[1]![0])).toBe(
+            "https://developer.confluent.io/page-data/get-started/java/page-data.json",
+          );
+        });
+
+        it("should return only the matching fragment section from page-data", async () => {
+          fetchSpy
+            .mockResolvedValueOnce(htmlResponse("<html><body></body></html>"))
+            .mockResolvedValueOnce(
+              jsonResponse({
+                result: {
+                  pageContext: {
+                    hero: { title: "Get Started with Java" },
+                    contentMappings: {
+                      "#introduction": "<p>Intro section content.</p>",
+                      "#produce-events":
+                        "<p>Produce events section content.</p>",
+                    },
+                  },
+                },
+              }),
+            );
+
+          const result = await handler.handle(runtime, {
+            url: "https://developer.confluent.io/get-started/java/#produce-events",
+          });
+
+          expect(result.isError).toBeFalsy();
+          const text = getText(result);
+          expect(text).toContain("Produce events section content.");
+          expect(text).not.toContain("Intro section content.");
+        });
+
+        it("should fall through to <section>-based extraction when page-data has no contentMappings", async () => {
+          const filler = "Lesson detail. ".repeat(150);
+          fetchSpy
+            .mockResolvedValueOnce(
+              htmlResponse(`
+                <html>
+                  <body>
+                    <section data-test-id="section"><p>Step one. ${filler}</p></section>
+                  </body>
+                </html>
+              `),
+            )
+            .mockResolvedValueOnce(
+              jsonResponse({
+                result: { pageContext: { id: "abc", slug: "x" } },
+              }),
+            );
+
+          const result = await handler.handle(runtime, {
+            url: "https://developer.confluent.io/quickstart/",
+          });
+
+          expect(result.isError).toBeFalsy();
+          expect(getText(result)).toContain("Step one.");
+        });
+
         it("should drop short data-test-id sections used as Cloud-promo/newsletter chrome", async () => {
           // /get-started/<lang>/ pages have only chrome inside <section data-test-id="section">;
           // real content lives outside in nav cards. Without filtering, the handler would
           // return the Cloud promo as if it were the article body.
-          fetchSpy.mockResolvedValueOnce(
-            htmlResponse(`
-              <html>
-                <body>
-                  <h1 data-swiftype-name="title">Get Started with Java</h1>
-                  <ul>
-                    <li><a href="/get-started/spring-boot/">Spring Boot</a></li>
-                    <li><a href="/get-started/javascript/">JavaScript</a></li>
-                  </ul>
-                  <section data-test-id="section">
-                    <p>Confluent Cloud is a fully managed Apache Kafka service.</p>
-                  </section>
-                </body>
-              </html>
-            `),
-          );
+          fetchSpy
+            .mockResolvedValueOnce(
+              htmlResponse(`
+                <html>
+                  <body>
+                    <h1 data-swiftype-name="title">Get Started with Java</h1>
+                    <ul>
+                      <li><a href="/get-started/spring-boot/">Spring Boot</a></li>
+                      <li><a href="/get-started/javascript/">JavaScript</a></li>
+                    </ul>
+                    <section data-test-id="section">
+                      <p>Confluent Cloud is a fully managed Apache Kafka service.</p>
+                    </section>
+                  </body>
+                </html>
+              `),
+            )
+            .mockResolvedValueOnce(jsonResponse({}));
 
           const result = await handler.handle(runtime, {
             url: "https://developer.confluent.io/get-started/java/",
@@ -284,21 +381,23 @@ describe("get-product-doc-pages-handler.ts", () => {
         });
 
         it("should fall back to <body> minus chrome on tutorial-style pages", async () => {
-          fetchSpy.mockResolvedValueOnce(
-            htmlResponse(`
-              <html>
-                <body>
-                  <header><nav data-swiftype-index="false">site nav</nav></header>
-                  <h1 data-swiftype-name="title">Avro Console Tutorial</h1>
-                  <div class="style-module--content--abc">
-                    <p>Tutorial body paragraph.</p>
-                    <pre><code>console-consumer --topic foo</code></pre>
-                  </div>
-                  <footer>copyright</footer>
-                </body>
-              </html>
-            `),
-          );
+          fetchSpy
+            .mockResolvedValueOnce(
+              htmlResponse(`
+                <html>
+                  <body>
+                    <header><nav data-swiftype-index="false">site nav</nav></header>
+                    <h1 data-swiftype-name="title">Avro Console Tutorial</h1>
+                    <div class="style-module--content--abc">
+                      <p>Tutorial body paragraph.</p>
+                      <pre><code>console-consumer --topic foo</code></pre>
+                    </div>
+                    <footer>copyright</footer>
+                  </body>
+                </html>
+              `),
+            )
+            .mockResolvedValueOnce(jsonResponse({}));
 
           const result = await handler.handle(runtime, {
             url: "https://developer.confluent.io/confluent-tutorials/console-consumer-producer-avro/",
@@ -314,11 +413,13 @@ describe("get-product-doc-pages-handler.ts", () => {
         });
 
         it("should return an error response when even the body fallback is empty", async () => {
-          fetchSpy.mockResolvedValueOnce(
-            htmlResponse(
-              "<html><body><header>nav</header><footer>foot</footer></body></html>",
-            ),
-          );
+          fetchSpy
+            .mockResolvedValueOnce(
+              htmlResponse(
+                "<html><body><header>nav</header><footer>foot</footer></body></html>",
+              ),
+            )
+            .mockResolvedValueOnce(jsonResponse({}));
 
           const result = await handler.handle(runtime, {
             url: "https://developer.confluent.io/empty/",

@@ -16,7 +16,10 @@ import {
   hasKafkaBootstrap,
   isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
-import { resolveKafkaClusterArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+import {
+  formatKafkaError,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -265,14 +268,8 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         false,
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : error instanceof KafkaJS.KafkaJSError
-            ? `Kafka error (${error.code}): ${error.message}`
-            : String(error);
       return this.createResponse(
-        `Failed to consume messages: ${errorMessage}`,
+        `Failed to consume messages: ${formatKafkaError(error)}`,
         true,
       );
     } finally {

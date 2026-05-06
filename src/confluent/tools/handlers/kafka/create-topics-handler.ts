@@ -1,4 +1,3 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -12,6 +11,7 @@ import {
 } from "@src/confluent/tools/connection-predicates.js";
 import {
   disposeIfOAuth,
+  formatKafkaError,
   resolveKafkaClusterArgs,
 } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -65,9 +65,7 @@ export class CreateTopicsHandler extends BaseToolHandler {
     try {
       let success: boolean;
       try {
-        // 30s timeout — the broker confirms topic creation within this
-        // window. KafkaJSAggregateError wraps per-topic errors; surface each
-        // one (topic name + cause) so the agent sees the real reason.
+        // 30s timeout — the broker confirms topic creation within this window.
         success = await admin.createTopics({
           timeout: 30_000,
           topics: parsed.topics.map(({ topic, numPartitions }) => ({
@@ -76,30 +74,8 @@ export class CreateTopicsHandler extends BaseToolHandler {
           })),
         });
       } catch (err) {
-        if (err instanceof KafkaJS.KafkaJSAggregateError) {
-          const details = err.errors
-            .map((inner) => {
-              if (
-                inner instanceof KafkaJS.KafkaJSCreateTopicError ||
-                inner instanceof KafkaJS.KafkaJSError
-              ) {
-                const topic =
-                  inner instanceof KafkaJS.KafkaJSCreateTopicError
-                    ? inner.topic
-                    : "(unknown topic)";
-                return `- ${topic}: ${inner.message}`;
-              }
-              return `- ${typeof inner === "string" ? inner : String(inner)}`;
-            })
-            .join("\n");
-          return this.createResponse(
-            `Failed to create Kafka topics: ${err.message}\n${details}`,
-            true,
-          );
-        }
-        const message = err instanceof Error ? err.message : String(err);
         return this.createResponse(
-          `Failed to create Kafka topics (${topicNames}): ${message}`,
+          `Failed to create Kafka topics (${topicNames}): ${formatKafkaError(err)}`,
           true,
         );
       }

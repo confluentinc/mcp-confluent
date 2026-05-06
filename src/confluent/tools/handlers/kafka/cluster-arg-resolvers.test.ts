@@ -1,7 +1,9 @@
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { MCPServerConfiguration } from "@src/config/index.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import {
   disposeIfOAuth,
+  formatKafkaError,
   resolveKafkaClusterArgs,
 } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { logger } from "@src/logger.js";
@@ -108,5 +110,42 @@ describe("disposeIfOAuth", () => {
       disposeIfOAuth(runtime, CONN_ID, { disconnect }),
     ).resolves.toBeUndefined();
     expect(warnSpy).toHaveBeenCalledOnce();
+  });
+});
+
+describe("formatKafkaError", () => {
+  it("should unwrap KafkaJSAggregateError per-topic causes", () => {
+    const inner1 = new KafkaJS.KafkaJSCreateTopicError(
+      new KafkaJS.KafkaJSError("Topic already exists"),
+      "topic-a",
+    );
+    const inner2 = new KafkaJS.KafkaJSCreateTopicError(
+      new KafkaJS.KafkaJSError("Authorization failed"),
+      "topic-b",
+    );
+    const aggregate = new KafkaJS.KafkaJSAggregateError(
+      "Topic creation errors",
+      [inner1, inner2],
+    );
+    const result = formatKafkaError(aggregate);
+    expect(result).toContain("Topic creation errors");
+    expect(result).toContain("- topic-a:");
+    expect(result).toContain("Topic already exists");
+    expect(result).toContain("- topic-b:");
+    expect(result).toContain("Authorization failed");
+  });
+
+  it("should include the code on a plain KafkaJSError", () => {
+    const err = new KafkaJS.KafkaJSError("connection refused");
+    expect(formatKafkaError(err)).toMatch(/Kafka error.*connection refused/);
+  });
+
+  it("should fall back to message for a generic Error", () => {
+    expect(formatKafkaError(new Error("oh no"))).toBe("oh no");
+  });
+
+  it("should fall back to String() for a non-Error value", () => {
+    expect(formatKafkaError("just a string")).toBe("just a string");
+    expect(formatKafkaError(42)).toBe("42");
   });
 });

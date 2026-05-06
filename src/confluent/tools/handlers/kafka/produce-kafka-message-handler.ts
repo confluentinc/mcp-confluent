@@ -19,6 +19,7 @@ import {
 } from "@src/confluent/tools/connection-predicates.js";
 import {
   disposeIfOAuth,
+  formatKafkaError,
   resolveKafkaClusterArgs,
 } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -191,6 +192,8 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
         );
       }
     } catch (err) {
+      // Serialization errors come from user input (bad payload shape vs schema),
+      // not the Kafka client — keep the simpler formatter here.
       return this.createResponse(
         `Failed to serialize: ${err instanceof Error ? err.message : err}`,
         true,
@@ -214,7 +217,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
         });
       } catch (err) {
         return this.createResponse(
-          `Failed to produce message: ${err instanceof Error ? err.message : err}`,
+          `Failed to produce message: ${formatKafkaError(err)}`,
           true,
         );
       }

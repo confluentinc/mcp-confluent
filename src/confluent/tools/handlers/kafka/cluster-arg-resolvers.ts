@@ -14,6 +14,7 @@
  * list-schema-registry-clusters tool that closes the discovery gap.
  */
 
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
@@ -55,4 +56,33 @@ export async function disposeIfOAuth(
   } catch (err) {
     logger.warn({ err, connId }, "OAuth Kafka client disconnect failed");
   }
+}
+
+/**
+ * Renders any error thrown from a Kafka admin/producer/consumer call into a
+ * single agent-readable string. Preserves per-topic-cause unwrapping for
+ * `KafkaJSAggregateError` (the whole reason `create-topics` previously
+ * hand-rolled this logic), surfaces `KafkaJSError.code` when present, and
+ * falls back gracefully for unknown shapes.
+ */
+export function formatKafkaError(err: unknown): string {
+  if (err instanceof KafkaJS.KafkaJSAggregateError) {
+    const details = err.errors
+      .map((inner) => {
+        if (inner instanceof KafkaJS.KafkaJSCreateTopicError) {
+          return `- ${inner.topic}: ${inner.message}`;
+        }
+        if (inner instanceof KafkaJS.KafkaJSError) {
+          return `- ${inner.code ?? "unknown"}: ${inner.message}`;
+        }
+        return `- ${typeof inner === "string" ? inner : String(inner)}`;
+      })
+      .join("\n");
+    return `${err.message}\n${details}`;
+  }
+  if (err instanceof KafkaJS.KafkaJSError) {
+    return `Kafka error (${err.code}): ${err.message}`;
+  }
+  if (err instanceof Error) return err.message;
+  return String(err);
 }

@@ -10,7 +10,10 @@ import {
   hasKafkaBootstrap,
   isOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
-import { resolveKafkaClusterArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+import {
+  disposeIfOAuth,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -20,16 +23,13 @@ const createTopicArgs = z.object({
     .string()
     .optional()
     .describe(
-      "The Confluent Cloud logical Kafka cluster ID (lkc-...). " +
-        "Required under --oauth; under a direct connection it is ignored " +
-        "(cluster fixed by configuration). Discover via list-clusters.",
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
     ),
   environment_id: z
     .string()
     .optional()
     .describe(
-      "The Confluent Cloud environment ID (env-...) that owns the cluster. " +
-        "Required alongside cluster_id under --oauth. Optional under direct.",
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
     ),
   topics: z
     .array(
@@ -62,69 +62,64 @@ export class CreateTopicsHandler extends BaseToolHandler {
       resolved.envId,
     );
     const topicNames = parsed.topics.map((t) => t.topic).join(",");
-    let success: boolean;
     try {
-      // 30s timeout (vs librdkafka's short default) — the broker confirms
-      // topic creation in this window. Increasing this further is not the fix
-      // for the OAuth first-call stall: that issue is a never-arriving response
-      // from the broker, which a longer timeout only delays. Keep this at a
-      // reasonable upper bound and diagnose stalls via OAUTH_KAFKA_DEBUG.
-      success = await admin.createTopics({
-        timeout: 30_000,
-        topics: parsed.topics.map(({ topic, numPartitions }) => ({
-          topic,
-          numPartitions,
-        })),
-      });
-    } catch (err) {
-      // KafkaJSAggregateError wraps per-topic KafkaJSCreateTopicError instances;
-      // surface each one (topic name + cause) so the agent sees the real reason
-      // (auth denial, invalid config, name conflict, etc.) instead of just the
-      // aggregate's generic "Topic creation errors" message.
-      if (err instanceof KafkaJS.KafkaJSAggregateError) {
-        const details = err.errors
-          .map((inner) => {
-            if (
-              inner instanceof KafkaJS.KafkaJSCreateTopicError ||
-              inner instanceof KafkaJS.KafkaJSError
-            ) {
-              const topic =
-                inner instanceof KafkaJS.KafkaJSCreateTopicError
-                  ? inner.topic
-                  : "(unknown topic)";
-              return `- ${topic}: ${inner.message}`;
-            }
-            return `- ${typeof inner === "string" ? inner : String(inner)}`;
-          })
-          .join("\n");
+      let success: boolean;
+      try {
+        // 30s timeout — the broker confirms topic creation within this
+        // window. KafkaJSAggregateError wraps per-topic errors; surface each
+        // one (topic name + cause) so the agent sees the real reason.
+        success = await admin.createTopics({
+          timeout: 30_000,
+          topics: parsed.topics.map(({ topic, numPartitions }) => ({
+            topic,
+            numPartitions,
+          })),
+        });
+      } catch (err) {
+        if (err instanceof KafkaJS.KafkaJSAggregateError) {
+          const details = err.errors
+            .map((inner) => {
+              if (
+                inner instanceof KafkaJS.KafkaJSCreateTopicError ||
+                inner instanceof KafkaJS.KafkaJSError
+              ) {
+                const topic =
+                  inner instanceof KafkaJS.KafkaJSCreateTopicError
+                    ? inner.topic
+                    : "(unknown topic)";
+                return `- ${topic}: ${inner.message}`;
+              }
+              return `- ${typeof inner === "string" ? inner : String(inner)}`;
+            })
+            .join("\n");
+          return this.createResponse(
+            `Failed to create Kafka topics: ${err.message}\n${details}`,
+            true,
+          );
+        }
+        const message = err instanceof Error ? err.message : String(err);
         return this.createResponse(
-          `Failed to create Kafka topics: ${err.message}\n${details}`,
+          `Failed to create Kafka topics (${topicNames}): ${message}`,
           true,
         );
       }
-      const message = err instanceof Error ? err.message : String(err);
-      return this.createResponse(
-        `Failed to create Kafka topics (${topicNames}): ${message}`,
-        true,
-      );
+      if (!success) {
+        return this.createResponse(
+          `Failed to create Kafka topics: ${topicNames}`,
+          true,
+        );
+      }
+      return this.createResponse(`Created Kafka topics: ${topicNames}`);
+    } finally {
+      await disposeIfOAuth(runtime, connId, admin);
     }
-    if (!success) {
-      return this.createResponse(
-        `Failed to create Kafka topics: ${topicNames}`,
-        true,
-      );
-    }
-    return this.createResponse(`Created Kafka topics: ${topicNames}`);
   }
 
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.CREATE_TOPICS,
       description:
-        "Create one or more Kafka topics with an optional partition count. " +
-        "Under --oauth, requires cluster_id and environment_id (call " +
-        "list-clusters first to discover them). Under a direct connection, " +
-        "the cluster is fixed by config.",
+        "Create one or more Kafka topics with an optional partition count.",
       inputSchema: createTopicArgs.shape,
       annotations: CREATE_UPDATE,
     };

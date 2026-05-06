@@ -639,6 +639,22 @@ describe("oauth/auth-context.ts", () => {
       expect(refreshSpy).toHaveBeenCalledTimes(2);
     });
 
+    it("should stop scheduling after a non-transient refresh error", async () => {
+      // Simulate a non-transient error already recorded on the context.
+      // `recordRefreshError` is private; write the error shape directly.
+      ctx["errors"] = {
+        tokenRefresh: { message: "invalid_grant", isTransient: false },
+      };
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
+
+      ctx.startRefreshLoop();
+      // Advance well past the would-be first-fire — guard should have
+      // returned without scheduling a timer.
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS * 2);
+
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
+
     it("should stop the loop when stopRefreshLoop is called", async () => {
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
       ctx.startRefreshLoop();

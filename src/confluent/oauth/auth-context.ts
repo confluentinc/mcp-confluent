@@ -329,11 +329,23 @@ export class AuthContext {
       this.clear();
       return;
     }
+    // After a non-transient refresh error (e.g., refresh-token revoked, or
+    // `MAX_CONSECUTIVE_TRANSIENT_FAILURES` exceeded), don't reschedule. The
+    // loop terminates; the user must re-authenticate to recover. Without
+    // this guard the loop would hammer auth0 every 1s indefinitely on a
+    // permanent failure.
+    if (hasNonTransientError(this.errors)) {
+      logger.info(
+        "Non-transient refresh error recorded; refresh loop stopping until re-auth",
+      );
+      return;
+    }
     // Target: fire `REFRESH_WINDOW_MS` before CP expiry. Floor at 1s so a
-    // permanent transient-error loop doesn't spin without the event loop
-    // breathing — refresh failures bump `failedRefreshAttempts`, which
-    // eventually flips `shouldAttemptRefresh` to false via
-    // `hasNonTransientError` and the next fire is a no-op clear.
+    // failed refresh (which doesn't advance `controlPlaneExpiresAt`)
+    // produces a tight retry. The failure counter caps at
+    // `MAX_CONSECUTIVE_TRANSIENT_FAILURES`, after which the next call to
+    // `recordRefreshError` flips the error to non-transient and the guard
+    // above stops the loop on the very next reschedule.
     const now = Date.now();
     const targetDelay = Math.max(
       this.internalTokens.controlPlaneExpiresAt -

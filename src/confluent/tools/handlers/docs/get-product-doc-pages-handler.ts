@@ -91,7 +91,9 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
       return this.formatResponse(parsed, undefined, body);
     }
 
-    const html = await this.fetchHtml(parsed);
+    // 404s on docs.confluent.io soft-redirect to /index.html; reject path
+    // changes so we don't return the homepage as if it were the requested page.
+    const html = await this.fetchHtml(parsed, { rejectRedirect: true });
     const $ = cheerio.load(html);
     const main = $("div.rst-content").first();
     const target = main.length > 0 ? main : $("body");
@@ -198,12 +200,23 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
     );
   }
 
-  private async fetchHtml(parsed: URL): Promise<string> {
+  private async fetchHtml(
+    parsed: URL,
+    opts?: { rejectRedirect?: boolean },
+  ): Promise<string> {
     const response = await fetchWithTimeout(parsed.toString(), {
       headers: { "user-agent": USER_AGENT },
     });
     if (!response.ok) {
       throw new Error(`${response.status} ${response.statusText}`);
+    }
+    if (opts?.rejectRedirect) {
+      const finalPath = new URL(response.url || parsed.toString()).pathname;
+      if (finalPath !== parsed.pathname) {
+        throw new Error(
+          `${parsed.toString()} redirected to ${finalPath}; page may have been moved or removed.`,
+        );
+      }
     }
     return response.text();
   }

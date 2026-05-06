@@ -35,6 +35,13 @@ function getText(result: CallToolResult): string {
   return item.text;
 }
 
+// Set response.url so handler can see the post-redirect URL — Response
+// constructed via `new Response(...)` has an empty `.url` by default.
+function withFinalUrl(response: Response, url: string): Response {
+  Object.defineProperty(response, "url", { value: url });
+  return response;
+}
+
 describe("get-product-doc-pages-handler.ts", () => {
   describe("GetProductDocPagesHandler", () => {
     const handler = new GetProductDocPagesHandler();
@@ -148,6 +155,26 @@ describe("get-product-doc-pages-handler.ts", () => {
           expect(text).toContain("# Title");
           expect(text).toContain("Body text.");
           expect(fetchSpy).toHaveBeenCalledTimes(2);
+        });
+
+        it("should reject HTML fallback when the path is redirected (soft 404)", async () => {
+          // docs.confluent.io 404s redirect to /index.html. Without this guard,
+          // the handler would return the homepage as if it were the requested page.
+          fetchSpy
+            .mockResolvedValueOnce(new Response("not found", { status: 404 }))
+            .mockResolvedValueOnce(
+              withFinalUrl(
+                htmlResponse("<html><body>...homepage...</body></html>"),
+                "https://docs.confluent.io/index.html",
+              ),
+            );
+
+          const result = await handler.handle(runtime, {
+            url: "https://docs.confluent.io/this-page-does-not-exist.html",
+          });
+
+          expect(result.isError).toBe(true);
+          expect(getText(result)).toMatch(/moved or removed/);
         });
 
         it("should ignore non-markdown content-type on the .md endpoint", async () => {
@@ -432,13 +459,12 @@ describe("get-product-doc-pages-handler.ts", () => {
         });
 
         it("should reject when fetch redirects to a disallowed host", async () => {
-          fetchSpy.mockImplementationOnce(async () => {
-            const r = markdownResponse("compromised");
-            Object.defineProperty(r, "url", {
-              value: "https://attacker.com/page.md",
-            });
-            return r;
-          });
+          fetchSpy.mockImplementationOnce(async () =>
+            withFinalUrl(
+              markdownResponse("compromised"),
+              "https://attacker.com/page.md",
+            ),
+          );
 
           const result = await handler.handle(runtime, {
             url: "https://docs.confluent.io/platform/quickstart.html",

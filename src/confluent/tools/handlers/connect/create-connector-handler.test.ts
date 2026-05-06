@@ -9,12 +9,19 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 type ConnectHandleCase = HandleCaseWithConn & {
   expectedEnvId?: string;
   expectedClusterId?: string;
+  /** Response object the cloud REST POST resolves with. Use { data } for the
+   *  success path or { error } for the API-error path. Omit for cases that
+   *  throw before reaching the client. */
+  mockResponse?: { data?: unknown; error?: unknown };
 };
 
 const MINIMAL_CONNECTOR_ARGS = {
@@ -55,7 +62,7 @@ describe("create-connector-handler.ts", () => {
             "fall back to conn kafka env_id and cluster_id when args are absent",
           connectionConfig: CONNECT_CONN_WITH_AUTH,
           args: MINIMAL_CONNECTOR_ARGS,
-          responseData: { name: "my-connector" },
+          mockResponse: { data: { name: "my-connector" } },
           outcome: { resolves: "my-connector created" },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -69,7 +76,7 @@ describe("create-connector-handler.ts", () => {
             environmentId: "env-from-arg",
             clusterId: "lkc-from-arg",
           },
-          responseData: { name: "my-connector" },
+          mockResponse: { data: { name: "my-connector" } },
           outcome: { resolves: "my-connector created" },
           expectedEnvId: "env-from-arg",
           expectedClusterId: "lkc-from-arg",
@@ -85,7 +92,6 @@ describe("create-connector-handler.ts", () => {
             },
           },
           args: MINIMAL_CONNECTOR_ARGS,
-          responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
         {
@@ -100,14 +106,13 @@ describe("create-connector-handler.ts", () => {
             },
           },
           args: MINIMAL_CONNECTOR_ARGS,
-          responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
         {
           label: "resolve with an error message when the API returns an error",
           connectionConfig: CONNECT_CONN_WITH_AUTH,
           args: MINIMAL_CONNECTOR_ARGS,
-          responseData: { error: { message: "connector already exists" } },
+          mockResponse: { error: { message: "connector already exists" } },
           outcome: { resolves: "Failed to create connector my-connector" },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -119,13 +124,17 @@ describe("create-connector-handler.ts", () => {
         async ({
           connectionConfig = {},
           args,
-          responseData,
+          mockResponse,
           outcome,
           expectedEnvId,
           expectedClusterId,
         }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          const cloudRest = clientManager.getConfluentCloudRestClient();
+          if (mockResponse !== undefined) {
+            cloudRest.POST.mockResolvedValue(mockResponse);
+          }
+
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -135,26 +144,31 @@ describe("create-connector-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
+
           if (typeof outcome === "object" && "resolves" in outcome) {
-            expect(capturedCalls).toHaveLength(1);
-            expect(capturedCalls[0]!.args).toMatchObject({
-              params: expect.objectContaining({
-                path: expect.objectContaining({
-                  environment_id: expectedEnvId,
-                  kafka_cluster_id: expectedClusterId,
+            expect(cloudRest.POST).toHaveBeenCalledOnce();
+            expect(cloudRest.POST).toHaveBeenCalledWith(
+              expect.any(String),
+              expect.objectContaining({
+                params: expect.objectContaining({
+                  path: expect.objectContaining({
+                    environment_id: expectedEnvId,
+                    kafka_cluster_id: expectedClusterId,
+                  }),
                 }),
               }),
-            });
+            );
           }
         },
       );
 
       it("should embed kafka auth credentials from conn config in the POST body", async () => {
-        const { clientManager, capturedCalls } = stubClientGetters({
-          name: "my-connector",
-        });
+        const clientManager = getMockedClientManager();
+        const cloudRest = clientManager.getConfluentCloudRestClient();
+        cloudRest.POST.mockResolvedValue({ data: { name: "my-connector" } });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -164,15 +178,20 @@ describe("create-connector-handler.ts", () => {
           ),
           args: MINIMAL_CONNECTOR_ARGS,
           outcome: { resolves: "my-connector created" },
+          clientManager,
         });
-        expect(capturedCalls[0]!.args).toMatchObject({
-          body: expect.objectContaining({
-            config: expect.objectContaining({
-              "kafka.api.key": "kafka-key",
-              "kafka.api.secret": "kafka-secret",
+
+        expect(cloudRest.POST).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            body: expect.objectContaining({
+              config: expect.objectContaining({
+                "kafka.api.key": "kafka-key",
+                "kafka.api.secret": "kafka-secret",
+              }),
             }),
           }),
-        });
+        );
       });
     });
   });

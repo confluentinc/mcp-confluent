@@ -9,12 +9,19 @@ import {
   HandleCaseWithConn,
   runtimeWith,
 } from "@tests/factories/runtime.js";
-import { assertHandleCase, stubClientGetters } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 type ConnectHandleCase = HandleCaseWithConn & {
   expectedEnvId?: string;
   expectedClusterId?: string;
+  /** Response object the cloud REST DELETE resolves with. Use {} for success
+   *  (handler only reads `error`) or { error } for the API-error path. Omit
+   *  for cases that throw before reaching the client. */
+  mockResponse?: { data?: unknown; error?: unknown };
 };
 
 describe("delete-connector-handler.ts", () => {
@@ -44,7 +51,7 @@ describe("delete-connector-handler.ts", () => {
             "fall back to conn kafka env_id and cluster_id when args are absent",
           connectionConfig: CONNECT_CONN,
           args: { connectorName: "my-connector" },
-          responseData: {},
+          mockResponse: {},
           outcome: { resolves: "Successfully deleted connector my-connector" },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -58,7 +65,7 @@ describe("delete-connector-handler.ts", () => {
             environmentId: "env-from-arg",
             clusterId: "lkc-from-arg",
           },
-          responseData: {},
+          mockResponse: {},
           outcome: { resolves: "Successfully deleted connector my-connector" },
           expectedEnvId: "env-from-arg",
           expectedClusterId: "lkc-from-arg",
@@ -67,7 +74,6 @@ describe("delete-connector-handler.ts", () => {
           label: "throw when environment_id is absent from both arg and config",
           connectionConfig: CCLOUD_CONN,
           args: { connectorName: "my-connector" },
-          responseData: {},
           outcome: { throws: "Environment ID is required" },
         },
         {
@@ -81,14 +87,13 @@ describe("delete-connector-handler.ts", () => {
             },
           },
           args: { connectorName: "my-connector" },
-          responseData: {},
           outcome: { throws: "Kafka Cluster ID is required" },
         },
         {
           label: "resolve with an error message when the API returns an error",
           connectionConfig: CONNECT_CONN,
           args: { connectorName: "my-connector" },
-          responseData: { error: { message: "connector not found" } },
+          mockResponse: { error: { message: "connector not found" } },
           outcome: { resolves: "Failed to delete connector my-connector" },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -100,13 +105,17 @@ describe("delete-connector-handler.ts", () => {
         async ({
           connectionConfig = {},
           args,
-          responseData,
+          mockResponse,
           outcome,
           expectedEnvId,
           expectedClusterId,
         }) => {
-          const { clientManager, clientGetters, capturedCalls } =
-            stubClientGetters(responseData);
+          const clientManager = getMockedClientManager();
+          const cloudRest = clientManager.getConfluentCloudRestClient();
+          if (mockResponse !== undefined) {
+            cloudRest.DELETE.mockResolvedValue(mockResponse);
+          }
+
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -116,19 +125,23 @@ describe("delete-connector-handler.ts", () => {
             ),
             args,
             outcome,
-            clientGetters,
+            clientManager,
           });
+
           if (typeof outcome === "object" && "resolves" in outcome) {
-            expect(capturedCalls).toHaveLength(1);
-            expect(capturedCalls[0]!.args).toMatchObject({
-              params: expect.objectContaining({
-                path: expect.objectContaining({
-                  connector_name: "my-connector",
-                  environment_id: expectedEnvId,
-                  kafka_cluster_id: expectedClusterId,
+            expect(cloudRest.DELETE).toHaveBeenCalledOnce();
+            expect(cloudRest.DELETE).toHaveBeenCalledWith(
+              expect.any(String),
+              expect.objectContaining({
+                params: expect.objectContaining({
+                  path: expect.objectContaining({
+                    connector_name: "my-connector",
+                    environment_id: expectedEnvId,
+                    kafka_cluster_id: expectedClusterId,
+                  }),
                 }),
               }),
-            });
+            );
           }
         },
       );

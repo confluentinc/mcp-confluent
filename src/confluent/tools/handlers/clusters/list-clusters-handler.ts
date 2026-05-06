@@ -19,9 +19,7 @@ const listClustersArguments = z.object({
     .string()
     .optional()
     .describe(
-      "The environment ID (env-...) to filter clusters by. Required under " +
-        "--oauth (the cmk endpoint requires it). Under a direct connection it " +
-        "falls back to kafka.env_id from the YAML config.",
+      "Environment ID (env-...) to filter clusters by. Falls back to kafka.env_id from the YAML config when omitted.",
     ),
 });
 

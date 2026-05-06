@@ -14,9 +14,7 @@ import {
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-type EnvIdCase = HandleCaseWithConn & {
-  expectedEnvId: string;
-};
+type EnvIdCase = HandleCaseWithConn & { expectedEnvId: string };
 
 describe("list-clusters-handler.ts", () => {
   describe("ListClustersHandler", () => {
@@ -33,8 +31,10 @@ describe("list-clusters-handler.ts", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });
 
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
+      it("should return the connection id when the connection is OAuth-typed", () => {
+        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
+          DEFAULT_CONNECTION_ID,
+        ]);
       });
     });
 
@@ -62,14 +62,6 @@ describe("list-clusters-handler.ts", () => {
           args: { environmentId: "env-explicit" },
           outcome: { resolves: "Successfully retrieved 0 clusters" },
           expectedEnvId: "env-explicit",
-        },
-        {
-          label:
-            "use empty string when both environmentId arg and conn kafka.env_id are absent",
-          connectionConfig: CCLOUD_CONN,
-          args: {},
-          outcome: { resolves: "Successfully retrieved 0 clusters" },
-          expectedEnvId: "",
         },
       ];
 
@@ -103,6 +95,20 @@ describe("list-clusters-handler.ts", () => {
           );
         },
       );
+
+      it("should return an error response when both environmentId arg and conn kafka.env_id are absent", async () => {
+        const clientManager = getMockedClientManager();
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            CCLOUD_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: { resolves: "environmentId is required" },
+        });
+      });
     });
   });
 });

@@ -32,12 +32,13 @@ Every tool handler follows this pattern:
 
 ## Registration Checklist
 
-When adding a new tool, touch exactly three files (plus optionally a fourth):
+When adding a new tool, touch these files:
 
 1. `src/confluent/tools/tool-name.ts` — add enum entry (e.g., `MY_TOOL = "my-tool"`)
 2. `src/confluent/tools/handlers/<domain>/my-tool-handler.ts` — create handler class
 3. `src/confluent/tools/tool-registry.ts` — import handler and add `[ToolName.MY_TOOL, new MyToolHandler()]` to the `ToolHandlerRegistry.handlers` map
-4. (Only if needed) `src/confluent/tools/connection-predicates.ts` — add a new predicate if no existing one expresses the tool's requirement
+4. `src/index.test.ts` — classify the new `ToolName` in the capstone partition test by adding it to either `EXPECTED_OAUTH_ENABLED` or `EXPECTED_OAUTH_DISABLED`. The partition test fails if a tool belongs to neither — the guard against birthing a tool without thinking about its OAuth posture.
+5. (Only if needed) `src/confluent/tools/connection-predicates.ts` — add a new predicate if no existing one expresses the tool's requirement
 
 ## Connection Predicates
 

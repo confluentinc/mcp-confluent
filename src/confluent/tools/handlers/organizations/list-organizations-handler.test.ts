@@ -2,6 +2,7 @@ import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organiza
 import {
   bareRuntime,
   CCLOUD_CONN,
+  CCLOUD_OAUTH_CONNECTION_ID,
   ccloudOAuthRuntime,
   confluentCloudRuntime,
   DEFAULT_CONNECTION_ID,
@@ -44,7 +45,7 @@ describe("list-organizations-handler.ts", () => {
 
       it("should return the connection id when the connection is OAuth-typed", () => {
         expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
+          CCLOUD_OAUTH_CONNECTION_ID,
         ]);
       });
     });

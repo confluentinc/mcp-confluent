@@ -45,7 +45,7 @@ function backoffWithJitter(attempt: number, base: number): number {
  * honoring `Retry-After` when present and falling back to exponential
  * backoff with jitter otherwise. Caps at
  * {@linkcode RetryOn429Options.maxAttempts} retries and returns the final
- * 429 on exhaustion so callers still fail loud.
+ * 429 on exhaustion so openapi-fetch surfaces it as `{ error }` (not silently as `data === undefined`)
  */
 export function createRetryOn429Middleware(
   opts: RetryOn429Options = {},
@@ -55,10 +55,22 @@ export function createRetryOn429Middleware(
   const fetchFn = opts.fetch ?? globalThis.fetch;
   const sleep = opts.sleep ?? defaultSleep;
 
+  // post-fetch `request.clone()` throws "unusable" for body-bearing calls since openapi-fetch hands
+  // the same Request to fetch() and onResponse; capture bytes in onRequest and rebuild a new Request
+  // per retry
+  const requestBodyBytes = new WeakMap<Request, ArrayBuffer>();
+
   return {
+    async onRequest({ request }) {
+      if (request.body !== null) {
+        requestBodyBytes.set(request, await request.clone().arrayBuffer());
+      }
+      return undefined;
+    },
     async onResponse({ request, response }) {
       if (response.status !== 429) return undefined;
       let current = response;
+      const cachedBody = requestBodyBytes.get(request);
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const retryAfter = parseRetryAfter(current.headers.get("Retry-After"));
         const delayMs = retryAfter ?? backoffWithJitter(attempt, baseBackoffMs);
@@ -67,7 +79,14 @@ export function createRetryOn429Middleware(
             `retry ${attempt}/${maxAttempts} after ${Math.round(delayMs)}ms`,
         );
         await sleep(delayMs);
-        current = await fetchFn(request.clone());
+        current = await fetchFn(
+          new Request(request.url, {
+            method: request.method,
+            headers: request.headers,
+            body: cachedBody ?? null,
+            signal: request.signal,
+          }),
+        );
         if (current.status !== 429) return current;
       }
       return current;

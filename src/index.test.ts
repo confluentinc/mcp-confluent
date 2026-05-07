@@ -1,3 +1,4 @@
+import * as nodeDeps from "@src/confluent/node-deps.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -5,10 +6,15 @@ import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import {
   getToolHandlersToRegister,
   outputApiKey,
+  outputInitConfig,
   outputToolList,
 } from "@src/index.js";
 import { runtimeWith } from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
+import {
+  createFsWrappers,
+  type MockedFsWrappers,
+} from "@tests/stubs/node-deps.js";
 import {
   beforeEach,
   describe,
@@ -181,6 +187,143 @@ describe("index.ts", () => {
       outputApiKey();
       const allArgs: unknown[] = consoleLog.mock.calls.flat();
       expect(allArgs).toContain(EXPECTED_API_KEY);
+    });
+  });
+
+  describe("outputInitConfig()", () => {
+    const DEST_PATH = "/cwd/config.yaml";
+    const GITIGNORE_PATH = "/cwd/.gitignore";
+    const EXAMPLE_CONTENTS = "server: { transports: [stdio] }\n";
+
+    let fsMocks: MockedFsWrappers;
+
+    beforeEach(() => {
+      fsMocks = createFsWrappers();
+      // path.resolve("config.yaml") → /cwd/config.yaml
+      vi.spyOn(nodeDeps.path, "resolve").mockReturnValue(DEST_PATH);
+      // path.dirname(/cwd/config.yaml) → /cwd
+      vi.spyOn(nodeDeps.path, "dirname").mockReturnValue("/cwd");
+      // path.basename(/cwd/config.yaml) → config.yaml
+      vi.spyOn(nodeDeps.path, "basename").mockReturnValue("config.yaml");
+      // path.join("/cwd", ".gitignore") → /cwd/.gitignore
+      vi.spyOn(nodeDeps.path, "join").mockReturnValue(GITIGNORE_PATH);
+    });
+
+    it("should refuse to overwrite an existing config.yaml", () => {
+      // The exclusive-create write throws EEXIST when the destination
+      // already exists; outputInitConfig converts it to the friendly error.
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+      const eexist: NodeJS.ErrnoException = Object.assign(
+        new Error("EEXIST: file already exists"),
+        { code: "EEXIST" },
+      );
+      fsMocks.writeFileSync.mockImplementation(() => {
+        throw eexist;
+      });
+
+      expect(() => outputInitConfig()).toThrow(/config\.yaml already exists/);
+      // Failed write must not be followed by gitignore mutation.
+      expect(fsMocks.appendFileSync).not.toHaveBeenCalled();
+    });
+
+    it("should propagate non-EEXIST write errors verbatim", () => {
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+      const eacces: NodeJS.ErrnoException = Object.assign(
+        new Error("EACCES: permission denied"),
+        { code: "EACCES" },
+      );
+      fsMocks.writeFileSync.mockImplementation(() => {
+        throw eacces;
+      });
+
+      expect(() => outputInitConfig()).toThrow(eacces);
+    });
+
+    it("should write the bundled example to ./config.yaml with an exclusive-create flag", () => {
+      // No .gitignore yet.
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+
+      outputInitConfig();
+
+      // The first writeFileSync writes the config with `wx` (exclusive create);
+      // the second creates the gitignore (since existsSync returned false for it too).
+      expect(fsMocks.writeFileSync).toHaveBeenNthCalledWith(
+        1,
+        DEST_PATH,
+        EXAMPLE_CONTENTS,
+        { flag: "wx" },
+      );
+    });
+
+    it("should create .gitignore with the file basename when it does not exist", () => {
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+
+      outputInitConfig();
+
+      expect(fsMocks.writeFileSync).toHaveBeenCalledWith(
+        GITIGNORE_PATH,
+        "config.yaml\n",
+      );
+      expect(fsMocks.appendFileSync).not.toHaveBeenCalled();
+      const allArgs = consoleLog.mock.calls.flat().join(" ");
+      expect(allArgs).toContain("added to .gitignore");
+    });
+
+    it("should append the file basename when .gitignore exists without it", () => {
+      fsMocks.existsSync.mockImplementation((p) => p === GITIGNORE_PATH);
+      // First readFileSync = the bundled example; second = the gitignore.
+      fsMocks.readFileSync
+        .mockReturnValueOnce(EXAMPLE_CONTENTS)
+        .mockReturnValueOnce("node_modules\n.env\n");
+
+      outputInitConfig();
+
+      expect(fsMocks.appendFileSync).toHaveBeenCalledWith(
+        GITIGNORE_PATH,
+        "config.yaml\n",
+      );
+      const allArgs = consoleLog.mock.calls.flat().join(" ");
+      expect(allArgs).toContain("added to .gitignore");
+    });
+
+    it("should prepend a newline before appending if .gitignore lacks a trailing newline", () => {
+      fsMocks.existsSync.mockImplementation((p) => p === GITIGNORE_PATH);
+      fsMocks.readFileSync
+        .mockReturnValueOnce(EXAMPLE_CONTENTS)
+        .mockReturnValueOnce("node_modules"); // no trailing newline
+
+      outputInitConfig();
+
+      expect(fsMocks.appendFileSync).toHaveBeenCalledWith(
+        GITIGNORE_PATH,
+        "\nconfig.yaml\n",
+      );
+    });
+
+    it("should not append when .gitignore already lists the basename", () => {
+      fsMocks.existsSync.mockImplementation((p) => p === GITIGNORE_PATH);
+      fsMocks.readFileSync
+        .mockReturnValueOnce(EXAMPLE_CONTENTS)
+        .mockReturnValueOnce("node_modules\nconfig.yaml\n.env\n");
+
+      outputInitConfig();
+
+      expect(fsMocks.appendFileSync).not.toHaveBeenCalled();
+      const allArgs = consoleLog.mock.calls.flat().join(" ");
+      expect(allArgs).toContain(".gitignore already excludes it");
+    });
+
+    it("should ignore surrounding whitespace when matching existing .gitignore lines", () => {
+      fsMocks.existsSync.mockImplementation((p) => p === GITIGNORE_PATH);
+      fsMocks.readFileSync
+        .mockReturnValueOnce(EXAMPLE_CONTENTS)
+        .mockReturnValueOnce("  config.yaml  \n");
+
+      outputInitConfig();
+
+      expect(fsMocks.appendFileSync).not.toHaveBeenCalled();
     });
   });
 });

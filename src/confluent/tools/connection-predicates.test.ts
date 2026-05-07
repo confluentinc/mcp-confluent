@@ -5,6 +5,8 @@ import {
   type PredicateResult,
   ToolDisabledReason,
   allOf,
+  canCreateDirectConnector,
+  flinkWithTelemetry,
   hasCCloudCatalogSupport,
   hasConfluentCloud,
   hasDirectConfluentCloud,
@@ -16,6 +18,7 @@ import {
   hasSchemaRegistry,
   hasTableflow,
   hasTelemetry,
+  kafkaBootstrapOrOAuth,
   widenForOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { describe, expect, it, vi } from "vitest";
@@ -72,6 +75,31 @@ const TABLEFLOW_CONN = conn({
 const CCLOUD_SR_CONN = conn({
   schema_registry: {
     endpoint: "https://psrc-abc.us-east-1.aws.confluent.cloud",
+    auth: { type: "api_key", key: "k", secret: "s" },
+  },
+});
+
+const DIRECT_CCLOUD_KAFKA_AUTH_CONN = conn({
+  confluent_cloud: {
+    endpoint: "https://api.confluent.cloud",
+    auth: { type: "api_key", key: "k", secret: "s" },
+  },
+  kafka: {
+    bootstrap_servers: "broker:9092",
+    auth: { type: "api_key", key: "k", secret: "s" },
+  },
+});
+
+const FLINK_AND_TELEMETRY_CONN = conn({
+  flink: {
+    endpoint: "https://flink.confluent.cloud",
+    auth: { type: "api_key", key: "k", secret: "s" },
+    environment_id: "env-abc",
+    organization_id: "org-123",
+    compute_pool_id: "lfcp-xyz",
+  },
+  telemetry: {
+    endpoint: "https://api.telemetry.confluent.cloud",
     auth: { type: "api_key", key: "k", secret: "s" },
   },
 });
@@ -378,6 +406,82 @@ describe("connection-predicates.ts", () => {
       const widened = widenForOAuth(wrapped);
       widened(OAUTH_CONN);
       expect(wrapped).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("kafkaBootstrapOrOAuth", () => {
+    it("should return ENABLED for a direct connection with kafka.bootstrap_servers", () => {
+      expect(kafkaBootstrapOrOAuth(KAFKA_CONN)).toEqual(ENABLED);
+    });
+
+    it("should report MissingKafkaBootstrap for a direct connection whose kafka block has no bootstrap_servers", () => {
+      expect(kafkaBootstrapOrOAuth(KAFKA_REST_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaBootstrap),
+      );
+    });
+
+    it("should report MissingKafkaBlock for a direct connection without a kafka block", () => {
+      expect(kafkaBootstrapOrOAuth(SCHEMA_REGISTRY_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaBlock),
+      );
+    });
+
+    it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
+      expect(kafkaBootstrapOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
+    });
+  });
+
+  describe("canCreateDirectConnector", () => {
+    it("should return ENABLED when both confluent_cloud and kafka.auth are present on a direct connection", () => {
+      expect(canCreateDirectConnector(DIRECT_CCLOUD_KAFKA_AUTH_CONN)).toEqual(
+        ENABLED,
+      );
+    });
+
+    it("should report MissingConfluentCloudBlock when the first conjunct fails (no confluent_cloud block)", () => {
+      // KAFKA_REST_WITH_AUTH_CONN has kafka.auth but no confluent_cloud,
+      // so hasDirectConfluentCloud short-circuits before hasKafkaAuth runs.
+      expect(canCreateDirectConnector(KAFKA_REST_WITH_AUTH_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingConfluentCloudBlock),
+      );
+    });
+
+    it("should report MissingKafkaBlock when the second conjunct fails (confluent_cloud present but no kafka block)", () => {
+      // CONFLUENT_CLOUD_CONN has confluent_cloud but no kafka block;
+      // hasKafkaAuth's first check (kafka block presence) trips first.
+      expect(canCreateDirectConnector(CONFLUENT_CLOUD_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaBlock),
+      );
+    });
+
+    it("should report OAuthNotDirectCapable for an OAuth connection", () => {
+      expect(canCreateDirectConnector(OAUTH_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.OAuthNotDirectCapable),
+      );
+    });
+  });
+
+  describe("flinkWithTelemetry", () => {
+    it("should return ENABLED when both flink and telemetry blocks are present on a direct connection", () => {
+      expect(flinkWithTelemetry(FLINK_AND_TELEMETRY_CONN)).toEqual(ENABLED);
+    });
+
+    it("should report MissingFlinkBlock when only the telemetry block is present (first conjunct fails)", () => {
+      expect(flinkWithTelemetry(TELEMETRY_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingFlinkBlock),
+      );
+    });
+
+    it("should report MissingTelemetryBlock when only the flink block is present (second conjunct fails)", () => {
+      expect(flinkWithTelemetry(FLINK_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingTelemetryBlock),
+      );
+    });
+
+    it("should report OAuthNoServiceBlocks for an OAuth connection", () => {
+      expect(flinkWithTelemetry(OAUTH_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.OAuthNoServiceBlocks),
+      );
     });
   });
 });

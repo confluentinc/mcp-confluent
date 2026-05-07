@@ -4,10 +4,7 @@ import {
   CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  hasKafkaBootstrap,
-  widenForOAuth,
-} from "@src/confluent/tools/connection-predicates.js";
+import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
   disposeIfOAuth,
   formatKafkaError,
@@ -100,5 +97,5 @@ export class CreateTopicsHandler extends BaseToolHandler {
     };
   }
 
-  readonly predicate = widenForOAuth(hasKafkaBootstrap);
+  readonly predicate = kafkaBootstrapOrOAuth;
 }

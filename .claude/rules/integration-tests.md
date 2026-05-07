@@ -415,3 +415,9 @@ Schema Registry, Flink, Tableflow):
   specific fields (URLs, status codes, IDs) rather than whole object bindings,
   and never pass `process.env` or a full config object to a logger or
   `console.*` call.
+- **Don't call `createClient<paths>(...)` directly in test code**: route
+  every test-side CCloud REST call through `newTestCloudClient()` in
+  `tests/harness/confluent-cloud.ts`. That factory wraps the client with
+  the 429-retry middleware. A new harness helper that builds its own client
+  silently bypasses retry coverage; full-suite runs already push CCloud's
+  per-account quota close to its limit.

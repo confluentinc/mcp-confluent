@@ -26,6 +26,7 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
   - [Getting Started](#getting-started)
   - [Configuration](#configuration)
     - [YAML Configuration](#yaml-configuration)
+  - [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
   - [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports)
   - [Usage](#usage)
   - [CLI Usage](#cli-usage)
@@ -44,7 +45,7 @@ npx -y @confluentinc/mcp-confluent --list-tools
 
 ### Available Tools for Confluent Cloud
 
-These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`.env.example`](.env.example) for the full set of configuration variables.
+These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`.env.example`](.env.example) for the full set of configuration variables, or to [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) below to authenticate as a logged-in user instead of via API keys (currently supported by the native-broker **Kafka** tools — `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`).
 
 | Category                                   | Tools                                                                                                                                                                                               | Description                                                       |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -197,6 +198,38 @@ Please refer to the following Confluent Cloud documentation for detailed instruc
   [https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html)
 
 Ensuring these prerequisites are met will prevent authorization errors when the `mcp-server` attempts to provision or manage Tableflow-enabled tables.
+
+### OAuth Authentication for Confluent Cloud
+
+The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys.
+
+#### How it works
+
+On startup, the server opens your browser to the Confluent Cloud sign-in page and waits for the redirect callback. Supported tools begin working only after sign-in completes — calls made before then will fail with an `"OAuth token is not currently available"` error.
+
+#### YAML setup
+
+Add the following to the yaml file to enable an OAuth Connection:
+
+```yaml
+connections:
+  ccloud-oauth:
+    type: oauth
+```
+
+Run with `--config oauth.yaml` and the browser sign-in opens on first start.
+
+#### Supported tools under OAuth
+
+| Category               | Tools                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| **Kafka (native)**     | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` |
+| **Control plane REST** | `list-organizations`, `list-environments`, `read-environment`, `list-billing-costs`    |
+
+#### Limitations
+
+- **Schema Registry (de)serialization** is not yet exposed under OAuth. `produce-message` / `consume-messages` calls with `useSchemaRegistry: true` return a clear capability error. Use a direct connection if schema-aware (de)serialization is required.
+- **Other REST-only tool categories** (`list-clusters`, Connect, Tableflow, Flink, Schema Registry, Metrics, Catalog & Tags) are still being migrated to OAuth and currently require a `direct` connection.
 
 ### Authentication for HTTP/SSE Transports
 

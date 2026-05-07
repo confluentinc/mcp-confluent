@@ -12,6 +12,10 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const getTopicConfigArguments = z.object({
+  topicName: z
+    .string()
+    .describe("Name of the topic to get configuration for")
+    .nonempty(),
   clusterId: z
     .string()
     .optional()
@@ -24,10 +28,6 @@ const getTopicConfigArguments = z.object({
     .describe(
       "Confluent Cloud environment ID (env-...) that owns the cluster.",
     ),
-  topicName: z
-    .string()
-    .describe("Name of the topic to get configuration for")
-    .nonempty(),
 });
 
 /**

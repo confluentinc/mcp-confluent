@@ -12,6 +12,17 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const alterTopicConfigArguments = z.object({
+  topicName: z.string().describe("Name of the topic to alter").nonempty(),
+  topicConfigs: z
+    .array(
+      z.object({
+        name: z.string().describe("Configuration parameter name").nonempty(),
+        value: z.string().describe("Configuration parameter value"),
+        operation: z.enum(["SET", "DELETE"]).describe("Operation type"),
+      }),
+    )
+    .nonempty(),
+  validateOnly: z.boolean().default(false),
   clusterId: z
     .string()
     .optional()
@@ -24,17 +35,6 @@ const alterTopicConfigArguments = z.object({
     .describe(
       "Confluent Cloud environment ID (env-...) that owns the cluster.",
     ),
-  topicName: z.string().describe("Name of the topic to alter").nonempty(),
-  topicConfigs: z
-    .array(
-      z.object({
-        name: z.string().describe("Configuration parameter name").nonempty(),
-        value: z.string().describe("Configuration parameter value"),
-        operation: z.enum(["SET", "DELETE"]).describe("Operation type"),
-      }),
-    )
-    .nonempty(),
-  validateOnly: z.boolean().default(false),
 });
 
 /**

@@ -222,6 +222,7 @@ describe("index.ts", () => {
         ToolName.GET_PRODUCT_DOC_PAGE,
         ToolName.ALTER_TOPIC_CONFIG,
         ToolName.GET_TOPIC_CONFIG,
+        ToolName.LIST_CLUSTERS,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
@@ -252,9 +253,6 @@ describe("index.ts", () => {
         ToolName.REMOVE_TAG_FROM_ENTITY,
         ToolName.ADD_TAGS_TO_TOPIC,
         ToolName.LIST_TAGS,
-        // CCloud — handler calls getSoleDirectConnection() so it stays unwrapped
-        // (no widenForOAuth) until the handler is migrated.
-        ToolName.LIST_CLUSTERS,
         // Schema Registry (hasSchemaRegistry)
         ToolName.LIST_SCHEMAS,
         ToolName.DELETE_SCHEMA,

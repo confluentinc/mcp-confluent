@@ -11,7 +11,7 @@ import {
   flinkWithTelemetry,
   hasCCloudCatalogSupport,
   hasConfluentCloud,
-  hasDirectConfluentCloud,
+  hasConfluentCloudOrOAuth,
   hasFlink,
   hasSchemaRegistry,
   hasTableflow,
@@ -190,10 +190,10 @@ describe("tool-registry.ts", () => {
         [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
         [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
         // Connect
-        [ToolName.LIST_CONNECTORS]: hasDirectConfluentCloud,
-        [ToolName.READ_CONNECTOR]: hasDirectConfluentCloud,
+        [ToolName.LIST_CONNECTORS]: hasConfluentCloud,
+        [ToolName.READ_CONNECTOR]: hasConfluentCloud,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
-        [ToolName.DELETE_CONNECTOR]: hasDirectConfluentCloud,
+        [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
         // Catalog + search (CCloud catalog support)
         [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
         [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
@@ -203,12 +203,12 @@ describe("tool-registry.ts", () => {
         [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupport,
         [ToolName.LIST_TAGS]: hasCCloudCatalogSupport,
         // Clusters
-        [ToolName.LIST_CLUSTERS]: hasConfluentCloud,
+        [ToolName.LIST_CLUSTERS]: hasConfluentCloudOrOAuth,
         // Environments + billing + organizations (Confluent Cloud control plane)
-        [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloud,
-        [ToolName.READ_ENVIRONMENT]: hasConfluentCloud,
-        [ToolName.LIST_BILLING_COSTS]: hasConfluentCloud,
-        [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloud,
+        [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloudOrOAuth,
+        [ToolName.READ_ENVIRONMENT]: hasConfluentCloudOrOAuth,
+        [ToolName.LIST_BILLING_COSTS]: hasConfluentCloudOrOAuth,
+        [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
         // Schema Registry
         [ToolName.LIST_SCHEMAS]: hasSchemaRegistry,
         [ToolName.DELETE_SCHEMA]: hasSchemaRegistry,

@@ -20,8 +20,8 @@
 // OAuth note: most predicates short-circuit on `conn.type === "oauth"`
 // and answer disabled — OAuth connections carry no service blocks for these
 // predicates to inspect. Two mechanisms admit OAuth where it's supported:
-// `hasConfluentCloud` answers enabled for OAuth directly (the CCloud REST URL
-// is reachable via the Auth0 environment without a block), and the
+// `hasConfluentCloudOrOAuth` answers enabled for OAuth directly (the CCloud
+// REST URL is reachable via the Auth0 environment without a block), and the
 // `widenForOAuth(predicate)` combinator wraps any block-checking predicate
 // so OAuth connections bypass the block check and answer enabled. Use
 // `widenForOAuth` here, when defining a new named composite export, for
@@ -121,24 +121,24 @@ export function hasSchemaRegistry(conn: ConnectionConfig): PredicateResult {
 
 /**
  * Block-level — verdict on whether the connection can reach the Confluent
- * Cloud control-plane REST surface. Direct connections satisfy this when
- * they carry a `confluent_cloud` block; OAuth connections satisfy it
- * unconditionally (the cloud REST URL is derived from the Auth0
- * environment).
+ * Cloud control-plane REST surface, accepting either flavor. Direct
+ * connections satisfy this when they carry a `confluent_cloud` block; OAuth
+ * connections satisfy it unconditionally (the cloud REST URL is derived from
+ * the Auth0 environment).
+ *
+ * Pair: {@linkcode hasConfluentCloud} for the direct-only verdict.
  */
-export const hasConfluentCloud: ConnectionPredicate = widenForOAuth(
-  hasDirectConfluentCloud,
-);
+export const hasConfluentCloudOrOAuth: ConnectionPredicate =
+  widenForOAuth(hasConfluentCloud);
 
 /**
  * Block-level — verdict that holds only for direct connections carrying a
- * `confluent_cloud` block. Use this instead of {@linkcode hasConfluentCloud}
- * for handlers that are not yet OAuth-capable and call
- * `getSoleDirectConnection()` inside `handle()`.
+ * `confluent_cloud` block. Use this on handlers that are not yet OAuth-capable
+ * and call `getSoleDirectConnection()` inside `handle()`. Once a handler
+ * widens to OAuth, switch its predicate to
+ * {@linkcode hasConfluentCloudOrOAuth}.
  */
-export function hasDirectConfluentCloud(
-  conn: ConnectionConfig,
-): PredicateResult {
+export function hasConfluentCloud(conn: ConnectionConfig): PredicateResult {
   if (conn.type === "oauth")
     return disabled(ToolDisabledReason.OAuthNotDirectCapable);
   if (conn.confluent_cloud === undefined) {
@@ -272,7 +272,7 @@ export const kafkaRestWithAuthOrOAuth: ConnectionPredicate =
  * because the handler calls `getSoleDirectConnection()`.
  */
 export const canCreateDirectConnector: ConnectionPredicate = allOf(
-  hasDirectConfluentCloud,
+  hasConfluentCloud,
   hasKafkaAuth,
 );
 

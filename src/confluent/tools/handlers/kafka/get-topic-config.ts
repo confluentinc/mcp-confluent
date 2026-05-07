@@ -25,7 +25,7 @@ const getTopicConfigArguments = z.object({
     .string()
     .optional()
     .describe(
-      "Confluent Cloud environment ID (env-...) that owns the cluster. Required under OAuth; ignored under direct.",
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
     ),
   topicName: z
     .string()

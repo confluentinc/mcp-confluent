@@ -49,9 +49,8 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = alterTopicConfigArguments.parse(toolArguments);
-    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
     const { clusterId, envId } = resolveKafkaRestArgs(parsed, runtime, connId);
-    const clientManager = runtime.clientManagers[connId]!;
 
     const restClient = await clientManager.getConfluentCloudKafkaRestClient(
       clusterId,

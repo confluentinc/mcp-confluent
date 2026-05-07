@@ -11,14 +11,14 @@
 // need to render the verdict (group disabled tools by reason, surface
 // availability per connection) rather than just filter on it.
 //
-// OAuth note: while OAuth support is being built out, most predicates
-// currently short-circuit on `conn.type === "oauth"` and answer disabled
-// — OAuth connections do not yet carry the service blocks these predicates
-// inspect. Expect this treatment to evolve as OAuth-capable handlers land
-// and predicates widen to admit OAuth on a case-by-case basis.
-// `hasConfluentCloud` is the first to do so: it answers enabled for OAuth
-// because the CCloud REST URL is reachable via the Auth0 environment
-// without a block.
+// OAuth note: every predicate in this module is strict — OAuth connections
+// short-circuit to disabled because they carry no service blocks. Tool
+// handlers that have been migrated to support OAuth opt in at the call
+// site by wrapping the predicate in {@linkcode widenForOAuth}. This keeps
+// the per-predicate verdict honest (a connection without a `confluent_cloud`
+// block is missing one regardless of whether OAuth happens to make the
+// CCloud REST URL reachable some other way) and concentrates the "this
+// handler is OAuth-capable" decision in one visible place per handler.
 
 import type { ConnectionConfig } from "@src/config/models.js";
 
@@ -113,31 +113,17 @@ export function hasSchemaRegistry(conn: ConnectionConfig): PredicateResult {
 }
 
 /**
- * Block-level — verdict on whether the connection can reach the Confluent
- * Cloud control-plane REST surface. Direct connections satisfy this when
- * they carry a `confluent_cloud` block; OAuth connections satisfy it
- * unconditionally (the cloud REST URL is derived from the Auth0
- * environment).
+ * Block-level — required by tools that read or write through the Confluent
+ * Cloud control-plane REST surface. Strict: OAuth connections fail because
+ * they carry no `confluent_cloud` block. OAuth-capable handlers wrap this
+ * predicate with {@linkcode widenForOAuth} at the call site — OAuth's cloud
+ * REST URL is derived from the Auth0 environment, so wrapping is sufficient
+ * to admit it. Handlers that still call `getSoleDirectConnection()` use this
+ * predicate unwrapped and stay disabled for OAuth until they're migrated.
  */
 export function hasConfluentCloud(conn: ConnectionConfig): PredicateResult {
-  if (conn.type === "oauth") return ENABLED;
-  if (conn.confluent_cloud === undefined) {
-    return disabled(ToolDisabledReason.MissingConfluentCloudBlock);
-  }
-  return ENABLED;
-}
-
-/**
- * Block-level — verdict that holds only for direct connections carrying a
- * `confluent_cloud` block. Use this instead of {@linkcode hasConfluentCloud}
- * for handlers that are not yet OAuth-capable and call
- * `getSoleDirectConnection()` inside `handle()`.
- */
-export function hasDirectConfluentCloud(
-  conn: ConnectionConfig,
-): PredicateResult {
   if (conn.type === "oauth")
-    return disabled(ToolDisabledReason.OAuthNotDirectCapable);
+    return disabled(ToolDisabledReason.OAuthNoServiceBlocks);
   if (conn.confluent_cloud === undefined) {
     return disabled(ToolDisabledReason.MissingConfluentCloudBlock);
   }

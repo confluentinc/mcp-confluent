@@ -6,7 +6,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasDirectConfluentCloud,
+  hasConfluentCloud,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
@@ -194,9 +194,6 @@ Cluster: ${cluster.name}
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      hasDirectConfluentCloud,
-    );
+    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 }

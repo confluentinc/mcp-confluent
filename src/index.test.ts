@@ -359,8 +359,47 @@ describe("index.ts", () => {
       });
 
       expect(() => outputInitConfig()).toThrow(/config\.yaml already exists/);
+      expect(() => outputInitConfig()).toThrow(/--init-config/);
       // Failed write must not be followed by gitignore mutation.
       expect(fsMocks.appendFileSync).not.toHaveBeenCalled();
+    });
+
+    it("should reference --init-oauth-config in the EEXIST error when oauth=true", () => {
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+      const eexist: NodeJS.ErrnoException = Object.assign(
+        new Error("EEXIST: file already exists"),
+        { code: "EEXIST" },
+      );
+      fsMocks.writeFileSync.mockImplementation(() => {
+        throw eexist;
+      });
+
+      expect(() => outputInitConfig(true)).toThrow(/--init-oauth-config/);
+    });
+
+    it("should read the OAuth example template when oauth=true", () => {
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+
+      outputInitConfig(true);
+
+      // The first readFileSync resolves the bundled template URL; assert
+      // the basename it points at matches the OAuth example, not the
+      // direct/api-key one. The second readFileSync (the gitignore) is
+      // skipped here — existsSync(false) short-circuits that path.
+      const sourceUrl = fsMocks.readFileSync.mock.calls[0]![0] as URL;
+      expect(sourceUrl.pathname).toMatch(/config\.oauth\.example\.yaml$/);
+    });
+
+    it("should read the direct example template when oauth is omitted", () => {
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+
+      outputInitConfig();
+
+      const sourceUrl = fsMocks.readFileSync.mock.calls[0]![0] as URL;
+      expect(sourceUrl.pathname).toMatch(/config\.example\.yaml$/);
+      expect(sourceUrl.pathname).not.toMatch(/oauth/);
     });
 
     it("should propagate non-EEXIST write errors verbatim", () => {

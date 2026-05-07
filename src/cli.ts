@@ -32,6 +32,7 @@ export interface CLIOptions {
   allowedHosts?: string[];
   generateKey?: boolean;
   initConfig?: boolean;
+  initOauthConfig?: boolean;
   oauth?: boolean;
   ccloudEnv?: "devel" | "stag" | "prod";
 }
@@ -216,6 +217,10 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       "Bootstrap a starter config.yaml in the current working directory (also adds it to .gitignore), then exit. Refuses to overwrite an existing config.yaml.",
     )
     .option(
+      "--init-oauth-config",
+      "Bootstrap a starter config.yaml for OAuth auth in the current working directory (also adds it to .gitignore), then exit. Refuses to overwrite an existing config.yaml. Mutually exclusive with --init-config.",
+    )
+    .option(
       "--oauth",
       "Enable OAuth (PKCE) auth against Confluent Cloud (defaults to prod)",
     )
@@ -245,6 +250,11 @@ export function parseCliArgs(argv: string[]): CLIOptions {
     if (opts.oauth && opts.config) {
       throw new Error(
         "--oauth and --config cannot be combined: declare OAuth as a connection inside the YAML (type: oauth) instead of passing --oauth",
+      );
+    }
+    if (opts.initConfig && opts.initOauthConfig) {
+      throw new Error(
+        "--init-config and --init-oauth-config are mutually exclusive: pick one template to bootstrap.",
       );
     }
 
@@ -281,6 +291,7 @@ export function parseCliArgs(argv: string[]): CLIOptions {
         : undefined,
       generateKey: !!opts.generateKey,
       initConfig: !!opts.initConfig,
+      initOauthConfig: !!opts.initOauthConfig,
       oauth: opts.oauth,
       ccloudEnv: opts.ccloudEnv,
     };

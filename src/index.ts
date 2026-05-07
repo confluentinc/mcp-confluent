@@ -94,9 +94,9 @@ export function outputApiKey(): void {
 
 /**
  * Bootstrap a starter `config.yaml` in the current working directory by
- * copying the bundled `config.example.yaml`, then ensure the new file is
- * listed in `<cwd>/.gitignore` so credentials filled in later don't slip
- * into git.
+ * copying one of the bundled example templates, then ensure the new file
+ * is listed in `<cwd>/.gitignore` so credentials filled in later don't
+ * slip into git.
  *
  * Resolved relative to `import.meta.url` (the compiled `dist/index.js`)
  * so this keeps working when invoked via `npx`, where `process.cwd()`
@@ -107,9 +107,18 @@ export function outputApiKey(): void {
  * `wx` (exclusive create) so the existence check and the create happen
  * as a single syscall — there is no TOCTOU window where another process
  * could create the file between a precheck and the write.
+ *
+ * @param oauth When true, copy `config.oauth.example.yaml` (the minimal
+ *   OAuth template); when false, copy `config.example.yaml` (the
+ *   fully-annotated direct/api-key template). The CLI flag in the EEXIST
+ *   error message is selected to match.
  */
-export function outputInitConfig(): void {
-  const sourceUrl = new URL("../config.example.yaml", import.meta.url);
+export function outputInitConfig(oauth: boolean = false): void {
+  const sourceFileName = oauth
+    ? "config.oauth.example.yaml"
+    : "config.example.yaml";
+  const flagName = oauth ? "init-oauth-config" : "init-config";
+  const sourceUrl = new URL(`../${sourceFileName}`, import.meta.url);
   const destPath = path.resolve("config.yaml");
 
   const contents = fs.readFileSync(sourceUrl, "utf-8");
@@ -119,7 +128,7 @@ export function outputInitConfig(): void {
     if ((err as NodeJS.ErrnoException).code === "EEXIST") {
       throw new Error(
         `config.yaml already exists at ${destPath}. ` +
-          `Remove or rename it before running --init-config.`,
+          `Remove or rename it before running --${flagName}.`,
       );
     }
     throw err;
@@ -194,6 +203,17 @@ async function main() {
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`--init-config failed: ${msg}`);
+        process.exit(1);
+      }
+      process.exit(0);
+    }
+
+    if (cliOptions.initOauthConfig) {
+      try {
+        outputInitConfig(true);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`--init-oauth-config failed: ${msg}`);
         process.exit(1);
       }
       process.exit(0);

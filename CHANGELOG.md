@@ -19,7 +19,7 @@ All notable changes to this MCP server will be documented in this file.
   - Details go here eventually.
 - `config.example.yaml` template for YAML-based configuration. Users copy it to `config.yaml` to use; `.gitignore` rules for `/*.yaml` and `/*.yml` (with explicit allow-rules for currently-tracked root files) keep personal configs and any other accidental root-level yaml out of git.
 - `--init-config` CLI flag bootstraps a starter `./config.yaml` (a copy of the bundled `config.example.yaml`) in the current working directory and idempotently appends it to a sibling `.gitignore` (creating one if needed). Refuses to overwrite an existing `config.yaml`. Lets `npx` users get started without checking out the repo.
-- `--init-oauth-config` CLI flag bootstraps a starter `./config.yaml` for OAuth auth (a copy of the bundled `config.oauth.example.yaml`). Same destination, gitignore behavior, and EEXIST refusal as `--init-config`; mutually exclusive with it. Skips the per-service blocks and `${VAR}` placeholders that don't apply to OAuth connections.
+- `--init-oauth-config` CLI flag bootstraps a starter `./config.yaml` for OAuth auth (a copy of the bundled `config.oauth.example.yaml`). Same destination and gitignore behavior as `--init-config`; mutually exclusive with it.
 
 ## 1.2.1
 

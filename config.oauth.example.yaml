@@ -1,4 +1,4 @@
-# Example MCP Confluent Server configuration — OAuth (PKCE) connection.
+# Example MCP Confluent Server configuration — OAuth connection.
 #
 # Generate `config.yaml` from this template with:
 #   npx @confluentinc/mcp-confluent --init-oauth-config
@@ -32,6 +32,6 @@
 
 connections:
   # Connection name is freeform. The `type: oauth` declaration is the only
-  # required field — `ccloud_env` is optional and defaults to `prod`.
+  # required field.
   ccloud-oauth:
     type: oauth

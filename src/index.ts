@@ -14,6 +14,7 @@ import {
 } from "@src/config/index.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { groupDisabledToolsByReason } from "@src/confluent/tools/tool-availability.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
@@ -33,15 +34,20 @@ export function getToolHandlersToRegister(
   const toolHandlers = new Map<ToolName, ToolHandler>();
   const knownIds = new Set(Object.keys(runtime.config.connections));
 
-  Object.values(ToolName).forEach((toolName) => {
-    // Skip names that are not in the filtered list of tool names provided.
+  // Pass 1: drop tools excluded by the allow/block list (logged per-tool —
+  // the reason is config-driven, not predicate-driven, so it doesn't fold
+  // into the grouped warning emitted later).
+  const candidates: Array<readonly [ToolName, ToolHandler]> = [];
+  for (const toolName of Object.values(ToolName)) {
     if (!filteredToolNames.includes(toolName)) {
       logger.warn(`Tool ${toolName} disabled due to allow/block list rules`);
-      return;
+      continue;
     }
+    candidates.push([toolName, ToolHandlerRegistry.getToolHandler(toolName)]);
+  }
 
-    const handler = ToolHandlerRegistry.getToolHandler(toolName);
-
+  // Pass 2: register tools that are enabled on at least one connection.
+  for (const [toolName, handler] of candidates) {
     const enabledIds = handler.enabledConnectionIds(runtime);
     const unknownIds = enabledIds.filter((id) => !knownIds.has(id));
     if (unknownIds.length > 0) {
@@ -52,12 +58,18 @@ export function getToolHandlersToRegister(
     if (enabledIds.length > 0) {
       toolHandlers.set(toolName, handler);
       logger.info(`Tool ${toolName} enabled`);
-    } else {
-      logger.warn(
-        `Tool ${toolName} disabled; no connections satisfy its requirements`,
-      );
     }
-  });
+  }
+
+  // Pass 3: emit one grouped warning per (connectionId, reason) for tools
+  // that are fully disabled — readers see the missing config piece and the
+  // list of all tools blocked by it in a single line, rather than one
+  // line per tool.
+  for (const group of groupDisabledToolsByReason(candidates, runtime)) {
+    logger.warn(
+      `Tools disabled on connection '${group.connectionId}' — ${group.reason}: ${group.toolNames.join(", ")}`,
+    );
+  }
 
   // Raise an error if no tools are enabled, as the server would be non-functional without any tools.
   if (toolHandlers.size === 0) {

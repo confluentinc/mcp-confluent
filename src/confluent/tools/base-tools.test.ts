@@ -1,9 +1,51 @@
+import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
+import { bareRuntime, kafkaRuntime } from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 describe("base-tools.ts", () => {
   describe("BaseToolHandler", () => {
     const handler = new StubHandler();
+
+    describe("predicate-derived enabledConnectionIds()", () => {
+      it("should return the connection ID for an enabled stub on any runtime", () => {
+        expect(new StubHandler().enabledConnectionIds(kafkaRuntime())).toEqual([
+          "default",
+        ]);
+      });
+
+      it("should return an empty array for a disabled stub", () => {
+        expect(
+          new StubHandler({ enabled: false }).enabledConnectionIds(
+            kafkaRuntime(),
+          ),
+        ).toEqual([]);
+      });
+    });
+
+    describe("predicate-derived connectionVerdicts()", () => {
+      it("should report enabled verdicts for a stub configured as enabled", () => {
+        expect(new StubHandler().connectionVerdicts(kafkaRuntime())).toEqual(
+          new Map([["default", { enabled: true }]]),
+        );
+      });
+
+      it("should report disabled verdicts (with a reason) for a stub configured as disabled", () => {
+        expect(
+          new StubHandler({ enabled: false }).connectionVerdicts(bareRuntime()),
+        ).toEqual(
+          new Map([
+            [
+              "default",
+              {
+                enabled: false,
+                reason: ToolDisabledReason.MissingFlinkBlock,
+              },
+            ],
+          ]),
+        );
+      });
+    });
 
     describe("resolveParam()", () => {
       // BaseToolHandler.resolveParam() is protected, so we have to work a little bit to get at

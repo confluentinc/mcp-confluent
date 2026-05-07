@@ -7,6 +7,7 @@ import {
   outputApiKey,
   outputToolList,
 } from "@src/index.js";
+import { logger } from "@src/logger.js";
 import { runtimeWith } from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import {
@@ -17,6 +18,14 @@ import {
   type MockInstance,
   vi,
 } from "vitest";
+
+/**
+ * Capture-and-mute logger.warn so test assertions can pin grouped warning
+ * format without polluting test output.
+ */
+function spyOnLoggerWarn(): MockInstance<typeof logger.warn> {
+  return vi.spyOn(logger, "warn").mockImplementation((() => {}) as never);
+}
 
 describe("index.ts", () => {
   let consoleLog: MockInstance<typeof console.log>;
@@ -156,6 +165,36 @@ describe("index.ts", () => {
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
       expect(result.has(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+
+    it("should emit one grouped warn per (connectionId, reason) for fully-disabled tools", () => {
+      const warnSpy = spyOnLoggerWarn();
+      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockImplementation(
+        (name) => {
+          if (name === ToolName.LIST_TOPICS) return new StubHandler();
+          // Both disabled-stub tools share the same arbitrary reason
+          // (`MissingFlinkBlock`), so they should collapse into a single
+          // grouped warn line listing both names.
+          return new StubHandler({ enabled: false });
+        },
+      );
+
+      getToolHandlersToRegister(
+        [ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS, ToolName.DELETE_TOPICS],
+        runtimeWith(),
+      );
+
+      const warningMessages = warnSpy.mock.calls
+        .map((call) => call[0])
+        .filter(
+          (msg): msg is string =>
+            typeof msg === "string" && msg.startsWith("Tools disabled"),
+        );
+
+      expect(warningMessages).toHaveLength(1);
+      expect(warningMessages[0]).toBe(
+        `Tools disabled on connection 'default' — no 'flink' block in connection config: ${ToolName.CREATE_TOPICS}, ${ToolName.DELETE_TOPICS}`,
+      );
     });
   });
 

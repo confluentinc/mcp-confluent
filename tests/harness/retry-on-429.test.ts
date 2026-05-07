@@ -1,26 +1,6 @@
 import { createRetryOn429Middleware } from "@tests/harness/retry-on-429.js";
-import type { Middleware } from "openapi-fetch";
+import { callOnRequest, callOnResponse } from "@tests/openapi-middleware.js";
 import { describe, expect, it, vi } from "vitest";
-
-// invokes onResponse with a stub MiddlewareCallbackParams; the middleware
-// only consumes `request` and `response`.
-async function invokeOnResponse(
-  middleware: Middleware,
-  request: Request,
-  response: Response,
-) {
-  if (!middleware.onResponse) {
-    throw new Error("middleware must define onResponse");
-  }
-  return middleware.onResponse({
-    request,
-    response,
-    schemaPath: "",
-    params: {},
-    id: "test",
-    options: {},
-  } as Parameters<NonNullable<Middleware["onResponse"]>>[0]);
-}
 
 const makeReq = () =>
   new Request("https://api.example.com/test", { method: "GET" });
@@ -38,7 +18,7 @@ describe("retry-on-429.ts", () => {
         sleep,
       });
 
-      const result = await invokeOnResponse(middleware, makeReq(), makeOk());
+      const result = await callOnResponse(middleware, makeReq(), makeOk());
 
       expect(result).toBeUndefined();
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -53,7 +33,7 @@ describe("retry-on-429.ts", () => {
         sleep,
       });
 
-      const result = await invokeOnResponse(middleware, makeReq(), make429());
+      const result = await callOnResponse(middleware, makeReq(), make429());
 
       expect(result?.status).toBe(200);
       expect(fetchSpy).toHaveBeenCalledOnce();
@@ -68,7 +48,7 @@ describe("retry-on-429.ts", () => {
         sleep,
       });
 
-      await invokeOnResponse(
+      await callOnResponse(
         middleware,
         makeReq(),
         make429({ "Retry-After": "2" }),
@@ -90,7 +70,7 @@ describe("retry-on-429.ts", () => {
       vi.useFakeTimers({ now: fixedNow });
       try {
         const retryAt = new Date(fixedNow + 3000);
-        await invokeOnResponse(
+        await callOnResponse(
           middleware,
           makeReq(),
           make429({ "Retry-After": retryAt.toUTCString() }),
@@ -111,7 +91,7 @@ describe("retry-on-429.ts", () => {
         baseBackoffMs: 500,
       });
 
-      await invokeOnResponse(middleware, makeReq(), make429());
+      await callOnResponse(middleware, makeReq(), make429());
 
       expect(sleep).toHaveBeenCalledOnce();
       const delay = sleep.mock.calls[0]![0] as number;
@@ -129,14 +109,14 @@ describe("retry-on-429.ts", () => {
         maxAttempts: 3,
       });
 
-      const result = await invokeOnResponse(middleware, makeReq(), make429());
+      const result = await callOnResponse(middleware, makeReq(), make429());
 
       expect(result?.status).toBe(429);
       expect(fetchSpy).toHaveBeenCalledTimes(3);
       expect(sleep).toHaveBeenCalledTimes(3);
     });
 
-    it("should re-issue with a cloned Request so headers (auth) are preserved across retries", async () => {
+    it("should preserve request headers (auth) across retries", async () => {
       const fetchSpy = vi.fn().mockResolvedValue(makeOk());
       const sleep = vi.fn().mockResolvedValue(undefined);
       const middleware = createRetryOn429Middleware({
@@ -149,13 +129,38 @@ describe("retry-on-429.ts", () => {
         headers: { Authorization: "Basic abc123" },
       });
 
-      await invokeOnResponse(middleware, req, make429());
+      await callOnResponse(middleware, req, make429());
 
       const fetched = fetchSpy.mock.calls[0]![0] as Request;
       expect(fetched.headers.get("Authorization")).toBe("Basic abc123");
-      // openapi-fetch may have already consumed the original Request's body,
-      // so the middleware must clone before re-issuing.
+      // retry rebuilds the Request rather than mutating the original.
       expect(fetched).not.toBe(req);
+    });
+
+    it("should replay the original body on body-bearing retries even after fetch consumed it", async () => {
+      const fetchSpy = vi.fn().mockResolvedValue(makeOk());
+      const sleep = vi.fn().mockResolvedValue(undefined);
+      const middleware = createRetryOn429Middleware({
+        fetch: fetchSpy,
+        sleep,
+      });
+
+      const req = new Request("https://api.example.com/test", {
+        method: "POST",
+        body: "payload-bytes",
+      });
+
+      // openapi-fetch lifecycle: onRequest caches body, fetch consumes it,
+      // onResponse retries. clone() would throw post-fetch.
+      await callOnRequest(middleware, req);
+      await req.text();
+      expect(req.bodyUsed).toBe(true);
+
+      await callOnResponse(middleware, req, make429());
+
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const replayed = fetchSpy.mock.calls[0]![0] as Request;
+      expect(await replayed.text()).toBe("payload-bytes");
     });
   });
 });

@@ -221,8 +221,7 @@ connections:
 
 Run with `--config oauth.yaml` and the browser sign-in opens on first start.
 
-For `npx`-only users without a checkout, the CLI can drop a starter file
-into the current directory:
+The CLI can drop a starter file into the current directory:
 
 ```bash
 npx @confluentinc/mcp-confluent --init-oauth-config

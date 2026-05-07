@@ -5,7 +5,7 @@ import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   bareRuntime,
-  flinkRuntime,
+  FLINK_CONN,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
@@ -65,7 +65,7 @@ describe("flink-tool-handler.ts", () => {
 
     describe("getFlinkDirectConfig()", () => {
       it("should return the flink block when present", () => {
-        const runtime = flinkRuntime();
+        const runtime = runtimeWith(FLINK_CONN);
         const flink = handler["getFlinkDirectConfig"](runtime.config);
         expect(flink).toBe(runtime.config.getSoleDirectConnection().flink);
       });

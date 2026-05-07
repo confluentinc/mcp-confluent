@@ -41,90 +41,15 @@ export function runtimeWith(
   );
 }
 
-/** Runtime with no service blocks — the disabled case in enabledConnectionIds() tests. */
+/** Runtime with no service blocks — the disabled-baseline shape used by predicate-derivation tests in `base-tools.test.ts` and as a no-config runtime by handlers that don't read connection state. */
 export function bareRuntime(): ServerRuntime {
   return runtimeWith();
-}
-
-/** Runtime with a schema_registry block. */
-export function schemaRegistryRuntime(): ServerRuntime {
-  return runtimeWith({
-    schema_registry: { endpoint: "https://schema-registry.example.com" },
-  });
-}
-
-/** Runtime with a confluent_cloud block. */
-export function confluentCloudRuntime(): ServerRuntime {
-  return runtimeWith({
-    confluent_cloud: {
-      endpoint: "https://api.confluent.cloud",
-      auth: { type: "api_key", key: "k", secret: "s" },
-    },
-  });
-}
-
-/** Runtime with a CCloud-hosted schema_registry (api_key auth) — the minimal enabled case for catalog-API tools. */
-export function ccloudSchemaRegistryRuntime(): ServerRuntime {
-  return runtimeWith({
-    schema_registry: {
-      endpoint: "https://psrc-abc.us-east-1.aws.confluent.cloud",
-      auth: { type: "api_key", key: "k", secret: "s" },
-    },
-  });
 }
 
 /** Runtime with a kafka block. */
 export function kafkaRuntime(): ServerRuntime {
   return runtimeWith({
     kafka: { bootstrap_servers: "broker:9092" },
-  });
-}
-
-/** Runtime with a kafka block containing only a rest_endpoint (no bootstrap_servers) — the disabled case for admin-client handlers. */
-export function kafkaRestOnlyRuntime(): ServerRuntime {
-  return runtimeWith({
-    kafka: { rest_endpoint: "https://kafka-rest.example.com" },
-  });
-}
-
-/** Runtime with a kafka block including a rest_endpoint and auth. */
-export function kafkaRestRuntime(): ServerRuntime {
-  return runtimeWith({
-    kafka: {
-      bootstrap_servers: "broker:9092",
-      rest_endpoint: "https://kafka-rest.example.com",
-      auth: { type: "api_key", key: "k", secret: "s" },
-    },
-  });
-}
-
-/** Runtime with a tableflow block. */
-export function tableflowRuntime(): ServerRuntime {
-  return runtimeWith({
-    tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-  });
-}
-
-/** Runtime with a flink block. */
-export function flinkRuntime(): ServerRuntime {
-  return runtimeWith({
-    flink: {
-      endpoint: "https://flink.us-east-1.aws.confluent.cloud",
-      auth: { type: "api_key", key: "k", secret: "s" },
-      environment_id: "env-abc123",
-      organization_id: "org-xyz789",
-      compute_pool_id: "lfcp-pool01",
-    },
-  });
-}
-
-/** Runtime with a telemetry block. */
-export function telemetryRuntime(): ServerRuntime {
-  return runtimeWith({
-    telemetry: {
-      endpoint: "https://api.telemetry.confluent.cloud",
-      auth: { type: "api_key", key: "k", secret: "s" },
-    },
   });
 }
 
@@ -243,9 +168,9 @@ export type FlinkGetCase = HandleCaseWithConn & {
 
 /**
  * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`, loaded
- * from the `ccloud-oauth.yaml` fixture. Used by handler tests to assert that
- * handlers wrapped in `widenForOAuth(...)` see the connection as enabled and
- * that strict-predicate handlers see it as disabled. A stub
+ * from the `ccloud-oauth.yaml` fixture. Used by the OAuth tool-surface
+ * partition test in `src/index.test.ts` to confirm `getToolHandlersToRegister`
+ * enables the expected set of tools against an OAuth runtime. A stub
  * `OAuthClientManager` is supplied solely to satisfy `ServerRuntime`'s
  * constructor — `enabledConnectionIds()` reads `runtime.config.connections`
  * and never touches the client manager.

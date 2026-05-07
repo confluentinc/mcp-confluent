@@ -72,19 +72,12 @@ export class ListClustersHandler extends BaseToolHandler {
     const clientManager = runtime.clientManagers[connId]!;
 
     // Resolve environment: arg wins; under direct, fall back to kafka.env_id;
-    // under OAuth there is no service block to fall back to. If neither is
-    // available, surface an actionable error before hitting the cmk endpoint
-    // — its generic "Environment ID not specified" response wastes a
-    // round-trip and gives the agent no hint about what to do next.
+    // under OAuth there is no service block to fall back to, so an unset arg
+    // produces an empty string — the cmk endpoint will then return its
+    // standard "environment is required" error, which the agent receives via
+    // the response error path.
     const envFallback = conn.type === "direct" ? conn.kafka?.env_id : undefined;
-    const resolvedEnv = environmentId ?? envFallback;
-    if (!resolvedEnv) {
-      const guidance =
-        conn.type === "oauth"
-          ? "environmentId is required under OAuth. Call list-environments to discover available environments and pass the env-... id as environmentId."
-          : "environmentId is required: pass it as a tool argument or set kafka.env_id in the connection config.";
-      return this.createResponse(guidance, true);
-    }
+    const resolvedEnv = environmentId ?? envFallback ?? "";
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(

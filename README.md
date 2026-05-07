@@ -221,6 +221,19 @@ connections:
 
 Run with `--config oauth.yaml` and the browser sign-in opens on first start.
 
+The CLI can drop a starter file into the current directory:
+
+```bash
+npx @confluentinc/mcp-confluent --init-oauth-config
+# edit ./config.yaml if needed, then:
+npx @confluentinc/mcp-confluent --config ./config.yaml
+```
+
+`--init-oauth-config` is the OAuth analogue of `--init-config`: same
+destination (`./config.yaml`), same idempotent `.gitignore` append, same
+refusal to overwrite an existing file. The two flags are mutually
+exclusive — pick the template that matches the auth mode you want.
+
 #### Supported tools under OAuth
 
 | Category               | Tools                                                                                  |

@@ -98,7 +98,8 @@
   },
   "files": [
     "dist",
-    "config.example.yaml"
+    "config.example.yaml",
+    "config.oauth.example.yaml"
   ],
   "engines": {
     "node": ">=22"

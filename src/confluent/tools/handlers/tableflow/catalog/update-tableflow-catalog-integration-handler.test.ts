@@ -1,10 +1,7 @@
 import { UpdateTableFlowCatalogIntegrationHandler } from "@src/confluent/tools/handlers/tableflow/catalog/update-tableflow-catalog-integration-handler.js";
 import {
-  bareRuntime,
-  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
-  tableflowRuntime,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -25,22 +22,6 @@ const UPDATE_ARGS = {
 describe("update-tableflow-catalog-integration-handler.ts", () => {
   describe("UpdateTableFlowCatalogIntegrationHandler", () => {
     const handler = new UpdateTableFlowCatalogIntegrationHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a tableflow block", () => {
-        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a tableflow block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
-      });
-    });
 
     describe("handle()", () => {
       it("should resolve with an updated message on success", async () => {

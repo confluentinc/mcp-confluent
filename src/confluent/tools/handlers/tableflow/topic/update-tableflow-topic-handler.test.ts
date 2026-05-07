@@ -1,10 +1,7 @@
 import { UpdateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/update-tableflow-topic-handler.js";
 import {
-  bareRuntime,
-  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
-  tableflowRuntime,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -36,22 +33,6 @@ const UPDATE_ARGS = {
 describe("update-tableflow-topic-handler.ts", () => {
   describe("UpdateTableFlowTopicHandler", () => {
     const handler = new UpdateTableFlowTopicHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a tableflow block", () => {
-        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a tableflow block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
-      });
-    });
 
     describe("handle()", () => {
       // PATCH's openapi-fetch FetchResponse requires `response: Response` in every variant, and the

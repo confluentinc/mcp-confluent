@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "allow": ["Bash(echo \"typecheck exit: $?\")", "Bash(echo \"exit: $?\")"],
     "deny": [
       "Read(.env)",
       "Read(.env.integration)",

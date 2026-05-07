@@ -100,7 +100,7 @@ SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 
 ### General Setup Steps
 
-This MCP server is designed to be used with various MCP clients, such as Claude Desktop, Copliot, or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using.
+This MCP server is designed to be used with various MCP clients, such as Claude Desktop, Copilot, or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using.
 
 The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys defined in the YAML config. See [OAuth Authentication For Confluent Cloud](#oauth-authentication-for-confluent-cloud) for more details.
 
@@ -136,7 +136,7 @@ npx @confluentinc/mcp-confluent --init-config
 
 The `--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in ./config.yaml, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
 
-It also adds this file it to a `.gitignore` (creating one if needed), so your filled-in copy can't slip into git. It will not overwrite an existing `config.yaml`, so a rerun won't overwrite your edits.
+It also adds this file to a `.gitignore` (creating one if needed), so your filled-in copy can't slip into git. It will not overwrite an existing `config.yaml`, so a rerun won't overwrite your edits.
 
 If you have this repo cloned, `cp config.example.yaml config.yaml` works just as well. Every `*.yaml`/`*.yml` file at this repo root is gitignored by default, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
 

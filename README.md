@@ -53,7 +53,7 @@ npx -y @confluentinc/mcp-confluent --list-tools
 
 ### Available Tools for Confluent Cloud
 
-These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`config.env.yaml`](config.env.yaml) for the full set of configuration variables, or to [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) below to authenticate as a logged-in user instead of via API keys (currently supported by the native-broker **Kafka** tools — `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`).
+These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`config.example.yaml`](config.example.yaml) for the full set of configuration variables, or to [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) below to authenticate as a logged-in user instead of via API keys (currently supported by the native-broker **Kafka** tools — `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`).
 
 | Category                                   | Tools                                                                                                                                                                                               | Description                                                       |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |

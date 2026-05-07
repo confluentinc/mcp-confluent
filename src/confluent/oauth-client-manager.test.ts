@@ -116,6 +116,190 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
+    describe("getKafkaProducer()", () => {
+      it("should throw when cluster_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getKafkaProducer(undefined, "env-1"),
+        ).rejects.toThrow(
+          "cluster_id and environment_id are required under --oauth",
+        );
+      });
+
+      it("should throw when environment_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getKafkaProducer("lkc-1", undefined),
+        ).rejects.toThrow(
+          "cluster_id and environment_id are required under --oauth",
+        );
+      });
+
+      it("should build, connect, and return a producer per call", async () => {
+        vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
+          "broker:9092",
+        );
+        const fakeProducer = {
+          connect: vi.fn().mockResolvedValue(undefined),
+          disconnect: vi.fn().mockResolvedValue(undefined),
+        };
+        const fakeKafka = { producer: () => fakeProducer };
+        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function () {
+          return fakeKafka as unknown as KafkaJS.Kafka;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+
+        const manager = buildManager();
+        const producer = await manager.getKafkaProducer("lkc-1", "env-1");
+
+        expect(producer).toBe(fakeProducer);
+        expect(fakeProducer.connect).toHaveBeenCalledOnce();
+      });
+    });
+
+    describe("buildKafkaConsumer()", () => {
+      it("should throw when cluster_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.buildKafkaConsumer(undefined, "env-1"),
+        ).rejects.toThrow(
+          "cluster_id and environment_id are required under --oauth",
+        );
+      });
+
+      it("should throw when environment_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.buildKafkaConsumer("lkc-1", undefined),
+        ).rejects.toThrow(
+          "cluster_id and environment_id are required under --oauth",
+        );
+      });
+
+      it("should build a consumer with the default groupId 'mcp-confluent' when none is supplied", async () => {
+        vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
+          "broker:9092",
+        );
+        const fakeConsumer = { connect: vi.fn(), disconnect: vi.fn() };
+        let consumerOpts:
+          | {
+              kafkaJS?: {
+                groupId?: string;
+                autoCommit?: boolean;
+                fromBeginning?: boolean;
+              };
+            }
+          | undefined;
+        const fakeKafka = {
+          consumer: (opts: typeof consumerOpts) => {
+            consumerOpts = opts;
+            return fakeConsumer;
+          },
+        };
+        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function () {
+          return fakeKafka as unknown as KafkaJS.Kafka;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+
+        const manager = buildManager();
+        await manager.buildKafkaConsumer("lkc-1", "env-1");
+
+        expect(consumerOpts?.kafkaJS).toMatchObject({
+          groupId: "mcp-confluent",
+          autoCommit: false,
+          fromBeginning: true,
+        });
+      });
+
+      it("should pass an explicit groupId through to the consumer config", async () => {
+        vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
+          "broker:9092",
+        );
+        const fakeConsumer = { connect: vi.fn(), disconnect: vi.fn() };
+        let consumerOpts: { kafkaJS?: { groupId?: string } } | undefined;
+        const fakeKafka = {
+          consumer: (opts: typeof consumerOpts) => {
+            consumerOpts = opts;
+            return fakeConsumer;
+          },
+        };
+        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function () {
+          return fakeKafka as unknown as KafkaJS.Kafka;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+
+        const manager = buildManager();
+        await manager.buildKafkaConsumer("lkc-1", "env-1", "session-42");
+
+        expect(consumerOpts?.kafkaJS?.groupId).toBe("session-42");
+      });
+    });
+
+    describe("getSchemaRegistrySdkClient()", () => {
+      it("should throw when cluster_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getSchemaRegistrySdkClient(undefined, "env-1"),
+        ).rejects.toThrow(
+          "cluster_id and environment_id are required under --oauth",
+        );
+      });
+
+      it("should throw when environment_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getSchemaRegistrySdkClient("lsrc-1", undefined),
+        ).rejects.toThrow(
+          "cluster_id and environment_id are required under --oauth",
+        );
+      });
+
+      it("should throw when DPAT is unavailable after bootstrap", async () => {
+        // Symmetric with the Kafka-side guard — prevents constructing an SR
+        // SDK client with `Authorization: Bearer ` (empty) baked into axios
+        // defaults during initial login or after a non-transient refresh
+        // failure.
+        const holder = createMockInstance(
+          OAuthHolder as unknown as new (...args: never[]) => OAuthHolder,
+        );
+        Object.defineProperty(holder, "bootstrapPromise", {
+          value: Promise.resolve(),
+          writable: true,
+          configurable: true,
+        });
+        holder.getDataPlaneToken.mockReturnValue(undefined);
+        const manager = new OAuthClientManager(
+          holder as unknown as OAuthHolder,
+          "devel",
+        );
+
+        await expect(
+          manager.getSchemaRegistrySdkClient("lsrc-1", "env-1"),
+        ).rejects.toThrow("OAuth login did not produce a data-plane token");
+      });
+
+      it("should build a SchemaRegistryClient against the resolved endpoint", async () => {
+        vi.spyOn(resolvers, "resolveSchemaRegistryEndpoint").mockResolvedValue(
+          "https://psrc-abc.us-east-1.aws.confluent.cloud",
+        );
+
+        const manager = buildManager();
+        const client = await manager.getSchemaRegistrySdkClient(
+          "lsrc-1",
+          "env-1",
+        );
+
+        expect(client).toBeDefined();
+        // resolveSchemaRegistryEndpoint should have been called with the
+        // cloud REST client + the cluster/env args.
+        expect(resolvers.resolveSchemaRegistryEndpoint).toHaveBeenCalledWith(
+          expect.anything(),
+          "lsrc-1",
+          "env-1",
+        );
+      });
+    });
+
     describe("disconnect()", () => {
       it("should be a no-op (no caches to drain — clients are caller-owned)", async () => {
         const manager = buildManager();

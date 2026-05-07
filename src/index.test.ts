@@ -210,26 +210,49 @@ describe("index.ts", () => {
     });
 
     it("should refuse to overwrite an existing config.yaml", () => {
-      // existsSync(destPath) === true → bail out
-      fsMocks.existsSync.mockImplementation((p) => p === DEST_PATH);
+      // The exclusive-create write throws EEXIST when the destination
+      // already exists; outputInitConfig converts it to the friendly error.
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+      const eexist: NodeJS.ErrnoException = Object.assign(
+        new Error("EEXIST: file already exists"),
+        { code: "EEXIST" },
+      );
+      fsMocks.writeFileSync.mockImplementation(() => {
+        throw eexist;
+      });
 
       expect(() => outputInitConfig()).toThrow(/config\.yaml already exists/);
-      expect(fsMocks.writeFileSync).not.toHaveBeenCalled();
+      // Failed write must not be followed by gitignore mutation.
+      expect(fsMocks.appendFileSync).not.toHaveBeenCalled();
     });
 
-    it("should write the bundled example to ./config.yaml when none exists", () => {
-      // No config.yaml, no .gitignore yet.
+    it("should propagate non-EEXIST write errors verbatim", () => {
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+      const eacces: NodeJS.ErrnoException = Object.assign(
+        new Error("EACCES: permission denied"),
+        { code: "EACCES" },
+      );
+      fsMocks.writeFileSync.mockImplementation(() => {
+        throw eacces;
+      });
+
+      expect(() => outputInitConfig()).toThrow(eacces);
+    });
+
+    it("should write the bundled example to ./config.yaml with an exclusive-create flag", () => {
+      // No .gitignore yet.
       fsMocks.existsSync.mockReturnValue(false);
       fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
 
       outputInitConfig();
 
-      // The first writeFileSync writes the config; the second creates the
-      // gitignore (since existsSync returned false for it too).
+      // The first writeFileSync writes the config with `wx` (exclusive create);
+      // the second creates the gitignore (since existsSync returned false for it too).
       expect(fsMocks.writeFileSync).toHaveBeenNthCalledWith(
         1,
         DEST_PATH,
         EXAMPLE_CONTENTS,
+        { flag: "wx" },
       );
     });
 

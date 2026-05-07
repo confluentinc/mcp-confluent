@@ -15,7 +15,7 @@ const runtime = integrationRuntime();
 
 describe("list-metrics-handler", { tags: [Tag.METRICS] }, () => {
   if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires telemetry.auth (or confluent_cloud.auth fallback) config", () => {});
+    it.skip("requires telemetry.auth config", () => {});
     return;
   }
 

@@ -1,13 +1,32 @@
-import type { DirectConnectionConfig } from "@src/config/index.js";
+import {
+  loadConfigFromYaml,
+  type DirectConnectionConfig,
+} from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance, type HandleCase } from "@tests/stubs/index.js";
+import { fileURLToPath } from "node:url";
 import type { Mocked } from "vitest";
 
 /** Connection ID used by the named runtime factories and their default single-connection runtimes. */
 export const DEFAULT_CONNECTION_ID = "default";
+
+/**
+ * Connection ID used by {@link ccloudOAuthRuntime}, matching the connection
+ * name in `test-fixtures/yaml_configs/valid/ccloud-oauth.yaml`. Distinct from
+ * {@link DEFAULT_CONNECTION_ID} because the OAuth runtime is anchored to a
+ * real YAML fixture rather than constructed inline.
+ */
+export const CCLOUD_OAUTH_CONNECTION_ID = "ccloud";
+
+const CCLOUD_OAUTH_FIXTURE = fileURLToPath(
+  new URL(
+    "../../test-fixtures/yaml_configs/valid/ccloud-oauth.yaml",
+    import.meta.url,
+  ),
+);
 
 /**
  * Creates a ServerRuntime with a mocked ClientManager.
@@ -233,21 +252,18 @@ export type FlinkGetCase = HandleCaseWithConn & {
 /**
  * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`, paired
  * with a mocked `OAuthClientManager` (matching what `ServerRuntime.fromConfig`
- * actually constructs for OAuth connections). Used by handler tests to assert
- * that handlers widened for OAuth (e.g. via the widened `hasConfluentCloud`
- * predicate) see the connection as enabled, and that handlers staying
- * direct-only (e.g. native Kafka) see it as disabled. Does not populate
- * `runtime.oauthHolder`; tests that need a holder should construct one
+ * actually constructs for OAuth connections). The config is loaded from the
+ * `ccloud-oauth.yaml` fixture so the factory and the capstone tool-registration
+ * test share a single source of truth for what an OAuth config looks like.
+ * Used by handler tests to assert that handlers wrapped in `widenForOAuth(...)`
+ * see the connection as enabled, and that handlers using strict predicates.
+ * Does not populate `runtime.oauthHolder`; tests that need a holder should construct one
  * explicitly. `createMockInstance` doesn't invoke the real constructor, so the
  * OAuthClientManager's eager cloud-REST client setup is sidestepped.
  */
 export function ccloudOAuthRuntime(): ServerRuntime {
-  return new ServerRuntime(
-    new MCPServerConfiguration({
-      connections: {
-        [DEFAULT_CONNECTION_ID]: { type: "oauth", ccloud_env: "devel" },
-      },
-    }),
-    { [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager) },
-  );
+  const config = loadConfigFromYaml(CCLOUD_OAUTH_FIXTURE, {});
+  return new ServerRuntime(config, {
+    [CCLOUD_OAUTH_CONNECTION_ID]: createMockInstance(OAuthClientManager),
+  });
 }

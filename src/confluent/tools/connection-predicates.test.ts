@@ -9,7 +9,6 @@ import {
   connectionReasonsWhere,
   hasCCloudCatalogSupport,
   hasConfluentCloud,
-  hasDirectConfluentCloud,
   hasFlink,
   hasKafka,
   hasKafkaAuth,
@@ -209,26 +208,10 @@ describe("connection-predicates.ts", () => {
       );
     });
 
-    it("should return enabled unconditionally for an OAuth connection", () => {
-      // OAuth gets the CCloud REST URL from its Auth0 env, so it always reaches the CP surface.
-      expect(hasConfluentCloud(OAUTH_CONN)).toEqual(ENABLED);
-    });
-  });
-
-  describe("hasDirectConfluentCloud()", () => {
-    it("should return enabled when the confluent_cloud block is present on a direct connection", () => {
-      expect(hasDirectConfluentCloud(CONFLUENT_CLOUD_CONN)).toEqual(ENABLED);
-    });
-
-    it("should report MissingConfluentCloudBlock when the confluent_cloud block is absent on a direct connection", () => {
-      expect(hasDirectConfluentCloud(KAFKA_CONN)).toEqual(
-        disabledFor(ToolDisabledReason.MissingConfluentCloudBlock),
-      );
-    });
-
-    it("should report OAuthNotDirectCapable for an OAuth connection", () => {
-      expect(hasDirectConfluentCloud(OAUTH_CONN)).toEqual(
-        disabledFor(ToolDisabledReason.OAuthNotDirectCapable),
+    it("should report OAuthNoServiceBlocks for an OAuth connection", () => {
+      // hasConfluentCloud is strict — OAuth opt-in lives at call sites via widenForOAuth.
+      expect(hasConfluentCloud(OAUTH_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.OAuthNoServiceBlocks),
       );
     });
   });

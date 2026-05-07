@@ -2,21 +2,18 @@ import { DirectConnectionConfig } from "@src/config/models.js";
 import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   connectionIdsWhere,
-  hasDirectConfluentCloud,
+  hasConfluentCloud,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
  * Intermediate base class for all Connect tool handlers.
- * Gates enablement on `hasDirectConfluentCloud` and exposes
+ * Gates enablement on `hasConfluentCloud` and exposes
  * `resolveConnectEnvAndClusterId` for consistent env/cluster resolution.
  */
 export abstract class ConnectToolHandler extends BaseToolHandler {
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      hasDirectConfluentCloud,
-    );
+    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 
   /**

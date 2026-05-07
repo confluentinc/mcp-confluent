@@ -29,10 +29,10 @@ export interface DirectConnectionConfig {
  * OAuth (PKCE) connection variant. Peer arm of {@link DirectConnectionConfig}
  * inside the `ConnectionConfig` discriminated union. The CCloud REST URL is
  * derived from `ccloud_env` via `getCloudRestUrlForEnv` inside
- * `OAuthClientManager`. No service blocks; OAuth-eligible tools auto-enable
- * because `hasConfluentCloud` widens to return `true` for OAuth connections
- * (see `connection-predicates.ts`). Resource IDs that direct connections
- * supply via blocks must be passed as tool arguments under OAuth.
+ * `OAuthClientManager`. No service blocks; OAuth-eligible tools opt in by
+ * wrapping their predicate in `widenForOAuth(...)` at the call site (see
+ * `connection-predicates.ts`). Resource IDs that direct connections supply
+ * via blocks must be passed as tool arguments under OAuth.
  *
  * `ccloud_env` defaults to "prod" via the schema; only Confluent staff
  * testing against devel/stag set it explicitly.

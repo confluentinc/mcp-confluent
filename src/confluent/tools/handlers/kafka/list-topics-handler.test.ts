@@ -1,31 +1,21 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
-import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import {
   bareRuntime,
+  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   kafkaRestOnlyRuntime,
   kafkaRuntime,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
-  createMockAdmin,
-  createMockInstance,
-  type MockedAdmin,
+  assertHandleCase,
+  getMockedClientManager,
 } from "@tests/stubs/index.js";
-import { beforeEach, describe, expect, it, type Mocked } from "vitest";
+import { describe, expect, it } from "vitest";
 
 describe("list-topics-handler.ts", () => {
   describe("ListTopicsHandler", () => {
     const handler = new ListTopicsHandler();
-    let clientManager: Mocked<DirectClientManager>;
-    let admin: MockedAdmin;
-
-    beforeEach(() => {
-      admin = createMockAdmin();
-      clientManager = createMockInstance(DirectClientManager);
-      clientManager.getAdminClient.mockResolvedValue(admin as KafkaJS.Admin);
-    });
 
     describe("enabledConnectionIds()", () => {
       it("should return the connection ID for a connection with kafka.bootstrap_servers", () => {
@@ -43,24 +33,48 @@ describe("list-topics-handler.ts", () => {
           [],
         );
       });
+
+      it("should return the connection id when the connection is OAuth-typed", () => {
+        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
+          DEFAULT_CONNECTION_ID,
+        ]);
+      });
     });
 
     describe("handle()", () => {
-      it("should propagate errors from the admin client", async () => {
-        clientManager.getAdminClient.mockRejectedValue(
-          new Error("connection refused"),
-        );
+      it("should return the topic list when the admin call resolves", async () => {
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.listTopics.mockResolvedValue(["topic-a", "topic-b"]);
 
-        await expect(
-          handler.handle(
-            runtimeWith(
-              { kafka: { bootstrap_servers: "broker:9092" } },
-              DEFAULT_CONNECTION_ID,
-              clientManager,
-            ),
-            {},
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
           ),
-        ).rejects.toThrow("connection refused");
+          args: {},
+          outcome: { resolves: "Kafka topics: topic-a,topic-b" },
+          clientManager,
+        });
+      });
+
+      it("should let admin errors propagate (no try/catch around the read op)", async () => {
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.listTopics.mockRejectedValue(new Error("broker unreachable"));
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: { throws: "broker unreachable" },
+        });
       });
     });
   });

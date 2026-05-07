@@ -39,6 +39,11 @@ export interface ToolHandler {
    * IDs of connections that satisfy this tool's service requirements. A
    * non-empty result enables the tool; an empty result disables it. Always a
    * subset of `runtime.config.connections` keys.
+   *
+   * Implementations that extend {@linkcode BaseToolHandler} (the standard
+   * path for every tool in this codebase) must not override this — declare
+   * a {@linkcode BaseToolHandler.predicate} property and let the base class
+   * derive the result.
    */
   enabledConnectionIds(runtime: ServerRuntime): string[];
 
@@ -68,12 +73,26 @@ export abstract class BaseToolHandler implements ToolHandler {
   abstract getToolConfig(): ToolConfig;
 
   /**
-   * The connection predicate that gates this tool. Subclasses declare it as
-   * a readonly property; {@linkcode enabledConnectionIds} and
-   * {@linkcode connectionVerdicts} are derived from it. Use a
-   * predicate from `connection-predicates.ts` (e.g. `hasKafka`), or compose
-   * with `allOf(...)` for compound requirements; use `alwaysEnabled` for
-   * tools with no service-block requirement.
+   * The connection predicate that gates this tool. The single customization
+   * seam for tool enablement — declared as a one-line readonly property:
+   *
+   *     readonly predicate = hasKafka;
+   *     readonly predicate = widenForOAuth(hasKafkaBootstrap);
+   *     readonly predicate = allOf(hasKafka, hasFlink);
+   *     readonly predicate = alwaysEnabled;
+   *
+   * Pick from `connection-predicates.ts`: a base predicate (`hasKafka`,
+   * `hasFlink`, `hasSchemaRegistry`, `hasConfluentCloud`,
+   * `hasDirectConfluentCloud`, `hasTelemetry`, `hasTableflow`, etc.),
+   * `widenForOAuth(p)` to admit OAuth connections through a block-based
+   * predicate, `allOf(p1, p2, ...)` for compound requirements, or
+   * `alwaysEnabled` for tools with no service-block requirement.
+   *
+   * Both {@linkcode enabledConnectionIds} and {@linkcode connectionVerdicts}
+   * are derived from this property and are marked `@final`; never override
+   * either method. The retired iteration helpers `connectionIdsWhere` and
+   * `connectionReasonsWhere` are no longer exported — the base class walks
+   * `runtime.config.connections` for you.
    */
   abstract readonly predicate: ConnectionPredicate;
 

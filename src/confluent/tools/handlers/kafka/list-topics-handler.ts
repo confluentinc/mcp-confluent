@@ -4,23 +4,52 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasKafkaBootstrap } from "@src/confluent/tools/connection-predicates.js";
+import {
+  hasKafkaBootstrap,
+  widenForOAuth,
+} from "@src/confluent/tools/connection-predicates.js";
+import {
+  disposeIfOAuth,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listTopicArgs = z.object({
-  // No arguments
+  cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+    ),
 });
 
 export class ListTopicsHandler extends BaseToolHandler {
   async handle(
     runtime: ServerRuntime,
-    _toolArguments: Record<string, unknown>,
+    toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.requireDirectClientManager();
-    const topics = await (await clientManager.getAdminClient()).listTopics();
-    return this.createResponse(`Kafka topics: ${topics.join(",")}`);
+    const parsed = listTopicArgs.parse(toolArguments);
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
+    const clientManager = runtime.clientManagers[connId]!;
+    const admin = await clientManager.getKafkaAdminClient(
+      resolved.clusterId,
+      resolved.envId,
+    );
+    try {
+      const topics = await admin.listTopics();
+      return this.createResponse(`Kafka topics: ${topics.join(",")}`);
+    } finally {
+      await disposeIfOAuth(runtime, connId, admin);
+    }
   }
 
   getToolConfig(): ToolConfig {
@@ -31,5 +60,6 @@ export class ListTopicsHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-  readonly predicate = hasKafkaBootstrap;
+
+  readonly predicate = widenForOAuth(hasKafkaBootstrap);
 }

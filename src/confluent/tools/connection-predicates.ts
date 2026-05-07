@@ -10,14 +10,15 @@
 // compound requirements with `allOf(...)` and use `alwaysEnabled` for
 // tools with no service-block requirement.
 //
-// OAuth note: while OAuth support is being built out, most predicates
-// currently short-circuit on `conn.type === "oauth"` and answer disabled
-// — OAuth connections do not yet carry the service blocks these predicates
-// inspect. Expect this treatment to evolve as OAuth-capable handlers land
-// and predicates widen to admit OAuth on a case-by-case basis.
-// `hasConfluentCloud` is the first to do so: it answers enabled for OAuth
-// because the CCloud REST URL is reachable via the Auth0 environment
-// without a block.
+// OAuth note: most predicates short-circuit on `conn.type === "oauth"`
+// and answer disabled — OAuth connections carry no service blocks for these
+// predicates to inspect. Two mechanisms admit OAuth where it's supported:
+// `hasConfluentCloud` answers enabled for OAuth directly (the CCloud REST URL
+// is reachable via the Auth0 environment without a block), and the
+// `widenForOAuth(predicate)` combinator wraps any block-checking predicate
+// so OAuth connections bypass the block check and answer enabled. Use
+// `widenForOAuth` on tool handlers that have been adapted to operate
+// against an OAuth-typed connection at call time.
 
 import type { ConnectionConfig } from "@src/config/models.js";
 
@@ -226,6 +227,19 @@ export function allOf(
     }
     return ENABLED;
   };
+}
+
+/**
+ * Wrap a predicate so OAuth connections always answer enabled. Use this on
+ * tool handlers that have been adapted to operate against an OAuth-typed
+ * connection at call time — the wrapped predicate's block-based verdict
+ * still governs direct connections, while OAuth's "no service blocks"
+ * early-exit is overridden.
+ */
+export function widenForOAuth(
+  predicate: ConnectionPredicate,
+): ConnectionPredicate {
+  return (conn) => (conn.type === "oauth" ? ENABLED : predicate(conn));
 }
 
 /**

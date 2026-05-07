@@ -222,6 +222,18 @@ export function allOf(
   };
 }
 
+/**
+ * Wrap a predicate so OAuth connections always answer enabled. Use this on
+ * tool handlers that have been migrated to support OAuth — the underlying
+ * predicate keeps its block-based verdict for direct connections, while
+ * OAuth's "no service blocks" early-exit is overridden.
+ */
+export function widenForOAuth(
+  predicate: ConnectionPredicate,
+): ConnectionPredicate {
+  return (conn) => (conn.type === "oauth" ? ENABLED : predicate(conn));
+}
+
 export function connectionIdsWhere(
   connections: Readonly<Record<string, ConnectionConfig>>,
   predicate: ConnectionPredicate,

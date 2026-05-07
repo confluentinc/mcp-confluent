@@ -4,10 +4,7 @@ import {
   CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  hasKafkaRestWithAuth,
-  widenForOAuth,
-} from "@src/confluent/tools/connection-predicates.js";
+import { kafkaRestWithAuthOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { resolveKafkaRestArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -91,5 +88,5 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
       annotations: CREATE_UPDATE,
     };
   }
-  readonly predicate = widenForOAuth(hasKafkaRestWithAuth);
+  readonly predicate = kafkaRestWithAuthOrOAuth;
 }

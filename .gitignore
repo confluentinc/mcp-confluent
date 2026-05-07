@@ -140,8 +140,9 @@ dist
 .pnp.*
 
 
-# test results
-TEST-result*.xml
+# test results (per-lane outputFile names live alongside the legacy
+# TEST-result.xml; see vitest.config.ts and package.json scripts)
+TEST-*.xml
 
 # vscode (ignore everything except local dev configs)
 .vscode/*

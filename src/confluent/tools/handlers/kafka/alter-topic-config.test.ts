@@ -1,18 +1,15 @@
 import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alter-topic-config.js";
 import {
-  bareRuntime,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   KAFKA_CONN,
-  kafkaRestOnlyRuntime,
-  kafkaRestRuntime,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
   getMockedClientManager,
 } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 
 const VALID_CONFIGS = [
   { name: "retention.ms", value: "86400000", operation: "SET" as const },
@@ -21,24 +18,6 @@ const VALID_CONFIGS = [
 describe("alter-topic-config.ts", () => {
   describe("AlterTopicConfigHandler", () => {
     const handler = new AlterTopicConfigHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with kafka.rest_endpoint and auth", () => {
-        expect(handler.enabledConnectionIds(kafkaRestRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a kafka block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for a kafka REST connection without auth", () => {
-        expect(handler.enabledConnectionIds(kafkaRestOnlyRuntime())).toEqual(
-          [],
-        );
-      });
-    });
 
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [

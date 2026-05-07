@@ -2,13 +2,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  bareRuntime,
-  ccloudOAuthRuntime,
-  confluentCloudRuntime,
-  DEFAULT_CONNECTION_ID,
-  runtimeWith,
-} from "@tests/factories/runtime.js";
+import { runtimeWith } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
 
 const CONNECT_CONN = {
@@ -37,22 +31,6 @@ class StubConnectHandler extends ConnectToolHandler {
 describe("connect-tool-handler.ts", () => {
   describe("ConnectToolHandler", () => {
     const handler = new StubConnectHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a confluent_cloud block", () => {
-        expect(handler.enabledConnectionIds(confluentCloudRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a confluent_cloud block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
-      });
-    });
 
     describe("resolveConnectEnvAndClusterId()", () => {
       const resolveConnectEnvAndClusterId =

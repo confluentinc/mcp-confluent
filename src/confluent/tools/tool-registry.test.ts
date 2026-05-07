@@ -21,6 +21,7 @@ import {
   hasTableflow,
   hasTelemetry,
   kafkaBootstrapOrOAuth,
+  kafkaRestWithAuthOrOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
@@ -169,6 +170,7 @@ describe("tool-registry.ts", () => {
         hasTableflow,
         hasCCloudCatalogSupport,
         kafkaBootstrapOrOAuth,
+        kafkaRestWithAuthOrOAuth,
         canCreateDirectConnector,
         flinkWithTelemetry,
       ]);

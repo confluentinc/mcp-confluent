@@ -10,6 +10,7 @@ An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI as
 > **Prerequisites:** [Node.js 22+](https://nodejs.org/). If you want to interact with [Confluent Cloud](https://confluent.cloud/), you need to create an account first.
 
 ```bash
+# generate a quick config file in your project root:
 npx @confluentinc/mcp-confluent --init-config
 # edit ./config.yaml with your connection details, then:
 npx @confluentinc/mcp-confluent --config ./config.yaml
@@ -38,7 +39,7 @@ See [Getting Started](#getting-started) for full setup instructions and [Configu
 
 ## Available Tools
 
-**Only the tools whose required environment variables are provided in the configuration file will be enabled.** 
+**Only the tools whose required environment variables are provided in the configuration file will be enabled.**
 
 You can list all available tools via the CLI:
 
@@ -84,11 +85,12 @@ SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 
 ## Getting Started
 
-### General Usage
+### General Steps
 
 This MCP server is designed to be used with various MCP clients, such as Claude Desktop, Copliot, or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using. However, the general steps are:
 
-1. **Start the Server:** You can run the MCP server in one of two ways:
+1. **Populate the Server Options:** Setup a yaml configuration file with the appropriate variables for the tools and resources you want to use.
+2. **Start the Server:** You can run the MCP server in one of two ways:
    - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source. This typically involves:
      - Installing dependencies (`npm install`)
      - Building the project (`npm run build` or `npm run dev`)
@@ -98,11 +100,11 @@ This MCP server is designed to be used with various MCP clients, such as Claude 
      npx -y @confluentinc/mcp-confluent -e /path/to/confluent-mcp-server/.env
      ```
 
-2. **Configure your MCP Client:** Each client will have its own way of specifying the MCP server's address and any required credentials. You'll need to configure your client (e.g., Claude, Goose) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on can be configured by an environment variable.
+3. **Configure your MCP Client:** Each client will have its own way of specifying the MCP server's address and any required credentials. You'll need to configure your client (e.g., Claude, Goose) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on can be configured by an environment variable.
 
-3. **Start the MCP Client:** Once your client is configured to connect to the MCP server, you can start your mcp client and on startup it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with Confluent Cloud on your behalf.
+4. **Start the MCP Client:** Once your client is configured to connect to the MCP server, you can start your mcp client and on startup it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with Confluent Cloud on your behalf.
 
-4. **Interact with Confluent through the Client:** Once the client is connected and configured, you can use the client's interface to interact with Confluent Cloud resources. The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
+5. **Interact with Confluent through the Client:** Once the client is connected and configured, you can use the client's interface to interact with Confluent Cloud resources. The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
 
 ### Prerequisites
 
@@ -111,39 +113,42 @@ This MCP server is designed to be used with various MCP clients, such as Claude 
   nvm install 22
   nvm use 22
   ```
-- A **Confluent Cloud** account with appropriate API keys to access your resources
+- A [**Confluent Cloud**](https://confluent.cloud) account with appropriate API keys to access your resources or login credentials if using [OAuth](#oauth-authentication-for-confluent-cloud) to authenticate.
 
 ### Setup
 
-1. **Create a configuration file:** Copy the provided [`config.yaml` example](https://github.com/confluentinc/mcp-confluent/blob/main/config.example.yaml) file to the root of your project
-2. **Populate the file:** Fill in the necessary values for your Confluent Cloud environment. Different tools will require & use different configuration variables. See the [Configuration](#configuration) section for details on which variables to fill in based on the tools you want to enable.
-
-### Configuration
-
-> **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition — the server accepts both - but we plan to deprecate the latter in a near-future release.
-
-The fastest way to get a starter `config.yaml` is to let the CLI bootstrap one in your current directory — no checkout required:
+1. **Create a configuration file:** Copy the provided [`config.yaml` example](https://github.com/confluentinc/mcp-confluent/blob/main/config.example.yaml) file to the root of your project. You can use the CLI to bootstrap one in your current directory — no git checkout required:
 
 ```bash
 npx @confluentinc/mcp-confluent --init-config
 ```
+
+2. **Populate the file:** Fill in the necessary values for your Confluent Cloud environment. Different tools will require & use different configuration variables. See the [Configuration](#configuration) section for details on which variables to fill in based on the tools you want to enable.
+
 After editing to include your variables, pass your YAML config file path at server startup with the `--config` flag:
 
 ```bash
 npx @confluentinc/mcp-confluent --config /path/to/myconfig.yaml
 ```
 
-`--init-config` creates a copy of [`config.example.yaml`](config.example.yaml) in `./config.yaml`, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment. 
+### Configuration Details
+
+> **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition — the server accepts both - but we plan to deprecate the latter in a near-future release.
+
+`--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in `./config.yaml`, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
 
 It also adds this file it to a `.gitignore` (creating one if needed), so your filled-in copy can't slip into git. It refuses to overwrite an existing `config.yaml`, so a stray rerun won't overwrite edits.
 
 If you have this repo cloned, `cp config.example.yaml config.yaml` works just as well. Every `*.yaml`/`*.yml` file at the repo root is gitignored by default, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
 
 #### Side note: Why YAML over environment variables?
+
 Flat environment variables can only express a single implicit connection. A YAML file can define multiple named connections, which is necessary for real-world workflows — for example, a `local-dev` connection pointing at a local Docker Kafka alongside a `staging` connection to a Confluent Cloud cluster, all in one file.
 
 #### All Configuration Options
+
 You can configure the MCP server using the following environment variables:
+
 <details>
 <summary>Show Table</summary>
 | Variable                      | Description                                                                                                                                                                                                                                                       | Default Value                           | Required |
@@ -186,6 +191,7 @@ You can configure the MCP server using the following environment variables:
 </details>
 
 #### Examples
+
 For more focused reference snippets, browse [test-fixtures/yaml_configs/valid/](test-fixtures/yaml_configs/valid/) — these files are executed as part of the test suite on every CI run, so they are always valid and current.
 
 #### Env-var interpolation in YAML

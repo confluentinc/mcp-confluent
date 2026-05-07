@@ -37,7 +37,7 @@ When adding a new tool, touch these files:
 1. `src/confluent/tools/tool-name.ts` — add enum entry (e.g., `MY_TOOL = "my-tool"`)
 2. `src/confluent/tools/handlers/<domain>/my-tool-handler.ts` — create handler class
 3. `src/confluent/tools/tool-registry.ts` — import handler and add `[ToolName.MY_TOOL, new MyToolHandler()]` to the `ToolHandlerRegistry.handlers` map
-4. `src/index.test.ts` — classify the new `ToolName` in the capstone partition test by adding it to **either** `EXPECTED_OAUTH_ENABLED` (handler is OAuth-capable, predicate wrapped in `widenForOAuth(...)`) **or** `EXPECTED_OAUTH_DISABLED` (handler reads direct-only fields or otherwise rejects OAuth). The partition test fails if a `ToolName` belongs to neither list — the guard against birthing a tool without thinking about its OAuth posture.
+4. `src/index.test.ts` — classify the new `ToolName` in the capstone partition test by adding it to either `EXPECTED_OAUTH_ENABLED` or `EXPECTED_OAUTH_DISABLED`. The partition test fails if a tool belongs to neither — the guard against birthing a tool without thinking about its OAuth posture.
 5. (Only if needed) `src/confluent/tools/connection-predicates.ts` — add a new predicate if no existing one expresses the tool's requirement
 
 ## Connection Predicates
@@ -50,10 +50,24 @@ Tool enablement is decided by inspecting which **service blocks** are present in
 - A tool with no service-specific requirement (a rare case) returns `Object.keys(runtime.config.connections)` directly.
 - New predicates should be additive and pure; they read the YAML/config shape only.
 
-### Strict predicates, widen at the call site
+### `hasConfluentCloud` vs `hasDirectConfluentCloud` — pick carefully
 
-Every predicate in `connection-predicates.ts` is strict — OAuth short-circuits to disabled.
-OAuth-capable handlers opt in by wrapping at the call site: `widenForOAuth(hasConfluentCloud)`. Leave it unwrapped when `handle()` calls `getSoleDirectConnection()` or reads direct-only fields; wrapping would advertise the tool then crash at call time. When widening, add an `enabledConnectionIds()` test against `ccloudOAuthRuntime()`.
+`hasConfluentCloud` returns `true` for **both** direct connections with a `confluent_cloud`
+block **and** OAuth connections. `hasDirectConfluentCloud` returns `true` only for direct
+connections.
+
+**If `handle()` calls `runtime.config.getSoleDirectConnection()`** (which narrows to
+`DirectConnectionConfig` and throws for OAuth connections), the predicate **must** be
+`hasDirectConfluentCloud`. Using `hasConfluentCloud` here enables the tool for OAuth
+connections but then crashes at call time — the tool is advertised as available but always
+throws. This mismatch has burned us more than once.
+
+Rule of thumb: reach for `hasDirectConfluentCloud` when the handler reads service-block
+fields (`.kafka`, `.flink`, `.confluent_cloud`, etc.) from the connection. Only widen to
+`hasConfluentCloud` once the handler is genuinely OAuth-capable (i.e. it no longer calls
+`getSoleDirectConnection()` and doesn't read direct-only fields). When widening, add an
+`enabledConnectionIds()` test against `ccloudOAuthRuntime()` that confirms the tool is
+enabled for OAuth.
 
 ## File Organization
 

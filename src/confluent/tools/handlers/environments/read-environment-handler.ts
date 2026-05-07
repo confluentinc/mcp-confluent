@@ -7,7 +7,6 @@ import {
 import {
   connectionIdsWhere,
   hasConfluentCloud,
-  widenForOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import {
   Environment,
@@ -125,9 +124,6 @@ Environment: ${environmentDetails.name}
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      widenForOAuth(hasConfluentCloud),
-    );
+    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 }

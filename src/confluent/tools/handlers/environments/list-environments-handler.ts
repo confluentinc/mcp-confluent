@@ -7,7 +7,6 @@ import {
 import {
   connectionIdsWhere,
   hasConfluentCloud,
-  widenForOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
@@ -176,9 +175,6 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
   }
 
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      widenForOAuth(hasConfluentCloud),
-    );
+    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
   }
 }

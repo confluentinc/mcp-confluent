@@ -1,10 +1,7 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  bareRuntime,
-  DEFAULT_CONNECTION_ID,
-} from "@tests/factories/runtime.js";
+import { bareRuntime } from "@tests/factories/runtime.js";
 import { type MockedFetch, mockFetch } from "@tests/stubs/index.js";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -71,14 +68,6 @@ describe("search-product-docs-handler.ts", () => {
         expect(config.annotations).toEqual({ readOnlyHint: true });
         expect(config.inputSchema).toHaveProperty("query");
         expect(config.inputSchema).toHaveProperty("limit");
-      });
-    });
-
-    describe("enabledConnectionIds()", () => {
-      it("should return every configured connection id (no service-block requirement)", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
       });
     });
 

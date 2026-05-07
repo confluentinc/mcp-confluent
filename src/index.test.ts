@@ -168,7 +168,7 @@ describe("index.ts", () => {
     // registry advertises as enabled when the sole connection is OAuth-typed.
     // Two source-of-truth lists, EXPECTED_OAUTH_ENABLED and EXPECTED_OAUTH_DISABLED,
     // must together cover the ToolName enum exactly once.
-    describe("against configed OAuth connection", () => {
+    describe("against configured OAuth connection", () => {
       const EXPECTED_OAUTH_ENABLED: readonly ToolName[] = [
         ToolName.LIST_TOPICS,
         ToolName.CREATE_TOPICS,

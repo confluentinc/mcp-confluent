@@ -250,16 +250,13 @@ export type FlinkGetCase = HandleCaseWithConn & {
 };
 
 /**
- * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`, paired
- * with a mocked `OAuthClientManager` (matching what `ServerRuntime.fromConfig`
- * actually constructs for OAuth connections). The config is loaded from the
- * `ccloud-oauth.yaml` fixture so the factory and the capstone tool-registration
- * test share a single source of truth for what an OAuth config looks like.
- * Used by handler tests to assert that handlers wrapped in `widenForOAuth(...)`
- * see the connection as enabled, and that handlers using strict predicates.
- * Does not populate `runtime.oauthHolder`; tests that need a holder should construct one
- * explicitly. `createMockInstance` doesn't invoke the real constructor, so the
- * OAuthClientManager's eager cloud-REST client setup is sidestepped.
+ * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`, loaded
+ * from the `ccloud-oauth.yaml` fixture. Used by handler tests to assert that
+ * handlers wrapped in `widenForOAuth(...)` see the connection as enabled and
+ * that strict-predicate handlers see it as disabled. A stub
+ * `OAuthClientManager` is supplied solely to satisfy `ServerRuntime`'s
+ * constructor — `enabledConnectionIds()` reads `runtime.config.connections`
+ * and never touches the client manager.
  */
 export function ccloudOAuthRuntime(): ServerRuntime {
   const config = loadConfigFromYaml(CCLOUD_OAUTH_FIXTURE, {});

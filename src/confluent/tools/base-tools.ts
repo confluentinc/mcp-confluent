@@ -76,17 +76,24 @@ export abstract class BaseToolHandler implements ToolHandler {
    * The connection predicate that gates this tool. The single customization
    * seam for tool enablement — declared as a one-line readonly property:
    *
-   *     readonly predicate = hasKafka;
-   *     readonly predicate = widenForOAuth(hasKafkaBootstrap);
-   *     readonly predicate = allOf(hasKafka, hasFlink);
-   *     readonly predicate = alwaysEnabled;
+   *     readonly predicate = hasKafka;                  // base predicate
+   *     readonly predicate = kafkaBootstrapOrOAuth;     // named composite
+   *     readonly predicate = alwaysEnabled;             // no requirement
    *
-   * Pick from `connection-predicates.ts`: a base predicate (`hasKafka`,
-   * `hasFlink`, `hasSchemaRegistry`, `hasConfluentCloud`,
-   * `hasDirectConfluentCloud`, `hasTelemetry`, `hasTableflow`, etc.),
-   * `widenForOAuth(p)` to admit OAuth connections through a block-based
-   * predicate, `allOf(p1, p2, ...)` for compound requirements, or
-   * `alwaysEnabled` for tools with no service-block requirement.
+   * **Must reference a named export from `connection-predicates.ts`.** Do
+   * not compose with `allOf(...)` or `widenForOAuth(...)` at the use site.
+   * If no existing named export expresses the gate you need, add one —
+   * with a per-predicate test in `connection-predicates.test.ts` matching
+   * the depth of the existing `hasKafka` / `flinkWithTelemetry` blocks —
+   * and reference that. Enforced mechanically: the `predicate property`
+   * block in `tool-registry.test.ts` maintains an explicit allow-list
+   * typed as `ReadonlySet<ConnectionPredicate>` (so combinators cannot
+   * compile in) and asserts each handler's `predicate` is a member. New
+   * predicates added to `connection-predicates.ts` need a one-line
+   * addition to that allow-list; inline `allOf(...)` or `widenForOAuth(...)`
+   * at a handler use site returns a closure that is not in the set and
+   * fails the membership check with the offending tool name in the row
+   * label.
    *
    * Both {@linkcode enabledConnectionIds} and {@linkcode connectionVerdicts}
    * are derived from this property and are marked `@final`; never override

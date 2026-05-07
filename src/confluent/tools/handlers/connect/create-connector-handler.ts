@@ -1,10 +1,6 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import {
-  allOf,
-  hasDirectConfluentCloud,
-  hasKafkaAuth,
-} from "@src/confluent/tools/connection-predicates.js";
+import { canCreateDirectConnector } from "@src/confluent/tools/connection-predicates.js";
 import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -84,7 +80,7 @@ export class CreateConnectorHandler extends ConnectToolHandler {
     const conn = runtime.config.getSoleDirectConnection();
     const { environment_id, kafka_cluster_id } =
       this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
-    // hasKafkaAuth in enabledConnectionIds() guarantees auth is present here.
+    // The canCreateDirectConnector predicate guarantees kafka.auth is present.
     const kafkaApiKey = this.resolveParam(
       undefined,
       conn.kafka?.auth?.key,
@@ -139,5 +135,5 @@ export class CreateConnectorHandler extends ConnectToolHandler {
     };
   }
 
-  override readonly predicate = allOf(hasDirectConfluentCloud, hasKafkaAuth);
+  override readonly predicate = canCreateDirectConnector;
 }

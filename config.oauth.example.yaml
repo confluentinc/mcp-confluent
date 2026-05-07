@@ -4,10 +4,11 @@
 #   npx @confluentinc/mcp-confluent --init-oauth-config
 #
 # OAuth authenticates against Confluent Cloud via PKCE; no API keys to
-# provision. The browser flow runs on first tool call. OAuth-eligible tools
-# auto-enable — there are no per-service blocks like there are for direct
-# (api-key) connections. Resource IDs (cluster_id, env_id, etc.) are passed
-# as tool arguments at call time rather than declared here.
+# provision. The browser sign-in opens automatically on server start; tools
+# that depend on OAuth begin working once sign-in completes. OAuth-eligible
+# tools auto-enable — there are no per-service blocks like there are for
+# direct (api-key) connections. Resource IDs (cluster_id, env_id, etc.) are
+# passed as tool arguments at call time rather than declared here.
 
 # --- Server ---
 # MCP server transport, authentication, and logging settings.

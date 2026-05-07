@@ -4,7 +4,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasDirectConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -15,7 +15,9 @@ const listClustersArguments = z.object({
   environmentId: z
     .string()
     .optional()
-    .describe("The environment ID to filter clusters by"),
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+    ),
 });
 
 /**
@@ -64,8 +66,18 @@ export class ListClustersHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
-    const { environmentId } = listClustersArguments.parse(toolArguments);
+    const { environmentId } = listClustersArguments.parse(toolArguments ?? {});
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const conn = runtime.config.connections[connId]!;
+    const clientManager = runtime.clientManagers[connId]!;
+
+    // Resolve environment: arg wins; under direct, fall back to kafka.env_id;
+    // under OAuth there is no service block to fall back to, so an unset arg
+    // produces an empty string — the cmk endpoint will then return its
+    // standard "environment is required" error, which the agent receives via
+    // the response error path.
+    const envFallback = conn.type === "direct" ? conn.kafka?.env_id : undefined;
+    const resolvedEnv = environmentId ?? envFallback ?? "";
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(
@@ -77,10 +89,7 @@ export class ListClustersHandler extends BaseToolHandler {
       ].GET({
         params: {
           query: {
-            environment:
-              environmentId ??
-              runtime.config.getSoleDirectConnection().kafka?.env_id ??
-              "",
+            environment: resolvedEnv,
             page_size: 100,
           },
         },
@@ -189,5 +198,5 @@ Cluster: ${cluster.name}
       annotations: READ_ONLY,
     };
   }
-  readonly predicate = hasDirectConfluentCloud;
+  readonly predicate = hasConfluentCloud;
 }

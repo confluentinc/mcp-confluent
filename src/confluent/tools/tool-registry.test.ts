@@ -13,11 +13,11 @@ import {
   hasConfluentCloud,
   hasDirectConfluentCloud,
   hasFlink,
-  hasKafkaRestWithAuth,
   hasSchemaRegistry,
   hasTableflow,
   hasTelemetry,
   kafkaBootstrapOrOAuth,
+  kafkaRestWithAuthOrOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
@@ -173,8 +173,8 @@ describe("tool-registry.ts", () => {
         [ToolName.DELETE_TOPICS]: kafkaBootstrapOrOAuth,
         [ToolName.PRODUCE_MESSAGE]: kafkaBootstrapOrOAuth,
         [ToolName.CONSUME_MESSAGES]: kafkaBootstrapOrOAuth,
-        [ToolName.ALTER_TOPIC_CONFIG]: hasKafkaRestWithAuth,
-        [ToolName.GET_TOPIC_CONFIG]: hasKafkaRestWithAuth,
+        [ToolName.ALTER_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
+        [ToolName.GET_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         // Flink
         [ToolName.LIST_FLINK_STATEMENTS]: hasFlink,
         [ToolName.CREATE_FLINK_STATEMENT]: hasFlink,
@@ -203,7 +203,7 @@ describe("tool-registry.ts", () => {
         [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupport,
         [ToolName.LIST_TAGS]: hasCCloudCatalogSupport,
         // Clusters
-        [ToolName.LIST_CLUSTERS]: hasDirectConfluentCloud,
+        [ToolName.LIST_CLUSTERS]: hasConfluentCloud,
         // Environments + billing + organizations (Confluent Cloud control plane)
         [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloud,
         [ToolName.READ_ENVIRONMENT]: hasConfluentCloud,

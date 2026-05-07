@@ -1,9 +1,9 @@
 /**
  * @fileoverview OAuth (bearer-auth) client manager. Wires Confluent Cloud
- * REST surfaces, native Kafka admin/producer/consumer (via KafkaJS +
+ * REST surfaces, native Kafka admin/producer/consumer (via `@confluentinc/kafka-javascript` +
  * SASL/OAUTHBEARER), and the Schema Registry SDK to bearer tokens supplied
  * by an {@link OAuthHolder}. REST endpoint URLs and Kafka bootstrap servers
- * are resolved at call time from the Auth0 environment + cluster IDs the
+ * are resolved at call time from the CCloud environment + cluster IDs the
  * agent supplies as tool args.
  *
  * Native Kafka clients are built fresh per call; handlers wrap usage in
@@ -55,7 +55,7 @@ type PostProcessTokenRefresh = (
  * tokens — control plane (cloud / tableflow / telemetry) reads
  * {@link OAuthHolder.getControlPlaneToken}; data plane (flink / schema-registry
  * REST / kafka REST) reads {@link OAuthHolder.getDataPlaneToken}. Cloud REST URL
- * is auto-derived from the Auth0 env. Native Kafka clients (admin, producer,
+ * is auto-derived from the CCloud env. Native Kafka clients (admin, producer,
  * consumer) are built fresh per call against bootstrap endpoints resolved
  * via the cmk REST API; SASL/OAUTHBEARER is configured via librdkafka's
  * synchronous token-refresh callback to avoid the kafkaJS-compat

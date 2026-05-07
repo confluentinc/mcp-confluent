@@ -39,6 +39,15 @@ describe("oauth-client-manager.ts", () => {
         );
       });
 
+      it("should throw when environment_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getKafkaAdminClient("lkc-1", undefined),
+        ).rejects.toThrow(
+          "cluster_id and environment_id are required under --oauth",
+        );
+      });
+
       it("should build a fresh Kafka instance on each call (no caching)", async () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",

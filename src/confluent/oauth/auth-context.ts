@@ -243,7 +243,7 @@ export class AuthContext {
       // Full success — clear any prior transient error state.
       this.errors = { ...this.errors, tokenRefresh: undefined };
       this.failedRefreshAttempts = 0;
-      logger.debug("Token set refreshed successfully");
+      logger.info("Token set refreshed successfully");
     } catch (error) {
       this.recordRefreshError(error);
     }
@@ -341,6 +341,16 @@ export class AuthContext {
         now -
         CONTROL_PLANE_REFRESH_WINDOW_MS,
       1_000,
+    );
+    logger.info(
+      {
+        delayMs: targetDelay,
+        cpExpiresAt: new Date(
+          this.internalTokens.controlPlaneExpiresAt,
+        ).toISOString(),
+        firesAt: new Date(now + targetDelay).toISOString(),
+      },
+      "Next token refresh scheduled",
     );
     this.refreshTimer = setTimeout(async () => {
       this.refreshTimer = null;

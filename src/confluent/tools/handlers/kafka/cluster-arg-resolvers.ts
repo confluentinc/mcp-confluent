@@ -28,7 +28,8 @@ export function resolveKafkaClusterArgs(
 
   if (args.cluster_id === undefined || args.environment_id === undefined) {
     throw new Error(
-      "cluster_id and environment_id are required under OAuth connection type. Call list-clusters " +
+      "cluster_id and environment_id are required under OAuth connection type. " +
+        "Discover the environment via list-environments, then call list-clusters " +
         "with environment_id and pass the cluster's `id` and `spec.environment.id`.",
     );
   }

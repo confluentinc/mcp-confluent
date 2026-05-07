@@ -206,7 +206,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     // Block the path here with a clear capability boundary rather than throw a discovery hint
     // that points at a tool the agent can't call.
     const needsRegistry =
-      value.useSchemaRegistry || (key && key.useSchemaRegistry);
+      (value && value.useSchemaRegistry) || (key && key.useSchemaRegistry);
     if (needsRegistry && conn.type === "oauth") {
       return this.createResponse(
         "Schema Registry deserialization is not yet supported under OAuth connection type. " +

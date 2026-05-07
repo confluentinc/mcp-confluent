@@ -90,11 +90,25 @@ SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 
 ## Getting Started
 
-### General Steps
+### Prerequisites
+
+- **Node.js 22 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
+  ```bash
+  nvm install 22
+  nvm use 22
+  ```
+- A [**Confluent Cloud**](https://confluent.cloud) account with appropriate API keys to access your resources, or your login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
+
+### General Overview
 
 This MCP server is designed to be used with various MCP clients, such as Claude Desktop, Copliot, or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using. However, the general steps are:
 
-1. **Populate the Server Options:** Setup a yaml configuration file with the appropriate variables for the tools and resources you want to use.
+1. **Populate the Server Options:** Setup a `config.yaml` file in your project root with the appropriate variables for the tools and resources you want to use. You can bootstrap the file using the CLI with:
+
+```bash
+npx @confluentinc/mcp-confluent --init-config
+```
+
 2. **Start the Server:** You can run the MCP server in one of two ways:
    - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source. This typically involves:
      - Installing dependencies (`npm install`)
@@ -107,20 +121,11 @@ This MCP server is designed to be used with various MCP clients, such as Claude 
 
 3. **Configure your MCP Client:** Each client will have its own way of specifying the MCP server's address and any required credentials. You'll need to configure your client (e.g., Claude, Goose) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on can be configured by an environment variable.
 
-4. **Start the MCP Client:** Once your client is configured to connect to the MCP server, you can start your mcp client and on startup it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with Confluent Cloud on your behalf.
+4. **Start your MCP Client:** Once your client is configured to connect to the MCP server, you can start your mcp client and on startup it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with Confluent Cloud on your behalf.
 
 5. **Interact with Confluent through the Client:** Once the client is connected and configured, you can use the client's interface to interact with Confluent Cloud resources. The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
 
-### Prerequisites
-
-- **Node.js 22 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
-  ```bash
-  nvm install 22
-  nvm use 22
-  ```
-- A [**Confluent Cloud**](https://confluent.cloud) account with appropriate API keys to access your resources or login credentials if using [OAuth](#oauth-authentication-for-confluent-cloud) to authenticate.
-
-### Setup
+### Detailed Setup
 
 1. **Create a configuration file:** Copy the provided [`config.yaml` example](https://github.com/confluentinc/mcp-confluent/blob/main/config.example.yaml) file to the root of your project. You can use the CLI to bootstrap one in your current directory — no git checkout required:
 
@@ -136,7 +141,7 @@ After editing to include your variables, pass your YAML config file path at serv
 npx @confluentinc/mcp-confluent --config /path/to/myconfig.yaml
 ```
 
-### Configuration Details
+### Configuration Options
 
 > **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition — the server accepts both - but we plan to deprecate the latter in a near-future release.
 
@@ -150,7 +155,7 @@ If you have this repo cloned, `cp config.example.yaml config.yaml` works just as
 
 Flat environment variables can only express a single implicit connection. A YAML file can define multiple named connections, which is necessary for real-world workflows — for example, a `local-dev` connection pointing at a local Docker Kafka alongside a `staging` connection to a Confluent Cloud cluster, all in one file.
 
-#### All Configuration Options
+#### All Configuration Variables
 
 You can configure the MCP server using the following environment variables:
 

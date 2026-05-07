@@ -505,3 +505,7 @@ This MCP server collects anonymous usage data to help make improvements. No pers
 ## Contributing
 
 Bug reports and feedback is appreciated in the form of Github Issues. For guidelines on contributing please see [CONTRIBUTING.md](CONTRIBUTING.md)
+
+### Pre-release testing
+
+To run the MCP server against a pre-release version for beta testing or early feedback, download the release tarball file to a local directory. Then, when running any of the `npx` commands above, replace `@confluentinc/mcp-confluent` with the path to that tarball, e.g. `npx @~path/to/my/tarball --list-tools`

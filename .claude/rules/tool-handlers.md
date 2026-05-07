@@ -31,12 +31,11 @@ Every tool handler follows this pattern:
    - `handle(runtime, toolArguments, sessionId?)` → returns `Promise<CallToolResult>`.
    - `readonly predicate` (skip if you inherited it from a domain subclass) → a `ConnectionPredicate` from `connection-predicates.ts` that gates tool enablement. Declared as a one-liner property, never as a method:
      ```typescript
-     readonly predicate = hasKafka;
-     readonly predicate = widenForOAuth(hasKafkaBootstrap);
-     readonly predicate = allOf(hasKafka, hasFlink);
-     readonly predicate = alwaysEnabled;
+     readonly predicate = hasKafka;                  // base predicate
+     readonly predicate = kafkaBootstrapOrOAuth;     // named composite
+     readonly predicate = alwaysEnabled;             // no requirement
      ```
-     `BaseToolHandler` derives `enabledConnectionIds()` and `connectionVerdicts()` from this property. **Do not override either method** — they are `@final`. The retired iteration helpers `connectionIdsWhere`/`connectionReasonsWhere` are no longer exported.
+     **The `predicate` property must reference a named export from `connection-predicates.ts`. No inline composition at the use site.** `widenForOAuth(...)` and `allOf(...)` are predicate-library construction tools, not handler-side glue. If no existing named export expresses the gate you need, the path is: add a named `const` export to `connection-predicates.ts` → add a per-predicate test in `connection-predicates.test.ts` matching the depth of the existing `hasKafka` / `flinkWithTelemetry` blocks (direct-enabled, each conjunct's failure mode, OAuth verdict) → add the new export to `NAMED_PREDICATES` in the `predicate property` block of `tool-registry.test.ts` → reference the new export from your handler. Promotion is a precondition of adding the handler, not a followup. Enforced mechanically: that `NAMED_PREDICATES` set is typed `ReadonlySet<ConnectionPredicate>` so combinators cannot compile in, and the per-tool assertion fails with the offending tool name in the row label whenever a handler's `predicate` is not in the set — whether because of inline composition or because the allow-list was not updated alongside a new predicate. `BaseToolHandler` derives `enabledConnectionIds()` and `connectionVerdicts()` from this property. **Do not override either method** — they are `@final`. The retired iteration helpers `connectionIdsWhere`/`connectionReasonsWhere` are no longer exported.
 
 ## Input Schema
 
@@ -59,7 +58,7 @@ When adding a new tool, touch these files:
 2. `src/confluent/tools/handlers/<domain>/my-tool-handler.ts` — create handler class
 3. `src/confluent/tools/tool-registry.ts` — import handler and add `[ToolName.MY_TOOL, new MyToolHandler()]` to the `ToolHandlerRegistry.handlers` map
 4. `src/index.test.ts` — classify the new `ToolName` in the capstone partition test by adding it to either `EXPECTED_OAUTH_ENABLED` or `EXPECTED_OAUTH_DISABLED`. The partition test fails if a tool belongs to neither — the guard against birthing a tool without thinking about its OAuth posture.
-5. (Only if needed) `src/confluent/tools/connection-predicates.ts` — add a new predicate if no existing one expresses the tool's requirement
+5. (Only if needed) `src/confluent/tools/connection-predicates.ts` — add a new predicate if no existing one expresses the tool's requirement. A new gate must land as a named `const` here (with a per-predicate test in `connection-predicates.test.ts`) before the handler that consumes it; the new predicate also needs adding to the `NAMED_PREDICATES` allow-list in `tool-registry.test.ts`'s `predicate property` block, otherwise the per-tool membership assertion will fail.
 
 ## Connection Predicates
 
@@ -69,9 +68,16 @@ Tool enablement is decided by inspecting which **service blocks** are present in
 
 - A tool whose predicate matches zero connections is automatically disabled.
 - A tool with no service-specific requirement uses `alwaysEnabled` from `connection-predicates.ts`.
-- For compound requirements, compose with `allOf(p1, p2, ...)` — never raw `&&`, which silently drops the first operand because every `PredicateResult` is a truthy object.
-- For OAuth-capable handlers, wrap a block-based predicate with `widenForOAuth(p)` so OAuth connections answer enabled even though they carry no service blocks.
 - New predicates should be additive and pure; they read the `ConnectionConfig` shape only and return a `PredicateResult` with a `ToolDisabledReason` on failure.
+
+When you need a gate the library doesn't yet publish, add a new named `const` export to `connection-predicates.ts` (then reference it from the handler — see the rule above). Two combinators inside the library make composition safe:
+
+- `allOf(p1, p2, ...)` for compound requirements — never raw `&&`, which silently drops the first operand because every `PredicateResult` is a truthy object.
+- `widenForOAuth(p)` to admit OAuth through a block-based predicate, for handlers genuinely adapted to operate against an OAuth connection at call time.
+
+These combinators are construction tools used to define new named exports; they are not for inline use at the handler site. After adding the named export, give it a per-predicate test in `connection-predicates.test.ts` (modelled on the existing blocks: direct-enabled, each conjunct's failure mode, OAuth verdict) before the handler that consumes it lands.
+
+The named-export-only rule is enforced by the `predicate property` block in `tool-registry.test.ts`, which maintains an explicit `NAMED_PREDICATES` allow-list typed as `ReadonlySet<ConnectionPredicate>` (so combinators can't compile in) and asserts every handler's `predicate` is a member. Use it as the "did I get the wiring right" oracle — if the test fails for your tool, the row label names which handler is the problem and the assertion message distinguishes the two failure modes (inline composition vs. forgot to update the allow-list).
 
 ### `hasConfluentCloud` vs `hasDirectConfluentCloud` — pick carefully
 

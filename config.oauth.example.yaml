@@ -35,7 +35,3 @@ connections:
   # required field — `ccloud_env` is optional and defaults to `prod`.
   ccloud-oauth:
     type: oauth
-    # Auth0 environment override for the OAuth flow. One of: devel, stag, prod.
-    # Defaults to prod when omitted; uncomment only if you need to point at a
-    # non-prod Confluent Cloud control plane.
-    # ccloud_env: prod

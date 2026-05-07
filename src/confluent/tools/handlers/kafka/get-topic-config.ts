@@ -4,7 +4,11 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasKafkaRestWithAuth } from "@src/confluent/tools/connection-predicates.js";
+import {
+  hasKafkaRestWithAuth,
+  widenForOAuth,
+} from "@src/confluent/tools/connection-predicates.js";
+import { resolveKafkaRestArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -14,7 +18,15 @@ const getTopicConfigArguments = z.object({
   clusterId: z
     .string()
     .optional()
-    .describe("The unique identifier for the Kafka cluster."),
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
+  environmentId: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Required under OAuth; ignored under direct.",
+    ),
   topicName: z
     .string()
     .describe("Name of the topic to get configuration for")
@@ -31,24 +43,21 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
-    const { clusterId, topicName } =
-      getTopicConfigArguments.parse(toolArguments);
-    const conn = runtime.config.getSoleDirectConnection();
-    const kafka_cluster_id = this.resolveParam(
-      clusterId,
-      conn.kafka?.cluster_id,
-      "Kafka Cluster ID",
-    );
+    const parsed = getTopicConfigArguments.parse(toolArguments);
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const { clusterId, envId } = resolveKafkaRestArgs(parsed, runtime, connId);
+    const clientManager = runtime.clientManagers[connId]!;
 
-    const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudKafkaRestClient(),
+    const restClient = await clientManager.getConfluentCloudKafkaRestClient(
+      clusterId,
+      envId,
     );
+    const pathBasedClient = wrapAsPathBasedClient(restClient);
 
     // First, get topic details
     const { data: topicData, error: topicError } =
       await pathBasedClient[
-        `/kafka/v3/clusters/${kafka_cluster_id}/topics/${topicName}`
+        `/kafka/v3/clusters/${clusterId}/topics/${parsed.topicName}`
       ].GET();
 
     if (topicError) {
@@ -61,7 +70,7 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     // Then, get topic configurations
     const { data: configData, error: configError } =
       await pathBasedClient[
-        `/kafka/v3/clusters/${kafka_cluster_id}/topics/${topicName}/configs`
+        `/kafka/v3/clusters/${clusterId}/topics/${parsed.topicName}/configs`
       ].GET();
 
     if (configError) {
@@ -78,7 +87,7 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     };
 
     return this.createResponse(
-      `Topic configuration for '${topicName}':\n${JSON.stringify(response, null, 2)}`,
+      `Topic configuration for '${parsed.topicName}':\n${JSON.stringify(response, null, 2)}`,
     );
   }
 
@@ -90,5 +99,5 @@ export class GetTopicConfigHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-  readonly predicate = hasKafkaRestWithAuth;
+  readonly predicate = widenForOAuth(hasKafkaRestWithAuth);
 }

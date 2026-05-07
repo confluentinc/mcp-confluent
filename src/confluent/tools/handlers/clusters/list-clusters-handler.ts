@@ -4,10 +4,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasDirectConfluentCloud,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasDirectConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -192,11 +189,5 @@ Cluster: ${cluster.name}
       annotations: READ_ONLY,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      hasDirectConfluentCloud,
-    );
-  }
+  readonly predicate = hasDirectConfluentCloud;
 }

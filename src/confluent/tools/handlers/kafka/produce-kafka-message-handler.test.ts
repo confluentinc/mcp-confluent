@@ -5,7 +5,12 @@ import {
   DEFAULT_CONNECTION_ID,
   kafkaRestOnlyRuntime,
   kafkaRuntime,
+  runtimeWith,
 } from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 describe("produce-kafka-message-handler.ts", () => {
@@ -33,6 +38,87 @@ describe("produce-kafka-message-handler.ts", () => {
         expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
           DEFAULT_CONNECTION_ID,
         ]);
+      });
+    });
+
+    describe("handle()", () => {
+      it("should report success offset metadata when producer.send resolves", async () => {
+        const clientManager = getMockedClientManager();
+        const producer = await clientManager.getProducer();
+        producer.send.mockResolvedValue([
+          {
+            topicName: "smoke",
+            partition: 0,
+            offset: "5",
+            errorCode: 0,
+          },
+        ]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: { message: "hello", useSchemaRegistry: false },
+          },
+          outcome: {
+            resolves: "Message produced successfully to [Topic: smoke",
+          },
+          clientManager,
+        });
+      });
+
+      it("should return an isError response when producer.send throws", async () => {
+        const clientManager = getMockedClientManager();
+        const producer = await clientManager.getProducer();
+        producer.send.mockRejectedValue(new Error("connection lost"));
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: { message: "hello", useSchemaRegistry: false },
+          },
+          outcome: { resolves: "Failed to produce message: connection lost" },
+          clientManager,
+        });
+      });
+
+      it("should report a per-record error when delivery report has a non-zero errorCode", async () => {
+        const clientManager = getMockedClientManager();
+        const producer = await clientManager.getProducer();
+        producer.send.mockResolvedValue([
+          {
+            topicName: "smoke",
+            partition: 0,
+            offset: "5",
+            errorCode: 2,
+          },
+        ]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: { message: "hello", useSchemaRegistry: false },
+          },
+          outcome: { resolves: "Error producing message to [Topic: smoke" },
+          clientManager,
+        });
       });
     });
   });

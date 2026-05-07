@@ -5,7 +5,12 @@ import {
   DEFAULT_CONNECTION_ID,
   kafkaRestOnlyRuntime,
   kafkaRuntime,
+  runtimeWith,
 } from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 describe("list-topics-handler.ts", () => {
@@ -33,6 +38,43 @@ describe("list-topics-handler.ts", () => {
         expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
           DEFAULT_CONNECTION_ID,
         ]);
+      });
+    });
+
+    describe("handle()", () => {
+      it("should return the topic list when the admin call resolves", async () => {
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.listTopics.mockResolvedValue(["topic-a", "topic-b"]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: { resolves: "Kafka topics: topic-a,topic-b" },
+          clientManager,
+        });
+      });
+
+      it("should let admin errors propagate (no try/catch around the read op)", async () => {
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.listTopics.mockRejectedValue(new Error("broker unreachable"));
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: { throws: "broker unreachable" },
+        });
       });
     });
   });

@@ -4,10 +4,7 @@ import {
   DESTRUCTIVE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasSchemaRegistry,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasSchemaRegistry } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -114,8 +111,5 @@ export class DeleteSchemaHandler extends BaseToolHandler {
       annotations: DESTRUCTIVE,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasSchemaRegistry);
-  }
+  readonly predicate = hasSchemaRegistry;
 }

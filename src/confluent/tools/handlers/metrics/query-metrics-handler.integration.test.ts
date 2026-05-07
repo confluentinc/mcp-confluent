@@ -15,7 +15,7 @@ const runtime = integrationRuntime();
 
 describe("query-metrics-handler", { tags: [Tag.METRICS] }, () => {
   if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires telemetry.auth (or confluent_cloud.auth fallback) config", () => {});
+    it.skip("requires telemetry.auth config", () => {});
     return;
   }
 
@@ -46,7 +46,6 @@ describe("query-metrics-handler", { tags: [Tag.METRICS] }, () => {
         arguments: {
           metric: "io.confluent.kafka.server/received_bytes",
           granularity: "PT5M",
-          interval: "PT15M",
         },
       });
 

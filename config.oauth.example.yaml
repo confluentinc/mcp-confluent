@@ -1,0 +1,41 @@
+# Example MCP Confluent Server configuration — OAuth (PKCE) connection.
+#
+# Generate `config.yaml` from this template with:
+#   npx @confluentinc/mcp-confluent --init-oauth-config
+#
+# OAuth authenticates against Confluent Cloud via PKCE; no API keys to
+# provision. The browser flow runs on first tool call. OAuth-eligible tools
+# auto-enable — there are no per-service blocks like there are for direct
+# (api-key) connections. Resource IDs (cluster_id, env_id, etc.) are passed
+# as tool arguments at call time rather than declared here.
+
+# --- Server ---
+# MCP server transport, authentication, and logging settings.
+# All fields are optional — uncomment and edit only what you need.
+# (See `config.example.yaml` for the fully-annotated server block; the same
+# fields apply here. Stdio users can leave the entire block commented out.)
+# server:
+#   transports: [stdio]
+#   log_level: "${LOG_LEVEL:-info}"
+#   http:
+#     port: ${HTTP_PORT:-8080}
+#     host: "${HTTP_HOST:-127.0.0.1}"
+#     mcp_endpoint: "${HTTP_MCP_ENDPOINT_PATH:-/mcp}"
+#     sse_endpoint: "${SSE_MCP_ENDPOINT_PATH:-/sse}"
+#     sse_message_endpoint: "${SSE_MCP_MESSAGE_ENDPOINT_PATH:-/messages}"
+#   auth:
+#     # api_key: "${MCP_API_KEY}"
+#     allowed_hosts:
+#       - localhost
+#       - "127.0.0.1"
+#     # disabled: true
+
+connections:
+  # Connection name is freeform. The `type: oauth` declaration is the only
+  # required field — `ccloud_env` is optional and defaults to `prod`.
+  ccloud-oauth:
+    type: oauth
+    # Auth0 environment override for the OAuth flow. One of: devel, stag, prod.
+    # Defaults to prod when omitted; uncomment only if you need to point at a
+    # non-prod Confluent Cloud control plane.
+    # ccloud_env: prod

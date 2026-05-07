@@ -31,6 +31,7 @@ export interface CLIOptions {
   disableAuth?: boolean;
   allowedHosts?: string[];
   generateKey?: boolean;
+  initConfig?: boolean;
   oauth?: boolean;
   ccloudEnv?: "devel" | "stag" | "prod";
 }
@@ -211,6 +212,10 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       "Generate a secure API key for MCP_API_KEY and print it to stdout, then exit. Use this to set MCP_API_KEY in your .env file.",
     )
     .option(
+      "--init-config",
+      "Bootstrap a starter config.yaml in the current working directory (also adds it to .gitignore), then exit. Refuses to overwrite an existing config.yaml.",
+    )
+    .option(
       "--oauth",
       "Enable OAuth (PKCE) auth against Confluent Cloud (defaults to prod)",
     )
@@ -275,6 +280,7 @@ export function parseCliArgs(argv: string[]): CLIOptions {
             .map((h: string) => h.trim().toLowerCase())
         : undefined,
       generateKey: !!opts.generateKey,
+      initConfig: !!opts.initConfig,
       oauth: opts.oauth,
       ccloudEnv: opts.ccloudEnv,
     };

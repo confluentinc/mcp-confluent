@@ -40,8 +40,7 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          // Tests of shared scaffolding under tests/ (factories, stubs, harness utilities), and
-          // runs with `npm run test:unit` and `npm run test:integration` by default
+          // Tests of shared scaffolding under tests/ (factories, stubs, harness utilities)
           name: "harness",
           include: ["tests/**/*.test.ts"],
           testTimeout: 10_000,

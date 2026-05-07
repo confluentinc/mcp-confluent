@@ -5,6 +5,7 @@ import {
   disposeIfOAuth,
   formatKafkaError,
   resolveKafkaClusterArgs,
+  resolveKafkaRestArgs,
 } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -80,6 +81,65 @@ describe("resolveKafkaClusterArgs", () => {
     expect(() =>
       resolveKafkaClusterArgs({ cluster_id: "lkc-abc" }, runtime, CONN_ID),
     ).toThrow(/cluster_id.*environment_id.*required.*list-clusters/i);
+  });
+});
+
+describe("resolveKafkaRestArgs", () => {
+  it("under direct, uses arg when provided", () => {
+    const runtime = directRuntime({
+      kafka: {
+        rest_endpoint: "https://x",
+        cluster_id: "lkc-cfg",
+        auth: { type: "api_key", key: "k", secret: "s" },
+      },
+    });
+    expect(
+      resolveKafkaRestArgs({ clusterId: "lkc-arg" }, runtime, CONN_ID),
+    ).toEqual({ clusterId: "lkc-arg", envId: undefined });
+  });
+
+  it("under direct, falls back to conn.kafka.cluster_id when arg is absent", () => {
+    const runtime = directRuntime({
+      kafka: {
+        rest_endpoint: "https://x",
+        cluster_id: "lkc-cfg",
+        auth: { type: "api_key", key: "k", secret: "s" },
+      },
+    });
+    expect(resolveKafkaRestArgs({}, runtime, CONN_ID)).toEqual({
+      clusterId: "lkc-cfg",
+      envId: undefined,
+    });
+  });
+
+  it("under direct, throws when neither arg nor config provides clusterId", () => {
+    const runtime = directRuntime({
+      kafka: {
+        rest_endpoint: "https://x",
+        auth: { type: "api_key", key: "k", secret: "s" },
+      },
+    });
+    expect(() => resolveKafkaRestArgs({}, runtime, CONN_ID)).toThrow(
+      /clusterId is required/,
+    );
+  });
+
+  it("under OAuth, requires both args", () => {
+    const runtime = oauthRuntime();
+    expect(() =>
+      resolveKafkaRestArgs({ clusterId: "lkc-1" }, runtime, CONN_ID),
+    ).toThrow(/clusterId.*environmentId.*required.*OAuth/i);
+  });
+
+  it("under OAuth, returns both args when supplied", () => {
+    const runtime = oauthRuntime();
+    expect(
+      resolveKafkaRestArgs(
+        { clusterId: "lkc-1", environmentId: "env-1" },
+        runtime,
+        CONN_ID,
+      ),
+    ).toEqual({ clusterId: "lkc-1", envId: "env-1" });
   });
 });
 

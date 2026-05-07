@@ -22,9 +22,8 @@ export default defineConfig({
     // in start-server.ts, which copies process.env.
     env: { LOG_LEVEL: "error" },
     reporters: ["verbose", "junit"],
-    // JUnit output file name is shared across projects; CI jobs run a single
-    // project at a time so there's no collision (`--project unit` or
-    // `--project integration`).
+    // Default JUnit output path; per-script overrides (e.g. `--outputFile.junit=TEST-unit.xml`) in
+    // package.json scripts pin a distinct path per lane so CI can publish each lane separately
     outputFile: { junit: "TEST-result.xml" },
     coverage: {
       provider: "v8",
@@ -38,6 +37,16 @@ export default defineConfig({
     // source of truth shared with the test files).
     tags: Object.values(Tag).map((name) => ({ name })),
     projects: [
+      {
+        extends: true,
+        test: {
+          // Tests of shared scaffolding under tests/ (factories, stubs, harness utilities), and
+          // runs with `npm run test:unit` and `npm run test:integration` by default
+          name: "harness",
+          include: ["tests/**/*.test.ts"],
+          testTimeout: 10_000,
+        },
+      },
       {
         extends: true,
         test: {

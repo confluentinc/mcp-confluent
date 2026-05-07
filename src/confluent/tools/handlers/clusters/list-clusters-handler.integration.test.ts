@@ -52,7 +52,7 @@ describe("list-clusters-handler", { tags: [Tag.CLUSTERS] }, () => {
 
       expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(
-        /^Successfully retrieved \d+ clusters:/,
+        /^Successfully retrieved [1-9]\d* clusters:/,
       );
     });
   });

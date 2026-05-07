@@ -5,8 +5,6 @@ import {
   type PredicateResult,
   ToolDisabledReason,
   allOf,
-  connectionIdsWhere,
-  connectionReasonsWhere,
   hasCCloudCatalogSupport,
   hasConfluentCloud,
   hasDirectConfluentCloud,
@@ -313,84 +311,6 @@ describe("connection-predicates.ts", () => {
     it("should report OAuthNoServiceBlocks for an OAuth connection", () => {
       expect(hasTableflow(OAUTH_CONN)).toEqual(
         disabledFor(ToolDisabledReason.OAuthNoServiceBlocks),
-      );
-    });
-  });
-
-  describe("connectionIdsWhere()", () => {
-    it("should return an empty array when no connections match the predicate", () => {
-      const connections: Record<string, ConnectionConfig> = {
-        sr: SCHEMA_REGISTRY_CONN,
-      };
-      expect(connectionIdsWhere(connections, hasKafka)).toEqual([]);
-    });
-
-    it("should return the matching connection ID when one connection matches", () => {
-      const connections: Record<string, ConnectionConfig> = {
-        kafka: KAFKA_CONN,
-        sr: SCHEMA_REGISTRY_CONN,
-      };
-      expect(connectionIdsWhere(connections, hasKafka)).toEqual(["kafka"]);
-    });
-
-    it("should return all matching IDs when multiple connections satisfy the predicate", () => {
-      const connections: Record<string, ConnectionConfig> = {
-        kafka1: KAFKA_CONN,
-        kafka2: KAFKA_REST_CONN,
-        sr: SCHEMA_REGISTRY_CONN,
-      };
-      expect(connectionIdsWhere(connections, hasKafka)).toEqual([
-        "kafka1",
-        "kafka2",
-      ]);
-    });
-  });
-
-  describe("connectionReasonsWhere()", () => {
-    it("should return an empty map when there are no connections", () => {
-      expect(connectionReasonsWhere({}, hasKafka)).toEqual(new Map());
-    });
-
-    it("should record one verdict per connection, preserving entry order", () => {
-      const connections: Record<string, ConnectionConfig> = {
-        kafka: KAFKA_CONN,
-        sr: SCHEMA_REGISTRY_CONN,
-        oauth: OAUTH_CONN,
-      };
-      const verdicts = connectionReasonsWhere(connections, hasKafka);
-      expect(verdicts).toEqual(
-        new Map([
-          ["kafka", ENABLED],
-          ["sr", disabledFor(ToolDisabledReason.MissingKafkaBlock)],
-          ["oauth", disabledFor(ToolDisabledReason.OAuthNoServiceBlocks)],
-        ]),
-      );
-      expect(Array.from(verdicts.keys())).toEqual(["kafka", "sr", "oauth"]);
-    });
-
-    it("should report enabled for every connection when all match the predicate", () => {
-      const connections: Record<string, ConnectionConfig> = {
-        a: KAFKA_CONN,
-        b: KAFKA_REST_CONN,
-      };
-      expect(connectionReasonsWhere(connections, hasKafka)).toEqual(
-        new Map([
-          ["a", ENABLED],
-          ["b", ENABLED],
-        ]),
-      );
-    });
-
-    it("should report disabled for every connection when none match the predicate", () => {
-      const connections: Record<string, ConnectionConfig> = {
-        sr: SCHEMA_REGISTRY_CONN,
-        oauth: OAUTH_CONN,
-      };
-      expect(connectionReasonsWhere(connections, hasFlink)).toEqual(
-        new Map([
-          ["sr", disabledFor(ToolDisabledReason.MissingFlinkBlock)],
-          ["oauth", disabledFor(ToolDisabledReason.OAuthNoServiceBlocks)],
-        ]),
       );
     });
   });

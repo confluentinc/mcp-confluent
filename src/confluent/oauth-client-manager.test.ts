@@ -35,7 +35,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getKafkaAdminClient(undefined, "env-1"),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -44,7 +44,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getKafkaAdminClient("lkc-1", undefined),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -122,7 +122,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getKafkaProducer(undefined, "env-1"),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -131,7 +131,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getKafkaProducer("lkc-1", undefined),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -163,7 +163,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.buildKafkaConsumer(undefined, "env-1"),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -172,7 +172,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.buildKafkaConsumer("lkc-1", undefined),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -241,7 +241,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getSchemaRegistrySdkClient(undefined, "env-1"),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -250,7 +250,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getSchemaRegistrySdkClient("lsrc-1", undefined),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -306,7 +306,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getConfluentCloudKafkaRestClient(undefined, "env-1"),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -315,7 +315,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getConfluentCloudKafkaRestClient("lkc-1", undefined),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 

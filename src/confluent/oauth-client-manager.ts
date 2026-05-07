@@ -231,9 +231,14 @@ export class OAuthClientManager extends BaseClientManager {
     envId: string | undefined,
   ): void {
     if (clusterId === undefined || envId === undefined) {
+      // Defensive check — handlers should validate arg-name shape and throw
+      // their own user-facing error via resolveKafkaClusterArgs (native, snake_case)
+      // or resolveKafkaRestArgs (REST, camelCase) before reaching the manager.
+      // This message fires only when a caller bypasses those resolvers, so
+      // it's worded generically rather than tied to either arg-name convention.
       throw new Error(
-        "cluster_id and environment_id are required under --oauth for native Kafka access. " +
-          "Call list-clusters with environment_id and pass the cluster's `id` and `spec.environment.id`.",
+        "OAuth client construction requires a cluster id and environment id. " +
+          "Discover via list-environments and list-clusters; pass the cluster's `id` and `spec.environment.id`.",
       );
     }
   }

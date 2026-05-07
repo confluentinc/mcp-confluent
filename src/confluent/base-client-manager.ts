@@ -230,7 +230,10 @@ export abstract class BaseClientManager
   }
 
   /** @inheritdoc */
-  getConfluentCloudKafkaRestClient(): Client<paths, `${string}/${string}`> {
+  async getConfluentCloudKafkaRestClient(
+    _clusterId?: string,
+    _envId?: string,
+  ): Promise<Client<paths, `${string}/${string}`>> {
     return this.confluentCloudKafkaRestClient.get();
   }
 

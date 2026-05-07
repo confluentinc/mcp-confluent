@@ -29,15 +29,14 @@ See [Getting Started](#getting-started) for full setup instructions and [Configu
 - [Available Tools](#available-tools)
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
   - [Confluent Local](#available-tools-for-confluent-local)
-- [User Guide](#user-guide)
-  - [Getting Started](#getting-started)
-  - [Configuration](#configuration)
-    - [YAML Configuration](#yaml-configuration)
-  - [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
-  - [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports)
-  - [Usage](#usage)
-  - [CLI Usage](#cli-usage)
-  - [Configuring MCP Clients](#configuring-mcp-clients)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [General Setup Steps](#general-setup-steps)
+  - [Configuration Details](#configuration-details)
+- [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
+- [CLI Usage](#cli-usage)
+- [Configuring MCP Clients](#configuring-mcp-clients)
+- [Authentication for HTTP/SSE Client Transports](#authentication-for-httpsse-client-transports)
 - [Telemetry](#telemetry)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -109,7 +108,7 @@ This MCP server is designed to be used with various MCP clients, such as Claude 
 npx @confluentinc/mcp-confluent --init-config
 ```
 
-2. **Populate the file:** Fill in the necessary values for your Confluent Cloud environment. Different tools will require & use different configuration variables. See the [Configuration](#configuration) section for details on which variables to fill in based on the tools you want to enable.
+2. **Populate the file:** Fill in the necessary values for your Confluent Cloud environment. Different tools will require & use different configuration variables. See the [Configuration Details](#configuration-details) section for details on which variables to fill in based on the tools you want to enable.
 
 3. **Start the Server:** You can run the MCP server in one of two ways:
    - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source. This typically involves:
@@ -131,11 +130,13 @@ npx @confluentinc/mcp-confluent --init-config
 
 > **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition — the server accepts both - but we plan to deprecate the latter in a near-future release.
 
-The `--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in `./config.yaml`, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
+The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys defined in the YAML config. See [OAuth Authentication For Confluent Cloud](#oauth-authentication-for-confluent-cloud) for more details.
+
+The `--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in ./config.yaml, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
 
 It also adds this file it to a `.gitignore` (creating one if needed), so your filled-in copy can't slip into git. It will not overwrite an existing `config.yaml`, so a rerun won't overwrite your edits.
 
-If you have this repo cloned, `cp config.example.yaml config.yaml` works just as well. Every `*.yaml`/`*.yml` file at the repo root is gitignored by default, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
+If you have this repo cloned, `cp config.example.yaml config.yaml` works just as well. Every `*.yaml`/`*.yml` file at this repo root is gitignored by default, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
 
 #### Side note: Why YAML over environment variables?
 
@@ -143,12 +144,11 @@ Flat environment variables can only express a single implicit connection. A YAML
 
 #### All Configuration Variables
 
-The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys defined in the YAML config. See [OAuth Authentication For Confluent Cloud](#oauth-authentication-for-confluent-cloud) for more details.
-
 You can configure the MCP server using the following variables:
 
 <details>
 <summary>Show Table</summary>
+
 | Variable                      | Description                                                                                                                                                                                                                                                       | Default Value                           | Required |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------- |
 | HTTP_HOST                     | Host to bind for HTTP transport. Defaults to localhost only for security.                                                                                                                                                                                         | "127.0.0.1"                             | Yes      |
@@ -186,6 +186,7 @@ You can configure the MCP server using the following variables:
 | TELEMETRY_API_KEY             | Optional API key for telemetry access. Falls back to CONFLUENT_CLOUD_API_KEY if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).)       |                                         | No       |
 | TELEMETRY_API_SECRET          | Optional API secret for telemetry access. Falls back to CONFLUENT_CLOUD_API_SECRET if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).) |                                         | No       |
 | DO_NOT_TRACK                  | Set to `true` to opt out of anonymous telemetry data collection. See [Telemetry](#telemetry) for details.                                                                                                                                                         |                                         | No       |
+
 </details>
 
 #### Examples
@@ -253,78 +254,7 @@ Run with `--config oauth.yaml` and the browser sign-in opens on first start.
 - **Schema Registry (de)serialization** is not yet exposed under OAuth. `produce-message` / `consume-messages` calls with `useSchemaRegistry: true` return a clear capability error. Use a direct connection if schema-aware (de)serialization is required.
 - **Other REST-only tool categories** (`list-clusters`, Connect, Tableflow, Flink, Schema Registry, Metrics, Catalog & Tags) are still being migrated to OAuth and currently require a `direct` connection.
 
-## Authentication for HTTP/SSE Transports
-
-When using HTTP or SSE transports, the MCP server requires API key authentication to prevent unauthorized access and protect against DNS rebinding attacks. This is **enabled by default**.
-
-### Generating an API Key
-
-Generate a secure API key using the built-in utility:
-
-```bash
-npx @confluentinc/mcp-confluent --generate-key
-```
-
-This will output a 64-character key generated using secure cryptography:
-
-```
-Generated MCP API Key:
-================================================================
-a1b2c3d4e5f6...your-64-char-key-here...
-================================================================
-
-```
-
-### Configuring Authentication
-
-Add the generated key to your `config.yaml` file:
-
-```properties
-# MCP Server Authentication (required for HTTP/SSE transports)
-MCP_API_KEY=your-generated-64-char-key-here
-```
-
-### Making Authenticated Requests
-
-Include the API key in the `cflt-mcp-api-Key` header for all HTTP/SSE requests:
-
-```bash
-curl -H "cflt-mcp-api-Key: your-api-key" http://localhost:8080/mcp
-```
-
-### DNS Rebinding Protection
-
-The server includes additional protections against DNS rebinding attacks:
-
-- **Host Header Validation**: Only requests with allowed Host headers are accepted
-
-Configure allowed hosts if needed:
-
-```properties
-# Allow additional hosts (comma-separated)
-MCP_ALLOWED_HOSTS=localhost,127.0.0.1,myhost.local
-```
-
-### Additional security to prevent internet exposure of MCP server
-
-- **Localhost Binding**: Server binds to `127.0.0.1` by default (not `0.0.0.0`)
-
-### Disabling Authentication (Development Only)
-
-For local development, you can disable authentication:
-
-```bash
-# Via CLI flag
-npx @confluentinc/mcp-confluent -e .env --transport http --disable-auth
-
-# Or via environment variable
-MCP_AUTH_DISABLED=true
-```
-
-> [!WARNING]
-> Never disable authentication in production or when the server is network-accessible.
-
-### CLI Usage
+## CLI Usage
 
 The MCP server provides a flexible command line interface (CLI) for advanced configuration and control. The CLI allows you to specify environment files, transports, and fine-tune which tools are enabled or blocked.
 
@@ -483,6 +413,77 @@ Please refer to the following guides for step-by-step instructions on setting up
 - [VS Code](docs/configuring-vs-code.md)
 - [Windsurf](docs/configuring-windsurf.md)
 
+## Authentication for HTTP/SSE Client Transports
+
+When using HTTP or SSE transports, the MCP server requires API key authentication to prevent unauthorized access and protect against DNS rebinding attacks. This is **enabled by default**.
+
+### Generating an API Key
+
+Generate a secure API key using the built-in utility:
+
+```bash
+npx @confluentinc/mcp-confluent --generate-key
+```
+
+This will output a 64-character key generated using secure cryptography:
+
+```
+Generated MCP API Key:
+================================================================
+a1b2c3d4e5f6...your-64-char-key-here...
+================================================================
+
+```
+
+### Configuring Authentication
+
+Add the generated key to your `config.yaml` file:
+
+```properties
+# MCP Server Authentication (required for HTTP/SSE transports)
+MCP_API_KEY=your-generated-64-char-key-here
+```
+
+### Making Authenticated Requests
+
+Include the API key in the `cflt-mcp-api-Key` header for all HTTP/SSE requests:
+
+```bash
+curl -H "cflt-mcp-api-Key: your-api-key" http://localhost:8080/mcp
+```
+
+### DNS Rebinding Protection
+
+The server includes additional protections against DNS rebinding attacks:
+
+- **Host Header Validation**: Only requests with allowed Host headers are accepted
+
+Configure allowed hosts if needed:
+
+```properties
+# Allow additional hosts (comma-separated)
+MCP_ALLOWED_HOSTS=localhost,127.0.0.1,myhost.local
+```
+
+### Additional security to prevent internet exposure of MCP server
+
+- **Localhost Binding**: Server binds to `127.0.0.1` by default (not `0.0.0.0`)
+
+### Disabling Authentication (Development Only)
+
+For local development, you can disable authentication:
+
+```bash
+# Via CLI flag
+npx @confluentinc/mcp-confluent -e .env --transport http --disable-auth
+
+# Or via environment variable
+MCP_AUTH_DISABLED=true
+```
+
+> [!WARNING]
+> Never disable authentication in production or when the server is network-accessible.
+
 ## Telemetry
 
 This MCP server collects anonymous usage data to help make improvements. No personally identifiable information is collected. You can opt out by setting `DO_NOT_TRACK=true` in your environment. See [telemetry.md](telemetry.md) for full details on what is collected.
@@ -493,7 +494,7 @@ This MCP server collects anonymous usage data to help make improvements. No pers
 
 **Tools not appearing** -- Ensure the required environment variables for those tools are set in your `config.yaml` file. Tools are only enabled when their dependencies are configured. Run `--list-tools` to see which tools are active.
 
-**Authentication errors on HTTP/SSE** -- Generate an API key with `npx @confluentinc/mcp-confluent --generate-key` and add it to your `config.yaml` file as `MCP_API_KEY`. See [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports).
+**Authentication errors on HTTP/SSE** -- Generate an API key with `npx @confluentinc/mcp-confluent --generate-key` and add it to your `config.yaml` file as `MCP_API_KEY`. See [Authentication for HTTP/SSE Client Transports](#authentication-for-httpsse-client-transports).
 
 **Connection refused / port conflicts** -- The default HTTP port is 8080. If it's already in use, set a different port via `HTTP_PORT` in your `config.yaml` file.
 

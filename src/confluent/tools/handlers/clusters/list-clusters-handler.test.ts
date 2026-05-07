@@ -1,6 +1,7 @@
 import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list-clusters-handler.js";
 import {
   CCLOUD_CONN,
+  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   runtimeWith,
@@ -44,14 +45,6 @@ describe("list-clusters-handler.ts", () => {
           outcome: { resolves: "Successfully retrieved 0 clusters" },
           expectedEnvId: "env-explicit",
         },
-        {
-          label:
-            "use empty string when both environmentId arg and conn kafka.env_id are absent",
-          connectionConfig: CCLOUD_CONN,
-          args: {},
-          outcome: { resolves: "Successfully retrieved 0 clusters" },
-          expectedEnvId: "",
-        },
       ];
 
       it.each(cases)(
@@ -84,6 +77,28 @@ describe("list-clusters-handler.ts", () => {
           );
         },
       );
+
+      it("should throw a discovery hint under direct when neither environmentId arg nor conn kafka.env_id is present", async () => {
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            CCLOUD_CONN,
+            DEFAULT_CONNECTION_ID,
+            getMockedClientManager(),
+          ),
+          args: {},
+          outcome: { throws: "set kafka.env_id in the connection config" },
+        });
+      });
+
+      it("should throw a discovery hint under OAuth when environmentId is omitted", async () => {
+        await assertHandleCase({
+          handler,
+          runtime: ccloudOAuthRuntime(),
+          args: {},
+          outcome: { throws: "call list-environments" },
+        });
+      });
     });
   });
 });

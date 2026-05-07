@@ -346,6 +346,20 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
+    describe("requireDataPlaneToken (via getConfluentCloudKafkaRestClient)", () => {
+      it("should reject with a descriptive error when bootstrap completes without a DPAT", async () => {
+        const manager = buildManager();
+        // Override the holder's DPAT to be empty even after bootstrap.
+        manager["holder"].getDataPlaneToken = vi
+          .fn()
+          .mockReturnValue(undefined);
+
+        await expect(
+          manager.getConfluentCloudKafkaRestClient("lkc-1", "env-1"),
+        ).rejects.toThrow(/OAuth login did not produce a data-plane token/);
+      });
+    });
+
     describe("disconnect()", () => {
       it("should be a no-op (no caches to drain — clients are caller-owned)", async () => {
         const manager = buildManager();

@@ -133,10 +133,8 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       produceKafkaMessageArguments.parse(toolArguments);
     const { topicName, value, key } = parsed;
 
-    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const { connId, conn, clientManager } = this.resolveSoleConnection(runtime);
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
-    const clientManager = runtime.clientManagers[connId]!;
-    const conn = runtime.config.connections[connId]!;
 
     // Schema Registry serialization is not yet exposed under OAuth connection type
     // Block the path here with a clear capability boundary rather than throw a discovery hint

@@ -25,7 +25,7 @@ VAULT_PATH_FIELDS := \
 	tableflow:TABLEFLOW_API_KEY,TABLEFLOW_API_SECRET \
 	telemetry:TELEMETRY_API_KEY,TELEMETRY_API_SECRET
 
-.PHONY: setup-test-env remove-test-env test-integration store-integration-test-results
+.PHONY: setup-test-env remove-test-env test-integration store-integration-test-results store-unit-test-results store-harness-test-results
 
 # Pull integration secrets into $(ENV_FILE). Fails fast if `vault` isn't on
 # PATH or the user isn't authed. Empty Vault reads (missing field, no
@@ -86,11 +86,26 @@ test-integration:
 	fi; \
 	INTEGRATION_TEST_TRANSPORT="$$TRANSPORT_ENV" npm run test:integration -- $$TAG_ARG
 
-# publish junit results to semaphore. mirrors the pattern in
-# .semaphore/semaphore.yml's Test block but for the integration junit file.
-store-integration-test-results:
-	@if [ -f TEST-result.xml ]; then \
-		test-results publish TEST-result.xml --name "Integration ($(TAG) / $(TRANSPORT))" --force; \
+# publish JUnit results to semaphore: each test lane writes a distinct file via package.json's
+# --outputFile.junit overrides, so per-test-type publishing stays separated in the Semaphore UI
+
+store-unit-test-results:
+	@if [ -f TEST-unit.xml ]; then \
+		test-results publish TEST-unit.xml --name "Unit" --force; \
 	else \
-		echo "no TEST-result.xml to publish"; \
+		echo "no TEST-unit.xml to publish"; \
+	fi
+
+store-integration-test-results:
+	@if [ -f TEST-integration.xml ]; then \
+		test-results publish TEST-integration.xml --name "Integration ($(TAG) / $(TRANSPORT))" --force; \
+	else \
+		echo "no TEST-integration.xml to publish"; \
+	fi
+
+store-harness-test-results:
+	@if [ -f TEST-harness.xml ]; then \
+		test-results publish TEST-harness.xml --name "Harness" --force; \
+	else \
+		echo "no TEST-harness.xml to publish"; \
 	fi

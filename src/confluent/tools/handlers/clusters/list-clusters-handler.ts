@@ -5,6 +5,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { resolveEnvArg } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -68,16 +69,8 @@ export class ListClustersHandler extends BaseToolHandler {
   ): Promise<CallToolResult> {
     const { environmentId } = listClustersArguments.parse(toolArguments ?? {});
     const connId = this.enabledConnectionIds(runtime)[0]!;
-    const conn = runtime.config.connections[connId]!;
     const clientManager = runtime.clientManagers[connId]!;
-
-    // Resolve environment: arg wins; under direct, fall back to kafka.env_id;
-    // under OAuth there is no service block to fall back to, so an unset arg
-    // produces an empty string — the cmk endpoint will then return its
-    // standard "environment is required" error, which the agent receives via
-    // the response error path.
-    const envFallback = conn.type === "direct" ? conn.kafka?.env_id : undefined;
-    const resolvedEnv = environmentId ?? envFallback ?? "";
+    const resolvedEnv = resolveEnvArg({ environmentId }, runtime, connId);
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(

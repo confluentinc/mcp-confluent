@@ -335,6 +335,14 @@ describe("cli.ts", () => {
       expect(parseCliArgs(makeArgs(["--generate-key"])).generateKey).toBe(true);
     });
 
+    it("should set initConfig to true when --init-config is specified", () => {
+      expect(parseCliArgs(makeArgs(["--init-config"])).initConfig).toBe(true);
+    });
+
+    it("should leave initConfig false when --init-config is not specified", () => {
+      expect(parseCliArgs(makeArgs([])).initConfig).toBe(false);
+    });
+
     it("should parse --allowed-hosts into a lowercased array", () => {
       const result = parseCliArgs(
         makeArgs(["--allowed-hosts", "Localhost,127.0.0.1,MyHost.local"]),

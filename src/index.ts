@@ -12,6 +12,7 @@ import {
   loadConfigFromYaml,
   MCPServerConfiguration,
 } from "@src/config/index.js";
+import { fs, path } from "@src/confluent/node-deps.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { groupDisabledToolsByReason } from "@src/confluent/tools/tool-availability.js";
@@ -91,6 +92,79 @@ export function outputApiKey(): void {
   console.log(`MCP_API_KEY=${apiKey}\n`);
 }
 
+/**
+ * Bootstrap a starter `config.yaml` in the current working directory by
+ * copying the bundled `config.example.yaml`, then ensure the new file is
+ * listed in `<cwd>/.gitignore` so credentials filled in later don't slip
+ * into git.
+ *
+ * Resolved relative to `import.meta.url` (the compiled `dist/index.js`)
+ * so this keeps working when invoked via `npx`, where `process.cwd()`
+ * is the user's project but the example file lives next to the install.
+ *
+ * Refuses to overwrite an existing destination so an accidental rerun
+ * cannot wipe credentials the user already filled in. The write uses
+ * `wx` (exclusive create) so the existence check and the create happen
+ * as a single syscall — there is no TOCTOU window where another process
+ * could create the file between a precheck and the write.
+ */
+export function outputInitConfig(): void {
+  const sourceUrl = new URL("../config.example.yaml", import.meta.url);
+  const destPath = path.resolve("config.yaml");
+
+  const contents = fs.readFileSync(sourceUrl, "utf-8");
+  try {
+    fs.writeFileSync(destPath, contents, { flag: "wx" });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
+      throw new Error(
+        `config.yaml already exists at ${destPath}. ` +
+          `Remove or rename it before running --init-config.`,
+      );
+    }
+    throw err;
+  }
+
+  const gitignoreNote = ensureGitignoreEntry(destPath);
+
+  console.log(`wrote ./config.yaml (${gitignoreNote})`);
+  console.log(
+    `Next: edit credentials in config.yaml and run with --config ./config.yaml`,
+  );
+}
+
+/**
+ * Ensure the basename of `filePath` is listed in `<dirname(filePath)>/.gitignore`.
+ * Creates the gitignore if missing; appends idempotently if present (matching
+ * trimmed lines verbatim — `*.yaml` globs or `/config.yaml` anchors are not
+ * recognized, so a user who already wrote either form will see a duplicate
+ * `config.yaml` entry, which is harmless).
+ *
+ * @returns A short note describing what happened, suitable for the success message.
+ */
+function ensureGitignoreEntry(filePath: string): string {
+  const dir = path.dirname(filePath);
+  const fileName = path.basename(filePath);
+  const gitignorePath = path.join(dir, ".gitignore");
+
+  if (!fs.existsSync(gitignorePath)) {
+    fs.writeFileSync(gitignorePath, `${fileName}\n`);
+    return "added to .gitignore";
+  }
+
+  const existing = fs.readFileSync(gitignorePath, "utf-8");
+  const alreadyListed = existing
+    .split("\n")
+    .some((line) => line.trim() === fileName);
+  if (alreadyListed) {
+    return ".gitignore already excludes it";
+  }
+
+  const prefix = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+  fs.appendFileSync(gitignorePath, `${prefix}${fileName}\n`);
+  return "added to .gitignore";
+}
+
 export function outputToolList(filteredToolNames: ToolName[]): void {
   const MAX_DESC_LENGTH = 120;
   filteredToolNames.forEach((toolName) => {
@@ -111,6 +185,17 @@ async function main() {
     // Handle early-exit modes as requested by CLI args before initializing the server.
     if (cliOptions.generateKey) {
       outputApiKey();
+      process.exit(0);
+    }
+
+    if (cliOptions.initConfig) {
+      try {
+        outputInitConfig();
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`--init-config failed: ${msg}`);
+        process.exit(1);
+      }
       process.exit(0);
     }
 

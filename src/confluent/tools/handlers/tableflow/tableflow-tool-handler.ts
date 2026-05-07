@@ -1,8 +1,5 @@
 import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasTableflow,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasTableflow } from "@src/confluent/tools/connection-predicates.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
@@ -16,9 +13,7 @@ import { ServerRuntime } from "@src/server-runtime.js";
  * from both the call arguments and the connection config.
  */
 export abstract class TableflowToolHandler extends BaseToolHandler {
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasTableflow);
-  }
+  readonly predicate = hasTableflow;
 
   /**
    * Resolves the environment ID and Kafka cluster ID for a Tableflow operation,

@@ -12,7 +12,6 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
-  connectionIdsWhere,
   hasKafkaBootstrap,
   widenForOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
@@ -300,10 +299,5 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     };
   }
 
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      widenForOAuth(hasKafkaBootstrap),
-    );
-  }
+  readonly predicate = widenForOAuth(hasKafkaBootstrap);
 }

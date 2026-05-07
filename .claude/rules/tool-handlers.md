@@ -5,17 +5,38 @@ paths:
 
 # MCP Tool Handler Conventions
 
+## Before you start: read a neighbor
+
+This is no longer a greenfield. There are 50+ tools in `src/confluent/tools/handlers/`, each
+already exercising the conventions below in production. **Before writing a new tool, read at
+least one existing handler in the same domain end-to-end** — handler class, colocated `.test.ts`,
+and the registration line in `tool-registry.ts`. The fastest way to get a new tool right is to
+mimic the closest working sibling. The rules below describe the abstract contract; the existing
+handlers show the lived shape (imports, predicate choice, Zod arg patterns, response idioms,
+test layout).
+
+If the closest sibling is doing something different from what this rule says, prefer the
+sibling's pattern and flag the rule as drift — neighboring tools are the source of truth for
+"what we actually do," and this document follows them.
+
 ## Handler Structure
 
 Every tool handler follows this pattern:
 
 1. **Pick a base class:**
-   - If a domain subclass exists (e.g., `FlinkToolHandler`, `TableflowToolHandler` under `handlers/<domain>/`), extend it. The subclass already implements `enabledConnectionIds()` for the whole domain, so you don't repeat the predicate per tool.
-   - Otherwise extend `BaseToolHandler` from `@src/confluent/tools/base-tools.js` directly and implement `enabledConnectionIds()` yourself. If a domain has more than one tool with the same predicate, introduce a domain subclass first and extend that.
-2. **Implement these methods (skip `enabledConnectionIds` if you inherited it):**
+   - If a domain subclass exists (e.g., `FlinkToolHandler`, `TableflowToolHandler` under `handlers/<domain>/`), extend it. The subclass already declares the domain `predicate`, so you don't repeat it per tool.
+   - Otherwise extend `BaseToolHandler` from `@src/confluent/tools/base-tools.js` directly. If a domain has more than one tool with the same predicate, introduce a domain subclass first and extend that.
+2. **Implement these members:**
    - `getToolConfig()` → returns `{ name: ToolName, description: string, inputSchema: zodSchema.shape, annotations: ToolAnnotations }`. Use one of the shared annotation constants exported from `base-tools.ts`: `READ_ONLY`, `CREATE_UPDATE`, or `DESTRUCTIVE` (don't construct ad-hoc instances).
-   - `handle(clientManager, toolArguments, sessionId?)` → returns `Promise<CallToolResult>`.
-   - `enabledConnectionIds(runtime: ServerRuntime)` → returns `string[]` of connection ids whose YAML satisfies a predicate from `connection-predicates.ts`. The canonical body is a one-liner: `return connectionIdsWhere(runtime.config.connections, hasFoo);`. An empty result disables the tool.
+   - `handle(runtime, toolArguments, sessionId?)` → returns `Promise<CallToolResult>`.
+   - `readonly predicate` (skip if you inherited it from a domain subclass) → a `ConnectionPredicate` from `connection-predicates.ts` that gates tool enablement. Declared as a one-liner property, never as a method:
+     ```typescript
+     readonly predicate = hasKafka;
+     readonly predicate = widenForOAuth(hasKafkaBootstrap);
+     readonly predicate = allOf(hasKafka, hasFlink);
+     readonly predicate = alwaysEnabled;
+     ```
+     `BaseToolHandler` derives `enabledConnectionIds()` and `connectionVerdicts()` from this property. **Do not override either method** — they are `@final`. The retired iteration helpers `connectionIdsWhere`/`connectionReasonsWhere` are no longer exported.
 
 ## Input Schema
 
@@ -42,13 +63,15 @@ When adding a new tool, touch these files:
 
 ## Connection Predicates
 
-Tool enablement is decided by inspecting which **service blocks** are present in each `ConnectionConfig` (Kafka, Flink, Schema Registry, Confluent Cloud, Tableflow, Telemetry). Predicates in `connection-predicates.ts` express those checks as pure functions; `connectionIdsWhere(connections, predicate)` walks `runtime.config.connections` and returns the matching ids.
+Tool enablement is decided by inspecting which **service blocks** are present in each `ConnectionConfig` (Kafka, Flink, Schema Registry, Confluent Cloud, Tableflow, Telemetry). Predicates in `connection-predicates.ts` express those checks as pure functions returning a `PredicateResult` (enabled, or disabled with a reason). Each handler names one as its `predicate` property; `BaseToolHandler` walks `runtime.config.connections` against it to derive `enabledConnectionIds()` and `connectionVerdicts()`.
 
 **Invariant: a predicate must guarantee the tool has at least one valid invocation path.** A tool should be advertised as enabled if callers can succeed — either because the required values are present in config, or because the handler accepts them as explicit tool arguments. A predicate that requires only a service block (e.g. `conn.kafka !== undefined`) is correct even if some fields within that block are optional, as long as callers can supply those fields as arguments. The goal is that no enabled tool _always_ throws regardless of how it is called — the predicate is a pre-flight check, not a guarantee of zero-argument success.
 
 - A tool whose predicate matches zero connections is automatically disabled.
-- A tool with no service-specific requirement (a rare case) returns `Object.keys(runtime.config.connections)` directly.
-- New predicates should be additive and pure; they read the YAML/config shape only.
+- A tool with no service-specific requirement uses `alwaysEnabled` from `connection-predicates.ts`.
+- For compound requirements, compose with `allOf(p1, p2, ...)` — never raw `&&`, which silently drops the first operand because every `PredicateResult` is a truthy object.
+- For OAuth-capable handlers, wrap a block-based predicate with `widenForOAuth(p)` so OAuth connections answer enabled even though they carry no service blocks.
+- New predicates should be additive and pure; they read the `ConnectionConfig` shape only and return a `PredicateResult` with a `ToolDisabledReason` on failure.
 
 ### `hasConfluentCloud` vs `hasDirectConfluentCloud` — pick carefully
 
@@ -95,24 +118,20 @@ handlers/
 - Use `.js` extensions on import paths (ESM requirement)
 - Standard imports for a handler that extends `BaseToolHandler` directly:
   ```typescript
-  import { ClientManager } from "@src/confluent/client-manager.js";
   import { CallToolResult } from "@src/confluent/schema.js";
   import {
     BaseToolHandler,
     READ_ONLY,
     ToolConfig,
   } from "@src/confluent/tools/base-tools.js";
-  import {
-    connectionIdsWhere,
-    hasSchemaRegistry,
-  } from "@src/confluent/tools/connection-predicates.js";
+  import { hasSchemaRegistry } from "@src/confluent/tools/connection-predicates.js";
   import { ToolName } from "@src/confluent/tools/tool-name.js";
   import { ServerRuntime } from "@src/server-runtime.js";
   import { z } from "zod";
   ```
-- For a handler that extends a domain subclass, drop `BaseToolHandler`, the predicate imports, and `ServerRuntime` (the subclass owns those):
+  Import only the predicate(s) you actually name on the `predicate` property. Do not import `connectionIdsWhere` or `connectionReasonsWhere` — those helpers were retired; the base class iterates for you.
+- For a handler that extends a domain subclass, drop `BaseToolHandler`, the predicate import, and `ServerRuntime` (the subclass owns those):
   ```typescript
-  import { ClientManager } from "@src/confluent/client-manager.js";
   import { CallToolResult } from "@src/confluent/schema.js";
   import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
   import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";

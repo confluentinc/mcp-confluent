@@ -4,10 +4,7 @@ import {
   CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasCCloudCatalogSupport,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -71,11 +68,5 @@ export class CreateTopicTagsHandler extends BaseToolHandler {
       annotations: CREATE_UPDATE,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      hasCCloudCatalogSupport,
-    );
-  }
+  readonly predicate = hasCCloudCatalogSupport;
 }

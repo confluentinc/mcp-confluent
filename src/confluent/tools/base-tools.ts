@@ -1,4 +1,9 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  ConnectionConfig,
+  DirectConnectionConfig,
+} from "@src/config/models.js";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   ConnectionPredicate,
@@ -136,6 +141,56 @@ export abstract class BaseToolHandler implements ToolHandler {
         this.predicate(conn),
       ]),
     );
+  }
+
+  /**
+   * Resolves the single connection enabled for this tool, returning the
+   * connection id, its config, and the matching client manager. Designed
+   * for handlers that look up `runtime.clientManagers[connId]` (multi-
+   * connection-ready shape).
+   *
+   * Selects `enabledConnectionIds(runtime)[0]` — current runtime is single-
+   * connection, so this is unambiguous; if multi-connection support lands
+   * later, handlers can switch to iterating ids.
+   *
+   * For direct-only handlers that read fields off the narrowed
+   * {@link DirectConnectionConfig} (`conn.kafka.*`, `conn.flink.*`), use
+   * {@link resolveSoleDirectConnection} instead.
+   */
+  protected resolveSoleConnection(runtime: ServerRuntime): {
+    connId: string;
+    conn: ConnectionConfig;
+    clientManager: BaseClientManager;
+  } {
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    return {
+      connId,
+      conn: runtime.config.connections[connId]!,
+      clientManager: runtime.clientManagers[connId]!,
+    };
+  }
+
+  /**
+   * Like {@link resolveSoleConnection} but narrows `conn` to
+   * {@link DirectConnectionConfig}. Throws if the connection is OAuth-typed.
+   *
+   * Drop-in replacement for the older `runtime.config.getSoleDirectConnection()`
+   * pattern. Use in handlers gated by direct-only predicates
+   * (`hasDirectConfluentCloud`, `hasFlink`, etc.) that read direct-only
+   * fields from the connection config.
+   */
+  protected resolveSoleDirectConnection(runtime: ServerRuntime): {
+    connId: string;
+    conn: DirectConnectionConfig;
+    clientManager: BaseClientManager;
+  } {
+    const { connId, conn, clientManager } = this.resolveSoleConnection(runtime);
+    if (conn.type !== "direct") {
+      throw new Error(
+        `Tool ${this.getToolConfig().name} requires a direct (non-OAuth) connection.`,
+      );
+    }
+    return { connId, conn, clientManager };
   }
 
   /**

@@ -1,5 +1,12 @@
 import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
-import { bareRuntime, kafkaRuntime } from "@tests/factories/runtime.js";
+import {
+  bareRuntime,
+  CCLOUD_CONN,
+  ccloudOAuthRuntime,
+  DEFAULT_CONNECTION_ID,
+  kafkaRuntime,
+  runtimeWith,
+} from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
@@ -43,6 +50,47 @@ describe("base-tools.ts", () => {
               },
             ],
           ]),
+        );
+      });
+    });
+
+    describe("resolveSoleConnection()", () => {
+      const resolveSoleConnection = handler["resolveSoleConnection"].bind(
+        handler,
+      ) as (typeof handler)["resolveSoleConnection"];
+
+      it("should return the sole direct connection's id, config, and client manager", () => {
+        const runtime = runtimeWith(CCLOUD_CONN);
+        const { connId, conn, clientManager } = resolveSoleConnection(runtime);
+        expect(connId).toBe(DEFAULT_CONNECTION_ID);
+        expect(conn.type).toBe("direct");
+        expect(clientManager).toBeDefined();
+      });
+
+      it("should return the sole OAuth connection without narrowing", () => {
+        const { conn } = resolveSoleConnection(ccloudOAuthRuntime());
+        expect(conn.type).toBe("oauth");
+      });
+    });
+
+    describe("resolveSoleDirectConnection()", () => {
+      const resolveSoleDirectConnection = handler[
+        "resolveSoleDirectConnection"
+      ].bind(handler) as (typeof handler)["resolveSoleDirectConnection"];
+
+      it("should narrow conn to DirectConnectionConfig under direct", () => {
+        const runtime = runtimeWith(CCLOUD_CONN);
+        const { conn } = resolveSoleDirectConnection(runtime);
+        // Type-narrowed access to the direct-only `confluent_cloud` field is
+        // the contract this method exists to provide.
+        expect(conn.confluent_cloud?.endpoint).toBe(
+          "https://api.confluent.cloud",
+        );
+      });
+
+      it("should throw when the connection is OAuth-typed", () => {
+        expect(() => resolveSoleDirectConnection(ccloudOAuthRuntime())).toThrow(
+          /requires a direct \(non-OAuth\) connection/,
         );
       });
     });

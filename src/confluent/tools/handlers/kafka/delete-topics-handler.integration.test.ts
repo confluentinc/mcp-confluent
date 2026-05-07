@@ -1,15 +1,13 @@
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  uniqueTopicName,
-  withSharedAdminClient,
-} from "@tests/harness/kafka-admin.js";
+import { withSharedAdminClient } from "@tests/harness/kafka-admin.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { activeTransports } from "@tests/harness/transports.js";
+import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -37,7 +35,7 @@ describe("delete-topics-handler", { tags: [Tag.KAFKA] }, () => {
     });
 
     it("should delete the requested Kafka topic", async () => {
-      const topic = uniqueTopicName(`delete-${transport}`);
+      const topic = uniqueName(`delete-${transport}`);
       createdTopics.push(topic);
       await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
       // wait for the newly-created topic to be visible before deleting it

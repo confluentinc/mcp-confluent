@@ -2,7 +2,6 @@ import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alt
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   getTestClusterId,
-  uniqueTopicName,
   withSharedAdminClient,
 } from "@tests/harness/kafka-admin.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
@@ -12,6 +11,7 @@ import {
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
 import { activeTransports } from "@tests/harness/transports.js";
+import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -40,7 +40,7 @@ describe("alter-topic-config", { tags: [Tag.KAFKA] }, () => {
     });
 
     it("should alter retention.ms on the test topic via the REST proxy", async () => {
-      const topic = uniqueTopicName(`alter-${transport}`);
+      const topic = uniqueName(`alter-${transport}`);
       createdTopics.push(topic);
       await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
 

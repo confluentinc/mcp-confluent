@@ -9,10 +9,15 @@ An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI as
 
 > **Prerequisites:** [Node.js 22+](https://nodejs.org/). If you want to interact with [Confluent Cloud](https://confluent.cloud/), you need to create an account first.
 
+1. Generate a quick `config.yaml` file in your project root:
+
 ```bash
-# generate a quick config file in your project root:
 npx @confluentinc/mcp-confluent --init-config
-# edit ./config.yaml with your connection details, then:
+```
+
+2. Edit the `config.yaml` file with your connection details, then:
+
+```bash
 npx @confluentinc/mcp-confluent --config ./config.yaml
 ```
 
@@ -135,9 +140,9 @@ npx @confluentinc/mcp-confluent --config /path/to/myconfig.yaml
 
 > **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition — the server accepts both - but we plan to deprecate the latter in a near-future release.
 
-`--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in `./config.yaml`, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
+The `--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in `./config.yaml`, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
 
-It also adds this file it to a `.gitignore` (creating one if needed), so your filled-in copy can't slip into git. It refuses to overwrite an existing `config.yaml`, so a stray rerun won't overwrite edits.
+It also adds this file it to a `.gitignore` (creating one if needed), so your filled-in copy can't slip into git. It will not overwrite an existing `config.yaml`, so a rerun won't overwrite your edits.
 
 If you have this repo cloned, `cp config.example.yaml config.yaml` works just as well. Every `*.yaml`/`*.yml` file at the repo root is gitignored by default, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
 

@@ -180,6 +180,7 @@ describe("index.ts", () => {
         ToolName.LIST_ORGANIZATIONS,
         ToolName.LIST_BILLING_COSTS,
         ToolName.SEARCH_PRODUCT_DOCS,
+        ToolName.GET_PRODUCT_DOC_PAGE,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [

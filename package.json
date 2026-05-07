@@ -32,7 +32,7 @@
     "test:unit:watch": "vitest --project unit",
     "test:integration": "npm run build && vitest run --project integration --outputFile.junit=TEST-integration.xml",
     "test:integration:coverage": "npm run test:integration -- --coverage",
-    "test:harness": "vitest run --project harness --outputFile.junit=TEST-harness.xml",
+    "test:harness": "vitest run --project harness --reporter=verbose",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js --env-file .env",
     "start:http": "node dist/index.js --env-file .env --transport http",

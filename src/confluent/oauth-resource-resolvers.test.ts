@@ -1,5 +1,6 @@
 import {
   resolveKafkaBootstrap,
+  resolveKafkaRestEndpoint,
   resolveSchemaRegistryEndpoint,
 } from "@src/confluent/oauth-resource-resolvers.js";
 import type { paths } from "@src/confluent/openapi-schema.js";
@@ -93,6 +94,44 @@ describe("resolveSchemaRegistryEndpoint", () => {
     });
     await expect(
       resolveSchemaRegistryEndpoint(client, "lsrc-no-endpoint", "env-1"),
+    ).rejects.toThrow(/http_endpoint/);
+  });
+});
+
+describe("resolveKafkaRestEndpoint", () => {
+  it("returns spec.http_endpoint on success", async () => {
+    const client = makeStubClient({
+      "/cmk/v2/clusters/{id}:lkc-abc": {
+        data: {
+          spec: {
+            http_endpoint:
+              "https://pkc-abc.us-east-1.aws.confluent.cloud:443",
+          },
+        },
+      },
+    });
+    expect(await resolveKafkaRestEndpoint(client, "lkc-abc", "env-1")).toBe(
+      "https://pkc-abc.us-east-1.aws.confluent.cloud:443",
+    );
+  });
+
+  it("throws with cluster + env in message on 404", async () => {
+    const client = makeStubClient({
+      "/cmk/v2/clusters/{id}:lkc-x": {
+        error: { message: "not found", status: 404 },
+      },
+    });
+    await expect(
+      resolveKafkaRestEndpoint(client, "lkc-x", "env-9"),
+    ).rejects.toThrow(/lkc-x.*env-9/);
+  });
+
+  it("throws when response is missing http_endpoint", async () => {
+    const client = makeStubClient({
+      "/cmk/v2/clusters/{id}:lkc-no-http": { data: { spec: {} } },
+    });
+    await expect(
+      resolveKafkaRestEndpoint(client, "lkc-no-http", "env-1"),
     ).rejects.toThrow(/http_endpoint/);
   });
 });

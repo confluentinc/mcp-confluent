@@ -438,12 +438,10 @@ describe("tool-registry.ts", () => {
       [ToolName.READ_ENVIRONMENT]: { outcome: { throws: "ZodError" } },
       // Clusters
       [ToolName.LIST_CLUSTERS]: {
-        outcome: { resolves: "Successfully retrieved 0 clusters" },
-        setup: (cm) => {
-          cm.getConfluentCloudRestClient().GET.mockResolvedValue({
-            data: { data: [] },
-          });
-        },
+        // resolveEnvArg throws under direct when neither environmentId arg
+        // nor conn.kafka.env_id supplies a value — `allServicesRuntime`
+        // omits kafka.env_id, so this is the expected smoke-test path.
+        outcome: { throws: "environmentId is required" },
       },
       // Tableflow
       [ToolName.CREATE_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },

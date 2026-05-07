@@ -126,13 +126,9 @@ export function hasSchemaRegistry(conn: ConnectionConfig): PredicateResult {
  * unconditionally (the cloud REST URL is derived from the Auth0
  * environment).
  */
-export function hasConfluentCloud(conn: ConnectionConfig): PredicateResult {
-  if (conn.type === "oauth") return ENABLED;
-  if (conn.confluent_cloud === undefined) {
-    return disabled(ToolDisabledReason.MissingConfluentCloudBlock);
-  }
-  return ENABLED;
-}
+export const hasConfluentCloud: ConnectionPredicate = widenForOAuth(
+  hasDirectConfluentCloud,
+);
 
 /**
  * Block-level — verdict that holds only for direct connections carrying a

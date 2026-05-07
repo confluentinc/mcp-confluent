@@ -30,15 +30,12 @@ import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
 import { kafkaLogger } from "@src/logger.js";
+import { DATA_PLANE_TOKEN_LIFETIME_MS } from "./oauth/token-lifetimes.js";
 
-/**
- * Lifetime hint passed to librdkafka inside the OAUTHBEARER refresh callback.
- * librdkafka uses this to schedule its next refresh callback; 10 minutes lines
- * up with CCloud's typical DPAT lifetime. Within a single tool call, only the
- * first invocation actually matters (the call completes well before the next
- * scheduled refresh).
- */
-const OAUTHBEARER_TOKEN_LIFETIME_MS = 10 * 60 * 1000;
+// Lifetime hint passed to librdkafka inside the OAUTHBEARER refresh callback
+// — `DATA_PLANE_TOKEN_LIFETIME_MS` is the canonical value (~10min, matching
+// CCloud's DPAT lifetime). librdkafka uses this to schedule its next refresh
+// callback; within a single tool call only the first invocation matters.
 
 type PostProcessTokenRefresh = (
   err: Error | null,
@@ -231,14 +228,20 @@ export class OAuthClientManager extends BaseClientManager {
       // Synchronous librdkafka-native refresh callback. Reads the holder's
       // current DPAT and pushes it into librdkafka via postProcessTokenRefresh
       // inline — no async, no microtask race with the SASL state machine.
-      // See "SASL spike findings" comment at the top of this file.
       oauthbearer_token_refresh_cb: (
         _oauthbearerConfig: string,
         postProcessTokenRefresh: PostProcessTokenRefresh,
       ): void => {
+        const dpat = this.holder.getDataPlaneToken();
+        if (!dpat) {
+          postProcessTokenRefresh(
+            new Error("Data-plane token unavailable for SASL refresh"),
+          );
+          return;
+        }
         postProcessTokenRefresh(null, {
-          tokenValue: this.holder.getDataPlaneToken() ?? "",
-          lifetime: Date.now() + OAUTHBEARER_TOKEN_LIFETIME_MS,
+          tokenValue: dpat,
+          lifetime: Date.now() + DATA_PLANE_TOKEN_LIFETIME_MS,
           principal: clusterId,
           extensions: { logicalCluster: clusterId },
         });

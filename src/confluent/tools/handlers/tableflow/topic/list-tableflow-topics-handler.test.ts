@@ -1,12 +1,9 @@
 import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tableflow/topic/list-tableflow-topics-handler.js";
 import {
-  bareRuntime,
-  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
   TABLEFLOW_CONN,
   TableflowHandleCase,
-  tableflowRuntime,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -17,28 +14,6 @@ import { describe, expect, it } from "vitest";
 describe("list-tableflow-topics-handler.ts", () => {
   describe("ListTableFlowTopicsHandler", () => {
     const handler = new ListTableFlowTopicsHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with tableflow and kafka blocks", () => {
-        expect(
-          handler.enabledConnectionIds(runtimeWith(TABLEFLOW_CONN)),
-        ).toEqual([DEFAULT_CONNECTION_ID]);
-      });
-
-      it("should return the connection ID for a tableflow-only connection without a kafka block", () => {
-        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a tableflow block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
-      });
-    });
 
     describe("handle()", () => {
       const cases: TableflowHandleCase[] = [

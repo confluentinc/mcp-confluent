@@ -1,47 +1,19 @@
 import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
 import {
-  bareRuntime,
-  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   KAFKA_CONN,
-  kafkaRestOnlyRuntime,
-  kafkaRestRuntime,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
   getMockedClientManager,
 } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 
 describe("get-topic-config.ts", () => {
   describe("GetTopicConfigHandler", () => {
     const handler = new GetTopicConfigHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with kafka.rest_endpoint and auth", () => {
-        expect(handler.enabledConnectionIds(kafkaRestRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a kafka block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for a kafka REST connection without auth", () => {
-        expect(handler.enabledConnectionIds(kafkaRestOnlyRuntime())).toEqual(
-          [],
-        );
-      });
-
-      it("should return the connection id when the connection is OAuth-typed", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-    });
 
     describe("handle()", () => {
       const cases: HandleCaseWithConn[] = [
@@ -49,6 +21,7 @@ describe("get-topic-config.ts", () => {
           label: "throws ZodError when topicName is absent",
           args: {},
           outcome: { throws: "ZodError" },
+          connectionConfig: {},
         },
         {
           label:

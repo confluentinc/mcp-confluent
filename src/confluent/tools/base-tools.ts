@@ -86,14 +86,15 @@ export abstract class BaseToolHandler implements ToolHandler {
    * with a per-predicate test in `connection-predicates.test.ts` matching
    * the depth of the existing `hasKafka` / `flinkWithTelemetry` blocks —
    * and reference that. Enforced mechanically: the `predicate property`
-   * block in `tool-registry.test.ts` maintains an explicit allow-list
-   * typed as `ReadonlySet<ConnectionPredicate>` (so combinators cannot
-   * compile in) and asserts each handler's `predicate` is a member. New
-   * predicates added to `connection-predicates.ts` need a one-line
-   * addition to that allow-list; inline `allOf(...)` or `widenForOAuth(...)`
-   * at a handler use site returns a closure that is not in the set and
-   * fails the membership check with the offending tool name in the row
-   * label.
+   * block in `tool-registry.test.ts` maintains an explicit
+   * `Readonly<Record<ToolName, ConnectionPredicate>>` (`EXPECTED_PREDICATES`)
+   * pinning every tool to its expected predicate. The `Record` over
+   * `ToolName` makes exhaustiveness a compile-time check (a missing tool
+   * is a `tsc` error, not a runtime one), and the value type rejects
+   * combinators at compile time. The `it.each` over the record fails with
+   * the offending tool name in the row label whenever a handler's
+   * `predicate` drifts from the table. New tools or rewires are a one-line
+   * table edit.
    *
    * Both {@linkcode enabledConnectionIds} and {@linkcode connectionVerdicts}
    * are derived from this property and are marked `@final`; never override

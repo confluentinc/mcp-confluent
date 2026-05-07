@@ -2,7 +2,6 @@ import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import { generateOpaqueToken } from "@src/confluent/oauth/crypto-utils.js";
 import { runPkceLogin } from "@src/confluent/oauth/pkce-login.js";
-import { DEFAULT_REFRESH_INTERVAL_MS } from "@src/confluent/oauth/token-lifetimes.js";
 import type {
   Auth0Environment,
   ConfluentTokenSet,
@@ -84,7 +83,7 @@ export class OAuthHolder {
         accessToken: generateOpaqueToken(),
       };
       const ctx = AuthContext.fromTokens(auth0Config, tokens);
-      ctx.startRefreshLoop(DEFAULT_REFRESH_INTERVAL_MS);
+      ctx.startRefreshLoop();
       this.ctx = ctx;
       logger.info({ env }, "OAuth login successful");
     } catch (err) {

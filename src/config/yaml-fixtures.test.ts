@@ -187,6 +187,22 @@ describe("config/yaml-fixtures.test.ts", () => {
     });
   });
 
+  describe("oauth fixtures", () => {
+    it("should load ccloud-oauth with type=oauth and the configured ccloud_env", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/ccloud-oauth.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.type).toBe("oauth");
+      // Narrow off the discriminant before reading ccloud_env so the assertion
+      // also serves as a compile-time check on the OAuth arm of ConnectionConfig.
+      if (conn.type !== "oauth")
+        throw new Error("expected oauth connection after type assertion");
+      expect(conn.ccloud_env).toBe("devel");
+    });
+  });
+
   describe("kafka extra_properties fixtures", () => {
     it("should load kafka-with-extra-properties and parse the extra_properties block", () => {
       const config = loadConfigFromYaml(

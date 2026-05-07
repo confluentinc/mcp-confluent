@@ -43,7 +43,7 @@ describe("create-connector-handler.ts", () => {
       });
 
       it("should return an empty array for a connection with kafka.auth but no confluent_cloud block", () => {
-        // Pins that hasDirectConfluentCloud and hasKafkaAuth are AND'd, not
+        // Pins that hasConfluentCloud and hasKafkaAuth are AND'd, not
         // collapsed to the second predicate. A naive `&&` of two
         // `PredicateResult` objects (both truthy) silently drops the first
         // predicate; this case keeps that regression honest.

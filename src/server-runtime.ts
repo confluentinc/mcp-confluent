@@ -3,10 +3,7 @@ import {
   MCPServerConfiguration,
 } from "@src/config/index.js";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
-import {
-  constructDirectClientManager,
-  DirectClientManager,
-} from "@src/confluent/direct-client-manager.js";
+import { constructDirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 
@@ -54,23 +51,6 @@ export class ServerRuntime {
       );
     }
     return managers[0]!;
-  }
-
-  /**
-   * Narrows the sole client manager to a {@link DirectClientManager} or throws
-   * if the connection is OAuth-backed. Native-Kafka tools call this instead of
-   * {@link clientManager} so a missing-on-OAuth Kafka method is a compile-time
-   * error rather than a runtime throw on a stub. Their `hasKafka` predicates
-   * already gate them off for OAuth connections, so the throw here is defensive.
-   */
-  requireDirectClientManager(): DirectClientManager {
-    const cm = this.clientManager;
-    if (!(cm instanceof DirectClientManager)) {
-      throw new Error(
-        "Native Kafka tools require a direct (non-OAuth) connection.",
-      );
-    }
-    return cm;
   }
 
   static fromConfig(config: MCPServerConfiguration): ServerRuntime {

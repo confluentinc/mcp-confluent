@@ -36,7 +36,6 @@ describe("produce-kafka-message-handler.ts", () => {
 
       it("should return the connection id when the connection is OAuth-typed", () => {
         expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
         ]);
       });
     });

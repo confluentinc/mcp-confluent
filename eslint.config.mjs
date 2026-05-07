@@ -10,7 +10,12 @@ export default [
   { files: ["**/*.{js,mjs,cjs,ts}"] },
   { languageOptions: { globals: globals.browser } },
   {
-    ignores: ["dist/**", "src/confluent/openapi-schema.d.ts", "coverage/**"],
+    ignores: [
+      "dist/**",
+      "src/confluent/openapi-schema.d.ts",
+      "coverage/**",
+      ".worktrees/**",
+    ],
   },
   { files: ["scripts/**"], languageOptions: { globals: globals.node } },
   pluginJs.configs.recommended,

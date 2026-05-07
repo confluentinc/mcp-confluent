@@ -5,6 +5,7 @@
  * plus the OAuth variant introduced in the OAuth wiring ticket).
  */
 
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { ClientConfig } from "@confluentinc/schemaregistry";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
@@ -34,9 +35,17 @@ export interface BaseClientManagerConfig {
 }
 
 /**
- * Holds every Confluent Cloud REST client (cloud, tableflow, flink, schema-registry REST,
- * kafka REST, telemetry) and the Schema Registry SDK client. Does not own a native Kafka
- * broker client — subclasses add that when they need one.
+ * Holds every Confluent Cloud REST client (cloud, tableflow, flink,
+ * schema-registry REST, kafka REST, telemetry) and the Schema Registry SDK
+ * client. Native Kafka admin/producer/consumer clients are declared abstract
+ * here so subclasses can supply the implementation that fits their auth model:
+ * api-key + SASL/PLAIN in {@link DirectClientManager}, or DPAT +
+ * SASL/OAUTHBEARER in OAuthClientManager.
+ *
+ * The `getSchemaRegistrySdkClient(clusterId?, envId?)` accessor has a default
+ * implementation that delegates to the no-arg `getSchemaRegistryClient()`.
+ * That covers direct connections (the args are ignored). OAuth subclasses
+ * override it to build per-cluster SR SDK clients with bearer auth.
  */
 export abstract class BaseClientManager
   implements ConfluentCloudRestClientManager, SchemaRegistryClientHandler
@@ -170,7 +179,10 @@ export abstract class BaseClientManager
       const schemaRegistryAuth = config.auth.schemaRegistry;
       if (schemaRegistryAuth.type === "oauth") {
         throw new Error(
-          "Schema Registry OAuth authentication is not supported for SchemaRegistryClient yet. Configure SCHEMA_REGISTRY_API_KEY and SCHEMA_REGISTRY_API_SECRET instead.",
+          "Schema Registry OAuth authentication requires the cluster-aware accessor: " +
+            "call getSchemaRegistrySdkClient(clusterId, envId) instead. The no-arg " +
+            "getSchemaRegistryClient() does not have access to the logical SR cluster ID " +
+            "(needed for the target-sr-cluster header) under OAuth.",
         );
       }
       const { apiKey, apiSecret } = schemaRegistryAuth;
@@ -231,6 +243,55 @@ export abstract class BaseClientManager
   getSchemaRegistryClient(): SchemaRegistryClient {
     return this.schemaRegistryClient.get();
   }
+
+  /**
+   * Cluster-aware Schema Registry SDK client accessor. Under direct, args are
+   * ignored and the existing single-instance Lazy is returned. Under OAuth,
+   * args are required: `clusterId` is `lsrc-...` and `envId` is `env-...`. The
+   * SR client itself is built per-call (no cache) because the DPAT is captured
+   * in the SDK's axios headers at construction time; endpoint resolution
+   * happens fresh on every call too.
+   */
+  async getSchemaRegistrySdkClient(
+    _clusterId?: string,
+    _envId?: string,
+  ): Promise<SchemaRegistryClient> {
+    return this.getSchemaRegistryClient();
+  }
+
+  /**
+   * Cluster-aware Kafka admin client. Under direct, args are ignored and the
+   * manager-owned `AsyncLazy` singleton admin is returned (manager controls
+   * its lifetime). Under OAuth, args are required and a fresh admin is built
+   * per call — the caller owns the lifetime and must dispose via
+   * `disposeIfOAuth(runtime, connId, admin)` in a `try { ... } finally { ... }`
+   * block (helper at `@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js`).
+   */
+  abstract getKafkaAdminClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Admin>;
+
+  /**
+   * Cluster-aware Kafka producer. Same direct/OAuth lifecycle asymmetry as
+   * {@link getKafkaAdminClient}.
+   */
+  abstract getKafkaProducer(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<KafkaJS.Producer>;
+
+  /**
+   * Build a fresh Kafka consumer (per-call on both direct and OAuth — group
+   * membership has its own server-side lifecycle that doesn't compose with
+   * cached clients). The returned consumer is unconnected; the caller must
+   * call `connect()` and `disconnect()` (typically in a `try/finally`).
+   */
+  abstract buildKafkaConsumer(
+    clusterId?: string,
+    envId?: string,
+    groupId?: string,
+  ): Promise<KafkaJS.Consumer>;
 
   abstract disconnect(): Promise<void>;
 }

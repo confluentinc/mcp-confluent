@@ -109,6 +109,23 @@ export interface MockedClientManager extends Mocked<DirectClientManager> {
   getAdminClient: Mock<() => Promise<Mocked<KafkaJS.Admin>>>;
   getProducer: Mock<() => Promise<Mocked<KafkaJS.Producer>>>;
   getConsumer: Mock<(sessionId?: string) => Promise<Mocked<KafkaJS.Consumer>>>;
+  // Cluster-aware accessors. On direct, production delegates to the singleton
+  // accessors above; getMockedClientManager wires these to do the same so
+  // tests configure `getAdminClient` / `getProducer` / `getConsumer` and the
+  // cluster-aware getter lands on the same mock.
+  getKafkaAdminClient: Mock<
+    (clusterId?: string, envId?: string) => Promise<Mocked<KafkaJS.Admin>>
+  >;
+  getKafkaProducer: Mock<
+    (clusterId?: string, envId?: string) => Promise<Mocked<KafkaJS.Producer>>
+  >;
+  buildKafkaConsumer: Mock<
+    (
+      clusterId?: string,
+      envId?: string,
+      groupId?: string,
+    ) => Promise<Mocked<KafkaJS.Consumer>>
+  >;
   getConfluentCloudFlinkRestClient: Mock<() => MockedRestClient>;
   getConfluentCloudRestClient: Mock<() => MockedRestClient>;
   getConfluentCloudTableflowRestClient: Mock<() => MockedRestClient>;
@@ -164,6 +181,16 @@ export function getMockedClientManager(): MockedClientManager {
   cm.getAdminClient.mockResolvedValue(getMockedAdmin());
   cm.getProducer.mockResolvedValue(getMockedProducer());
   cm.getConsumer.mockResolvedValue(getMockedConsumer());
+
+  // Cluster-aware accessors delegate to the singleton mocks above on direct,
+  // matching DirectClientManager's production wiring. Tests can override
+  // either layer; the underlying mocks (getAdminClient etc.) stay the
+  // canonical configuration point so existing test setup keeps working.
+  cm.getKafkaAdminClient.mockImplementation(() => cm.getAdminClient());
+  cm.getKafkaProducer.mockImplementation(() => cm.getProducer());
+  cm.buildKafkaConsumer.mockImplementation((_cluster, _env, groupId) =>
+    cm.getConsumer(groupId),
+  );
 
   cm.getSchemaRegistryClient.mockReturnValue(getMockedSchemaRegistry());
 

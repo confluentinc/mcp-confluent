@@ -1,6 +1,7 @@
 # Example MCP Confluent Server configuration.
 #
-# Generate this file with `npx @confluentinc/mcp-confluent --init-config`
+# Generate `config.yaml` from this template with:
+#   npx @confluentinc/mcp-confluent --init-config
 #
 # Every `${VAR}` and `${VAR:-default}` placeholder is resolved from the process
 # environment at startup, so secrets can stay in your shell or `.env` file

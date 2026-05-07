@@ -91,21 +91,27 @@ export function outputApiKey(): void {
  * is the user's project but the example file lives next to the install.
  *
  * Refuses to overwrite an existing destination so an accidental rerun
- * cannot wipe credentials the user already filled in.
+ * cannot wipe credentials the user already filled in. The write uses
+ * `wx` (exclusive create) so the existence check and the create happen
+ * as a single syscall — there is no TOCTOU window where another process
+ * could create the file between a precheck and the write.
  */
 export function outputInitConfig(): void {
   const sourceUrl = new URL("../config.example.yaml", import.meta.url);
   const destPath = path.resolve("config.yaml");
 
-  if (fs.existsSync(destPath)) {
-    throw new Error(
-      `config.yaml already exists at ${destPath}. ` +
-        `Remove or rename it before running --init-config.`,
-    );
-  }
-
   const contents = fs.readFileSync(sourceUrl, "utf-8");
-  fs.writeFileSync(destPath, contents);
+  try {
+    fs.writeFileSync(destPath, contents, { flag: "wx" });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
+      throw new Error(
+        `config.yaml already exists at ${destPath}. ` +
+          `Remove or rename it before running --init-config.`,
+      );
+    }
+    throw err;
+  }
 
   const gitignoreNote = ensureGitignoreEntry(destPath);
 
@@ -171,7 +177,13 @@ async function main() {
     }
 
     if (cliOptions.initConfig) {
-      outputInitConfig();
+      try {
+        outputInitConfig();
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`--init-config failed: ${msg}`);
+        process.exit(1);
+      }
       process.exit(0);
     }
 

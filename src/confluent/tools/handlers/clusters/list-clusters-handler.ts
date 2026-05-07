@@ -66,7 +66,7 @@ export class ListClustersHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { environmentId } = listClustersArguments.parse(toolArguments);
+    const { environmentId } = listClustersArguments.parse(toolArguments ?? {});
     const connId = this.enabledConnectionIds(runtime)[0]!;
     const conn = runtime.config.connections[connId]!;
     const clientManager = runtime.clientManagers[connId]!;

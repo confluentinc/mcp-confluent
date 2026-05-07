@@ -96,11 +96,15 @@ SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
   nvm install 22
   nvm use 22
   ```
-- A [**Confluent Cloud**](https://confluent.cloud) account with appropriate API keys to access your resources, or your login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
+- A **Confluent Cloud** account with appropriate API keys to access your resources, or your login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
 
 ### General Setup Steps
 
-This MCP server is designed to be used with various MCP clients, such as Claude Desktop, Copliot, or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using. However, the general steps are:
+This MCP server is designed to be used with various MCP clients, such as Claude Desktop, Copliot, or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using.
+
+The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys defined in the YAML config. See [OAuth Authentication For Confluent Cloud](#oauth-authentication-for-confluent-cloud) for more details.
+
+The general steps to configure (if not using OAuth) and run this MCP are:
 
 1. **Create a configuration file:** Copy the provided [`config.yaml` example](https://github.com/confluentinc/mcp-confluent/blob/main/config.example.yaml) file to the root of your project. You can use the CLI to bootstrap one in your current directory — no git checkout required:
 
@@ -129,8 +133,6 @@ npx @confluentinc/mcp-confluent --init-config
 ### Configuration Details
 
 > **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition — the server accepts both - but we plan to deprecate the latter in a near-future release.
-
-The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys defined in the YAML config. See [OAuth Authentication For Confluent Cloud](#oauth-authentication-for-confluent-cloud) for more details.
 
 The `--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in ./config.yaml, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
 

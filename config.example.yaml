@@ -1,11 +1,6 @@
 # Example MCP Confluent Server configuration.
 #
-# Copy this file to `config.yaml` at the repo root (that filename is gitignored
-# so your filled-in credentials stay out of git) and launch the server with:
-#
-#   cp config.example.yaml config.yaml
-#   # edit config.yaml, then:
-#   npx @confluentinc/mcp-confluent --config ./config.yaml
+# Generate this file with `npx @confluentinc/mcp-confluent --init-config`
 #
 # Every `${VAR}` and `${VAR:-default}` placeholder is resolved from the process
 # environment at startup, so secrets can stay in your shell or `.env` file

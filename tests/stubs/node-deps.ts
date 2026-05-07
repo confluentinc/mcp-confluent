@@ -13,13 +13,15 @@ import { type MockInstance, vi } from "vitest";
  *
  * Read methods (`existsSync`, `readFileSync`) call through to the real fs
  * by default; tests should override with `.mockReturnValue(...)`. Write
- * methods (`writeFileSync`, `mkdirSync`) are no-op-by-default to prevent
- * an unmocked call from accidentally mutating the real filesystem.
+ * methods (`writeFileSync`, `appendFileSync`, `mkdirSync`) are
+ * no-op-by-default to prevent an unmocked call from accidentally mutating
+ * the real filesystem.
  */
 export type MockedFsWrappers = {
   existsSync: MockInstance<typeof nodeDeps.fs.existsSync>;
   readFileSync: MockInstance<typeof nodeDeps.fs.readFileSync>;
   writeFileSync: MockInstance<typeof nodeDeps.fs.writeFileSync>;
+  appendFileSync: MockInstance<typeof nodeDeps.fs.appendFileSync>;
   mkdirSync: MockInstance<typeof nodeDeps.fs.mkdirSync>;
 };
 
@@ -29,8 +31,8 @@ export type MockedFsWrappers = {
  * Read spies (`existsSync`, `readFileSync`) call through by default; real
  * `existsSync` on a non-existent path returns `false` and real `readFileSync`
  * throws ENOENT, both of which surface a missed mock loudly. Write spies
- * (`writeFileSync`, `mkdirSync`) are no-op-by-default so an unmocked call
- * doesn't accidentally mutate the real filesystem.
+ * (`writeFileSync`, `appendFileSync`, `mkdirSync`) are no-op-by-default
+ * so an unmocked call doesn't accidentally mutate the real filesystem.
  *
  * @example
  * ```ts
@@ -45,6 +47,9 @@ export function createFsWrappers(): MockedFsWrappers {
     readFileSync: vi.spyOn(nodeDeps.fs, "readFileSync"),
     writeFileSync: vi
       .spyOn(nodeDeps.fs, "writeFileSync")
+      .mockImplementation(() => undefined),
+    appendFileSync: vi
+      .spyOn(nodeDeps.fs, "appendFileSync")
       .mockImplementation(() => undefined),
     mkdirSync: vi
       .spyOn(nodeDeps.fs, "mkdirSync")

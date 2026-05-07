@@ -156,3 +156,4 @@ connector-config.json
 
 # GSD planning directory
 .planning
+config.yaml

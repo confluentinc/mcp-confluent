@@ -33,8 +33,10 @@ describe("list-clusters-handler.ts", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });
 
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
+      it("should return the connection id when the connection is OAuth-typed", () => {
+        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
+          DEFAULT_CONNECTION_ID,
+        ]);
       });
     });
 

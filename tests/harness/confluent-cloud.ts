@@ -2,7 +2,7 @@ import type { paths } from "@src/confluent/openapi-schema.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import createClient, { type Client } from "openapi-fetch";
 
-function newTestCloudClient(): Client<paths> {
+export function newTestCloudClient(): Client<paths> {
   const conn = integrationRuntime().config.getSoleDirectConnection();
   if (!conn.confluent_cloud) {
     throw new Error(

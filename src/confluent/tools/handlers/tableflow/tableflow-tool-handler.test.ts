@@ -88,11 +88,12 @@ describe("tableflow-tool-handler.ts", () => {
         });
       });
 
-      // The following two cases document intentional failure behaviour: the tool is
-      // enabled on a tableflow-only connection (see enabledConnectionIds tests above),
-      // but the handler throws when a required ID is absent from both the call arguments
-      // and the connection config. Callers on such a connection must supply the missing
-      // IDs as explicit arguments.
+      // The following two cases pin intentional failure behaviour: a
+      // tableflow-only connection satisfies the `hasTableflow` predicate (so
+      // the tool is enabled), but `resolveTableflowEnvAndClusterId` throws
+      // when a required ID is absent from both the call arguments and the
+      // connection config. Callers on such a connection must supply the
+      // missing IDs as explicit arguments.
       it("should throw when environment_id is absent from both arg and config", () => {
         const connNoEnv: DirectConnectionConfig = {
           type: "direct",

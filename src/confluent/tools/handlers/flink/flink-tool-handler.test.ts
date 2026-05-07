@@ -5,7 +5,6 @@ import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   bareRuntime,
-  DEFAULT_CONNECTION_ID,
   flinkRuntime,
   runtimeWith,
 } from "@tests/factories/runtime.js";
@@ -37,18 +36,6 @@ class StubFlinkHandler extends FlinkToolHandler {
 describe("flink-tool-handler.ts", () => {
   describe("FlinkToolHandler", () => {
     const handler = new StubFlinkHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a flink block", () => {
-        expect(handler.enabledConnectionIds(flinkRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a flink block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-    });
 
     describe("resolveOrgAndEnvIds()", () => {
       const resolveOrgAndEnvIds = handler["resolveOrgAndEnvIds"].bind(

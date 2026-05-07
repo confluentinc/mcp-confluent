@@ -300,6 +300,52 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
+    describe("getConfluentCloudKafkaRestClient()", () => {
+      it("should reject when cluster_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getConfluentCloudKafkaRestClient(undefined, "env-1"),
+        ).rejects.toThrow(
+          "cluster_id and environment_id are required under --oauth",
+        );
+      });
+
+      it("should reject when environment_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getConfluentCloudKafkaRestClient("lkc-1", undefined),
+        ).rejects.toThrow(
+          "cluster_id and environment_id are required under --oauth",
+        );
+      });
+
+      it("should build a fresh REST client per call against the resolved http_endpoint", async () => {
+        vi.spyOn(resolvers, "resolveKafkaRestEndpoint").mockResolvedValue(
+          "https://pkc-xxxxx.us-east-1.aws.confluent.cloud:443",
+        );
+
+        const manager = buildManager();
+        const c1 = await manager.getConfluentCloudKafkaRestClient(
+          "lkc-1",
+          "env-1",
+        );
+        const c2 = await manager.getConfluentCloudKafkaRestClient(
+          "lkc-1",
+          "env-1",
+        );
+
+        expect(c1).toBeDefined();
+        expect(c2).toBeDefined();
+        expect(c1).not.toBe(c2);
+        expect(resolvers.resolveKafkaRestEndpoint).toHaveBeenCalledTimes(2);
+        expect(resolvers.resolveKafkaRestEndpoint).toHaveBeenCalledWith(
+          expect.anything(),
+          "lkc-1",
+          "env-1",
+        );
+      });
+    });
+
     describe("disconnect()", () => {
       it("should be a no-op (no caches to drain — clients are caller-owned)", async () => {
         const manager = buildManager();

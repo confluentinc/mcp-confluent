@@ -18,6 +18,7 @@ All notable changes to this MCP server will be documented in this file.
 - Configuration via YAML file.
   - Details go here eventually.
 - `config.example.yaml` template for YAML-based configuration. Users copy it to `config.yaml` to use; `.gitignore` rules for `/*.yaml` and `/*.yml` (with explicit allow-rules for currently-tracked root files) keep personal configs and any other accidental root-level yaml out of git.
+- `--init-config` CLI flag bootstraps a starter `./config.yaml` (a copy of the bundled `config.example.yaml`) in the current working directory and idempotently appends it to a sibling `.gitignore` (creating one if needed). Refuses to overwrite an existing `config.yaml`. Lets `npx` users get started without checking out the repo.
 - Confluent product documentation tools (support `docs.confluent.io`, `developer.confluent.io`, `support.confluent.io`):
   - `search-product-docs` for keyword search across product docs.
   - `get-product-doc-page` for fetching the full markdown content of a single page.

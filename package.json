@@ -97,7 +97,8 @@
     "zod": "^4.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "config.example.yaml"
   ],
   "engines": {
     "node": ">=22"

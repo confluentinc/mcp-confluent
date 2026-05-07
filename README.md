@@ -158,15 +158,17 @@ Flat environment variables can only express a single implicit connection. A YAML
 
 #### Configuration examples
 
-Start from [`config.example.yaml`](config.example.yaml) at the repo root — it is the YAML analogue of `.env.example`, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) annotated and wired up with `${VAR}` placeholders so credentials stay in your environment.
-
-Copy it to `config.yaml` at the repo root and the `.gitignore` will keep your filled-in copy out of git — every `*.yaml`/`*.yml` file at the repo root is ignored by default unless explicitly allow-listed, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
+The fastest way to get a starter `config.yaml` is to let the CLI bootstrap one in your current directory — no checkout required:
 
 ```bash
-cp config.example.yaml config.yaml
-# edit config.yaml, then:
+npx @confluentinc/mcp-confluent --init-config
+# edit ./config.yaml, then:
 npx @confluentinc/mcp-confluent --config ./config.yaml
 ```
+
+`--init-config` drops a copy of [`config.example.yaml`](config.example.yaml) — the YAML analogue of `.env.example`, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) annotated and wired up with `${VAR}` placeholders so credentials stay in your environment — into `./config.yaml` and adds it to a `.gitignore` next to it (creating one if needed) so your filled-in copy can't slip into git. It refuses to overwrite an existing `config.yaml`, so a stray rerun won't clobber edits.
+
+If you already have this repo cloned, `cp config.example.yaml config.yaml` works just as well — every `*.yaml`/`*.yml` file at the repo root is gitignored by default, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
 
 For more focused reference snippets, browse [test-fixtures/yaml_configs/valid/](test-fixtures/yaml_configs/valid/) — these files are executed as part of the test suite on every CI run, so they are always valid and current.
 

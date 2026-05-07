@@ -1,5 +1,6 @@
 // Wrappers for easier stubbing in tests — ESM live bindings can't be stubbed at runtime,
 // but property access on these namespace objects can be (via `vi.spyOn`).
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Analytics } from "@segment/analytics-node";
 import { TELEMETRY_WRITE_KEY } from "@src/build-config.js";
@@ -33,3 +34,6 @@ export const nodeOpen = {
   },
 };
 export const sdkTransports = { StreamableHTTPServerTransport };
+// KafkaJS constructor wrapped so tests can spy on `kafkaDeps.Kafka` and return
+// a mock Kafka instance without needing vi.mock on the external module.
+export const kafkaDeps = { Kafka: KafkaJS.Kafka };

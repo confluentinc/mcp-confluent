@@ -18,6 +18,7 @@ import {
   hasSchemaRegistry,
   hasTableflow,
   hasTelemetry,
+  widenForOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { describe, expect, it, vi } from "vitest";
 
@@ -427,6 +428,36 @@ describe("connection-predicates.ts", () => {
     it("should return ENABLED when called with zero predicates", () => {
       const combined = allOf();
       expect(combined(KAFKA_CONN)).toEqual(ENABLED);
+    });
+  });
+
+  describe("widenForOAuth()", () => {
+    it("should override the wrapped predicate and answer ENABLED for OAuth connections", () => {
+      // hasKafkaBootstrap normally answers OAuthNoServiceBlocks for OAuth;
+      // widenForOAuth lets the handler opt into accepting OAuth despite that.
+      const widened = widenForOAuth(hasKafkaBootstrap);
+      expect(widened(OAUTH_CONN)).toEqual(ENABLED);
+    });
+
+    it("should delegate to the wrapped predicate for direct connections (passing case)", () => {
+      const widened = widenForOAuth(hasKafkaBootstrap);
+      expect(widened(KAFKA_CONN)).toEqual(ENABLED);
+    });
+
+    it("should delegate to the wrapped predicate for direct connections (failing case)", () => {
+      // KAFKA_REST_CONN has no bootstrap_servers; the wrapped predicate's
+      // disabled verdict propagates unchanged for direct connections.
+      const widened = widenForOAuth(hasKafkaBootstrap);
+      expect(widened(KAFKA_REST_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaBootstrap),
+      );
+    });
+
+    it("should not call the wrapped predicate at all for OAuth connections", () => {
+      const wrapped = vi.fn(() => ENABLED);
+      const widened = widenForOAuth(wrapped);
+      widened(OAUTH_CONN);
+      expect(wrapped).not.toHaveBeenCalled();
     });
   });
 });

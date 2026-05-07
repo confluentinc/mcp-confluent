@@ -5,10 +5,16 @@
 // it from the catalogue.
 //
 // Tool handlers consume predicates indirectly: each handler declares a
-// `predicate` property, and `BaseToolHandler` derives both
-// `enabledConnectionIds()` and `connectionVerdicts()` from it. Compose
-// compound requirements with `allOf(...)` and use `alwaysEnabled` for
-// tools with no service-block requirement.
+// `predicate` property referencing one of this file's named exports, and
+// `BaseToolHandler` derives both `enabledConnectionIds()` and
+// `connectionVerdicts()` from it. Handlers must not call `allOf(...)` or
+// `widenForOAuth(...)` at the use site — those combinators are construction
+// tools used here to define new named exports. When adding a new named
+// predicate here: also add it to the `NAMED_PREDICATES` allow-list in
+// `tool-registry.test.ts`'s `predicate property` block (typed as
+// `ReadonlySet<ConnectionPredicate>`, so combinators can't slip in) and to
+// `connection-predicates.test.ts` for per-predicate coverage. Handlers
+// referencing it then sail through the membership assertion.
 //
 // OAuth note: most predicates short-circuit on `conn.type === "oauth"`
 // and answer disabled — OAuth connections carry no service blocks for these
@@ -17,8 +23,8 @@
 // is reachable via the Auth0 environment without a block), and the
 // `widenForOAuth(predicate)` combinator wraps any block-checking predicate
 // so OAuth connections bypass the block check and answer enabled. Use
-// `widenForOAuth` on tool handlers that have been adapted to operate
-// against an OAuth-typed connection at call time.
+// `widenForOAuth` here, when defining a new named composite export, for
+// gates that should admit OAuth.
 
 import type { ConnectionConfig } from "@src/config/models.js";
 
@@ -241,6 +247,37 @@ export function widenForOAuth(
 ): ConnectionPredicate {
   return (conn) => (conn.type === "oauth" ? ENABLED : predicate(conn));
 }
+
+/**
+ * The native-Kafka client gate, widened to admit OAuth. Direct connections
+ * still need `kafka.bootstrap_servers`; OAuth connections satisfy it
+ * unconditionally (the broker URL is synthesized from the Auth0 environment).
+ * Use on handlers that have been brought into the OAuth fold.
+ */
+export const kafkaBootstrapOrOAuth: ConnectionPredicate =
+  widenForOAuth(hasKafkaBootstrap);
+
+/**
+ * Gate for tools that create connectors against the direct Confluent Cloud
+ * REST surface: requires both a `confluent_cloud` block (the `/connect/v1`
+ * endpoint) and `kafka.auth` (the connector spec carries kafka API
+ * credentials). Strict-direct — OAuth connections answer `OAuthNotDirectCapable`
+ * because the handler calls `getSoleDirectConnection()`.
+ */
+export const canCreateDirectConnector: ConnectionPredicate = allOf(
+  hasDirectConfluentCloud,
+  hasKafkaAuth,
+);
+
+/**
+ * Gate for tools that read telemetry metrics about Flink statements:
+ * requires both the `flink` block (to address a statement) and the
+ * `telemetry` block (to query the metrics API).
+ */
+export const flinkWithTelemetry: ConnectionPredicate = allOf(
+  hasFlink,
+  hasTelemetry,
+);
 
 /**
  * Every reason a {@linkcode ConnectionPredicate} can return `enabled: false`.

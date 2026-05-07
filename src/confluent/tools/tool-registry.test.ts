@@ -1,8 +1,27 @@
 import {
+  BaseToolHandler,
   CREATE_UPDATE,
   DESTRUCTIVE,
   READ_ONLY,
 } from "@src/confluent/tools/base-tools.js";
+import {
+  alwaysEnabled,
+  canCreateDirectConnector,
+  type ConnectionPredicate,
+  flinkWithTelemetry,
+  hasCCloudCatalogSupport,
+  hasConfluentCloud,
+  hasDirectConfluentCloud,
+  hasFlink,
+  hasKafka,
+  hasKafkaAuth,
+  hasKafkaBootstrap,
+  hasKafkaRestWithAuth,
+  hasSchemaRegistry,
+  hasTableflow,
+  hasTelemetry,
+  kafkaBootstrapOrOAuth,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
@@ -132,6 +151,57 @@ describe("tool-registry.ts", () => {
           }
         }
       });
+    });
+
+    describe("predicate property", () => {
+      // The exhaustive allow-list of legal handler `predicate` values.
+      const NAMED_PREDICATES: ReadonlySet<ConnectionPredicate> = new Set([
+        alwaysEnabled,
+        hasKafka,
+        hasKafkaBootstrap,
+        hasKafkaAuth,
+        hasKafkaRestWithAuth,
+        hasSchemaRegistry,
+        hasConfluentCloud,
+        hasDirectConfluentCloud,
+        hasFlink,
+        hasTelemetry,
+        hasTableflow,
+        hasCCloudCatalogSupport,
+        kafkaBootstrapOrOAuth,
+        canCreateDirectConnector,
+        flinkWithTelemetry,
+      ]);
+
+      it.each(ALL_TOOL_NAMES)(
+        "%s: predicate must be one of the expected predicates from connection-predicates.ts (no inline allOf/widenForOAuth at handler use sites)",
+        (toolName) => {
+          const handler = ToolHandlerRegistry.getToolHandler(toolName);
+          // Every registered handler is expected to extend BaseToolHandler —
+          // that's where the `predicate` property lives. The instanceof check
+          // both narrows the type for the next assertion and enforces the
+          // class-extension invariant in its own right.
+          expect(
+            handler,
+            `Tool ${toolName}'s handler does not extend BaseToolHandler; the ` +
+              `predicate property lives on BaseToolHandler, so a handler that ` +
+              `implements ToolHandler directly cannot be checked for predicate ` +
+              `compliance.`,
+          ).toBeInstanceOf(BaseToolHandler);
+          const predicate = (handler as BaseToolHandler).predicate;
+          expect(
+            NAMED_PREDICATES.has(predicate),
+            `Tool ${toolName}'s predicate is not one of the named exports from ` +
+              `connection-predicates.ts. Two possible causes: (1) the handler ` +
+              `composes inline with allOf(...) or widenForOAuth(...) at the use ` +
+              `site — promote the composition to a named const export (with a ` +
+              `per-predicate test in connection-predicates.test.ts) and reference ` +
+              `the named export here; or (2) you added a new predicate to ` +
+              `connection-predicates.ts but forgot to add it to NAMED_PREDICATES ` +
+              `in this test.`,
+          ).toBe(true);
+        },
+      );
     });
   });
 

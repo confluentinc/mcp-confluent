@@ -4,7 +4,6 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   connectTestAdmin,
   connectTestProducer,
-  uniqueTopicName,
 } from "@tests/harness/kafka-admin.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
@@ -13,6 +12,7 @@ import {
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
 import { activeTransports } from "@tests/harness/transports.js";
+import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -28,7 +28,7 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
   // seed a shared test topic with messages (no need to split by transport)
   let admin: KafkaJS.Admin;
   let producer: KafkaJS.Producer;
-  const topic = uniqueTopicName("consume");
+  const topic = uniqueName("consume");
   const seededValues = ["msg-0", "msg-1", "msg-2"];
 
   beforeAll(async () => {

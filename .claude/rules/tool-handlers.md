@@ -80,25 +80,6 @@ These combinators are construction tools used to define new named exports; they 
 
 The named-export-only rule is enforced by the `predicate property` block in `tool-registry.test.ts`, which maintains an explicit `EXPECTED_PREDICATES` record of `ToolName → ConnectionPredicate` (typed `Readonly<Record<ToolName, ConnectionPredicate>>` — the `Record` over `ToolName` makes exhaustiveness a compile-time check, and the value type forbids combinators) and asserts every handler's `predicate` is exactly the expected named export for that tool. Use it as the "did I get the wiring right" oracle — a missing or wrong row fails `tsc --noEmit`; a wrong predicate or inline composition at the handler use site fails the test with the offending tool name in the row label.
 
-### `hasConfluentCloud` vs `hasDirectConfluentCloud` — pick carefully
-
-`hasConfluentCloud` returns `true` for **both** direct connections with a `confluent_cloud`
-block **and** OAuth connections. `hasDirectConfluentCloud` returns `true` only for direct
-connections.
-
-**If `handle()` calls `runtime.config.getSoleDirectConnection()`** (which narrows to
-`DirectConnectionConfig` and throws for OAuth connections), the predicate **must** be
-`hasDirectConfluentCloud`. Using `hasConfluentCloud` here enables the tool for OAuth
-connections but then crashes at call time — the tool is advertised as available but always
-throws. This mismatch has burned us more than once.
-
-Rule of thumb: reach for `hasDirectConfluentCloud` when the handler reads service-block
-fields (`.kafka`, `.flink`, `.confluent_cloud`, etc.) from the connection. Only widen to
-`hasConfluentCloud` once the handler is genuinely OAuth-capable (i.e. it no longer calls
-`getSoleDirectConnection()` and doesn't read direct-only fields). When widening, add an
-`enabledConnectionIds()` test against `ccloudOAuthRuntime()` that confirms the tool is
-enabled for OAuth.
-
 ## File Organization
 
 Handlers live under `src/confluent/tools/handlers/<domain>/`:

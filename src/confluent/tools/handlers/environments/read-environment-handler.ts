@@ -4,10 +4,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasConfluentCloud,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
 import {
   Environment,
   environmentSchema,
@@ -122,8 +119,5 @@ Environment: ${environmentDetails.name}
       annotations: READ_ONLY,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
-  }
+  readonly predicate = hasConfluentCloud;
 }

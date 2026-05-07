@@ -25,7 +25,7 @@ VAULT_PATH_FIELDS := \
 	tableflow:TABLEFLOW_API_KEY,TABLEFLOW_API_SECRET \
 	telemetry:TELEMETRY_API_KEY,TELEMETRY_API_SECRET
 
-.PHONY: setup-test-env remove-test-env test-integration store-integration-test-results store-unit-test-results store-harness-test-results
+.PHONY: setup-test-env remove-test-env test-integration store-unit-test-results store-integration-test-results
 
 # Pull integration secrets into $(ENV_FILE). Fails fast if `vault` isn't on
 # PATH or the user isn't authed. Empty Vault reads (missing field, no
@@ -101,11 +101,4 @@ store-integration-test-results:
 		test-results publish TEST-integration.xml --name "Integration ($(TAG) / $(TRANSPORT))" --force; \
 	else \
 		echo "no TEST-integration.xml to publish"; \
-	fi
-
-store-harness-test-results:
-	@if [ -f TEST-harness.xml ]; then \
-		test-results publish TEST-harness.xml --name "Harness" --force; \
-	else \
-		echo "no TEST-harness.xml to publish"; \
 	fi

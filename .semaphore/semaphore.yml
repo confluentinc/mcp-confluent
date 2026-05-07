@@ -41,7 +41,6 @@ blocks:
       epilogue:
         always:
           commands:
-            - make store-harness-test-results
             - make store-unit-test-results
             - sem-version java 17
             - emit-sonarqube-data --run_only_sonar_scan --enable_sonarqube_enterprise

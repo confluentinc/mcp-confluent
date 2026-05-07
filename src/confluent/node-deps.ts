@@ -6,16 +6,28 @@ import { Analytics } from "@segment/analytics-node";
 import { TELEMETRY_WRITE_KEY } from "@src/build-config.js";
 import * as dotenv from "dotenv";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer as httpCreateServer } from "node:http";
 import { arch, homedir, platform, release } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 export const buildConfig = { TELEMETRY_WRITE_KEY };
 export const dotenvLib = { config: dotenv.config };
-export const fs = { existsSync, readFileSync, writeFileSync, mkdirSync };
+export const fs = {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  appendFileSync,
+  mkdirSync,
+};
 export const os = { homedir, platform, release, arch };
-export const path = { join, resolve };
+export const path = { join, resolve, dirname, basename };
 export const segment = { Analytics };
 export const nodeFetch = { fetch: globalThis.fetch };
 // Wrapped as a single-signature arrow so spies don't have to disambiguate

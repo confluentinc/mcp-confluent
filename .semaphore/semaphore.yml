@@ -36,14 +36,13 @@ blocks:
             - npm run lint
             - npm run typecheck
             - npm run build
-            - npm run test:coverage
+            - npm run test:harness
+            - npm run test:unit:coverage
       epilogue:
         always:
           commands:
-            - >-
-              if [ -f TEST-result.xml ]; then
-                test-results publish TEST-result.xml --force;
-              fi
+            - make store-harness-test-results
+            - make store-unit-test-results
             - sem-version java 17
             - emit-sonarqube-data --run_only_sonar_scan --enable_sonarqube_enterprise
 

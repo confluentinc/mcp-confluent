@@ -44,7 +44,13 @@ function buildConfig(
 
 describe("base-client-manager.ts", () => {
   describe("BaseClientManager", () => {
-    type RestGetterKey = keyof ConfluentCloudRestClientManager;
+    // getConfluentCloudKafkaRestClient is now async + cluster-aware and is
+    // covered by its own dedicated describe block below; exclude it from the
+    // synchronous parameterized loop's getter union.
+    type RestGetterKey = Exclude<
+      keyof ConfluentCloudRestClientManager,
+      "getConfluentCloudKafkaRestClient"
+    >;
 
     const restCases: Array<{
       getter: RestGetterKey;

@@ -104,8 +104,7 @@ describe("resolveKafkaRestEndpoint", () => {
       "/cmk/v2/clusters/{id}:lkc-abc": {
         data: {
           spec: {
-            http_endpoint:
-              "https://pkc-abc.us-east-1.aws.confluent.cloud:443",
+            http_endpoint: "https://pkc-abc.us-east-1.aws.confluent.cloud:443",
           },
         },
       },

@@ -21,15 +21,22 @@
 import type { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import {
+  type ConfluentAuth,
+  createAuthMiddleware,
+} from "@src/confluent/middleware.js";
 import { kafkaDeps } from "@src/confluent/node-deps.js";
 import {
   resolveKafkaBootstrap,
+  resolveKafkaRestEndpoint,
   resolveSchemaRegistryEndpoint,
 } from "@src/confluent/oauth-resource-resolvers.js";
 import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
+import type { paths } from "@src/confluent/openapi-schema.js";
 import { kafkaLogger } from "@src/logger.js";
+import createClient, { type Client } from "openapi-fetch";
 import { DATA_PLANE_TOKEN_LIFETIME_MS } from "./oauth/token-lifetimes.js";
 
 // Lifetime hint passed to librdkafka inside the OAUTHBEARER refresh callback
@@ -123,6 +130,38 @@ export class OAuthClientManager extends BaseClientManager {
         },
       },
     });
+  }
+
+  /** @inheritdoc */
+  async getConfluentCloudKafkaRestClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<Client<paths, `${string}/${string}`>> {
+    this.requireClusterArgs(clusterId, envId);
+    // Wait for OAuth login to populate the DPAT before constructing the
+    // client. The bearer middleware reads `auth.getToken()` per-request, but
+    // failing fast here gives the agent a clear error rather than letting
+    // an empty bearer go out on the wire. Symmetric with
+    // `getSchemaRegistrySdkClient`.
+    await this.holder.bootstrapPromise;
+    if (!this.holder.getDataPlaneToken()) {
+      throw new Error(
+        "OAuth login did not produce a data-plane token; cannot build a Kafka REST client. " +
+          "Check the OAuth login flow status (browser sign-in must complete).",
+      );
+    }
+    const baseUrl = await resolveKafkaRestEndpoint(
+      this.getConfluentCloudRestClient(),
+      clusterId!,
+      envId!,
+    );
+    const auth: ConfluentAuth = {
+      type: "oauth",
+      getToken: () => this.holder.getDataPlaneToken(),
+    };
+    const client = createClient<paths>({ baseUrl });
+    client.use(createAuthMiddleware(auth));
+    return client;
   }
 
   /** @inheritdoc */

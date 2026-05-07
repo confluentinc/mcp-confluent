@@ -25,6 +25,28 @@ export async function resolveKafkaBootstrap(
   return bootstrap;
 }
 
+export async function resolveKafkaRestEndpoint(
+  cloudClient: CloudClient,
+  clusterId: string,
+  envId: string,
+): Promise<string> {
+  const { data, error } = await cloudClient.GET("/cmk/v2/clusters/{id}", {
+    params: { path: { id: clusterId }, query: { environment: envId } },
+  });
+  if (error !== undefined) {
+    throw new Error(
+      `Failed to read Kafka cluster ${clusterId} in environment ${envId}: ${JSON.stringify(error)}`,
+    );
+  }
+  const httpEndpoint = data?.spec?.http_endpoint;
+  if (typeof httpEndpoint !== "string" || httpEndpoint.length === 0) {
+    throw new Error(
+      `Cluster ${clusterId} in environment ${envId} has no http_endpoint`,
+    );
+  }
+  return httpEndpoint;
+}
+
 export async function resolveSchemaRegistryEndpoint(
   cloudClient: CloudClient,
   clusterId: string,

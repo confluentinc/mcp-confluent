@@ -13,14 +13,6 @@ import type { Mocked } from "vitest";
 /** Connection ID used by the named runtime factories and their default single-connection runtimes. */
 export const DEFAULT_CONNECTION_ID = "default";
 
-/**
- * Connection ID used by {@link ccloudOAuthRuntime}, matching the connection
- * name in `test-fixtures/yaml_configs/valid/ccloud-oauth.yaml`. Distinct from
- * {@link DEFAULT_CONNECTION_ID} because the OAuth runtime is anchored to a
- * real YAML fixture rather than constructed inline.
- */
-export const CCLOUD_OAUTH_CONNECTION_ID = "ccloud";
-
 const CCLOUD_OAUTH_FIXTURE = fileURLToPath(
   new URL(
     "../../test-fixtures/yaml_configs/valid/ccloud-oauth.yaml",
@@ -261,6 +253,6 @@ export type FlinkGetCase = HandleCaseWithConn & {
 export function ccloudOAuthRuntime(): ServerRuntime {
   const config = loadConfigFromYaml(CCLOUD_OAUTH_FIXTURE, {});
   return new ServerRuntime(config, {
-    [CCLOUD_OAUTH_CONNECTION_ID]: createMockInstance(OAuthClientManager),
+    [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager),
   });
 }

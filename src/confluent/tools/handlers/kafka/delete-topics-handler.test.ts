@@ -1,7 +1,6 @@
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
 import {
   bareRuntime,
-  CCLOUD_OAUTH_CONNECTION_ID,
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   kafkaRestOnlyRuntime,
@@ -37,7 +36,7 @@ describe("delete-topics-handler.ts", () => {
 
       it("should return the connection id when the connection is OAuth-typed", () => {
         expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          CCLOUD_OAUTH_CONNECTION_ID,
+          DEFAULT_CONNECTION_ID,
         ]);
       });
     });

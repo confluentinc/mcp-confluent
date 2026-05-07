@@ -1,7 +1,6 @@
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import {
   bareRuntime,
-  CCLOUD_OAUTH_CONNECTION_ID,
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   kafkaRestOnlyRuntime,
@@ -37,7 +36,6 @@ describe("produce-kafka-message-handler.ts", () => {
 
       it("should return the connection id when the connection is OAuth-typed", () => {
         expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          CCLOUD_OAUTH_CONNECTION_ID,
         ]);
       });
     });

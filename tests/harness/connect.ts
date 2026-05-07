@@ -61,11 +61,16 @@ export async function provisionTestDatagenConnector(
   }
 }
 
-/** Idempotent DELETE; safe to call on already-deleted connectors during teardown. */
+/**
+ * DELETE the named connector. Tolerates 404 silently because the delete-connector
+ * test deletes via the tool, so teardown's 404 isn't a real failure. Logs other
+ * failures to stderr; {@linkcode withSharedConnectorCleanup} uses
+ * `Promise.allSettled`, so logging is the only path that surfaces them.
+ */
 export async function deleteTestConnector(name: string): Promise<void> {
   const { envId, clusterId } = getConnectScope();
   const client = newTestCloudClient();
-  await client.DELETE(
+  const { error, response } = await client.DELETE(
     "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}",
     {
       params: {
@@ -77,6 +82,11 @@ export async function deleteTestConnector(name: string): Promise<void> {
       },
     },
   );
+  if (error && response.status !== 404) {
+    console.error(
+      `failed to delete test connector ${name} (status ${response.status}): ${JSON.stringify(error)}`,
+    );
+  }
 }
 
 /**

@@ -44,7 +44,7 @@ blocks:
                 exit 0
               fi
             # parameterize the head branch by TARGET_BRANCH so a single
-            # long-lived PR accumulates weekly audit updates per base branch.
+            # long-lived PR accumulates audit updates per base branch.
             # running against v1.2.x auto-gets chore/npm-audit-fix-v1.2.x.
             - |
               set -e
@@ -64,5 +64,5 @@ blocks:
                   --base "$TARGET_BRANCH" \
                   --head "$BRANCH" \
                   --title "$TITLE" \
-                  --body "Automated weekly security update produced by \`npm audit fix\` on \`${TARGET_BRANCH}\`. Please review changes to \`package.json\` and \`package-lock.json\` before merging. Breaking fixes that require \`--force\` are intentionally excluded and must be handled manually. This PR is created/updated weekly via the [\`scheduled-npm-audit\`](https://github.com/confluentinc/mcp-confluent/blob/${TARGET_BRANCH}/.semaphore/npm-audit.yml) Semaphore task."
+                  --body "Automated security update produced by \`npm audit fix\` on \`${TARGET_BRANCH}\`. Please review changes to \`package.json\` and \`package-lock.json\` before merging. Breaking fixes that require \`--force\` are intentionally excluded and must be handled manually. This PR is created/updated via the [\`scheduled-npm-audit\`](https://github.com/confluentinc/mcp-confluent/blob/${TARGET_BRANCH}/.semaphore/npm-audit.yml) Semaphore task."
               fi

@@ -23,10 +23,10 @@ const ALLOWED_HOSTS = new Set<Source>([
   "support.confluent.io",
 ]);
 
-const USER_AGENT = "mcp-confluent/get-product-doc-pages";
+const USER_AGENT = "mcp-confluent/get-product-doc-page";
 const REQUEST_TIMEOUT_MS = 10_000;
 
-const getProductDocPagesArguments = z.object({
+const getProductDocPageArguments = z.object({
   url: z
     .url()
     .describe(
@@ -34,7 +34,7 @@ const getProductDocPagesArguments = z.object({
     ),
 });
 
-export class GetProductDocPagesHandler extends BaseToolHandler {
+export class GetProductDocPageHandler extends BaseToolHandler {
   private readonly turndown = new TurndownService({
     headingStyle: "atx",
     codeBlockStyle: "fenced",
@@ -45,14 +45,14 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
     _runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { url } = getProductDocPagesArguments.parse(toolArguments);
+    const { url } = getProductDocPageArguments.parse(toolArguments);
     const parsed = new URL(url);
     if (
       parsed.protocol !== "https:" ||
       !ALLOWED_HOSTS.has(parsed.hostname as Source)
     ) {
       return this.createResponse(
-        "URL host not allowed. Only https://docs.confluent.io/, https://developer.confluent.io/, and https://support.confluent.io/ are supported.",
+        `Hostname '${parsed.hostname}' is not allowed. Only docs.confluent.io, developer.confluent.io, and support.confluent.io are supported.`,
         true,
       );
     }
@@ -68,10 +68,7 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.warn(
-        { url, error: message },
-        "get-product-doc-pages fetch failed",
-      );
+      logger.warn({ url, error: message }, "get-product-doc-page fetch failed");
       return this.createResponse(`Failed to fetch ${url}: ${message}`, true);
     }
   }
@@ -275,10 +272,10 @@ export class GetProductDocPagesHandler extends BaseToolHandler {
 
   getToolConfig(): ToolConfig {
     return {
-      name: ToolName.GET_PRODUCT_DOC_PAGES,
+      name: ToolName.GET_PRODUCT_DOC_PAGE,
       description:
         "Fetch the full markdown content of a Confluent product documentation page. Accepts URLs under https://docs.confluent.io/, https://developer.confluent.io/, or https://support.confluent.io/. Use this after search-product-docs to read a result's full content.",
-      inputSchema: getProductDocPagesArguments.shape,
+      inputSchema: getProductDocPageArguments.shape,
       annotations: READ_ONLY,
     };
   }

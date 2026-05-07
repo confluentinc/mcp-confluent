@@ -1,5 +1,5 @@
 import { CallToolResult } from "@src/confluent/schema.js";
-import { GetProductDocPagesHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-pages-handler.js";
+import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   bareRuntime,
@@ -42,9 +42,9 @@ function withFinalUrl(response: Response, url: string): Response {
   return response;
 }
 
-describe("get-product-doc-pages-handler.ts", () => {
-  describe("GetProductDocPagesHandler", () => {
-    const handler = new GetProductDocPagesHandler();
+describe("get-product-doc-page-handler.ts", () => {
+  describe("GetProductDocPageHandler", () => {
+    const handler = new GetProductDocPageHandler();
     const runtime = bareRuntime();
     let fetchSpy: MockedFetch;
 
@@ -53,10 +53,10 @@ describe("get-product-doc-pages-handler.ts", () => {
     });
 
     describe("getToolConfig()", () => {
-      it("should be a read-only tool named GET_PRODUCT_DOC_PAGES", () => {
+      it("should be a read-only tool named GET_PRODUCT_DOC_PAGE", () => {
         const config = handler.getToolConfig();
 
-        expect(config.name).toBe(ToolName.GET_PRODUCT_DOC_PAGES);
+        expect(config.name).toBe(ToolName.GET_PRODUCT_DOC_PAGE);
         expect(config.annotations).toEqual({ readOnlyHint: true });
         expect(config.inputSchema).toHaveProperty("url");
       });
@@ -78,15 +78,24 @@ describe("get-product-doc-pages-handler.ts", () => {
       });
 
       it.each([
-        ["non-allowed host", "https://example.com/anything"],
-        ["http on an allowed host", "http://docs.confluent.io/page.html"],
-      ])("should reject %s without fetching", async (_label, url) => {
-        const result = await handler.handle(runtime, { url });
+        ["non-allowed host", "https://example.com/anything", "example.com"],
+        [
+          "http on an allowed host",
+          "http://docs.confluent.io/page.html",
+          "docs.confluent.io",
+        ],
+      ])(
+        "should reject %s without fetching",
+        async (_label, url, expectedHost) => {
+          const result = await handler.handle(runtime, { url });
 
-        expect(result.isError).toBe(true);
-        expect(getText(result)).toMatch(/host not allowed/);
-        expect(fetchSpy).not.toHaveBeenCalled();
-      });
+          expect(result.isError).toBe(true);
+          expect(getText(result)).toContain(
+            `Hostname '${expectedHost}' is not allowed`,
+          );
+          expect(fetchSpy).not.toHaveBeenCalled();
+        },
+      );
 
       describe("docs.confluent.io", () => {
         it("should prefer the .md twin when available", async () => {
@@ -155,26 +164,6 @@ describe("get-product-doc-pages-handler.ts", () => {
           expect(text).toContain("# Title");
           expect(text).toContain("Body text.");
           expect(fetchSpy).toHaveBeenCalledTimes(2);
-        });
-
-        it("should reject HTML fallback when the path is redirected (soft 404)", async () => {
-          // docs.confluent.io 404s redirect to /index.html. Without this guard,
-          // the handler would return the homepage as if it were the requested page.
-          fetchSpy
-            .mockResolvedValueOnce(new Response("not found", { status: 404 }))
-            .mockResolvedValueOnce(
-              withFinalUrl(
-                htmlResponse("<html><body>...homepage...</body></html>"),
-                "https://docs.confluent.io/index.html",
-              ),
-            );
-
-          const result = await handler.handle(runtime, {
-            url: "https://docs.confluent.io/this-page-does-not-exist.html",
-          });
-
-          expect(result.isError).toBe(true);
-          expect(getText(result)).toMatch(/moved or removed/);
         });
 
         it("should ignore non-markdown content-type on the .md endpoint", async () => {
@@ -557,6 +546,26 @@ describe("get-product-doc-pages-handler.ts", () => {
 
           expect(result.isError).toBe(true);
           expect(getText(result)).toMatch(/502/);
+        });
+
+        it("should reject HTML fallback when the path is redirected (soft 404)", async () => {
+          // docs.confluent.io 404s redirect to /index.html. Without this guard,
+          // the handler would return the homepage as if it were the requested page.
+          fetchSpy
+            .mockResolvedValueOnce(new Response("not found", { status: 404 }))
+            .mockResolvedValueOnce(
+              withFinalUrl(
+                htmlResponse("<html><body>...homepage...</body></html>"),
+                "https://docs.confluent.io/index.html",
+              ),
+            );
+
+          const result = await handler.handle(runtime, {
+            url: "https://docs.confluent.io/this-page-does-not-exist.html",
+          });
+
+          expect(result.isError).toBe(true);
+          expect(getText(result)).toMatch(/moved or removed/);
         });
 
         it("should reject when fetch redirects to a disallowed host", async () => {

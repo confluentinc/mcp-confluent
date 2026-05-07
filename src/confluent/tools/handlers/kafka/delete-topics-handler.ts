@@ -37,9 +37,8 @@ export class DeleteTopicsHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = deleteKafkaTopicsArguments.parse(toolArguments);
-    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
-    const clientManager = runtime.clientManagers[connId]!;
     const admin = await clientManager.getKafkaAdminClient(
       resolved.clusterId,
       resolved.envId,

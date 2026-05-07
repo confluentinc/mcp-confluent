@@ -50,5 +50,6 @@ export enum ToolName {
   QUERY_METRICS = "query-metrics",
   LIST_METRICS = "list-available-metrics",
   SEARCH_PRODUCT_DOCS = "search-product-docs",
+  GET_PRODUCT_DOC_PAGE = "get-product-doc-page",
   LIST_ORGANIZATIONS = "list-organizations",
 }

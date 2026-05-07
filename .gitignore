@@ -156,3 +156,6 @@ connector-config.json
 
 # GSD planning directory
 .planning
+
+# Worktree directories
+.worktrees/

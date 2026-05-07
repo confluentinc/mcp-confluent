@@ -387,11 +387,12 @@ describe("tool-registry.ts", () => {
       [ToolName.READ_ENVIRONMENT]: { outcome: { throws: "ZodError" } },
       // Clusters
       [ToolName.LIST_CLUSTERS]: {
-        outcome: { resolves: "Successfully retrieved 0 clusters" },
-        setup: (cm) => {
-          cm.getConfluentCloudRestClient().GET.mockResolvedValue({
-            data: { data: [] },
-          });
+        // Zero-arg invocation against a connection without kafka.env_id
+        // short-circuits with an actionable error before reaching the
+        // client (prevents a useless cmk round-trip + generic API error).
+        outcome: {
+          resolves:
+            "environmentId is required: pass it as a tool argument or set kafka.env_id",
         },
       },
       // Tableflow

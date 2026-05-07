@@ -33,8 +33,10 @@ describe("list-clusters-handler.ts", () => {
         expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });
 
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
+      it("should return the connection id when the connection is OAuth-typed", () => {
+        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
+          DEFAULT_CONNECTION_ID,
+        ]);
       });
     });
 
@@ -63,15 +65,27 @@ describe("list-clusters-handler.ts", () => {
           outcome: { resolves: "Successfully retrieved 0 clusters" },
           expectedEnvId: "env-explicit",
         },
-        {
-          label:
-            "use empty string when both environmentId arg and conn kafka.env_id are absent",
-          connectionConfig: CCLOUD_CONN,
-          args: {},
-          outcome: { resolves: "Successfully retrieved 0 clusters" },
-          expectedEnvId: "",
-        },
       ];
+
+      it("should return an actionable error when neither environmentId arg nor conn kafka.env_id is set", async () => {
+        const clientManager = getMockedClientManager();
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            CCLOUD_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: {
+            resolves:
+              "environmentId is required: pass it as a tool argument or set kafka.env_id",
+          },
+        });
+        expect(
+          clientManager.getConfluentCloudRestClient().GET,
+        ).not.toHaveBeenCalled();
+      });
 
       it.each(cases)(
         "should $label",

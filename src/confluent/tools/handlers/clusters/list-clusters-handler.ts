@@ -4,7 +4,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasDirectConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -15,7 +15,9 @@ const listClustersArguments = z.object({
   environmentId: z
     .string()
     .optional()
-    .describe("The environment ID to filter clusters by"),
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+    ),
 });
 
 /**
@@ -64,8 +66,25 @@ export class ListClustersHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
-    const { environmentId } = listClustersArguments.parse(toolArguments);
+    const { environmentId } = listClustersArguments.parse(toolArguments ?? {});
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const conn = runtime.config.connections[connId]!;
+    const clientManager = runtime.clientManagers[connId]!;
+
+    // Resolve environment: arg wins; under direct, fall back to kafka.env_id;
+    // under OAuth there is no service block to fall back to. If neither is
+    // available, surface an actionable error before hitting the cmk endpoint
+    // — its generic "Environment ID not specified" response wastes a
+    // round-trip and gives the agent no hint about what to do next.
+    const envFallback = conn.type === "direct" ? conn.kafka?.env_id : undefined;
+    const resolvedEnv = environmentId ?? envFallback;
+    if (!resolvedEnv) {
+      const guidance =
+        conn.type === "oauth"
+          ? "environmentId is required under OAuth. Call list-environments to discover available environments and pass the env-... id as environmentId."
+          : "environmentId is required: pass it as a tool argument or set kafka.env_id in the connection config.";
+      return this.createResponse(guidance, true);
+    }
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(
@@ -77,10 +96,7 @@ export class ListClustersHandler extends BaseToolHandler {
       ].GET({
         params: {
           query: {
-            environment:
-              environmentId ??
-              runtime.config.getSoleDirectConnection().kafka?.env_id ??
-              "",
+            environment: resolvedEnv,
             page_size: 100,
           },
         },
@@ -189,5 +205,5 @@ Cluster: ${cluster.name}
       annotations: READ_ONLY,
     };
   }
-  readonly predicate = hasDirectConfluentCloud;
+  readonly predicate = hasConfluentCloud;
 }

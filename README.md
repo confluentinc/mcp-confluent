@@ -53,7 +53,7 @@ npx -y @confluentinc/mcp-confluent --list-tools
 
 ### Available Tools for Confluent Cloud
 
-These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`config.example.yaml`](config.example.yaml) for the full set of configuration variables, or to [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) below to authenticate as a logged-in user instead of via API keys (currently supported by the native-broker **Kafka** tools — `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`).
+These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`config.env.yaml`](config.env.yaml) for the full set of configuration variables, or to [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) below to authenticate as a logged-in user instead of via API keys (currently supported by the native-broker **Kafka** tools — `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`).
 
 | Category                                   | Tools                                                                                                                                                                                               | Description                                                       |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -246,15 +246,19 @@ Run with `--config oauth.yaml` and the browser sign-in opens on first start.
 
 ### Supported tools under OAuth
 
-| Category               | Tools                                                                                  |
-| ---------------------- | -------------------------------------------------------------------------------------- |
-| **Kafka (native)**     | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` |
-| **Control plane REST** | `list-organizations`, `list-environments`, `read-environment`, `list-billing-costs`    |
+| Category                                   | Tools                                                                                  |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` |
+| **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               |
+| **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         |
+| **Billing**                                | `list-billing-costs`                                                                   |
+
+Under OAuth, native-Kafka tools require both `cluster_id` (`lkc-...`) and `environment_id` (`env-...`) at call time. The REST topic-config tools require `clusterId` and `environmentId` (camelCase, matching their existing direct-mode arg names). Discover both via `list-environments` then `list-clusters`.
 
 ### Limitations
 
 - **Schema Registry (de)serialization** is not yet exposed under OAuth. `produce-message` / `consume-messages` calls with `useSchemaRegistry: true` return a clear capability error. Use a direct connection if schema-aware (de)serialization is required.
-- **Other REST-only tool categories** (`list-clusters`, Connect, Tableflow, Flink, Schema Registry, Metrics, Catalog & Tags) are still being migrated to OAuth and currently require a `direct` connection.
+- **Other REST-only tool categories** (Connect, Tableflow, Flink, Schema Registry, Metrics, Catalog & Tags) are still being migrated to OAuth and currently require a `direct` connection.
 
 ## CLI Usage
 

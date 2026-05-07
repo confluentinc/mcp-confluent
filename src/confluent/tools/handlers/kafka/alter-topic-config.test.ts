@@ -28,10 +28,16 @@ describe("alter-topic-config.ts", () => {
           connectionConfig: {},
         },
         {
-          label: "throws when clusterId is absent and not in connection config",
+          label:
+            "throws when clusterId arg absent and conn.kafka.cluster_id missing",
           args: { topicName: "my-topic", topicConfigs: VALID_CONFIGS },
-          outcome: { throws: "Kafka Cluster ID is required" },
-          connectionConfig: {},
+          outcome: { throws: "clusterId is required" },
+          connectionConfig: {
+            kafka: {
+              rest_endpoint: "https://kafka-rest.example.com",
+              auth: { type: "api_key", key: "k", secret: "s" },
+            },
+          },
         },
         {
           label:
@@ -55,9 +61,9 @@ describe("alter-topic-config.ts", () => {
         async ({ args, outcome, connectionConfig = KAFKA_CONN }) => {
           const clientManager = getMockedClientManager();
           // handler POSTs to alter-configs and returns success on no error
-          clientManager
-            .getConfluentCloudKafkaRestClient()
-            .POST.mockResolvedValue({ data: undefined });
+          const restClient =
+            await clientManager.getConfluentCloudKafkaRestClient();
+          restClient.POST.mockResolvedValue({ data: undefined });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(

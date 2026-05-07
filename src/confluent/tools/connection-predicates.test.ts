@@ -19,6 +19,7 @@ import {
   hasTableflow,
   hasTelemetry,
   kafkaBootstrapOrOAuth,
+  kafkaRestWithAuthOrOAuth,
   widenForOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { describe, expect, it, vi } from "vitest";
@@ -428,6 +429,36 @@ describe("connection-predicates.ts", () => {
 
     it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
       expect(kafkaBootstrapOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
+    });
+  });
+
+  describe("kafkaRestWithAuthOrOAuth", () => {
+    it("should return ENABLED for a direct connection with kafka.rest_endpoint and kafka.auth", () => {
+      expect(kafkaRestWithAuthOrOAuth(KAFKA_REST_WITH_AUTH_CONN)).toEqual(
+        ENABLED,
+      );
+    });
+
+    it("should report MissingKafkaRestEndpoint for a direct kafka block without rest_endpoint", () => {
+      expect(kafkaRestWithAuthOrOAuth(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaRestEndpoint),
+      );
+    });
+
+    it("should report MissingKafkaAuth for a direct connection with rest_endpoint but no auth", () => {
+      expect(kafkaRestWithAuthOrOAuth(KAFKA_REST_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaAuth),
+      );
+    });
+
+    it("should report MissingKafkaBlock for a direct connection without a kafka block", () => {
+      expect(kafkaRestWithAuthOrOAuth(SCHEMA_REGISTRY_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaBlock),
+      );
+    });
+
+    it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
+      expect(kafkaRestWithAuthOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
     });
   });
 

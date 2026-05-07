@@ -10,12 +10,12 @@
 // `connectionVerdicts()` from it. Handlers must not call `allOf(...)` or
 // `widenForOAuth(...)` at the use site — those combinators are construction
 // tools used here to define new named exports. When adding a new named
-// predicate here: also pin its consumer(s) in the `EXPECTED_PREDICATES` map
-// inside `tool-registry.test.ts`'s `predicate property` block (typed as
-// `ReadonlyMap<ToolName, ConnectionPredicate>`, so combinators can't slip
-// in as values) and add per-predicate coverage in
-// `connection-predicates.test.ts`. The handler then sails through the
-// per-tool identity assertion.
+// predicate here: also pin its consumer(s) in the `EXPECTED_PREDICATES`
+// record inside `tool-registry.test.ts`'s `predicate property` block
+// (typed `Readonly<Record<ToolName, ConnectionPredicate>>`, so missing
+// rows fail `tsc` and combinators can't slip in as values) and add
+// per-predicate coverage in `connection-predicates.test.ts`. The handler
+// then sails through the per-tool identity assertion.
 //
 // OAuth note: most predicates short-circuit on `conn.type === "oauth"`
 // and answer disabled — OAuth connections carry no service blocks for these

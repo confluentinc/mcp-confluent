@@ -87,12 +87,14 @@ export abstract class BaseToolHandler implements ToolHandler {
    * the depth of the existing `hasKafka` / `flinkWithTelemetry` blocks —
    * and reference that. Enforced mechanically: the `predicate property`
    * block in `tool-registry.test.ts` maintains an explicit
-   * `ReadonlyMap<ToolName, ConnectionPredicate>` (`EXPECTED_PREDICATES`)
-   * pinning every tool to its expected predicate. The map's value type
-   * rejects combinators at compile time, and the `it.each` over the map
-   * fails with the offending tool name in the row label whenever a
-   * handler's `predicate` drifts from the table. New tools or rewires
-   * are a one-line table edit.
+   * `Readonly<Record<ToolName, ConnectionPredicate>>` (`EXPECTED_PREDICATES`)
+   * pinning every tool to its expected predicate. The `Record` over
+   * `ToolName` makes exhaustiveness a compile-time check (a missing tool
+   * is a `tsc` error, not a runtime one), and the value type rejects
+   * combinators at compile time. The `it.each` over the record fails with
+   * the offending tool name in the row label whenever a handler's
+   * `predicate` drifts from the table. New tools or rewires are a one-line
+   * table edit.
    *
    * Both {@linkcode enabledConnectionIds} and {@linkcode connectionVerdicts}
    * are derived from this property and are marked `@final`; never override

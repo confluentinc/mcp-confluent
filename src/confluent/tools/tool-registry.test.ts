@@ -157,96 +157,87 @@ describe("tool-registry.ts", () => {
     });
 
     describe("predicate property", () => {
-      // Exhaustive mapping of every registered tool to the named export from
-      // connection-predicates.ts that its handler is expected to wire as its
-      // `predicate`.
+      // Exhaustive mapping of every registered tool to the named export
+      // from connection-predicates.ts that its handler is expected to wire
+      // as its `predicate`.
       //
-      // When adding a new tool: add an entry here. When deliberately
-      // changing a handler's predicate: update the entry. The `it.each` row
-      // label names the offending tool when handler.predicate drifts from
-      // this table.
-      const EXPECTED_PREDICATES: ReadonlyMap<ToolName, ConnectionPredicate> =
-        new Map([
-          // Kafka
-          [ToolName.LIST_TOPICS, kafkaBootstrapOrOAuth],
-          [ToolName.CREATE_TOPICS, kafkaBootstrapOrOAuth],
-          [ToolName.DELETE_TOPICS, kafkaBootstrapOrOAuth],
-          [ToolName.PRODUCE_MESSAGE, kafkaBootstrapOrOAuth],
-          [ToolName.CONSUME_MESSAGES, kafkaBootstrapOrOAuth],
-          [ToolName.ALTER_TOPIC_CONFIG, hasKafkaRestWithAuth],
-          [ToolName.GET_TOPIC_CONFIG, hasKafkaRestWithAuth],
-          // Flink
-          [ToolName.LIST_FLINK_STATEMENTS, hasFlink],
-          [ToolName.CREATE_FLINK_STATEMENT, hasFlink],
-          [ToolName.READ_FLINK_STATEMENT, hasFlink],
-          [ToolName.DELETE_FLINK_STATEMENTS, hasFlink],
-          [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS, hasFlink],
-          [ToolName.LIST_FLINK_CATALOGS, hasFlink],
-          [ToolName.LIST_FLINK_DATABASES, hasFlink],
-          [ToolName.LIST_FLINK_TABLES, hasFlink],
-          [ToolName.DESCRIBE_FLINK_TABLE, hasFlink],
-          [ToolName.GET_FLINK_TABLE_INFO, hasFlink],
-          [ToolName.CHECK_FLINK_STATEMENT_HEALTH, hasFlink],
-          [ToolName.DETECT_FLINK_STATEMENT_ISSUES, hasFlink],
-          [ToolName.GET_FLINK_STATEMENT_PROFILE, flinkWithTelemetry],
-          // Connect
-          [ToolName.LIST_CONNECTORS, hasDirectConfluentCloud],
-          [ToolName.READ_CONNECTOR, hasDirectConfluentCloud],
-          [ToolName.CREATE_CONNECTOR, canCreateDirectConnector],
-          [ToolName.DELETE_CONNECTOR, hasDirectConfluentCloud],
-          // Catalog + search (CCloud catalog support)
-          [ToolName.SEARCH_TOPICS_BY_TAG, hasCCloudCatalogSupport],
-          [ToolName.SEARCH_TOPICS_BY_NAME, hasCCloudCatalogSupport],
-          [ToolName.CREATE_TOPIC_TAGS, hasCCloudCatalogSupport],
-          [ToolName.DELETE_TAG, hasCCloudCatalogSupport],
-          [ToolName.REMOVE_TAG_FROM_ENTITY, hasCCloudCatalogSupport],
-          [ToolName.ADD_TAGS_TO_TOPIC, hasCCloudCatalogSupport],
-          [ToolName.LIST_TAGS, hasCCloudCatalogSupport],
-          // Clusters
-          [ToolName.LIST_CLUSTERS, hasDirectConfluentCloud],
-          // Environments + billing + organizations (Confluent Cloud control plane)
-          [ToolName.LIST_ENVIRONMENTS, hasConfluentCloud],
-          [ToolName.READ_ENVIRONMENT, hasConfluentCloud],
-          [ToolName.LIST_BILLING_COSTS, hasConfluentCloud],
-          [ToolName.LIST_ORGANIZATIONS, hasConfluentCloud],
-          // Schema Registry
-          [ToolName.LIST_SCHEMAS, hasSchemaRegistry],
-          [ToolName.DELETE_SCHEMA, hasSchemaRegistry],
-          // Tableflow
-          [ToolName.CREATE_TABLEFLOW_TOPIC, hasTableflow],
-          [ToolName.LIST_TABLEFLOW_REGIONS, hasTableflow],
-          [ToolName.LIST_TABLEFLOW_TOPICS, hasTableflow],
-          [ToolName.READ_TABLEFLOW_TOPIC, hasTableflow],
-          [ToolName.UPDATE_TABLEFLOW_TOPIC, hasTableflow],
-          [ToolName.DELETE_TABLEFLOW_TOPIC, hasTableflow],
-          [ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION, hasTableflow],
-          [ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS, hasTableflow],
-          [ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION, hasTableflow],
-          [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION, hasTableflow],
-          [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION, hasTableflow],
-          // Metrics (Telemetry API)
-          [ToolName.QUERY_METRICS, hasTelemetry],
-          [ToolName.LIST_METRICS, hasTelemetry],
-          // Documentation (no service-block requirement)
-          [ToolName.SEARCH_PRODUCT_DOCS, alwaysEnabled],
-          [ToolName.GET_PRODUCT_DOC_PAGE, alwaysEnabled],
-        ]);
+      // When adding a new tool or rewiring an existing one: edit a single
+      // entry. The `it.each` row label names the offending tool if a
+      // handler's `predicate` drifts from the table.
+      const EXPECTED_PREDICATES: Readonly<
+        Record<ToolName, ConnectionPredicate>
+      > = {
+        // Kafka
+        [ToolName.LIST_TOPICS]: kafkaBootstrapOrOAuth,
+        [ToolName.CREATE_TOPICS]: kafkaBootstrapOrOAuth,
+        [ToolName.DELETE_TOPICS]: kafkaBootstrapOrOAuth,
+        [ToolName.PRODUCE_MESSAGE]: kafkaBootstrapOrOAuth,
+        [ToolName.CONSUME_MESSAGES]: kafkaBootstrapOrOAuth,
+        [ToolName.ALTER_TOPIC_CONFIG]: hasKafkaRestWithAuth,
+        [ToolName.GET_TOPIC_CONFIG]: hasKafkaRestWithAuth,
+        // Flink
+        [ToolName.LIST_FLINK_STATEMENTS]: hasFlink,
+        [ToolName.CREATE_FLINK_STATEMENT]: hasFlink,
+        [ToolName.READ_FLINK_STATEMENT]: hasFlink,
+        [ToolName.DELETE_FLINK_STATEMENTS]: hasFlink,
+        [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: hasFlink,
+        [ToolName.LIST_FLINK_CATALOGS]: hasFlink,
+        [ToolName.LIST_FLINK_DATABASES]: hasFlink,
+        [ToolName.LIST_FLINK_TABLES]: hasFlink,
+        [ToolName.DESCRIBE_FLINK_TABLE]: hasFlink,
+        [ToolName.GET_FLINK_TABLE_INFO]: hasFlink,
+        [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlink,
+        [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
+        [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
+        // Connect
+        [ToolName.LIST_CONNECTORS]: hasDirectConfluentCloud,
+        [ToolName.READ_CONNECTOR]: hasDirectConfluentCloud,
+        [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
+        [ToolName.DELETE_CONNECTOR]: hasDirectConfluentCloud,
+        // Catalog + search (CCloud catalog support)
+        [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
+        [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
+        [ToolName.CREATE_TOPIC_TAGS]: hasCCloudCatalogSupport,
+        [ToolName.DELETE_TAG]: hasCCloudCatalogSupport,
+        [ToolName.REMOVE_TAG_FROM_ENTITY]: hasCCloudCatalogSupport,
+        [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupport,
+        [ToolName.LIST_TAGS]: hasCCloudCatalogSupport,
+        // Clusters
+        [ToolName.LIST_CLUSTERS]: hasDirectConfluentCloud,
+        // Environments + billing + organizations (Confluent Cloud control plane)
+        [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloud,
+        [ToolName.READ_ENVIRONMENT]: hasConfluentCloud,
+        [ToolName.LIST_BILLING_COSTS]: hasConfluentCloud,
+        [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloud,
+        // Schema Registry
+        [ToolName.LIST_SCHEMAS]: hasSchemaRegistry,
+        [ToolName.DELETE_SCHEMA]: hasSchemaRegistry,
+        // Tableflow
+        [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.LIST_TABLEFLOW_REGIONS]: hasTableflow,
+        [ToolName.LIST_TABLEFLOW_TOPICS]: hasTableflow,
+        [ToolName.READ_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.UPDATE_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.DELETE_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS]: hasTableflow,
+        [ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        // Metrics (Telemetry API)
+        [ToolName.QUERY_METRICS]: hasTelemetry,
+        [ToolName.LIST_METRICS]: hasTelemetry,
+        // Documentation (no service-block requirement)
+        [ToolName.SEARCH_PRODUCT_DOCS]: alwaysEnabled,
+        [ToolName.GET_PRODUCT_DOC_PAGE]: alwaysEnabled,
+      };
 
-      // One test per tool — each missing entry is its own failure with a
-      // copy-paste fix in the assertion message.
-      it.each(ALL_TOOL_NAMES)(
-        "%s: should have an entry in EXPECTED_PREDICATES",
-        (name) => {
-          expect(
-            EXPECTED_PREDICATES.has(name),
-            `Tool "${name}" has no entry in EXPECTED_PREDICATES. ` +
-              `Add [ToolName.${TOOL_NAME_TO_KEY[name]}, <thePredicate>] to ` +
-              `the map in tool-registry.test.ts.`,
-          ).toBe(true);
-        },
-      );
-
-      it.each([...EXPECTED_PREDICATES.entries()])(
+      it.each(
+        Object.entries(EXPECTED_PREDICATES) as [
+          ToolName,
+          ConnectionPredicate,
+        ][],
+      )(
         "%s: handler.predicate must be exactly the expected named export",
         (toolName, expectedPredicate) => {
           const handler = ToolHandlerRegistry.getToolHandler(toolName);

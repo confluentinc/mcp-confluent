@@ -9,12 +9,19 @@ An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI as
 
 > **Prerequisites:** [Node.js 22+](https://nodejs.org/). If you want to interact with [Confluent Cloud](https://confluent.cloud/), you need to create an account first.
 
+1. Generate a quick `config.yaml` file in your project root:
+
 ```bash
-# Install and run
-npx -y @confluentinc/mcp-confluent -e /path/to/.env
+npx @confluentinc/mcp-confluent --init-config
 ```
 
-Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-confluent) directly. See [Getting Started](#getting-started) for full setup instructions and [Configuring MCP Clients](#configuring-mcp-clients) for integration with your preferred AI tool.
+2. Edit the `config.yaml` file with your connection details, then:
+
+```bash
+npx @confluentinc/mcp-confluent --config ./config.yaml
+```
+
+See [Getting Started](#getting-started) for full setup instructions and [Configuring MCP Clients](#configuring-mcp-clients) for integration with your preferred AI tool.
 
 ## Table of Contents
 
@@ -22,22 +29,23 @@ Or install the [npm package](https://www.npmjs.com/package/@confluentinc/mcp-con
 - [Available Tools](#available-tools)
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
   - [Confluent Local](#available-tools-for-confluent-local)
-- [User Guide](#user-guide)
-  - [Getting Started](#getting-started)
-  - [Configuration](#configuration)
-    - [YAML Configuration](#yaml-configuration)
-  - [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
-  - [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports)
-  - [Usage](#usage)
-  - [CLI Usage](#cli-usage)
-  - [Configuring MCP Clients](#configuring-mcp-clients)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [General Setup Steps](#general-setup-steps)
+  - [Configuration Details](#configuration-details)
+- [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
+- [CLI Usage](#cli-usage)
+- [Configuring MCP Clients](#configuring-mcp-clients)
+- [Authentication for HTTP/SSE Client Transports](#authentication-for-httpsse-client-transports)
 - [Telemetry](#telemetry)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
 ## Available Tools
 
-Only the tools whose required environment variables are configured will be enabled. You can also list all available tools via the CLI:
+**Only the tools whose required environment variables are provided in the configuration file will be enabled.**
+
+You can list all available tools via the CLI:
 
 ```bash
 npx -y @confluentinc/mcp-confluent --list-tools
@@ -45,7 +53,7 @@ npx -y @confluentinc/mcp-confluent --list-tools
 
 ### Available Tools for Confluent Cloud
 
-These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`.env.example`](.env.example) for the full set of configuration variables, or to [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) below to authenticate as a logged-in user instead of via API keys (currently supported by the native-broker **Kafka** tools — `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`).
+These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`config.example.yaml`](config.example.yaml) for the full set of configuration variables, or to [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) below to authenticate as a logged-in user instead of via API keys (currently supported by the native-broker **Kafka** tools — `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`).
 
 | Category                                   | Tools                                                                                                                                                                                               | Description                                                       |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -79,30 +87,69 @@ SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 | **Schema Registry** | `list-schemas`, `delete-schema`                                                        | List, inspect, and delete data schemas                    |
 | **Documentation**   | `search-product-docs`, `get-product-doc-page`                                          | Search Confluent product docs and fetch full page content |
 
-## User Guide
+## Getting Started
 
-### Getting Started
-
-#### Prerequisites
+### Prerequisites
 
 - **Node.js 22 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
   ```bash
   nvm install 22
   nvm use 22
   ```
-- A **Confluent Cloud** account with appropriate API keys
+- A **Confluent Cloud** account with appropriate API keys to access your resources, or your login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
 
-#### Setup
+### General Setup Steps
 
-1. **Create a `.env` file:** Copy the provided `.env.example` file to `.env` in the root of your project:
-   ```bash
-   cp .env.example .env
-   ```
-2. **Populate the `.env` file:** Fill in the necessary values for your Confluent Cloud environment. See the [Configuration](#configuration) section for details on each variable.
+This MCP server is designed to be used with various MCP clients, such as Claude Desktop, Copilot, or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using.
 
-### Configuration
+The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys defined in the YAML config. See [OAuth Authentication For Confluent Cloud](#oauth-authentication-for-confluent-cloud) for more details.
 
-You can configure the MCP server using the following environment variables:
+The general steps to configure (if not using OAuth) and run this MCP are:
+
+1. **Create a configuration file:** Copy the provided [`config.yaml` example](https://github.com/confluentinc/mcp-confluent/blob/main/config.example.yaml) file to the root of your project. You can use the CLI to bootstrap one in your current directory — no git checkout required:
+
+```bash
+npx @confluentinc/mcp-confluent --init-config
+```
+
+2. **Populate the file:** Fill in the necessary values for your Confluent Cloud environment. Different tools will require & use different configuration variables. See the [Configuration Details](#configuration-details) section for details on which variables to fill in based on the tools you want to enable.
+
+3. **Start the Server:** You can run the MCP server in one of two ways:
+   - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source. This typically involves:
+     - Installing dependencies (`npm install`)
+     - Building the project (`npm run build` or `npm run dev`)
+   - **With npx:** You can start the server directly using npx, no build required:
+
+     ```bash
+     npx @confluentinc/mcp-confluent --config /path/to/myconfig.yaml
+     ```
+
+4. **Configure your MCP Client:** Each client will have its own way of specifying the MCP server's address and any required credentials. You'll need to configure your client (e.g., Claude, Goose) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on can be configured by an environment variable.
+
+5. **Start your MCP Client:** Once your client is configured to connect to the MCP server, you can start your mcp client and on startup it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with Confluent Cloud on your behalf.
+
+6. **Interact with Confluent through the Client:** Once the client is connected and configured, you can use the client's interface to interact with Confluent Cloud resources. The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
+
+### Configuration Details
+
+> **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition — the server accepts both - but we plan to deprecate the latter in a near-future release.
+
+The `--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in ./config.yaml, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
+
+It also adds this file to a `.gitignore` (creating one if needed), so your filled-in copy can't slip into git. It will not overwrite an existing `config.yaml`, so a rerun won't overwrite your edits.
+
+If you have this repo cloned, `cp config.example.yaml config.yaml` works just as well. Every `*.yaml`/`*.yml` file at this repo root is gitignored by default, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
+
+#### Side note: Why YAML over environment variables?
+
+Flat environment variables can only express a single implicit connection. A YAML file can define multiple named connections, which is necessary for real-world workflows — for example, a `local-dev` connection pointing at a local Docker Kafka alongside a `staging` connection to a Confluent Cloud cluster, all in one file.
+
+#### All Configuration Variables
+
+You can configure the MCP server using the following variables:
+
+<details>
+<summary>Show Table</summary>
 
 | Variable                      | Description                                                                                                                                                                                                                                                       | Default Value                           | Required |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------- |
@@ -142,33 +189,9 @@ You can configure the MCP server using the following environment variables:
 | TELEMETRY_API_SECRET          | Optional API secret for telemetry access. Falls back to CONFLUENT_CLOUD_API_SECRET if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).) |                                         | No       |
 | DO_NOT_TRACK                  | Set to `true` to opt out of anonymous telemetry data collection. See [Telemetry](#telemetry) for details.                                                                                                                                                         |                                         | No       |
 
-### YAML Configuration
+</details>
 
-> **Note:** YAML-based configuration is actively being built out as the replacement for env-var-only startup. The two modes coexist during the transition — the server accepts both.
-
-Pass a YAML config file at startup with the `--config` flag:
-
-```bash
-npx @confluentinc/mcp-confluent --config /path/to/myconfig.yaml
-```
-
-#### Why YAML over environment variables
-
-Flat environment variables can only express a single implicit connection. A YAML file can define multiple named connections, which is necessary for real-world workflows — for example, a `local-dev` connection pointing at a local Docker Kafka alongside a `staging` connection to a Confluent Cloud cluster, all in one file.
-
-#### Configuration examples
-
-The fastest way to get a starter `config.yaml` is to let the CLI bootstrap one in your current directory — no checkout required:
-
-```bash
-npx @confluentinc/mcp-confluent --init-config
-# edit ./config.yaml, then:
-npx @confluentinc/mcp-confluent --config ./config.yaml
-```
-
-`--init-config` drops a copy of [`config.example.yaml`](config.example.yaml) — the YAML analogue of `.env.example`, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) annotated and wired up with `${VAR}` placeholders so credentials stay in your environment — into `./config.yaml` and adds it to a `.gitignore` next to it (creating one if needed) so your filled-in copy can't slip into git. It refuses to overwrite an existing `config.yaml`, so a stray rerun won't clobber edits.
-
-If you already have this repo cloned, `cp config.example.yaml config.yaml` works just as well — every `*.yaml`/`*.yml` file at the repo root is gitignored by default, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
+#### Examples
 
 For more focused reference snippets, browse [test-fixtures/yaml_configs/valid/](test-fixtures/yaml_configs/valid/) — these files are executed as part of the test suite on every CI run, so they are always valid and current.
 
@@ -201,15 +224,15 @@ Please refer to the following Confluent Cloud documentation for detailed instruc
 
 Ensuring these prerequisites are met will prevent authorization errors when the `mcp-server` attempts to provision or manage Tableflow-enabled tables.
 
-### OAuth Authentication for Confluent Cloud
+## OAuth Authentication for Confluent Cloud
 
-The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys.
+The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys defined in the YAML config.
 
-#### How it works
+### How it works
 
 On startup, the server opens your browser to the Confluent Cloud sign-in page and waits for the redirect callback. Supported tools begin working only after sign-in completes — calls made before then will fail with an `"OAuth token is not currently available"` error.
 
-#### YAML setup
+### YAML setup
 
 Add the following to the yaml file to enable an OAuth Connection:
 
@@ -221,110 +244,19 @@ connections:
 
 Run with `--config oauth.yaml` and the browser sign-in opens on first start.
 
-#### Supported tools under OAuth
+### Supported tools under OAuth
 
 | Category               | Tools                                                                                  |
 | ---------------------- | -------------------------------------------------------------------------------------- |
 | **Kafka (native)**     | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` |
 | **Control plane REST** | `list-organizations`, `list-environments`, `read-environment`, `list-billing-costs`    |
 
-#### Limitations
+### Limitations
 
 - **Schema Registry (de)serialization** is not yet exposed under OAuth. `produce-message` / `consume-messages` calls with `useSchemaRegistry: true` return a clear capability error. Use a direct connection if schema-aware (de)serialization is required.
 - **Other REST-only tool categories** (`list-clusters`, Connect, Tableflow, Flink, Schema Registry, Metrics, Catalog & Tags) are still being migrated to OAuth and currently require a `direct` connection.
 
-### Authentication for HTTP/SSE Transports
-
-When using HTTP or SSE transports, the MCP server requires API key authentication to prevent unauthorized access and protect against DNS rebinding attacks. This is **enabled by default**.
-
-#### Generating an API Key
-
-Generate a secure API key using the built-in utility:
-
-```bash
-npx @confluentinc/mcp-confluent --generate-key
-```
-
-This will output a 64-character key generated using secure cryptography:
-
-```
-Generated MCP API Key:
-================================================================
-a1b2c3d4e5f6...your-64-char-key-here...
-================================================================
-
-```
-
-#### Configuring Authentication
-
-Add the generated key to your `.env` file:
-
-```properties
-# MCP Server Authentication (required for HTTP/SSE transports)
-MCP_API_KEY=your-generated-64-char-key-here
-```
-
-#### Making Authenticated Requests
-
-Include the API key in the `cflt-mcp-api-Key` header for all HTTP/SSE requests:
-
-```bash
-curl -H "cflt-mcp-api-Key: your-api-key" http://localhost:8080/mcp
-```
-
-#### DNS Rebinding Protection
-
-The server includes additional protections against DNS rebinding attacks:
-
-- **Host Header Validation**: Only requests with allowed Host headers are accepted
-
-Configure allowed hosts if needed:
-
-```properties
-# Allow additional hosts (comma-separated)
-MCP_ALLOWED_HOSTS=localhost,127.0.0.1,myhost.local
-```
-
-#### Additional security to prevent internet exposure of MCP server
-
-- **Localhost Binding**: Server binds to `127.0.0.1` by default (not `0.0.0.0`)
-
-#### Disabling Authentication (Development Only)
-
-For local development, you can disable authentication:
-
-```bash
-# Via CLI flag
-npx @confluentinc/mcp-confluent -e .env --transport http --disable-auth
-
-# Or via environment variable
-MCP_AUTH_DISABLED=true
-```
-
-> [!WARNING]
-> Never disable authentication in production or when the server is network-accessible.
-
-### Usage
-
-This MCP server is designed to be used with various MCP clients, such as Claude Desktop or Goose CLI/Desktop. The specific configuration and interaction will depend on the client you are using. However, the general steps are:
-
-1. **Start the Server:** You can run the MCP server in one of two ways:
-   - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source. This typically involves:
-     - Installing dependencies (`npm install`)
-     - Building the project (`npm run build` or `npm run dev`)
-   - **With npx:** You can start the server directly using npx (no build required):
-
-     ```bash
-     npx -y @confluentinc/mcp-confluent -e /path/to/confluent-mcp-server/.env
-     ```
-
-2. **Configure your MCP Client:** Each client will have its own way of specifying the MCP server's address and any required credentials. You'll need to configure your client (e.g., Claude, Goose) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on may be configured by an environment variable.
-
-3. **Start the MCP Client:** Once your client is configured to connect to the MCP server, you can start your mcp client and on startup - it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with Confluent Cloud on your behalf.
-
-4. **Interact with Confluent through the Client:** Once the client is connected, you can use the client's interface to interact with Confluent Cloud resources. The client will send requests to this MCP server, which will then interact with Confluent Cloud on your behalf.
-
-### CLI Usage
+## CLI Usage
 
 The MCP server provides a flexible command line interface (CLI) for advanced configuration and control. The CLI allows you to specify environment files, transports, and fine-tune which tools are enabled or blocked.
 
@@ -471,7 +403,7 @@ list-organizations: List Confluent Cloud organizations the current credentials c
 
 > **Tip:** The allow-list is applied before the block-list. If neither is provided, all tools are enabled by default.
 
-### Configuring MCP Clients
+## Configuring MCP Clients
 
 Please refer to the following guides for step-by-step instructions on setting up and using this MCP server with your preferred client:
 
@@ -483,6 +415,77 @@ Please refer to the following guides for step-by-step instructions on setting up
 - [VS Code](docs/configuring-vs-code.md)
 - [Windsurf](docs/configuring-windsurf.md)
 
+## Authentication for HTTP/SSE Client Transports
+
+When using HTTP or SSE transports, the MCP server requires API key authentication to prevent unauthorized access and protect against DNS rebinding attacks. This is **enabled by default**.
+
+### Generating an API Key
+
+Generate a secure API key using the built-in utility:
+
+```bash
+npx @confluentinc/mcp-confluent --generate-key
+```
+
+This will output a 64-character key generated using secure cryptography:
+
+```
+Generated MCP API Key:
+================================================================
+a1b2c3d4e5f6...your-64-char-key-here...
+================================================================
+
+```
+
+### Configuring Authentication
+
+Add the generated key to your `config.yaml` file:
+
+```properties
+# MCP Server Authentication (required for HTTP/SSE transports)
+MCP_API_KEY=your-generated-64-char-key-here
+```
+
+### Making Authenticated Requests
+
+Include the API key in the `cflt-mcp-api-Key` header for all HTTP/SSE requests:
+
+```bash
+curl -H "cflt-mcp-api-Key: your-api-key" http://localhost:8080/mcp
+```
+
+### DNS Rebinding Protection
+
+The server includes additional protections against DNS rebinding attacks:
+
+- **Host Header Validation**: Only requests with allowed Host headers are accepted
+
+Configure allowed hosts if needed:
+
+```properties
+# Allow additional hosts (comma-separated)
+MCP_ALLOWED_HOSTS=localhost,127.0.0.1,myhost.local
+```
+
+### Additional security to prevent internet exposure of MCP server
+
+- **Localhost Binding**: Server binds to `127.0.0.1` by default (not `0.0.0.0`)
+
+### Disabling Authentication (Development Only)
+
+For local development, you can disable authentication:
+
+```bash
+# Via CLI flag
+npx @confluentinc/mcp-confluent -e .env --transport http --disable-auth
+
+# Or via environment variable
+MCP_AUTH_DISABLED=true
+```
+
+> [!WARNING]
+> Never disable authentication in production or when the server is network-accessible.
+
 ## Telemetry
 
 This MCP server collects anonymous usage data to help make improvements. No personally identifiable information is collected. You can opt out by setting `DO_NOT_TRACK=true` in your environment. See [telemetry.md](telemetry.md) for full details on what is collected.
@@ -491,14 +494,18 @@ This MCP server collects anonymous usage data to help make improvements. No pers
 
 **"Node.js version not supported"** -- This project requires Node.js 22 or later. Check your version with `node -v` and upgrade if needed.
 
-**Tools not appearing** -- Ensure the required environment variables for those tools are set in your `.env` file. Tools are only enabled when their dependencies are configured. Run `--list-tools` to see which tools are active.
+**Tools not appearing** -- Ensure the required environment variables for those tools are set in your `config.yaml` file. Tools are only enabled when their dependencies are configured. Run `--list-tools` to see which tools are active.
 
-**Authentication errors on HTTP/SSE** -- Generate an API key with `npx @confluentinc/mcp-confluent --generate-key` and add it to your `.env` file as `MCP_API_KEY`. See [Authentication for HTTP/SSE Transports](#authentication-for-httpsse-transports).
+**Authentication errors on HTTP/SSE** -- Generate an API key with `npx @confluentinc/mcp-confluent --generate-key` and add it to your `config.yaml` file as `MCP_API_KEY`. See [Authentication for HTTP/SSE Client Transports](#authentication-for-httpsse-client-transports).
 
-**Connection refused / port conflicts** -- The default HTTP port is 8080. If it's already in use, set a different port via `HTTP_PORT` in your `.env` file.
+**Connection refused / port conflicts** -- The default HTTP port is 8080. If it's already in use, set a different port via `HTTP_PORT` in your `config.yaml` file.
 
 **Tableflow authorization errors** -- Tableflow tools require specific IAM permissions in your cloud environment. See [Prerequisites & Setup for Tableflow Commands](#prerequisites--setup-for-tableflow-commands).
 
 ## Contributing
 
 Bug reports and feedback is appreciated in the form of Github Issues. For guidelines on contributing please see [CONTRIBUTING.md](CONTRIBUTING.md)
+
+### Pre-release testing
+
+To run the MCP server against a pre-release version for beta testing or early feedback, download the release tarball file to a local directory. Then, when running any of the `npx` commands above, replace `@confluentinc/mcp-confluent` with the path to that tarball, e.g. `npx @~path/to/my/tarball --list-tools`

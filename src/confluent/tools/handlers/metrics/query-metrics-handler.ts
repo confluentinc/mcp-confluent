@@ -4,10 +4,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasTelemetry,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasTelemetry } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -178,10 +175,7 @@ export class QueryMetricsHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasTelemetry);
-  }
+  readonly predicate = hasTelemetry;
 }
 
 /**

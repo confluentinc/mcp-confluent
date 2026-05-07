@@ -1,11 +1,6 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import {
-  allOf,
-  connectionIdsWhere,
-  hasFlink,
-  hasTelemetry,
-} from "@src/confluent/tools/connection-predicates.js";
+import { flinkWithTelemetry } from "@src/confluent/tools/connection-predicates.js";
 import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -535,10 +530,5 @@ export class QueryProfilerHandler extends FlinkToolHandler {
   }
 
   /** Overrides FlinkToolHandler: also requires a telemetry block because profiling fetches metrics from the Telemetry API in addition to the Flink REST API. */
-  override enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      allOf(hasFlink, hasTelemetry),
-    );
-  }
+  override readonly predicate = flinkWithTelemetry;
 }

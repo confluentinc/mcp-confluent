@@ -61,7 +61,7 @@ These tools require endpoints and authentication against specific Confluent Clou
 | **Tableflow Catalog**                      | `create-tableflow-catalog-integration`, `list-tableflow-catalog-integrations`, `read-tableflow-catalog-integration`, `update-tableflow-catalog-integration`, `delete-tableflow-catalog-integration` | Manage Tableflow catalog integrations (e.g., AWS Glue)            |
 | **Metrics**                                | `list-available-metrics`, `query-metrics`                                                                                                                                                           | Discover and query Confluent Cloud operational metrics            |
 | **Billing**                                | `list-billing-costs`                                                                                                                                                                                | Query billing and cost data                                       |
-| **Documentation**                          | `search-product-docs`                                                                                                                                                                               | Search Confluent product documentation by keyword                 |
+| **Documentation**                          | `search-product-docs`, `get-product-doc-page`                                                                                                                                                       | Search Confluent product docs and fetch full page content         |
 
 ### Available Tools for Confluent Local
 
@@ -73,11 +73,11 @@ BOOTSTRAP_SERVERS="localhost:9092"
 SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 ```
 
-| Category            | Tools                                                                                  | Description                                       |
-| ------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Manage topics, produce/consume messages           |
-| **Schema Registry** | `list-schemas`, `delete-schema`                                                        | List, inspect, and delete data schemas            |
-| **Documentation**   | `search-product-docs`                                                                  | Search Confluent product documentation by keyword |
+| Category            | Tools                                                                                  | Description                                               |
+| ------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Manage topics, produce/consume messages                   |
+| **Schema Registry** | `list-schemas`, `delete-schema`                                                        | List, inspect, and delete data schemas                    |
+| **Documentation**   | `search-product-docs`, `get-product-doc-page`                                          | Search Confluent product docs and fetch full page content |
 
 ## User Guide
 

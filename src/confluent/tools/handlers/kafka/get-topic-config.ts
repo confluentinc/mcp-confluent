@@ -4,10 +4,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasKafkaRestWithAuth,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasKafkaRestWithAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -93,8 +90,5 @@ export class GetTopicConfigHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaRestWithAuth);
-  }
+  readonly predicate = hasKafkaRestWithAuth;
 }

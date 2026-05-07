@@ -1,6 +1,7 @@
 import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
+  CONTROL_PLANE_TOKEN_LIFETIME_MS,
   MAX_CONSECUTIVE_TRANSIENT_FAILURES,
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
@@ -553,6 +554,13 @@ describe("oauth/auth-context.ts", () => {
       // real setTimeout. Install fake timers only after the login resolves.
       ctx = await newLoggedInContext(fetchSpy);
       vi.useFakeTimers();
+      // Re-stamp controlPlaneExpiresAt from the fake clock so the absolute
+      // timestamp and the loop's Date.now() share a baseline. Without this,
+      // drift between login (real clock) and useFakeTimers() install
+      // shortens the first scheduled fire by a few ms, making
+      // `advanceTimersByTimeAsync(FIRST_FIRE_MS - 1)` flakily trip the timer.
+      internals(ctx).controlPlaneExpiresAt =
+        Date.now() + CONTROL_PLANE_TOKEN_LIFETIME_MS;
     });
 
     afterEach(() => {

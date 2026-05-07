@@ -4,10 +4,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasConfluentCloud,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -173,8 +170,5 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
       annotations: READ_ONLY,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
-  }
+  readonly predicate = hasConfluentCloud;
 }

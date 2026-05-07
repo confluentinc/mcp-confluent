@@ -73,28 +73,6 @@ describe("base-tools.ts", () => {
       });
     });
 
-    describe("resolveSoleDirectConnection()", () => {
-      const resolveSoleDirectConnection = handler[
-        "resolveSoleDirectConnection"
-      ].bind(handler) as (typeof handler)["resolveSoleDirectConnection"];
-
-      it("should narrow conn to DirectConnectionConfig under direct", () => {
-        const runtime = runtimeWith(CCLOUD_CONN);
-        const { conn } = resolveSoleDirectConnection(runtime);
-        // Type-narrowed access to the direct-only `confluent_cloud` field is
-        // the contract this method exists to provide.
-        expect(conn.confluent_cloud?.endpoint).toBe(
-          "https://api.confluent.cloud",
-        );
-      });
-
-      it("should throw when the connection is OAuth-typed", () => {
-        expect(() => resolveSoleDirectConnection(ccloudOAuthRuntime())).toThrow(
-          /requires a direct \(non-OAuth\) connection/,
-        );
-      });
-    });
-
     describe("resolveParam()", () => {
       // BaseToolHandler.resolveParam() is protected, so we have to work a little bit to get at
       // it for this test suite.

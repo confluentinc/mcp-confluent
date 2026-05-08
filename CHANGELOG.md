@@ -22,6 +22,7 @@ All notable changes to this MCP server will be documented in this file.
 - Confluent product documentation tools (support `docs.confluent.io`, `developer.confluent.io`, `support.confluent.io`):
   - `search-product-docs` for keyword search across product docs.
   - `get-product-doc-page` for fetching the full markdown content of a single page.
+- New tool `describe-tool-gating` to diagnose why possible tools are not enabled at this time due to mismatches in configuration.
 
 ## 1.2.1
 

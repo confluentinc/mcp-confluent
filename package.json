@@ -46,6 +46,7 @@
     "generate:openapi-types": "openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --empty-objects-unknown",
     "print:schema": "node dist/print-md-schema.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js --env-file .env",
+    "inspector:yaml": "node scripts/inspector-yaml.mjs",
     "prepare": "husky",
     "prepack": "npm run build && node scripts/inject-build-config.mjs"
   },

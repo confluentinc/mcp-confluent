@@ -1,9 +1,6 @@
 import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list-clusters-handler.js";
 import {
-  bareRuntime,
   CCLOUD_CONN,
-  ccloudOAuthRuntime,
-  confluentCloudRuntime,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   runtimeWith,
@@ -21,22 +18,6 @@ type EnvIdCase = HandleCaseWithConn & {
 describe("list-clusters-handler.ts", () => {
   describe("ListClustersHandler", () => {
     const handler = new ListClustersHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a confluent_cloud block", () => {
-        expect(handler.enabledConnectionIds(confluentCloudRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a confluent_cloud block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
-      });
-    });
 
     describe("handle()", () => {
       const CCLOUD_WITH_KAFKA_CONN = {

@@ -1,10 +1,7 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  bareRuntime,
-  DEFAULT_CONNECTION_ID,
-} from "@tests/factories/runtime.js";
+import { bareRuntime } from "@tests/factories/runtime.js";
 import { type MockedFetch, mockFetch } from "@tests/stubs/index.js";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -59,14 +56,6 @@ describe("get-product-doc-page-handler.ts", () => {
         expect(config.name).toBe(ToolName.GET_PRODUCT_DOC_PAGE);
         expect(config.annotations).toEqual({ readOnlyHint: true });
         expect(config.inputSchema).toHaveProperty("url");
-      });
-    });
-
-    describe("enabledConnectionIds()", () => {
-      it("should return every configured connection id (no service-block requirement)", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
       });
     });
 

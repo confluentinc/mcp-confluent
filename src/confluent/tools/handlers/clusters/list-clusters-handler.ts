@@ -4,7 +4,8 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasDirectConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { resolveEnvArg } from "@src/confluent/tools/cluster-arg-resolvers.js";
+import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -15,7 +16,9 @@ const listClustersArguments = z.object({
   environmentId: z
     .string()
     .optional()
-    .describe("The environment ID to filter clusters by"),
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments",
+    ),
 });
 
 /**
@@ -64,8 +67,9 @@ export class ListClustersHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
-    const { environmentId } = listClustersArguments.parse(toolArguments);
+    const { environmentId } = listClustersArguments.parse(toolArguments ?? {});
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const resolvedEnv = resolveEnvArg({ environmentId }, runtime, connId);
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(
@@ -77,10 +81,7 @@ export class ListClustersHandler extends BaseToolHandler {
       ].GET({
         params: {
           query: {
-            environment:
-              environmentId ??
-              runtime.config.getSoleDirectConnection().kafka?.env_id ??
-              "",
+            environment: resolvedEnv,
             page_size: 100,
           },
         },
@@ -189,5 +190,5 @@ Cluster: ${cluster.name}
       annotations: READ_ONLY,
     };
   }
-  readonly predicate = hasDirectConfluentCloud;
+  readonly predicate = hasConfluentCloudOrOAuth;
 }

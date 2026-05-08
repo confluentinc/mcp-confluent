@@ -21,15 +21,22 @@
 import type { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import {
+  type ConfluentAuth,
+  createAuthMiddleware,
+} from "@src/confluent/middleware.js";
 import { kafkaDeps } from "@src/confluent/node-deps.js";
 import {
   resolveKafkaBootstrap,
+  resolveKafkaRestEndpoint,
   resolveSchemaRegistryEndpoint,
 } from "@src/confluent/oauth-resource-resolvers.js";
 import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
+import type { paths } from "@src/confluent/openapi-schema.js";
 import { kafkaLogger } from "@src/logger.js";
+import createClient, { type Client } from "openapi-fetch";
 import { DATA_PLANE_TOKEN_LIFETIME_MS } from "./oauth/token-lifetimes.js";
 
 // Lifetime hint passed to librdkafka inside the OAUTHBEARER refresh callback
@@ -96,19 +103,11 @@ export class OAuthClientManager extends BaseClientManager {
     envId?: string,
   ): Promise<SchemaRegistryClient> {
     this.requireClusterArgs(clusterId, envId);
-    // Wait for OAuth login to populate the DPAT before constructing the SDK
-    // client. The SR SDK captures `Authorization: Bearer <token>` in its
-    // axios `createAxiosDefaults` at construction time, so a build during
-    // initial login or a broken refresh would freeze an empty bearer into
-    // every subsequent request. Symmetric with `buildOAuthKafkaClient`.
-    await this.holder.bootstrapPromise;
-    const dpat = this.holder.getDataPlaneToken();
-    if (!dpat) {
-      throw new Error(
-        "OAuth login did not produce a data-plane token; cannot build a Schema Registry SDK client. " +
-          "Check the OAuth login flow status (browser sign-in must complete).",
-      );
-    }
+    // The SR SDK captures `Authorization: Bearer <token>` in its axios
+    // `createAxiosDefaults` at construction time, so a build during initial
+    // login or a broken refresh would freeze an empty bearer into every
+    // subsequent request — fail fast here before that can happen.
+    const dpat = await this.requireDataPlaneToken();
     const endpoint = await resolveSchemaRegistryEndpoint(
       this.getConfluentCloudRestClient(),
       clusterId!,
@@ -123,6 +122,30 @@ export class OAuthClientManager extends BaseClientManager {
         },
       },
     });
+  }
+
+  /** @inheritdoc */
+  async getConfluentCloudKafkaRestClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<Client<paths, `${string}/${string}`>> {
+    this.requireClusterArgs(clusterId, envId);
+    // The bearer middleware reads `auth.getToken()` per-request, but failing
+    // fast here gives the agent a clear error rather than letting an empty
+    // bearer go out on the wire.
+    await this.requireDataPlaneToken();
+    const baseUrl = await resolveKafkaRestEndpoint(
+      this.getConfluentCloudRestClient(),
+      clusterId!,
+      envId!,
+    );
+    const auth: ConfluentAuth = {
+      type: "oauth",
+      getToken: () => this.holder.getDataPlaneToken(),
+    };
+    const client = createClient<paths>({ baseUrl });
+    client.use(createAuthMiddleware(auth));
+    return client;
   }
 
   /** @inheritdoc */
@@ -187,14 +210,37 @@ export class OAuthClientManager extends BaseClientManager {
     // by the handler's `finally` block via `disposeIfOAuth`.
   }
 
+  /**
+   * Awaits the holder's bootstrap promise and returns the current data-plane
+   * token, throwing when the bootstrap completes without one. Used by every
+   * OAuth-side client accessor to fail fast before constructing a client
+   * with an empty bearer.
+   */
+  private async requireDataPlaneToken(): Promise<string> {
+    await this.holder.bootstrapPromise;
+    const dpat = this.holder.getDataPlaneToken();
+    if (!dpat) {
+      throw new Error(
+        "OAuth login did not produce a data-plane token. " +
+          "Check the OAuth login flow status (browser sign-in must complete).",
+      );
+    }
+    return dpat;
+  }
+
   private requireClusterArgs(
     clusterId: string | undefined,
     envId: string | undefined,
   ): void {
     if (clusterId === undefined || envId === undefined) {
+      // Defensive check — handlers should validate arg-name shape and throw
+      // their own user-facing error via resolveKafkaClusterArgs (native, snake_case)
+      // or resolveKafkaRestArgs (REST, camelCase) before reaching the manager.
+      // This message fires only when a caller bypasses those resolvers, so
+      // it's worded generically rather than tied to either arg-name convention.
       throw new Error(
-        "cluster_id and environment_id are required under --oauth for native Kafka access. " +
-          "Call list-clusters with environment_id and pass the cluster's `id` and `spec.environment.id`.",
+        "OAuth client construction requires a cluster id and environment id. " +
+          "Discover via list-environments and list-clusters; pass the cluster's `id` and `spec.environment.id`.",
       );
     }
   }
@@ -203,15 +249,11 @@ export class OAuthClientManager extends BaseClientManager {
     clusterId: string,
     envId: string,
   ): Promise<KafkaJS.Kafka> {
-    // Wait for OAuth login to finish so the data-plane token is populated
-    // before librdkafka starts the SASL handshake.
-    await this.holder.bootstrapPromise;
-    if (!this.holder.getDataPlaneToken()) {
-      throw new Error(
-        "OAuth login did not produce a data-plane token; cannot connect to Kafka. " +
-          "Check the OAuth login flow status (browser sign-in must complete).",
-      );
-    }
+    // Ensure the DPAT is populated before librdkafka starts the SASL
+    // handshake — the synchronous `oauthbearer_token_refresh_cb` (configured
+    // below) reads it on demand, so an empty token here would surface as a
+    // broker-side auth failure with no useful diagnostic.
+    await this.requireDataPlaneToken();
     // librdkafka debug logs — gated by env var so they don't pollute normal
     // server stderr. Set OAUTH_KAFKA_DEBUG=security,broker,protocol (or
     // "all") to see the full SASL/OAUTHBEARER handshake and broker traffic.

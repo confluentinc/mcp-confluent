@@ -9,7 +9,7 @@ import {
   flinkWithTelemetry,
   hasCCloudCatalogSupport,
   hasConfluentCloud,
-  hasDirectConfluentCloud,
+  hasConfluentCloudOrOAuth,
   hasFlink,
   hasKafka,
   hasKafkaAuth,
@@ -19,6 +19,7 @@ import {
   hasTableflow,
   hasTelemetry,
   kafkaBootstrapOrOAuth,
+  kafkaRestWithAuthOrOAuth,
   widenForOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { describe, expect, it, vi } from "vitest";
@@ -224,8 +225,25 @@ describe("connection-predicates.ts", () => {
     });
   });
 
-  describe("hasConfluentCloud()", () => {
+  describe("hasConfluentCloudOrOAuth()", () => {
     it("should return enabled when the confluent_cloud block is present", () => {
+      expect(hasConfluentCloudOrOAuth(CONFLUENT_CLOUD_CONN)).toEqual(ENABLED);
+    });
+
+    it("should report MissingConfluentCloudBlock when the confluent_cloud block is absent on a direct connection", () => {
+      expect(hasConfluentCloudOrOAuth(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingConfluentCloudBlock),
+      );
+    });
+
+    it("should return enabled unconditionally for an OAuth connection", () => {
+      // OAuth gets the CCloud REST URL from its Auth0 env, so it always reaches the CP surface.
+      expect(hasConfluentCloudOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
+    });
+  });
+
+  describe("hasConfluentCloud()", () => {
+    it("should return enabled when the confluent_cloud block is present on a direct connection", () => {
       expect(hasConfluentCloud(CONFLUENT_CLOUD_CONN)).toEqual(ENABLED);
     });
 
@@ -235,25 +253,8 @@ describe("connection-predicates.ts", () => {
       );
     });
 
-    it("should return enabled unconditionally for an OAuth connection", () => {
-      // OAuth gets the CCloud REST URL from its Auth0 env, so it always reaches the CP surface.
-      expect(hasConfluentCloud(OAUTH_CONN)).toEqual(ENABLED);
-    });
-  });
-
-  describe("hasDirectConfluentCloud()", () => {
-    it("should return enabled when the confluent_cloud block is present on a direct connection", () => {
-      expect(hasDirectConfluentCloud(CONFLUENT_CLOUD_CONN)).toEqual(ENABLED);
-    });
-
-    it("should report MissingConfluentCloudBlock when the confluent_cloud block is absent on a direct connection", () => {
-      expect(hasDirectConfluentCloud(KAFKA_CONN)).toEqual(
-        disabledFor(ToolDisabledReason.MissingConfluentCloudBlock),
-      );
-    });
-
     it("should report OAuthNotDirectCapable for an OAuth connection", () => {
-      expect(hasDirectConfluentCloud(OAUTH_CONN)).toEqual(
+      expect(hasConfluentCloud(OAUTH_CONN)).toEqual(
         disabledFor(ToolDisabledReason.OAuthNotDirectCapable),
       );
     });
@@ -431,6 +432,36 @@ describe("connection-predicates.ts", () => {
     });
   });
 
+  describe("kafkaRestWithAuthOrOAuth", () => {
+    it("should return ENABLED for a direct connection with kafka.rest_endpoint and kafka.auth", () => {
+      expect(kafkaRestWithAuthOrOAuth(KAFKA_REST_WITH_AUTH_CONN)).toEqual(
+        ENABLED,
+      );
+    });
+
+    it("should report MissingKafkaRestEndpoint for a direct kafka block without rest_endpoint", () => {
+      expect(kafkaRestWithAuthOrOAuth(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaRestEndpoint),
+      );
+    });
+
+    it("should report MissingKafkaAuth for a direct connection with rest_endpoint but no auth", () => {
+      expect(kafkaRestWithAuthOrOAuth(KAFKA_REST_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaAuth),
+      );
+    });
+
+    it("should report MissingKafkaBlock for a direct connection without a kafka block", () => {
+      expect(kafkaRestWithAuthOrOAuth(SCHEMA_REGISTRY_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingKafkaBlock),
+      );
+    });
+
+    it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
+      expect(kafkaRestWithAuthOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
+    });
+  });
+
   describe("canCreateDirectConnector", () => {
     it("should return ENABLED when both confluent_cloud and kafka.auth are present on a direct connection", () => {
       expect(canCreateDirectConnector(DIRECT_CCLOUD_KAFKA_AUTH_CONN)).toEqual(
@@ -440,7 +471,7 @@ describe("connection-predicates.ts", () => {
 
     it("should report MissingConfluentCloudBlock when the first conjunct fails (no confluent_cloud block)", () => {
       // KAFKA_REST_WITH_AUTH_CONN has kafka.auth but no confluent_cloud,
-      // so hasDirectConfluentCloud short-circuits before hasKafkaAuth runs.
+      // so hasConfluentCloud short-circuits before hasKafkaAuth runs.
       expect(canCreateDirectConnector(KAFKA_REST_WITH_AUTH_CONN)).toEqual(
         disabledFor(ToolDisabledReason.MissingConfluentCloudBlock),
       );

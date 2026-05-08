@@ -1,14 +1,14 @@
 import { DirectConnectionConfig } from "@src/config/models.js";
 import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
-import { hasDirectConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
 
 /**
  * Intermediate base class for all Connect tool handlers.
- * Gates enablement on `hasDirectConfluentCloud` and exposes
+ * Gates enablement on `hasConfluentCloud` and exposes
  * `resolveConnectEnvAndClusterId` for consistent env/cluster resolution.
  */
 export abstract class ConnectToolHandler extends BaseToolHandler {
-  readonly predicate = hasDirectConfluentCloud;
+  readonly predicate = hasConfluentCloud;
 
   /**
    * Resolves environment and Kafka cluster IDs from explicit tool args,

@@ -11,13 +11,13 @@ import {
   flinkWithTelemetry,
   hasCCloudCatalogSupport,
   hasConfluentCloud,
-  hasDirectConfluentCloud,
+  hasConfluentCloudOrOAuth,
   hasFlink,
-  hasKafkaRestWithAuth,
   hasSchemaRegistry,
   hasTableflow,
   hasTelemetry,
   kafkaBootstrapOrOAuth,
+  kafkaRestWithAuthOrOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
@@ -173,8 +173,8 @@ describe("tool-registry.ts", () => {
         [ToolName.DELETE_TOPICS]: kafkaBootstrapOrOAuth,
         [ToolName.PRODUCE_MESSAGE]: kafkaBootstrapOrOAuth,
         [ToolName.CONSUME_MESSAGES]: kafkaBootstrapOrOAuth,
-        [ToolName.ALTER_TOPIC_CONFIG]: hasKafkaRestWithAuth,
-        [ToolName.GET_TOPIC_CONFIG]: hasKafkaRestWithAuth,
+        [ToolName.ALTER_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
+        [ToolName.GET_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         // Flink
         [ToolName.LIST_FLINK_STATEMENTS]: hasFlink,
         [ToolName.CREATE_FLINK_STATEMENT]: hasFlink,
@@ -190,10 +190,10 @@ describe("tool-registry.ts", () => {
         [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
         [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
         // Connect
-        [ToolName.LIST_CONNECTORS]: hasDirectConfluentCloud,
-        [ToolName.READ_CONNECTOR]: hasDirectConfluentCloud,
+        [ToolName.LIST_CONNECTORS]: hasConfluentCloud,
+        [ToolName.READ_CONNECTOR]: hasConfluentCloud,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
-        [ToolName.DELETE_CONNECTOR]: hasDirectConfluentCloud,
+        [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
         // Catalog + search (CCloud catalog support)
         [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
         [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
@@ -203,12 +203,12 @@ describe("tool-registry.ts", () => {
         [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupport,
         [ToolName.LIST_TAGS]: hasCCloudCatalogSupport,
         // Clusters
-        [ToolName.LIST_CLUSTERS]: hasDirectConfluentCloud,
+        [ToolName.LIST_CLUSTERS]: hasConfluentCloudOrOAuth,
         // Environments + billing + organizations (Confluent Cloud control plane)
-        [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloud,
-        [ToolName.READ_ENVIRONMENT]: hasConfluentCloud,
-        [ToolName.LIST_BILLING_COSTS]: hasConfluentCloud,
-        [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloud,
+        [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloudOrOAuth,
+        [ToolName.READ_ENVIRONMENT]: hasConfluentCloudOrOAuth,
+        [ToolName.LIST_BILLING_COSTS]: hasConfluentCloudOrOAuth,
+        [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
         // Schema Registry
         [ToolName.LIST_SCHEMAS]: hasSchemaRegistry,
         [ToolName.DELETE_SCHEMA]: hasSchemaRegistry,
@@ -438,12 +438,10 @@ describe("tool-registry.ts", () => {
       [ToolName.READ_ENVIRONMENT]: { outcome: { throws: "ZodError" } },
       // Clusters
       [ToolName.LIST_CLUSTERS]: {
-        outcome: { resolves: "Successfully retrieved 0 clusters" },
-        setup: (cm) => {
-          cm.getConfluentCloudRestClient().GET.mockResolvedValue({
-            data: { data: [] },
-          });
-        },
+        // resolveEnvArg throws under direct when neither environmentId arg
+        // nor conn.kafka.env_id supplies a value — `allServicesRuntime`
+        // omits kafka.env_id, so this is the expected smoke-test path.
+        outcome: { throws: "environmentId is required" },
       },
       // Tableflow
       [ToolName.CREATE_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },

@@ -4,7 +4,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -164,5 +164,5 @@ Organization: ${org.name}
       annotations: READ_ONLY,
     };
   }
-  readonly predicate = hasConfluentCloud;
+  readonly predicate = hasConfluentCloudOrOAuth;
 }

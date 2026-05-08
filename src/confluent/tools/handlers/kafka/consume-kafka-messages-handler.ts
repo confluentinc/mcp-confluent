@@ -11,11 +11,11 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
   formatKafkaError,
   resolveKafkaClusterArgs,
-} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+} from "@src/confluent/tools/cluster-arg-resolvers.js";
+import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -69,12 +69,14 @@ export const consumeKafkaMessagesArgs = z.object({
   cluster_id: z
     .string()
     .optional()
-    .describe("Confluent Cloud logical Kafka cluster ID (lkc-...)."),
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
   environment_id: z
     .string()
     .optional()
     .describe(
-      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments.",
     ),
 });
 
@@ -193,10 +195,8 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
     const { topicNames, maxMessages, timeoutMs, value, key } = parsed;
 
-    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const { connId, conn, clientManager } = this.resolveSoleConnection(runtime);
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
-    const clientManager = runtime.clientManagers[connId]!;
-    const conn = runtime.config.connections[connId]!;
 
     // Schema Registry deserialization is not yet exposed under OAuth connection type
     // Block the path here with a clear capability boundary rather than throw a discovery hint

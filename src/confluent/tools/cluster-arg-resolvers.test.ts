@@ -4,8 +4,10 @@ import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import {
   disposeIfOAuth,
   formatKafkaError,
+  resolveEnvArg,
   resolveKafkaClusterArgs,
-} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+  resolveKafkaRestArgs,
+} from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
@@ -80,6 +82,109 @@ describe("resolveKafkaClusterArgs", () => {
     expect(() =>
       resolveKafkaClusterArgs({ cluster_id: "lkc-abc" }, runtime, CONN_ID),
     ).toThrow(/cluster_id.*environment_id.*required.*list-clusters/i);
+  });
+});
+
+describe("resolveKafkaRestArgs", () => {
+  it("under direct, uses arg when provided", () => {
+    const runtime = directRuntime({
+      kafka: {
+        rest_endpoint: "https://x",
+        cluster_id: "lkc-cfg",
+        auth: { type: "api_key", key: "k", secret: "s" },
+      },
+    });
+    expect(
+      resolveKafkaRestArgs({ clusterId: "lkc-arg" }, runtime, CONN_ID),
+    ).toEqual({ clusterId: "lkc-arg", envId: undefined });
+  });
+
+  it("under direct, falls back to conn.kafka.cluster_id when arg is absent", () => {
+    const runtime = directRuntime({
+      kafka: {
+        rest_endpoint: "https://x",
+        cluster_id: "lkc-cfg",
+        auth: { type: "api_key", key: "k", secret: "s" },
+      },
+    });
+    expect(resolveKafkaRestArgs({}, runtime, CONN_ID)).toEqual({
+      clusterId: "lkc-cfg",
+      envId: undefined,
+    });
+  });
+
+  it("under direct, throws when neither arg nor config provides clusterId", () => {
+    const runtime = directRuntime({
+      kafka: {
+        rest_endpoint: "https://x",
+        auth: { type: "api_key", key: "k", secret: "s" },
+      },
+    });
+    expect(() => resolveKafkaRestArgs({}, runtime, CONN_ID)).toThrow(
+      /clusterId is required/,
+    );
+  });
+
+  it("under OAuth with missing environmentId, throws discovery hint", () => {
+    const runtime = oauthRuntime();
+    expect(() =>
+      resolveKafkaRestArgs({ clusterId: "lkc-1" }, runtime, CONN_ID),
+    ).toThrow(/clusterId.*environmentId.*required.*OAuth/i);
+  });
+
+  it("under OAuth with missing clusterId, throws discovery hint", () => {
+    const runtime = oauthRuntime();
+    expect(() =>
+      resolveKafkaRestArgs({ environmentId: "env-1" }, runtime, CONN_ID),
+    ).toThrow(/clusterId.*environmentId.*required.*OAuth/i);
+  });
+
+  it("under OAuth, returns both args when supplied", () => {
+    const runtime = oauthRuntime();
+    expect(
+      resolveKafkaRestArgs(
+        { clusterId: "lkc-1", environmentId: "env-1" },
+        runtime,
+        CONN_ID,
+      ),
+    ).toEqual({ clusterId: "lkc-1", envId: "env-1" });
+  });
+});
+
+describe("resolveEnvArg", () => {
+  it("under direct, returns the arg when provided", () => {
+    const runtime = directRuntime({
+      kafka: { env_id: "env-from-config" },
+    });
+    expect(resolveEnvArg({ environmentId: "env-arg" }, runtime, CONN_ID)).toBe(
+      "env-arg",
+    );
+  });
+
+  it("under direct, falls back to conn.kafka.env_id", () => {
+    const runtime = directRuntime({
+      kafka: { env_id: "env-from-config" },
+    });
+    expect(resolveEnvArg({}, runtime, CONN_ID)).toBe("env-from-config");
+  });
+
+  it("under direct, throws with kafka.env_id hint when no source supplies a value", () => {
+    const runtime = directRuntime({});
+    expect(() => resolveEnvArg({}, runtime, CONN_ID)).toThrow(
+      /environmentId is required.*kafka\.env_id/,
+    );
+  });
+
+  it("under OAuth, returns the arg when provided", () => {
+    expect(
+      resolveEnvArg({ environmentId: "env-1" }, oauthRuntime(), CONN_ID),
+    ).toBe("env-1");
+  });
+
+  it("under OAuth, throws with list-environments hint when arg is missing", () => {
+    expect(() => resolveEnvArg({}, oauthRuntime(), CONN_ID)).toThrow(
+      /environmentId is required.*list-environments/,
+    );
   });
 });
 

@@ -2,6 +2,7 @@ import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagno
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   provisionTestFlinkStatement,
+  waitForFlinkStatementPhase,
   withSharedFlinkStatementCleanup,
 } from "@tests/harness/flink.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
@@ -32,6 +33,8 @@ describe("query-profiler-handler", { tags: [Tag.FLINK] }, () => {
   beforeAll(async () => {
     await provisionTestFlinkStatement(statementName);
     createdStatements.push(statementName);
+    // profiler reads the task graph, which only materializes once the statement is RUNNING
+    await waitForFlinkStatementPhase(statementName, "RUNNING");
   });
 
   describe.each(activeTransports)("via %s transport", (transport) => {

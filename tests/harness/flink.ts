@@ -1,4 +1,5 @@
 import type { paths } from "@src/confluent/openapi-schema.js";
+import { createRetryOn429Middleware } from "@tests/harness/retry-on-429.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import createClient, { type Client } from "openapi-fetch";
 import { afterAll } from "vitest";
@@ -33,10 +34,14 @@ function newTestFlinkClient(scope: FlinkScope): Client<paths> {
   const basic = Buffer.from(`${scope.authKey}:${scope.authSecret}`).toString(
     "base64",
   );
-  return createClient<paths>({
+  const client = createClient<paths>({
     baseUrl: scope.endpoint,
     headers: { Authorization: `Basic ${basic}` },
   });
+  // smooths transient CCloud rate limiting during full-suite runs (provision/teardown across
+  // many flink test files compounds against the per-account quota)
+  client.use(createRetryOn429Middleware());
+  return client;
 }
 
 /**

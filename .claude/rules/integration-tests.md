@@ -446,9 +446,15 @@ Schema Registry, Flink, Tableflow):
   specific fields (URLs, status codes, IDs) rather than whole object bindings,
   and never pass `process.env` or a full config object to a logger or
   `console.*` call.
-- **Don't call `createClient<paths>(...)` directly in test code**: route
-  every test-side CCloud REST call through `newTestCloudClient()` in
-  `tests/harness/confluent-cloud.ts`. That factory wraps the client with
-  the 429-retry middleware. A new harness helper that builds its own client
-  silently bypasses retry coverage; full-suite runs already push CCloud's
-  per-account quota close to its limit.
+- **Don't build a `Client<paths>` without installing the 429-retry middleware**:
+  every test-side openapi-fetch `Client<paths>` (whether in a test file or
+  inside a harness helper) must call
+  `client.use(createRetryOn429Middleware())` (from
+  `@tests/harness/retry-on-429.js`) before being used. The existing factories
+  under `tests/harness/` already do this; reuse them, or use the higher-level
+  helpers built on top of them, instead of calling `createClient` directly.
+  A new harness helper on a different host or with different creds must
+  mirror the same `client.use(...)` line. A client built without the
+  middleware silently bypasses retry coverage; full-suite runs already push
+  CCloud's per-account quota close to its limit, and provision/teardown
+  traffic compounds across files × transports × the matrix.

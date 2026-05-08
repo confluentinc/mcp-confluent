@@ -1,7 +1,10 @@
 import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { OAUTH_CALLBACK_PATH } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
-import { REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS } from "@src/confluent/oauth/token-lifetimes.js";
+import {
+  CONTROL_PLANE_TOKEN_LIFETIME_MS,
+  REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
+} from "@src/confluent/oauth/token-lifetimes.js";
 import {
   mockFetch,
   mockHttpServer,
@@ -229,6 +232,95 @@ describe("oauth/oauth-holder.ts", () => {
         expect(openSpy).toHaveBeenCalledTimes(2);
         expect(holder.getControlPlaneToken()).toBe("cp-2");
         expect(holder.getDataPlaneToken()).toBe("dp-2");
+      } finally {
+        holder.shutdown();
+      }
+    });
+
+    it("should refresh tokens (without re-launching PKCE) when CP/DP have expired but the refresh token is still alive", async () => {
+      // Edge case from system sleep / clock jump: setTimeout for the refresh
+      // loop is suspended during sleep; on wake, CP/DP are stale until the
+      // queued refresh fires. ensureLoggedIn covers this gap by triggering an
+      // on-demand refresh rather than returning success on a stale ctx.
+      vi.useFakeTimers({ now: 0 });
+      const httpMock = mockHttpServer();
+      const openSpy = mockOpen();
+      stubFullChain(fetchSpy);
+
+      const holder = new OAuthHolder("devel");
+      try {
+        const first = holder.ensureLoggedIn();
+        await completePkce(httpMock, openSpy);
+        await first;
+
+        // Stop the existing refresh-loop timer so it doesn't fire on its own
+        // when we advance time — we're testing the gate's on-demand refresh.
+        const ctx = (holder as unknown as { ctx: AuthContext }).ctx;
+        ctx.stopRefreshLoop();
+
+        // Advance past CP expiry but stay within refresh-family lifetime
+        // (DP has a longer TTL — ~10min — so it's still alive at this
+        // point; the gate correctly triggers refresh on either being
+        // missing, so CP-only expiry is sufficient to exercise the path).
+        vi.setSystemTime(CONTROL_PLANE_TOKEN_LIFETIME_MS + 1);
+        expect(holder.getControlPlaneToken()).toBeUndefined();
+
+        // Stub the refresh-token rotation chain (auth0 + cp + dp).
+        fetchSpy
+          .mockResolvedValueOnce(
+            jsonResponse({
+              id_token: "id-2",
+              refresh_token: "refresh-2",
+              access_token: "access-2",
+              token_type: "Bearer",
+              expires_in: 60,
+            }),
+          )
+          .mockResolvedValueOnce(jsonResponse({ token: "cp-2" }))
+          .mockResolvedValueOnce(jsonResponse({ token: "dp-2" }));
+
+        await holder.ensureLoggedIn();
+
+        // No new PKCE — refresh restored bearer tokens via the refresh-token
+        // grant, no browser launched.
+        expect(openSpy).toHaveBeenCalledOnce();
+        expect(holder.getControlPlaneToken()).toBe("cp-2");
+        expect(holder.getDataPlaneToken()).toBe("dp-2");
+      } finally {
+        holder.shutdown();
+      }
+    });
+
+    it("should reject (without launching PKCE) when refresh fails to restore tokens", async () => {
+      // Refresh attempt fails transiently (e.g., auth0 unreachable). The
+      // gate surfaces a retry-friendly error so the next tool call retries.
+      // Re-PKCE only happens once the failure becomes non-transient.
+      vi.useFakeTimers({ now: 0 });
+      const httpMock = mockHttpServer();
+      const openSpy = mockOpen();
+      stubFullChain(fetchSpy);
+
+      const holder = new OAuthHolder("devel");
+      try {
+        const first = holder.ensureLoggedIn();
+        await completePkce(httpMock, openSpy);
+        await first;
+
+        const ctx = (holder as unknown as { ctx: AuthContext }).ctx;
+        ctx.stopRefreshLoop();
+        vi.setSystemTime(CONTROL_PLANE_TOKEN_LIFETIME_MS + 1);
+
+        // Refresh attempt fails on the first auth0 call.
+        fetchSpy.mockRejectedValueOnce(new Error("network blip"));
+
+        await expect(holder.ensureLoggedIn()).rejects.toThrow(
+          /tokens unavailable/i,
+        );
+
+        // No re-PKCE — gate surfaced an error rather than launch a browser
+        // for what may be a transient network blip.
+        expect(openSpy).toHaveBeenCalledOnce();
+        expect(httpMock.spy).toHaveBeenCalledOnce();
       } finally {
         holder.shutdown();
       }

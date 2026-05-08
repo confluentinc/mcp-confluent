@@ -2,7 +2,11 @@ import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import { generateOpaqueToken } from "@src/confluent/oauth/crypto-utils.js";
 import { hasNonTransientError } from "@src/confluent/oauth/errors.js";
-import { runPkceLogin } from "@src/confluent/oauth/pkce-login.js";
+import {
+  PkceLoginError,
+  runPkceLogin,
+} from "@src/confluent/oauth/pkce-login.js";
+import type { TokenChainResult } from "@src/confluent/oauth/token-chain.js";
 import type {
   Auth0Environment,
   ConfluentTokenSet,
@@ -10,18 +14,15 @@ import type {
 import { logger } from "@src/logger.js";
 
 /**
- * Owns the current {@link AuthContext} reference for the process and gates
- * when PKCE login runs. Construction is side-effect-free; callers drive the
- * lifecycle through {@link ensureLoggedIn}, which the MCP tool-call wrapper
- * invokes lazily before any handler that needs Confluent access.
+ * Owns the process's {@link AuthContext} and lazily drives PKCE on demand.
+ * Construction is side-effect-free; callers go through {@link ensureLoggedIn}.
  *
  * State machine:
- *   - Idle (no ctx, no in-flight login): `ensureLoggedIn()` starts PKCE.
- *   - Logging in: concurrent callers share the cached Promise.
- *   - Logged in (ctx usable): `ensureLoggedIn()` is a no-op.
- *   - Failed / expired (ctx unusable): `ensureLoggedIn()` clears the dead
- *     ctx, transitions back to Idle, and starts a fresh PKCE.
- *   - Shut down: `ensureLoggedIn()` rejects.
+ *   - Idle: starts PKCE.
+ *   - Logging in: concurrent callers share the in-flight Promise.
+ *   - Logged in: no-op (or single-flight refresh if bearer tokens are stale).
+ *   - Failed / refresh-family expired: clears ctx and starts a fresh PKCE.
+ *   - Shut down: rejects.
  */
 export class OAuthHolder {
   private ctx: AuthContext | undefined;
@@ -31,27 +32,17 @@ export class OAuthHolder {
 
   constructor(private readonly env: Auth0Environment) {}
 
-  /** Live control-plane bearer token; `undefined` until `ensureLoggedIn()` resolves. */
   getControlPlaneToken(): string | undefined {
     return this.ctx?.getControlPlaneToken();
   }
 
-  /** Live data-plane bearer token; `undefined` until `ensureLoggedIn()` resolves. */
   getDataPlaneToken(): string | undefined {
     return this.ctx?.getDataPlaneToken();
   }
 
   /**
-   * Ensure the holder has a usable {@link AuthContext}, starting PKCE on
-   * demand. Single-flight: concurrent calls share the same in-flight login.
-   * Replayable: rejects when PKCE fails, but the next call starts a fresh
-   * attempt rather than locking the holder permanently. Rejects after
-   * {@link shutdown}.
-   *
-   * The PKCE failure path resets `inFlightLogin` to `null` (via `.finally`)
-   * so a subsequent caller observes Idle state and can retry. The
-   * AbortController is shared across attempts; once `shutdown()` aborts it,
-   * the holder is permanently terminal.
+   * Ensure the holder has usable bearer tokens, starting PKCE on demand.
+   * Single-flight, replayable after a PKCE failure, rejects after shutdown.
    */
   async ensureLoggedIn(): Promise<void> {
     if (this.cleared) {
@@ -61,19 +52,39 @@ export class OAuthHolder {
       return this.inFlightLogin;
     }
     if (this.ctx) {
-      // Usable contexts are a no-op fast path. Unusable contexts (refresh
-      // family expired, non-transient error recorded) are cleared so the
-      // next steps start from a clean Idle state. Atomically clearing here
-      // — before the await on `runLogin()` — ensures concurrent callers
-      // don't race into two parallel PKCE flows after a state transition.
       if (
-        !this.ctx.refreshTokenExpired() &&
-        !hasNonTransientError(this.ctx.getErrors())
+        this.ctx.refreshTokenExpired() ||
+        hasNonTransientError(this.ctx.getErrors())
+      ) {
+        this.ctx.clear();
+        this.ctx = undefined;
+        // fall through to PKCE
+      } else if (
+        this.ctx.getControlPlaneToken() !== undefined &&
+        this.ctx.getDataPlaneToken() !== undefined
       ) {
         return;
+      } else {
+        // Refresh token alive but bearer tokens stale (e.g., system sleep
+        // suspended the refresh-loop tick). Refresh on demand rather than
+        // re-prompt; `AuthContext.refresh()` joins any in-flight refresh.
+        await this.ctx.refresh();
+        if (this.cleared) {
+          throw new Error("OAuthHolder is shut down");
+        }
+        if (
+          this.ctx.getControlPlaneToken() !== undefined &&
+          this.ctx.getDataPlaneToken() !== undefined
+        ) {
+          return;
+        }
+        // Refresh didn't restore tokens. Surface a retry-friendly error
+        // rather than launch a browser; if the failure becomes
+        // non-transient, the next call falls through to PKCE.
+        throw new Error(
+          "OAuth bearer tokens unavailable after refresh; retry the tool call",
+        );
       }
-      this.ctx.clear();
-      this.ctx = undefined;
     }
     this.inFlightLogin = this.runLogin().finally(() => {
       this.inFlightLogin = null;
@@ -82,9 +93,8 @@ export class OAuthHolder {
   }
 
   /**
-   * Stops the refresh loop, clears the held context, and aborts any
-   * in-flight PKCE login. Idempotent. Once shut down, `ensureLoggedIn()`
-   * rejects — the holder is terminal.
+   * Terminal — clears ctx (which stops the refresh loop) and aborts any
+   * in-flight PKCE. Idempotent.
    */
   shutdown(): void {
     this.ctx?.clear();
@@ -96,10 +106,21 @@ export class OAuthHolder {
   private async runLogin(): Promise<void> {
     const auth0Config = getAuth0Config(this.env);
     logger.info({ env: this.env }, "Starting OAuth login");
-    const tokenChain = await runPkceLogin(
-      auth0Config,
-      this.abortController.signal,
-    );
+    let tokenChain: TokenChainResult;
+    try {
+      tokenChain = await runPkceLogin(auth0Config, this.abortController.signal);
+    } catch (err) {
+      // The MCP tool-call wrapper rethrows but doesn't log; surface the
+      // failure here so server stderr captures the cause (timeout,
+      // port_in_use, configuration, user_aborted).
+      if (this.cleared) {
+        logger.info({ env: this.env }, "OAuth login aborted by shutdown");
+      } else {
+        const reason = err instanceof PkceLoginError ? err.reason : undefined;
+        logger.error({ env: this.env, err, reason }, "OAuth login failed");
+      }
+      throw err;
+    }
     if (this.cleared) {
       // shutdown() raced with PKCE completion — discard the tokens we just
       // obtained rather than attaching them to a holder that's been

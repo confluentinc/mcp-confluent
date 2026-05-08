@@ -38,6 +38,15 @@ export interface ToolHandler {
   getToolConfig(): ToolConfig;
 
   /**
+   * The connection predicate that gates this tool's enablement. Lifted onto
+   * the interface so the MCP tool-call wrapper can compare it against
+   * `alwaysEnabled` to skip the OAuth login gate for tools that don't touch
+   * the client manager (currently the doc-lookup tools). See
+   * {@linkcode BaseToolHandler.predicate} for the rules around setting it.
+   */
+  readonly predicate: ConnectionPredicate;
+
+  /**
    * IDs of connections that satisfy this tool's service requirements. A
    * non-empty result enables the tool; an empty result disables it. Always a
    * subset of `runtime.config.connections` keys.

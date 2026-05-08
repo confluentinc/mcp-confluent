@@ -238,7 +238,7 @@ The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead 
 
 ### How it works
 
-On startup, the server opens your browser to the Confluent Cloud sign-in page and waits for the redirect callback. Supported tools begin working only after sign-in completes — calls made before then will fail with an `"OAuth token is not currently available"` error.
+On the first tool call that needs Confluent access, the server opens your browser to the Confluent Cloud sign-in page and waits for the redirect callback. Subsequent tool calls reuse the resulting session.
 
 ### YAML setup
 
@@ -250,7 +250,7 @@ connections:
     type: oauth
 ```
 
-Run with `--config oauth.yaml` and the browser sign-in opens on first start.
+Run with `--config oauth.yaml`. The server starts immediately; the browser sign-in opens on the first tool call that needs Confluent access.
 
 ### Supported tools under OAuth
 

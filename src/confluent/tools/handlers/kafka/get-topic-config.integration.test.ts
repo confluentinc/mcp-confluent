@@ -52,7 +52,6 @@ describe("get-topic-config", { tags: [Tag.KAFKA] }, () => {
         },
       });
 
-      expect(result.isError).not.toBe(true);
       // handler embeds a JSON blob with both topicDetails and topicConfig
       const text = textContent(result);
       expect(text).toContain(`Topic configuration for '${topic}'`);

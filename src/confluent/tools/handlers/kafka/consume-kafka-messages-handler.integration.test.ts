@@ -75,8 +75,6 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
         },
       });
 
-      expect(result.isError).not.toBe(true);
-
       const text = textContent(result);
       expect(text).toMatch(/^Consumed \d+ messages/);
       for (const value of seededValues) {

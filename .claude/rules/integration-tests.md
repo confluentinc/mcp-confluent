@@ -171,7 +171,6 @@ describe("my-handler", { tags: [Tag.KAFKA] }, () => {
         name: ToolName.MY_TOOL,
         arguments: {},
       });
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(/expected prefix/);
     });
   });
@@ -196,6 +195,42 @@ expect(textContent(result)).toMatch(/^Kafka topics:/);
 practice the helper returns that block's text. For typed payloads, prefer
 `result.structuredContent` when the handler sets `_meta` via its third arg.
 
+**Verify response shape before writing a parser.** Handlers often
+re-stringify external API payloads verbatim, and the on-the-wire shape can
+differ from what the handler's source suggests. When a test needs to parse
+text content into structured data, run the tool once with
+`console.error(textContent(result))` to capture the actual shape, then write
+the parser against that. Remove the diagnostic before commit. (E.g.
+`list-flink-databases` emits Flink SQL row payloads of shape
+`{ row: [...] }`, not column-named objects.)
+
+### When to assert `isError` explicitly
+
+**Skip the explicit `isError` check by default.** When the next assertion is
+`expect(textContent(result)).toMatch/toContain/toBe(...)`, the matcher's
+failure output already shows `received: "<actual error text>"`, because
+errors and successes share the same text content block
+(`BaseToolHandler.createResponse(msg, true)` puts the error message in
+`content[0].text`). A separate `expect(result.isError).not.toBe(true)` line
+adds noise without surfacing anything new.
+
+Reach for an explicit check only when the next assertion would shadow or
+destroy the error text:
+
+- The next assertion polls a separate resource (e.g.
+  `expect.poll(() => admin.listTopics()).toContain(topic)`). The handler's
+  error never reaches that matcher, so a failed call silently times out.
+- The next step parses the response (e.g.
+  `JSON.parse(textContent(result))`). A non-JSON error body throws a cryptic
+  `SyntaxError` with no original message.
+
+For those cases, use vitest's inline `expect(value, message)` form so the
+error text rides along with the failure (no helper needed):
+
+```ts
+expect(result.isError, textContent(result)).not.toBe(true);
+```
+
 ## Skip Pattern for Missing Credentials
 
 Do **NOT** use `describe.skipIf(!hasCreds)`. In vitest 4 it marks tests as
@@ -205,6 +240,28 @@ harness's server spawn then hits the hook timeout.
 
 Use the early-return pattern shown above: a plain `if (!hasCreds) { it.skip(reason); return; }` at the top of the describe body. The placeholder
 `it.skip()` keeps the file visible in vitest reports with a clear reason line.
+
+### Runtime preconditions vs file-load gates
+
+The skip above runs at file-load time against the parsed YAML. Some
+preconditions can only be evaluated _after_ the MCP server starts (e.g.,
+"the configured kafka cluster is catalogued in the Flink workspace" requires
+calling a tool to find out). Two options for those:
+
+- **Assertion (preferred when the precondition is supposed to hold).** Inline
+  `expect(value, "<actionable message>").toBeDefined()` (or
+  `.not.toBe(true)`, etc.) so a CI failure points at the env regression that
+  needs fixing. The custom message is the second arg to `expect`, not the
+  matcher.
+- **`ctx.skip(reason)` (only when the precondition genuinely may not hold).**
+  In vitest 4, `it("...", async (ctx) => { if (...) ctx.skip(...); ... })`
+  is the canonical mid-test skip. Use this only when "skipped" is a
+  legitimate outcome, not as a way to swallow a real failure. Silent green
+  on a broken env is exactly the failure mode this project warns against.
+
+When in doubt, prefer the assertion: an actionable failure message that
+names what to fix is more valuable than a green test run that hides the
+problem.
 
 ## Credential Gating by Tool Domain
 
@@ -415,9 +472,15 @@ Schema Registry, Flink, Tableflow):
   specific fields (URLs, status codes, IDs) rather than whole object bindings,
   and never pass `process.env` or a full config object to a logger or
   `console.*` call.
-- **Don't call `createClient<paths>(...)` directly in test code**: route
-  every test-side CCloud REST call through `newTestCloudClient()` in
-  `tests/harness/confluent-cloud.ts`. That factory wraps the client with
-  the 429-retry middleware. A new harness helper that builds its own client
-  silently bypasses retry coverage; full-suite runs already push CCloud's
-  per-account quota close to its limit.
+- **Don't build a `Client<paths>` without installing the 429-retry middleware**:
+  every test-side openapi-fetch `Client<paths>` (whether in a test file or
+  inside a harness helper) must call
+  `client.use(createRetryOn429Middleware())` (from
+  `@tests/harness/retry-on-429.js`) before being used. The existing factories
+  under `tests/harness/` already do this; reuse them, or use the higher-level
+  helpers built on top of them, instead of calling `createClient` directly.
+  A new harness helper on a different host or with different creds must
+  mirror the same `client.use(...)` line. A client built without the
+  middleware silently bypasses retry coverage; full-suite runs already push
+  CCloud's per-account quota close to its limit, and provision/teardown
+  traffic compounds across files × transports × the matrix.

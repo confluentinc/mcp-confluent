@@ -49,7 +49,6 @@ describe("query-metrics-handler", { tags: [Tag.METRICS] }, () => {
         },
       });
 
-      expect(result.isError).not.toBe(true);
       // idle cluster may show "No data returned for metric"
       expect(textContent(result)).toMatch(
         /^(Metrics Query Results|No data returned for metric)/,

@@ -60,7 +60,6 @@ describe("alter-topic-config", { tags: [Tag.KAFKA] }, () => {
         },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(/Successfully altered topic config/);
     });
   });

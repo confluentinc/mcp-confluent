@@ -1070,7 +1070,7 @@ describe("config/env-config.ts", () => {
         expect(conn).toEqual({ type: "oauth", ccloud_env: "devel" });
       });
 
-      describe("server-block validation failures (closes #404 coverage gap)", () => {
+      describe("server-block validation failures", () => {
         // The OAuth path constructs `{ type: "oauth" }` for the connection plus
         // a server block from env vars; if Zod rejects the manufactured config,
         // env-config.ts throws via a *different* branch than the direct path

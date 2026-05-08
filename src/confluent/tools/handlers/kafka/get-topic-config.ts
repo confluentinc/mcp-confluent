@@ -4,8 +4,8 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { resolveKafkaRestArgs } from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { kafkaRestWithAuthOrOAuth } from "@src/confluent/tools/connection-predicates.js";
-import { resolveKafkaRestArgs } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -26,7 +26,7 @@ const getTopicConfigArguments = z.object({
     .string()
     .optional()
     .describe(
-      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments",
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments.",
     ),
 });
 
@@ -41,9 +41,8 @@ export class GetTopicConfigHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = getTopicConfigArguments.parse(toolArguments);
-    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
     const { clusterId, envId } = resolveKafkaRestArgs(parsed, runtime, connId);
-    const clientManager = runtime.clientManagers[connId]!;
 
     const restClient = await clientManager.getConfluentCloudKafkaRestClient(
       clusterId,

@@ -9,24 +9,12 @@ import { describe, expect, it, vi } from "vitest";
 describe("oauth-client-manager.ts", () => {
   describe("OAuthClientManager", () => {
     function buildManager(): OAuthClientManager {
-      // OAuthHolder has a private constructor (factory pattern via .start()),
-      // so we widen the constructor signature for createMockInstance which
-      // expects an externally-callable ctor.
-      const holder = createMockInstance(
-        OAuthHolder as unknown as new (...args: never[]) => OAuthHolder,
-      );
-      // OAuthHolder.bootstrapPromise is an instance field set in the real
-      // constructor, which createMockInstance bypasses. Define it here so
-      // the OAuth manager's `await this.holder.bootstrapPromise` resolves.
-      Object.defineProperty(holder, "bootstrapPromise", {
-        value: Promise.resolve(),
-        writable: true,
-        configurable: true,
-      });
-      // Provide a non-empty data-plane token so buildOAuthKafkaClient passes
-      // its post-bootstrap guard.
+      const holder = createMockInstance(OAuthHolder);
+      // Provide a non-empty data-plane token so the post-gate guard in
+      // requireDataPlaneToken passes (the gate would have populated it
+      // before any tool call reaches this manager in production).
       holder.getDataPlaneToken.mockReturnValue("dpat");
-      return new OAuthClientManager(holder as unknown as OAuthHolder, "devel");
+      return new OAuthClientManager(holder, "devel");
     }
 
     describe("getKafkaAdminClient()", () => {
@@ -254,28 +242,18 @@ describe("oauth-client-manager.ts", () => {
         );
       });
 
-      it("should throw when DPAT is unavailable after bootstrap", async () => {
+      it("should throw when DPAT is unavailable", async () => {
         // Symmetric with the Kafka-side guard — prevents constructing an SR
         // SDK client with `Authorization: Bearer ` (empty) baked into axios
-        // defaults during initial login or after a non-transient refresh
-        // failure.
-        const holder = createMockInstance(
-          OAuthHolder as unknown as new (...args: never[]) => OAuthHolder,
-        );
-        Object.defineProperty(holder, "bootstrapPromise", {
-          value: Promise.resolve(),
-          writable: true,
-          configurable: true,
-        });
+        // defaults if the holder has been cleared or hit a non-transient
+        // refresh failure between the gate check and this method.
+        const holder = createMockInstance(OAuthHolder);
         holder.getDataPlaneToken.mockReturnValue(undefined);
-        const manager = new OAuthClientManager(
-          holder as unknown as OAuthHolder,
-          "devel",
-        );
+        const manager = new OAuthClientManager(holder, "devel");
 
         await expect(
           manager.getSchemaRegistrySdkClient("lsrc-1", "env-1"),
-        ).rejects.toThrow("OAuth login did not produce a data-plane token");
+        ).rejects.toThrow("No data-plane token available");
       });
 
       it("should build a SchemaRegistryClient against the resolved endpoint", async () => {
@@ -347,16 +325,18 @@ describe("oauth-client-manager.ts", () => {
     });
 
     describe("requireDataPlaneToken (via getConfluentCloudKafkaRestClient)", () => {
-      it("should reject with a descriptive error when bootstrap completes without a DPAT", async () => {
+      it("should reject with a descriptive error when no DPAT is available", async () => {
         const manager = buildManager();
-        // Override the holder's DPAT to be empty even after bootstrap.
+        // Override the holder's DPAT to be empty (e.g., shutdown raced with
+        // the tool call, or a non-transient refresh error invalidated the
+        // token between the gate and this accessor).
         manager["holder"].getDataPlaneToken = vi
           .fn()
           .mockReturnValue(undefined);
 
         await expect(
           manager.getConfluentCloudKafkaRestClient("lkc-1", "env-1"),
-        ).rejects.toThrow(/OAuth login did not produce a data-plane token/);
+        ).rejects.toThrow(/No data-plane token available/);
       });
     });
 

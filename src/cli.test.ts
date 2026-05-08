@@ -343,6 +343,22 @@ describe("cli.ts", () => {
       expect(parseCliArgs(makeArgs([])).initConfig).toBe(false);
     });
 
+    it("should set initOauthConfig to true when --init-oauth-config is specified", () => {
+      expect(
+        parseCliArgs(makeArgs(["--init-oauth-config"])).initOauthConfig,
+      ).toBe(true);
+    });
+
+    it("should leave initOauthConfig false when --init-oauth-config is not specified", () => {
+      expect(parseCliArgs(makeArgs([])).initOauthConfig).toBe(false);
+    });
+
+    it("should throw when both --init-config and --init-oauth-config are supplied", () => {
+      expect(() =>
+        parseCliArgs(makeArgs(["--init-config", "--init-oauth-config"])),
+      ).toThrow(/mutually exclusive/);
+    });
+
     it("should parse --allowed-hosts into a lowercased array", () => {
       const result = parseCliArgs(
         makeArgs(["--allowed-hosts", "Localhost,127.0.0.1,MyHost.local"]),

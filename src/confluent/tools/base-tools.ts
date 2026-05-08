@@ -1,4 +1,6 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
+import type { ConnectionConfig } from "@src/config/models.js";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   ConnectionPredicate,
@@ -136,6 +138,29 @@ export abstract class BaseToolHandler implements ToolHandler {
         this.predicate(conn),
       ]),
     );
+  }
+
+  /**
+   * Resolves the single connection enabled for this tool, returning the
+   * connection id, its config, and the matching client manager. Designed
+   * for handlers that look up `runtime.clientManagers[connId]` (multi-
+   * connection-ready shape).
+   *
+   * Selects `enabledConnectionIds(runtime)[0]` — current runtime is single-
+   * connection, so this is unambiguous; if multi-connection support lands
+   * later, handlers can switch to iterating ids.
+   */
+  protected resolveSoleConnection(runtime: ServerRuntime): {
+    connId: string;
+    conn: ConnectionConfig;
+    clientManager: BaseClientManager;
+  } {
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    return {
+      connId,
+      conn: runtime.config.connections[connId]!,
+      clientManager: runtime.clientManagers[connId]!,
+    };
   }
 
   /**

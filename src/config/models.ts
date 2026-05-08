@@ -30,7 +30,7 @@ export interface DirectConnectionConfig {
  * inside the `ConnectionConfig` discriminated union. The CCloud REST URL is
  * derived from `ccloud_env` via `getCloudRestUrlForEnv` inside
  * `OAuthClientManager`. No service blocks; OAuth-eligible tools auto-enable
- * because `hasConfluentCloud` widens to return `true` for OAuth connections
+ * because `hasConfluentCloudOrOAuth` widens to return `true` for OAuth connections
  * (see `connection-predicates.ts`). Resource IDs that direct connections
  * supply via blocks must be passed as tool arguments under OAuth.
  *

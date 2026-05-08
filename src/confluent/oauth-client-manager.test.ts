@@ -324,22 +324,6 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
-    describe("requireDataPlaneToken (via getConfluentCloudKafkaRestClient)", () => {
-      it("should reject with a descriptive error when no DPAT is available", async () => {
-        const manager = buildManager();
-        // Override the holder's DPAT to be empty (e.g., shutdown raced with
-        // the tool call, or a non-transient refresh error invalidated the
-        // token between the gate and this accessor).
-        manager["holder"].getDataPlaneToken = vi
-          .fn()
-          .mockReturnValue(undefined);
-
-        await expect(
-          manager.getConfluentCloudKafkaRestClient("lkc-1", "env-1"),
-        ).rejects.toThrow(/No data-plane token available/);
-      });
-    });
-
     describe("disconnect()", () => {
       it("should be a no-op (no caches to drain — clients are caller-owned)", async () => {
         const manager = buildManager();

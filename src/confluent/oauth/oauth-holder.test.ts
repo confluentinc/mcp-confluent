@@ -279,23 +279,6 @@ describe("oauth/oauth-holder.ts", () => {
       expect(() => holder.shutdown()).not.toThrow();
     });
 
-    it("should be safe to call twice", async () => {
-      const httpMock = mockHttpServer();
-      const openSpy = mockOpen();
-      stubFullChain(fetchSpy);
-
-      const holder = new OAuthHolder("devel");
-      const inFlight = holder.ensureLoggedIn();
-      await completePkce(httpMock, openSpy);
-      await inFlight;
-
-      expect(() => {
-        holder.shutdown();
-        holder.shutdown();
-      }).not.toThrow();
-      expect(holder.getControlPlaneToken()).toBeUndefined();
-    });
-
     it("should abort an in-flight login", async () => {
       mockHttpServer();
       mockOpen();

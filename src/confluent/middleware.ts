@@ -42,7 +42,6 @@ export const createBearerMiddleware = (
 
 export interface ConfluentEndpoints {
   cloud?: string;
-  tableflow?: string;
   flink?: string;
   schemaRegistry?: string;
   kafka?: string;

@@ -41,8 +41,19 @@ export interface ConfluentCloudRestClientManager {
     paths,
     `${string}/${string}`
   >;
-  /** Gets a configured REST client for Confluent Cloud Kafka operations */
-  getConfluentCloudKafkaRestClient(): Client<paths, `${string}/${string}`>;
+  /**
+   * Gets a configured REST client for Confluent Cloud Kafka operations.
+   *
+   * Under direct, args are ignored and the eagerly-built singleton is returned
+   * (its baseUrl was set from `conn.kafka.rest_endpoint` at construction).
+   * Under OAuth, both `clusterId` and `envId` are required: a fresh client is
+   * built per call against the resolved `spec.http_endpoint` for the given
+   * cluster.
+   */
+  getConfluentCloudKafkaRestClient(
+    clusterId?: string,
+    envId?: string,
+  ): Promise<Client<paths, `${string}/${string}`>>;
   /** Gets a configured REST client for Confluent Cloud Telemetry/Metrics API */
   getConfluentCloudTelemetryRestClient(): Client<paths, `${string}/${string}`>;
 }

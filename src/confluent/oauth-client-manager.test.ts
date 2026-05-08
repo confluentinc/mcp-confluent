@@ -35,7 +35,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getKafkaAdminClient(undefined, "env-1"),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -44,7 +44,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getKafkaAdminClient("lkc-1", undefined),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -122,7 +122,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getKafkaProducer(undefined, "env-1"),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -131,7 +131,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getKafkaProducer("lkc-1", undefined),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -163,7 +163,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.buildKafkaConsumer(undefined, "env-1"),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -172,7 +172,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.buildKafkaConsumer("lkc-1", undefined),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -241,7 +241,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getSchemaRegistrySdkClient(undefined, "env-1"),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -250,7 +250,7 @@ describe("oauth-client-manager.ts", () => {
         await expect(
           manager.getSchemaRegistrySdkClient("lsrc-1", undefined),
         ).rejects.toThrow(
-          "cluster_id and environment_id are required under --oauth",
+          "OAuth client construction requires a cluster id and environment id",
         );
       });
 
@@ -295,6 +295,52 @@ describe("oauth-client-manager.ts", () => {
         expect(resolvers.resolveSchemaRegistryEndpoint).toHaveBeenCalledWith(
           expect.anything(),
           "lsrc-1",
+          "env-1",
+        );
+      });
+    });
+
+    describe("getConfluentCloudKafkaRestClient()", () => {
+      it("should reject when cluster_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getConfluentCloudKafkaRestClient(undefined, "env-1"),
+        ).rejects.toThrow(
+          "OAuth client construction requires a cluster id and environment id",
+        );
+      });
+
+      it("should reject when environment_id is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getConfluentCloudKafkaRestClient("lkc-1", undefined),
+        ).rejects.toThrow(
+          "OAuth client construction requires a cluster id and environment id",
+        );
+      });
+
+      it("should build a fresh REST client per call against the resolved http_endpoint", async () => {
+        vi.spyOn(resolvers, "resolveKafkaRestEndpoint").mockResolvedValue(
+          "https://pkc-xxxxx.us-east-1.aws.confluent.cloud:443",
+        );
+
+        const manager = buildManager();
+        const c1 = await manager.getConfluentCloudKafkaRestClient(
+          "lkc-1",
+          "env-1",
+        );
+        const c2 = await manager.getConfluentCloudKafkaRestClient(
+          "lkc-1",
+          "env-1",
+        );
+
+        expect(c1).toBeDefined();
+        expect(c2).toBeDefined();
+        expect(c1).not.toBe(c2);
+        expect(resolvers.resolveKafkaRestEndpoint).toHaveBeenCalledTimes(2);
+        expect(resolvers.resolveKafkaRestEndpoint).toHaveBeenCalledWith(
+          expect.anything(),
+          "lkc-1",
           "env-1",
         );
       });

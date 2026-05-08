@@ -259,6 +259,16 @@ export const kafkaBootstrapOrOAuth: ConnectionPredicate =
   widenForOAuth(hasKafkaBootstrap);
 
 /**
+ * The Kafka REST client gate, widened to admit OAuth. Direct connections still
+ * need both `kafka.rest_endpoint` and `kafka.auth`; OAuth connections satisfy
+ * it unconditionally (the per-cluster REST URL is resolved at call time via
+ * the cmk REST API and the bearer middleware handles auth). Use on REST-tool
+ * handlers (`get-topic-config`, `alter-topic-config`).
+ */
+export const kafkaRestWithAuthOrOAuth: ConnectionPredicate =
+  widenForOAuth(hasKafkaRestWithAuth);
+
+/**
  * Gate for tools that create connectors against the direct Confluent Cloud
  * REST surface: requires both a `confluent_cloud` block (the `/connect/v1`
  * endpoint) and `kafka.auth` (the connector spec carries kafka API

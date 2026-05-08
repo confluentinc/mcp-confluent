@@ -687,7 +687,7 @@ describe("config/models.ts", () => {
       it("should throw when the sole connection is OAuth-typed", () => {
         const config = new MCPServerConfiguration({
           connections: {
-            "env-connection": { type: "oauth", ccloud_env: "devel" },
+            _default: { type: "oauth", ccloud_env: "devel" },
           },
         });
 

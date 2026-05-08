@@ -64,12 +64,12 @@ describe("config/env-config.ts", () => {
         expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
       });
 
-      it("should use 'env-connection' as the connection name", () => {
+      it("should use '_default' as the connection name", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({ BOOTSTRAP_SERVERS: "localhost:9092" }),
         );
 
-        expect(Object.keys(config.connections)).toEqual(["env-connection"]);
+        expect(Object.keys(config.connections)).toEqual(["_default"]);
       });
 
       it("should build a kafka-only config when only BOOTSTRAP_SERVERS is set", () => {

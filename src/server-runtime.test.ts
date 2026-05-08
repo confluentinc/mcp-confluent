@@ -232,7 +232,7 @@ describe("ServerRuntime", () => {
     it("should leave oauthHolder undefined when the config has no ccloud-oauth", () => {
       const noOauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": connWith({
+          _default: connWith({
             kafka: { bootstrap_servers: "broker:9092" },
           }),
         },
@@ -249,7 +249,7 @@ describe("ServerRuntime", () => {
 
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": { type: "oauth", ccloud_env: "devel" },
+          _default: { type: "oauth", ccloud_env: "devel" },
         },
       });
 
@@ -263,13 +263,13 @@ describe("ServerRuntime", () => {
       vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": { type: "oauth", ccloud_env: "stag" },
+          _default: { type: "oauth", ccloud_env: "stag" },
         },
       });
 
       const runtime = ServerRuntime.fromConfig(oauthConfig);
 
-      expect(runtime.clientManagers["env-connection"]).toBeInstanceOf(
+      expect(runtime.clientManagers["_default"]).toBeInstanceOf(
         OAuthClientManager,
       );
     });

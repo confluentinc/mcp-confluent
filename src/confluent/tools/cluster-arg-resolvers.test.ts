@@ -13,7 +13,7 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
 
-const CONN_ID = "env-connection";
+const CONN_ID = "_default";
 
 function directRuntime(
   connOverrides: Record<string, unknown> = {},

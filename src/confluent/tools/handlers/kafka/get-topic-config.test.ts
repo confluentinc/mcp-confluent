@@ -24,10 +24,16 @@ describe("get-topic-config.ts", () => {
           connectionConfig: {},
         },
         {
-          label: "throws when clusterId is absent and not in connection config",
+          label:
+            "throws when clusterId arg absent and conn.kafka.cluster_id missing",
           args: { topicName: "my-topic" },
-          outcome: { throws: "Kafka Cluster ID is required" },
-          connectionConfig: {},
+          outcome: { throws: "clusterId is required" },
+          connectionConfig: {
+            kafka: {
+              rest_endpoint: "https://kafka-rest.example.com",
+              auth: { type: "api_key", key: "k", secret: "s" },
+            },
+          },
         },
         {
           label:
@@ -48,9 +54,9 @@ describe("get-topic-config.ts", () => {
           const clientManager = getMockedClientManager();
           // handler does two GETs (topic details, then topic config) and stringifies the combined
           // result, so an empty object is fine here
-          clientManager
-            .getConfluentCloudKafkaRestClient()
-            .GET.mockResolvedValue({ data: {} });
+          const restClient =
+            await clientManager.getConfluentCloudKafkaRestClient();
+          restClient.GET.mockResolvedValue({ data: {} });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(

@@ -37,6 +37,48 @@ export function resolveKafkaClusterArgs(
 }
 
 /**
+ * REST-tool variant of {@link resolveKafkaClusterArgs}. The Kafka REST API
+ * places `cluster_id` directly in the URL path
+ * (e.g. `/kafka/v3/clusters/{id}/topics`), so the handler always needs a
+ * concrete cluster id — even on direct connections that omit the arg and
+ * rely on the configured fallback.
+ *
+ * Direct: `args.clusterId ?? conn.kafka?.cluster_id`; throws if neither.
+ *   `envId` is unused (direct's `kafka.rest_endpoint` already targets the
+ *   per-cluster hostname).
+ * OAuth: both `clusterId` and `environmentId` required. Argument names are
+ *   camelCase to match the existing input-schema convention of these tools
+ *   and `list-clusters`; the native-Kafka tools' snake_case `cluster_id` is
+ *   a separate convention.
+ */
+export function resolveKafkaRestArgs(
+  args: { clusterId?: string; environmentId?: string },
+  runtime: ServerRuntime,
+  connId: string,
+): { clusterId: string; envId: string | undefined } {
+  const conn = runtime.config.connections[connId]!;
+
+  if (conn.type === "direct") {
+    const clusterId = args.clusterId ?? conn.kafka?.cluster_id;
+    if (!clusterId) {
+      throw new Error(
+        "clusterId is required: pass it as a tool argument or set kafka.cluster_id in the connection config.",
+      );
+    }
+    return { clusterId, envId: undefined };
+  }
+
+  if (!args.clusterId || !args.environmentId) {
+    throw new Error(
+      "clusterId and environmentId are required under OAuth connection type. " +
+        "Discover the environment via list-environments, then call list-clusters " +
+        "with environmentId and pass the cluster's `id` and `spec.environment.id`.",
+    );
+  }
+  return { clusterId: args.clusterId, envId: args.environmentId };
+}
+
+/**
  * Disposes a Kafka client (admin or producer) iff the connection is OAuth-typed.
  * On direct connections this is a no-op — direct's `AsyncLazy` admin/producer
  * are manager-owned singletons and must not be disconnected by handlers. On

@@ -43,23 +43,6 @@ export class TransportManager {
 
   constructor(private readonly config?: TransportManagerConfig) {}
 
-  /**
-   * Returns the cached stdio {@link McpServer}, creating it lazily on first call. HTTP and SSE
-   * mint a fresh server per session inside their respective transports, so neither is cached here.
-   *
-   * @internal Production callers go through {@linkcode TransportManager.start}; exposed so unit
-   *   tests can assert the per-transport invariant directly.
-   */
-  getServer(
-    transport: TransportType.STDIO,
-    serverOptions: CreateMcpServerOptions,
-  ): McpServer {
-    switch (transport) {
-      case TransportType.STDIO:
-        return (this.stdioServer ??= createMcpServer(serverOptions));
-    }
-  }
-
   async start(options: TransportStartOptions): Promise<void> {
     const { serverOptions, types, http } = options;
     try {
@@ -180,8 +163,10 @@ export class TransportManager {
           http?.sseMessageEndpointPath,
         );
       case TransportType.STDIO:
+        // stdio is single-client by construction (one process, one stdin/stdout pair), so we
+        // cache one McpServer for the lifetime of the manager rather than minting per session
         return new StdioTransport(
-          this.getServer(TransportType.STDIO, serverOptions),
+          (this.stdioServer ??= createMcpServer(serverOptions)),
         );
       default:
         throw new Error(`Unsupported transport type: ${type}`);

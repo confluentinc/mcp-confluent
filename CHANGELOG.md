@@ -8,7 +8,6 @@ All notable changes to this MCP server will be documented in this file.
 
 - Removed `baseUrl` invocation parameter from all tool definitions. Now any API non-defaulting endpoint URLs must be provided through environment variable configuration prior to MCP server startup.
 - MCP tool annotations (`readOnlyHint`, `destructiveHint`) for all tools to enable AI clients to distinguish between read-only operations (e.g., `list-topics`) and destructive operations (e.g., `delete-topics`, `delete-schema`).
-- Direct connections no longer require at least one service block. A connection with no blocks enables only connection-agnostic tools.
 
 ### Removed
 

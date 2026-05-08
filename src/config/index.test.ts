@@ -124,7 +124,7 @@ describe("config/index.ts", () => {
       );
     });
 
-    it("should accept a direct connection with no service blocks (docs-only setup)", () => {
+    it("should accept a direct connection with no service blocks", () => {
       const yamlContent = `connections:
   local:
     type: "direct"

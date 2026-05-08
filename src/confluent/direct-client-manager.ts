@@ -159,7 +159,6 @@ export function constructDirectClientManager(
   return new DirectClientManager({
     kafka: kafkaClientConfig,
     endpoints: {
-      // BaseClientManager uses this as the Tableflow base URL too (see its constructor), so always supply the default.
       cloud: conn.confluent_cloud?.endpoint ?? CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
       flink: conn.flink?.endpoint,
       schemaRegistry: conn.schema_registry?.endpoint,

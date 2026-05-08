@@ -16,7 +16,7 @@ const listClustersArguments = z.object({
     .string()
     .optional()
     .describe(
-      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments",
     ),
 });
 

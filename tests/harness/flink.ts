@@ -2,7 +2,14 @@ import type { paths } from "@src/confluent/openapi-schema.js";
 import { createRetryOn429Middleware } from "@tests/harness/retry-on-429.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import createClient, { type Client } from "openapi-fetch";
-import { afterAll } from "vitest";
+import { afterAll, expect } from "vitest";
+
+type FlinkStatementPhase =
+  | "PENDING"
+  | "RUNNING"
+  | "COMPLETED"
+  | "FAILED"
+  | "STOPPED";
 
 interface FlinkScope {
   organizationId: string;
@@ -81,6 +88,42 @@ export async function provisionTestFlinkStatement(
       `failed to provision test flink statement ${name}: ${JSON.stringify(error)}`,
     );
   }
+}
+
+/** Polls the statement state endpoint until phase matches `targetPhase` or the timeout fires. */
+export async function waitForFlinkStatementPhase(
+  name: string,
+  targetPhase: FlinkStatementPhase,
+  opts: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<void> {
+  const { timeoutMs = 30_000, intervalMs = 2_000 } = opts;
+  const scope = getFlinkScope();
+  const client = newTestFlinkClient(scope);
+  await expect
+    .poll(
+      async () => {
+        const { data, error } = await client.GET(
+          "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements/{statement_name}",
+          {
+            params: {
+              path: {
+                organization_id: scope.organizationId,
+                environment_id: scope.environmentId,
+                statement_name: name,
+              },
+            },
+          },
+        );
+        if (error) {
+          throw new Error(
+            `failed to GET flink statement ${name}: ${JSON.stringify(error)}`,
+          );
+        }
+        return data?.status?.phase;
+      },
+      { timeout: timeoutMs, interval: intervalMs },
+    )
+    .toBe(targetPhase);
 }
 
 /**

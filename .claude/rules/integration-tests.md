@@ -171,7 +171,6 @@ describe("my-handler", { tags: [Tag.KAFKA] }, () => {
         name: ToolName.MY_TOOL,
         arguments: {},
       });
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(/expected prefix/);
     });
   });
@@ -204,6 +203,33 @@ text content into structured data, run the tool once with
 the parser against that. Remove the diagnostic before commit. (E.g.
 `list-flink-databases` emits Flink SQL row payloads of shape
 `{ row: [...] }`, not column-named objects.)
+
+### When to assert `isError` explicitly
+
+**Skip the explicit `isError` check by default.** When the next assertion is
+`expect(textContent(result)).toMatch/toContain/toBe(...)`, the matcher's
+failure output already shows `received: "<actual error text>"`, because
+errors and successes share the same text content block
+(`BaseToolHandler.createResponse(msg, true)` puts the error message in
+`content[0].text`). A separate `expect(result.isError).not.toBe(true)` line
+adds noise without surfacing anything new.
+
+Reach for an explicit check only when the next assertion would shadow or
+destroy the error text:
+
+- The next assertion polls a separate resource (e.g.
+  `expect.poll(() => admin.listTopics()).toContain(topic)`). The handler's
+  error never reaches that matcher, so a failed call silently times out.
+- The next step parses the response (e.g.
+  `JSON.parse(textContent(result))`). A non-JSON error body throws a cryptic
+  `SyntaxError` with no original message.
+
+For those cases, use vitest's inline `expect(value, message)` form so the
+error text rides along with the failure (no helper needed):
+
+```ts
+expect(result.isError, textContent(result)).not.toBe(true);
+```
 
 ## Skip Pattern for Missing Credentials
 

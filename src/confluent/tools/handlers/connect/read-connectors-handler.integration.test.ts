@@ -59,7 +59,6 @@ describe("read-connector-handler", { tags: [Tag.CONNECT] }, () => {
         arguments: { connectorName },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toContain(
         `Connector Details for ${connectorName}:`,
       );

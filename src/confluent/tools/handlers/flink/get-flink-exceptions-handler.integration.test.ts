@@ -58,7 +58,6 @@ describe("get-flink-exceptions-handler", { tags: [Tag.FLINK] }, () => {
         arguments: { statementName },
       });
 
-      expect(result.isError).not.toBe(true);
       // SELECT 1 typically completes cleanly, so accept either response shape
       expect(textContent(result)).toMatch(
         /^(No exceptions found|Flink Statement Exceptions)/,

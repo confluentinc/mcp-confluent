@@ -58,7 +58,6 @@ describe("read-flink-statement-handler", { tags: [Tag.FLINK] }, () => {
         arguments: { statementName, timeoutInMilliseconds: 5000 },
       });
 
-      expect(result.isError).not.toBe(true);
       // results header is emitted regardless of phase; SELECT 1 may still be PENDING.
       expect(textContent(result)).toMatch(/^Flink SQL Statement Results:/);
     });

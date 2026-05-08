@@ -44,7 +44,6 @@ describe("list-databases-handler", { tags: [Tag.FLINK] }, () => {
         arguments: {},
       });
 
-      expect(result.isError).not.toBe(true);
       // fresh test account may have no databases; either response shape is valid
       expect(textContent(result)).toMatch(/^(Databases:|No databases found)/);
     });

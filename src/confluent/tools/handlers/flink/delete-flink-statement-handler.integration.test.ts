@@ -57,7 +57,6 @@ describe("delete-flink-statement-handler", { tags: [Tag.FLINK] }, () => {
         arguments: { statementName },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(
         /^Flink SQL Statement Deletion Status Code:/,
       );

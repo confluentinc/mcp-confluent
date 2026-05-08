@@ -44,7 +44,6 @@ describe("list-tables-handler", { tags: [Tag.FLINK] }, () => {
         arguments: {},
       });
 
-      expect(result.isError).not.toBe(true);
       // handler filters out INFORMATION_SCHEMA; a fresh env may have no user tables
       expect(textContent(result)).toMatch(
         /^(Tables in catalog|No tables found)/,

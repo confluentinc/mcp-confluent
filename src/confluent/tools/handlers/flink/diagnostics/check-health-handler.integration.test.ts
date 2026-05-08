@@ -58,7 +58,6 @@ describe("check-health-handler", { tags: [Tag.FLINK] }, () => {
         arguments: { statementName },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(
         new RegExp(`^Health check for '${statementName}':`),
       );

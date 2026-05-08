@@ -54,7 +54,6 @@ describe("create-connector-handler", { tags: [Tag.CONNECT] }, () => {
         },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toContain(`${connectorName} created:`);
     });
   });

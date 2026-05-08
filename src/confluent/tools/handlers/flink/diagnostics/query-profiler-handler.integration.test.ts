@@ -59,7 +59,6 @@ describe("query-profiler-handler", { tags: [Tag.FLINK] }, () => {
         arguments: { statementName, includeAnalysis: false },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(
         new RegExp(`^Query Profiler for '${statementName}':`),
       );

@@ -58,7 +58,6 @@ describe("list-flink-statements-handler", { tags: [Tag.FLINK] }, () => {
         arguments: {},
       });
 
-      expect(result.isError).not.toBe(true);
       // handler stringifies the raw response, so just check that the statement name appears
       expect(textContent(result)).toContain(seedName);
     });

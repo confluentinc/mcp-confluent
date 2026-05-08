@@ -44,7 +44,6 @@ describe("list-catalogs-handler", { tags: [Tag.FLINK] }, () => {
         arguments: {},
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(/^Catalogs:/);
     });
   });

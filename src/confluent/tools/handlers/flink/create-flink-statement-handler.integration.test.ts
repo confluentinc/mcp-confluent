@@ -55,7 +55,6 @@ describe("create-flink-statement-handler", { tags: [Tag.FLINK] }, () => {
         },
       });
 
-      expect(result.isError).not.toBe(true);
       // just check for the name since the handler returns the stringified JSON response
       expect(textContent(result)).toContain(`"name":"${statementName}"`);
     });

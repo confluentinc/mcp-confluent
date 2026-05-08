@@ -48,7 +48,6 @@ describe("delete-connector-handler", { tags: [Tag.CONNECT] }, () => {
         arguments: { connectorName },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toBe(
         `Successfully deleted connector ${connectorName}`,
       );

@@ -43,7 +43,6 @@ describe("list-topics-handler", { tags: [Tag.KAFKA] }, () => {
         arguments: {},
       });
 
-      expect(result.isError).not.toBe(true);
       // handler response is always prefixed with "Kafka topics:" whether the
       // cluster is empty or not, so this proves the tool ran end-to-end
       expect(textContent(result)).toMatch(/^Kafka topics:/);

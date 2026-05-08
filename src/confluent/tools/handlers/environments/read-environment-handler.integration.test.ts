@@ -50,7 +50,6 @@ describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
         arguments: { environmentId },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toContain(`ID: ${environmentId}`);
     });
   });

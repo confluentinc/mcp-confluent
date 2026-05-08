@@ -59,7 +59,6 @@ describe("detect-issues-handler", { tags: [Tag.FLINK] }, () => {
         arguments: { statementName, includeMetrics: false },
       });
 
-      expect(result.isError).not.toBe(true);
       // SELECT 1 typically reports no issues; accept either response prefix.
       expect(textContent(result)).toMatch(
         new RegExp(

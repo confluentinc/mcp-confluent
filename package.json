@@ -46,8 +46,7 @@
     "generate:openapi-types": "openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --empty-objects-unknown",
     "print:schema": "node dist/print-md-schema.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js --env-file .env",
-    "//inspector:yaml": "Pre-checks the yaml file exists before launching the inspector. Without this guard, a missing config file lets the server exit non-zero on startup, which @modelcontextprotocol/inspector treats as a transient crash and respawns endlessly — masking the real cause from anyone trying to figure out why the inspector is misbehaving.",
-    "inspector:yaml": "bash -c 'config=\"${1:-config.yaml}\"; [ -f \"$config\" ] || { echo \"inspector:yaml: config file not found: $config\" >&2; echo \"  cwd: $(pwd)\" >&2; echo \"  hint: pass an explicit path with: npm run inspector:yaml -- path/to/your.yaml\" >&2; exit 1; }; exec npx @modelcontextprotocol/inspector node dist/index.js -- --config \"$config\"' _",
+    "inspector:yaml": "node scripts/inspector-yaml.mjs",
     "prepare": "husky",
     "prepack": "npm run build && node scripts/inject-build-config.mjs"
   },

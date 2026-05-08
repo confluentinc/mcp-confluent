@@ -44,7 +44,7 @@ const describeToolGatingArguments = z.object({});
  * Until v2 lands, the helper accepts a multi-connection runtime without
  * crashing, but the v1 flatten is *lossy*: a tool whose predicate is
  * enabled on at least one configured connection is reported as enabled
- * (and therefore omitted from `disabled_groups` entirely), and a tool
+ * (and therefore omitted from `disabledGroups` entirely), and a tool
  * disabled on multiple connections with different reasons is bucketed
  * under the first disabled verdict its iteration produces — the
  * cross-connection asymmetry vanishes from the output. Today's
@@ -124,8 +124,8 @@ export class DescribeToolGatingHandler extends BaseToolHandler {
  * handler's class JSDoc for the migration sketch.
  */
 function renderReport(report: ToolGatingReport): string {
-  const total = report.enabled_count + report.disabled_count;
-  if (report.disabled_count === 0) {
+  const total = report.enabledCount + report.disabledCount;
+  if (report.disabledCount === 0) {
     return `All ${total} registered tools are advertised via tools/list.`;
   }
 
@@ -133,11 +133,11 @@ function renderReport(report: ToolGatingReport): string {
   // joining with a blank line separates groups visually so long bullet
   // lists from one group don't bleed into the next.
   return [
-    `${report.disabled_count} of ${total} tools disabled for the following reasons:`,
+    `${report.disabledCount} of ${total} tools disabled for the following reasons:`,
     "",
-    report.disabled_groups.map(renderGroup).join("\n\n"),
+    report.disabledGroups.map(renderGroup).join("\n\n"),
     "",
-    `${report.enabled_count} tools advertised via tools/list.`,
+    `${report.enabledCount} tools advertised via tools/list.`,
   ].join("\n");
 }
 

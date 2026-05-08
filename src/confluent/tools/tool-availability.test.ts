@@ -208,22 +208,22 @@ describe("tool-availability.ts", () => {
     it("should produce an empty report with zero counts when no tools are passed", () => {
       const report = buildToolGatingReport([], runtimeWith({}, "default"));
       expect(report).toEqual({
-        disabled_groups: [],
-        enabled_count: 0,
-        disabled_count: 0,
+        disabledGroups: [],
+        enabledCount: 0,
+        disabledCount: 0,
       });
     });
 
-    it("should report each tool as enabled and emit no disabled_groups when every tool passes its predicate", () => {
+    it("should report each tool as enabled and emit no disabledGroups when every tool passes its predicate", () => {
       const handler = stubWithPredicate(alwaysEnabled);
       const report = buildToolGatingReport(
         [[ToolName.LIST_TOPICS, handler]],
         runtimeWith(KAFKA_CONN),
       );
       expect(report).toEqual({
-        disabled_groups: [],
-        enabled_count: 1,
-        disabled_count: 0,
+        disabledGroups: [],
+        enabledCount: 1,
+        disabledCount: 0,
       });
     });
 
@@ -240,7 +240,7 @@ describe("tool-availability.ts", () => {
         runtimeWith({}, "default"),
       );
       expect(report).toEqual({
-        disabled_groups: [
+        disabledGroups: [
           {
             reason: ToolDisabledReason.MissingFlinkBlock,
             tools: [ToolName.LIST_FLINK_STATEMENTS],
@@ -250,16 +250,16 @@ describe("tool-availability.ts", () => {
             tools: [ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS],
           },
         ],
-        enabled_count: 0,
-        disabled_count: 3,
+        enabledCount: 0,
+        disabledCount: 3,
       });
     });
 
-    it("should classify a tool as enabled when at least one configured connection passes its predicate, omitting it from disabled_groups (lossy v1 flatten)", () => {
+    it("should classify a tool as enabled when at least one configured connection passes its predicate, omitting it from disabledGroups (lossy v1 flatten)", () => {
       // Pins the v1 single-connection-scope behaviour against a synthesised
       // multi-connection runtime: a tool enabled on `with-kafka` and
       // disabled on `without-kafka` is reported as enabled overall, with
-      // no entry in `disabled_groups`. The asymmetry is dropped — the v2
+      // no entry in `disabledGroups`. The asymmetry is dropped — the v2
       // per-connection / cross-connection-deltas shape (see
       // ToolGatingReport JSDoc) is the proper fix for this. This test
       // exists so the lossy aggregation is documented in code rather
@@ -274,9 +274,9 @@ describe("tool-availability.ts", () => {
       );
 
       expect(report).toEqual({
-        disabled_groups: [],
-        enabled_count: 1,
-        disabled_count: 0,
+        disabledGroups: [],
+        enabledCount: 1,
+        disabledCount: 0,
       });
     });
 
@@ -312,7 +312,7 @@ describe("tool-availability.ts", () => {
         ],
         runtimeWith({}, "default"),
       );
-      expect(report.disabled_groups).toEqual([
+      expect(report.disabledGroups).toEqual([
         {
           reason: ToolDisabledReason.MissingKafkaBlock,
           tools: [

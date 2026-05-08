@@ -53,37 +53,37 @@ describe("describe-tool-gating-handler.ts", () => {
         const result = handler.handle(bareRuntime());
         const report = getReport(result);
 
-        const kafkaGroup = report.disabled_groups.find(
+        const kafkaGroup = report.disabledGroups.find(
           (g) => g.reason === ToolDisabledReason.MissingKafkaBlock,
         );
         expect(
           kafkaGroup,
-          "expected a disabled_groups entry for MissingKafkaBlock against a bare runtime",
+          "expected a disabledGroups entry for MissingKafkaBlock against a bare runtime",
         ).toBeDefined();
         expect(kafkaGroup!.tools).toContain(ToolName.LIST_TOPICS);
         expect(kafkaGroup!.tools).toContain(ToolName.PRODUCE_MESSAGE);
-        expect(report.disabled_count).toBeGreaterThan(0);
+        expect(report.disabledCount).toBeGreaterThan(0);
       });
 
       it("should not list alwaysEnabled tools (search-product-docs, get-product-doc-page, describe-tool-gating) under any disabled group", async () => {
         const result = handler.handle(bareRuntime());
         const report = getReport(result);
 
-        const allDisabledTools = report.disabled_groups.flatMap((g) => g.tools);
+        const allDisabledTools = report.disabledGroups.flatMap((g) => g.tools);
         expect(allDisabledTools).not.toContain(ToolName.SEARCH_PRODUCT_DOCS);
         expect(allDisabledTools).not.toContain(ToolName.GET_PRODUCT_DOC_PAGE);
         expect(allDisabledTools).not.toContain(ToolName.DESCRIBE_TOOL_GATING);
       });
 
-      it("should remove kafka tools from disabled_groups when the connection carries a kafka block", async () => {
+      it("should remove kafka tools from disabledGroups when the connection carries a kafka block", async () => {
         const result = handler.handle(runtimeWith(KAFKA_CONN));
         const report = getReport(result);
 
-        const allDisabledTools = report.disabled_groups.flatMap((g) => g.tools);
+        const allDisabledTools = report.disabledGroups.flatMap((g) => g.tools);
         expect(allDisabledTools).not.toContain(ToolName.LIST_TOPICS);
         expect(allDisabledTools).not.toContain(ToolName.PRODUCE_MESSAGE);
 
-        const flinkGroup = report.disabled_groups.find(
+        const flinkGroup = report.disabledGroups.find(
           (g) => g.reason === ToolDisabledReason.MissingFlinkBlock,
         );
         expect(flinkGroup).toBeDefined();
@@ -94,7 +94,7 @@ describe("describe-tool-gating-handler.ts", () => {
         const result = handler.handle(ccloudOAuthRuntime());
         const report = getReport(result);
 
-        const oauthGroup = report.disabled_groups.find(
+        const oauthGroup = report.disabledGroups.find(
           (g) => g.reason === ToolDisabledReason.OAuthNoServiceBlocks,
         );
         expect(oauthGroup).toBeDefined();
@@ -108,14 +108,14 @@ describe("describe-tool-gating-handler.ts", () => {
         const totalRegistered = Array.from(
           ToolHandlerRegistry.allHandlers(),
         ).length;
-        expect(report.enabled_count + report.disabled_count).toBe(
+        expect(report.enabledCount + report.disabledCount).toBe(
           totalRegistered,
         );
-        const flatDisabledCount = report.disabled_groups.reduce(
+        const flatDisabledCount = report.disabledGroups.reduce(
           (sum, g) => sum + g.tools.length,
           0,
         );
-        expect(flatDisabledCount).toBe(report.disabled_count);
+        expect(flatDisabledCount).toBe(report.disabledCount);
       });
 
       it("should render the disabled-count summary header with both totals", async () => {

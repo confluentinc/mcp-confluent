@@ -24,15 +24,15 @@ export interface DisabledToolsByReason {
  * v1 scope (today's release): the server enforces a single configured
  * connection (see `enforceSingleConnectionOnly()` in
  * `src/config/models.ts`), so the report flattens across that connection.
- * `disabled_groups` carries one entry per `(reason → tools)` bucket; tools
+ * `disabledGroups` carries one entry per `(reason → tools)` bucket; tools
  * already advertised via `tools/list` are intentionally absent.
  *
  * v2 plan (when multi-connection support lands — issue #151's follow-ups):
- * replace `disabled_groups` with
+ * replace `disabledGroups` with
  *   `per_connection: ReadonlyArray<{
  *      connection_id: string;
- *      enabled_count: number;
- *      disabled_count: number;
+ *      enabledCount: number;
+ *      disabledCount: number;
  *      gaps: ReadonlyArray<DisabledToolsByReason>;
  *    }>`
  * and add
@@ -50,9 +50,9 @@ export interface DisabledToolsByReason {
  * for that work.
  */
 export interface ToolGatingReport {
-  readonly disabled_groups: readonly DisabledToolsByReason[];
-  readonly enabled_count: number;
-  readonly disabled_count: number;
+  readonly disabledGroups: readonly DisabledToolsByReason[];
+  readonly enabledCount: number;
+  readonly disabledCount: number;
 }
 
 /**
@@ -118,12 +118,12 @@ export function groupDisabledToolsByReason(
  * the configured connection.
  *
  * v1 (single-connection scope):
- * - `disabled_groups` is sorted lex by reason; tools within a group follow
+ * - `disabledGroups` is sorted lex by reason; tools within a group follow
  *   handler iteration order.
- * - Each tool contributes once to `enabled_count` *or* `disabled_count`:
+ * - Each tool contributes once to `enabledCount` *or* `disabledCount`:
  *   a tool whose predicate produces an `enabled: true` verdict on at
  *   least one configured connection counts as enabled (and is omitted
- *   from `disabled_groups`); otherwise it counts as disabled and lands
+ *   from `disabledGroups`); otherwise it counts as disabled and lands
  *   under the first disabled verdict's reason. This flatten is lossy
  *   on a multi-connection runtime — see the handler module-doc for
  *   the consequences and the v2 (multi-connection) shape on
@@ -155,17 +155,13 @@ export function buildToolGatingReport(
     bucket.push(toolName);
   }
 
-  const disabled_groups: DisabledToolsByReason[] = Array.from(
+  const disabledGroups: DisabledToolsByReason[] = Array.from(
     groupsByReason.entries(),
   )
     .map(([reason, tools]) => ({ reason, tools }))
     .sort((a, b) => a.reason.localeCompare(b.reason));
 
-  return {
-    disabled_groups,
-    enabled_count: enabledCount,
-    disabled_count: disabledCount,
-  };
+  return { disabledGroups, enabledCount, disabledCount };
 }
 
 /**

@@ -13,8 +13,9 @@ import { z } from "zod";
 /**
  * Connection configuration for a direct (local/Docker/Cloud) Kafka cluster.
  * Corresponds to `connections.<name>` (with `type: direct`) in the YAML configuration.
- * At least one of kafka, schema_registry, confluent_cloud, tableflow, flink, or telemetry must be present,
- * unless `intentionally_empty: true` is set.
+ * Service blocks are all optional: a connection with no blocks is valid and enables
+ * only connection-agnostic tools (e.g. `search-product-docs`). Per-tool predicates
+ * in `connection-predicates.ts` decide which tools each connection enables.
  */
 export interface DirectConnectionConfig {
   readonly type: "direct";
@@ -24,11 +25,6 @@ export interface DirectConnectionConfig {
   readonly tableflow?: TableflowDirectConfig;
   readonly telemetry?: TelemetryDirectConfig;
   readonly flink?: FlinkDirectConfig;
-  /**
-   * Opt-in for connections with no service blocks (e.g. `search-product-docs`-only
-   * setups). Distinguishes intentional empty configs from half-finished YAML.
-   */
-  readonly intentionally_empty?: true;
 }
 
 /**
@@ -272,7 +268,6 @@ const authConfigSchema = z.discriminatedUnion("type", [apiKeyAuthSchema]);
 const directConnectionSchema = z
   .object({
     type: z.literal("direct"),
-    intentionally_empty: z.literal(true).optional(),
     confluent_cloud: z
       .object({
         endpoint: z
@@ -426,26 +421,8 @@ const oauthConnectionSchema = z
  */
 const connectionConfigSchema = z
   .discriminatedUnion("type", [directConnectionSchema, oauthConnectionSchema])
-  // superRefine calls are placed here (after the union) rather than on directConnectionSchema
+  // superRefine call is placed here (after the union) rather than on directConnectionSchema
   // because wrapping a ZodObject in ZodEffects breaks z.discriminatedUnion's discriminant lookup.
-  .superRefine((data, ctx) => {
-    if (
-      data.type === "direct" &&
-      !data.intentionally_empty &&
-      !data.kafka &&
-      !data.schema_registry &&
-      !data.confluent_cloud &&
-      !data.tableflow &&
-      !data.flink &&
-      !data.telemetry
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined — or set 'intentionally_empty: true' to enable only connection-agnostic tools",
-      });
-    }
-  })
   .superRefine((data, ctx) => {
     // Reject endpoint-only telemetry when there is no auth available from either
     // telemetry.auth or the confluent_cloud.auth fallback. Without this check the

@@ -124,47 +124,14 @@ describe("config/index.ts", () => {
       );
     });
 
-    it("should throw error when neither kafka nor schema_registry is defined", () => {
+    it("should accept a direct connection with no service blocks (docs-only setup)", () => {
       const yamlContent = `connections:
   local:
     type: "direct"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /Configuration validation failed/,
-      );
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined/,
-      );
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /'intentionally_empty: true'/,
-      );
-    });
-
-    it("should accept a connection with no service blocks when intentionally_empty is true", () => {
-      const yamlContent = `connections:
-  docs-only:
-    type: "direct"
-    intentionally_empty: true
-`;
-
       const config = parseYamlConfiguration(yamlContent, {});
-      expect(config.getSoleDirectConnection()).toEqual({
-        type: "direct",
-        intentionally_empty: true,
-      });
-    });
-
-    it("should reject 'intentionally_empty: false' (only true is meaningful)", () => {
-      const yamlContent = `connections:
-  bad:
-    type: "direct"
-    intentionally_empty: false
-`;
-
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /Configuration validation failed/,
-      );
+      expect(config.getSoleDirectConnection()).toEqual({ type: "direct" });
     });
 
     it("should throw error when bootstrap_servers is missing", () => {
@@ -542,7 +509,9 @@ describe("config/index.ts", () => {
       const invalidYaml = `connections:
   local:
     type: "direct"
-    # missing both kafka and schema_registry
+    kafka:
+      # missing required bootstrap_servers / rest_endpoint
+      cluster_id: "lkc-bogus"
 `;
       fsMocks.existsSync.mockReturnValue(true);
       fsMocks.readFileSync.mockReturnValue(invalidYaml);

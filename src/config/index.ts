@@ -9,12 +9,6 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
 export { buildConfigFromEnvAndCli } from "@src/config/env-config.js";
-export {
-  CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
-  MCPServerConfiguration,
-  type DirectConnectionConfig,
-  type OAuthConnectionConfig,
-} from "@src/config/models.js";
 
 /**
  * Loads and validates an MCP server configuration from a YAML file.

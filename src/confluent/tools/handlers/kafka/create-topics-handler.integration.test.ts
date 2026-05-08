@@ -6,6 +6,7 @@ import {
   startServer,
   type StartedServer,
 } from "@tests/harness/start-server.js";
+import { textContent } from "@tests/harness/tool-results.js";
 import { activeTransports } from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
@@ -45,7 +46,7 @@ describe("create-topics-handler", { tags: [Tag.KAFKA] }, () => {
         arguments: { topics: [{ topic, numPartitions: 1 }] },
       });
 
-      expect(result.isError).not.toBe(true);
+      expect(result.isError, textContent(result)).not.toBe(true);
 
       await expect
         .poll(() => admin().listTopics(), {

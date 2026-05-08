@@ -9,7 +9,16 @@ import {
 import type { Environment } from "@src/env.js";
 import { type KeyValuePairObject } from "properties-file";
 
-const ENV_CONNECTION_NAME = "env-connection";
+/**
+ * Connection name synthesized by the env-var path. Chosen as `"_default"` so
+ * the YAML loader can reuse the same name as the zero-config fallback.
+ *
+ * Fallback contract: with no CLI args and no env vars, this module
+ * produces `{ connections: { _default: { type: "direct" } } }` — a valid
+ * config with no service blocks, enabling only connection-agnostic tools.
+ * When the env-var path is retired, the YAML loader must preserve this same shape.
+ */
+const ENV_CONNECTION_NAME = "_default";
 
 /** The manufactured document path prefix for the single connection configured from env vars. */
 const CONN = `connections.${ENV_CONNECTION_NAME}`;

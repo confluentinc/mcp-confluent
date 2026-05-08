@@ -1,12 +1,9 @@
 import { DeleteTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/delete-tableflow-topic-handler.js";
 import {
-  bareRuntime,
-  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
   TABLEFLOW_CONN,
   TableflowHandleCase,
-  tableflowRuntime,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -19,28 +16,6 @@ const TOPIC_NAME = "my-topic";
 describe("delete-tableflow-topic-handler.ts", () => {
   describe("DeleteTableFlowTopicHandler", () => {
     const handler = new DeleteTableFlowTopicHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with tableflow and kafka blocks", () => {
-        expect(
-          handler.enabledConnectionIds(runtimeWith(TABLEFLOW_CONN)),
-        ).toEqual([DEFAULT_CONNECTION_ID]);
-      });
-
-      it("should return the connection ID for a tableflow-only connection without a kafka block", () => {
-        expect(handler.enabledConnectionIds(tableflowRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a tableflow block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
-      });
-    });
 
     describe("handle()", () => {
       const cases: TableflowHandleCase[] = [

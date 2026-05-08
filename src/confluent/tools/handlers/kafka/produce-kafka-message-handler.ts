@@ -12,11 +12,7 @@ import {
   CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasKafkaBootstrap,
-  widenForOAuth,
-} from "@src/confluent/tools/connection-predicates.js";
+import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
   disposeIfOAuth,
   formatKafkaError,
@@ -262,10 +258,5 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     };
   }
 
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(
-      runtime.config.connections,
-      widenForOAuth(hasKafkaBootstrap),
-    );
-  }
+  readonly predicate = kafkaBootstrapOrOAuth;
 }

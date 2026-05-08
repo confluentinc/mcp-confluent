@@ -1,8 +1,24 @@
 import {
+  BaseToolHandler,
   CREATE_UPDATE,
   DESTRUCTIVE,
   READ_ONLY,
 } from "@src/confluent/tools/base-tools.js";
+import {
+  alwaysEnabled,
+  canCreateDirectConnector,
+  type ConnectionPredicate,
+  flinkWithTelemetry,
+  hasCCloudCatalogSupport,
+  hasConfluentCloud,
+  hasDirectConfluentCloud,
+  hasFlink,
+  hasKafkaRestWithAuth,
+  hasSchemaRegistry,
+  hasTableflow,
+  hasTelemetry,
+  kafkaBootstrapOrOAuth,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
@@ -19,6 +35,12 @@ import {
 import { beforeAll, describe, expect, it } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
+
+// Reverse map from enum value ("list-topics") → enum key ("LIST_TOPICS"),
+// used to generate copy-paste suggestions in failure messages.
+const TOOL_NAME_TO_KEY = Object.fromEntries(
+  Object.entries(ToolName).map(([k, v]) => [v, k]),
+) as Record<ToolName, string>;
 
 describe("tool-registry.ts", () => {
   describe("ToolHandlerRegistry", () => {
@@ -133,6 +155,113 @@ describe("tool-registry.ts", () => {
         }
       });
     });
+
+    describe("predicate property", () => {
+      // Exhaustive mapping of every registered tool to the named export
+      // from connection-predicates.ts that its handler is expected to wire
+      // as its `predicate`.
+      //
+      // When adding a new tool or rewiring an existing one: edit a single
+      // entry. The `it.each` row label names the offending tool if a
+      // handler's `predicate` drifts from the table.
+      const EXPECTED_PREDICATES: Readonly<
+        Record<ToolName, ConnectionPredicate>
+      > = {
+        // Kafka
+        [ToolName.LIST_TOPICS]: kafkaBootstrapOrOAuth,
+        [ToolName.CREATE_TOPICS]: kafkaBootstrapOrOAuth,
+        [ToolName.DELETE_TOPICS]: kafkaBootstrapOrOAuth,
+        [ToolName.PRODUCE_MESSAGE]: kafkaBootstrapOrOAuth,
+        [ToolName.CONSUME_MESSAGES]: kafkaBootstrapOrOAuth,
+        [ToolName.ALTER_TOPIC_CONFIG]: hasKafkaRestWithAuth,
+        [ToolName.GET_TOPIC_CONFIG]: hasKafkaRestWithAuth,
+        // Flink
+        [ToolName.LIST_FLINK_STATEMENTS]: hasFlink,
+        [ToolName.CREATE_FLINK_STATEMENT]: hasFlink,
+        [ToolName.READ_FLINK_STATEMENT]: hasFlink,
+        [ToolName.DELETE_FLINK_STATEMENTS]: hasFlink,
+        [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: hasFlink,
+        [ToolName.LIST_FLINK_CATALOGS]: hasFlink,
+        [ToolName.LIST_FLINK_DATABASES]: hasFlink,
+        [ToolName.LIST_FLINK_TABLES]: hasFlink,
+        [ToolName.DESCRIBE_FLINK_TABLE]: hasFlink,
+        [ToolName.GET_FLINK_TABLE_INFO]: hasFlink,
+        [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlink,
+        [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
+        [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
+        // Connect
+        [ToolName.LIST_CONNECTORS]: hasDirectConfluentCloud,
+        [ToolName.READ_CONNECTOR]: hasDirectConfluentCloud,
+        [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
+        [ToolName.DELETE_CONNECTOR]: hasDirectConfluentCloud,
+        // Catalog + search (CCloud catalog support)
+        [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
+        [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
+        [ToolName.CREATE_TOPIC_TAGS]: hasCCloudCatalogSupport,
+        [ToolName.DELETE_TAG]: hasCCloudCatalogSupport,
+        [ToolName.REMOVE_TAG_FROM_ENTITY]: hasCCloudCatalogSupport,
+        [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupport,
+        [ToolName.LIST_TAGS]: hasCCloudCatalogSupport,
+        // Clusters
+        [ToolName.LIST_CLUSTERS]: hasDirectConfluentCloud,
+        // Environments + billing + organizations (Confluent Cloud control plane)
+        [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloud,
+        [ToolName.READ_ENVIRONMENT]: hasConfluentCloud,
+        [ToolName.LIST_BILLING_COSTS]: hasConfluentCloud,
+        [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloud,
+        // Schema Registry
+        [ToolName.LIST_SCHEMAS]: hasSchemaRegistry,
+        [ToolName.DELETE_SCHEMA]: hasSchemaRegistry,
+        // Tableflow
+        [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.LIST_TABLEFLOW_REGIONS]: hasTableflow,
+        [ToolName.LIST_TABLEFLOW_TOPICS]: hasTableflow,
+        [ToolName.READ_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.UPDATE_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.DELETE_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS]: hasTableflow,
+        [ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        // Metrics (Telemetry API)
+        [ToolName.QUERY_METRICS]: hasTelemetry,
+        [ToolName.LIST_METRICS]: hasTelemetry,
+        // Documentation (no service-block requirement)
+        [ToolName.SEARCH_PRODUCT_DOCS]: alwaysEnabled,
+        [ToolName.GET_PRODUCT_DOC_PAGE]: alwaysEnabled,
+      };
+
+      it.each(
+        Object.entries(EXPECTED_PREDICATES) as [
+          ToolName,
+          ConnectionPredicate,
+        ][],
+      )(
+        "%s: handler.predicate must be exactly the expected named export",
+        (toolName, expectedPredicate) => {
+          const handler = ToolHandlerRegistry.getToolHandler(toolName);
+          // Every registered handler is expected to extend BaseToolHandler —
+          // that's where the `predicate` property lives. The instanceof check
+          // both narrows the type for the next assertion and enforces the
+          // class-extension invariant in its own right.
+          expect(
+            handler,
+            `Tool ${toolName}'s handler does not extend BaseToolHandler; ` +
+              `the predicate property lives on BaseToolHandler.`,
+          ).toBeInstanceOf(BaseToolHandler);
+          expect(
+            (handler as BaseToolHandler).predicate,
+            `Tool ${toolName}'s handler.predicate does not match the value ` +
+              `in EXPECTED_PREDICATES. Either: (1) the handler is wired to ` +
+              `the wrong predicate (or composes inline with allOf(...) / ` +
+              `widenForOAuth(...) at the use site — promote to a named const ` +
+              `export and reference it instead); or (2) the handler was ` +
+              `deliberately rewired and EXPECTED_PREDICATES needs updating.`,
+          ).toBe(expectedPredicate);
+        },
+      );
+    });
   });
 
   describe("handle() smoke tests", () => {
@@ -173,12 +302,6 @@ describe("tool-registry.ts", () => {
         clientManager,
       );
     }
-
-    // Reverse map from enum value ("list-topics") → enum key ("LIST_TOPICS"),
-    // used to generate helpful copy-paste suggestions in failure messages.
-    const TOOL_NAME_TO_KEY = Object.fromEntries(
-      Object.entries(ToolName).map(([k, v]) => [v, k]),
-    ) as Record<ToolName, string>;
 
     /**
      * Per-tool fixture: what each handler produces when called with no

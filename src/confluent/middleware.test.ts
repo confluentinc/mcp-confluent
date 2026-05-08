@@ -1,4 +1,3 @@
-import { Middleware } from "openapi-fetch";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,27 +5,7 @@ import {
   createAuthMiddleware,
   createBearerMiddleware,
 } from "@src/confluent/middleware.js";
-
-type OnRequestArg = Parameters<NonNullable<Middleware["onRequest"]>>[0];
-
-/**
- * The openapi-fetch Middleware.onRequest signature requires several
- * parameters that this middleware doesn't use. This helper builds a
- * minimal-but-typed call so each test can focus on the request alone.
- */
-async function callOnRequest(
-  middleware: ReturnType<typeof createBearerMiddleware>,
-  request: Request,
-): Promise<Request | Response | void | undefined> {
-  if (!middleware.onRequest) throw new Error("middleware.onRequest missing");
-  return middleware.onRequest({
-    request,
-    schemaPath: "/test",
-    params: {} as OnRequestArg["params"],
-    options: {} as OnRequestArg["options"],
-    id: "test-id",
-  });
-}
+import { callOnRequest } from "@tests/openapi-middleware.js";
 
 describe("middleware.ts", () => {
   describe("BearerTokenUnavailableError", () => {

@@ -5,8 +5,7 @@ import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   bareRuntime,
-  DEFAULT_CONNECTION_ID,
-  flinkRuntime,
+  FLINK_CONN,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
@@ -38,18 +37,6 @@ describe("flink-tool-handler.ts", () => {
   describe("FlinkToolHandler", () => {
     const handler = new StubFlinkHandler();
 
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a flink block", () => {
-        expect(handler.enabledConnectionIds(flinkRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a flink block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-    });
-
     describe("resolveOrgAndEnvIds()", () => {
       const resolveOrgAndEnvIds = handler["resolveOrgAndEnvIds"].bind(
         handler,
@@ -78,7 +65,7 @@ describe("flink-tool-handler.ts", () => {
 
     describe("getFlinkDirectConfig()", () => {
       it("should return the flink block when present", () => {
-        const runtime = flinkRuntime();
+        const runtime = runtimeWith(FLINK_CONN);
         const flink = handler["getFlinkDirectConfig"](runtime.config);
         expect(flink).toBe(runtime.config.getSoleDirectConnection().flink);
       });

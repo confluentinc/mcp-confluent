@@ -5,6 +5,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -280,9 +281,7 @@ export class GetProductDocPageHandler extends BaseToolHandler {
     };
   }
 
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return Object.keys(runtime.config.connections);
-  }
+  readonly predicate = alwaysEnabled;
 }
 
 function toMarkdownTwin(parsed: URL): string {

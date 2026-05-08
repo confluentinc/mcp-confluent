@@ -1,13 +1,24 @@
-import type { DirectConnectionConfig } from "@src/config/index.js";
+import {
+  loadConfigFromYaml,
+  type DirectConnectionConfig,
+} from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance, type HandleCase } from "@tests/stubs/index.js";
+import { fileURLToPath } from "node:url";
 import type { Mocked } from "vitest";
 
 /** Connection ID used by the named runtime factories and their default single-connection runtimes. */
 export const DEFAULT_CONNECTION_ID = "default";
+
+const CCLOUD_OAUTH_FIXTURE = fileURLToPath(
+  new URL(
+    "../../test-fixtures/yaml_configs/valid/ccloud-oauth.yaml",
+    import.meta.url,
+  ),
+);
 
 /**
  * Creates a ServerRuntime with a mocked ClientManager.
@@ -30,90 +41,15 @@ export function runtimeWith(
   );
 }
 
-/** Runtime with no service blocks — the disabled case in enabledConnectionIds() tests. */
+/** Runtime with no service blocks — the disabled-baseline shape used by predicate-derivation tests in `base-tools.test.ts` and as a no-config runtime by handlers that don't read connection state. */
 export function bareRuntime(): ServerRuntime {
   return runtimeWith();
-}
-
-/** Runtime with a schema_registry block. */
-export function schemaRegistryRuntime(): ServerRuntime {
-  return runtimeWith({
-    schema_registry: { endpoint: "https://schema-registry.example.com" },
-  });
-}
-
-/** Runtime with a confluent_cloud block. */
-export function confluentCloudRuntime(): ServerRuntime {
-  return runtimeWith({
-    confluent_cloud: {
-      endpoint: "https://api.confluent.cloud",
-      auth: { type: "api_key", key: "k", secret: "s" },
-    },
-  });
-}
-
-/** Runtime with a CCloud-hosted schema_registry (api_key auth) — the minimal enabled case for catalog-API tools. */
-export function ccloudSchemaRegistryRuntime(): ServerRuntime {
-  return runtimeWith({
-    schema_registry: {
-      endpoint: "https://psrc-abc.us-east-1.aws.confluent.cloud",
-      auth: { type: "api_key", key: "k", secret: "s" },
-    },
-  });
 }
 
 /** Runtime with a kafka block. */
 export function kafkaRuntime(): ServerRuntime {
   return runtimeWith({
     kafka: { bootstrap_servers: "broker:9092" },
-  });
-}
-
-/** Runtime with a kafka block containing only a rest_endpoint (no bootstrap_servers) — the disabled case for admin-client handlers. */
-export function kafkaRestOnlyRuntime(): ServerRuntime {
-  return runtimeWith({
-    kafka: { rest_endpoint: "https://kafka-rest.example.com" },
-  });
-}
-
-/** Runtime with a kafka block including a rest_endpoint and auth. */
-export function kafkaRestRuntime(): ServerRuntime {
-  return runtimeWith({
-    kafka: {
-      bootstrap_servers: "broker:9092",
-      rest_endpoint: "https://kafka-rest.example.com",
-      auth: { type: "api_key", key: "k", secret: "s" },
-    },
-  });
-}
-
-/** Runtime with a tableflow block. */
-export function tableflowRuntime(): ServerRuntime {
-  return runtimeWith({
-    tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-  });
-}
-
-/** Runtime with a flink block. */
-export function flinkRuntime(): ServerRuntime {
-  return runtimeWith({
-    flink: {
-      endpoint: "https://flink.us-east-1.aws.confluent.cloud",
-      auth: { type: "api_key", key: "k", secret: "s" },
-      environment_id: "env-abc123",
-      organization_id: "org-xyz789",
-      compute_pool_id: "lfcp-pool01",
-    },
-  });
-}
-
-/** Runtime with a telemetry block. */
-export function telemetryRuntime(): ServerRuntime {
-  return runtimeWith({
-    telemetry: {
-      endpoint: "https://api.telemetry.confluent.cloud",
-      auth: { type: "api_key", key: "k", secret: "s" },
-    },
   });
 }
 
@@ -231,23 +167,17 @@ export type FlinkGetCase = HandleCaseWithConn & {
 };
 
 /**
- * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`, paired
- * with a mocked `OAuthClientManager` (matching what `ServerRuntime.fromConfig`
- * actually constructs for OAuth connections). Used by handler tests to assert
- * that handlers widened for OAuth (e.g. via the widened `hasConfluentCloud`
- * predicate) see the connection as enabled, and that handlers staying
- * direct-only (e.g. native Kafka) see it as disabled. Does not populate
- * `runtime.oauthHolder`; tests that need a holder should construct one
- * explicitly. `createMockInstance` doesn't invoke the real constructor, so the
- * OAuthClientManager's eager cloud-REST client setup is sidestepped.
+ * Runtime whose sole connection is an OAuth-typed `ConnectionConfig`, loaded
+ * from the `ccloud-oauth.yaml` fixture. Used by the OAuth tool-surface
+ * partition test in `src/index.test.ts` to confirm `getToolHandlersToRegister`
+ * enables the expected set of tools against an OAuth runtime. A stub
+ * `OAuthClientManager` is supplied solely to satisfy `ServerRuntime`'s
+ * constructor — `enabledConnectionIds()` reads `runtime.config.connections`
+ * and never touches the client manager.
  */
 export function ccloudOAuthRuntime(): ServerRuntime {
-  return new ServerRuntime(
-    new MCPServerConfiguration({
-      connections: {
-        [DEFAULT_CONNECTION_ID]: { type: "oauth", ccloud_env: "devel" },
-      },
-    }),
-    { [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager) },
-  );
+  const config = loadConfigFromYaml(CCLOUD_OAUTH_FIXTURE, {});
+  return new ServerRuntime(config, {
+    [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager),
+  });
 }

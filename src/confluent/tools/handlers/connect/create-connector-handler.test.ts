@@ -1,13 +1,9 @@
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import {
-  bareRuntime,
   CCLOUD_CONN,
-  ccloudOAuthRuntime,
-  confluentCloudRuntime,
   CONNECT_CONN_WITH_AUTH,
   ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
-  KAFKA_CONN,
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
@@ -24,38 +20,6 @@ const MINIMAL_CONNECTOR_ARGS = {
 describe("create-connector-handler.ts", () => {
   describe("CreateConnectorHandler", () => {
     const handler = new CreateConnectorHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with confluent_cloud and kafka.auth", () => {
-        expect(
-          handler.enabledConnectionIds(runtimeWith(CONNECT_CONN_WITH_AUTH)),
-        ).toEqual([DEFAULT_CONNECTION_ID]);
-      });
-
-      it("should return an empty array for a connection without a kafka block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for a connection with confluent_cloud but no kafka.auth", () => {
-        expect(handler.enabledConnectionIds(confluentCloudRuntime())).toEqual(
-          [],
-        );
-      });
-
-      it("should return an empty array for a connection with kafka.auth but no confluent_cloud block", () => {
-        // Pins that hasDirectConfluentCloud and hasKafkaAuth are AND'd, not
-        // collapsed to the second predicate. A naive `&&` of two
-        // `PredicateResult` objects (both truthy) silently drops the first
-        // predicate; this case keeps that regression honest.
-        expect(handler.enabledConnectionIds(runtimeWith(KAFKA_CONN))).toEqual(
-          [],
-        );
-      });
-
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
-      });
-    });
 
     describe("handle()", () => {
       const cases: ConnectHandleCase[] = [

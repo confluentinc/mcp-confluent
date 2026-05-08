@@ -118,17 +118,6 @@ describe("constructDirectClientManager()", () => {
     );
   });
 
-  it("should set confluentCloudTableflowBaseUrl to https://api.confluent.cloud when only tableflow is configured", () => {
-    const manager = constructDirectClientManager(
-      connWith({
-        tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-      }),
-    );
-    expect(manager["confluentCloudTableflowBaseUrl"]).toBe(
-      "https://api.confluent.cloud",
-    );
-  });
-
   it("should set confluentCloudTelemetryBaseUrl from the telemetry block", () => {
     const manager = constructDirectClientManager(
       connWith({

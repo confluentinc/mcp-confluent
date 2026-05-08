@@ -51,7 +51,6 @@ export abstract class BaseClientManager
   implements ConfluentCloudRestClientManager, SchemaRegistryClientHandler
 {
   private confluentCloudBaseUrl: string | undefined;
-  private confluentCloudTableflowBaseUrl: string | undefined;
   private confluentCloudFlinkBaseUrl: string | undefined;
   private confluentCloudSchemaRegistryBaseUrl: string | undefined;
   private confluentCloudKafkaRestBaseUrl: string | undefined;
@@ -78,7 +77,6 @@ export abstract class BaseClientManager
 
   constructor(config: BaseClientManagerConfig) {
     this.confluentCloudBaseUrl = config.endpoints.cloud;
-    this.confluentCloudTableflowBaseUrl = config.endpoints.cloud; // at the time of writing, apis are exposed on the same base url as confluent cloud
     this.confluentCloudFlinkBaseUrl = config.endpoints.flink;
     this.confluentCloudSchemaRegistryBaseUrl = config.endpoints.schemaRegistry;
     this.confluentCloudKafkaRestBaseUrl = config.endpoints.kafka;
@@ -99,16 +97,16 @@ export abstract class BaseClientManager
     });
 
     this.confluentCloudTableflowRestClient = new Lazy(() => {
-      if (!this.confluentCloudTableflowBaseUrl) {
+      if (!this.confluentCloudBaseUrl) {
         throw new Error(
           "Confluent Cloud Tableflow REST endpoint not configured",
         );
       }
       logger.info(
-        `Initializing Confluent Cloud Tableflow REST client for base URL ${this.confluentCloudTableflowBaseUrl}`,
+        `Initializing Confluent Cloud Tableflow REST client for base URL ${this.confluentCloudBaseUrl}`,
       );
       const client = createClient<paths>({
-        baseUrl: this.confluentCloudTableflowBaseUrl,
+        baseUrl: this.confluentCloudBaseUrl,
       });
       client.use(createAuthMiddleware(config.auth.tableflow));
       return client;

@@ -442,7 +442,7 @@ const connectionConfigSchema = z
       ctx.addIssue({
         code: "custom",
         message:
-          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined — or set 'intentionally_empty: true' to enable only connection-agnostic tools (e.g. 'search-product-docs')",
+          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined — or set 'intentionally_empty: true' to enable only connection-agnostic tools",
       });
     }
   })

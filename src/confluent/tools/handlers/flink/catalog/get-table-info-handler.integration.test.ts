@@ -25,6 +25,18 @@ describe("get-table-info-handler", { tags: [Tag.FLINK] }, () => {
     return;
   }
 
+  // also provisions a kafka topic and addresses it by cluster id, so gate
+  // explicitly on the kafka fields the flink predicate doesn't cover
+  const conn = runtime.config.getSoleDirectConnection();
+  if (
+    !conn.kafka?.bootstrap_servers ||
+    !conn.kafka.auth ||
+    !conn.kafka.cluster_id
+  ) {
+    it.skip("requires kafka.bootstrap_servers + kafka.auth + kafka.cluster_id config", () => {});
+    return;
+  }
+
   // installs beforeAll/afterAll at this describe scope (admin client + topic cleanup)
   const { admin, createdTopics } = withSharedAdminClient();
   const tableName = uniqueName("flink-tbl");

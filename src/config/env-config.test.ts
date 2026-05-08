@@ -94,13 +94,9 @@ describe("config/env-config.ts", () => {
         expect(conn.kafka).toBeUndefined();
       });
 
-      it("should throw when neither env var is set", () => {
-        expect(() => buildConfigFromEnvAndCli(envWith())).toThrow(
-          /Failed to construct MCPServerConfiguration from environment variables/,
-        );
-        expect(() => buildConfigFromEnvAndCli(envWith())).toThrow(
-          /At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined/,
-        );
+      it("should build an empty direct connection when no service env vars are set (docs-only setup)", () => {
+        const config = buildConfigFromEnvAndCli(envWith());
+        expect(config.getSoleDirectConnection()).toEqual({ type: "direct" });
       });
 
       it("should throw when BOOTSTRAP_SERVERS has an invalid format", () => {

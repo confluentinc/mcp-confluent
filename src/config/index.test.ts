@@ -124,18 +124,14 @@ describe("config/index.ts", () => {
       );
     });
 
-    it("should throw error when neither kafka nor schema_registry is defined", () => {
+    it("should accept a direct connection with no service blocks (docs-only setup)", () => {
       const yamlContent = `connections:
   local:
     type: "direct"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /Configuration validation failed/,
-      );
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined/,
-      );
+      const config = parseYamlConfiguration(yamlContent, {});
+      expect(config.getSoleDirectConnection()).toEqual({ type: "direct" });
     });
 
     it("should throw error when bootstrap_servers is missing", () => {
@@ -513,7 +509,9 @@ describe("config/index.ts", () => {
       const invalidYaml = `connections:
   local:
     type: "direct"
-    # missing both kafka and schema_registry
+    kafka:
+      # missing required bootstrap_servers / rest_endpoint
+      cluster_id: "lkc-bogus"
 `;
       fsMocks.existsSync.mockReturnValue(true);
       fsMocks.readFileSync.mockReturnValue(invalidYaml);

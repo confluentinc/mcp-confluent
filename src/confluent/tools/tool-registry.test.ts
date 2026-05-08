@@ -230,6 +230,8 @@ describe("tool-registry.ts", () => {
         // Documentation (no service-block requirement)
         [ToolName.SEARCH_PRODUCT_DOCS]: alwaysEnabled,
         [ToolName.GET_PRODUCT_DOC_PAGE]: alwaysEnabled,
+        // Diagnostics (no service-block requirement)
+        [ToolName.DESCRIBE_TOOL_GATING]: alwaysEnabled,
       };
 
       it.each(
@@ -318,6 +320,11 @@ describe("tool-registry.ts", () => {
     type SmokeFixture = {
       outcome: HandleOutcome;
       setup?: (cm: MockedClientManager) => Promise<void> | void;
+      /** Set for handlers that legitimately resolve without touching the
+       *  client layer (e.g. meta/diagnostic tools that read the registry
+       *  rather than calling Confluent Cloud). Skips the
+       *  "must have called a client getter" assertion in `assertHandleCase`. */
+      bypassesClientLayer?: boolean;
     };
 
     /** Stubs the Flink REST client to return a completed empty SQL query result.
@@ -491,6 +498,13 @@ describe("tool-registry.ts", () => {
       // Documentation
       [ToolName.SEARCH_PRODUCT_DOCS]: { outcome: { throws: "ZodError" } },
       [ToolName.GET_PRODUCT_DOC_PAGE]: { outcome: { throws: "ZodError" } },
+      // Diagnostics — no client calls; the handler walks the registry's
+      // own predicate map. Against `allServicesRuntime` every gate passes
+      // and the handler emits its all-enabled summary.
+      [ToolName.DESCRIBE_TOOL_GATING]: {
+        outcome: { resolves: "registered tools are advertised via tools/list" },
+        bypassesClientLayer: true,
+      },
       // Organizations
       [ToolName.LIST_ORGANIZATIONS]: {
         outcome: { resolves: "Retrieved 0 organizations" },
@@ -532,7 +546,12 @@ describe("tool-registry.ts", () => {
           runtime: allServicesRuntime(clientManager),
           args: {},
           outcome: fixture.outcome,
-          clientManager,
+          // Pass clientManager only when the handler exercises the client
+          // layer; meta/diagnostic tools that read the registry instead are
+          // exempt from the "must have called a client getter" assertion.
+          clientManager: fixture.bypassesClientLayer
+            ? undefined
+            : clientManager,
           name,
         });
       },

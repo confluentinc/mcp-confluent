@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { sdkTransports } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
 import {
   pingHandler,
@@ -7,8 +8,10 @@ import {
   pingResponseSchema,
 } from "@src/mcp/transports/ping.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
+import { SessionRegistry } from "@src/mcp/transports/session-registry.js";
 import { Transport } from "@src/mcp/transports/types.js";
 import { FastifyReply, FastifyRequest } from "fastify";
+import { ServerResponse } from "node:http";
 
 interface SseMessageRequest {
   Querystring: {
@@ -25,10 +28,10 @@ const sseErrorSchema = {
 };
 
 export class SseTransport implements Transport {
-  private sessions: Record<string, SSEServerTransport> = {};
+  private sessions = new SessionRegistry<SSEServerTransport>();
 
   constructor(
-    private server: McpServer,
+    private serverFactory: () => McpServer,
     private httpServer: HttpServer,
     private sseMcpEndpointPath: string = "/sse",
     private sseMcpMessageEndpointPath: string = "/messages",
@@ -49,35 +52,9 @@ export class SseTransport implements Transport {
           },
         },
       },
-      async (request: FastifyRequest, reply: FastifyReply) => {
+      async (_request: FastifyRequest, reply: FastifyReply) => {
         try {
-          // Create transport with the correct message endpoint
-          const transport = new SSEServerTransport(
-            this.sseMcpMessageEndpointPath,
-            reply.raw,
-          );
-
-          // Get the session ID from the transport
-          const sessionId = transport.sessionId;
-          if (!sessionId) {
-            throw new Error("Failed to get session ID from transport");
-          }
-
-          // Store the session before connecting to ensure it's available for messages
-          this.sessions[sessionId] = transport;
-
-          // Set up cleanup on connection close
-          reply.raw.on("close", () => {
-            logger.info(`SSE connection closed for session ${sessionId}`);
-            delete this.sessions[sessionId];
-          });
-
-          // Connect the transport to the server
-          await this.server.connect(transport);
-
-          logger.info(
-            `New SSE connection established for session ${sessionId}`,
-          );
+          await this.createSession(reply.raw);
         } catch (error) {
           logger.error({ error }, "Failed to establish SSE connection");
           if (!reply.sent) {
@@ -118,17 +95,15 @@ export class SseTransport implements Transport {
       ) => {
         try {
           const sessionId = request.query.sessionId;
-          logger.info(`Received message for sessionId ${sessionId}`);
+          const entry = this.sessions.get(sessionId);
 
-          const transport = this.sessions[sessionId];
-
-          if (!transport) {
+          if (!entry) {
             logger.warn(`No transport found for sessionId: ${sessionId}`);
             reply.code(400).send({ error: "No transport found for sessionId" });
             return;
           }
 
-          await transport.handlePostMessage(
+          await entry.transport.handlePostMessage(
             request.raw,
             reply.raw,
             request.body,
@@ -163,13 +138,59 @@ export class SseTransport implements Transport {
 
   async disconnect(): Promise<void> {
     logger.info("Cleaning up SSE transport sessions...");
-    // Clean up all active sessions
-    Object.values(this.sessions).forEach((transport) => {
-      const sessionId = transport.sessionId;
-      if (sessionId) {
-        delete this.sessions[sessionId];
-      }
-      transport.close();
+    await this.sessions.closeAll();
+  }
+
+  /**
+   * Mints a per-session {@link McpServer} + {@link SSEServerTransport} pair, wires
+   * lifecycle callbacks, registers the session, then binds the server. Streamable HTTP gets
+   * the sessionId asynchronously via the SDK's {@linkcode onsessioninitialized} callback (which
+   * fires inside {@linkcode StreamableHTTPServerTransport.handleRequest}), so it can register
+   * lazily and a failed bind leaves no entry. SSE has no such callback — sessionId is known at
+   * construction — so we register first and roll back on bind rejection. Without the rollback
+   * a fast client could see {@linkcode SSEServerTransport.start}'s endpoint event, POST to
+   * {@linkcode sseMcpMessageEndpointPath} and race the {@linkcode sessions.set} call.
+   */
+  private async createSession(
+    rawResponse: ServerResponse,
+  ): Promise<SSEServerTransport> {
+    const perSessionServer = this.serverFactory();
+    const transport = new sdkTransports.SSEServerTransport(
+      this.sseMcpMessageEndpointPath,
+      rawResponse,
+    );
+    const sessionId = transport.sessionId;
+    if (!sessionId) {
+      throw new Error("Failed to get session ID from transport");
+    }
+
+    // fires on every close path (network drop, server-initiated, etc.) so abandoned sessions
+    // don't leak; closeAndRemove is idempotent against the not-yet-registered case
+    transport.onclose = () => {
+      this.sessions.closeAndRemove(sessionId).catch((err) => {
+        logger.error(
+          { err, sessionId },
+          "Failed to close SSE session on transport.onclose",
+        );
+      });
+    };
+
+    this.sessions.set(sessionId, {
+      transport,
+      server: perSessionServer,
     });
+    try {
+      await this.sessions.bindServer(perSessionServer, transport);
+    } catch (err) {
+      // bindServer already closed both halves via its internal closeEntry; we still call
+      // closeAndRemove here because bindServer doesn't know the registry key and the entry
+      // is what makes the session reachable to incoming POSTs. The duplicate close is safe:
+      // SDK transport.close() and McpServer.close() are both idempotent.
+      await this.sessions.closeAndRemove(sessionId);
+      throw err;
+    }
+
+    logger.info(`New SSE connection established for session ${sessionId}`);
+    return transport;
   }
 }

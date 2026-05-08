@@ -49,6 +49,17 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => child.kill(signal));
 }
 
+// `error` fires when spawn itself fails (e.g. ENOENT because npx is not on
+// PATH). Without this handler the script hangs without explaining why the
+// inspector never came up.
+child.on("error", (err) => {
+  process.stderr.write(
+    `inspector:yaml: failed to launch the MCP Inspector: ${err.message}\n` +
+      `  hint: ensure npx is on PATH (it ships with Node)\n`,
+  );
+  process.exit(1);
+});
+
 child.on("exit", (code, signal) => {
   if (signal !== null) {
     // Surface the killing signal in the parent's exit so the shell sees the

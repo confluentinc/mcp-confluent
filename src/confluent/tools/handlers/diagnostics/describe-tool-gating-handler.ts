@@ -74,11 +74,7 @@ export class DescribeToolGatingHandler extends BaseToolHandler {
 
   handle(runtime: ServerRuntime): CallToolResult {
     const report = buildToolGatingReport(this.listHandlers(), runtime);
-    return this.createResponse(
-      renderReport(report),
-      false,
-      report as unknown as Record<string, unknown>,
-    );
+    return this.createResponse(renderReport(report), false, { ...report });
   }
 
   getToolConfig(): ToolConfig {

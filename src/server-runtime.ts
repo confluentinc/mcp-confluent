@@ -18,9 +18,9 @@ export class ServerRuntime {
   /**
    * The active OAuth holder when any connection in the config has `type === "oauth"`.
    * Constructed by {@link ServerRuntime.fromConfig}; `undefined` on api_key paths.
-   * The holder runs PKCE in the background — callers can await
-   * `holder.bootstrapPromise` to know the bootstrap attempt has finished, then
-   * inspect the token accessors to determine whether tokens are available.
+   * Construction is side-effect-free — PKCE runs lazily on the first
+   * `holder.ensureLoggedIn()` call, which the MCP tool-call wrapper invokes
+   * before any handler that needs Confluent access.
    */
   readonly oauthHolder: OAuthHolder | undefined;
 
@@ -67,7 +67,7 @@ export class ServerRuntime {
     }
     const oauthConn = oauthConns[0];
     const oauthHolder = oauthConn
-      ? OAuthHolder.start(oauthConn.ccloud_env)
+      ? new OAuthHolder(oauthConn.ccloud_env)
       : undefined;
 
     // Construct a client manager for each connection in the config.

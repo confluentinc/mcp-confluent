@@ -27,6 +27,7 @@ See [Getting Started](#getting-started) for full setup instructions and [Configu
 
 - [Quick Start](#quick-start)
 - [Available Tools](#available-tools)
+  - [Always Available](#always-available-tools)
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
   - [Confluent Local](#available-tools-for-confluent-local)
 - [Getting Started](#getting-started)
@@ -51,6 +52,15 @@ You can list all available tools via the CLI:
 npx -y @confluentinc/mcp-confluent --list-tools
 ```
 
+### Always-Available Tools
+
+These tools need no service blocks or authentication — they're enabled even on a bare config, regardless of which deployment the rest of your config targets.
+
+| Category          | Tools                                         | Description                                               |
+| ----------------- | --------------------------------------------- | --------------------------------------------------------- |
+| **Documentation** | `search-product-docs`, `get-product-doc-page` | Search Confluent product docs and fetch full page content |
+| **Diagnostics**   | `describe-tool-gating`                        | Explain why specific tools are absent from `tools/list`   |
+
 ### Available Tools for Confluent Cloud
 
 These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`config.example.yaml`](config.example.yaml) for the full set of configuration variables, or to [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) below to authenticate as a logged-in user instead of via API keys (currently supported by the native-broker **Kafka** tools — `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`).
@@ -69,8 +79,6 @@ These tools require endpoints and authentication against specific Confluent Clou
 | **Tableflow Catalog**                      | `create-tableflow-catalog-integration`, `list-tableflow-catalog-integrations`, `read-tableflow-catalog-integration`, `update-tableflow-catalog-integration`, `delete-tableflow-catalog-integration` | Manage Tableflow catalog integrations (e.g., AWS Glue)            |
 | **Metrics**                                | `list-available-metrics`, `query-metrics`                                                                                                                                                           | Discover and query Confluent Cloud operational metrics            |
 | **Billing**                                | `list-billing-costs`                                                                                                                                                                                | Query billing and cost data                                       |
-| **Documentation**                          | `search-product-docs`, `get-product-doc-page`                                                                                                                                                       | Search Confluent product docs and fetch full page content         |
-| **Diagnostics**                            | `describe-tool-gating`                                                                                                                                                                              | Explain why specific tools are absent from `tools/list`           |
 
 ### Available Tools for Confluent Local
 
@@ -82,12 +90,10 @@ BOOTSTRAP_SERVERS="localhost:9092"
 SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 ```
 
-| Category            | Tools                                                                                  | Description                                               |
-| ------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Manage topics, produce/consume messages                   |
-| **Schema Registry** | `list-schemas`, `delete-schema`                                                        | List, inspect, and delete data schemas                    |
-| **Documentation**   | `search-product-docs`, `get-product-doc-page`                                          | Search Confluent product docs and fetch full page content |
-| **Diagnostics**     | `describe-tool-gating`                                                                 | Explain why specific tools are absent from `tools/list`   |
+| Category            | Tools                                                                                  | Description                             |
+| ------------------- | -------------------------------------------------------------------------------------- | --------------------------------------- |
+| **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Manage topics, produce/consume messages |
+| **Schema Registry** | `list-schemas`, `delete-schema`                                                        | List, inspect, and delete data schemas  |
 
 ## Getting Started
 
@@ -254,7 +260,6 @@ Run with `--config oauth.yaml` and the browser sign-in opens on first start.
 | **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               |
 | **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         |
 | **Billing**                                | `list-billing-costs`                                                                   |
-| **Diagnostics**                            | `describe-tool-gating`                                                                 |
 
 Under OAuth, native-Kafka tools require both `cluster_id` (`lkc-...`) and `environment_id` (`env-...`) at call time. The REST topic-config tools require `clusterId` and `environmentId` (camelCase, matching their existing direct-mode arg names). Discover both via `list-environments` then `list-clusters`.
 

@@ -53,13 +53,20 @@ describe("read-flink-statement-handler", { tags: [Tag.FLINK] }, () => {
     });
 
     it("should read the seeded statement and return a results header", async () => {
-      const result = await server.client.callTool({
-        name: ToolName.READ_FLINK_STATEMENT,
-        arguments: { statementName, timeoutInMilliseconds: 5000 },
-      });
-
-      // results header is emitted regardless of phase; SELECT 1 may still be PENDING.
-      expect(textContent(result)).toMatch(/^Flink SQL Statement Results:/);
+      // CCloud briefly returns 409 "Results not ready" between statement creation time and the time
+      // results are available
+      await expect
+        .poll(
+          async () => {
+            const result = await server.client.callTool({
+              name: ToolName.READ_FLINK_STATEMENT,
+              arguments: { statementName, timeoutInMilliseconds: 5000 },
+            });
+            return textContent(result);
+          },
+          { timeout: 30_000, interval: 2_000 },
+        )
+        .toMatch(/^Flink SQL Statement Results:/);
     });
   });
 });

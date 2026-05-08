@@ -4,11 +4,11 @@ import {
   DESTRUCTIVE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
   disposeIfOAuth,
   resolveKafkaClusterArgs,
-} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+} from "@src/confluent/tools/cluster-arg-resolvers.js";
+import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -27,7 +27,7 @@ const deleteKafkaTopicsArguments = z.object({
     .string()
     .optional()
     .describe(
-      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments.",
     ),
 });
 
@@ -37,9 +37,8 @@ export class DeleteTopicsHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = deleteKafkaTopicsArguments.parse(toolArguments);
-    const connId = this.enabledConnectionIds(runtime)[0]!;
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
-    const clientManager = runtime.clientManagers[connId]!;
     const admin = await clientManager.getKafkaAdminClient(
       resolved.clusterId,
       resolved.envId,

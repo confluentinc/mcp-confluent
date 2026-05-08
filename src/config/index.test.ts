@@ -136,6 +136,35 @@ describe("config/index.ts", () => {
       expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
         /At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined/,
       );
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+        /'intentionally_empty: true'/,
+      );
+    });
+
+    it("should accept a connection with no service blocks when intentionally_empty is true", () => {
+      const yamlContent = `connections:
+  docs-only:
+    type: "direct"
+    intentionally_empty: true
+`;
+
+      const config = parseYamlConfiguration(yamlContent, {});
+      expect(config.getSoleDirectConnection()).toEqual({
+        type: "direct",
+        intentionally_empty: true,
+      });
+    });
+
+    it("should reject 'intentionally_empty: false' (only true is meaningful)", () => {
+      const yamlContent = `connections:
+  bad:
+    type: "direct"
+    intentionally_empty: false
+`;
+
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+        /Configuration validation failed/,
+      );
     });
 
     it("should throw error when bootstrap_servers is missing", () => {

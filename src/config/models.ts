@@ -13,7 +13,8 @@ import { z } from "zod";
 /**
  * Connection configuration for a direct (local/Docker/Cloud) Kafka cluster.
  * Corresponds to `connections.<name>` (with `type: direct`) in the YAML configuration.
- * At least one of kafka, schema_registry, confluent_cloud, tableflow, flink, or telemetry must be present.
+ * At least one of kafka, schema_registry, confluent_cloud, tableflow, flink, or telemetry must be present,
+ * unless `intentionally_empty: true` is set.
  */
 export interface DirectConnectionConfig {
   readonly type: "direct";
@@ -23,6 +24,11 @@ export interface DirectConnectionConfig {
   readonly tableflow?: TableflowDirectConfig;
   readonly telemetry?: TelemetryDirectConfig;
   readonly flink?: FlinkDirectConfig;
+  /**
+   * Opt-in for connections with no service blocks (e.g. `search-product-docs`-only
+   * setups). Distinguishes intentional empty configs from half-finished YAML.
+   */
+  readonly intentionally_empty?: true;
 }
 
 /**
@@ -266,6 +272,7 @@ const authConfigSchema = z.discriminatedUnion("type", [apiKeyAuthSchema]);
 const directConnectionSchema = z
   .object({
     type: z.literal("direct"),
+    intentionally_empty: z.literal(true).optional(),
     confluent_cloud: z
       .object({
         endpoint: z
@@ -424,6 +431,7 @@ const connectionConfigSchema = z
   .superRefine((data, ctx) => {
     if (
       data.type === "direct" &&
+      !data.intentionally_empty &&
       !data.kafka &&
       !data.schema_registry &&
       !data.confluent_cloud &&
@@ -434,7 +442,7 @@ const connectionConfigSchema = z
       ctx.addIssue({
         code: "custom",
         message:
-          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined",
+          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined — or set 'intentionally_empty: true' to enable only connection-agnostic tools",
       });
     }
   })

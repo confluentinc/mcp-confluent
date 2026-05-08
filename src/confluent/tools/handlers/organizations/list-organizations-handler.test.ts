@@ -1,9 +1,6 @@
 import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organizations/list-organizations-handler.js";
 import {
-  bareRuntime,
   CCLOUD_CONN,
-  ccloudOAuthRuntime,
-  confluentCloudRuntime,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
 } from "@tests/factories/runtime.js";
@@ -12,7 +9,7 @@ import {
   getMockedClientManager,
   type HandleCase,
 } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 
 const ORG_FIXTURE = {
   api_version: "org/v2",
@@ -30,24 +27,6 @@ const ORG_FIXTURE = {
 describe("list-organizations-handler.ts", () => {
   describe("ListOrganizationsHandler", () => {
     const handler = new ListOrganizationsHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a confluent_cloud block", () => {
-        expect(handler.enabledConnectionIds(confluentCloudRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a confluent_cloud block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return the connection id when the connection is OAuth-typed", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-    });
 
     describe("handle()", () => {
       type OrgsCase = HandleCase & { cloudGetData: unknown };

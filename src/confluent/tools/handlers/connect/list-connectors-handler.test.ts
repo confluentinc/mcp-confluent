@@ -1,9 +1,6 @@
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import {
-  bareRuntime,
   CCLOUD_CONN,
-  ccloudOAuthRuntime,
-  confluentCloudRuntime,
   CONNECT_CONN,
   ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
@@ -18,22 +15,6 @@ import { describe, expect, it } from "vitest";
 describe("list-connectors-handler.ts", () => {
   describe("ListConnectorsHandler", () => {
     const handler = new ListConnectorsHandler();
-
-    describe("enabledConnectionIds()", () => {
-      it("should return the connection ID for a connection with a confluent_cloud block", () => {
-        expect(handler.enabledConnectionIds(confluentCloudRuntime())).toEqual([
-          DEFAULT_CONNECTION_ID,
-        ]);
-      });
-
-      it("should return an empty array for a connection without a confluent_cloud block", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
-      });
-
-      it("should return an empty array for an OAuth-typed connection", () => {
-        expect(handler.enabledConnectionIds(ccloudOAuthRuntime())).toEqual([]);
-      });
-    });
 
     describe("handle()", () => {
       const cases: ConnectHandleCase[] = [

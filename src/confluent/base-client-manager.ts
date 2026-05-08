@@ -268,7 +268,7 @@ export abstract class BaseClientManager
    * its lifetime). Under OAuth, args are required and a fresh admin is built
    * per call — the caller owns the lifetime and must dispose via
    * `disposeIfOAuth(runtime, connId, admin)` in a `try { ... } finally { ... }`
-   * block (helper at `@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js`).
+   * block (helper at `@src/confluent/tools/cluster-arg-resolvers.js`).
    */
   abstract getKafkaAdminClient(
     clusterId?: string,

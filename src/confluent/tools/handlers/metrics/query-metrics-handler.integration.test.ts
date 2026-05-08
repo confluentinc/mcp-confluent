@@ -1,6 +1,5 @@
-import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
+import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { getFirstTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
@@ -11,20 +10,14 @@ import { activeTransports } from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const handler = new ReadEnvironmentHandler();
+const handler = new QueryMetricsHandler();
 const runtime = integrationRuntime();
 
-describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
+describe("query-metrics-handler", { tags: [Tag.METRICS] }, () => {
   if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires confluent_cloud.auth config", () => {});
+    it.skip("requires telemetry.auth config", () => {});
     return;
   }
-
-  // resolve once per file - same env id across all transport iterations
-  let environmentId: string;
-  beforeAll(async () => {
-    environmentId = await getFirstTestEnvironmentId();
-  });
 
   describe.each(activeTransports)("via %s transport", (transport) => {
     let server: StartedServer;
@@ -37,20 +30,29 @@ describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
       await server?.stop();
     });
 
-    it("should expose read-environment in tools/list", async () => {
+    it("should expose query-metrics in tools/list", async () => {
       const { tools } = await server.client.listTools();
+
       expect(
-        tools.find((t) => t.name === ToolName.READ_ENVIRONMENT),
+        tools.find((t) => t.name === ToolName.QUERY_METRICS),
       ).toBeDefined();
     });
 
-    it("should return details for the resolved environment id", async () => {
+    it("should query a kafka.server metric for the configured cluster", async () => {
+      // `filter` is omitted: for io.confluent.kafka.server/* metrics the handler auto-injects
+      // resource.kafka.id (from kafka.cluster_id in integration.yaml)
       const result = await server.client.callTool({
-        name: ToolName.READ_ENVIRONMENT,
-        arguments: { environmentId },
+        name: ToolName.QUERY_METRICS,
+        arguments: {
+          metric: "io.confluent.kafka.server/received_bytes",
+          granularity: "PT5M",
+        },
       });
 
-      expect(textContent(result)).toContain(`ID: ${environmentId}`);
+      // idle cluster may show "No data returned for metric"
+      expect(textContent(result)).toMatch(
+        /^(Metrics Query Results|No data returned for metric)/,
+      );
     });
   });
 });

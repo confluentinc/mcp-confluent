@@ -79,6 +79,37 @@ export function resolveKafkaRestArgs(
 }
 
 /**
+ * Env-only resolver for tools that scope a request to a single CCloud
+ * environment without a cluster identifier (e.g., `list-clusters`).
+ *
+ * Direct: arg wins; falls back to `conn.kafka?.env_id`; throws if neither
+ *   source supplies a value.
+ * OAuth: arg required (no service block to fall back to); throws with a
+ *   discovery hint pointing at `list-environments`.
+ *
+ * Argument name is camelCase (`environmentId`) to match the existing
+ * input-schema convention of cluster-management tools.
+ */
+export function resolveEnvArg(
+  args: { environmentId?: string },
+  runtime: ServerRuntime,
+  connId: string,
+): string {
+  const conn = runtime.config.connections[connId]!;
+  const fallback = conn.type === "direct" ? conn.kafka?.env_id : undefined;
+  const resolved = args.environmentId ?? fallback;
+  if (!resolved) {
+    throw new Error(
+      "environmentId is required: pass it as a tool argument or " +
+        (conn.type === "direct"
+          ? "set kafka.env_id in the connection config."
+          : "call list-environments to discover available environments."),
+    );
+  }
+  return resolved;
+}
+
+/**
  * Disposes a Kafka client (admin or producer) iff the connection is OAuth-typed.
  * On direct connections this is a no-op — direct's `AsyncLazy` admin/producer
  * are manager-owned singletons and must not be disconnected by handlers. On

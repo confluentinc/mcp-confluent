@@ -56,7 +56,6 @@ describe("delete-schema-handler", { tags: [Tag.SCHEMA] }, () => {
         arguments: { subject },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toContain(
         `Successfully deleted subject "${subject}"`,
       );

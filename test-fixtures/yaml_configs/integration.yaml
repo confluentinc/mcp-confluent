@@ -59,6 +59,8 @@ connections:
         type: api_key
         key: "${FLINK_API_KEY}"
         secret: "${FLINK_API_SECRET}"
+      # any future updates to the configured Flink compute pool must ensure the associated cloud
+      # provider/region pair matches the cluster in the `kafka` block
       compute_pool_id: "lfcp-1gv99z"
       endpoint: "https://flink.us-east-2.aws.confluent.cloud"
       environment_id: "env-rw7g8k"

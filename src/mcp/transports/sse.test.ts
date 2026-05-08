@@ -185,16 +185,22 @@ describe("SseTransport", () => {
       expect(mockSessions.closeAndRemove).toHaveBeenCalledWith(MOCK_SESSION_ID);
     });
 
-    it("should throw when the SDK transport has no session id", async () => {
+    it("should throw and close both halves when the SDK transport has no session id", async () => {
       newTransport = createMockSseServerTransport();
       // factory's default fills in MOCK_SESSION_ID; override to exercise the early-throw branch.
       // sessionId is a getter on the SDK class (so typed read-only), but the factory installs
       // it as a writable data prop, so the runtime assignment is fine.
       (newTransport as { sessionId: string | undefined }).sessionId = undefined;
+      // capture the per-session server so we can assert close() lands on it; default factory
+      // returns a fresh mock per call, which would make the close assertion target unreachable
+      const orphanServer = createMockInstance(McpServer);
+      serverFactory.mockReturnValueOnce(orphanServer);
 
       await expect(sseTransport["createSession"](rawResponse)).rejects.toThrow(
         /session ID/i,
       );
+      expect(newTransport.close).toHaveBeenCalledOnce();
+      expect(orphanServer.close).toHaveBeenCalledOnce();
       expect(mockSessions.bindServer).not.toHaveBeenCalled();
     });
 

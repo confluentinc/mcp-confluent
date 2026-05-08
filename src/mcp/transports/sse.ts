@@ -2,11 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { sdkTransports } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
-import {
-  pingHandler,
-  pingRequestSchema,
-  pingResponseSchema,
-} from "@src/mcp/transports/ping.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
 import { SessionRegistry } from "@src/mcp/transports/session-registry.js";
 import { Transport } from "@src/mcp/transports/types.js";
@@ -117,22 +112,6 @@ export class SseTransport implements Transport {
       },
     );
 
-    // POST ping endpoint for health checks
-    fastify.post(
-      "/ping",
-      {
-        schema: {
-          tags: ["mcp"],
-          summary: "JSON-RPC 2.0 ping endpoint",
-          body: pingRequestSchema,
-          response: {
-            200: pingResponseSchema,
-          },
-        },
-      },
-      pingHandler(),
-    );
-
     logger.info("SSE transport routes registered");
   }
 
@@ -161,6 +140,11 @@ export class SseTransport implements Transport {
     );
     const sessionId = transport.sessionId;
     if (!sessionId) {
+      // SDK's SSEServerTransport always assigns a sessionId in its constructor; this branch is
+      // defensive. Close the just-created pair before throwing so we don't leak the McpServer
+      // and the SSE response stays detached.
+      await transport.close();
+      await perSessionServer.close();
       throw new Error("Failed to get session ID from transport");
     }
 

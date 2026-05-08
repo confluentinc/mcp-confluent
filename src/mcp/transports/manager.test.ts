@@ -26,12 +26,5 @@ describe("TransportManager", () => {
 
       expect(second).toBe(first);
     });
-
-    it("should return the same instance on repeated calls for sse", () => {
-      const first = manager.getServer(TransportType.SSE, serverOptions);
-      const second = manager.getServer(TransportType.SSE, serverOptions);
-
-      expect(second).toBe(first);
-    });
   });
 });

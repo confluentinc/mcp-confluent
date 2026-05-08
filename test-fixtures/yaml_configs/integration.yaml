@@ -52,3 +52,14 @@ connections:
         type: api_key
         key: "${TELEMETRY_API_KEY}"
         secret: "${TELEMETRY_API_SECRET}"
+
+    # --- @flink (Flink SQL + catalog/diagnostics) ---
+    flink:
+      auth:
+        type: api_key
+        key: "${FLINK_API_KEY}"
+        secret: "${FLINK_API_SECRET}"
+      compute_pool_id: "lfcp-1gv99z"
+      endpoint: "https://flink.us-east-2.aws.confluent.cloud"
+      environment_id: "env-rw7g8k"
+      organization_id: "683187f4-4132-484a-adf7-0553cea0a5e4"

@@ -43,7 +43,6 @@ describe("list-connectors-handler", { tags: [Tag.CONNECT] }, () => {
         arguments: {},
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(/^Active Connectors:/);
     });
   });

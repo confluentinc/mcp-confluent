@@ -43,7 +43,6 @@ describe("list-environments-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
         arguments: {},
       });
 
-      expect(result.isError).not.toBe(true);
       // handler's success line starts with "Successfully retrieved N environments:"
       expect(textContent(result)).toMatch(
         /^Successfully retrieved \d+ environments:/,

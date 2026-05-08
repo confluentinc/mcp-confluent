@@ -58,7 +58,7 @@ describe("list-schemas-handler", { tags: [Tag.SCHEMA] }, () => {
         arguments: { subjectPrefix: subject },
       });
 
-      expect(result.isError).not.toBe(true);
+      expect(result.isError, textContent(result)).not.toBe(true);
       // handler stringifies a `Record<subject, metadata>` map; the prefix filter narrows the
       // response to a single-key object
       const parsed = JSON.parse(textContent(result));

@@ -123,3 +123,22 @@ export function withSharedFlinkStatementCleanup(): {
   });
   return { createdStatements };
 }
+
+/**
+ * Parses a list-databases response and returns the friendly SCHEMA_NAME for
+ * the given cluster id, or `undefined` if the cluster isn't catalogued in the
+ * Flink workspace. The friendly name is what TABLE_SCHEMA filters expect.
+ */
+export function findFriendlySchemaName(
+  listDatabasesText: string,
+  clusterId: string,
+): string | undefined {
+  const jsonStart = listDatabasesText.indexOf("[");
+  const jsonEnd = listDatabasesText.lastIndexOf("]");
+  if (jsonStart < 0 || jsonEnd < jsonStart) return undefined;
+  // handler emits raw Flink-SQL row payloads of shape `{ row: [SCHEMA_ID, SCHEMA_NAME] }`
+  const databases = JSON.parse(
+    listDatabasesText.slice(jsonStart, jsonEnd + 1),
+  ) as Array<{ row: [string, string] }>;
+  return databases.find((d) => d.row[0] === clusterId)?.row[1];
+}

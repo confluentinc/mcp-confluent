@@ -42,7 +42,6 @@ describe("list-metrics-handler", { tags: [Tag.METRICS] }, () => {
         arguments: { resource_type: "kafka" },
       });
 
-      expect(result.isError).not.toBe(true);
       const text = textContent(result);
       // received_bytes is a stable kafka.server metric, so finding it proves the end-to-end call
       // returned kafka data

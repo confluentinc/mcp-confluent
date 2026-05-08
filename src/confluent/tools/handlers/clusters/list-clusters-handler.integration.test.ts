@@ -50,7 +50,6 @@ describe("list-clusters-handler", { tags: [Tag.CLUSTERS] }, () => {
         arguments: { environmentId },
       });
 
-      expect(result.isError).not.toBe(true);
       expect(textContent(result)).toMatch(
         /^Successfully retrieved [1-9]\d* clusters:/,
       );

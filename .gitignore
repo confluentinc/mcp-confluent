@@ -86,6 +86,7 @@ web_modules/
 /*.yaml
 /*.yml
 !/config.example.yaml
+!/config.oauth.example.yaml
 !/docker-compose.yml
 !/service.yml
 

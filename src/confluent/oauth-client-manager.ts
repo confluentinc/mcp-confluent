@@ -107,7 +107,7 @@ export class OAuthClientManager extends BaseClientManager {
     // `createAxiosDefaults` at construction time, so a build during initial
     // login or a broken refresh would freeze an empty bearer into every
     // subsequent request — fail fast here before that can happen.
-    const dpat = await this.requireDataPlaneToken();
+    const dpat = this.requireDataPlaneToken();
     const endpoint = await resolveSchemaRegistryEndpoint(
       this.getConfluentCloudRestClient(),
       clusterId!,
@@ -133,7 +133,7 @@ export class OAuthClientManager extends BaseClientManager {
     // The bearer middleware reads `auth.getToken()` per-request, but failing
     // fast here gives the agent a clear error rather than letting an empty
     // bearer go out on the wire.
-    await this.requireDataPlaneToken();
+    this.requireDataPlaneToken();
     const baseUrl = await resolveKafkaRestEndpoint(
       this.getConfluentCloudRestClient(),
       clusterId!,
@@ -211,18 +211,23 @@ export class OAuthClientManager extends BaseClientManager {
   }
 
   /**
-   * Awaits the holder's bootstrap promise and returns the current data-plane
-   * token, throwing when the bootstrap completes without one. Used by every
-   * OAuth-side client accessor to fail fast before constructing a client
-   * with an empty bearer.
+   * Returns the current data-plane token, throwing when none is available.
+   * Used by every OAuth-side client accessor to fail fast before
+   * constructing a client with an empty bearer.
+   *
+   * The MCP tool-call gate calls `holder.ensureLoggedIn()` before any
+   * handler that needs Confluent access, so by the time this method runs
+   * login has already completed. A missing DPAT here means the holder was
+   * cleared mid-call (shutdown raced with a tool call) or a non-transient
+   * refresh error has invalidated the token between the gate check and
+   * the client construction — both rare and surface a clear message.
    */
-  private async requireDataPlaneToken(): Promise<string> {
-    await this.holder.bootstrapPromise;
+  private requireDataPlaneToken(): string {
     const dpat = this.holder.getDataPlaneToken();
     if (!dpat) {
       throw new Error(
-        "OAuth login did not produce a data-plane token. " +
-          "Check the OAuth login flow status (browser sign-in must complete).",
+        "No data-plane token available. The OAuth holder may have been " +
+          "shut down or an authentication error has invalidated the token.",
       );
     }
     return dpat;
@@ -253,7 +258,7 @@ export class OAuthClientManager extends BaseClientManager {
     // handshake — the synchronous `oauthbearer_token_refresh_cb` (configured
     // below) reads it on demand, so an empty token here would surface as a
     // broker-side auth failure with no useful diagnostic.
-    await this.requireDataPlaneToken();
+    this.requireDataPlaneToken();
     // librdkafka debug logs — gated by env var so they don't pollute normal
     // server stderr. Set OAUTH_KAFKA_DEBUG=security,broker,protocol (or
     // "all") to see the full SASL/OAUTHBEARER handshake and broker traffic.

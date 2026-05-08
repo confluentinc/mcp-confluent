@@ -118,15 +118,19 @@ export function groupDisabledToolsByReason(
  * the configured connection.
  *
  * v1 (single-connection scope):
- * - `disabled_groups` aggregates disabled tools from every configured
- *   connection's predicate verdict — under today's invariant of exactly one
- *   configured connection, that is just "the connection". Sorted lex by
- *   reason; tools within a group follow handler iteration order.
- * - `enabled_count` / `disabled_count` count distinct tools (a tool that
- *   resolves to the same verdict on every connection contributes once).
- *
- * See the {@linkcode ToolGatingReport} JSDoc for the v2 (multi-connection)
- * shape and how this function will grow when issue #151's follow-ups land.
+ * - `disabled_groups` is sorted lex by reason; tools within a group follow
+ *   handler iteration order.
+ * - Each tool contributes once to `enabled_count` *or* `disabled_count`:
+ *   a tool whose predicate produces an `enabled: true` verdict on at
+ *   least one configured connection counts as enabled (and is omitted
+ *   from `disabled_groups`); otherwise it counts as disabled and lands
+ *   under the first disabled verdict's reason. This flatten is lossy
+ *   on a multi-connection runtime — see the handler module-doc for
+ *   the consequences and the v2 (multi-connection) shape on
+ *   {@linkcode ToolGatingReport}.
+ * - Throws `Wacky -- ...` if any handler returns an empty verdict map
+ *   (a runtime-shaped invariant violation rather than a tool-state
+ *   condition; see `classifyTool` for the rationale).
  */
 export function buildToolGatingReport(
   handlers: Iterable<readonly [ToolName, ToolHandler]>,
@@ -146,10 +150,8 @@ export function buildToolGatingReport(
     }
     disabledCount += 1;
     let bucket = groupsByReason.get(classification.reason);
-    if (bucket === undefined) {
-      bucket = [];
-      groupsByReason.set(classification.reason, bucket);
-    }
+    bucket ??= [];
+    groupsByReason.set(classification.reason, bucket);
     bucket.push(toolName);
   }
 
@@ -191,14 +193,19 @@ function classifyTool(
   if (firstDisabledReason === undefined) {
     // Wacky -- handler returned an empty verdict map. BaseToolHandler builds
     // verdicts directly from `runtime.config.connections`, so an empty map
-    // means there are zero configured connections. Bootstrapping enforces
-    // at least one connection, so this branch should be unreachable in
-    // production; treat the tool as disabled with a placeholder reason
-    // rather than throwing inside a diagnostic tool.
-    return {
-      kind: "disabled",
-      reason: ToolDisabledReason.OAuthNoServiceBlocks,
-    };
+    // means there are zero configured connections, which
+    // `enforceSingleConnectionOnly()` in `src/config/models.ts` should have
+    // prevented at bootstrap. Fail loudly rather than fabricate a
+    // misleading `ToolDisabledReason` and ship it in the operator-facing
+    // report — a wrong-by-name reason is harder to diagnose than a stack
+    // trace.
+    throw new Error(
+      "Wacky -- classifyTool received an empty verdict map: a handler's " +
+        "connectionVerdicts() returned no entries. BaseToolHandler derives " +
+        "verdicts from runtime.config.connections; an empty map implies zero " +
+        "configured connections, which enforceSingleConnectionOnly() in " +
+        "src/config/models.ts should have rejected at bootstrap.",
+    );
   }
   return { kind: "disabled", reason: firstDisabledReason };
 }

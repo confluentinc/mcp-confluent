@@ -59,7 +59,7 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
  * Central registry for all tool call handlers.
  */
 export class ToolHandlerRegistry {
-  private static handlers: Map<ToolName, ToolHandler> = new Map<
+  private static readonly handlers: Map<ToolName, ToolHandler> = new Map<
     ToolName,
     ToolHandler
   >([

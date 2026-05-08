@@ -2,6 +2,7 @@ import type { DirectConnectionConfig } from "@src/config/index.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   ConnectionPredicate,
+  PredicateResult,
   ToolDisabledReason,
   alwaysEnabled,
 } from "@src/confluent/tools/connection-predicates.js";
@@ -48,6 +49,24 @@ const enabledOnlyWithKafka: ConnectionPredicate = (conn) =>
         enabled: false,
         reason: ToolDisabledReason.MissingKafkaBlock,
       };
+
+/**
+ * Returns a {@linkcode ToolHandler} whose `connectionVerdicts()` resolves
+ * to an empty map — the invariant-violation shape the diagnostic tool
+ * guards against. `BaseToolHandler.connectionVerdicts` is documented as
+ * `@final` but the test deliberately monkey-patches the instance method
+ * to reach a branch that should be unreachable in production (every
+ * runtime carries at least one connection by `enforceSingleConnectionOnly`).
+ */
+function handlerWithEmptyVerdicts(): ToolHandler {
+  const handler = new StubHandler();
+  (
+    handler as unknown as {
+      connectionVerdicts: () => Map<string, PredicateResult>;
+    }
+  ).connectionVerdicts = () => new Map();
+  return handler;
+}
 
 /**
  * Splice an additional `direct`-typed connection into a runtime built by
@@ -234,6 +253,47 @@ describe("tool-availability.ts", () => {
         enabled_count: 0,
         disabled_count: 3,
       });
+    });
+
+    it("should classify a tool as enabled when at least one configured connection passes its predicate, omitting it from disabled_groups (lossy v1 flatten)", () => {
+      // Pins the v1 single-connection-scope behaviour against a synthesised
+      // multi-connection runtime: a tool enabled on `with-kafka` and
+      // disabled on `without-kafka` is reported as enabled overall, with
+      // no entry in `disabled_groups`. The asymmetry is dropped — the v2
+      // per-connection / cross-connection-deltas shape (see
+      // ToolGatingReport JSDoc) is the proper fix for this. This test
+      // exists so the lossy aggregation is documented in code rather
+      // than implied by prose.
+      const handler = stubWithPredicate(enabledOnlyWithKafka);
+      const runtime = runtimeWith(KAFKA_CONN, "with-kafka");
+      addConnection(runtime, "without-kafka", {});
+
+      const report = buildToolGatingReport(
+        [[ToolName.LIST_TOPICS, handler]],
+        runtime,
+      );
+
+      expect(report).toEqual({
+        disabled_groups: [],
+        enabled_count: 1,
+        disabled_count: 0,
+      });
+    });
+
+    it("should throw a 'Wacky --' error when a handler returns an empty verdict map (invariant violation)", () => {
+      // The empty-verdict-map case means a tool's `connectionVerdicts()`
+      // returned no entries — which only happens if `runtime.config.connections`
+      // is empty, which `enforceSingleConnectionOnly()` should have prevented
+      // at bootstrap. The diagnostic tool fails loudly with a `Wacky --`
+      // message rather than fabricating a misleading reason (e.g. the
+      // never-applicable `OAuthNoServiceBlocks`) and shipping it in the
+      // operator-facing report.
+      expect(() =>
+        buildToolGatingReport(
+          [[ToolName.LIST_TOPICS, handlerWithEmptyVerdicts()]],
+          runtimeWith({}),
+        ),
+      ).toThrow(/Wacky --.*empty verdict map/i);
     });
 
     it("should preserve handler iteration order for tools within a single reason group", () => {

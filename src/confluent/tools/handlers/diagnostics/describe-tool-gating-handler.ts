@@ -39,11 +39,18 @@ const describeToolGatingArguments = z.object({});
  * others — the canonical "what does connection B need to reach parity with
  * connection A?" view. The structured `_meta` shape mirrors that change;
  * see the {@linkcode ToolGatingReport} JSDoc in `tool-availability.ts` for
- * the exact target type. Until then this handler keeps a flat, single-
- * connection view, but the helper already iterates `runtime.config.connections`
- * defensively so multi-connection runtimes degrade gracefully (every
- * connection's verdict feeds into the same flat groups) rather than
- * crashing.
+ * the exact target type.
+ *
+ * Until v2 lands, the helper accepts a multi-connection runtime without
+ * crashing, but the v1 flatten is *lossy*: a tool whose predicate is
+ * enabled on at least one configured connection is reported as enabled
+ * (and therefore omitted from `disabled_groups` entirely), and a tool
+ * disabled on multiple connections with different reasons is bucketed
+ * under the first disabled verdict its iteration produces — the
+ * cross-connection asymmetry vanishes from the output. Today's
+ * single-connection invariant means neither lossy case can fire in
+ * production; this paragraph exists so a future reader does not mistake
+ * defensive iteration for parity reporting.
  *
  * Always enabled (predicate is `alwaysEnabled`) so an operator can call it
  * to diagnose a config that left every other tool disabled.
@@ -96,10 +103,21 @@ export class DescribeToolGatingHandler extends BaseToolHandler {
  *
  *   {disabled} of {total} tools disabled for the following reasons:
  *
- *     {reason} ({n}): {tool, tool, ...}
- *     ...
+ *     {reason} ({n}):
+ *       - {tool}
+ *       - {tool}
+ *       …
+ *
+ *     {next reason} ({n}):
+ *       - {tool}
+ *       …
  *
  *   {enabled} tools advertised via tools/list.
+ *
+ * Each disabled-reason group is a header line followed by one tool per
+ * indented bullet (two-space indent on the reason header, four-space
+ * indent on the bullets). Groups are separated by a blank line so
+ * adjacent buckets stay visually distinct.
  *
  * v2 (multi-connection): grow a connection header per per-connection
  * section and an optional `Cross-connection deltas` section. See the

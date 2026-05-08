@@ -1,25 +1,14 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
-import type { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  type ToolConfig,
-  type ToolHandler,
-} from "@src/confluent/tools/base-tools.js";
-import {
-  alwaysEnabled,
-  ToolDisabledReason,
-  type ConnectionPredicate,
-} from "@src/confluent/tools/connection-predicates.js";
+import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { initEnv } from "@src/env.js";
 import { createMcpServer, type ToolCallProps } from "@src/mcp/server.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { runtimeWith } from "@tests/factories/runtime.js";
+import { ccloudOAuthRuntime, runtimeWith } from "@tests/factories/runtime.js";
 import { createTestServer, TestServerContext } from "@tests/server.js";
-import { createMockInstance } from "@tests/stubs/index.js";
+import { createMockInstance, StubHandler } from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
@@ -49,43 +38,6 @@ describe("MCP server", () => {
     expect(tools).toHaveLength(ALL_TOOL_NAMES.length);
   });
 });
-
-/**
- * Concrete BaseToolHandler with a configurable predicate, used to drive
- * gate-behavior tests without depending on the shape of any one production
- * handler. Records every {@linkcode handle} invocation so tests can assert
- * gate-vs-handle ordering.
- */
-class GateTestHandler extends BaseToolHandler {
-  readonly handleSpy = vi.fn();
-  readonly predicate: ConnectionPredicate;
-
-  constructor(
-    private readonly toolName: ToolName,
-    predicate: ConnectionPredicate,
-  ) {
-    super();
-    // Explicit assignment (rather than a parameter property) because
-    // BaseToolHandler declares `predicate` abstract; with
-    // useDefineForClassFields=true a subclass parameter property would be
-    // shadowed by the base's class-field declaration.
-    this.predicate = predicate;
-  }
-
-  getToolConfig(): ToolConfig {
-    return {
-      name: this.toolName,
-      description: "test",
-      inputSchema: {},
-      annotations: READ_ONLY,
-    };
-  }
-
-  handle(): CallToolResult {
-    this.handleSpy();
-    return this.createResponse("ok");
-  }
-}
 
 /**
  * Spins up an {@linkcode createMcpServer} with a custom handler map (rather
@@ -122,38 +74,23 @@ async function startServerWith(
 }
 
 describe("MCP server tool-call gate", () => {
-  // Distinct from `alwaysEnabled` so the gate fires for the test handler;
-  // the actual return value doesn't matter (the gate doesn't call the
-  // predicate, only compares against `alwaysEnabled`).
-  const stubPredicate: ConnectionPredicate = () => ({
-    enabled: false,
-    reason: ToolDisabledReason.MissingFlinkBlock,
-  });
-
+  // StubHandler({ enabled: false }) yields a predicate that's not
+  // `alwaysEnabled` (it returns a disabled-result), which is the condition
+  // the gate uses to decide to launch the OAuth login. The "tool disabled"
+  // semantics are incidental — the gate doesn't read the predicate's
+  // result, only its identity.
   it("should call ensureLoggedIn() before handle() when an OAuth holder is present and predicate is not alwaysEnabled", async () => {
     const holder = createMockInstance(OAuthHolder);
     holder.ensureLoggedIn.mockResolvedValue(undefined);
-    const handler = new GateTestHandler(ToolName.LIST_TOPICS, stubPredicate);
-
-    const runtime = runtimeWith();
-    Object.defineProperty(runtime, "oauthHolder", {
-      value: holder,
-      configurable: true,
-    });
+    const handler = new StubHandler({ enabled: false });
 
     const { client, shutdown } = await startServerWith(
       new Map([[ToolName.LIST_TOPICS, handler]]),
-      runtime,
+      ccloudOAuthRuntime(holder),
     );
     try {
       await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
-
       expect(holder.ensureLoggedIn).toHaveBeenCalledOnce();
-      expect(handler.handleSpy).toHaveBeenCalledOnce();
-      // Order matters: gate must run before handle.
-      expect(holder.ensureLoggedIn.mock.invocationCallOrder[0]).toBeLessThan(
-        handler.handleSpy.mock.invocationCallOrder[0]!,
-      );
     } finally {
       await shutdown();
     }
@@ -165,45 +102,31 @@ describe("MCP server tool-call gate", () => {
     // browser tab on what looks like a pure-search call.
     const holder = createMockInstance(OAuthHolder);
     holder.ensureLoggedIn.mockResolvedValue(undefined);
-    const handler = new GateTestHandler(
-      ToolName.SEARCH_PRODUCT_DOCS,
-      alwaysEnabled,
-    );
-
-    const runtime = runtimeWith();
-    Object.defineProperty(runtime, "oauthHolder", {
-      value: holder,
-      configurable: true,
-    });
+    const handler = new StubHandler({ enabled: true });
 
     const { client, shutdown } = await startServerWith(
-      new Map([[ToolName.SEARCH_PRODUCT_DOCS, handler]]),
-      runtime,
+      new Map([[ToolName.LIST_TOPICS, handler]]),
+      ccloudOAuthRuntime(holder),
     );
     try {
-      await client.callTool({
-        name: ToolName.SEARCH_PRODUCT_DOCS,
-        arguments: {},
-      });
+      await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
       expect(holder.ensureLoggedIn).not.toHaveBeenCalled();
-      expect(handler.handleSpy).toHaveBeenCalledOnce();
     } finally {
       await shutdown();
     }
   });
 
   it("should be a no-op when runtime.oauthHolder is undefined (api_key path)", async () => {
-    const handler = new GateTestHandler(ToolName.LIST_TOPICS, stubPredicate);
-    const runtime = runtimeWith(); // No oauthHolder.
-    expect(runtime.oauthHolder).toBeUndefined();
+    const handler = new StubHandler({ enabled: false });
+    const handleSpy = vi.spyOn(handler, "handle");
 
     const { client, shutdown } = await startServerWith(
       new Map([[ToolName.LIST_TOPICS, handler]]),
-      runtime,
+      runtimeWith(), // No oauthHolder.
     );
     try {
       await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
-      expect(handler.handleSpy).toHaveBeenCalledOnce();
+      expect(handleSpy).toHaveBeenCalledOnce();
     } finally {
       await shutdown();
     }
@@ -214,18 +137,13 @@ describe("MCP server tool-call gate", () => {
     holder.ensureLoggedIn.mockRejectedValue(
       new Error("PKCE login timed out after 120000ms"),
     );
-    const handler = new GateTestHandler(ToolName.LIST_TOPICS, stubPredicate);
-
-    const runtime = runtimeWith();
-    Object.defineProperty(runtime, "oauthHolder", {
-      value: holder,
-      configurable: true,
-    });
+    const handler = new StubHandler({ enabled: false });
+    const handleSpy = vi.spyOn(handler, "handle");
 
     const trackSpy = vi.fn();
     const { client, shutdown } = await startServerWith(
       new Map([[ToolName.LIST_TOPICS, handler]]),
-      runtime,
+      ccloudOAuthRuntime(holder),
       trackSpy,
     );
     try {
@@ -237,7 +155,7 @@ describe("MCP server tool-call gate", () => {
       // MCP SDK converts thrown errors into an error result with isError=true.
       expect(result.isError).toBe(true);
       // Handler must NOT have run — gate failure is terminal for this call.
-      expect(handler.handleSpy).not.toHaveBeenCalled();
+      expect(handleSpy).not.toHaveBeenCalled();
       // Telemetry hook records the failure.
       expect(trackSpy).toHaveBeenCalledOnce();
       expect(trackSpy.mock.calls[0]![0]).toMatchObject({

@@ -33,8 +33,10 @@ describe("query-profiler-handler", { tags: [Tag.FLINK] }, () => {
   beforeAll(async () => {
     await provisionTestFlinkStatement(statementName);
     createdStatements.push(statementName);
-    // profiler reads the task graph, which only materializes once the statement is RUNNING
-    await waitForFlinkStatementPhase(statementName, "RUNNING");
+    // profiler needs the task graph, which materializes once the statement leaves PENDING.
+    // SELECT 1 is bounded and can blow through RUNNING into COMPLETED between polls, so accept
+    // both - either state means the task graph exists.
+    await waitForFlinkStatementPhase(statementName, ["RUNNING", "COMPLETED"]);
   });
 
   describe.each(activeTransports)("via %s transport", (transport) => {

@@ -124,10 +124,17 @@ describe("resolveKafkaRestArgs", () => {
     );
   });
 
-  it("under OAuth, requires both args", () => {
+  it("under OAuth with missing environmentId, throws discovery hint", () => {
     const runtime = oauthRuntime();
     expect(() =>
       resolveKafkaRestArgs({ clusterId: "lkc-1" }, runtime, CONN_ID),
+    ).toThrow(/clusterId.*environmentId.*required.*OAuth/i);
+  });
+
+  it("under OAuth with missing clusterId, throws discovery hint", () => {
+    const runtime = oauthRuntime();
+    expect(() =>
+      resolveKafkaRestArgs({ environmentId: "env-1" }, runtime, CONN_ID),
     ).toThrow(/clusterId.*environmentId.*required.*OAuth/i);
   });
 

@@ -10,6 +10,7 @@ import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/cr
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
+import { DescribeToolGatingHandler } from "@src/confluent/tools/handlers/diagnostics/describe-tool-gating-handler.js";
 import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
@@ -58,7 +59,10 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
  * Central registry for all tool call handlers.
  */
 export class ToolHandlerRegistry {
-  private static handlers: Map<ToolName, ToolHandler> = new Map([
+  private static readonly handlers: Map<ToolName, ToolHandler> = new Map<
+    ToolName,
+    ToolHandler
+  >([
     [ToolName.LIST_TOPICS, new ListTopicsHandler()],
     [ToolName.CREATE_TOPICS, new CreateTopicsHandler()],
     [ToolName.DELETE_TOPICS, new DeleteTopicsHandler()],
@@ -127,6 +131,10 @@ export class ToolHandlerRegistry {
     [ToolName.SEARCH_PRODUCT_DOCS, new SearchProductDocsHandler()],
     [ToolName.GET_PRODUCT_DOC_PAGE, new GetProductDocPageHandler()],
     [ToolName.LIST_ORGANIZATIONS, new ListOrganizationsHandler()],
+    [
+      ToolName.DESCRIBE_TOOL_GATING,
+      new DescribeToolGatingHandler(() => ToolHandlerRegistry.allHandlers()),
+    ],
   ]);
 
   static getToolHandler(toolName: ToolName): ToolHandler {
@@ -135,5 +143,15 @@ export class ToolHandlerRegistry {
 
   static getToolConfig(toolName: ToolName): ToolConfig {
     return this.getToolHandler(toolName).getToolConfig();
+  }
+
+  /**
+   * Iterable over every (ToolName, ToolHandler) pair in the registry, in
+   * declaration order. Consumed by the `describe-tool-gating` diagnostic
+   * tool to walk the full handler set without a back-channel into the
+   * private map. Read-only — callers must not mutate the underlying map.
+   */
+  static allHandlers(): Iterable<readonly [ToolName, ToolHandler]> {
+    return this.handlers.entries();
   }
 }

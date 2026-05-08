@@ -45,3 +45,10 @@ connections:
         type: api_key
         key: "${CONFLUENT_CLOUD_API_KEY}"
         secret: "${CONFLUENT_CLOUD_API_SECRET}"
+
+    # --- @metrics (Telemetry API) ---
+    telemetry:
+      auth:
+        type: api_key
+        key: "${TELEMETRY_API_KEY}"
+        secret: "${TELEMETRY_API_SECRET}"

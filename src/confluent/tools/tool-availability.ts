@@ -18,36 +18,17 @@ export interface DisabledToolsByReason {
 }
 
 /**
- * Output shape of {@linkcode buildToolGatingReport} — drives the
- * `describe-tool-gating` diagnostic tool.
+ * Output of {@linkcode buildToolGatingReport}; drives the
+ * `describe-tool-gating` diagnostic tool. Tools advertised via
+ * `tools/list` are intentionally absent — the report carries the
+ * negative signal only.
  *
- * v1 scope (today's release): the server enforces a single configured
- * connection (see `enforceSingleConnectionOnly()` in
- * `src/config/models.ts`), so the report flattens across that connection.
- * `disabledGroups` carries one entry per `(reason → tools)` bucket; tools
- * already advertised via `tools/list` are intentionally absent.
- *
- * v2 plan (when multi-connection support lands — issue #151's follow-ups):
- * replace `disabledGroups` with
- *   `per_connection: ReadonlyArray<{
- *      connection_id: string;
- *      enabledCount: number;
- *      disabledCount: number;
- *      gaps: ReadonlyArray<DisabledToolsByReason>;
- *    }>`
- * and add
- *   `cross_connection_deltas: ReadonlyArray<{
- *      tool: ToolName;
- *      enabled_for: ReadonlyArray<string>;
- *      disabled_for: ReadonlyArray<{ connection_id: string; reason: ToolDisabledReason }>;
- *    }>`
- * populated only for tools enabled on some connections but not others
- * (the canonical "what does connection B need to reach parity with
- * connection A?" view). The text rendering grows a per-connection header
- * per section and an optional `Cross-connection deltas` section. The
- * handler tests under `describe-tool-gating-handler.test.ts` already
- * include synthesised multi-connection fixtures retained as scaffolding
- * for that work.
+ * Single-connection scope today (the server enforces one connection; see
+ * `enforceSingleConnectionOnly()` in `src/config/models.ts`). When
+ * multi-connection support lands as part of issue #151's follow-ups the
+ * shape regrows around connections — per-connection sections plus a
+ * cross-connection-deltas section calling out tools enabled on some
+ * connections but not others.
  */
 export interface ToolGatingReport {
   readonly disabledGroups: readonly DisabledToolsByReason[];
@@ -56,10 +37,9 @@ export interface ToolGatingReport {
 }
 
 /**
- * One bucket of tools that all share the same `(connectionId, reason)` pair —
- * the unit of one log line at startup and one row in the
- * `describe-tool-gating` diagnostic surface. `toolNames` preserves the order
- * tools appeared in the input iterable.
+ * One bucket of tools sharing the same `(connectionId, reason)` pair — the
+ * unit of one grouped log line at server startup. `toolNames` preserves
+ * input iteration order.
  */
 export interface DisabledToolGroup {
   readonly connectionId: string;

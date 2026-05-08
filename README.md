@@ -87,6 +87,7 @@ SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 | **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Manage topics, produce/consume messages                   |
 | **Schema Registry** | `list-schemas`, `delete-schema`                                                        | List, inspect, and delete data schemas                    |
 | **Documentation**   | `search-product-docs`, `get-product-doc-page`                                          | Search Confluent product docs and fetch full page content |
+| **Diagnostics**     | `describe-tool-gating`                                                                 | Explain why specific tools are absent from `tools/list`   |
 
 ## Getting Started
 

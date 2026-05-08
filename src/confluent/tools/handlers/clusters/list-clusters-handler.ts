@@ -4,8 +4,8 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { resolveEnvArg } from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
-import { resolveEnvArg } from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";

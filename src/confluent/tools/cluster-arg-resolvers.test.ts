@@ -7,7 +7,7 @@ import {
   resolveEnvArg,
   resolveKafkaClusterArgs,
   resolveKafkaRestArgs,
-} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+} from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";

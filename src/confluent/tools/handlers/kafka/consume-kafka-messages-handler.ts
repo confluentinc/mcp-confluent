@@ -11,11 +11,11 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
   formatKafkaError,
   resolveKafkaClusterArgs,
-} from "@src/confluent/tools/handlers/kafka/cluster-arg-resolvers.js";
+} from "@src/confluent/tools/cluster-arg-resolvers.js";
+import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -69,12 +69,14 @@ export const consumeKafkaMessagesArgs = z.object({
   cluster_id: z
     .string()
     .optional()
-    .describe("Confluent Cloud logical Kafka cluster ID (lkc-...)."),
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
   environment_id: z
     .string()
     .optional()
     .describe(
-      "Confluent Cloud environment ID (env-...) that owns the cluster.",
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments.",
     ),
 });
 

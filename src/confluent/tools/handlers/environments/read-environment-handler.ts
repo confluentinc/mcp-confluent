@@ -4,7 +4,7 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
   Environment,
   environmentSchema,
@@ -119,5 +119,5 @@ Environment: ${environmentDetails.name}
       annotations: READ_ONLY,
     };
   }
-  readonly predicate = hasConfluentCloud;
+  readonly predicate = hasConfluentCloudOrOAuth;
 }

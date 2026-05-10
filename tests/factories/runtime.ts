@@ -5,6 +5,7 @@ import {
 import { MCPServerConfiguration } from "@src/config/models.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
+import type { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance, type HandleCase } from "@tests/stubs/index.js";
 import { fileURLToPath } from "node:url";
@@ -173,11 +174,14 @@ export type FlinkGetCase = HandleCaseWithConn & {
  * enables the expected set of tools against an OAuth runtime. A stub
  * `OAuthClientManager` is supplied solely to satisfy `ServerRuntime`'s
  * constructor — `enabledConnectionIds()` reads `runtime.config.connections`
- * and never touches the client manager.
+ * and never touches the client manager. Pass `holder` to install a specific
+ * {@link OAuthHolder} on the runtime (used by the gate-behavior tests).
  */
-export function ccloudOAuthRuntime(): ServerRuntime {
+export function ccloudOAuthRuntime(holder?: OAuthHolder): ServerRuntime {
   const config = loadConfigFromYaml(CCLOUD_OAUTH_FIXTURE, {});
-  return new ServerRuntime(config, {
-    [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager),
-  });
+  return new ServerRuntime(
+    config,
+    { [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager) },
+    holder,
+  );
 }

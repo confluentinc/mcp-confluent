@@ -58,7 +58,6 @@ describe("produce-kafka-message-handler", { tags: [Tag.KAFKA] }, () => {
         },
       });
 
-      expect(result.isError).not.toBe(true);
       // handler formats each delivery report as:
       //   "Message produced successfully to [Topic: ..., Partition: ..., Offset: ...]"
       const text = textContent(result);

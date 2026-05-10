@@ -1,6 +1,5 @@
-import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
+import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tableflow/topic/list-tableflow-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { getFirstTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
@@ -11,20 +10,14 @@ import { activeTransports } from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const handler = new ReadEnvironmentHandler();
+const handler = new ListTableFlowTopicsHandler();
 const runtime = integrationRuntime();
 
-describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
+describe("list-tableflow-topics-handler", { tags: [Tag.TABLEFLOW] }, () => {
   if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires confluent_cloud.auth config", () => {});
+    it.skip("requires tableflow.auth config", () => {});
     return;
   }
-
-  // resolve once per file - same env id across all transport iterations
-  let environmentId: string;
-  beforeAll(async () => {
-    environmentId = await getFirstTestEnvironmentId();
-  });
 
   describe.each(activeTransports)("via %s transport", (transport) => {
     let server: StartedServer;
@@ -37,20 +30,25 @@ describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
       await server?.stop();
     });
 
-    it("should expose read-environment in tools/list", async () => {
+    it("should expose list-tableflow-topics in tools/list", async () => {
       const { tools } = await server.client.listTools();
+
       expect(
-        tools.find((t) => t.name === ToolName.READ_ENVIRONMENT),
+        tools.find((t) => t.name === ToolName.LIST_TABLEFLOW_TOPICS),
       ).toBeDefined();
     });
 
-    it("should return details for the resolved environment id", async () => {
+    it("should list tableflow topics for the configured cluster", async () => {
+      // omit env/cluster args: handler falls back to kafka.env_id and kafka.cluster_id from
+      // the YAML fixture. an empty data array is a valid happy-path response when no kafka topics
+      // have tableflow enabled in the test cluster.
       const result = await server.client.callTool({
-        name: ToolName.READ_ENVIRONMENT,
-        arguments: { environmentId },
+        name: ToolName.LIST_TABLEFLOW_TOPICS,
+        arguments: {},
       });
 
-      expect(textContent(result)).toContain(`ID: ${environmentId}`);
+      expect(result.isError).not.toBe(true);
+      expect(textContent(result)).toMatch(/^Tableflow Topics:/);
     });
   });
 });

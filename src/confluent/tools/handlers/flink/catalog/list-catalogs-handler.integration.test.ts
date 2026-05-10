@@ -1,6 +1,5 @@
-import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
+import { ListCatalogsHandler } from "@src/confluent/tools/handlers/flink/catalog/list-catalogs-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { getFirstTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
@@ -11,20 +10,14 @@ import { activeTransports } from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const handler = new ReadEnvironmentHandler();
+const handler = new ListCatalogsHandler();
 const runtime = integrationRuntime();
 
-describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
+describe("list-catalogs-handler", { tags: [Tag.FLINK] }, () => {
   if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires confluent_cloud.auth config", () => {});
+    it.skip("requires flink config", () => {});
     return;
   }
-
-  // resolve once per file - same env id across all transport iterations
-  let environmentId: string;
-  beforeAll(async () => {
-    environmentId = await getFirstTestEnvironmentId();
-  });
 
   describe.each(activeTransports)("via %s transport", (transport) => {
     let server: StartedServer;
@@ -37,20 +30,21 @@ describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
       await server?.stop();
     });
 
-    it("should expose read-environment in tools/list", async () => {
+    it("should expose list-flink-catalogs in tools/list", async () => {
       const { tools } = await server.client.listTools();
+
       expect(
-        tools.find((t) => t.name === ToolName.READ_ENVIRONMENT),
+        tools.find((t) => t.name === ToolName.LIST_FLINK_CATALOGS),
       ).toBeDefined();
     });
 
-    it("should return details for the resolved environment id", async () => {
+    it("should return at least the configured environment as a catalog", async () => {
       const result = await server.client.callTool({
-        name: ToolName.READ_ENVIRONMENT,
-        arguments: { environmentId },
+        name: ToolName.LIST_FLINK_CATALOGS,
+        arguments: {},
       });
 
-      expect(textContent(result)).toContain(`ID: ${environmentId}`);
+      expect(textContent(result)).toMatch(/^Catalogs:/);
     });
   });
 });

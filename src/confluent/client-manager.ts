@@ -47,11 +47,11 @@ export interface ConfluentCloudRestClientManager {
    * direct-only handlers (catalog/tag/search) and is unaffected by this
    * method.
    *
-   * Under direct, `envId` is ignored and the eagerly-built singleton is
-   * returned (same instance as the sync getter). Under OAuth, `envId` is
-   * required: a fresh client is built per call against the resolved SR host
-   * for the env's SR cluster, with bearer auth + the `target-sr-cluster`
-   * default header.
+   * Under direct, `envId` is ignored; a client is built against the
+   * `schema_registry.endpoint` from the connection config (same configuration
+   * source as the sync getter). Under OAuth, `envId` is required: a fresh
+   * client is built per call against the resolved SR host for the env's SR
+   * cluster, with bearer auth + the `target-sr-cluster` default header.
    */
   getSchemaRegistryRestClient(
     envId?: string,
@@ -59,11 +59,10 @@ export interface ConfluentCloudRestClientManager {
   /**
    * Gets a configured REST client for Confluent Cloud Kafka operations.
    *
-   * Under direct, args are ignored and the eagerly-built singleton is returned
-   * (its baseUrl was set from `conn.kafka.rest_endpoint` at construction).
-   * Under OAuth, both `clusterId` and `envId` are required: a fresh client is
-   * built per call against the resolved `spec.http_endpoint` for the given
-   * cluster.
+   * Under direct, args are ignored; a client is built against
+   * `conn.kafka.rest_endpoint` from the connection config. Under OAuth, both
+   * `clusterId` and `envId` are required: a fresh client is built per call
+   * against the resolved `spec.http_endpoint` for the given cluster.
    */
   getConfluentCloudKafkaRestClient(
     clusterId?: string,

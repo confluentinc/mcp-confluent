@@ -101,7 +101,8 @@
   "files": [
     "dist",
     "config.example.yaml",
-    "config.oauth.example.yaml"
+    "config.oauth.example.yaml",
+    "assets/oauth-templates"
   ],
   "engines": {
     "node": ">=22"

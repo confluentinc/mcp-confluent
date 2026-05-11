@@ -44,7 +44,7 @@ export function renderSuccessPage(): string {
 
 export function renderErrorPage(message: string): string {
   cachedFailureTemplate ??= inlinePartials(readTemplate(FAILURE_TEMPLATE_FILE));
-  return cachedFailureTemplate.replace("{{error}}", escapeHtml(message));
+  return cachedFailureTemplate.replace("{{error}}", () => escapeHtml(message));
 }
 
 /** Test-only: reset the module-level template cache. */

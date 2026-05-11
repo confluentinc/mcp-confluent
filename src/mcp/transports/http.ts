@@ -3,11 +3,6 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { sdkTransports } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
-import {
-  pingHandler,
-  pingRequestSchema,
-  pingResponseSchema,
-} from "@src/mcp/transports/ping.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
 import { SessionRegistry } from "@src/mcp/transports/session-registry.js";
 import { Transport } from "@src/mcp/transports/types.js";
@@ -169,22 +164,6 @@ export class HttpTransport implements Transport {
         // where session + per-session-server cleanup actually happen
         await entry.transport.handleRequest(request.raw, reply.raw);
       },
-    );
-
-    // POST ping endpoint for health checks
-    fastify.post(
-      "/ping",
-      {
-        schema: {
-          tags: ["mcp"],
-          summary: "JSON-RPC 2.0 ping endpoint",
-          body: pingRequestSchema,
-          response: {
-            200: pingResponseSchema,
-          },
-        },
-      },
-      pingHandler(),
     );
 
     logger.info("HTTP transport routes registered");

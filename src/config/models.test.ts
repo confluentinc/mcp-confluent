@@ -557,6 +557,55 @@ describe("config/models.ts", () => {
     });
   });
 
+  describe("server.analytics block", () => {
+    const validConnection = {
+      type: "direct" as const,
+      kafka: { bootstrap_servers: "broker:9092" },
+    };
+
+    it("should accept server.analytics.write_key when supplied", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { analytics: { write_key: "segment-write-key" } },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.analytics?.write_key).toBe(
+          "segment-write-key",
+        );
+      }
+    });
+
+    it("should leave server.analytics undefined when the block is omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.analytics).toBeUndefined();
+      }
+    });
+
+    it("should reject unknown keys in server.analytics", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { analytics: { write_key: "k", bogus: 1 } },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject empty server.analytics.write_key", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { analytics: { write_key: "" } },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatZodIssues(result.error.issues)).toMatch(/write_key/);
+      }
+    });
+  });
+
   describe("confluent_cloud block", () => {
     const baseCC = {
       auth: { type: "api_key" as const, key: "k", secret: "s" },
@@ -758,6 +807,50 @@ describe("config/models.ts", () => {
         >;
         expect(conn).not.toHaveProperty("confluent_cloud");
         expect(conn).not.toHaveProperty("telemetry");
+      }
+    });
+
+    it("should accept kafka_debug as an optional librdkafka debug-contexts string", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: {
+            type: "oauth",
+            ccloud_env: "prod",
+            kafka_debug: "security,broker",
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.connections.foo).toEqual({
+          type: "oauth",
+          ccloud_env: "prod",
+          kafka_debug: "security,broker",
+        });
+      }
+    });
+
+    it("should leave kafka_debug undefined when omitted on an oauth connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth" } },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const conn = result.data.connections.foo as unknown as Record<
+          string,
+          unknown
+        >;
+        expect(conn.kafka_debug).toBeUndefined();
+      }
+    });
+
+    it("should reject empty kafka_debug string", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth", kafka_debug: "" } },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatZodIssues(result.error.issues)).toMatch(/kafka_debug/);
       }
     });
   });

@@ -67,8 +67,15 @@ type PostProcessTokenRefresh = (
  */
 export class OAuthClientManager extends BaseClientManager {
   private readonly holder: OAuthHolder;
+  private readonly kafkaDebug: string | undefined;
 
-  constructor(holder: OAuthHolder, env: Auth0Environment) {
+  /**
+   * @param kafkaDebug Optional librdkafka `debug` contexts string, threaded
+   *   through to every native Kafka client built by this manager. Sourced
+   *   from `connections.<name>.kafka_debug` on the OAuth YAML arm; used as a
+   *   diagnostic knob when a SASL/OAUTHBEARER handshake misbehaves.
+   */
+  constructor(holder: OAuthHolder, env: Auth0Environment, kafkaDebug?: string) {
     const cpToken = (): string | undefined => holder.getControlPlaneToken();
     const dpToken = (): string | undefined => holder.getDataPlaneToken();
     super({
@@ -91,6 +98,7 @@ export class OAuthClientManager extends BaseClientManager {
     });
 
     this.holder = holder;
+    this.kafkaDebug = kafkaDebug;
 
     // Eager construction: surface the cloud REST client at startup so a bad
     // endpoint or middleware wiring fails fast rather than at first tool call.
@@ -259,10 +267,11 @@ export class OAuthClientManager extends BaseClientManager {
     // below) reads it on demand, so an empty token here would surface as a
     // broker-side auth failure with no useful diagnostic.
     this.requireDataPlaneToken();
-    // librdkafka debug logs — gated by env var so they don't pollute normal
-    // server stderr. Set OAUTH_KAFKA_DEBUG=security,broker,protocol (or
-    // "all") to see the full SASL/OAUTHBEARER handshake and broker traffic.
-    const debug = process.env.OAUTH_KAFKA_DEBUG;
+    // librdkafka debug logs — gated by `kafka_debug` on the OAuth YAML arm so
+    // they don't pollute normal server stderr. Set
+    // `connections.<name>.kafka_debug: "security,broker,protocol"` (or "all")
+    // to see the full SASL/OAUTHBEARER handshake and broker traffic.
+    const debug = this.kafkaDebug;
     const bootstrap = await resolveKafkaBootstrap(
       this.getConfluentCloudRestClient(),
       clusterId,

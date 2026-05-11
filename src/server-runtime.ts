@@ -79,7 +79,11 @@ export class ServerRuntime {
         if (oauthHolder && oauthConn) {
           return [
             id,
-            new OAuthClientManager(oauthHolder, oauthConn.ccloud_env),
+            new OAuthClientManager(
+              oauthHolder,
+              oauthConn.ccloud_env,
+              oauthConn.kafka_debug,
+            ),
           ] as const;
         }
         // No OAuth connection found, so every connection is direct.

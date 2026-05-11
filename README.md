@@ -219,6 +219,21 @@ connections:
         secret: "${KAFKA_API_SECRET}"
 ```
 
+#### Using `-e` for linked-library env vars
+
+mcp-confluent's own configuration flows through YAML (or, on the legacy path, through the env-var-to-config bridge). The `-e <file>` flag has a second job too: its entries land in `process.env`, which lets you supply env vars consumed by **linked libraries** that mcp-confluent has no explicit YAML knob for. Typical examples:
+
+- TLS: `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `NODE_TLS_REJECT_UNAUTHORIZED`
+- SASL plugin search: `SASL_PATH`, `SASL_CONF_PATH`
+- Kerberos / GSSAPI: `KRB5_CONFIG`, `KRB5CCNAME`, `KRB5_KTNAME`, `KRB5_TRACE`
+- HTTP proxy: `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`
+
+These are read directly by the C/Node libraries we link against (OpenSSL, cyrus-sasl, krb5, undici, librdkafka transitively) — outside mcp-confluent's control — so a corporate-environment user can drop them in `-e` alongside their interpolation tokens and have them honored.
+
+The same file feeds `${VAR}` interpolation inside YAML, so `-e` consistently serves both audiences from a single source.
+
+**Caveat**: env vars consumed by the dynamic linker (`LD_LIBRARY_PATH`, `LD_PRELOAD`, macOS `DYLD_*`) are read **before** Node starts and cannot be set via `-e`; supply those in the shell that launches mcp-confluent.
+
 #### Prerequisites & Setup for Tableflow Commands
 
 In order to leverage **Tableflow commands** to interact with your data ecosystem and successfully execute these Tableflow commands and manage resources (e.g., interacting with data storage like AWS S3 and metadata catalogs like AWS Glue), certain **IAM (Identity and Access Management) permissions** and configurations are essential.

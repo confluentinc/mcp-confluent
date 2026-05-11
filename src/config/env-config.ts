@@ -60,6 +60,11 @@ const ENV_VAR_TO_ZPATH = {
   TELEMETRY_ENDPOINT: `${CONN}.telemetry.endpoint`,
   TELEMETRY_API_KEY: `${CONN}.telemetry.auth.key`,
   TELEMETRY_API_SECRET: `${CONN}.telemetry.auth.secret`,
+  // Analytics (internal-dev-only: Segment write key override)
+  TELEMETRY_WRITE_KEY: "server.analytics.write_key",
+  // OAuth diagnostic knob — only meaningful when --oauth is also set, in which
+  // case buildConfigFromEnv synthesizes the OAuth connection arm that carries it.
+  OAUTH_KAFKA_DEBUG: `${CONN}.kafka_debug`,
   // Server configuration
   LOG_LEVEL: "server.log_level",
   HTTP_PORT: "server.http.port",
@@ -98,6 +103,9 @@ function buildConfigFromEnv(
           type: "oauth",
           ...(oauth.ccloudEnv && {
             ccloud_env: oauth.ccloudEnv,
+          }),
+          ...(env.OAUTH_KAFKA_DEBUG !== undefined && {
+            kafka_debug: env.OAUTH_KAFKA_DEBUG,
           }),
         },
       },
@@ -464,6 +472,9 @@ function buildServerBlock(
         disabled: authOverrides.disableAuth ?? env.MCP_AUTH_DISABLED,
         allowed_hosts: authOverrides.allowedHosts ?? env.MCP_ALLOWED_HOSTS,
       },
+      ...(env.TELEMETRY_WRITE_KEY !== undefined && {
+        analytics: { write_key: env.TELEMETRY_WRITE_KEY },
+      }),
     },
   };
 }

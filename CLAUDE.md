@@ -82,6 +82,7 @@ Detailed conventions (handler structure, input schema rules, registration checkl
 - Prettier + ESLint enforced; pre-commit hook runs both automatically via Husky. `eslint --fix` auto-removes unused imports via `eslint-plugin-unused-imports`, so stale imports left during a migration are cleaned up at commit time without manual intervention. Pre-push hook runs full-repo `lint` + `typecheck` so CI failures on those checks are nearly impossible.
 - `noImplicitAny` is disabled in tsconfig due to OpenAPI type resolution issues.
 - REST API calls use `openapi-fetch` with typed paths from the generated schema — prefer this over raw fetch.
+- Application code reads configuration from `MCPServerConfiguration` / `ConnectionConfig`, never from `process.env`. A `no-restricted-syntax` rule in `eslint.config.mjs` enforces this; the only bootstrap files exempt are `src/index.ts`, `src/cli.ts`, `src/env.ts`, `src/logger.ts`. The `-e` dotenv mutation in `cli.ts` is intentional — it seeds env vars for linked C/Node libraries (OpenSSL, cyrus-sasl, krb5, undici) that read `process.env` outside our control.
 
 ## Unit Test Conventions
 

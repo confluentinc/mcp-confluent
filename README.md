@@ -282,16 +282,18 @@ exclusive — pick the template that matches the auth mode you want.
 
 ### Supported tools under OAuth
 
-| Category                                   | Tools                                                                                  | Notes                                                                                                                                   |
-| ------------------------------------------ | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Requires arguments `cluster_id` + `environment_id`. SR serialization (AVRO, JSONSCHEMA) on produce/consume; PROTOBUF not supported yet. |
-| **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               | Requires arguments `clusterId` + `environmentId`.                                                                                       |
-| **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         | —                                                                                                                                       |
-| **Billing**                                | `list-billing-costs`                                                                   | —                                                                                                                                       |
+| Category                                   | Tools                                                                                                                                          | Notes                                                                                                                                        |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`                                                         | Requires arguments `cluster_id` + `environment_id`. SR serialization (AVRO, JSONSCHEMA) on produce/consume; PROTOBUF not supported yet.      |
+| **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                                                                                       | Requires arguments `clusterId` + `environmentId`.                                                                                            |
+| **Schema Registry**                        | `list-schemas`, `delete-schema`                                                                                                                | Requires argument `environment_id`. The SR cluster + endpoint are auto-resolved from it (single SR per environment is the CCloud invariant). |
+| **Catalog & Tags**                         | `list-tags`, `create-topic-tags`, `delete-tag`, `add-tags-to-topic`, `remove-tag-from-entity`, `search-topics-by-name`, `search-topics-by-tag` | Requires argument `environment_id`. Reach the `/catalog/v1/` surface on the resolved SR host.                                                |
+| **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`                                                                 | —                                                                                                                                            |
+| **Billing**                                | `list-billing-costs`                                                                                                                           | —                                                                                                                                            |
 
 ### Limitations
 
-- **Other REST-only tool categories** (Connect, Tableflow, Flink, Schema Registry, Metrics, Catalog & Tags) are still being migrated to OAuth and currently require a `direct` connection.
+- **Other REST-only tool categories** (Connect, Tableflow, Flink, Metrics) are still being migrated to OAuth and currently require a `direct` connection.
 
 ## CLI Usage
 

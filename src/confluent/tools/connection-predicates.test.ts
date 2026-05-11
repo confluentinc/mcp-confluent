@@ -8,6 +8,7 @@ import {
   canCreateDirectConnector,
   flinkWithTelemetry,
   hasCCloudCatalogSupport,
+  hasCCloudCatalogSupportOrOAuth,
   hasConfluentCloud,
   hasConfluentCloudOrOAuth,
   hasFlink,
@@ -16,6 +17,7 @@ import {
   hasKafkaBootstrap,
   hasKafkaRestWithAuth,
   hasSchemaRegistry,
+  hasSchemaRegistryOrOAuth,
   hasTableflow,
   hasTelemetry,
   kafkaBootstrapOrOAuth,
@@ -326,6 +328,28 @@ describe("connection-predicates.ts", () => {
     });
   });
 
+  describe("hasCCloudCatalogSupportOrOAuth", () => {
+    it("should return ENABLED for a direct connection with api_key SR auth", () => {
+      expect(hasCCloudCatalogSupportOrOAuth(CCLOUD_SR_CONN)).toEqual(ENABLED);
+    });
+
+    it("should report MissingSchemaRegistryApiKeyAuth for a direct SR block without api_key auth", () => {
+      expect(hasCCloudCatalogSupportOrOAuth(SCHEMA_REGISTRY_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingSchemaRegistryApiKeyAuth),
+      );
+    });
+
+    it("should report MissingSchemaRegistryBlock for a direct connection without a schema_registry block", () => {
+      expect(hasCCloudCatalogSupportOrOAuth(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingSchemaRegistryBlock),
+      );
+    });
+
+    it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
+      expect(hasCCloudCatalogSupportOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
+    });
+  });
+
   describe("hasTableflow()", () => {
     it("should return enabled when the tableflow block is present", () => {
       expect(hasTableflow(TABLEFLOW_CONN)).toEqual(ENABLED);
@@ -459,6 +483,22 @@ describe("connection-predicates.ts", () => {
 
     it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
       expect(kafkaRestWithAuthOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
+    });
+  });
+
+  describe("hasSchemaRegistryOrOAuth", () => {
+    it("should return ENABLED for a direct connection with a schema_registry block", () => {
+      expect(hasSchemaRegistryOrOAuth(SCHEMA_REGISTRY_CONN)).toEqual(ENABLED);
+    });
+
+    it("should report MissingSchemaRegistryBlock for a direct connection without a schema_registry block", () => {
+      expect(hasSchemaRegistryOrOAuth(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingSchemaRegistryBlock),
+      );
+    });
+
+    it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
+      expect(hasSchemaRegistryOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
     });
   });
 

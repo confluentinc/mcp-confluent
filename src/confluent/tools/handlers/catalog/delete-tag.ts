@@ -4,7 +4,7 @@ import {
   DESTRUCTIVE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
+import { hasCCloudCatalogSupportOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -12,6 +12,12 @@ import { z } from "zod";
 
 const deleteTagArguments = z.object({
   tagName: z.string().describe("Name of the tag to delete").nonempty(),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Schema Registry. Required under OAuth (the SR cluster + endpoint are auto-resolved from this env); ignored under direct.",
+    ),
 });
 
 export class DeleteTagHandler extends BaseToolHandler {
@@ -20,10 +26,12 @@ export class DeleteTagHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
-    const { tagName } = deleteTagArguments.parse(toolArguments);
+    const { tagName, environment_id } = deleteTagArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(
+        environment_id,
+      ),
     );
 
     const { response, error } = await pathBasedClient[
@@ -55,5 +63,5 @@ export class DeleteTagHandler extends BaseToolHandler {
       annotations: DESTRUCTIVE,
     };
   }
-  readonly predicate = hasCCloudCatalogSupport;
+  readonly predicate = hasCCloudCatalogSupportOrOAuth;
 }

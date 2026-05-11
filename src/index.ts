@@ -13,6 +13,7 @@ import {
   loadConfigFromYaml,
   MCPServerConfiguration,
 } from "@src/config/index.js";
+import { buildConfigTelemetry } from "@src/confluent/config-telemetry.js";
 import { buildConfig, fs, path } from "@src/confluent/node-deps.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
@@ -320,6 +321,7 @@ async function main() {
       doNotTrack: mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
       writeKey: resolveTelemetryWriteKey(mcpConfig),
     });
+    const telemetry = TelemetryService.getInstance();
 
     logger.info(
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
@@ -329,10 +331,7 @@ async function main() {
 
     const serverVersion = getPackageVersion();
 
-    TelemetryService.getInstance().setCommonProperties({
-      serverVersion,
-      transportType: transports.join(","),
-    });
+    telemetry.setCommonProperties({ serverVersion });
 
     const toolHandlers = getToolHandlersToRegister(filteredToolNames, runtime);
 
@@ -360,7 +359,7 @@ async function main() {
       toolHandlers,
       runtime,
       track: (props) =>
-        TelemetryService.getInstance().track(TelemetryEvent.TOOL_CALL, {
+        telemetry.track(TelemetryEvent.TOOL_CALL, {
           ...props,
         }),
     };
@@ -379,10 +378,19 @@ async function main() {
       },
     });
 
+    // Boot-time invariants (config source, active transports, connection
+    // types) ride this one-shot event rather than every TOOL_CALL — they
+    // don't change after startup, so duplicating them per tool call buys
+    // nothing. Warehouse queries join SERVER_START to TOOL_CALL on
+    // `serverSessionId` (a common property) when slicing is needed.
+    telemetry.track(TelemetryEvent.SERVER_START, {
+      ...buildConfigTelemetry(cliOptions, mcpConfig, transports),
+    });
+
     // Set up cleanup handlers
     const performCleanup = async () => {
       logger.info("Shutting down...");
-      await TelemetryService.getInstance().shutdown();
+      await telemetry.shutdown();
       await transportManager.stop();
       // shutdown() is race-safe with an in-flight bootstrap.
       runtime.oauthHolder?.shutdown();

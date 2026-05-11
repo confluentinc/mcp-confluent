@@ -1,8 +1,16 @@
 import type { paths } from "@src/confluent/openapi-schema.js";
 import { createRetryOn429Middleware } from "@tests/harness/retry-on-429.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
+import { setTimeout as sleep } from "node:timers/promises";
 import createClient, { type Client } from "openapi-fetch";
 import { afterAll } from "vitest";
+
+type FlinkStatementPhase =
+  | "PENDING"
+  | "RUNNING"
+  | "COMPLETED"
+  | "FAILED"
+  | "STOPPED";
 
 interface FlinkScope {
   organizationId: string;
@@ -81,6 +89,53 @@ export async function provisionTestFlinkStatement(
       `failed to provision test flink statement ${name}: ${JSON.stringify(error)}`,
     );
   }
+}
+
+/**
+ * Polls until the statement reaches one of `targetPhases`, or throws on
+ * timeout. Uses a vanilla async loop rather than `expect.poll` so it's
+ * callable from outside of a test context (e.g. before/after hooks).
+ */
+export async function waitForFlinkStatementPhase(
+  name: string,
+  targetPhases: FlinkStatementPhase | readonly FlinkStatementPhase[],
+  opts: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<void> {
+  const { timeoutMs = 30_000, intervalMs = 2_000 } = opts;
+  const acceptable = Array.isArray(targetPhases)
+    ? targetPhases
+    : [targetPhases];
+  const scope = getFlinkScope();
+  const client = newTestFlinkClient(scope);
+  const deadline = Date.now() + timeoutMs;
+  let lastPhase: string | undefined;
+  while (Date.now() < deadline) {
+    const { data, error } = await client.GET(
+      "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements/{statement_name}",
+      {
+        params: {
+          path: {
+            organization_id: scope.organizationId,
+            environment_id: scope.environmentId,
+            statement_name: name,
+          },
+        },
+      },
+    );
+    if (error) {
+      throw new Error(
+        `failed to GET flink statement ${name}: ${JSON.stringify(error)}`,
+      );
+    }
+    lastPhase = data?.status?.phase;
+    if (acceptable.includes(lastPhase as FlinkStatementPhase)) {
+      return;
+    }
+    await sleep(intervalMs);
+  }
+  throw new Error(
+    `flink statement ${name} did not reach any of phases [${acceptable.join(", ")}] within ${timeoutMs}ms (last phase: ${lastPhase ?? "unknown"})`,
+  );
 }
 
 /**

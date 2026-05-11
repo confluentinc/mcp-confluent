@@ -359,9 +359,7 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_SCHEMAS]: {
         outcome: { resolves: "{}" },
         setup: (cm) => {
-          const sr = cm.getSchemaRegistryClient();
-          sr.getAllSubjects.mockResolvedValue([]);
-          cm.getSchemaRegistrySdkClient.mockResolvedValue(sr);
+          cm.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
         },
       },
       [ToolName.DELETE_SCHEMA]: { outcome: { throws: "ZodError" } },

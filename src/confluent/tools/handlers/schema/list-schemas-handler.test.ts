@@ -1,3 +1,4 @@
+import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
@@ -6,8 +7,9 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  type MockedClientManager,
 } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, type Mocked } from "vitest";
 
 const SR_CONN = {
   schema_registry: { endpoint: "https://sr.example.com" },
@@ -18,9 +20,15 @@ describe("list-schemas-handler.ts", () => {
     const handler = new ListSchemasHandler();
 
     describe("handle()", () => {
+      let clientManager: MockedClientManager;
+      let sr: Mocked<SchemaRegistryClient>;
+
+      beforeEach(() => {
+        clientManager = getMockedClientManager();
+        sr = clientManager.getSchemaRegistryClient();
+      });
+
       it("should return a JSON map of subject -> latest schema metadata when latestOnly is true (the default)", async () => {
-        const clientManager = getMockedClientManager();
-        const sr = clientManager.getSchemaRegistryClient();
         sr.getAllSubjects.mockResolvedValue(["subject-a", "subject-b"]);
         sr.getLatestSchemaMetadata.mockImplementation(
           async (subject: string) => ({
@@ -30,7 +38,6 @@ describe("list-schemas-handler.ts", () => {
             schema: `{"name":"${subject}"}`,
           }),
         );
-        clientManager.getSchemaRegistrySdkClient.mockResolvedValue(sr);
 
         await assertHandleCase({
           handler,
@@ -46,8 +53,6 @@ describe("list-schemas-handler.ts", () => {
       });
 
       it("should filter subjects to those matching subjectPrefix before fetching metadata", async () => {
-        const clientManager = getMockedClientManager();
-        const sr = clientManager.getSchemaRegistryClient();
         sr.getAllSubjects.mockResolvedValue([
           "order-events",
           "order-status",
@@ -59,7 +64,6 @@ describe("list-schemas-handler.ts", () => {
           schemaType: "AVRO",
           schema: "{}",
         });
-        clientManager.getSchemaRegistrySdkClient.mockResolvedValue(sr);
 
         await assertHandleCase({
           handler,
@@ -77,10 +81,7 @@ describe("list-schemas-handler.ts", () => {
       });
 
       it("should pass environment_id through to getSchemaRegistrySdkClient (OAuth wiring)", async () => {
-        const clientManager = getMockedClientManager();
-        const sr = clientManager.getSchemaRegistryClient();
         sr.getAllSubjects.mockResolvedValue([]);
-        clientManager.getSchemaRegistrySdkClient.mockResolvedValue(sr);
 
         await assertHandleCase({
           handler,
@@ -96,10 +97,7 @@ describe("list-schemas-handler.ts", () => {
       });
 
       it("should return an isError response when getAllSubjects rejects", async () => {
-        const clientManager = getMockedClientManager();
-        const sr = clientManager.getSchemaRegistryClient();
         sr.getAllSubjects.mockRejectedValue(new Error("registry unreachable"));
-        clientManager.getSchemaRegistrySdkClient.mockResolvedValue(sr);
 
         await assertHandleCase({
           handler,

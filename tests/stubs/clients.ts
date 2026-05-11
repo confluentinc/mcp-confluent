@@ -129,7 +129,9 @@ export interface MockedClientManager extends Mocked<DirectClientManager> {
   getConfluentCloudFlinkRestClient: Mock<() => MockedRestClient>;
   getConfluentCloudRestClient: Mock<() => MockedRestClient>;
   getConfluentCloudTableflowRestClient: Mock<() => MockedRestClient>;
-  getConfluentCloudSchemaRegistryRestClient: Mock<() => MockedRestClient>;
+  getConfluentCloudSchemaRegistryRestClient: Mock<
+    (envId?: string) => Promise<MockedRestClient>
+  >;
   getConfluentCloudKafkaRestClient: Mock<
     (clusterId?: string, envId?: string) => Promise<MockedRestClient>
   >;
@@ -172,7 +174,7 @@ export function getMockedClientManager(): MockedClientManager {
   cm.getConfluentCloudTableflowRestClient.mockReturnValue(
     getMockedRestClient(),
   );
-  cm.getConfluentCloudSchemaRegistryRestClient.mockReturnValue(
+  cm.getConfluentCloudSchemaRegistryRestClient.mockResolvedValue(
     getMockedRestClient(),
   );
   cm.getConfluentCloudKafkaRestClient.mockResolvedValue(getMockedRestClient());

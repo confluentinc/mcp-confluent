@@ -32,7 +32,7 @@ export class SearchTopicsByTagHandler extends BaseToolHandler {
     const { topicTag, limit, offset } =
       searchTopicsByTagArguments.parse(toolArguments);
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
     const { data: response, error } = await pathBasedClient[
       "/catalog/v1/search/basic?types=kafka_topic&tag={topicTag}&limit={limit}&offset={offset}"

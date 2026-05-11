@@ -23,7 +23,7 @@ export class DeleteTagHandler extends BaseToolHandler {
     const { tagName } = deleteTagArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
 
     const { response, error } = await pathBasedClient[

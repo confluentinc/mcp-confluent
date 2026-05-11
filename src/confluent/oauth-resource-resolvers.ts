@@ -88,6 +88,15 @@ export async function resolveSchemaRegistryClusterId(
         `Schema Registry must be enabled on the environment in Confluent Cloud.`,
     );
   }
+  if (clusters.length > 1) {
+    // Defensive: CCloud's documented invariant is one SR per environment.
+    // If that ever changes, callers will need to pick a specific cluster
+    // rather than have us silently take the first.
+    throw new Error(
+      `Multiple Schema Registry clusters found in environment ${envId} (count: ${clusters.length}). ` +
+        `Single SR per environment is assumed; multi-SR is not supported.`,
+    );
+  }
   const id = clusters[0]?.id;
   if (typeof id !== "string" || id.length === 0) {
     throw new Error(

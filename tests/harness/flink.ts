@@ -5,12 +5,22 @@ import { setTimeout as sleep } from "node:timers/promises";
 import createClient, { type Client } from "openapi-fetch";
 import { afterAll } from "vitest";
 
+// mirrors the documented phase values on `sql.v1.StatementStatus.phase` in
+// `src/confluent/openapi-schema.d.ts` (typed as `string` upstream; we keep an explicit union here
+// for autocomplete and typo detection at call sites)
 type FlinkStatementPhase =
   | "PENDING"
   | "RUNNING"
   | "COMPLETED"
+  | "DELETING"
+  | "FAILING"
   | "FAILED"
   | "STOPPED";
+
+const TERMINAL_FAILURE_PHASES: readonly FlinkStatementPhase[] = [
+  "FAILED",
+  "FAILING",
+];
 
 interface FlinkScope {
   organizationId: string;
@@ -130,6 +140,13 @@ export async function waitForFlinkStatementPhase(
     lastPhase = data?.status?.phase;
     if (acceptable.includes(lastPhase as FlinkStatementPhase)) {
       return;
+    }
+    // short-circuit on terminal-failure phases the caller didn't ask for, so CI surfaces the
+    // real failure (with the API's `status.detail`) instead of waiting out the timeout
+    if (TERMINAL_FAILURE_PHASES.includes(lastPhase as FlinkStatementPhase)) {
+      throw new Error(
+        `flink statement ${name} entered ${lastPhase} while waiting for [${acceptable.join(", ")}]: ${data?.status?.detail ?? "no detail"}`,
+      );
     }
     await sleep(intervalMs);
   }

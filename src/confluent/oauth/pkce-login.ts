@@ -1,9 +1,15 @@
+import type { ServerResponse } from "node:http";
+
 import { nodeHttp, nodeOpen } from "@src/confluent/node-deps.js";
 import {
   OAUTH_CALLBACK_HOST,
   OAUTH_CALLBACK_PATH,
   OAUTH_CALLBACK_PORT,
 } from "@src/confluent/oauth/auth0-config.js";
+import {
+  renderErrorPage,
+  renderSuccessPage,
+} from "@src/confluent/oauth/callback-pages.js";
 import {
   generateCodeChallenge,
   generateCodeVerifier,
@@ -36,6 +42,11 @@ export class PkceLoginError extends Error {
     super(message);
     this.name = "PkceLoginError";
   }
+}
+
+function sendHtml(res: ServerResponse, status: number, body: string): void {
+  res.writeHead(status, { "Content-Type": "text/html; charset=UTF-8" });
+  res.end(body);
 }
 
 function buildAuthorizationUrl(
@@ -99,20 +110,21 @@ export async function runPkceLogin(
     const reqUrl = req.url ?? "";
     const parsed = new URL(reqUrl, "http://127.0.0.1");
     if (parsed.pathname !== OAUTH_CALLBACK_PATH) {
-      res.writeHead(404);
-      res.end("Not found");
+      sendHtml(res, 404, renderErrorPage("Not found"));
       return;
     }
     const receivedState = parsed.searchParams.get("state");
     if (receivedState !== state) {
-      res.writeHead(400);
-      res.end("State mismatch");
+      sendHtml(res, 400, renderErrorPage("State mismatch"));
       return;
     }
     const errorParam = parsed.searchParams.get("error");
     if (errorParam) {
-      res.writeHead(400);
-      res.end("Authentication failed");
+      sendHtml(
+        res,
+        400,
+        renderErrorPage(`Authentication failed: ${errorParam}`),
+      );
       rejectFlow(
         new PkceLoginError(
           "user_aborted",
@@ -123,14 +135,10 @@ export async function runPkceLogin(
     }
     const code = parsed.searchParams.get("code");
     if (!code) {
-      res.writeHead(400);
-      res.end("Missing code");
+      sendHtml(res, 400, renderErrorPage("Missing authorization code"));
       return;
     }
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end(
-      "Login successful. You can close this window and return to the terminal.",
-    );
+    sendHtml(res, 200, renderSuccessPage());
     resolveCode(code);
   });
 

@@ -11,6 +11,7 @@ RUN npm ci
 
 COPY tsconfig.json tsconfig.build.json ./
 COPY src/ ./src/
+COPY assets/ ./assets/
 
 RUN npm run build
 
@@ -23,6 +24,7 @@ WORKDIR /app
 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/assets ./assets
 COPY --from=builder /app/node_modules ./node_modules/
 
 # run as non-root (node user is built into node:alpine images)

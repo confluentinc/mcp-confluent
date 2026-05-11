@@ -44,6 +44,11 @@ export class PkceLoginError extends Error {
   }
 }
 
+function sendHtml(res: ServerResponse, status: number, body: string): void {
+  res.writeHead(status, { "Content-Type": "text/html; charset=UTF-8" });
+  res.end(body);
+}
+
 function buildAuthorizationUrl(
   auth0Config: Auth0Config,
   codeChallenge: string,
@@ -100,15 +105,6 @@ export async function runPkceLogin(
     resolveCode = resolve;
     rejectFlow = reject;
   });
-
-  const sendHtml = (
-    res: ServerResponse,
-    status: number,
-    body: string,
-  ): void => {
-    res.writeHead(status, { "Content-Type": "text/html; charset=UTF-8" });
-    res.end(body);
-  };
 
   const server = nodeHttp.createServer((req, res) => {
     const reqUrl = req.url ?? "";

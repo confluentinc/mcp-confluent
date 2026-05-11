@@ -1,4 +1,8 @@
 import type { CLIOptions } from "@src/cli.js";
+import {
+  DEFAULT_SERVER_CONFIG,
+  MCPServerConfiguration,
+} from "@src/config/models.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
@@ -10,6 +14,7 @@ import {
   outputApiKey,
   outputInitConfig,
   outputToolList,
+  resolveTelemetryWriteKey,
 } from "@src/index.js";
 import { logger } from "@src/logger.js";
 import { ccloudOAuthRuntime, runtimeWith } from "@tests/factories/runtime.js";
@@ -681,6 +686,62 @@ describe("index.ts", () => {
       expect(allArgs).toContain("Generated MCP API Key:");
       // The init-config branch is bypassed entirely.
       expect(fsMocks.writeFileSync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("resolveTelemetryWriteKey()", () => {
+    // Build a minimal MCPServerConfiguration whose only point of variation is
+    // the `server.analytics.write_key` field. Spreads DEFAULT_SERVER_CONFIG so
+    // the literal-type widening on transports/log_level/etc. is sidestepped.
+    function configWithAnalytics(
+      writeKey: string | undefined,
+    ): MCPServerConfiguration {
+      return new MCPServerConfiguration({
+        connections: { default: { type: "direct" } },
+        server:
+          writeKey === undefined
+            ? DEFAULT_SERVER_CONFIG
+            : { ...DEFAULT_SERVER_CONFIG, analytics: { write_key: writeKey } },
+      });
+    }
+
+    it("should return the YAML-supplied write_key when server.analytics is present", () => {
+      vi.spyOn(
+        nodeDeps.buildConfig,
+        "TELEMETRY_WRITE_KEY",
+        "get",
+      ).mockReturnValue("packed-key");
+
+      const result = resolveTelemetryWriteKey(configWithAnalytics("yaml-key"));
+
+      expect(result).toBe("yaml-key");
+    });
+
+    it("should fall back to buildConfig.TELEMETRY_WRITE_KEY when server.analytics is absent", () => {
+      vi.spyOn(
+        nodeDeps.buildConfig,
+        "TELEMETRY_WRITE_KEY",
+        "get",
+      ).mockReturnValue("packed-key");
+
+      const result = resolveTelemetryWriteKey(configWithAnalytics(undefined));
+
+      expect(result).toBe("packed-key");
+    });
+
+    it("should return undefined when neither YAML nor buildConfig supplies a key", () => {
+      vi.spyOn(
+        nodeDeps.buildConfig,
+        "TELEMETRY_WRITE_KEY",
+        "get",
+      ).mockReturnValue("");
+
+      const result = resolveTelemetryWriteKey(configWithAnalytics(undefined));
+
+      // Empty-string buildConfig is the unpacked/dev-build shape; treat it as
+      // "no key supplied" so the caller routes through TelemetryService's
+      // falsy-writeKey disabled path rather than passing "" to Segment.
+      expect(result).toBeFalsy();
     });
   });
 });

@@ -83,6 +83,26 @@ export function getToolHandlersToRegister(
   return toolHandlers;
 }
 
+/**
+ * Resolve the Segment write key handed to `TelemetryService.initialize`.
+ *
+ * Precedence: an explicit YAML `server.analytics.write_key` wins; otherwise
+ * fall back to `buildConfig.TELEMETRY_WRITE_KEY` (the value `npm pack` injects
+ * at release time). On unpacked / dev builds the build-time value is empty,
+ * so an absent YAML field produces an empty-string fallback that
+ * `TelemetryService` treats as "no key supplied" — analytics stays off.
+ *
+ * Extracted from `main()` so the precedence is unit-testable without booting
+ * the full server.
+ */
+export function resolveTelemetryWriteKey(
+  mcpConfig: MCPServerConfiguration,
+): string | undefined {
+  return (
+    mcpConfig.server.analytics?.write_key ?? buildConfig.TELEMETRY_WRITE_KEY
+  );
+}
+
 export function outputApiKey(): void {
   const apiKey = generateApiKey();
   console.log("\nGenerated MCP API Key:");
@@ -296,15 +316,9 @@ async function main() {
 
     // DO_NOT_TRACK is a cross-tool user preference (consoledonottrack.com);
     // the env var acts as a floor so it is honored even when --config is used.
-    // writeKey precedence: explicit config wins over the build-time injected
-    // value. The config value reaches us either from a YAML declaration or
-    // from the legacy TELEMETRY_WRITE_KEY → server.analytics.write_key bridge
-    // in env-config.ts.
     TelemetryService.initialize({
       doNotTrack: mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
-      writeKey:
-        mcpConfig.server.analytics?.write_key ??
-        buildConfig.TELEMETRY_WRITE_KEY,
+      writeKey: resolveTelemetryWriteKey(mcpConfig),
     });
 
     logger.info(

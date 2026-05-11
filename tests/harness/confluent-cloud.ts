@@ -41,3 +41,35 @@ export async function getFirstTestEnvironmentId(): Promise<string> {
   }
   return first.id;
 }
+
+/**
+ * Fetches the logical Schema Registry cluster id (`lsrc-...`) for the integration environment.
+ * Required to construct catalog qualified names of the form `<lsrc-id>:<lkc-id>:<topic>`; SR
+ * doesn't expose the logical id from its URL alone. Assumes one SR cluster per environment (the
+ * test account's case) and returns the first result from `/srcm/v3/clusters`.
+ */
+export async function getSchemaRegistryClusterId(): Promise<string> {
+  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const envId = conn.kafka?.env_id;
+  if (!envId) {
+    throw new Error(
+      "test-side sr cluster id discovery requires kafka.env_id in test-fixtures/yaml_configs/integration.yaml",
+    );
+  }
+  const client = newTestCloudClient();
+  const { data, error } = await client.GET("/srcm/v3/clusters", {
+    params: { query: { environment: envId } },
+  });
+  if (error) {
+    throw new Error(
+      `failed to list sr clusters from ccloud: ${JSON.stringify(error)}`,
+    );
+  }
+  const first = data?.data?.[0];
+  if (!first?.id) {
+    throw new Error(
+      `no schema registry cluster found in environment ${envId} - is stream governance enabled?`,
+    );
+  }
+  return first.id;
+}

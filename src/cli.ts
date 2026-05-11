@@ -310,24 +310,36 @@ export function parseCliArgs(argv: string[]): CLIOptions {
 }
 
 /**
- * Load dotenv keys/values from file into process.env.
- * Throws if file not found or if dotenv returns an error.
- * Overwrites preexisting keys in process.env as a side effect.
+ * Parse a dotenv file, returning its entries as a `Record<string,string>` and
+ * (intentionally) writing the same entries into `process.env` with `override:
+ * true` so preexisting shell-environment values are replaced.
+ *
+ * Two channels, one source. The return value is what mcp-confluent application
+ * code consumes — fed into `buildConfigFromEnvAndCli` on the legacy env-var
+ * path, and supplied as the env source for `${VAR}` interpolation inside YAML.
+ * The `process.env` mutation exists for a different audience: **external
+ * libraries** (OpenSSL via `SSL_CERT_FILE` / `NODE_EXTRA_CA_CERTS`, cyrus-sasl
+ * via `SASL_PATH`, krb5 via `KRB5_CONFIG` / `KRB5CCNAME` / `KRB5_KTNAME`,
+ * undici via `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`, librdkafka transitively
+ * through these) read `process.env` directly outside our control, and a user
+ * supplying `-e` reasonably expects those settings to be honored.
+ *
+ * Do not "clean up" the side effect: application code is forbidden by lint
+ * from reading `process.env` outside the bootstrap allowlist, but the linked
+ * libraries that need this seed are unaffected by that rule.
+ *
+ * Throws if the file does not exist or `dotenv` returns an error.
+ *
  * @param envFile Path to the environment file
- * @returns Object containing the parsed key-value pairs from the environment file
- *          (primarily for test purposes, but updates process.env as a side effect)
+ * @returns The parsed entries — also reflected into `process.env`
  */
-export function loadDotEnvIntoProcessEnv(
-  envFile: string,
-): Record<string, string> {
+export function loadDotEnvFile(envFile: string): Record<string, string> {
   const envPath = path.resolve(envFile);
 
-  // Check if file exists
   if (!fs.existsSync(envPath)) {
     throw new Error(`Environment file not found: ${envPath}`);
   }
 
-  // Load environment variables from file
   const result = dotenvLib.config({ path: envPath, override: true });
 
   if (result.error) {
@@ -336,7 +348,6 @@ export function loadDotEnvIntoProcessEnv(
 
   logger.info(`Loaded environment variables from ${envPath}`);
 
-  // Return the parsed variables that are also now in process.env.
   return result.parsed || {};
 }
 

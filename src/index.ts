@@ -5,7 +5,7 @@ import {
   DisplayedCommandLineUsageError,
   getFilteredToolNames,
   getPackageVersion,
-  loadDotEnvIntoProcessEnv,
+  loadDotEnvFile,
   parseCliArgs,
 } from "@src/cli.js";
 import {
@@ -13,7 +13,7 @@ import {
   loadConfigFromYaml,
   MCPServerConfiguration,
 } from "@src/config/index.js";
-import { fs, path } from "@src/confluent/node-deps.js";
+import { buildConfig, fs, path } from "@src/confluent/node-deps.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { groupDisabledToolsByReason } from "@src/confluent/tools/tool-availability.js";
@@ -81,6 +81,26 @@ export function getToolHandlersToRegister(
   }
 
   return toolHandlers;
+}
+
+/**
+ * Resolve the Segment write key handed to `TelemetryService.initialize`.
+ *
+ * Precedence: an explicit YAML `server.analytics.write_key` wins; otherwise
+ * fall back to `buildConfig.TELEMETRY_WRITE_KEY` (the value `npm pack` injects
+ * at release time). On unpacked / dev builds the build-time value is empty,
+ * so an absent YAML field produces an empty-string fallback that
+ * `TelemetryService` treats as "no key supplied" — analytics stays off.
+ *
+ * Extracted from `main()` so the precedence is unit-testable without booting
+ * the full server.
+ */
+export function resolveTelemetryWriteKey(
+  mcpConfig: MCPServerConfiguration,
+): string | undefined {
+  return (
+    mcpConfig.server.analytics?.write_key ?? buildConfig.TELEMETRY_WRITE_KEY
+  );
 }
 
 export function outputApiKey(): void {
@@ -266,8 +286,7 @@ async function main() {
     );
 
     if (cliOptions.envFile) {
-      // NOW load env vars into process.env!
-      loadDotEnvIntoProcessEnv(cliOptions.envFile);
+      loadDotEnvFile(cliOptions.envFile);
     }
 
     // Convert our known env vars into a typed Environment obj.
@@ -297,9 +316,10 @@ async function main() {
 
     // DO_NOT_TRACK is a cross-tool user preference (consoledonottrack.com);
     // the env var acts as a floor so it is honored even when --config is used.
-    TelemetryService.initialize(
-      mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
-    );
+    TelemetryService.initialize({
+      doNotTrack: mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
+      writeKey: resolveTelemetryWriteKey(mcpConfig),
+    });
 
     logger.info(
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,

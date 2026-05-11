@@ -27,8 +27,49 @@ paths:
   - `expect(mock).toHaveBeenCalledWith(arg)`
   - `expect(mock).toHaveBeenCalledTimes(n)`
   - `expect(mock).not.toHaveBeenCalled()`
-- For argument matching inside calls: `expect.any(String)`, `expect.objectContaining({...})`,
-  `expect.stringContaining("...")`, `expect.anything()`
+
+### Literal arguments over loose matchers (default)
+
+When the test owns the inputs to the unit under test, assert the resulting call with
+**literal deep-equality**, not partial matchers. `toHaveBeenCalledWith` uses `toEqual`
+semantics, so a literal object pins the exact contract and produces precise diffs on
+drift. Vitest treats `{ k: undefined }` and `{}` as equal, so an explicit `undefined`
+in the expected literal stays robust whether the call site passes the key or omits
+it.
+
+```typescript
+// Prefer: literal pins the contract — extra keys, renamed keys, regressed shapes all fail loudly.
+expect(client.GET).toHaveBeenCalledWith("/tableflow/v1/regions", {
+  params: {
+    query: { cloud: "AWS", page_size: undefined, page_token: undefined },
+  },
+});
+
+// Avoid: lets a buggy call shape slip through silently.
+expect(client.GET).toHaveBeenCalledWith(
+  expect.any(String),
+  expect.objectContaining({
+    params: expect.objectContaining({
+      query: expect.objectContaining({ cloud: "AWS" }),
+    }),
+  }),
+);
+```
+
+Reach for `expect.any(...)`, `expect.objectContaining(...)`, `expect.stringContaining(...)`,
+or `expect.anything()` only when there is **genuine non-determinism** the test can't
+compute — timestamps, generated UUIDs, opaque tokens minted by the unit under test, or
+fields whose value the test deliberately doesn't pin (e.g. a free-port-allocated URL).
+"I don't want to spell out the full object" is not non-determinism.
+
+**Cautionary tale.** Issue #129 (`ListTableFlowRegions sends cloud=undefined`) was a path
+key built via template literal — the colocated test used `expect.any(String)` for that
+path and `expect.objectContaining({ params: { path: { cloud: "AWS" } } })` for the
+options. The matchers were internally consistent with the broken implementation, so the
+test passed even though the call sent `/tableflow/v1/regions?cloud=undefined` to CCloud.
+A literal assertion on the path string and the options object would have failed against
+the buggy code and prevented the bug from shipping. The loose matcher and the bug were
+two sides of the same coin.
 
 ## Key Patterns
 

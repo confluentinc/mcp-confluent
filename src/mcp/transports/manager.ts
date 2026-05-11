@@ -40,28 +40,8 @@ export class TransportManager {
   private readonly transports: Map<TransportType, Transport> = new Map();
   private httpServer: HttpServer | null = null;
   private stdioServer: McpServer | null = null;
-  private sseServer: McpServer | null = null;
 
   constructor(private readonly config?: TransportManagerConfig) {}
-
-  /**
-   * Returns the cached {@link McpServer} for {@linkcode transport}, creating it lazily on first
-   * call. Only stdio/SSE are cached; HTTP creates a fresh server per session inside the transport.
-   *
-   * @internal Production callers go through {@linkcode TransportManager.start}; exposed so unit
-   *   tests can assert the per-transport invariant directly.
-   */
-  getServer(
-    transport: TransportType.STDIO | TransportType.SSE,
-    serverOptions: CreateMcpServerOptions,
-  ): McpServer {
-    switch (transport) {
-      case TransportType.STDIO:
-        return (this.stdioServer ??= createMcpServer(serverOptions));
-      case TransportType.SSE:
-        return (this.sseServer ??= createMcpServer(serverOptions));
-    }
-  }
 
   async start(options: TransportStartOptions): Promise<void> {
     const { serverOptions, types, http } = options;
@@ -149,14 +129,11 @@ export class TransportManager {
     this.transports.clear();
     this.httpServer = null;
 
-    // close cached stdio/SSE McpServers; HTTP per-session ones were closed by HttpTransport above
+    // close the cached stdio McpServer; HTTP and SSE per-session servers were already closed
+    // by their respective transports' disconnect() above
     if (this.stdioServer) {
       await this.stdioServer.close();
       this.stdioServer = null;
-    }
-    if (this.sseServer) {
-      await this.sseServer.close();
-      this.sseServer = null;
     }
   }
 
@@ -180,14 +157,16 @@ export class TransportManager {
           throw new Error("HTTP server not initialized");
         }
         return new SseTransport(
-          this.getServer(TransportType.SSE, serverOptions),
+          () => createMcpServer(serverOptions),
           this.httpServer,
           http?.sseEndpointPath,
           http?.sseMessageEndpointPath,
         );
       case TransportType.STDIO:
+        // stdio is single-client by construction (one process, one stdin/stdout pair), so we
+        // cache one McpServer for the lifetime of the manager rather than minting per session
         return new StdioTransport(
-          this.getServer(TransportType.STDIO, serverOptions),
+          (this.stdioServer ??= createMcpServer(serverOptions)),
         );
       default:
         throw new Error(`Unsupported transport type: ${type}`);

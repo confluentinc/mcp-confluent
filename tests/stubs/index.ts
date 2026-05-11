@@ -31,12 +31,12 @@ export {
   type MockedOpen,
 } from "./node-deps.js";
 export {
+  MOCK_SESSION_ID,
   createMockSdkTransport,
+  createMockTransportWithSession,
   type MockedSdkTransport,
 } from "./sdk-transport.js";
 export { createMockSessionRegistry } from "./session-registry.js";
-export {
-  MOCK_SESSION_ID,
-  createMockHttpServerTransport,
-} from "./streamable-http-transport.js";
+export { createMockSseServerTransport } from "./sse-server-transport.js";
+export { createMockHttpServerTransport } from "./streamable-http-transport.js";
 export { StubHandler } from "./stub-handler.js";

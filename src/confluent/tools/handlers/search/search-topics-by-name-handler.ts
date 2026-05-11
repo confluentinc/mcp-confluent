@@ -22,7 +22,7 @@ export class SearchTopicsByNameHandler extends BaseToolHandler {
     const clientManager = runtime.clientManager;
     const { topicName } = searchTopicsByNameArguments.parse(toolArguments);
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
     const { data: response, error } = await pathBasedClient[
       "/catalog/v1/search/basic?types=kafka_topic&query={topicName}"

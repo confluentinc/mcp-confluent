@@ -36,7 +36,7 @@ export class AddTagToTopicHandler extends BaseToolHandler {
     const { tagAssignments } = addTagToTopicArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
 
     const { data: response, error } = await pathBasedClient[

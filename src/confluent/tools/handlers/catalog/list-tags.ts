@@ -13,7 +13,7 @@ export class ListTagsHandler extends BaseToolHandler {
   async handle(runtime: ServerRuntime): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
 
     const { data: response, error } =

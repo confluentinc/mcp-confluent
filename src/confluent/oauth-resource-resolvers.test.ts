@@ -1,6 +1,7 @@
 import {
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
+  resolveSchemaRegistryClusterId,
   resolveSchemaRegistryEndpoint,
 } from "@src/confluent/oauth-resource-resolvers.js";
 import type { paths } from "@src/confluent/openapi-schema.js";
@@ -14,8 +15,17 @@ function makeStubClient(
 ): CloudClient {
   return {
     GET: vi.fn(
-      async (path: string, opts?: { params?: { path?: { id?: string } } }) => {
-        const id = opts?.params?.path?.id ?? "";
+      async (
+        path: string,
+        opts?: {
+          params?: {
+            path?: { id?: string };
+            query?: { environment?: string };
+          };
+        },
+      ) => {
+        const id =
+          opts?.params?.path?.id ?? opts?.params?.query?.environment ?? "";
         const key = `${path}:${id}`;
         return responses[key] ?? { error: { message: `unhandled ${key}` } };
       },
@@ -132,5 +142,76 @@ describe("resolveKafkaRestEndpoint", () => {
     await expect(
       resolveKafkaRestEndpoint(client, "lkc-no-http", "env-1"),
     ).rejects.toThrow(/http_endpoint/);
+  });
+});
+
+describe("resolveSchemaRegistryClusterId", () => {
+  it("returns the SR cluster's lsrc-id when exactly one SR is registered in the environment", async () => {
+    const client = makeStubClient({
+      "/srcm/v3/clusters:env-1": {
+        data: { data: [{ id: "lsrc-abc" }] },
+      },
+    });
+    expect(await resolveSchemaRegistryClusterId(client, "env-1")).toBe(
+      "lsrc-abc",
+    );
+  });
+
+  it("throws when no SR cluster is registered in the environment", async () => {
+    const client = makeStubClient({
+      "/srcm/v3/clusters:env-empty": {
+        data: { data: [] },
+      },
+    });
+    await expect(
+      resolveSchemaRegistryClusterId(client, "env-empty"),
+    ).rejects.toThrow(/env-empty/);
+    await expect(
+      resolveSchemaRegistryClusterId(client, "env-empty"),
+    ).rejects.toThrow(/No Schema Registry cluster/);
+  });
+
+  it("throws when multiple SR clusters are registered in the environment", async () => {
+    // Defense-in-depth: CCloud's documented invariant is one SR per env, but
+    // if that ever changes we want to fail loud rather than silently pick
+    // data[0] and bake the wrong target-sr-cluster header into requests.
+    const client = makeStubClient({
+      "/srcm/v3/clusters:env-multi": {
+        data: { data: [{ id: "lsrc-a" }, { id: "lsrc-b" }] },
+      },
+    });
+    await expect(
+      resolveSchemaRegistryClusterId(client, "env-multi"),
+    ).rejects.toThrow(/env-multi/);
+    await expect(
+      resolveSchemaRegistryClusterId(client, "env-multi"),
+    ).rejects.toThrow(/Multiple Schema Registry clusters/);
+  });
+
+  it("throws when the SR cluster response has no usable id (absent or empty)", async () => {
+    for (const cluster of [{}, { id: "" }]) {
+      const client = makeStubClient({
+        "/srcm/v3/clusters:env-bad-id": {
+          data: { data: [cluster] },
+        },
+      });
+      await expect(
+        resolveSchemaRegistryClusterId(client, "env-bad-id"),
+      ).rejects.toThrow(/env-bad-id.*has no id/);
+    }
+  });
+
+  it("surfaces the REST error payload when /srcm/v3/clusters fails", async () => {
+    const client = makeStubClient({
+      "/srcm/v3/clusters:env-broken": {
+        error: { message: "internal server error", status: 500 },
+      },
+    });
+    await expect(
+      resolveSchemaRegistryClusterId(client, "env-broken"),
+    ).rejects.toThrow(/internal server error/);
+    await expect(
+      resolveSchemaRegistryClusterId(client, "env-broken"),
+    ).rejects.toThrow(/env-broken/);
   });
 });

@@ -73,9 +73,15 @@ new segment.Analytics({ key }); // third-party constructors
 // test file
 import * as nodeDeps from "@src/confluent/node-deps.js";
 vi.spyOn(nodeDeps.fs, "readFileSync").mockReturnValue("content");
-vi.spyOn(nodeDeps.segment, "Analytics").mockImplementation(function () {
-  return { track: trackStub };
-} as any);
+vi.spyOn(nodeDeps.segment, "Analytics").mockImplementation(
+  class FakeAnalytics {
+    constructor() {
+      return {
+        track: trackStub,
+      } as unknown as InstanceType<typeof nodeDeps.segment.Analytics>;
+    }
+  } as unknown as typeof nodeDeps.segment.Analytics,
+);
 ```
 
 The env proxy is intentionally **not** wrapped in `node-deps.ts`. Production code receives an
@@ -83,9 +89,29 @@ already-validated `Environment` as an explicit parameter from the bootstrap; it 
 into a global. Tests therefore don't need to stub the env — if a code path under test reads
 process state, that state should be a parameter you pass in.
 
-**Constructor note**: `vi.spyOn` on a `new`-called function requires `mockImplementation` with a
-**regular function** (not arrow — arrows can't be constructors). Return the instance from inside
-the function.
+**Constructor note**: `vi.spyOn` on a `new`-called function rejects `mockReturnValue` outright —
+Vitest throws at construction time with `Cannot use \`mockReturnValue\` when called with \`new\`.
+Use \`mockImplementation\` with a \`class\` keyword instead.` Follow that guidance:
+
+```typescript
+vi.spyOn(nodeDeps.someNs, "Ctor").mockImplementation(
+  class FakeCtor {
+    constructor() {
+      return fake as unknown as RealCtor;
+    }
+  } as unknown as typeof RealCtor,
+);
+```
+
+Arrow-function implementations can't be constructed at all. A regular `function () { ... }` body
+also works and can avoid `as any` entirely when its signature satisfies the constructor type —
+declaring `this: unknown` as the first parameter is usually enough (see
+`function MockAnalytics(this: unknown) { ... }` in `src/confluent/telemetry.test.ts`). Without
+that escape hatch the function shape collides with the constructor shape and you'll need an
+outer `as any` cast plus an `eslint-disable` for the explicit-any rule; the class-keyword form
+sidesteps the question and reads cleaner for multi-method fakes. When the same construct-spy
+pattern recurs across tests, wrap it in a helper next to `getMockedAdmin()` /
+`getMockedProducer()`; `mockKafkaConstructor` in `tests/stubs/clients.ts` is the worked example.
 
 Add new deps to `node-deps.ts` as needed. For shared mutable objects like `logger`, spy methods
 directly on the object without a wrapper.

@@ -1,6 +1,4 @@
-import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -10,20 +8,12 @@ import { activeTransports } from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const handler = new SearchProductDocsHandler();
-const runtime = integrationRuntime();
-
 interface SearchPayload {
   results: Array<{ url: string; source: string }>;
   warnings: string[];
 }
 
 describe("search-product-docs-handler", { tags: [Tag.DOCS] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires at least one connection in config", () => {});
-    return;
-  }
-
   describe.each(activeTransports)("via %s transport", (transport) => {
     let server: StartedServer;
 

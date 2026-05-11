@@ -1,6 +1,4 @@
-import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -9,9 +7,6 @@ import { textContent } from "@tests/harness/tool-results.js";
 import { activeTransports } from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-const handler = new GetProductDocPageHandler();
-const runtime = integrationRuntime();
 
 // One URL per parser branch — failures usually point upstream, not at our code.
 const cases = [
@@ -38,11 +33,6 @@ const cases = [
 ] as const;
 
 describe("get-product-doc-page-handler", { tags: [Tag.DOCS] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires at least one connection in config", () => {});
-    return;
-  }
-
   describe.each(activeTransports)("via %s transport", (transport) => {
     let server: StartedServer;
 

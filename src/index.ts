@@ -5,7 +5,7 @@ import {
   DisplayedCommandLineUsageError,
   getFilteredToolNames,
   getPackageVersion,
-  loadDotEnvIntoProcessEnv,
+  loadDotEnvFile,
   parseCliArgs,
 } from "@src/cli.js";
 import {
@@ -13,7 +13,7 @@ import {
   loadConfigFromYaml,
   MCPServerConfiguration,
 } from "@src/config/index.js";
-import { fs, path } from "@src/confluent/node-deps.js";
+import { buildConfig, fs, path } from "@src/confluent/node-deps.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { groupDisabledToolsByReason } from "@src/confluent/tools/tool-availability.js";
@@ -266,8 +266,7 @@ async function main() {
     );
 
     if (cliOptions.envFile) {
-      // NOW load env vars into process.env!
-      loadDotEnvIntoProcessEnv(cliOptions.envFile);
+      loadDotEnvFile(cliOptions.envFile);
     }
 
     // Convert our known env vars into a typed Environment obj.
@@ -297,9 +296,16 @@ async function main() {
 
     // DO_NOT_TRACK is a cross-tool user preference (consoledonottrack.com);
     // the env var acts as a floor so it is honored even when --config is used.
-    TelemetryService.initialize(
-      mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
-    );
+    // writeKey precedence: explicit config wins over the build-time injected
+    // value. The config value reaches us either from a YAML declaration or
+    // from the legacy TELEMETRY_WRITE_KEY → server.analytics.write_key bridge
+    // in env-config.ts.
+    TelemetryService.initialize({
+      doNotTrack: mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
+      writeKey:
+        mcpConfig.server.analytics?.write_key ??
+        buildConfig.TELEMETRY_WRITE_KEY,
+    });
 
     logger.info(
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,

@@ -2,7 +2,7 @@ import { CommanderError } from "@commander-js/extra-typings";
 import {
   DisplayedCommandLineUsageError,
   getFilteredToolNames,
-  loadDotEnvIntoProcessEnv,
+  loadDotEnvFile,
   parseCliArgs,
 } from "@src/cli.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
@@ -108,7 +108,7 @@ describe("cli.ts", () => {
     });
   });
 
-  describe("loadDotEnvIntoProcessEnv()", () => {
+  describe("loadDotEnvFile()", () => {
     let existsSyncSpy: MockInstance<typeof nodeDeps.fs.existsSync>;
     let resolveSpy: MockInstance<typeof nodeDeps.path.resolve>;
     let dotenvConfigSpy: MockedDotenv;
@@ -123,7 +123,7 @@ describe("cli.ts", () => {
       resolveSpy.mockReturnValue("/resolved/.env");
       existsSyncSpy.mockReturnValue(false);
 
-      expect(() => loadDotEnvIntoProcessEnv(".env")).toThrow(
+      expect(() => loadDotEnvFile(".env")).toThrow(
         "Environment file not found: /resolved/.env",
       );
     });
@@ -132,7 +132,7 @@ describe("cli.ts", () => {
       resolveSpy.mockReturnValue("/abs/path/.env");
       existsSyncSpy.mockReturnValue(false);
 
-      expect(() => loadDotEnvIntoProcessEnv("relative/.env")).toThrow();
+      expect(() => loadDotEnvFile("relative/.env")).toThrow();
 
       expect(resolveSpy).toHaveBeenCalledWith("relative/.env");
       expect(existsSyncSpy).toHaveBeenCalledWith("/abs/path/.env");
@@ -143,7 +143,7 @@ describe("cli.ts", () => {
       existsSyncSpy.mockReturnValue(true);
       dotenvConfigSpy.mockReturnValue({ error: new Error("parse error") });
 
-      expect(() => loadDotEnvIntoProcessEnv(".env")).toThrow(
+      expect(() => loadDotEnvFile(".env")).toThrow(
         "Error loading environment variables:",
       );
     });
@@ -153,7 +153,7 @@ describe("cli.ts", () => {
       existsSyncSpy.mockReturnValue(true);
       dotenvConfigSpy.mockReturnValue({ parsed: {} });
 
-      loadDotEnvIntoProcessEnv("relative/.env");
+      loadDotEnvFile("relative/.env");
 
       // Should call with the resolved absolute path and override: true
       // to ensure CLI env vars take precedence over existing ones in process.env
@@ -169,7 +169,7 @@ describe("cli.ts", () => {
       existsSyncSpy.mockReturnValue(true);
       dotenvConfigSpy.mockReturnValue({ parsed: { FOO: "bar", BAZ: "qux" } });
 
-      const result = loadDotEnvIntoProcessEnv(".env");
+      const result = loadDotEnvFile(".env");
 
       expect(result).toEqual({ FOO: "bar", BAZ: "qux" });
     });
@@ -179,7 +179,7 @@ describe("cli.ts", () => {
       existsSyncSpy.mockReturnValue(true);
       dotenvConfigSpy.mockReturnValue({ parsed: undefined });
 
-      const result = loadDotEnvIntoProcessEnv(".env");
+      const result = loadDotEnvFile(".env");
 
       expect(result).toEqual({});
     });

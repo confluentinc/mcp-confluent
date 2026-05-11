@@ -256,6 +256,20 @@ const configSchema = z
       )
       .trim()
       .min(1),
+    TELEMETRY_WRITE_KEY: z
+      .string()
+      .describe(
+        "Developer-only override for the Segment write key used to emit anonymous usage analytics from this MCP server. Normal builds inject the right value at npm pack time; setting this is only useful when developing mcp-confluent against a non-production telemetry sink.",
+      )
+      .trim()
+      .min(1),
+    OAUTH_KAFKA_DEBUG: z
+      .string()
+      .describe(
+        "librdkafka `debug` contexts for the native Kafka client of an --oauth-synthesized connection. Common values: 'security,broker,protocol', 'all'. Useful when diagnosing a SASL/OAUTHBEARER handshake failure under OAuth. YAML configs supply this via the OAuth connection's kafka_debug field instead.",
+      )
+      .trim()
+      .min(1),
   })
   .partial();
 

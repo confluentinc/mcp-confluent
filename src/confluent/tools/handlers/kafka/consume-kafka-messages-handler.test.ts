@@ -84,6 +84,41 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
         expect(consumer.disconnect).toHaveBeenCalledOnce();
       });
+
+      it("should call getSchemaRegistrySdkClient with the resolved envId when value.useSchemaRegistry is true", async () => {
+        // Pin the SR-under-OAuth wiring at the handler-test layer. Under
+        // direct-mode runtime, `resolveKafkaClusterArgs` returns
+        // `envId: undefined`, so the manager call is `(undefined)`. The
+        // assertion is on the call shape, not message processing — the
+        // mocked `consumer.run` resolves without invoking `eachMessage`.
+        const clientManager = getMockedClientManager();
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicNames: ["smoke"],
+            maxMessages: 1,
+            timeoutMs: 50,
+            value: { useSchemaRegistry: true },
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        expect(clientManager.getSchemaRegistrySdkClient).toHaveBeenCalledWith(
+          undefined,
+        );
+      });
     });
   });
 });

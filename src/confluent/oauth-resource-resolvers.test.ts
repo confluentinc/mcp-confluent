@@ -2,6 +2,7 @@ import {
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
   resolveSchemaRegistryEndpoint,
+  resolveSoleSchemaRegistryCluster,
 } from "@src/confluent/oauth-resource-resolvers.js";
 import type { paths } from "@src/confluent/openapi-schema.js";
 import type { Client } from "openapi-fetch";
@@ -14,8 +15,17 @@ function makeStubClient(
 ): CloudClient {
   return {
     GET: vi.fn(
-      async (path: string, opts?: { params?: { path?: { id?: string } } }) => {
-        const id = opts?.params?.path?.id ?? "";
+      async (
+        path: string,
+        opts?: {
+          params?: {
+            path?: { id?: string };
+            query?: { environment?: string };
+          };
+        },
+      ) => {
+        const id =
+          opts?.params?.path?.id ?? opts?.params?.query?.environment ?? "";
         const key = `${path}:${id}`;
         return responses[key] ?? { error: { message: `unhandled ${key}` } };
       },
@@ -132,5 +142,46 @@ describe("resolveKafkaRestEndpoint", () => {
     await expect(
       resolveKafkaRestEndpoint(client, "lkc-no-http", "env-1"),
     ).rejects.toThrow(/http_endpoint/);
+  });
+});
+
+describe("resolveSoleSchemaRegistryCluster", () => {
+  it("returns the single cluster's id when one SR cluster exists in the env", async () => {
+    const client = makeStubClient({
+      "/srcm/v3/clusters:env-1": {
+        data: { data: [{ id: "lsrc-abc" }] },
+      },
+    });
+    expect(await resolveSoleSchemaRegistryCluster(client, "env-1")).toBe(
+      "lsrc-abc",
+    );
+  });
+
+  it("throws with the environment id in the message when no SR cluster exists", async () => {
+    const client = makeStubClient({
+      "/srcm/v3/clusters:env-empty": {
+        data: { data: [] },
+      },
+    });
+    await expect(
+      resolveSoleSchemaRegistryCluster(client, "env-empty"),
+    ).rejects.toThrow(/env-empty/);
+    await expect(
+      resolveSoleSchemaRegistryCluster(client, "env-empty"),
+    ).rejects.toThrow(/No Schema Registry cluster/);
+  });
+
+  it("surfaces the REST error payload when /srcm/v3/clusters fails", async () => {
+    const client = makeStubClient({
+      "/srcm/v3/clusters:env-broken": {
+        error: { message: "internal server error", status: 500 },
+      },
+    });
+    await expect(
+      resolveSoleSchemaRegistryCluster(client, "env-broken"),
+    ).rejects.toThrow(/internal server error/);
+    await expect(
+      resolveSoleSchemaRegistryCluster(client, "env-broken"),
+    ).rejects.toThrow(/env-broken/);
   });
 });

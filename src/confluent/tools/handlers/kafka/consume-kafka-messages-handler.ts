@@ -23,10 +23,11 @@ import { z } from "zod";
 
 const messageOptions = z.object({
   useSchemaRegistry: z
-    .enum(["yes", "no", "auto"])
+    .boolean()
     .optional()
+    .default(false)
     .describe(
-      "Schema Registry deserialization mode. yes: decode. no: raw bytes. auto (default if omitted): decode when a schema is registered for the subject.",
+      "Whether to use schema registry for deserialization. If false, messages will be returned as raw.",
     ),
   subject: z
     .string()
@@ -116,16 +117,12 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     let processedKey: unknown = message.key?.toString();
     let processedValue: unknown = message.value?.toString();
 
-    // Per-side semantics: useSchemaRegistry="no" → always raw bytes;
-    // useSchemaRegistry="yes" → decode; "auto" or omitted → auto-decode
-    // iff a registry is in scope and the subject is registered. The
-    // registry, when built, is shared across both sides.
     const deserializeWithOptions = async (
       buffer: Buffer | undefined,
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<unknown> => {
-      if (options.useSchemaRegistry === "no" || !registry) {
+      if (!options.useSchemaRegistry || !registry) {
         return buffer?.toString();
       }
       const subject =
@@ -157,10 +154,10 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       valueOptions,
       SerdeType.VALUE,
     );
-    if (message.key) {
+    if (message.key && keyOptions) {
       processedKey = await deserializeWithOptions(
         message.key as Buffer,
-        keyOptions ?? {},
+        keyOptions,
         SerdeType.KEY,
       );
     }
@@ -201,11 +198,8 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     const { connId, clientManager } = this.resolveSoleConnection(runtime);
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
-    // Build the registry unless BOTH sides explicitly opted out. "yes",
-    // "auto", and omitted all want a registry in scope; only an explicit
-    // "no" skips SR client construction.
     const needsRegistry =
-      value?.useSchemaRegistry !== "no" || key?.useSchemaRegistry !== "no";
+      (value && value.useSchemaRegistry) || (key && key.useSchemaRegistry);
 
     let registry: SchemaRegistryClient | undefined;
     if (needsRegistry) {

@@ -36,10 +36,16 @@ export interface DirectConnectionConfig {
  * connections supply via blocks must be passed as tool arguments under OAuth.
  *
  * `ccloud_env` defaults to "prod"
+ *
+ * `kafka_debug` is the optional librdkafka `debug` contexts string (e.g.
+ * "security,broker,protocol", or "all") used as a diagnostic knob when an
+ * OAuth/OAUTHBEARER SASL handshake misbehaves. Surfaced through to the
+ * `OAuthClientManager` and threaded into the rdkafka client config.
  */
 export interface OAuthConnectionConfig {
   readonly type: "oauth";
   readonly ccloud_env: "devel" | "stag" | "prod";
+  readonly kafka_debug?: string;
 }
 
 /**
@@ -132,6 +138,22 @@ export interface ServerConfig {
   readonly do_not_track: boolean;
   readonly http: ServerHttpConfig;
   readonly auth: ServerAuthConfig;
+  readonly analytics?: ServerAnalyticsConfig;
+}
+
+/**
+ * Internal-developer-only override for the Segment write key used to emit
+ * anonymous usage analytics from this MCP server. Normal builds inject the
+ * right value at `npm pack` time via build-config injection; this knob exists
+ * so contributors can point analytics at a non-production Segment project
+ * during local development. End users should not set it.
+ *
+ * Deliberately undocumented in the user-facing example YAML templates
+ * (`config.example.yaml`, `config.oauth.example.yaml`) — surfacing it there
+ * would legitimize a knob that exists only for internal mcp-confluent dev.
+ */
+export interface ServerAnalyticsConfig {
+  readonly write_key: string;
 }
 
 /**
@@ -411,6 +433,11 @@ const oauthConnectionSchema = z
   .object({
     type: z.literal("oauth"),
     ccloud_env: z.enum(["devel", "stag", "prod"]).default("prod"),
+    kafka_debug: z
+      .string()
+      .trim()
+      .min(1, "kafka_debug cannot be empty")
+      .optional(),
   })
   .strict();
 
@@ -519,6 +546,15 @@ const serverAuthConfigSchema = z
       "server.auth.disabled and server.auth.api_key cannot both be set — remove the api_key or set disabled: false",
   });
 
+const serverAnalyticsConfigSchema = z
+  .object({
+    write_key: z
+      .string()
+      .trim()
+      .min(1, "server.analytics.write_key cannot be empty"),
+  })
+  .strict();
+
 // Zod v4 requires .default() to receive a value (or factory) matching the schema's
 // output type. Since each sub-schema's output type has required fields (those with
 // their own .default() calls), we use factory functions so Zod resolves field-level
@@ -551,6 +587,7 @@ const serverConfigSchema = z
     auth: serverAuthConfigSchema.default(() =>
       serverAuthConfigSchema.parse({}),
     ),
+    analytics: serverAnalyticsConfigSchema.optional(),
   })
   .strict();
 

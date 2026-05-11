@@ -117,12 +117,18 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     let processedKey: unknown = message.key?.toString();
     let processedValue: unknown = message.value?.toString();
 
+    // When the caller opts into Schema Registry on either side, the registry
+    // is built once and shared across both. Per-side opt-in then becomes
+    // unnecessary — `<topic>-key` and `<topic>-value` are looked up
+    // independently, and a missing subject naturally falls through to raw
+    // bytes. This mirrors the direct-connection mental model where one SR
+    // SDK serves both sides of a record.
     const deserializeWithOptions = async (
       buffer: Buffer | undefined,
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<unknown> => {
-      if (!options.useSchemaRegistry || !registry) {
+      if (!registry) {
         return buffer?.toString();
       }
       const subject =
@@ -154,10 +160,10 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       valueOptions,
       SerdeType.VALUE,
     );
-    if (message.key && keyOptions) {
+    if (message.key) {
       processedKey = await deserializeWithOptions(
         message.key as Buffer,
-        keyOptions,
+        keyOptions ?? { useSchemaRegistry: false },
         SerdeType.KEY,
       );
     }

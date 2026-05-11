@@ -21,7 +21,11 @@ export type ConnectionTelemetryType = "direct" | "ccloud-oauth";
 export interface ConfigTelemetry {
   /** Which branch of `main()` built the `MCPServerConfiguration`. */
   configSource: "yaml" | "env-vars";
-  /** Sorted, deduplicated list of active MCP serving listeners. */
+  /**
+   * Sorted list of active MCP serving listeners. Inputs are already unique by
+   * construction (Zod rejects duplicates on the YAML path; `parseTransportList`
+   * dedupes on the CLI path), so this helper does not enforce uniqueness.
+   */
   transports: TransportType[];
   /**
    * Sorted list of each declared connection's wire type. Length equals the
@@ -49,7 +53,7 @@ export function buildConfigTelemetry(
     .sort(byLocale);
   return {
     configSource: cliOptions.config ? "yaml" : "env-vars",
-    transports: [...new Set(transports)].sort(byLocale),
+    transports: [...transports].sort(byLocale),
     connectionTypes,
   };
 }

@@ -50,7 +50,8 @@ export function integrationRuntime(): ServerRuntime {
   try {
     const config = loadConfigFromYaml(BASE_FIXTURE_PATH, process.env);
     return ServerRuntime.fromConfig(config);
-  } catch {
+  } catch (err) {
+    if (!isInterpolationError(err)) throw err;
     return new ServerRuntime(
       new MCPServerConfiguration({
         connections: { [DEFAULT_CONNECTION_NAME]: { type: "direct" } },
@@ -80,7 +81,8 @@ export function spawnConfigPath(options: SpawnConfigOptions): string {
       string,
       unknown
     >;
-  } catch {
+  } catch (err) {
+    if (!isInterpolationError(err)) throw err;
     parsed = { connections: { [DEFAULT_CONNECTION_NAME]: { type: "direct" } } };
   }
   const server = {
@@ -113,3 +115,14 @@ const BASE_FIXTURE_PATH = resolve(
   process.cwd(),
   "test-fixtures/yaml_configs/integration.yaml",
 );
+
+/**
+ * True only for `${VAR}` interpolation failures. YAML syntax, Zod, and
+ * missing-file errors must rethrow so broken fixtures fail loudly.
+ */
+function isInterpolationError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    err.message.includes("Failed to interpolate configuration values")
+  );
+}

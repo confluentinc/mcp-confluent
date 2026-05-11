@@ -224,21 +224,12 @@ describe("oauth-client-manager.ts", () => {
     });
 
     describe("getSchemaRegistrySdkClient()", () => {
-      it("should throw when cluster_id is omitted under OAuth", async () => {
-        const manager = buildManager();
-        await expect(
-          manager.getSchemaRegistrySdkClient(undefined, "env-1"),
-        ).rejects.toThrow(
-          "OAuth client construction requires a cluster id and environment id",
-        );
-      });
-
       it("should throw when environment_id is omitted under OAuth", async () => {
         const manager = buildManager();
         await expect(
           manager.getSchemaRegistrySdkClient("lsrc-1", undefined),
         ).rejects.toThrow(
-          "OAuth client construction requires a cluster id and environment id",
+          /environment_id is required under OAuth for Schema Registry access/,
         );
       });
 
@@ -274,6 +265,38 @@ describe("oauth-client-manager.ts", () => {
           expect.anything(),
           "lsrc-1",
           "env-1",
+        );
+      });
+
+      it("should auto-resolve lsrc from envId when clusterId is omitted", async () => {
+        const resolveSole = vi
+          .spyOn(resolvers, "resolveSoleSchemaRegistryCluster")
+          .mockResolvedValue("lsrc-auto");
+        const resolveEndpoint = vi
+          .spyOn(resolvers, "resolveSchemaRegistryEndpoint")
+          .mockResolvedValue("https://psrc-auto.us-east-1.aws.confluent.cloud");
+
+        const manager = buildManager();
+        const client = await manager.getSchemaRegistrySdkClient(
+          undefined,
+          "env-1",
+        );
+
+        expect(client).toBeDefined();
+        expect(resolveSole).toHaveBeenCalledWith(expect.anything(), "env-1");
+        expect(resolveEndpoint).toHaveBeenCalledWith(
+          expect.anything(),
+          "lsrc-auto",
+          "env-1",
+        );
+      });
+
+      it("should throw with an envId-required message when both args are omitted", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getSchemaRegistrySdkClient(undefined, undefined),
+        ).rejects.toThrow(
+          /environment_id is required under OAuth for Schema Registry access/,
         );
       });
     });

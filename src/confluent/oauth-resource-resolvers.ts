@@ -68,3 +68,31 @@ export async function resolveSchemaRegistryEndpoint(
   }
   return httpEndpoint;
 }
+
+export async function resolveSoleSchemaRegistryCluster(
+  cloudClient: CloudClient,
+  envId: string,
+): Promise<string> {
+  const { data, error } = await cloudClient.GET("/srcm/v3/clusters", {
+    params: { query: { environment: envId } },
+  });
+  if (error !== undefined) {
+    throw new Error(
+      `Failed to list Schema Registry clusters in environment ${envId}: ${JSON.stringify(error)}`,
+    );
+  }
+  const clusters = data?.data ?? [];
+  if (clusters.length === 0) {
+    throw new Error(
+      `No Schema Registry cluster found in environment ${envId}. ` +
+        `Schema Registry must be enabled on the environment in Confluent Cloud.`,
+    );
+  }
+  const id = clusters[0]?.id;
+  if (typeof id !== "string" || id.length === 0) {
+    throw new Error(
+      `Schema Registry cluster in environment ${envId} has no id`,
+    );
+  }
+  return id;
+}

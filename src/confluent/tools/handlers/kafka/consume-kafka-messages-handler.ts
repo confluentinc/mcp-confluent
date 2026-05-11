@@ -117,12 +117,18 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     let processedKey: unknown = message.key?.toString();
     let processedValue: unknown = message.value?.toString();
 
+    // When the caller opts into Schema Registry on either side, the registry
+    // is built once and shared across both. Per-side opt-in then becomes
+    // unnecessary — `<topic>-key` and `<topic>-value` are looked up
+    // independently, and a missing subject naturally falls through to raw
+    // bytes. This mirrors the direct-connection mental model where one SR
+    // SDK serves both sides of a record.
     const deserializeWithOptions = async (
       buffer: Buffer | undefined,
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<unknown> => {
-      if (!options.useSchemaRegistry || !registry) {
+      if (!registry) {
         return buffer?.toString();
       }
       const subject =
@@ -154,10 +160,10 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       valueOptions,
       SerdeType.VALUE,
     );
-    if (message.key && keyOptions) {
+    if (message.key) {
       processedKey = await deserializeWithOptions(
         message.key as Buffer,
-        keyOptions,
+        keyOptions ?? { useSchemaRegistry: false },
         SerdeType.KEY,
       );
     }
@@ -195,27 +201,18 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
     const { topicNames, maxMessages, timeoutMs, value, key } = parsed;
 
-    const { connId, conn, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
-    // Schema Registry deserialization is not yet exposed under OAuth connection type
-    // Block the path here with a clear capability boundary rather than throw a discovery hint
-    // that points at a tool the agent can't call.
     const needsRegistry =
       (value && value.useSchemaRegistry) || (key && key.useSchemaRegistry);
-    if (needsRegistry && conn.type === "oauth") {
-      return this.createResponse(
-        "Schema Registry deserialization is not yet supported under OAuth connection type. " +
-          "Set useSchemaRegistry: false (or omit it) to receive raw bytes, or " +
-          "use a direct connection with schema_registry configured for " +
-          "schema-aware deserialization.",
-        true,
-      );
-    }
 
     let registry: SchemaRegistryClient | undefined;
     if (needsRegistry) {
-      registry = await clientManager.getSchemaRegistrySdkClient();
+      registry = await clientManager.getSchemaRegistrySdkClient(
+        undefined,
+        resolved.envId,
+      );
     }
 
     const consumedMessages: ProcessedMessage[] = [];

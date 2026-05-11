@@ -52,5 +52,5 @@ export enum ToolName {
   SEARCH_PRODUCT_DOCS = "search-product-docs",
   GET_PRODUCT_DOC_PAGE = "get-product-doc-page",
   LIST_ORGANIZATIONS = "list-organizations",
-  DESCRIBE_TOOL_GATING = "describe-tool-gating",
+  EXPLAIN_DISABLED_TOOLS = "explain-disabled-tools",
 }

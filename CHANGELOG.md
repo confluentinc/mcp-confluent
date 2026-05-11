@@ -4,6 +4,10 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- Multiple MCP clients can now connect to the same HTTP or SSE server concurrently. Previously, both transports held a single shared `McpServer` across all sessions, which the MCP SDK rejects with `Already connected to a transport` when a second client tried to handshake. Both transports now create a fresh `McpServer` per session. Closes #122 (HTTP) and #337 (SSE).
+
 ### Changed
 
 - Removed `baseUrl` invocation parameter from all tool definitions. Now any API non-defaulting endpoint URLs must be provided through environment variable configuration prior to MCP server startup.
@@ -23,7 +27,7 @@ All notable changes to this MCP server will be documented in this file.
 - Confluent product documentation tools (support `docs.confluent.io`, `developer.confluent.io`, `support.confluent.io`):
   - `search-product-docs` for keyword search across product docs.
   - `get-product-doc-page` for fetching the full markdown content of a single page.
-- New tool `describe-tool-gating` to diagnose why possible tools are not enabled at this time due to mismatches in configuration.
+- New tool `explain-disabled-tools` to diagnose why possible tools are not enabled at this time due to mismatches in configuration.
 
 ## 1.2.1
 

@@ -242,7 +242,7 @@ describe("index.ts", () => {
         ToolName.ALTER_TOPIC_CONFIG,
         ToolName.GET_TOPIC_CONFIG,
         ToolName.LIST_CLUSTERS,
-        ToolName.DESCRIBE_TOOL_GATING,
+        ToolName.EXPLAIN_DISABLED_TOOLS,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [

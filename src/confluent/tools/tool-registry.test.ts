@@ -100,6 +100,7 @@ describe("tool-registry.ts", () => {
           "get",
           "search",
           "describe",
+          "explain",
           "check",
           "detect",
           "query",
@@ -231,7 +232,7 @@ describe("tool-registry.ts", () => {
         [ToolName.SEARCH_PRODUCT_DOCS]: alwaysEnabled,
         [ToolName.GET_PRODUCT_DOC_PAGE]: alwaysEnabled,
         // Diagnostics (no service-block requirement)
-        [ToolName.DESCRIBE_TOOL_GATING]: alwaysEnabled,
+        [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
       };
 
       it.each(
@@ -499,7 +500,7 @@ describe("tool-registry.ts", () => {
       // Diagnostics — no client calls; the handler walks the registry's
       // own predicate map. Against `allServicesRuntime` every gate passes
       // and the handler emits its all-enabled summary.
-      [ToolName.DESCRIBE_TOOL_GATING]: {
+      [ToolName.EXPLAIN_DISABLED_TOOLS]: {
         outcome: { resolves: "registered tools are advertised via tools/list" },
         bypassesClientLayer: true,
       },

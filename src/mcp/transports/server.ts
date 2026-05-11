@@ -6,6 +6,11 @@ import {
   CFLT_MCP_API_KEY_HEADER,
   createAuthHook,
 } from "@src/mcp/transports/auth.js";
+import {
+  pingHandler,
+  pingRequestSchema,
+  pingResponseSchema,
+} from "@src/mcp/transports/ping.js";
 import { ServerConfig } from "@src/mcp/transports/types.js";
 import {
   default as Fastify,
@@ -90,6 +95,23 @@ export class HttpServer {
       },
       staticCSP: true,
     });
+
+    // Register /ping at the server level (not per-transport) so HTTP+SSE configurations
+    // don't fail at startup with a duplicate-route error
+    this.fastify.post(
+      "/ping",
+      {
+        schema: {
+          tags: ["mcp"],
+          summary: "JSON-RPC 2.0 ping endpoint",
+          body: pingRequestSchema,
+          response: {
+            200: pingResponseSchema,
+          },
+        },
+      },
+      pingHandler(),
+    );
 
     this.isSwaggerConfigured = true;
   }

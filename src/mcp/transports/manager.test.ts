@@ -1,3 +1,4 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { CreateMcpServerOptions } from "@src/mcp/server.js";
@@ -19,19 +20,19 @@ describe("TransportManager", () => {
     };
   });
 
-  describe("getServer()", () => {
-    it("should return the same instance on repeated calls for stdio", () => {
-      const first = manager.getServer(TransportType.STDIO, serverOptions);
-      const second = manager.getServer(TransportType.STDIO, serverOptions);
+  describe("createTransport()", () => {
+    it("should reuse the cached stdio McpServer across repeated createTransport calls", () => {
+      // stdio is single-client by construction, so a `start() → stop() → start()` cycle should
+      // hand the new StdioTransport the same cached McpServer until the manager's `stop()`
+      // explicitly clears it
+      manager["createTransport"](TransportType.STDIO, serverOptions, undefined);
+      const cachedAfterFirst = manager["stdioServer"];
 
-      expect(second).toBe(first);
-    });
+      manager["createTransport"](TransportType.STDIO, serverOptions, undefined);
+      const cachedAfterSecond = manager["stdioServer"];
 
-    it("should return the same instance on repeated calls for sse", () => {
-      const first = manager.getServer(TransportType.SSE, serverOptions);
-      const second = manager.getServer(TransportType.SSE, serverOptions);
-
-      expect(second).toBe(first);
+      expect(cachedAfterFirst).toBeInstanceOf(McpServer);
+      expect(cachedAfterSecond).toBe(cachedAfterFirst);
     });
   });
 });

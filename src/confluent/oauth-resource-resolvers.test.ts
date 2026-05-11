@@ -146,7 +146,7 @@ describe("resolveKafkaRestEndpoint", () => {
 });
 
 describe("resolveSchemaRegistryClusterId", () => {
-  it("returns the single cluster's id when one SR cluster exists in the env", async () => {
+  it("returns the SR cluster's lsrc-id when exactly one SR is registered in the environment", async () => {
     const client = makeStubClient({
       "/srcm/v3/clusters:env-1": {
         data: { data: [{ id: "lsrc-abc" }] },
@@ -157,7 +157,7 @@ describe("resolveSchemaRegistryClusterId", () => {
     );
   });
 
-  it("throws with the environment id in the message when no SR cluster exists", async () => {
+  it("throws when no SR cluster is registered in the environment", async () => {
     const client = makeStubClient({
       "/srcm/v3/clusters:env-empty": {
         data: { data: [] },
@@ -169,6 +169,23 @@ describe("resolveSchemaRegistryClusterId", () => {
     await expect(
       resolveSchemaRegistryClusterId(client, "env-empty"),
     ).rejects.toThrow(/No Schema Registry cluster/);
+  });
+
+  it("throws when multiple SR clusters are registered in the environment", async () => {
+    // Defense-in-depth: CCloud's documented invariant is one SR per env, but
+    // if that ever changes we want to fail loud rather than silently pick
+    // data[0] and bake the wrong target-sr-cluster header into requests.
+    const client = makeStubClient({
+      "/srcm/v3/clusters:env-multi": {
+        data: { data: [{ id: "lsrc-a" }, { id: "lsrc-b" }] },
+      },
+    });
+    await expect(
+      resolveSchemaRegistryClusterId(client, "env-multi"),
+    ).rejects.toThrow(/env-multi/);
+    await expect(
+      resolveSchemaRegistryClusterId(client, "env-multi"),
+    ).rejects.toThrow(/Multiple Schema Registry clusters/);
   });
 
   it("surfaces the REST error payload when /srcm/v3/clusters fails", async () => {

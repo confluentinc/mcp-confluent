@@ -23,10 +23,10 @@ import { z } from "zod";
 
 const messageOptions = z.object({
   useSchemaRegistry: z
-    .boolean()
+    .enum(["yes", "no", "auto"])
     .optional()
     .describe(
-      "Whether to use schema registry for deserialization. If false, messages will be returned as raw. If omitted, auto-decodes when a schema is registered for the subject.",
+      "Schema Registry deserialization mode. yes: decode. no: raw bytes. auto (default if omitted): decode when a schema is registered for the subject.",
     ),
   subject: z
     .string()
@@ -116,16 +116,16 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     let processedKey: unknown = message.key?.toString();
     let processedValue: unknown = message.value?.toString();
 
-    // Per-side semantics: useSchemaRegistry=false → always raw bytes;
-    // useSchemaRegistry=true → decode; omitted → auto-decode iff a registry
-    // is in scope and the subject is registered. The registry,
-    // when built, is shared across both sides.
+    // Per-side semantics: useSchemaRegistry="no" → always raw bytes;
+    // useSchemaRegistry="yes" → decode; "auto" or omitted → auto-decode
+    // iff a registry is in scope and the subject is registered. The
+    // registry, when built, is shared across both sides.
     const deserializeWithOptions = async (
       buffer: Buffer | undefined,
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<unknown> => {
-      if (options.useSchemaRegistry === false || !registry) {
+      if (options.useSchemaRegistry === "no" || !registry) {
         return buffer?.toString();
       }
       const subject =
@@ -202,7 +202,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
     const needsRegistry =
-      (value && value.useSchemaRegistry) || (key && key.useSchemaRegistry);
+      value?.useSchemaRegistry === "yes" || key?.useSchemaRegistry === "yes";
 
     let registry: SchemaRegistryClient | undefined;
     if (needsRegistry) {

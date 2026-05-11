@@ -127,7 +127,7 @@ describe("consume-kafka-messages-handler.ts", () => {
           0,
           buildMessage(),
           registry,
-          { useSchemaRegistry: false },
+          { useSchemaRegistry: "no" },
         );
         expect(result.value).toBe("v");
         expect(getLatestSchemaMetadata).not.toHaveBeenCalled();
@@ -154,7 +154,7 @@ describe("consume-kafka-messages-handler.ts", () => {
           0,
           buildMessage({ key: Buffer.from("k") }),
           registry,
-          { useSchemaRegistry: false }, // value opt-out isolates the key path
+          { useSchemaRegistry: "no" }, // value opt-out isolates the key path
         );
         expect(result.key).toBe("k");
         expect(getLatestSchemaMetadata).toHaveBeenCalledOnce();
@@ -168,8 +168,8 @@ describe("consume-kafka-messages-handler.ts", () => {
           0,
           buildMessage({ key: Buffer.from("k") }),
           registry,
-          { useSchemaRegistry: false },
-          { useSchemaRegistry: false },
+          { useSchemaRegistry: "no" },
+          { useSchemaRegistry: "no" },
         );
         expect(result.key).toBe("k");
         expect(getLatestSchemaMetadata).not.toHaveBeenCalled();

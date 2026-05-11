@@ -64,13 +64,13 @@ const produceKafkaMessageArguments = z.object({
     .describe("Name of the kafka topic to produce the message to"),
   value: valueOptions,
   key: keyOptions.optional(),
-  cluster_id: z
+  clusterId: z
     .string()
     .optional()
     .describe(
       "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
     ),
-  environment_id: z
+  environmentId: z
     .string()
     .optional()
     .describe(

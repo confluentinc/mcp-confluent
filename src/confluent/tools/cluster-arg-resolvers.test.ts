@@ -49,7 +49,7 @@ describe("resolveKafkaClusterArgs", () => {
     });
     expect(
       resolveKafkaClusterArgs(
-        { cluster_id: "lkc-arg", environment_id: "env-arg" },
+        { clusterId: "lkc-arg", environmentId: "env-arg" },
         runtime,
         CONN_ID,
       ),
@@ -64,25 +64,25 @@ describe("resolveKafkaClusterArgs", () => {
     const runtime = oauthRuntime();
     expect(
       resolveKafkaClusterArgs(
-        { cluster_id: "lkc-abc", environment_id: "env-1" },
+        { clusterId: "lkc-abc", environmentId: "env-1" },
         runtime,
         CONN_ID,
       ),
     ).toEqual({ clusterId: "lkc-abc", envId: "env-1" });
   });
 
-  it("under OAuth with missing cluster_id, throws discovery hint", () => {
+  it("under OAuth with missing clusterId, throws discovery hint", () => {
     const runtime = oauthRuntime();
     expect(() =>
-      resolveKafkaClusterArgs({ environment_id: "env-1" }, runtime, CONN_ID),
-    ).toThrow(/cluster_id.*environment_id.*required.*list-clusters/i);
+      resolveKafkaClusterArgs({ environmentId: "env-1" }, runtime, CONN_ID),
+    ).toThrow(/clusterId.*environmentId.*required.*list-clusters/i);
   });
 
-  it("under OAuth with missing environment_id, throws discovery hint", () => {
+  it("under OAuth with missing environmentId, throws discovery hint", () => {
     const runtime = oauthRuntime();
     expect(() =>
-      resolveKafkaClusterArgs({ cluster_id: "lkc-abc" }, runtime, CONN_ID),
-    ).toThrow(/cluster_id.*environment_id.*required.*list-clusters/i);
+      resolveKafkaClusterArgs({ clusterId: "lkc-abc" }, runtime, CONN_ID),
+    ).toThrow(/clusterId.*environmentId.*required.*list-clusters/i);
   });
 });
 

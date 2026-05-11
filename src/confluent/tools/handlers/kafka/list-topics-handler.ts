@@ -14,13 +14,13 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listTopicArgs = z.object({
-  cluster_id: z
+  clusterId: z
     .string()
     .optional()
     .describe(
       "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
     ),
-  environment_id: z
+  environmentId: z
     .string()
     .optional()
     .describe(

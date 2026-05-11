@@ -282,12 +282,12 @@ exclusive — pick the template that matches the auth mode you want.
 
 ### Supported tools under OAuth
 
-| Category                                   | Tools                                                                                  | Notes                                                                                                                                   |
-| ------------------------------------------ | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Requires arguments `cluster_id` + `environment_id`. SR serialization (AVRO, JSONSCHEMA) on produce/consume; PROTOBUF not supported yet. |
-| **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               | Requires arguments `clusterId` + `environmentId`.                                                                                       |
-| **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         | —                                                                                                                                       |
-| **Billing**                                | `list-billing-costs`                                                                   | —                                                                                                                                       |
+| Category                                   | Tools                                                                                  | Notes                                                                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Requires arguments `clusterId` + `environmentId`. SR serialization (AVRO, JSONSCHEMA) on produce/consume; PROTOBUF not supported yet. |
+| **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               | Requires arguments `clusterId` + `environmentId`.                                                                                     |
+| **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         | —                                                                                                                                     |
+| **Billing**                                | `list-billing-costs`                                                                   | —                                                                                                                                     |
 
 ### Limitations
 

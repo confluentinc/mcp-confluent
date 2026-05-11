@@ -16,7 +16,7 @@ import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 export function resolveKafkaClusterArgs(
-  args: { cluster_id?: string; environment_id?: string },
+  args: { clusterId?: string; environmentId?: string },
   runtime: ServerRuntime,
   connId: string,
 ): { clusterId: string | undefined; envId: string | undefined } {
@@ -26,14 +26,14 @@ export function resolveKafkaClusterArgs(
     return { clusterId: undefined, envId: undefined };
   }
 
-  if (args.cluster_id === undefined || args.environment_id === undefined) {
+  if (args.clusterId === undefined || args.environmentId === undefined) {
     throw new Error(
-      "cluster_id and environment_id are required under OAuth connection type. " +
+      "clusterId and environmentId are required under OAuth connection type. " +
         "Discover the environment via list-environments, then call list-clusters " +
-        "with environment_id and pass the cluster's `id` and `spec.environment.id`.",
+        "with environmentId and pass the cluster's `id` and `spec.environment.id`.",
     );
   }
-  return { clusterId: args.cluster_id, envId: args.environment_id };
+  return { clusterId: args.clusterId, envId: args.environmentId };
 }
 
 /**
@@ -46,10 +46,7 @@ export function resolveKafkaClusterArgs(
  * Direct: `args.clusterId ?? conn.kafka?.cluster_id`; throws if neither.
  *   `envId` is unused (direct's `kafka.rest_endpoint` already targets the
  *   per-cluster hostname).
- * OAuth: both `clusterId` and `environmentId` required. Argument names are
- *   camelCase to match the existing input-schema convention of these tools
- *   and `list-clusters`; the native-Kafka tools' snake_case `cluster_id` is
- *   a separate convention.
+ * OAuth: both `clusterId` and `environmentId` required.
  */
 export function resolveKafkaRestArgs(
   args: { clusterId?: string; environmentId?: string },

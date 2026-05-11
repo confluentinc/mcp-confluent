@@ -17,13 +17,13 @@ const deleteKafkaTopicsArguments = z.object({
   topicNames: z
     .array(z.string().describe("Names of kafka topics to delete"))
     .nonempty(),
-  cluster_id: z
+  clusterId: z
     .string()
     .optional()
     .describe(
       "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
     ),
-  environment_id: z
+  environmentId: z
     .string()
     .optional()
     .describe(

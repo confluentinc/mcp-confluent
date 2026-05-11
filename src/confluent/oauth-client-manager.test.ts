@@ -62,6 +62,64 @@ describe("oauth-client-manager.ts", () => {
         expect(kafkaSpy).toHaveBeenCalledTimes(2);
       });
 
+      it("should pass librdkafka `debug` contexts through when kafka_debug is configured on the OAuth connection", async () => {
+        vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
+          "broker:9092",
+        );
+        const fakeAdmin = {
+          connect: vi.fn().mockResolvedValue(undefined),
+          disconnect: vi.fn().mockResolvedValue(undefined),
+          listTopics: vi.fn().mockResolvedValue([]),
+        };
+        let capturedConfig: Record<string, unknown> | undefined;
+        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function (
+          config: Record<string, unknown>,
+        ) {
+          capturedConfig = config;
+          return { admin: () => fakeAdmin } as unknown as KafkaJS.Kafka;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+
+        const holder = createMockInstance(OAuthHolder);
+        holder.getDataPlaneToken.mockReturnValue("dpat");
+        const manager = new OAuthClientManager(
+          holder,
+          "devel",
+          "security,broker,protocol",
+        );
+        await manager.getKafkaAdminClient("lkc-1", "env-1");
+
+        expect(capturedConfig).toBeDefined();
+        expect(capturedConfig!["debug"]).toBe("security,broker,protocol");
+      });
+
+      it("should omit `debug` from the rdkafka config when kafka_debug is undefined", async () => {
+        vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
+          "broker:9092",
+        );
+        const fakeAdmin = {
+          connect: vi.fn().mockResolvedValue(undefined),
+          disconnect: vi.fn().mockResolvedValue(undefined),
+          listTopics: vi.fn().mockResolvedValue([]),
+        };
+        let capturedConfig: Record<string, unknown> | undefined;
+        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function (
+          config: Record<string, unknown>,
+        ) {
+          capturedConfig = config;
+          return { admin: () => fakeAdmin } as unknown as KafkaJS.Kafka;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+
+        const manager = buildManager();
+        await manager.getKafkaAdminClient("lkc-1", "env-1");
+
+        expect(capturedConfig).toBeDefined();
+        // The key must be absent — not present-but-undefined — so the
+        // rdkafka client never receives a stray `debug` property.
+        expect(Object.hasOwn(capturedConfig!, "debug")).toBe(false);
+      });
+
       it("should configure KafkaJS.Kafka with librdkafka-native SASL keys, not the kafkaJS-compat async provider", async () => {
         // Regression guard: re-introducing `kafkaJS.sasl.oauthBearerProvider`
         // would resurrect the SASL race that previously required a warmup

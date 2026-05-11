@@ -36,3 +36,10 @@ connections:
   # required field.
   ccloud-oauth:
     type: oauth
+
+    # librdkafka `debug` contexts to emit on stderr for this OAuth connection's
+    # native Kafka client. Reach for it when an OAuth/OAUTHBEARER SASL handshake
+    # misbehaves and you need to see which side broke — works the same in
+    # production as in dev. Common values: "security,broker,protocol", "all".
+    # The output is verbose; turn it off again once the investigation is done.
+    # kafka_debug: "${OAUTH_KAFKA_DEBUG:-security,broker,protocol}"

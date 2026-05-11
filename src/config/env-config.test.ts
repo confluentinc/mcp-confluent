@@ -32,6 +32,8 @@ function envWith(overrides: Partial<EnvInput> = {}): EnvInput {
     TELEMETRY_ENDPOINT: undefined,
     TELEMETRY_API_KEY: undefined,
     TELEMETRY_API_SECRET: undefined,
+    TELEMETRY_WRITE_KEY: undefined,
+    OAUTH_KAFKA_DEBUG: undefined,
     // Server vars — non-optional in Environment (have envSchema defaults), so must be provided
     LOG_LEVEL: "info",
     HTTP_PORT: 8080,
@@ -820,6 +822,20 @@ describe("config/env-config.ts", () => {
         ).toThrow(/TELEMETRY_API_KEY/);
       });
     });
+
+    describe("analytics env vars (Segment write key)", () => {
+      it("should populate server.analytics.write_key from TELEMETRY_WRITE_KEY", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({ TELEMETRY_WRITE_KEY: "segment-write-key" }),
+        );
+        expect(config.server.analytics?.write_key).toBe("segment-write-key");
+      });
+
+      it("should leave server.analytics undefined when TELEMETRY_WRITE_KEY is absent", () => {
+        const config = buildConfigFromEnvAndCli(envWith());
+        expect(config.server.analytics).toBeUndefined();
+      });
+    });
   });
 
   describe("buildConfigFromEnvAndCli", () => {
@@ -1068,6 +1084,25 @@ describe("config/env-config.ts", () => {
         );
         const conn = config.getSoleConnection();
         expect(conn).toEqual({ type: "oauth", ccloud_env: "devel" });
+      });
+
+      it("should thread OAUTH_KAFKA_DEBUG into the synthesized OAuth connection's kafka_debug", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({ OAUTH_KAFKA_DEBUG: "security,broker" }),
+          { oauth: true },
+        );
+        const conn = config.getSoleConnection();
+        expect(conn).toEqual({
+          type: "oauth",
+          ccloud_env: "prod",
+          kafka_debug: "security,broker",
+        });
+      });
+
+      it("should leave kafka_debug unset on the OAuth connection when OAUTH_KAFKA_DEBUG is absent", () => {
+        const config = buildConfigFromEnvAndCli(envWith({}), { oauth: true });
+        const conn = config.getSoleConnection();
+        expect(conn).not.toHaveProperty("kafka_debug");
       });
     });
   });

@@ -65,4 +65,33 @@ export default [
       ],
     },
   },
+  // Production code reads configuration from `MCPServerConfiguration` /
+  // `ConnectionConfig`, never from `process.env`. The bootstrap allowlist
+  // below is the only place that consults it: index.ts orchestrates startup,
+  // cli.ts performs the -e dotenv mutation, env.ts parses the legacy env-var
+  // schema, logger.ts reads LOG_LEVEL/LOG_PRETTY at module-load (before
+  // main()). The dotenv mutation in cli.ts is intentional — it seeds
+  // linked-library env-var consumption (OpenSSL, cyrus-sasl, krb5, undici)
+  // outside our control. See #186 for the full rationale.
+  {
+    files: ["src/**/*.ts"],
+    ignores: [
+      "src/index.ts",
+      "src/cli.ts",
+      "src/env.ts",
+      "src/logger.ts",
+      "**/*.test.ts",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            "process.env may only be read in the bootstrap allowlist (src/index.ts, src/cli.ts, src/env.ts, src/logger.ts). Read from MCPServerConfiguration or ConnectionConfig instead.",
+        },
+      ],
+    },
+  },
 ];

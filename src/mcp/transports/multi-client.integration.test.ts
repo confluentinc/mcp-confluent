@@ -26,6 +26,11 @@ describe("multi-client", { tags: [Tag.SMOKE] }, () => {
     return;
   }
 
+  if (multiClientTransports.length === 0) {
+    it.skip("multi-client coverage applies only to HTTP/SSE transports", () => {});
+    return;
+  }
+
   describe.each(multiClientTransports)("via %s transport", (transport) => {
     let server: StartedServer;
     let secondClient: Client | undefined;

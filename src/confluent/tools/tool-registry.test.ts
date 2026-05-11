@@ -417,19 +417,17 @@ describe("tool-registry.ts", () => {
       [ToolName.ADD_TAGS_TO_TOPIC]: { outcome: { throws: "ZodError" } },
       [ToolName.LIST_TAGS]: {
         outcome: { resolves: "Successfully retrieved tags" },
-        setup: (cm) => {
-          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
-            data: [],
-          });
+        setup: async (cm) => {
+          const sr = await cm.getConfluentCloudSchemaRegistryRestClient();
+          sr.GET.mockResolvedValue({ data: [] });
         },
       },
       // Search
       [ToolName.SEARCH_TOPICS_BY_TAG]: {
         outcome: { resolves: "{}" },
-        setup: (cm) => {
-          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
-            data: {},
-          });
+        setup: async (cm) => {
+          const sr = await cm.getConfluentCloudSchemaRegistryRestClient();
+          sr.GET.mockResolvedValue({ data: {} });
         },
       },
       [ToolName.SEARCH_TOPICS_BY_NAME]: { outcome: { throws: "ZodError" } },

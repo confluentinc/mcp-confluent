@@ -38,7 +38,7 @@ export class RemoveTagFromEntityHandler extends BaseToolHandler {
       removeTagFromEntityArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
 
     const { response, error } = await pathBasedClient[

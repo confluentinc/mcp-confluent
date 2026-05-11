@@ -34,7 +34,7 @@ export class CreateTopicTagsHandler extends BaseToolHandler {
     const { tags } = createTagsArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
 
     const tagDefinitions = tags.map((tag) => ({

@@ -223,10 +223,9 @@ export abstract class BaseClientManager
   }
 
   /** @inheritdoc */
-  getConfluentCloudSchemaRegistryRestClient(): Client<
-    paths,
-    `${string}/${string}`
-  > {
+  async getConfluentCloudSchemaRegistryRestClient(
+    _envId?: string,
+  ): Promise<Client<paths, `${string}/${string}`>> {
     return this.confluentCloudSchemaRegistryRestClient.get();
   }
 

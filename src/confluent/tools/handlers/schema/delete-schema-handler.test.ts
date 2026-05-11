@@ -166,7 +166,10 @@ describe("delete-schema-handler.ts", () => {
           handler,
           runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
           args: { subject: "missing" },
-          outcome: { resolves: 'Failed to delete subject "missing"' },
+          outcome: {
+            resolves: 'Failed to delete subject "missing"',
+            isError: true,
+          },
           clientManager,
         });
       });

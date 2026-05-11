@@ -30,10 +30,20 @@ describe("remove-tag-from-entity-handler", { tags: [Tag.CATALOG] }, () => {
     it.skip("requires schema_registry.endpoint + schema_registry.auth (api_key) config", () => {});
     return;
   }
-  // test-side dep beyond the handler predicate: getSchemaRegistryClusterId() hits
-  // /srcm/v3/clusters via the CCloud REST client
-  if (!runtime.config.getSoleDirectConnection().confluent_cloud) {
+  // test-side deps beyond the handler predicate (kafka admin + SR cluster id discovery); gating
+  // here keeps a missing field as a skip rather than a beforeAll throw that fails the suite
+  const conn = runtime.config.getSoleDirectConnection();
+  if (!conn.confluent_cloud) {
     it.skip("requires confluent_cloud config for SR cluster id discovery", () => {});
+    return;
+  }
+  if (
+    !conn.kafka?.bootstrap_servers ||
+    !conn.kafka.auth ||
+    !conn.kafka.cluster_id ||
+    !conn.kafka.env_id
+  ) {
+    it.skip("requires kafka.bootstrap_servers + kafka.auth + kafka.cluster_id + kafka.env_id config", () => {});
     return;
   }
 

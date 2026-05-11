@@ -286,14 +286,15 @@ exclusive — pick the template that matches the auth mode you want.
 | ------------------------------------------ | -------------------------------------------------------------------------------------- |
 | **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` |
 | **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               |
+| **Schema Registry**                        | `list-schemas`, `delete-schema`                                                        |
 | **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         |
 | **Billing**                                | `list-billing-costs`                                                                   |
 
-Under OAuth, native-Kafka tools require both `cluster_id` (`lkc-...`) and `environment_id` (`env-...`) at call time. The REST topic-config tools require `clusterId` and `environmentId` (camelCase, matching their existing direct-mode arg names). Discover both via `list-environments` then `list-clusters`.
+Under OAuth, native-Kafka tools require both `cluster_id` (`lkc-...`) and `environment_id` (`env-...`) at call time. The REST topic-config tools require `clusterId` and `environmentId` (camelCase, matching their existing direct-mode arg names). Schema Registry tools require `environment_id` only — the SR cluster + endpoint are auto-resolved from it (single SR per environment is the CCloud invariant). Discover both via `list-environments` then `list-clusters`.
 
 ### Limitations
 
-- **Other REST-only tool categories** (Connect, Tableflow, Flink, Schema Registry, Metrics, Catalog & Tags) are still being migrated to OAuth and currently require a `direct` connection.
+- **Other REST-only tool categories** (Connect, Tableflow, Flink, Metrics, Catalog & Tags) are still being migrated to OAuth and currently require a `direct` connection.
 
 ## CLI Usage
 

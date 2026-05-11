@@ -248,6 +248,9 @@ describe("index.ts", () => {
         ToolName.GET_TOPIC_CONFIG,
         ToolName.LIST_CLUSTERS,
         ToolName.EXPLAIN_DISABLED_TOOLS,
+        // Schema Registry (hasSchemaRegistryOrOAuth)
+        ToolName.LIST_SCHEMAS,
+        ToolName.DELETE_SCHEMA,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
@@ -278,9 +281,6 @@ describe("index.ts", () => {
         ToolName.REMOVE_TAG_FROM_ENTITY,
         ToolName.ADD_TAGS_TO_TOPIC,
         ToolName.LIST_TAGS,
-        // Schema Registry (hasSchemaRegistry)
-        ToolName.LIST_SCHEMAS,
-        ToolName.DELETE_SCHEMA,
         // Tableflow (hasTableflow — needs the tableflow service block)
         ToolName.CREATE_TABLEFLOW_TOPIC,
         ToolName.LIST_TABLEFLOW_REGIONS,

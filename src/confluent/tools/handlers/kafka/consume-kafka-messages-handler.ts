@@ -25,7 +25,6 @@ const messageOptions = z.object({
   useSchemaRegistry: z
     .boolean()
     .optional()
-    .default(false)
     .describe(
       "Whether to use schema registry for deserialization. If false, messages will be returned as raw.",
     ),
@@ -117,18 +116,16 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     let processedKey: unknown = message.key?.toString();
     let processedValue: unknown = message.value?.toString();
 
-    // When the caller opts into Schema Registry on either side, the registry
-    // is built once and shared across both. Per-side opt-in then becomes
-    // unnecessary — `<topic>-key` and `<topic>-value` are looked up
-    // independently, and a missing subject naturally falls through to raw
-    // bytes. This mirrors the direct-connection mental model where one SR
-    // SDK serves both sides of a record.
+    // Per-side semantics: useSchemaRegistry=false → always raw bytes;
+    // useSchemaRegistry=true → decode; omitted → auto-decode iff a registry
+    // is in scope (i.e., the other side opted in) and the subject is
+    // registered. The registry, when built, is shared across both sides.
     const deserializeWithOptions = async (
       buffer: Buffer | undefined,
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<unknown> => {
-      if (!registry) {
+      if (options.useSchemaRegistry === false || !registry) {
         return buffer?.toString();
       }
       const subject =
@@ -163,7 +160,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     if (message.key) {
       processedKey = await deserializeWithOptions(
         message.key as Buffer,
-        keyOptions ?? { useSchemaRegistry: false },
+        keyOptions ?? {},
         SerdeType.KEY,
       );
     }

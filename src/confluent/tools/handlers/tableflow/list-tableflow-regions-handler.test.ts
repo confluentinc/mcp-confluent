@@ -34,20 +34,22 @@ describe("list-tableflow-regions-handler.ts", () => {
         clientManager
           .getConfluentCloudTableflowRestClient()
           .GET.mockResolvedValue({ error: { message: "unauthorized" } });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
           args: { cloud: "AWS" },
-          outcome: { resolves: "Failed to list Tableflow regions for  AWS" },
+          outcome: { resolves: "Failed to list Tableflow regions:" },
           clientManager,
         });
       });
 
-      it("should pass the cloud filter in the request path", async () => {
+      it("should send cloud as a query parameter when provided", async () => {
         const clientManager = getMockedClientManager();
         const tableflowRest: MockedRestClient =
           clientManager.getConfluentCloudTableflowRestClient();
         tableflowRest.GET.mockResolvedValue({ data: [] });
+
         await assertHandleCase({
           handler,
           runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
@@ -55,14 +57,79 @@ describe("list-tableflow-regions-handler.ts", () => {
           outcome: { resolves: "Tableflow Regions" },
           clientManager,
         });
+
         expect(tableflowRest.GET).toHaveBeenCalledOnce();
         expect(tableflowRest.GET).toHaveBeenCalledWith(
-          expect.any(String),
-          expect.objectContaining({
-            params: expect.objectContaining({
-              path: expect.objectContaining({ cloud: "AWS" }),
-            }),
-          }),
+          "/tableflow/v1/regions",
+          {
+            params: {
+              query: {
+                cloud: "AWS",
+                page_size: undefined,
+                page_token: undefined,
+              },
+            },
+          },
+        );
+      });
+
+      it("should not encode cloud in the request path when omitted", async () => {
+        const clientManager = getMockedClientManager();
+        const tableflowRest: MockedRestClient =
+          clientManager.getConfluentCloudTableflowRestClient();
+        tableflowRest.GET.mockResolvedValue({ data: [] });
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          args: {},
+          outcome: { resolves: "Tableflow Regions" },
+          clientManager,
+        });
+
+        // regression for #129: an omitted `cloud` must not be encoded into the
+        // path key as `?cloud=undefined`, and must not regress to `params.path`
+        expect(tableflowRest.GET).toHaveBeenCalledOnce();
+        expect(tableflowRest.GET).toHaveBeenCalledWith(
+          "/tableflow/v1/regions",
+          {
+            params: {
+              query: {
+                cloud: undefined,
+                page_size: undefined,
+                page_token: undefined,
+              },
+            },
+          },
+        );
+      });
+
+      it("should send pagination as snake_case query parameters", async () => {
+        const clientManager = getMockedClientManager();
+        const tableflowRest: MockedRestClient =
+          clientManager.getConfluentCloudTableflowRestClient();
+        tableflowRest.GET.mockResolvedValue({ data: [] });
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          args: { pageSize: 20, pageToken: "abc" },
+          outcome: { resolves: "Tableflow Regions" },
+          clientManager,
+        });
+
+        expect(tableflowRest.GET).toHaveBeenCalledOnce();
+        expect(tableflowRest.GET).toHaveBeenCalledWith(
+          "/tableflow/v1/regions",
+          {
+            params: {
+              query: {
+                cloud: undefined,
+                page_size: 20,
+                page_token: "abc",
+              },
+            },
+          },
         );
       });
     });

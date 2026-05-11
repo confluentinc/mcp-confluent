@@ -188,6 +188,19 @@ describe("resolveSchemaRegistryClusterId", () => {
     ).rejects.toThrow(/Multiple Schema Registry clusters/);
   });
 
+  it("throws when the SR cluster response has no usable id (absent or empty)", async () => {
+    for (const cluster of [{}, { id: "" }]) {
+      const client = makeStubClient({
+        "/srcm/v3/clusters:env-bad-id": {
+          data: { data: [cluster] },
+        },
+      });
+      await expect(
+        resolveSchemaRegistryClusterId(client, "env-bad-id"),
+      ).rejects.toThrow(/env-bad-id.*has no id/);
+    }
+  });
+
   it("surfaces the REST error payload when /srcm/v3/clusters fails", async () => {
     const client = makeStubClient({
       "/srcm/v3/clusters:env-broken": {

@@ -118,8 +118,8 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
 
     // Per-side semantics: useSchemaRegistry=false → always raw bytes;
     // useSchemaRegistry=true → decode; omitted → auto-decode iff a registry
-    // is in scope (i.e., the other side opted in) and the subject is
-    // registered. The registry, when built, is shared across both sides.
+    // is in scope and the subject is registered. The registry,
+    // when built, is shared across both sides.
     const deserializeWithOptions = async (
       buffer: Buffer | undefined,
       options: ValueOptions | KeyOptions,

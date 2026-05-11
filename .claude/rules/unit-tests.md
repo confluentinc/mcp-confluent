@@ -76,9 +76,11 @@ vi.spyOn(nodeDeps.fs, "readFileSync").mockReturnValue("content");
 vi.spyOn(nodeDeps.segment, "Analytics").mockImplementation(
   class FakeAnalytics {
     constructor() {
-      return { track: trackStub } as unknown as Analytics;
+      return {
+        track: trackStub,
+      } as unknown as InstanceType<typeof nodeDeps.segment.Analytics>;
     }
-  } as unknown as typeof Analytics,
+  } as unknown as typeof nodeDeps.segment.Analytics,
 );
 ```
 

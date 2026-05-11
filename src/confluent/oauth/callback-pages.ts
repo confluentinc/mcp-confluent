@@ -38,16 +38,12 @@ function escapeHtml(value: string): string {
 }
 
 export function renderSuccessPage(): string {
-  if (cachedSuccessPage === undefined) {
-    cachedSuccessPage = inlinePartials(readTemplate(SUCCESS_TEMPLATE_FILE));
-  }
+  cachedSuccessPage ??= inlinePartials(readTemplate(SUCCESS_TEMPLATE_FILE));
   return cachedSuccessPage;
 }
 
 export function renderErrorPage(message: string): string {
-  if (cachedFailureTemplate === undefined) {
-    cachedFailureTemplate = inlinePartials(readTemplate(FAILURE_TEMPLATE_FILE));
-  }
+  cachedFailureTemplate ??= inlinePartials(readTemplate(FAILURE_TEMPLATE_FILE));
   return cachedFailureTemplate.replace("{{error}}", escapeHtml(message));
 }
 

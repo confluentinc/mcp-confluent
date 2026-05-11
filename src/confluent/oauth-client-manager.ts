@@ -30,8 +30,8 @@ import { kafkaDeps } from "@src/confluent/node-deps.js";
 import {
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
+  resolveSchemaRegistryClusterId,
   resolveSchemaRegistryEndpoint,
-  resolveSoleSchemaRegistryCluster,
 } from "@src/confluent/oauth-resource-resolvers.js";
 import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
@@ -123,7 +123,7 @@ export class OAuthClientManager extends BaseClientManager {
       );
     }
     const cloud = this.getConfluentCloudRestClient();
-    const lsrc = await resolveSoleSchemaRegistryCluster(cloud, envId);
+    const lsrc = await resolveSchemaRegistryClusterId(cloud, envId);
     const endpoint = await resolveSchemaRegistryEndpoint(cloud, lsrc, envId);
     return new SchemaRegistryClient({
       baseURLs: [endpoint],

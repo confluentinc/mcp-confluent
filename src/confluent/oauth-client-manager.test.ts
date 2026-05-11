@@ -307,7 +307,7 @@ describe("oauth-client-manager.ts", () => {
 
       it("should resolve lsrc from envId and build the SDK client against the resolved endpoint", async () => {
         const resolveSole = vi
-          .spyOn(resolvers, "resolveSoleSchemaRegistryCluster")
+          .spyOn(resolvers, "resolveSchemaRegistryClusterId")
           .mockResolvedValue("lsrc-auto");
         const resolveEndpoint = vi
           .spyOn(resolvers, "resolveSchemaRegistryEndpoint")

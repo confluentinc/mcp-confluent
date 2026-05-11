@@ -13,6 +13,7 @@ export enum Tag {
   CATALOG = "@catalog",
   CLUSTERS = "@clusters",
   CONNECT = "@connect",
+  DOCS = "@docs",
   ENVIRONMENTS = "@environments",
   FLINK = "@flink",
   KAFKA = "@kafka",

@@ -1,3 +1,4 @@
+import { DEFAULT_CONNECTION_NAME } from "@src/config/env-config.js";
 import { loadConfigFromYaml } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import { TransportType } from "@src/mcp/transports/types.js";
@@ -40,11 +41,10 @@ export interface SpawnConfigOptions {
  * injection, which gating doesn't depend on), so the test's view of
  * "configured" matches the server's by construction.
  *
- * Tests use this to gate via {@linkcode ToolHandler.enabledConnectionIds}
- * (the same predicate the server itself uses to decide whether to register
- * a tool). If the YAML fails to load (any required `${VAR}` missing), we
- * return an empty runtime so handlers' gates yield a clean skip with the
- * tool's `requiredConnectionPath` as the reason.
+ * Tests use this with {@linkcode ToolHandler.enabledConnectionIds} as a
+ * skip gate. If `${VAR}` interpolation fails, we return a placeholder
+ * direct connection so connection-agnostic tests (doc tools, smoke) run
+ * without credentials; cred-gated predicates still skip.
  */
 export function integrationRuntime(): ServerRuntime {
   try {
@@ -52,7 +52,9 @@ export function integrationRuntime(): ServerRuntime {
     return ServerRuntime.fromConfig(config);
   } catch {
     return new ServerRuntime(
-      new MCPServerConfiguration({ connections: {} }),
+      new MCPServerConfiguration({
+        connections: { [DEFAULT_CONNECTION_NAME]: { type: "direct" } },
+      }),
       {},
     );
   }
@@ -69,10 +71,18 @@ export function integrationRuntime(): ServerRuntime {
  * YAML.
  */
 export function spawnConfigPath(options: SpawnConfigOptions): string {
-  const parsed = parse(readFileSync(BASE_FIXTURE_PATH, "utf-8")) as Record<
-    string,
-    unknown
-  >;
+  // Mirror integrationRuntime()'s fallback. Cred-gated tests have already
+  // skipped via their own gate before reaching this path.
+  let parsed: Record<string, unknown>;
+  try {
+    loadConfigFromYaml(BASE_FIXTURE_PATH, process.env);
+    parsed = parse(readFileSync(BASE_FIXTURE_PATH, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+  } catch {
+    parsed = { connections: { [DEFAULT_CONNECTION_NAME]: { type: "direct" } } };
+  }
   const server = {
     ...((parsed.server as Record<string, unknown> | undefined) ?? {}),
     transports: [options.transport],

@@ -13,7 +13,6 @@ import {
   hasConfluentCloud,
   hasConfluentCloudOrOAuth,
   hasFlink,
-  hasSchemaRegistry,
   hasSchemaRegistryOrOAuth,
   hasTableflow,
   hasTelemetry,
@@ -213,7 +212,7 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
         // Schema Registry
         [ToolName.LIST_SCHEMAS]: hasSchemaRegistryOrOAuth,
-        [ToolName.DELETE_SCHEMA]: hasSchemaRegistry,
+        [ToolName.DELETE_SCHEMA]: hasSchemaRegistryOrOAuth,
         // Tableflow
         [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
         [ToolName.LIST_TABLEFLOW_REGIONS]: hasTableflow,

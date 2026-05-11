@@ -231,6 +231,13 @@ export abstract class BaseClientManager
   }
 
   /** @inheritdoc */
+  async getSchemaRegistryRestClient(
+    _envId?: string,
+  ): Promise<Client<paths, `${string}/${string}`>> {
+    return this.confluentCloudSchemaRegistryRestClient.get();
+  }
+
+  /** @inheritdoc */
   async getConfluentCloudKafkaRestClient(
     _clusterId?: string,
     _envId?: string,

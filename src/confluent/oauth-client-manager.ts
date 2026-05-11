@@ -161,6 +161,35 @@ export class OAuthClientManager extends BaseClientManager {
   }
 
   /** @inheritdoc */
+  async getSchemaRegistryRestClient(
+    envId?: string,
+  ): Promise<Client<paths, `${string}/${string}`>> {
+    this.requireDataPlaneToken();
+    if (!envId) {
+      throw new Error(
+        "environment_id is required under OAuth for Schema Registry REST access. " +
+          "Call list-environments to discover available environments.",
+      );
+    }
+    const cloud = this.getConfluentCloudRestClient();
+    const lsrc = await resolveSchemaRegistryClusterId(cloud, envId);
+    const baseUrl = await resolveSchemaRegistryEndpoint(cloud, lsrc, envId);
+    const auth: ConfluentAuth = {
+      type: "oauth",
+      getToken: () => this.holder.getDataPlaneToken(),
+    };
+    const client = createClient<paths>({
+      baseUrl,
+      // The `target-sr-cluster` header pins all requests on this client to
+      // the right logical SR cluster — mirrors the SR SDK construction in
+      // `getSchemaRegistrySdkClient`.
+      headers: { "target-sr-cluster": lsrc },
+    });
+    client.use(createAuthMiddleware(auth));
+    return client;
+  }
+
+  /** @inheritdoc */
   async getKafkaAdminClient(
     clusterId?: string,
     envId?: string,

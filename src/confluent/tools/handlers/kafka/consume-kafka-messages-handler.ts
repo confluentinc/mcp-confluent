@@ -201,8 +201,11 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     const { connId, clientManager } = this.resolveSoleConnection(runtime);
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
+    // Build the registry unless BOTH sides explicitly opted out. "yes",
+    // "auto", and omitted all want a registry in scope; only an explicit
+    // "no" skips SR client construction.
     const needsRegistry =
-      value?.useSchemaRegistry === "yes" || key?.useSchemaRegistry === "yes";
+      value?.useSchemaRegistry !== "no" || key?.useSchemaRegistry !== "no";
 
     let registry: SchemaRegistryClient | undefined;
     if (needsRegistry) {

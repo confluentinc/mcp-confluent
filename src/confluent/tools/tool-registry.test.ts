@@ -9,11 +9,11 @@ import {
   canCreateDirectConnector,
   type ConnectionPredicate,
   flinkWithTelemetry,
-  hasCCloudCatalogSupport,
+  hasCCloudCatalogSupportOrOAuth,
   hasConfluentCloud,
   hasConfluentCloudOrOAuth,
   hasFlink,
-  hasSchemaRegistry,
+  hasSchemaRegistryOrOAuth,
   hasTableflow,
   hasTelemetry,
   kafkaBootstrapOrOAuth,
@@ -196,13 +196,13 @@ describe("tool-registry.ts", () => {
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
         [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
         // Catalog + search (CCloud catalog support)
-        [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
-        [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
-        [ToolName.CREATE_TOPIC_TAGS]: hasCCloudCatalogSupport,
-        [ToolName.DELETE_TAG]: hasCCloudCatalogSupport,
-        [ToolName.REMOVE_TAG_FROM_ENTITY]: hasCCloudCatalogSupport,
-        [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupport,
-        [ToolName.LIST_TAGS]: hasCCloudCatalogSupport,
+        [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupportOrOAuth,
+        [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupportOrOAuth,
+        [ToolName.CREATE_TOPIC_TAGS]: hasCCloudCatalogSupportOrOAuth,
+        [ToolName.DELETE_TAG]: hasCCloudCatalogSupportOrOAuth,
+        [ToolName.REMOVE_TAG_FROM_ENTITY]: hasCCloudCatalogSupportOrOAuth,
+        [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupportOrOAuth,
+        [ToolName.LIST_TAGS]: hasCCloudCatalogSupportOrOAuth,
         // Clusters
         [ToolName.LIST_CLUSTERS]: hasConfluentCloudOrOAuth,
         // Environments + billing + organizations (Confluent Cloud control plane)
@@ -211,8 +211,8 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_BILLING_COSTS]: hasConfluentCloudOrOAuth,
         [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
         // Schema Registry
-        [ToolName.LIST_SCHEMAS]: hasSchemaRegistry,
-        [ToolName.DELETE_SCHEMA]: hasSchemaRegistry,
+        [ToolName.LIST_SCHEMAS]: hasSchemaRegistryOrOAuth,
+        [ToolName.DELETE_SCHEMA]: hasSchemaRegistryOrOAuth,
         // Tableflow
         [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
         [ToolName.LIST_TABLEFLOW_REGIONS]: hasTableflow,
@@ -358,7 +358,9 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_SCHEMAS]: {
         outcome: { resolves: "{}" },
         setup: (cm) => {
-          cm.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
+          const sr = cm.getSchemaRegistryClient();
+          sr.getAllSubjects.mockResolvedValue([]);
+          cm.getSchemaRegistrySdkClient.mockResolvedValue(sr);
         },
       },
       [ToolName.DELETE_SCHEMA]: { outcome: { throws: "ZodError" } },
@@ -414,19 +416,17 @@ describe("tool-registry.ts", () => {
       [ToolName.ADD_TAGS_TO_TOPIC]: { outcome: { throws: "ZodError" } },
       [ToolName.LIST_TAGS]: {
         outcome: { resolves: "Successfully retrieved tags" },
-        setup: (cm) => {
-          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
-            data: [],
-          });
+        setup: async (cm) => {
+          const sr = await cm.getConfluentCloudSchemaRegistryRestClient();
+          sr.GET.mockResolvedValue({ data: [] });
         },
       },
       // Search
       [ToolName.SEARCH_TOPICS_BY_TAG]: {
         outcome: { resolves: "{}" },
-        setup: (cm) => {
-          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
-            data: {},
-          });
+        setup: async (cm) => {
+          const sr = await cm.getConfluentCloudSchemaRegistryRestClient();
+          sr.GET.mockResolvedValue({ data: {} });
         },
       },
       [ToolName.SEARCH_TOPICS_BY_NAME]: { outcome: { throws: "ZodError" } },

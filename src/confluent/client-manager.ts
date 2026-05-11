@@ -36,11 +36,18 @@ export interface ConfluentCloudRestClientManager {
   getConfluentCloudRestClient(): Client<paths, `${string}/${string}`>;
   /** Gets a configured REST client for Tableflow operations */
   getConfluentCloudTableflowRestClient(): Client<paths, `${string}/${string}`>;
-  /** Gets a configured REST client for Confluent Cloud Schema Registry operations */
-  getConfluentCloudSchemaRegistryRestClient(): Client<
-    paths,
-    `${string}/${string}`
-  >;
+  /**
+   * Gets a configured REST client for Confluent Cloud Schema Registry operations.
+   *
+   * Under direct, the arg is ignored and the eagerly-built singleton is
+   * returned (its baseUrl was set from `conn.schema_registry.endpoint` at
+   * construction). Under OAuth, `envId` is required: a fresh client is built
+   * per call against the resolved SR endpoint for the environment's SR
+   * cluster, with bearer auth + the `target-sr-cluster` default header.
+   */
+  getConfluentCloudSchemaRegistryRestClient(
+    envId?: string,
+  ): Promise<Client<paths, `${string}/${string}`>>;
   /**
    * Gets a configured REST client for Confluent Cloud Kafka operations.
    *

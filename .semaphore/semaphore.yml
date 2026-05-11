@@ -61,7 +61,7 @@ promotions:
       env_vars:
         - name: TOOL_GROUPS
           description: "Pipe-separated vitest tags to run (e.g. @kafka|@schema)"
-          default_value: "@smoke|@kafka|@schema|@environments|@clusters|@connect|@metrics|@flink|@tableflow|@billing"
+          default_value: "@smoke|@kafka|@schema|@environments|@clusters|@connect|@metrics|@flink|@tableflow|@billing|@docs"
           required: true
         - name: TRANSPORTS
           description: "Pipe-separated MCP transports (stdio|http|sse)"

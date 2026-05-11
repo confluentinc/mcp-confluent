@@ -1,4 +1,5 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { DEFAULT_CONNECTION_NAME } from "@src/config/env-config.js";
 import { MCPServerConfiguration } from "@src/config/index.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import {
@@ -13,7 +14,7 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
 
-const CONN_ID = "_default";
+const CONN_ID = DEFAULT_CONNECTION_NAME;
 
 function directRuntime(
   connOverrides: Record<string, unknown> = {},

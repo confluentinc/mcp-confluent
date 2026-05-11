@@ -13,15 +13,16 @@ import { type KeyValuePairObject } from "properties-file";
  * Connection name synthesized by the env-var path. Chosen as `"_default"` so
  * the YAML loader can reuse the same name as the zero-config fallback.
  *
- * Fallback contract: with no CLI args and no env vars, this module
- * produces `{ connections: { _default: { type: "direct" } } }` — a valid
- * config with no service blocks, enabling only connection-agnostic tools.
- * When the env-var path is retired, the YAML loader must preserve this same shape.
+ * Fallback contract: with no CLI args and no env vars, this module produces
+ * `connections: { _default: { type: "direct" } }` alongside the
+ * always-present `server` block. This yields a config with no service
+ * blocks, so only connection-agnostic tools are enabled. When the env-var
+ * path is retired, the YAML loader must preserve this connection shape.
  */
-const ENV_CONNECTION_NAME = "_default";
+export const DEFAULT_CONNECTION_NAME = "_default";
 
 /** The manufactured document path prefix for the single connection configured from env vars. */
-const CONN = `connections.${ENV_CONNECTION_NAME}`;
+const CONN = `connections.${DEFAULT_CONNECTION_NAME}`;
 
 /**
  * Maps each environment variable in type Environment (and handled by buildConfigFromEnvAndCli)
@@ -93,7 +94,7 @@ function buildConfigFromEnv(
   if (oauth) {
     const rawDocument: Record<string, unknown> = {
       connections: {
-        [ENV_CONNECTION_NAME]: {
+        [DEFAULT_CONNECTION_NAME]: {
           type: "oauth",
           ...(oauth.ccloudEnv && {
             ccloud_env: oauth.ccloudEnv,
@@ -146,7 +147,7 @@ function buildConfigFromEnv(
   // authOverrides are folded in here so Zod validates the final combined state,
   // including the disabled+api_key mutual exclusion refine.
   const rawDocument: Record<string, unknown> = {
-    connections: { [ENV_CONNECTION_NAME]: connection },
+    connections: { [DEFAULT_CONNECTION_NAME]: connection },
     ...buildServerBlock(env, authOverrides),
   };
 

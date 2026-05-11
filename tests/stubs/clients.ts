@@ -1,9 +1,10 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
+import { kafkaDeps } from "@src/confluent/node-deps.js";
 import { paths } from "@src/confluent/openapi-schema.js";
 import type { Client } from "openapi-fetch";
-import { type Mock, type Mocked, vi } from "vitest";
+import { type Mock, type MockInstance, type Mocked, vi } from "vitest";
 import { createMockInstance } from "./mock-instance.js";
 
 // shared shape for the six openapi-fetch REST seams (they differ only in `paths`).
@@ -86,6 +87,57 @@ export function getMockedConsumer(): Mocked<KafkaJS.Consumer> {
  *  (a real runtime class, so its methods come from prototype-walking). */
 export function getMockedSchemaRegistry(): Mocked<SchemaRegistryClient> {
   return createMockInstance(SchemaRegistryClient);
+}
+
+/**
+ * Mocks `new Kafka(config)` (via {@linkcode kafkaDeps.Kafka}) to return `fake`.
+ * Use when the unit under test is the code that constructs `Kafka` and the
+ * assertion is about what config got passed — read it back from
+ * `spy.mock.calls[0]![0]` rather than maintaining a closure variable. (The
+ * `!` is needed because `noUncheckedIndexedAccess` makes the outer array
+ * index possibly-undefined; the inner element type is narrowed by the helper's
+ * return type — see below.)
+ *
+ * `fake` is structurally typed (just the factory methods tests actually mock),
+ * not `Partial<KafkaJS.Kafka>`, because partial-of-the-full-class would still
+ * require each present method to return the complete `Admin`/`Producer`/
+ * `Consumer` interface. Real tests only mock the methods they exercise.
+ *
+ * Each slot is typed as `(...args: unknown[]) => unknown` — broad enough that
+ * both shapes call sites actually use land without casts: a thunk that returns
+ * a hand-rolled partial (`{ admin: () => fakeAdmin }`) and a `vi.fn()` whose
+ * captured args the test wants to read back (`{ consumer: vi.fn() }`). A
+ * narrower `KafkaJS.Kafka["consumer"]` would force every test to satisfy the
+ * real `Consumer` return type just to stub two methods.
+ *
+ * The returned spy declares its constructor signature as `(config:
+ * Record<string, unknown>) => Kafka` (required config, not `Partial<...> |
+ * undefined` from the real signature) so `mock.calls[0]![0]` reads back as
+ * `Record<string, unknown>` rather than `CommonConstructorConfig | undefined`.
+ * Production never calls `new Kafka()` without a config, so this isn't a lie.
+ *
+ * Implemented via `mockImplementation(class { constructor() { return fake; } })`:
+ * Vitest rejects `mockReturnValue` on a `new`-called spy (it throws when the
+ * spied prop is actually invoked with `new`), and an arrow-function
+ * implementation can't be constructed at all. A regular `function () { ... }`
+ * body works too if the signature can satisfy the constructor type (e.g.
+ * declaring `this: unknown`, as in `telemetry.test.ts`); the class-keyword
+ * form is just clearer for this multi-method fake.
+ */
+export function mockKafkaConstructor(fake: {
+  admin?: (...args: unknown[]) => unknown;
+  producer?: (...args: unknown[]) => unknown;
+  consumer?: (...args: unknown[]) => unknown;
+}): MockInstance<(config: Record<string, unknown>) => KafkaJS.Kafka> {
+  return vi.spyOn(kafkaDeps, "Kafka").mockImplementation(
+    class FakeKafka {
+      constructor() {
+        return fake as unknown as KafkaJS.Kafka;
+      }
+    } as unknown as typeof KafkaJS.Kafka,
+  ) as unknown as MockInstance<
+    (config: Record<string, unknown>) => KafkaJS.Kafka
+  >;
 }
 
 /**

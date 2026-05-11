@@ -251,6 +251,14 @@ describe("index.ts", () => {
         // Schema Registry (hasSchemaRegistryOrOAuth)
         ToolName.LIST_SCHEMAS,
         ToolName.DELETE_SCHEMA,
+        // Catalog / search (hasCCloudCatalogSupportOrOAuth)
+        ToolName.SEARCH_TOPICS_BY_TAG,
+        ToolName.SEARCH_TOPICS_BY_NAME,
+        ToolName.CREATE_TOPIC_TAGS,
+        ToolName.DELETE_TAG,
+        ToolName.REMOVE_TAG_FROM_ENTITY,
+        ToolName.ADD_TAGS_TO_TOPIC,
+        ToolName.LIST_TAGS,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
@@ -273,14 +281,6 @@ describe("index.ts", () => {
         ToolName.READ_CONNECTOR,
         ToolName.CREATE_CONNECTOR,
         ToolName.DELETE_CONNECTOR,
-        // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)
-        ToolName.SEARCH_TOPICS_BY_TAG,
-        ToolName.SEARCH_TOPICS_BY_NAME,
-        ToolName.CREATE_TOPIC_TAGS,
-        ToolName.DELETE_TAG,
-        ToolName.REMOVE_TAG_FROM_ENTITY,
-        ToolName.ADD_TAGS_TO_TOPIC,
-        ToolName.LIST_TAGS,
         // Tableflow (hasTableflow — needs the tableflow service block)
         ToolName.CREATE_TABLEFLOW_TOPIC,
         ToolName.LIST_TABLEFLOW_REGIONS,

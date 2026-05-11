@@ -4,16 +4,32 @@ import {
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
+import { hasCCloudCatalogSupportOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
+import { z } from "zod";
+
+const listTagsArguments = z.object({
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Schema Registry. Required under OAuth (the SR cluster + endpoint are auto-resolved from this env); ignored under direct.",
+    ),
+});
 
 export class ListTagsHandler extends BaseToolHandler {
-  async handle(runtime: ServerRuntime): Promise<CallToolResult> {
+  async handle(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown>,
+  ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
+    const { environment_id } = listTagsArguments.parse(toolArguments);
     const pathBasedClient = wrapAsPathBasedClient(
-      await clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(
+        environment_id,
+      ),
     );
 
     const { data: response, error } =
@@ -34,9 +50,9 @@ export class ListTagsHandler extends BaseToolHandler {
       name: ToolName.LIST_TAGS,
       description:
         "Retrieve all tags with definitions from Confluent Cloud Schema Registry.",
-      inputSchema: {},
+      inputSchema: listTagsArguments.shape,
       annotations: READ_ONLY,
     };
   }
-  readonly predicate = hasCCloudCatalogSupport;
+  readonly predicate = hasCCloudCatalogSupportOrOAuth;
 }

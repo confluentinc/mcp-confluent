@@ -39,18 +39,31 @@ describe("list-tableflow-regions-handler", { tags: [Tag.TABLEFLOW] }, () => {
     });
 
     it("should return AWS regions when filtered by cloud=AWS", async () => {
-      // pass `cloud` explicitly: omitting it sends the literal string "undefined" to the API
-      // (issue #129). once that lands we can drop the arg. CCloud's REST surface expects
-      // uppercase cloud codes ("AWS", "GCP", "AZURE").
+      // CCloud's REST surface expects uppercase cloud codes ("AWS", "GCP", "AZURE").
       const result = await server.client.callTool({
         name: ToolName.LIST_TABLEFLOW_REGIONS,
         arguments: { cloud: "AWS" },
       });
 
-      expect(result.isError).not.toBe(true);
       const text = textContent(result);
       expect(text).toMatch(/^Tableflow Regions:/);
       expect(text).toContain("us-east-2");
+    });
+
+    it("should return regions across clouds when cloud is omitted", async () => {
+      // regression for #129: omitted cloud must not send `?cloud=undefined`,
+      // which CCloud rejects. With the fix, the call returns regions across
+      // all clouds — assert two distinct clouds appear so a future regression
+      // to default-cloud filtering would fail this test.
+      const result = await server.client.callTool({
+        name: ToolName.LIST_TABLEFLOW_REGIONS,
+        arguments: {},
+      });
+
+      const text = textContent(result);
+      expect(text).toMatch(/^Tableflow Regions:/);
+      expect(text).toMatch(/"cloud":"AWS"/);
+      expect(text).toMatch(/"cloud":"GCP"/);
     });
   });
 });

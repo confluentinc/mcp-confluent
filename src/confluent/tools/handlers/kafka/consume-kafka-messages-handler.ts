@@ -209,10 +209,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
 
     let registry: SchemaRegistryClient | undefined;
     if (needsRegistry) {
-      registry = await clientManager.getSchemaRegistrySdkClient(
-        undefined,
-        resolved.envId,
-      );
+      registry = await clientManager.getSchemaRegistrySdkClient(resolved.envId);
     }
 
     const consumedMessages: ProcessedMessage[] = [];

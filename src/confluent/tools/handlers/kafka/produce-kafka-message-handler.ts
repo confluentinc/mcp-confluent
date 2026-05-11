@@ -141,10 +141,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
 
     let registry: SchemaRegistryClient | undefined;
     if (needsRegistry) {
-      registry = await clientManager.getSchemaRegistrySdkClient(
-        undefined,
-        resolved.envId,
-      );
+      registry = await clientManager.getSchemaRegistrySdkClient(resolved.envId);
     }
 
     // Check for latest schema if needed (value)

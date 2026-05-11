@@ -101,7 +101,6 @@ export class OAuthClientManager extends BaseClientManager {
 
   /** @inheritdoc */
   async getSchemaRegistrySdkClient(
-    clusterId?: string,
     envId?: string,
   ): Promise<SchemaRegistryClient> {
     // The SR SDK captures `Authorization: Bearer <token>` in its axios
@@ -116,8 +115,7 @@ export class OAuthClientManager extends BaseClientManager {
       );
     }
     const cloud = this.getConfluentCloudRestClient();
-    const lsrc =
-      clusterId ?? (await resolveSoleSchemaRegistryCluster(cloud, envId));
+    const lsrc = await resolveSoleSchemaRegistryCluster(cloud, envId);
     const endpoint = await resolveSchemaRegistryEndpoint(cloud, lsrc, envId);
     return new SchemaRegistryClient({
       baseURLs: [endpoint],

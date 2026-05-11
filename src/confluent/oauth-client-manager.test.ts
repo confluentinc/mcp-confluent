@@ -224,10 +224,10 @@ describe("oauth-client-manager.ts", () => {
     });
 
     describe("getSchemaRegistrySdkClient()", () => {
-      it("should throw when environment_id is omitted under OAuth", async () => {
+      it("should throw when envId is omitted under OAuth", async () => {
         const manager = buildManager();
         await expect(
-          manager.getSchemaRegistrySdkClient("lsrc-1", undefined),
+          manager.getSchemaRegistrySdkClient(undefined),
         ).rejects.toThrow(
           /environment_id is required under OAuth for Schema Registry access/,
         );
@@ -243,32 +243,11 @@ describe("oauth-client-manager.ts", () => {
         const manager = new OAuthClientManager(holder, "devel");
 
         await expect(
-          manager.getSchemaRegistrySdkClient("lsrc-1", "env-1"),
+          manager.getSchemaRegistrySdkClient("env-1"),
         ).rejects.toThrow("No data-plane token available");
       });
 
-      it("should build a SchemaRegistryClient against the resolved endpoint", async () => {
-        vi.spyOn(resolvers, "resolveSchemaRegistryEndpoint").mockResolvedValue(
-          "https://psrc-abc.us-east-1.aws.confluent.cloud",
-        );
-
-        const manager = buildManager();
-        const client = await manager.getSchemaRegistrySdkClient(
-          "lsrc-1",
-          "env-1",
-        );
-
-        expect(client).toBeDefined();
-        // resolveSchemaRegistryEndpoint should have been called with the
-        // cloud REST client + the cluster/env args.
-        expect(resolvers.resolveSchemaRegistryEndpoint).toHaveBeenCalledWith(
-          expect.anything(),
-          "lsrc-1",
-          "env-1",
-        );
-      });
-
-      it("should auto-resolve lsrc from envId when clusterId is omitted", async () => {
+      it("should resolve lsrc from envId and build the SDK client against the resolved endpoint", async () => {
         const resolveSole = vi
           .spyOn(resolvers, "resolveSoleSchemaRegistryCluster")
           .mockResolvedValue("lsrc-auto");
@@ -277,10 +256,7 @@ describe("oauth-client-manager.ts", () => {
           .mockResolvedValue("https://psrc-auto.us-east-1.aws.confluent.cloud");
 
         const manager = buildManager();
-        const client = await manager.getSchemaRegistrySdkClient(
-          undefined,
-          "env-1",
-        );
+        const client = await manager.getSchemaRegistrySdkClient("env-1");
 
         expect(client).toBeDefined();
         expect(resolveSole).toHaveBeenCalledWith(expect.anything(), "env-1");
@@ -288,15 +264,6 @@ describe("oauth-client-manager.ts", () => {
           expect.anything(),
           "lsrc-auto",
           "env-1",
-        );
-      });
-
-      it("should throw with an envId-required message when both args are omitted", async () => {
-        const manager = buildManager();
-        await expect(
-          manager.getSchemaRegistrySdkClient(undefined, undefined),
-        ).rejects.toThrow(
-          /environment_id is required under OAuth for Schema Registry access/,
         );
       });
     });

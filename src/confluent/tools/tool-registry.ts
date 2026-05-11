@@ -10,7 +10,7 @@ import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/cr
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
-import { DescribeToolGatingHandler } from "@src/confluent/tools/handlers/diagnostics/describe-tool-gating-handler.js";
+import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
 import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
@@ -132,8 +132,8 @@ export class ToolHandlerRegistry {
     [ToolName.GET_PRODUCT_DOC_PAGE, new GetProductDocPageHandler()],
     [ToolName.LIST_ORGANIZATIONS, new ListOrganizationsHandler()],
     [
-      ToolName.DESCRIBE_TOOL_GATING,
-      new DescribeToolGatingHandler(() => ToolHandlerRegistry.allHandlers()),
+      ToolName.EXPLAIN_DISABLED_TOOLS,
+      new ExplainDisabledToolsHandler(() => ToolHandlerRegistry.allHandlers()),
     ],
   ]);
 
@@ -147,7 +147,7 @@ export class ToolHandlerRegistry {
 
   /**
    * Iterable over every (ToolName, ToolHandler) pair in the registry, in
-   * declaration order. Consumed by the `describe-tool-gating` diagnostic
+   * declaration order. Consumed by the `explain-disabled-tools` diagnostic
    * tool to walk the full handler set without a back-channel into the
    * private map. Read-only — callers must not mutate the underlying map.
    */

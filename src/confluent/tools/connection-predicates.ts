@@ -275,6 +275,18 @@ export const hasSchemaRegistryOrOAuth: ConnectionPredicate =
   widenForOAuth(hasSchemaRegistry);
 
 /**
+ * The CCloud catalog gate, widened to admit OAuth. Direct connections still
+ * need a `schema_registry` block with `auth.type === "api_key"` (the proxy
+ * for "this is CCloud-hosted SR, which exposes `/catalog/v1/`"); OAuth
+ * connections satisfy it unconditionally — the OAuth flow targets CCloud by
+ * definition, and the resolved SR REST endpoint reaches the same `/catalog/v1/`
+ * surface. Use on catalog/tag/search handlers that have been adapted to call
+ * the async `getConfluentCloudSchemaRegistryRestClient(envId)` accessor.
+ */
+export const hasCCloudCatalogSupportOrOAuth: ConnectionPredicate =
+  widenForOAuth(hasCCloudCatalogSupport);
+
+/**
  * Gate for tools that create connectors against the direct Confluent Cloud
  * REST surface: requires both a `confluent_cloud` block (the `/connect/v1`
  * endpoint) and `kafka.auth` (the connector spec carries kafka API

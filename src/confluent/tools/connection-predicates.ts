@@ -267,9 +267,8 @@ export const kafkaRestWithAuthOrOAuth: ConnectionPredicate =
 /**
  * The Schema Registry gate, widened to admit OAuth. Direct connections still
  * need a `schema_registry` block; OAuth connections satisfy it unconditionally
- * (the SR cluster + endpoint are auto-resolved at call time from `environment_id`
- * via the SRCM REST API, and the bearer middleware handles auth). Use on
- * SR-domain handlers (`list-schemas`, `delete-schema`).
+ * (the SR cluster + endpoint are auto-resolved at call time from
+ * `environment_id`).
  */
 export const hasSchemaRegistryOrOAuth: ConnectionPredicate =
   widenForOAuth(hasSchemaRegistry);

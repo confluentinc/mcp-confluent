@@ -6,6 +6,7 @@ export {
   getMockedProducer,
   getMockedRestClient,
   getMockedSchemaRegistry,
+  mockKafkaConstructor,
   type MockedClientManager,
   type MockedRestClient,
 } from "./clients.js";

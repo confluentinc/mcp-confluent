@@ -1,4 +1,3 @@
-import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import * as resolvers from "@src/confluent/oauth-resource-resolvers.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
@@ -200,9 +199,7 @@ describe("oauth-client-manager.ts", () => {
         );
         const fakeConsumer = { connect: vi.fn(), disconnect: vi.fn() };
         const consumerFn = vi.fn().mockReturnValue(fakeConsumer);
-        mockKafkaConstructor({
-          consumer: consumerFn as unknown as KafkaJS.Kafka["consumer"],
-        });
+        mockKafkaConstructor({ consumer: consumerFn });
 
         const manager = buildManager();
         await manager.buildKafkaConsumer("lkc-1", "env-1");
@@ -221,9 +218,7 @@ describe("oauth-client-manager.ts", () => {
         );
         const fakeConsumer = { connect: vi.fn(), disconnect: vi.fn() };
         const consumerFn = vi.fn().mockReturnValue(fakeConsumer);
-        mockKafkaConstructor({
-          consumer: consumerFn as unknown as KafkaJS.Kafka["consumer"],
-        });
+        mockKafkaConstructor({ consumer: consumerFn });
 
         const manager = buildManager();
         await manager.buildKafkaConsumer("lkc-1", "env-1", "session-42");

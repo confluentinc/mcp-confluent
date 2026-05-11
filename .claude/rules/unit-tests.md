@@ -102,11 +102,14 @@ vi.spyOn(nodeDeps.someNs, "Ctor").mockImplementation(
 ```
 
 Arrow-function implementations can't be constructed at all. A regular `function () { ... }` body
-also works but requires an outer `as any` cast plus an `eslint-disable` for the explicit-any
-rule. The class-keyword form needs only an outer `as unknown as typeof RealCtor` — a _typed_
-cast rather than `any`. When the same construct-spy pattern recurs across tests, wrap it in a
-helper next to `getMockedAdmin()` / `getMockedProducer()`; `mockKafkaConstructor` in
-`tests/stubs/clients.ts` is the worked example.
+also works and can avoid `as any` entirely when its signature satisfies the constructor type —
+declaring `this: unknown` as the first parameter is usually enough (see
+`function MockAnalytics(this: unknown) { ... }` in `src/confluent/telemetry.test.ts`). Without
+that escape hatch the function shape collides with the constructor shape and you'll need an
+outer `as any` cast plus an `eslint-disable` for the explicit-any rule; the class-keyword form
+sidesteps the question and reads cleaner for multi-method fakes. When the same construct-spy
+pattern recurs across tests, wrap it in a helper next to `getMockedAdmin()` /
+`getMockedProducer()`; `mockKafkaConstructor` in `tests/stubs/clients.ts` is the worked example.
 
 Add new deps to `node-deps.ts` as needed. For shared mutable objects like `logger`, spy methods
 directly on the object without a wrapper.

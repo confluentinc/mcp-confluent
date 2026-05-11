@@ -103,6 +103,13 @@ export function getMockedSchemaRegistry(): Mocked<SchemaRegistryClient> {
  * require each present method to return the complete `Admin`/`Producer`/
  * `Consumer` interface. Real tests only mock the methods they exercise.
  *
+ * Each slot is typed as `(...args: unknown[]) => unknown` — broad enough that
+ * both shapes call sites actually use land without casts: a thunk that returns
+ * a hand-rolled partial (`{ admin: () => fakeAdmin }`) and a `vi.fn()` whose
+ * captured args the test wants to read back (`{ consumer: vi.fn() }`). A
+ * narrower `KafkaJS.Kafka["consumer"]` would force every test to satisfy the
+ * real `Consumer` return type just to stub two methods.
+ *
  * The returned spy declares its constructor signature as `(config:
  * Record<string, unknown>) => Kafka` (required config, not `Partial<...> |
  * undefined` from the real signature) so `mock.calls[0]![0]` reads back as
@@ -113,13 +120,14 @@ export function getMockedSchemaRegistry(): Mocked<SchemaRegistryClient> {
  * Vitest rejects `mockReturnValue` on a `new`-called spy (it throws when the
  * spied prop is actually invoked with `new`), and an arrow-function
  * implementation can't be constructed at all. A regular `function () { ... }`
- * body also works but requires an outer `as any` cast and an `eslint-disable`
- * for the explicit-any rule — the class form needs only a typed cast.
+ * body works too if the signature can satisfy the constructor type (e.g.
+ * declaring `this: unknown`, as in `telemetry.test.ts`); the class-keyword
+ * form is just clearer for this multi-method fake.
  */
 export function mockKafkaConstructor(fake: {
-  admin?: (...args: never[]) => unknown;
-  producer?: (...args: never[]) => unknown;
-  consumer?: (...args: never[]) => unknown;
+  admin?: (...args: unknown[]) => unknown;
+  producer?: (...args: unknown[]) => unknown;
+  consumer?: (...args: unknown[]) => unknown;
 }): MockInstance<(config: Record<string, unknown>) => KafkaJS.Kafka> {
   return vi.spyOn(kafkaDeps, "Kafka").mockImplementation(
     class FakeKafka {

@@ -44,12 +44,15 @@ function buildConfig(
 
 describe("base-client-manager.ts", () => {
   describe("BaseClientManager", () => {
-    // getConfluentCloudKafkaRestClient is now async + cluster-aware and is
-    // covered by its own dedicated describe block below; exclude it from the
-    // synchronous parameterized loop's getter union.
+    // getConfluentCloudKafkaRestClient and
+    // getConfluentCloudSchemaRegistryRestClient are now async +
+    // env/cluster-aware and are covered by their own dedicated describe
+    // blocks below; exclude them from the synchronous parameterized loop's
+    // getter union.
     type RestGetterKey = Exclude<
       keyof ConfluentCloudRestClientManager,
-      "getConfluentCloudKafkaRestClient"
+      | "getConfluentCloudKafkaRestClient"
+      | "getConfluentCloudSchemaRegistryRestClient"
     >;
 
     const restCases: Array<{
@@ -77,13 +80,6 @@ describe("base-client-manager.ts", () => {
         errorFragment: "Confluent Cloud Flink REST endpoint not configured",
       },
       {
-        getter: "getConfluentCloudSchemaRegistryRestClient",
-        endpointKey: "schemaRegistry",
-        url: "https://psrc-abc.us-east-1.aws.confluent.cloud",
-        errorFragment:
-          "Confluent Cloud Schema Registry REST endpoint not configured",
-      },
-      {
         getter: "getConfluentCloudTelemetryRestClient",
         endpointKey: "telemetry",
         url: "https://api.telemetry.confluent.cloud",
@@ -109,9 +105,10 @@ describe("base-client-manager.ts", () => {
       });
     }
 
-    // getConfluentCloudKafkaRestClient is now async + cluster-aware (the
-    // OAuth path resolves the endpoint per call); the loop above only covers
-    // the synchronous getters.
+    // getConfluentCloudKafkaRestClient and
+    // getConfluentCloudSchemaRegistryRestClient are now async + env/cluster-
+    // aware (the OAuth path resolves the endpoint per call); the loop above
+    // only covers the synchronous getters.
     describe("getConfluentCloudKafkaRestClient()", () => {
       const url = "https://kafka-rest.example.com";
       it("should return a client when the endpoint is configured", async () => {
@@ -127,6 +124,27 @@ describe("base-client-manager.ts", () => {
         const cm = new DirectClientManager(buildConfig());
         await expect(cm.getConfluentCloudKafkaRestClient()).rejects.toThrow(
           "Confluent Cloud Kafka REST endpoint not configured",
+        );
+      });
+    });
+
+    describe("getConfluentCloudSchemaRegistryRestClient()", () => {
+      const url = "https://psrc-abc.us-east-1.aws.confluent.cloud";
+      it("should return a client when the endpoint is configured", async () => {
+        const cm = new DirectClientManager(
+          buildConfig({ endpoints: { schemaRegistry: url } }),
+        );
+        const client = await cm.getConfluentCloudSchemaRegistryRestClient();
+        expect(client).toBeDefined();
+        expect(typeof client.GET).toBe("function");
+      });
+
+      it("should reject when the endpoint is not configured", async () => {
+        const cm = new DirectClientManager(buildConfig());
+        await expect(
+          cm.getConfluentCloudSchemaRegistryRestClient(),
+        ).rejects.toThrow(
+          "Confluent Cloud Schema Registry REST endpoint not configured",
         );
       });
     });

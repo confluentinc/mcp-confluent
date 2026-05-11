@@ -13,17 +13,19 @@ const listTableFlowRegionsArguments = z.object({
     .optional()
     .describe("Filter the results by exact match for cloud."),
   pageSize: z
-    .string()
-    .trim()
+    .number()
+    .int()
+    .positive()
     .optional()
-    .default("10")
-    .describe("The pagination size of collection requests."),
+    .describe(
+      "Maximum regions to return in this response. Server-side default applies if omitted.",
+    ),
   pageToken: z
     .string()
-    .trim()
     .optional()
-    .default("0")
-    .describe("An opaque pagination token for collection requests."),
+    .describe(
+      "Opaque pagination token from a previous response. Omit on first request.",
+    ),
 });
 
 export class ListTableFlowRegionsHandler extends TableflowToolHandler {
@@ -32,24 +34,27 @@ export class ListTableFlowRegionsHandler extends TableflowToolHandler {
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
-    const { cloud } = listTableFlowRegionsArguments.parse(toolArguments);
+    const { cloud, pageSize, pageToken } =
+      listTableFlowRegionsArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),
     );
 
     const { data: response, error } = await pathBasedClient[
-      `/tableflow/v1/regions?cloud=${cloud}`
+      "/tableflow/v1/regions"
     ].GET({
       params: {
-        path: {
-          cloud: cloud,
+        query: {
+          cloud,
+          page_size: pageSize,
+          page_token: pageToken,
         },
       },
     });
     if (error) {
       return this.createResponse(
-        `Failed to list Tableflow regions for  ${cloud}: ${JSON.stringify(error)}`,
+        `Failed to list Tableflow regions: ${JSON.stringify(error)}`,
         true,
       );
     }

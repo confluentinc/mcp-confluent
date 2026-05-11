@@ -100,7 +100,8 @@ export function withSharedCatalogTagsClient(): {
 
   afterAll(async () => {
     const path = wrapAsPathBasedClient(client);
-    await Promise.all(
+    // allSettled so a single rejection (e.g. network error) don't fail teardown for the others
+    await Promise.allSettled(
       createdTags.map(async (tagName) => {
         const { error, response } = await path[
           "/catalog/v1/types/tagdefs/{tagName}"

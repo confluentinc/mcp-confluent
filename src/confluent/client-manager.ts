@@ -42,6 +42,21 @@ export interface ConfluentCloudRestClientManager {
     `${string}/${string}`
   >;
   /**
+   * Env-aware REST client for Schema Registry operations. Use from handlers
+   * that need OAuth support; the existing sync getter above stays in use by
+   * direct-only handlers (catalog/tag/search) and is unaffected by this
+   * method.
+   *
+   * Under direct, `envId` is ignored and the eagerly-built singleton is
+   * returned (same instance as the sync getter). Under OAuth, `envId` is
+   * required: a fresh client is built per call against the resolved SR host
+   * for the env's SR cluster, with bearer auth + the `target-sr-cluster`
+   * default header.
+   */
+  getSchemaRegistryRestClient(
+    envId?: string,
+  ): Promise<Client<paths, `${string}/${string}`>>;
+  /**
    * Gets a configured REST client for Confluent Cloud Kafka operations.
    *
    * Under direct, args are ignored and the eagerly-built singleton is returned

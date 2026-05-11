@@ -1,3 +1,4 @@
+import { DEFAULT_CONNECTION_NAME } from "@src/config/env-config.js";
 import type { DirectConnectionConfig } from "@src/config/models.js";
 import {
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
@@ -687,7 +688,7 @@ describe("config/models.ts", () => {
       it("should throw when the sole connection is OAuth-typed", () => {
         const config = new MCPServerConfiguration({
           connections: {
-            "env-connection": { type: "oauth", ccloud_env: "devel" },
+            [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "devel" },
           },
         });
 

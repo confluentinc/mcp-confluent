@@ -23,11 +23,10 @@ import { z } from "zod";
 
 const messageOptions = z.object({
   useSchemaRegistry: z
-    .boolean()
+    .enum(["yes", "no", "auto"])
     .optional()
-    .default(false)
     .describe(
-      "Whether to use schema registry for deserialization. If false, messages will be returned as raw.",
+      "Schema Registry deserialization mode. yes: decode. no: raw bytes. auto (default if omitted): decode when a schema is registered for the subject.",
     ),
   subject: z
     .string()
@@ -117,12 +116,16 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     let processedKey: unknown = message.key?.toString();
     let processedValue: unknown = message.value?.toString();
 
+    // Per-side semantics: useSchemaRegistry="no" → always raw bytes;
+    // useSchemaRegistry="yes" → decode; "auto" or omitted → auto-decode
+    // iff a registry is in scope and the subject is registered. The
+    // registry, when built, is shared across both sides.
     const deserializeWithOptions = async (
       buffer: Buffer | undefined,
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<unknown> => {
-      if (!options.useSchemaRegistry || !registry) {
+      if (options.useSchemaRegistry === "no" || !registry) {
         return buffer?.toString();
       }
       const subject =
@@ -154,10 +157,10 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       valueOptions,
       SerdeType.VALUE,
     );
-    if (message.key && keyOptions) {
+    if (message.key) {
       processedKey = await deserializeWithOptions(
         message.key as Buffer,
-        keyOptions,
+        keyOptions ?? {},
         SerdeType.KEY,
       );
     }
@@ -195,27 +198,15 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
     const { topicNames, maxMessages, timeoutMs, value, key } = parsed;
 
-    const { connId, conn, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
-    // Schema Registry deserialization is not yet exposed under OAuth connection type
-    // Block the path here with a clear capability boundary rather than throw a discovery hint
-    // that points at a tool the agent can't call.
     const needsRegistry =
-      (value && value.useSchemaRegistry) || (key && key.useSchemaRegistry);
-    if (needsRegistry && conn.type === "oauth") {
-      return this.createResponse(
-        "Schema Registry deserialization is not yet supported under OAuth connection type. " +
-          "Set useSchemaRegistry: false (or omit it) to receive raw bytes, or " +
-          "use a direct connection with schema_registry configured for " +
-          "schema-aware deserialization.",
-        true,
-      );
-    }
+      value?.useSchemaRegistry === "yes" || key?.useSchemaRegistry === "yes";
 
     let registry: SchemaRegistryClient | undefined;
     if (needsRegistry) {
-      registry = await clientManager.getSchemaRegistrySdkClient();
+      registry = await clientManager.getSchemaRegistrySdkClient(resolved.envId);
     }
 
     const consumedMessages: ProcessedMessage[] = [];

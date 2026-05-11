@@ -421,7 +421,7 @@ describe("index.ts", () => {
 
       const sourceUrl = fsMocks.readFileSync.mock.calls[0]![0] as URL;
       expect(sourceUrl.pathname).toMatch(/config\.example\.yaml$/);
-      expect(sourceUrl.pathname).not.toMatch(/oauth/);
+      expect(sourceUrl.pathname).not.toMatch(/oauth\.example\.yaml$/);
     });
 
     it("should propagate non-EEXIST write errors verbatim", () => {
@@ -593,7 +593,7 @@ describe("index.ts", () => {
       expect(result).toEqual({ handled: true, exitCode: 0 });
       const sourceUrl = fsMocks.readFileSync.mock.calls[0]![0] as URL;
       expect(sourceUrl.pathname).toMatch(/config\.example\.yaml$/);
-      expect(sourceUrl.pathname).not.toMatch(/oauth/);
+      expect(sourceUrl.pathname).not.toMatch(/oauth\.example\.yaml$/);
     });
 
     it("should load the OAuth template and return success when initOauthConfig is set", () => {

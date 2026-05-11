@@ -42,10 +42,12 @@ export interface BaseClientManagerConfig {
  * api-key + SASL/PLAIN in {@link DirectClientManager}, or DPAT +
  * SASL/OAUTHBEARER in OAuthClientManager.
  *
- * The `getSchemaRegistrySdkClient(clusterId?, envId?)` accessor has a default
+ * The `getSchemaRegistrySdkClient(envId?)` accessor has a default
  * implementation that delegates to the no-arg `getSchemaRegistryClient()`.
- * That covers direct connections (the args are ignored). OAuth subclasses
- * override it to build per-cluster SR SDK clients with bearer auth.
+ * That covers direct connections (the arg is ignored). OAuth subclasses
+ * override it to auto-resolve the SR cluster from the supplied environment
+ * id (single SR per environment is the CCloud invariant) and build a
+ * bearer-authenticated SDK client per call.
  */
 export abstract class BaseClientManager
   implements ConfluentCloudRestClientManager, SchemaRegistryClientHandler
@@ -178,9 +180,10 @@ export abstract class BaseClientManager
       if (schemaRegistryAuth.type === "oauth") {
         throw new Error(
           "Schema Registry OAuth authentication requires the cluster-aware accessor: " +
-            "call getSchemaRegistrySdkClient(clusterId, envId) instead. The no-arg " +
+            "call getSchemaRegistrySdkClient(envId) instead. The no-arg " +
             "getSchemaRegistryClient() does not have access to the logical SR cluster ID " +
-            "(needed for the target-sr-cluster header) under OAuth.",
+            "(needed for the target-sr-cluster header) under OAuth; the cluster is " +
+            "auto-resolved from envId.",
         );
       }
       const { apiKey, apiSecret } = schemaRegistryAuth;
@@ -246,15 +249,15 @@ export abstract class BaseClientManager
   }
 
   /**
-   * Cluster-aware Schema Registry SDK client accessor. Under direct, args are
-   * ignored and the existing single-instance Lazy is returned. Under OAuth,
-   * args are required: `clusterId` is `lsrc-...` and `envId` is `env-...`. The
-   * SR client itself is built per-call (no cache) because the DPAT is captured
-   * in the SDK's axios headers at construction time; endpoint resolution
-   * happens fresh on every call too.
+   * Environment-aware Schema Registry SDK client accessor. Under direct, the
+   * arg is ignored and the existing single-instance Lazy is returned. Under
+   * OAuth, `envId` (`env-...`) is required; the SR cluster (`lsrc-...`) is
+   * auto-resolved from the environment (single SR per environment is the
+   * CCloud invariant). The SR client itself is built per-call (no cache)
+   * because the DPAT is captured in the SDK's axios headers at construction
+   * time; endpoint resolution happens fresh on every call too.
    */
   async getSchemaRegistrySdkClient(
-    _clusterId?: string,
     _envId?: string,
   ): Promise<SchemaRegistryClient> {
     return this.getSchemaRegistryClient();

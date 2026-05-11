@@ -12,10 +12,11 @@
  * token-refresh callback (no kafkaJS-compat async-provider race), so no
  * warmup workaround is needed.
  *
- * Schema Registry serialization under OAuth is wired at the manager level
- * but not yet exposed through the produce/consume tools — those handlers
- * return a clear "not yet supported" error. The accessor + endpoint
- * resolver stay in place ready for the follow-up.
+ * Schema Registry serialization is supported through `produce-message` and
+ * `consume-messages`: the manager's `getSchemaRegistrySdkClient` auto-resolves
+ * the SR cluster id from the environment id supplied by the agent (single SR
+ * per environment is the CCloud invariant) and builds a bearer-authenticated
+ * SDK client per call.
  */
 
 import type { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
@@ -29,6 +30,7 @@ import { kafkaDeps } from "@src/confluent/node-deps.js";
 import {
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
+  resolveSchemaRegistryClusterId,
   resolveSchemaRegistryEndpoint,
 } from "@src/confluent/oauth-resource-resolvers.js";
 import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
@@ -107,26 +109,28 @@ export class OAuthClientManager extends BaseClientManager {
 
   /** @inheritdoc */
   async getSchemaRegistrySdkClient(
-    clusterId?: string,
     envId?: string,
   ): Promise<SchemaRegistryClient> {
-    this.requireClusterArgs(clusterId, envId);
     // The SR SDK captures `Authorization: Bearer <token>` in its axios
     // `createAxiosDefaults` at construction time, so a build during initial
     // login or a broken refresh would freeze an empty bearer into every
     // subsequent request — fail fast here before that can happen.
     const dpat = this.requireDataPlaneToken();
-    const endpoint = await resolveSchemaRegistryEndpoint(
-      this.getConfluentCloudRestClient(),
-      clusterId!,
-      envId!,
-    );
+    if (!envId) {
+      throw new Error(
+        "environment_id is required under OAuth for Schema Registry access. " +
+          "Call list-environments to discover available environments.",
+      );
+    }
+    const cloud = this.getConfluentCloudRestClient();
+    const lsrc = await resolveSchemaRegistryClusterId(cloud, envId);
+    const endpoint = await resolveSchemaRegistryEndpoint(cloud, lsrc, envId);
     return new SchemaRegistryClient({
       baseURLs: [endpoint],
       createAxiosDefaults: {
         headers: {
           Authorization: `Bearer ${dpat}`,
-          "target-sr-cluster": clusterId,
+          "target-sr-cluster": lsrc,
         },
       },
     });

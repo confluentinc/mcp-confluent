@@ -7,7 +7,7 @@ import {
   assertHandleCase,
   getMockedClientManager,
 } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 describe("produce-kafka-message-handler.ts", () => {
   describe("ProduceKafkaMessageHandler", () => {
@@ -91,6 +91,43 @@ describe("produce-kafka-message-handler.ts", () => {
           outcome: { resolves: "Error producing message to [Topic: smoke" },
           clientManager,
         });
+      });
+
+      it("should call getSchemaRegistrySdkClient with the resolved envId when value.useSchemaRegistry is true", async () => {
+        // Pin the SR-under-OAuth wiring at the handler-test layer. Under
+        // direct-mode runtime, `resolveKafkaClusterArgs` returns
+        // `envId: undefined`, so the manager call is `(undefined)`. The
+        // assertion is on the call shape, not the outcome — the handler
+        // is allowed to short-circuit on the schema-missing path.
+        const clientManager = getMockedClientManager();
+        // Make subject lookup miss → checkSchemaNeeded returns "no-schema-
+        // needed" → handler returns an isError response without invoking
+        // the producer or serializer. Cheap controlled exit.
+        clientManager
+          .getSchemaRegistryClient()
+          .getLatestSchemaMetadata.mockRejectedValue({ status: 404 });
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: { message: { x: 1 }, useSchemaRegistry: true },
+          },
+          outcome: {
+            resolves:
+              "No schema registered for subject 'smoke-value', and no schema provided to register.",
+          },
+          clientManager,
+        });
+
+        expect(clientManager.getSchemaRegistrySdkClient).toHaveBeenCalledWith(
+          undefined,
+        );
       });
     });
   });

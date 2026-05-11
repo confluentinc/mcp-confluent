@@ -3,6 +3,9 @@ import * as resolvers from "@src/confluent/oauth-resource-resolvers.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import {
   createMockInstance,
+  getMockedAdmin,
+  getMockedConsumer,
+  getMockedProducer,
   mockKafkaConstructor,
 } from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
@@ -41,13 +44,7 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeAdmin = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-          // listTopics is invoked once per call as a metadata warmup —
-          // see comment in OAuthClientManager.getKafkaAdminClient.
-          listTopics: vi.fn().mockResolvedValue([]),
-        };
+        const fakeAdmin = getMockedAdmin();
         const kafkaSpy = mockKafkaConstructor({ admin: () => fakeAdmin });
 
         const manager = buildManager();
@@ -61,11 +58,7 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeAdmin = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-          listTopics: vi.fn().mockResolvedValue([]),
-        };
+        const fakeAdmin = getMockedAdmin();
         const kafkaSpy = mockKafkaConstructor({ admin: () => fakeAdmin });
 
         const holder = createMockInstance(OAuthHolder);
@@ -87,11 +80,7 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeAdmin = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-          listTopics: vi.fn().mockResolvedValue([]),
-        };
+        const fakeAdmin = getMockedAdmin();
         const kafkaSpy = mockKafkaConstructor({ admin: () => fakeAdmin });
 
         const manager = buildManager();
@@ -112,13 +101,7 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeAdmin = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-          // listTopics is invoked once per call as a metadata warmup —
-          // see comment in OAuthClientManager.getKafkaAdminClient.
-          listTopics: vi.fn().mockResolvedValue([]),
-        };
+        const fakeAdmin = getMockedAdmin();
         const kafkaSpy = mockKafkaConstructor({ admin: () => fakeAdmin });
 
         const manager = buildManager();
@@ -160,10 +143,7 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeProducer = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-        };
+        const fakeProducer = getMockedProducer();
         mockKafkaConstructor({ producer: () => fakeProducer });
 
         const manager = buildManager();
@@ -197,7 +177,7 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeConsumer = { connect: vi.fn(), disconnect: vi.fn() };
+        const fakeConsumer = getMockedConsumer();
         const consumerFn = vi.fn().mockReturnValue(fakeConsumer);
         mockKafkaConstructor({ consumer: consumerFn });
 
@@ -216,7 +196,7 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeConsumer = { connect: vi.fn(), disconnect: vi.fn() };
+        const fakeConsumer = getMockedConsumer();
         const consumerFn = vi.fn().mockReturnValue(fakeConsumer);
         mockKafkaConstructor({ consumer: consumerFn });
 

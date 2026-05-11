@@ -69,7 +69,7 @@ export async function resolveSchemaRegistryEndpoint(
   return httpEndpoint;
 }
 
-export async function resolveSoleSchemaRegistryCluster(
+export async function resolveSchemaRegistryClusterId(
   cloudClient: CloudClient,
   envId: string,
 ): Promise<string> {

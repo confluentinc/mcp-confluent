@@ -1,8 +1,8 @@
 import {
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
+  resolveSchemaRegistryClusterId,
   resolveSchemaRegistryEndpoint,
-  resolveSoleSchemaRegistryCluster,
 } from "@src/confluent/oauth-resource-resolvers.js";
 import type { paths } from "@src/confluent/openapi-schema.js";
 import type { Client } from "openapi-fetch";
@@ -145,14 +145,14 @@ describe("resolveKafkaRestEndpoint", () => {
   });
 });
 
-describe("resolveSoleSchemaRegistryCluster", () => {
+describe("resolveSchemaRegistryClusterId", () => {
   it("returns the single cluster's id when one SR cluster exists in the env", async () => {
     const client = makeStubClient({
       "/srcm/v3/clusters:env-1": {
         data: { data: [{ id: "lsrc-abc" }] },
       },
     });
-    expect(await resolveSoleSchemaRegistryCluster(client, "env-1")).toBe(
+    expect(await resolveSchemaRegistryClusterId(client, "env-1")).toBe(
       "lsrc-abc",
     );
   });
@@ -164,10 +164,10 @@ describe("resolveSoleSchemaRegistryCluster", () => {
       },
     });
     await expect(
-      resolveSoleSchemaRegistryCluster(client, "env-empty"),
+      resolveSchemaRegistryClusterId(client, "env-empty"),
     ).rejects.toThrow(/env-empty/);
     await expect(
-      resolveSoleSchemaRegistryCluster(client, "env-empty"),
+      resolveSchemaRegistryClusterId(client, "env-empty"),
     ).rejects.toThrow(/No Schema Registry cluster/);
   });
 
@@ -178,10 +178,10 @@ describe("resolveSoleSchemaRegistryCluster", () => {
       },
     });
     await expect(
-      resolveSoleSchemaRegistryCluster(client, "env-broken"),
+      resolveSchemaRegistryClusterId(client, "env-broken"),
     ).rejects.toThrow(/internal server error/);
     await expect(
-      resolveSoleSchemaRegistryCluster(client, "env-broken"),
+      resolveSchemaRegistryClusterId(client, "env-broken"),
     ).rejects.toThrow(/env-broken/);
   });
 });

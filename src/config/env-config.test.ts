@@ -1,4 +1,7 @@
-import { buildConfigFromEnvAndCli } from "@src/config/env-config.js";
+import {
+  buildConfigFromEnvAndCli,
+  DEFAULT_CONNECTION_NAME,
+} from "@src/config/env-config.js";
 import { describe, expect, it } from "vitest";
 
 type EnvInput = Parameters<typeof buildConfigFromEnvAndCli>[0];
@@ -66,12 +69,14 @@ describe("config/env-config.ts", () => {
         expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
       });
 
-      it("should use 'env-connection' as the connection name", () => {
+      it("should use the default connection name", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({ BOOTSTRAP_SERVERS: "localhost:9092" }),
         );
 
-        expect(Object.keys(config.connections)).toEqual(["env-connection"]);
+        expect(Object.keys(config.connections)).toEqual([
+          DEFAULT_CONNECTION_NAME,
+        ]);
       });
 
       it("should build a kafka-only config when only BOOTSTRAP_SERVERS is set", () => {
@@ -1103,6 +1108,46 @@ describe("config/env-config.ts", () => {
         const config = buildConfigFromEnvAndCli(envWith({}), { oauth: true });
         const conn = config.getSoleConnection();
         expect(conn).not.toHaveProperty("kafka_debug");
+      });
+
+      describe("server-block validation failures", () => {
+        // The OAuth path takes a different validation-failure branch from the
+        // direct path (OAuth-prefixed message via humanizeEnvConfigPaths).
+        // These tests pin that branch fires AND that the humanizer replaced
+        // the schema-space token with the env-var-space token.
+        it.each([
+          {
+            label: "MCP_API_KEY is shorter than 32 characters",
+            overrides: { MCP_API_KEY: "short" },
+            humanizedExpect: /MCP_API_KEY/,
+          },
+          {
+            label: "MCP_AUTH_DISABLED:true and MCP_API_KEY are both set",
+            overrides: {
+              MCP_AUTH_DISABLED: true,
+              MCP_API_KEY: "a".repeat(32),
+            },
+            humanizedExpect: /MCP_AUTH_DISABLED.*MCP_API_KEY/,
+          },
+        ])(
+          "should throw a humanized OAuth-path error when $label",
+          ({ overrides, humanizedExpect }) => {
+            const call = () =>
+              buildConfigFromEnvAndCli(envWith(overrides), { oauth: true });
+
+            // Branch identification: the OAuth-fail path emits the longer prefix.
+            expect(call).toThrow(
+              "Failed to construct OAuth MCPServerConfiguration from environment variables",
+            );
+            // Humanizer landed: env-var name appears in the message.
+            expect(call).toThrow(humanizedExpect);
+            // ...and the schema-space token is gone. The two positive .toThrow
+            // assertions above pin that `call` does throw, so this reads as
+            // "threw, but not with this token" rather than the ambiguous
+            // "didn't throw OR threw without this token".
+            expect(call).not.toThrow(/server\.auth\.api_key/);
+          },
+        );
       });
     });
   });

@@ -41,3 +41,62 @@ export async function getFirstTestEnvironmentId(): Promise<string> {
   }
   return first.id;
 }
+
+/**
+ * Fetches the logical Schema Registry cluster id (`lsrc-...`) for the integration environment by
+ * matching the SR cluster whose {@linkcode srcm.v3.ClusterSpec.http_endpoint} equals the
+ * configured `schema_registry.endpoint`, so the test's qualified-name construction stays tied to
+ * the same SR cluster the spawned MCP server is talking to.
+ */
+export async function getSchemaRegistryClusterId(): Promise<string> {
+  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const envId = conn.kafka?.env_id;
+  if (!envId) {
+    throw new Error(
+      "test-side SR cluster id discovery requires kafka.env_id in test-fixtures/yaml_configs/integration.yaml",
+    );
+  }
+  const srEndpoint = conn.schema_registry?.endpoint;
+  if (!srEndpoint) {
+    throw new Error(
+      "test-side SR cluster id discovery requires schema_registry.endpoint in test-fixtures/yaml_configs/integration.yaml",
+    );
+  }
+  const client = newTestCloudClient();
+  const { data, error } = await client.GET("/srcm/v3/clusters", {
+    params: { query: { environment: envId } },
+  });
+  if (error) {
+    throw new Error(
+      `failed to list sr clusters from ccloud: ${JSON.stringify(error)}`,
+    );
+  }
+  const clusters = data?.data ?? [];
+  // strip possible trailing slash
+  const normalize = (url: string) => url.replace(/\/+$/, "");
+  const wanted = normalize(srEndpoint);
+  const matches = clusters.filter(
+    (c) => c.spec?.http_endpoint && normalize(c.spec.http_endpoint) === wanted,
+  );
+  if (matches.length === 0) {
+    const seen = clusters
+      .map((c) => c.spec?.http_endpoint ?? "<no endpoint>")
+      .join(", ");
+    throw new Error(
+      `no schema registry cluster in environment ${envId} matches configured endpoint ${srEndpoint} (saw: ${seen || "<none>"})`,
+    );
+  }
+  if (matches.length > 1) {
+    const ids = matches.map((c) => c.id).join(", ");
+    throw new Error(
+      `multiple schema registry clusters in environment ${envId} match endpoint ${srEndpoint} (${ids}) - cannot disambiguate`,
+    );
+  }
+  const id = matches[0]?.id;
+  if (!id) {
+    throw new Error(
+      `matched schema registry cluster in environment ${envId} has no id field`,
+    );
+  }
+  return id;
+}

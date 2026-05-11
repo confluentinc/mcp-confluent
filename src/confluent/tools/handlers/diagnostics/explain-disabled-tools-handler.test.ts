@@ -1,7 +1,7 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
-import { DescribeToolGatingHandler } from "@src/confluent/tools/handlers/diagnostics/describe-tool-gating-handler.js";
+import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
 import type { ToolGatingReport } from "@src/confluent/tools/tool-availability.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
@@ -32,16 +32,16 @@ function getReport(result: CallToolResult): ToolGatingReport {
   return meta as unknown as ToolGatingReport;
 }
 
-describe("describe-tool-gating-handler.ts", () => {
-  describe("DescribeToolGatingHandler", () => {
-    const handler = new DescribeToolGatingHandler(() =>
+describe("explain-disabled-tools-handler.ts", () => {
+  describe("ExplainDisabledToolsHandler", () => {
+    const handler = new ExplainDisabledToolsHandler(() =>
       ToolHandlerRegistry.allHandlers(),
     );
 
     describe("getToolConfig()", () => {
-      it("should be a read-only tool named DESCRIBE_TOOL_GATING with no input fields", () => {
+      it("should be a read-only tool named EXPLAIN_DISABLED_TOOLS with no input fields", () => {
         const config = handler.getToolConfig();
-        expect(config.name).toBe(ToolName.DESCRIBE_TOOL_GATING);
+        expect(config.name).toBe(ToolName.EXPLAIN_DISABLED_TOOLS);
         expect(config.annotations).toBe(READ_ONLY);
         expect(config.inputSchema).toEqual({});
         expect(config.description.length).toBeGreaterThan(10);
@@ -65,14 +65,14 @@ describe("describe-tool-gating-handler.ts", () => {
         expect(report.disabledCount).toBeGreaterThan(0);
       });
 
-      it("should not list alwaysEnabled tools (search-product-docs, get-product-doc-page, describe-tool-gating) under any disabled group", async () => {
+      it("should not list alwaysEnabled tools (search-product-docs, get-product-doc-page, explain-disabled-tools) under any disabled group", async () => {
         const result = handler.handle(bareRuntime());
         const report = getReport(result);
 
         const allDisabledTools = report.disabledGroups.flatMap((g) => g.tools);
         expect(allDisabledTools).not.toContain(ToolName.SEARCH_PRODUCT_DOCS);
         expect(allDisabledTools).not.toContain(ToolName.GET_PRODUCT_DOC_PAGE);
-        expect(allDisabledTools).not.toContain(ToolName.DESCRIBE_TOOL_GATING);
+        expect(allDisabledTools).not.toContain(ToolName.EXPLAIN_DISABLED_TOOLS);
       });
 
       it("should remove kafka tools from disabledGroups when the connection carries a kafka block", async () => {
@@ -148,7 +148,7 @@ describe("describe-tool-gating-handler.ts", () => {
       it("should render a single 'all tools enabled' summary when nothing is disabled", async () => {
         // Build a no-tool registry-thunk so every tool is trivially absent
         // from the disabled set; the flat-summary branch fires.
-        const empty = new DescribeToolGatingHandler(() => []);
+        const empty = new ExplainDisabledToolsHandler(() => []);
         const text = getText(empty.handle(bareRuntime()));
         expect(text).toBe(
           "All 0 registered tools are advertised via tools/list.",

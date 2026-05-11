@@ -15,7 +15,7 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
-const describeToolGatingArguments = z.object({});
+const explainDisabledToolsArguments = z.object({});
 
 /**
  * Diagnostic tool that surfaces *why* tools are absent from `tools/list`.
@@ -62,7 +62,7 @@ const describeToolGatingArguments = z.object({});
  * is set. The thunk is invoked at request time, after every module is
  * fully loaded, sidestepping the cycle entirely.
  */
-export class DescribeToolGatingHandler extends BaseToolHandler {
+export class ExplainDisabledToolsHandler extends BaseToolHandler {
   private readonly listHandlers: () => Iterable<
     readonly [ToolName, ToolHandler]
   >;
@@ -79,10 +79,10 @@ export class DescribeToolGatingHandler extends BaseToolHandler {
 
   getToolConfig(): ToolConfig {
     return {
-      name: ToolName.DESCRIBE_TOOL_GATING,
+      name: ToolName.EXPLAIN_DISABLED_TOOLS,
       description:
-        'When you can\'t find a tool to answer a user\'s request — e.g., the user asks "why can\'t I list Kafka topics?", "where are the Flink tools?", "I don\'t see anything for schema registry" — call this tool first. Returns the disabled tools grouped by what each tool\'s predicate found missing in the connection config (a kafka/flink/schema_registry/tableflow/telemetry block, a required field within one, or an OAuth-vs-direct-only mismatch). Tell the user the exact YAML to add or change. Always call this rather than speculating about credentials, network, or auth — the server already knows the verdict for every tool.',
-      inputSchema: describeToolGatingArguments.shape,
+        'Call when the user asks why a tool is missing or unavailable (e.g., "why can\'t I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools grouped by the config gap each one is waiting on, so you can tell the user the exact YAML block or field to add. Prefer this over guessing about credentials, network, or auth.',
+      inputSchema: explainDisabledToolsArguments.shape,
       annotations: READ_ONLY,
     };
   }

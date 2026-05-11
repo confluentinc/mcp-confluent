@@ -59,7 +59,7 @@ These tools need no service blocks or authentication — they're enabled even on
 | Category          | Tools                                         | Description                                               |
 | ----------------- | --------------------------------------------- | --------------------------------------------------------- |
 | **Documentation** | `search-product-docs`, `get-product-doc-page` | Search Confluent product docs and fetch full page content |
-| **Diagnostics**   | `describe-tool-gating`                        | Explain why specific tools are absent from `tools/list`   |
+| **Diagnostics**   | `explain-disabled-tools`                      | Explain why specific tools are absent from `tools/list`   |
 
 ### Available Tools for Confluent Cloud
 
@@ -422,7 +422,7 @@ read-tableflow-catalog-integration: Make a request to read a catalog integration
 update-tableflow-catalog-integration: Make a request to update a catalog integration.
 delete-tableflow-catalog-integration: Make a request to delete a tableflow catalog integration.
 list-organizations: List Confluent Cloud organizations the current credentials can see. Paginated; if the response includes a nextPageToken, pass it back as pageToken to fetch additional pages.
-describe-tool-gating: When you can't find a tool to answer a user's request — e.g., the user asks "why can't I list Kafka topics?", "where are the Flink tools?", "I don't see anything for schema registry" — call this tool first. Returns the disabled tools grouped by what each tool's predicate found missing in the connection config (a kafka/flink/schema_registry/tableflow/telemetry block, a required field within one, or an OAuth-vs-direct-only mismatch). Tell the user the exact YAML to add or change. Always call this rather than speculating about credentials, network, or auth — the server already knows the verdict for every tool.
+explain-disabled-tools: Call when the user asks why a tool is missing or unavailable (e.g., "why can't I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools grouped by the config gap each one is waiting on, so you can tell the user the exact YAML block or field to add. Prefer this over guessing about credentials, network, or auth.
 ```
 
 </details>

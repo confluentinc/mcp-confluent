@@ -19,7 +19,7 @@ export interface DisabledToolsByReason {
 
 /**
  * Output of {@linkcode buildToolGatingReport}; drives the
- * `describe-tool-gating` diagnostic tool. Tools advertised via
+ * `explain-disabled-tools` diagnostic tool. Tools advertised via
  * `tools/list` are intentionally absent — the report carries the
  * negative signal only.
  *

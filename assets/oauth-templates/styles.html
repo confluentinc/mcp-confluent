@@ -1,0 +1,49 @@
+<style>
+    /* Axon theme design tokens partial */
+    :root {
+        --background: #F5F4F4;
+        --text-primary: #131316;
+        --link-primary: #4933D7;
+        --link-primary-hover: #30228B;
+        --support-failure: #C43B42;
+        --logo: #040531;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --background: #131316;
+            --text-primary: #F5F4F4;
+            --link-primary: #BDB3FF;
+            --link-primary-hover: #B4A8FF;
+            --support-failure: #F07A80;
+            --logo: #FFFFFF;
+        }
+    }
+
+    /* Page styling */
+    a, a:active { color: var(--link-primary); }
+    a:hover { color: var(--link-primary-hover); }
+
+    body {
+        margin: 0;
+        overflow: hidden;
+        background-color: var(--background);
+        color: var(--text-primary);
+    }
+
+    /* Logo styling */
+    div.logo {
+        width: 320px;
+    }
+    .logo .st0{ fill: none; }
+    .logo .st1{ fill: var(--logo); }
+
+    /* Content styling */
+    div.banner {
+        margin: 80px 32px;
+        font-family: 'MarkPro-NarrowBook', 'Arial', sans-serif;
+        text-align: center;
+    }
+
+    /* Util styling */
+    .failure { color: var(--support-failure); }
+</style>

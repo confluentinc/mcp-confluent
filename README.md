@@ -27,6 +27,7 @@ See [Getting Started](#getting-started) for full setup instructions and [Configu
 
 - [Quick Start](#quick-start)
 - [Available Tools](#available-tools)
+  - [Always Available](#always-available-tools)
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
   - [Confluent Local](#available-tools-for-confluent-local)
 - [Getting Started](#getting-started)
@@ -51,6 +52,15 @@ You can list all available tools via the CLI:
 npx -y @confluentinc/mcp-confluent --list-tools
 ```
 
+### Always-Available Tools
+
+These tools need no service blocks or authentication — they're enabled even on a bare config, regardless of which deployment the rest of your config targets.
+
+| Category          | Tools                                         | Description                                               |
+| ----------------- | --------------------------------------------- | --------------------------------------------------------- |
+| **Documentation** | `search-product-docs`, `get-product-doc-page` | Search Confluent product docs and fetch full page content |
+| **Diagnostics**   | `explain-disabled-tools`                      | Explain why specific tools are absent from `tools/list`   |
+
 ### Available Tools for Confluent Cloud
 
 These tools require endpoints and authentication against specific Confluent Cloud components. Refer to [`config.example.yaml`](config.example.yaml) for the full set of configuration variables, or to [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) below to authenticate as a logged-in user instead of via API keys (currently supported by the native-broker **Kafka** tools — `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`).
@@ -69,7 +79,6 @@ These tools require endpoints and authentication against specific Confluent Clou
 | **Tableflow Catalog**                      | `create-tableflow-catalog-integration`, `list-tableflow-catalog-integrations`, `read-tableflow-catalog-integration`, `update-tableflow-catalog-integration`, `delete-tableflow-catalog-integration` | Manage Tableflow catalog integrations (e.g., AWS Glue)            |
 | **Metrics**                                | `list-available-metrics`, `query-metrics`                                                                                                                                                           | Discover and query Confluent Cloud operational metrics            |
 | **Billing**                                | `list-billing-costs`                                                                                                                                                                                | Query billing and cost data                                       |
-| **Documentation**                          | `search-product-docs`, `get-product-doc-page`                                                                                                                                                       | Search Confluent product docs and fetch full page content         |
 
 ### Available Tools for Confluent Local
 
@@ -81,11 +90,10 @@ BOOTSTRAP_SERVERS="localhost:9092"
 SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
 ```
 
-| Category            | Tools                                                                                  | Description                                               |
-| ------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Manage topics, produce/consume messages                   |
-| **Schema Registry** | `list-schemas`, `delete-schema`                                                        | List, inspect, and delete data schemas                    |
-| **Documentation**   | `search-product-docs`, `get-product-doc-page`                                          | Search Confluent product docs and fetch full page content |
+| Category            | Tools                                                                                  | Description                             |
+| ------------------- | -------------------------------------------------------------------------------------- | --------------------------------------- |
+| **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Manage topics, produce/consume messages |
+| **Schema Registry** | `list-schemas`, `delete-schema`                                                        | List, inspect, and delete data schemas  |
 
 ## Getting Started
 
@@ -244,6 +252,19 @@ connections:
 
 Run with `--config oauth.yaml`. The server starts immediately; the browser sign-in opens on the first tool call that needs Confluent access.
 
+The CLI can drop a starter file into the current directory:
+
+```bash
+npx @confluentinc/mcp-confluent --init-oauth-config
+# edit ./config.yaml if needed, then:
+npx @confluentinc/mcp-confluent --config ./config.yaml
+```
+
+`--init-oauth-config` is the OAuth analogue of `--init-config`: same
+destination (`./config.yaml`), same idempotent `.gitignore` append, same
+refusal to overwrite an existing file. The two flags are mutually
+exclusive — pick the template that matches the auth mode you want.
+
 ### Supported tools under OAuth
 
 | Category                                   | Tools                                                                                  |
@@ -401,6 +422,7 @@ read-tableflow-catalog-integration: Make a request to read a catalog integration
 update-tableflow-catalog-integration: Make a request to update a catalog integration.
 delete-tableflow-catalog-integration: Make a request to delete a tableflow catalog integration.
 list-organizations: List Confluent Cloud organizations the current credentials can see. Paginated; if the response includes a nextPageToken, pass it back as pageToken to fetch additional pages.
+explain-disabled-tools: Call when the user asks why a tool is missing or unavailable (e.g., "why can't I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools grouped by the config gap each one is waiting on, so you can tell the user the exact YAML block or field to add. Prefer this over guessing about credentials, network, or auth.
 ```
 
 </details>

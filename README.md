@@ -282,14 +282,12 @@ exclusive — pick the template that matches the auth mode you want.
 
 ### Supported tools under OAuth
 
-| Category                                   | Tools                                                                                  |
-| ------------------------------------------ | -------------------------------------------------------------------------------------- |
-| **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` |
-| **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               |
-| **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         |
-| **Billing**                                | `list-billing-costs`                                                                   |
-
-Under OAuth, native-Kafka tools require both `cluster_id` (`lkc-...`) and `environment_id` (`env-...`) at call time. The REST topic-config tools require `clusterId` and `environmentId` (camelCase, matching their existing direct-mode arg names). Discover both via `list-environments` then `list-clusters`.
+| Category                                   | Tools                                                                                  | Notes                                                                                                           |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Requires arguments `cluster_id` + `environment_id`. SR serialization(AVRO, JSONSCHEMA) on produce/consume; PROTOBUF not supported yet. |
+| **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               | Requires arguments `clusterId` + `environmentId`.                                                                |
+| **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         | —                                             |
+| **Billing**                                | `list-billing-costs`                                                                   | —                                                                                                               |
 
 ### Limitations
 

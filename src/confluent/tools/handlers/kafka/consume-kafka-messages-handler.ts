@@ -26,7 +26,7 @@ const messageOptions = z.object({
     .boolean()
     .optional()
     .describe(
-      "Whether to use schema registry for deserialization. If false, messages will be returned as raw.",
+      "Whether to use schema registry for deserialization. If false, messages will be returned as raw. If omitted, auto-decodes when a schema is registered for the subject.",
     ),
   subject: z
     .string()

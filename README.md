@@ -278,7 +278,6 @@ Under OAuth, native-Kafka tools require both `cluster_id` (`lkc-...`) and `envir
 
 ### Limitations
 
-- **Schema Registry (de)serialization** is not yet exposed under OAuth. `produce-message` / `consume-messages` calls with `useSchemaRegistry: true` return a clear capability error. Use a direct connection if schema-aware (de)serialization is required.
 - **Other REST-only tool categories** (Connect, Tableflow, Flink, Schema Registry, Metrics, Catalog & Tags) are still being migrated to OAuth and currently require a `direct` connection.
 
 ## CLI Usage

@@ -301,6 +301,43 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
+    describe("getConfluentCloudSchemaRegistryRestClient()", () => {
+      it("should reject when envId is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getConfluentCloudSchemaRegistryRestClient(undefined),
+        ).rejects.toThrow(
+          /environment_id is required under OAuth for Schema Registry REST access/,
+        );
+      });
+
+      it("should resolve the lsrc + endpoint per call and build a fresh REST client", async () => {
+        const resolveSole = vi
+          .spyOn(resolvers, "resolveSchemaRegistryClusterId")
+          .mockResolvedValue("lsrc-auto");
+        const resolveEndpoint = vi
+          .spyOn(resolvers, "resolveSchemaRegistryEndpoint")
+          .mockResolvedValue("https://psrc-auto.us-east-1.aws.confluent.cloud");
+
+        const manager = buildManager();
+        const c1 =
+          await manager.getConfluentCloudSchemaRegistryRestClient("env-1");
+        const c2 =
+          await manager.getConfluentCloudSchemaRegistryRestClient("env-1");
+
+        expect(c1).toBeDefined();
+        expect(c2).toBeDefined();
+        expect(c1).not.toBe(c2);
+        expect(resolveSole).toHaveBeenCalledTimes(2);
+        expect(resolveSole).toHaveBeenCalledWith(expect.anything(), "env-1");
+        expect(resolveEndpoint).toHaveBeenCalledWith(
+          expect.anything(),
+          "lsrc-auto",
+          "env-1",
+        );
+      });
+    });
+
     describe("disconnect()", () => {
       it("should be a no-op (no caches to drain — clients are caller-owned)", async () => {
         const manager = buildManager();

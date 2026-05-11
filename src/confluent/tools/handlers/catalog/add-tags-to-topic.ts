@@ -4,7 +4,7 @@ import {
   CREATE_UPDATE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
+import { hasCCloudCatalogSupportOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -25,6 +25,12 @@ const addTagToTopicArguments = z.object({
     )
     .nonempty()
     .describe("Array of tag assignments to create"),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Schema Registry. Required under OAuth (the SR cluster + endpoint are auto-resolved from this env); ignored under direct.",
+    ),
 });
 
 export class AddTagToTopicHandler extends BaseToolHandler {
@@ -33,10 +39,13 @@ export class AddTagToTopicHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
-    const { tagAssignments } = addTagToTopicArguments.parse(toolArguments);
+    const { tagAssignments, environment_id } =
+      addTagToTopicArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getConfluentCloudSchemaRegistryRestClient(
+        environment_id,
+      ),
     );
 
     const { data: response, error } = await pathBasedClient[
@@ -64,5 +73,5 @@ export class AddTagToTopicHandler extends BaseToolHandler {
       annotations: CREATE_UPDATE,
     };
   }
-  readonly predicate = hasCCloudCatalogSupport;
+  readonly predicate = hasCCloudCatalogSupportOrOAuth;
 }

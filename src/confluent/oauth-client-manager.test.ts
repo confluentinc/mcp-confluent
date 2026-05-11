@@ -1,9 +1,13 @@
-import type { KafkaJS } from "@confluentinc/kafka-javascript";
-import * as nodeDeps from "@src/confluent/node-deps.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import * as resolvers from "@src/confluent/oauth-resource-resolvers.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
-import { createMockInstance } from "@tests/stubs/index.js";
+import {
+  createMockInstance,
+  getMockedAdmin,
+  getMockedConsumer,
+  getMockedProducer,
+  mockKafkaConstructor,
+} from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
 
 describe("oauth-client-manager.ts", () => {
@@ -40,20 +44,8 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeAdmin = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-          // listTopics is invoked once per call as a metadata warmup —
-          // see comment in OAuthClientManager.getKafkaAdminClient.
-          listTopics: vi.fn().mockResolvedValue([]),
-        };
-        const fakeKafka = { admin: () => fakeAdmin };
-        const kafkaSpy = vi
-          .spyOn(nodeDeps.kafkaDeps, "Kafka")
-          .mockImplementation(function () {
-            return fakeKafka as unknown as KafkaJS.Kafka;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any);
+        const fakeAdmin = getMockedAdmin();
+        const kafkaSpy = mockKafkaConstructor({ admin: () => fakeAdmin });
 
         const manager = buildManager();
         await manager.getKafkaAdminClient("lkc-1", "env-1");
@@ -66,19 +58,8 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeAdmin = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-          listTopics: vi.fn().mockResolvedValue([]),
-        };
-        let capturedConfig: Record<string, unknown> | undefined;
-        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function (
-          config: Record<string, unknown>,
-        ) {
-          capturedConfig = config;
-          return { admin: () => fakeAdmin } as unknown as KafkaJS.Kafka;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+        const fakeAdmin = getMockedAdmin();
+        const kafkaSpy = mockKafkaConstructor({ admin: () => fakeAdmin });
 
         const holder = createMockInstance(OAuthHolder);
         holder.getDataPlaneToken.mockReturnValue("dpat");
@@ -89,35 +70,26 @@ describe("oauth-client-manager.ts", () => {
         );
         await manager.getKafkaAdminClient("lkc-1", "env-1");
 
-        expect(capturedConfig).toBeDefined();
-        expect(capturedConfig!["debug"]).toBe("security,broker,protocol");
+        expect(kafkaSpy).toHaveBeenCalledOnce();
+        expect(kafkaSpy.mock.calls[0]![0]).toMatchObject({
+          debug: "security,broker,protocol",
+        });
       });
 
       it("should omit `debug` from the rdkafka config when kafka_debug is undefined", async () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeAdmin = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-          listTopics: vi.fn().mockResolvedValue([]),
-        };
-        let capturedConfig: Record<string, unknown> | undefined;
-        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function (
-          config: Record<string, unknown>,
-        ) {
-          capturedConfig = config;
-          return { admin: () => fakeAdmin } as unknown as KafkaJS.Kafka;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+        const fakeAdmin = getMockedAdmin();
+        const kafkaSpy = mockKafkaConstructor({ admin: () => fakeAdmin });
 
         const manager = buildManager();
         await manager.getKafkaAdminClient("lkc-1", "env-1");
 
-        expect(capturedConfig).toBeDefined();
+        expect(kafkaSpy).toHaveBeenCalledOnce();
         // The key must be absent — not present-but-undefined — so the
         // rdkafka client never receives a stray `debug` property.
-        expect(Object.hasOwn(capturedConfig!, "debug")).toBe(false);
+        expect(Object.hasOwn(kafkaSpy.mock.calls[0]![0], "debug")).toBe(false);
       });
 
       it("should configure KafkaJS.Kafka with librdkafka-native SASL keys, not the kafkaJS-compat async provider", async () => {
@@ -129,33 +101,19 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeAdmin = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-          // listTopics is invoked once per call as a metadata warmup —
-          // see comment in OAuthClientManager.getKafkaAdminClient.
-          listTopics: vi.fn().mockResolvedValue([]),
-        };
-        let capturedConfig: Record<string, unknown> | undefined;
-        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function (
-          config: Record<string, unknown>,
-        ) {
-          capturedConfig = config;
-          return { admin: () => fakeAdmin } as unknown as KafkaJS.Kafka;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+        const fakeAdmin = getMockedAdmin();
+        const kafkaSpy = mockKafkaConstructor({ admin: () => fakeAdmin });
 
         const manager = buildManager();
         await manager.getKafkaAdminClient("lkc-1", "env-1");
 
-        expect(capturedConfig).toBeDefined();
-        expect(capturedConfig!["security.protocol"]).toBe("sasl_ssl");
-        expect(capturedConfig!["sasl.mechanisms"]).toBe("OAUTHBEARER");
-        expect(typeof capturedConfig!["oauthbearer_token_refresh_cb"]).toBe(
-          "function",
-        );
+        expect(kafkaSpy).toHaveBeenCalledOnce();
+        const config = kafkaSpy.mock.calls[0]![0];
+        expect(config["security.protocol"]).toBe("sasl_ssl");
+        expect(config["sasl.mechanisms"]).toBe("OAUTHBEARER");
+        expect(typeof config["oauthbearer_token_refresh_cb"]).toBe("function");
         // The kafkaJS-compat async provider must NOT be present.
-        const kafkaJsBlock = capturedConfig!["kafkaJS"] as
+        const kafkaJsBlock = config["kafkaJS"] as
           | Record<string, unknown>
           | undefined;
         expect(kafkaJsBlock?.["sasl"]).toBeUndefined();
@@ -185,15 +143,8 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeProducer = {
-          connect: vi.fn().mockResolvedValue(undefined),
-          disconnect: vi.fn().mockResolvedValue(undefined),
-        };
-        const fakeKafka = { producer: () => fakeProducer };
-        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function () {
-          return fakeKafka as unknown as KafkaJS.Kafka;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+        const fakeProducer = getMockedProducer();
+        mockKafkaConstructor({ producer: () => fakeProducer });
 
         const manager = buildManager();
         const producer = await manager.getKafkaProducer("lkc-1", "env-1");
@@ -226,31 +177,15 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeConsumer = { connect: vi.fn(), disconnect: vi.fn() };
-        let consumerOpts:
-          | {
-              kafkaJS?: {
-                groupId?: string;
-                autoCommit?: boolean;
-                fromBeginning?: boolean;
-              };
-            }
-          | undefined;
-        const fakeKafka = {
-          consumer: (opts: typeof consumerOpts) => {
-            consumerOpts = opts;
-            return fakeConsumer;
-          },
-        };
-        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function () {
-          return fakeKafka as unknown as KafkaJS.Kafka;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+        const fakeConsumer = getMockedConsumer();
+        const consumerFn = vi.fn().mockReturnValue(fakeConsumer);
+        mockKafkaConstructor({ consumer: consumerFn });
 
         const manager = buildManager();
         await manager.buildKafkaConsumer("lkc-1", "env-1");
 
-        expect(consumerOpts?.kafkaJS).toMatchObject({
+        expect(consumerFn).toHaveBeenCalledOnce();
+        expect(consumerFn.mock.calls[0]![0]?.kafkaJS).toMatchObject({
           groupId: "mcp-confluent",
           autoCommit: false,
           fromBeginning: true,
@@ -261,23 +196,17 @@ describe("oauth-client-manager.ts", () => {
         vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
           "broker:9092",
         );
-        const fakeConsumer = { connect: vi.fn(), disconnect: vi.fn() };
-        let consumerOpts: { kafkaJS?: { groupId?: string } } | undefined;
-        const fakeKafka = {
-          consumer: (opts: typeof consumerOpts) => {
-            consumerOpts = opts;
-            return fakeConsumer;
-          },
-        };
-        vi.spyOn(nodeDeps.kafkaDeps, "Kafka").mockImplementation(function () {
-          return fakeKafka as unknown as KafkaJS.Kafka;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+        const fakeConsumer = getMockedConsumer();
+        const consumerFn = vi.fn().mockReturnValue(fakeConsumer);
+        mockKafkaConstructor({ consumer: consumerFn });
 
         const manager = buildManager();
         await manager.buildKafkaConsumer("lkc-1", "env-1", "session-42");
 
-        expect(consumerOpts?.kafkaJS?.groupId).toBe("session-42");
+        expect(consumerFn).toHaveBeenCalledOnce();
+        expect(consumerFn.mock.calls[0]![0]?.kafkaJS?.groupId).toBe(
+          "session-42",
+        );
       });
     });
 

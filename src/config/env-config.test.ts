@@ -1069,6 +1069,49 @@ describe("config/env-config.ts", () => {
         const conn = config.getSoleConnection();
         expect(conn).toEqual({ type: "oauth", ccloud_env: "devel" });
       });
+
+      describe("server-block validation failures", () => {
+        // The OAuth path constructs `{ type: "oauth" }` for the connection plus
+        // a server block from env vars; if Zod rejects the manufactured config,
+        // env-config.ts throws via a *different* branch than the direct path
+        // (the OAuth-prefixed message via humanizeEnvConfigPaths). These tests
+        // pin that branch — both that it fires, and that the humanizer
+        // actually replaces the schema-space token (`server.auth.api_key`) with
+        // the env-var-space token (`MCP_API_KEY`) before surfacing the error.
+        it.each([
+          {
+            label: "MCP_API_KEY is shorter than 32 characters",
+            overrides: { MCP_API_KEY: "short" },
+            humanizedExpect: /MCP_API_KEY/,
+          },
+          {
+            label: "MCP_AUTH_DISABLED:true and MCP_API_KEY are both set",
+            overrides: {
+              MCP_AUTH_DISABLED: true,
+              MCP_API_KEY: "a".repeat(32),
+            },
+            humanizedExpect: /MCP_AUTH_DISABLED.*MCP_API_KEY/,
+          },
+        ])(
+          "should throw a humanized OAuth-path error when $label",
+          ({ overrides, humanizedExpect }) => {
+            let message = "";
+            try {
+              buildConfigFromEnvAndCli(envWith(overrides), { oauth: true });
+            } catch (err) {
+              message = (err as Error).message;
+            }
+
+            // Branch identification: the OAuth-fail path emits the longer prefix.
+            expect(message).toContain(
+              "Failed to construct OAuth MCPServerConfiguration from environment variables",
+            );
+            // Humanizer ran AND landed: env-var name appears, schema path does not.
+            expect(message).toMatch(humanizedExpect);
+            expect(message).not.toContain("server.auth.api_key");
+          },
+        );
+      });
     });
   });
 });

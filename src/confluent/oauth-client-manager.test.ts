@@ -282,21 +282,12 @@ describe("oauth-client-manager.ts", () => {
     });
 
     describe("getSchemaRegistrySdkClient()", () => {
-      it("should throw when cluster_id is omitted under OAuth", async () => {
+      it("should throw when envId is omitted under OAuth", async () => {
         const manager = buildManager();
         await expect(
-          manager.getSchemaRegistrySdkClient(undefined, "env-1"),
+          manager.getSchemaRegistrySdkClient(undefined),
         ).rejects.toThrow(
-          "OAuth client construction requires a cluster id and environment id",
-        );
-      });
-
-      it("should throw when environment_id is omitted under OAuth", async () => {
-        const manager = buildManager();
-        await expect(
-          manager.getSchemaRegistrySdkClient("lsrc-1", undefined),
-        ).rejects.toThrow(
-          "OAuth client construction requires a cluster id and environment id",
+          /environment_id is required under OAuth for Schema Registry access/,
         );
       });
 
@@ -310,27 +301,26 @@ describe("oauth-client-manager.ts", () => {
         const manager = new OAuthClientManager(holder, "devel");
 
         await expect(
-          manager.getSchemaRegistrySdkClient("lsrc-1", "env-1"),
+          manager.getSchemaRegistrySdkClient("env-1"),
         ).rejects.toThrow("No data-plane token available");
       });
 
-      it("should build a SchemaRegistryClient against the resolved endpoint", async () => {
-        vi.spyOn(resolvers, "resolveSchemaRegistryEndpoint").mockResolvedValue(
-          "https://psrc-abc.us-east-1.aws.confluent.cloud",
-        );
+      it("should resolve lsrc from envId and build the SDK client against the resolved endpoint", async () => {
+        const resolveSole = vi
+          .spyOn(resolvers, "resolveSchemaRegistryClusterId")
+          .mockResolvedValue("lsrc-auto");
+        const resolveEndpoint = vi
+          .spyOn(resolvers, "resolveSchemaRegistryEndpoint")
+          .mockResolvedValue("https://psrc-auto.us-east-1.aws.confluent.cloud");
 
         const manager = buildManager();
-        const client = await manager.getSchemaRegistrySdkClient(
-          "lsrc-1",
-          "env-1",
-        );
+        const client = await manager.getSchemaRegistrySdkClient("env-1");
 
         expect(client).toBeDefined();
-        // resolveSchemaRegistryEndpoint should have been called with the
-        // cloud REST client + the cluster/env args.
-        expect(resolvers.resolveSchemaRegistryEndpoint).toHaveBeenCalledWith(
+        expect(resolveSole).toHaveBeenCalledWith(expect.anything(), "env-1");
+        expect(resolveEndpoint).toHaveBeenCalledWith(
           expect.anything(),
-          "lsrc-1",
+          "lsrc-auto",
           "env-1",
         );
       });

@@ -314,6 +314,11 @@ label per test:
   `undefined`) if `kafka.cluster_id` is missing from the fixture.
 - Other tool groups (e.g. `@schema`, `@flink`) follow the same shape:
   pick the dotted YAML key(s) that the handler's predicate touches.
+- `@docs` is special: doc tools hit public web, not CCloud, and need
+  no service block. The skip-reason is the generic
+  `"requires at least one connection in config"`. These tests run
+  locally without `.env.integration` thanks to the placeholder
+  fallback in `integrationRuntime()` and `spawnConfigPath()`.
 
 A future cleanup will derive these strings from the handler's predicate
 automatically (see #288 and #289); for now, keep them in sync by hand.

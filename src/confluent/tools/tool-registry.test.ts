@@ -14,6 +14,7 @@ import {
   hasConfluentCloudOrOAuth,
   hasFlink,
   hasSchemaRegistry,
+  hasSchemaRegistryOrOAuth,
   hasTableflow,
   hasTelemetry,
   kafkaBootstrapOrOAuth,
@@ -211,7 +212,7 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_BILLING_COSTS]: hasConfluentCloudOrOAuth,
         [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
         // Schema Registry
-        [ToolName.LIST_SCHEMAS]: hasSchemaRegistry,
+        [ToolName.LIST_SCHEMAS]: hasSchemaRegistryOrOAuth,
         [ToolName.DELETE_SCHEMA]: hasSchemaRegistry,
         // Tableflow
         [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
@@ -358,7 +359,9 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_SCHEMAS]: {
         outcome: { resolves: "{}" },
         setup: (cm) => {
-          cm.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
+          const sr = cm.getSchemaRegistryClient();
+          sr.getAllSubjects.mockResolvedValue([]);
+          cm.getSchemaRegistrySdkClient.mockResolvedValue(sr);
         },
       },
       [ToolName.DELETE_SCHEMA]: { outcome: { throws: "ZodError" } },

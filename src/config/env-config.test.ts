@@ -1,4 +1,7 @@
-import { buildConfigFromEnvAndCli } from "@src/config/env-config.js";
+import {
+  buildConfigFromEnvAndCli,
+  DEFAULT_CONNECTION_NAME,
+} from "@src/config/env-config.js";
 import { describe, expect, it } from "vitest";
 
 type EnvInput = Parameters<typeof buildConfigFromEnvAndCli>[0];
@@ -64,12 +67,14 @@ describe("config/env-config.ts", () => {
         expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
       });
 
-      it("should use 'env-connection' as the connection name", () => {
+      it("should use the default connection name", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({ BOOTSTRAP_SERVERS: "localhost:9092" }),
         );
 
-        expect(Object.keys(config.connections)).toEqual(["env-connection"]);
+        expect(Object.keys(config.connections)).toEqual([
+          DEFAULT_CONNECTION_NAME,
+        ]);
       });
 
       it("should build a kafka-only config when only BOOTSTRAP_SERVERS is set", () => {

@@ -1,3 +1,4 @@
+import { DEFAULT_CONNECTION_NAME } from "@src/config/env-config.js";
 import { type DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import {
@@ -214,7 +215,7 @@ describe("ServerRuntime", () => {
     it("should leave oauthHolder undefined when the config has no ccloud-oauth", () => {
       const noOauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": connWith({
+          [DEFAULT_CONNECTION_NAME]: connWith({
             kafka: { bootstrap_servers: "broker:9092" },
           }),
         },
@@ -226,7 +227,7 @@ describe("ServerRuntime", () => {
     it("should construct an OAuthHolder when a connection has type 'oauth'", () => {
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": { type: "oauth", ccloud_env: "devel" },
+          [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "devel" },
         },
       });
 
@@ -240,13 +241,13 @@ describe("ServerRuntime", () => {
     it("should construct OAuthClientManager instances for every connection when an oauth connection is present", () => {
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          "env-connection": { type: "oauth", ccloud_env: "stag" },
+          [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "stag" },
         },
       });
 
       const runtime = ServerRuntime.fromConfig(oauthConfig);
 
-      expect(runtime.clientManagers["env-connection"]).toBeInstanceOf(
+      expect(runtime.clientManagers[DEFAULT_CONNECTION_NAME]).toBeInstanceOf(
         OAuthClientManager,
       );
     });

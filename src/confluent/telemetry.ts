@@ -3,6 +3,11 @@ import { logger } from "@src/logger.js";
 import { randomUUID } from "node:crypto";
 
 export enum TelemetryEvent {
+  /**
+   * Emitted once after successful startup so we can count boots independently
+   * of tool calls.
+   */
+  SERVER_START = "Server Start",
   TOOL_CALL = "Tool Call",
 }
 

@@ -255,6 +255,55 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
+    // Parallel to getSchemaRegistrySdkClient but on the REST surface — used by
+    // handlers that stay on openapi-fetch (e.g. delete-schema). Same gates
+    // (env required, DPAT required), same per-call resolution, and a fresh
+    // client per call so the resolved endpoint is never stale.
+    describe("getSchemaRegistryRestClient()", () => {
+      it("should throw when envId is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getSchemaRegistryRestClient(undefined),
+        ).rejects.toThrow(
+          /environment_id is required under OAuth for Schema Registry REST access/,
+        );
+      });
+
+      it("should throw when DPAT is unavailable", async () => {
+        const holder = createMockInstance(OAuthHolder);
+        holder.getDataPlaneToken.mockReturnValue(undefined);
+        const manager = new OAuthClientManager(holder, "devel");
+
+        await expect(
+          manager.getSchemaRegistryRestClient("env-1"),
+        ).rejects.toThrow("No data-plane token available");
+      });
+
+      it("should resolve lsrc + endpoint per call and build a fresh REST client", async () => {
+        const resolveSole = vi
+          .spyOn(resolvers, "resolveSchemaRegistryClusterId")
+          .mockResolvedValue("lsrc-auto");
+        const resolveEndpoint = vi
+          .spyOn(resolvers, "resolveSchemaRegistryEndpoint")
+          .mockResolvedValue("https://psrc-auto.us-east-1.aws.confluent.cloud");
+
+        const manager = buildManager();
+        const c1 = await manager.getSchemaRegistryRestClient("env-1");
+        const c2 = await manager.getSchemaRegistryRestClient("env-1");
+
+        expect(c1).toBeDefined();
+        expect(c2).toBeDefined();
+        expect(c1).not.toBe(c2);
+        expect(resolveSole).toHaveBeenCalledTimes(2);
+        expect(resolveSole).toHaveBeenCalledWith(expect.anything(), "env-1");
+        expect(resolveEndpoint).toHaveBeenCalledWith(
+          expect.anything(),
+          "lsrc-auto",
+          "env-1",
+        );
+      });
+    });
+
     describe("getConfluentCloudKafkaRestClient()", () => {
       it("should reject when cluster_id is omitted under OAuth", async () => {
         const manager = buildManager();

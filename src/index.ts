@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import {
+  CLIOptions,
   DisplayedCommandLineUsageError,
   getFilteredToolNames,
   getPackageVersion,
@@ -94,9 +95,9 @@ export function outputApiKey(): void {
 
 /**
  * Bootstrap a starter `config.yaml` in the current working directory by
- * copying the bundled `config.example.yaml`, then ensure the new file is
- * listed in `<cwd>/.gitignore` so credentials filled in later don't slip
- * into git.
+ * copying one of the bundled example templates, then ensure the new file
+ * is listed in `<cwd>/.gitignore` so credentials filled in later don't
+ * slip into git.
  *
  * Resolved relative to `import.meta.url` (the compiled `dist/index.js`)
  * so this keeps working when invoked via `npx`, where `process.cwd()`
@@ -107,9 +108,18 @@ export function outputApiKey(): void {
  * `wx` (exclusive create) so the existence check and the create happen
  * as a single syscall — there is no TOCTOU window where another process
  * could create the file between a precheck and the write.
+ *
+ * @param oauth When true, copy `config.oauth.example.yaml` (the minimal
+ *   OAuth template); when false, copy `config.example.yaml` (the
+ *   fully-annotated direct/api-key template). The CLI flag in the EEXIST
+ *   error message is selected to match.
  */
-export function outputInitConfig(): void {
-  const sourceUrl = new URL("../config.example.yaml", import.meta.url);
+export function outputInitConfig(oauth: boolean = false): void {
+  const sourceFileName = oauth
+    ? "config.oauth.example.yaml"
+    : "config.example.yaml";
+  const flagName = oauth ? "init-oauth-config" : "init-config";
+  const sourceUrl = new URL(`../${sourceFileName}`, import.meta.url);
   const destPath = path.resolve("config.yaml");
 
   const contents = fs.readFileSync(sourceUrl, "utf-8");
@@ -119,7 +129,7 @@ export function outputInitConfig(): void {
     if ((err as NodeJS.ErrnoException).code === "EEXIST") {
       throw new Error(
         `config.yaml already exists at ${destPath}. ` +
-          `Remove or rename it before running --init-config.`,
+          `Remove or rename it before running --${flagName}.`,
       );
     }
     throw err;
@@ -128,8 +138,13 @@ export function outputInitConfig(): void {
   const gitignoreNote = ensureGitignoreEntry(destPath);
 
   console.log(`wrote ./config.yaml (${gitignoreNote})`);
+  // OAuth has no credentials to edit; the bundled template is already
+  // runnable as-is. The api-key template, by contrast, ships placeholder
+  // values the user must fill in before the server can connect.
   console.log(
-    `Next: edit credentials in config.yaml and run with --config ./config.yaml`,
+    oauth
+      ? `Next: run with --config ./config.yaml`
+      : `Next: edit credentials in config.yaml and run with --config ./config.yaml`,
   );
 }
 
@@ -177,38 +192,78 @@ export function outputToolList(filteredToolNames: ToolName[]): void {
   });
 }
 
+/**
+ * Result of {@link handleEarlyExits}. Returning a value instead of calling
+ * `process.exit` directly keeps the function pure enough that tests can
+ * assert dispatch behavior by inspecting the result + per-output spies,
+ * without having to stub `process.exit`.
+ */
+export type EarlyExitResult =
+  | { handled: false }
+  | { handled: true; exitCode: 0 }
+  | { handled: true; exitCode: 1; stderr: string };
+
+/**
+ * Dispatch the CLI's mutually-exclusive early-exit modes — generate-key,
+ * init-config, init-oauth-config, and list-tools — before the server
+ * bootstrap begins. Returns `{ handled: false }` when none apply, in
+ * which case the caller continues with normal startup.
+ *
+ * On init-config failure, the friendly error message is returned in
+ * `stderr` rather than written here, so the caller controls writing to
+ * stderr and exiting.
+ */
+export function handleEarlyExits(cliOptions: CLIOptions): EarlyExitResult {
+  if (cliOptions.generateKey) {
+    outputApiKey();
+    return { handled: true, exitCode: 0 };
+  }
+  if (cliOptions.initConfig) {
+    return runOutputInitConfig(false);
+  }
+  if (cliOptions.initOauthConfig) {
+    return runOutputInitConfig(true);
+  }
+  if (cliOptions.listTools) {
+    outputToolList(
+      getFilteredToolNames(
+        cliOptions.allowTools ?? [],
+        cliOptions.blockTools ?? [],
+      ),
+    );
+    return { handled: true, exitCode: 0 };
+  }
+  return { handled: false };
+}
+
+function runOutputInitConfig(oauth: boolean): EarlyExitResult {
+  try {
+    outputInitConfig(oauth);
+    return { handled: true, exitCode: 0 };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    const flag = oauth ? "--init-oauth-config" : "--init-config";
+    return { handled: true, exitCode: 1, stderr: `${flag} failed: ${msg}` };
+  }
+}
+
 async function main() {
   try {
     // Parse command line arguments.(NO LONGER LOADS ENV VARS FROM -e file!)
     const cliOptions = parseCliArgs(process.argv);
 
-    // Handle early-exit modes as requested by CLI args before initializing the server.
-    if (cliOptions.generateKey) {
-      outputApiKey();
-      process.exit(0);
-    }
-
-    if (cliOptions.initConfig) {
-      try {
-        outputInitConfig();
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`--init-config failed: ${msg}`);
-        process.exit(1);
+    const earlyExit = handleEarlyExits(cliOptions);
+    if (earlyExit.handled) {
+      if (earlyExit.exitCode === 1) {
+        console.error(earlyExit.stderr);
       }
-      process.exit(0);
+      process.exit(earlyExit.exitCode);
     }
 
     const filteredToolNames = getFilteredToolNames(
       cliOptions.allowTools ?? [],
       cliOptions.blockTools ?? [],
     );
-
-    // If --list-tools is set, print the filtered tool names with descriptions and exit.
-    if (cliOptions.listTools) {
-      outputToolList(filteredToolNames);
-      process.exit(0);
-    }
 
     if (cliOptions.envFile) {
       // NOW load env vars into process.env!

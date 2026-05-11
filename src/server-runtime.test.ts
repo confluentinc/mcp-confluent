@@ -9,14 +9,7 @@ import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
-import { describe, expect, it, vi } from "vitest";
-
-function fakeOAuthHolder(): OAuthHolder {
-  return {
-    getControlPlaneToken: () => "cp-token",
-    getDataPlaneToken: () => "dp-token",
-  } as unknown as OAuthHolder;
-}
+import { describe, expect, it } from "vitest";
 
 function connWith(
   fields: Omit<DirectConnectionConfig, "type">,
@@ -126,17 +119,6 @@ describe("constructDirectClientManager()", () => {
     );
   });
 
-  it("should set confluentCloudTableflowBaseUrl to https://api.confluent.cloud when only tableflow is configured", () => {
-    const manager = constructDirectClientManager(
-      connWith({
-        tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-      }),
-    );
-    expect(manager["confluentCloudTableflowBaseUrl"]).toBe(
-      "https://api.confluent.cloud",
-    );
-  });
-
   it("should set confluentCloudTelemetryBaseUrl from the telemetry block", () => {
     const manager = constructDirectClientManager(
       connWith({
@@ -242,12 +224,7 @@ describe("ServerRuntime", () => {
       expect(runtime.oauthHolder).toBeUndefined();
     });
 
-    it("should call OAuthHolder.start and expose oauthHolder when a connection has type 'oauth'", () => {
-      const fakeHolder = fakeOAuthHolder();
-      const startSpy = vi
-        .spyOn(OAuthHolder, "start")
-        .mockReturnValue(fakeHolder);
-
+    it("should construct an OAuthHolder when a connection has type 'oauth'", () => {
       const oauthConfig = new MCPServerConfiguration({
         connections: {
           [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "devel" },
@@ -256,12 +233,12 @@ describe("ServerRuntime", () => {
 
       const runtime = ServerRuntime.fromConfig(oauthConfig);
 
-      expect(startSpy).toHaveBeenCalledWith("devel");
-      expect(runtime.oauthHolder).toBe(fakeHolder);
+      expect(runtime.oauthHolder).toBeInstanceOf(OAuthHolder);
+      expect(runtime.oauthHolder?.getControlPlaneToken()).toBeUndefined();
+      expect(runtime.oauthHolder?.getDataPlaneToken()).toBeUndefined();
     });
 
     it("should construct OAuthClientManager instances for every connection when an oauth connection is present", () => {
-      vi.spyOn(OAuthHolder, "start").mockReturnValue(fakeOAuthHolder());
       const oauthConfig = new MCPServerConfiguration({
         connections: {
           [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "stag" },

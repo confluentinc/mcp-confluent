@@ -1,3 +1,4 @@
+import type { CLIOptions } from "@src/cli.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
@@ -5,6 +6,7 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import {
   getToolHandlersToRegister,
+  handleEarlyExits,
   outputApiKey,
   outputInitConfig,
   outputToolList,
@@ -24,6 +26,23 @@ import {
   type MockInstance,
   vi,
 } from "vitest";
+
+/**
+ * Build a CLIOptions value with sane defaults so each test only spells out the
+ * flag(s) it cares about. Mirrors the shape produced by `parseCliArgs` for the
+ * no-flags-given case (transports defaulted to [stdio]; everything else
+ * undefined or false).
+ */
+function makeCliOptions(overrides: Partial<CLIOptions> = {}): CLIOptions {
+  return {
+    transports: [],
+    listTools: false,
+    generateKey: false,
+    initConfig: false,
+    initOauthConfig: false,
+    ...overrides,
+  };
+}
 
 /**
  * Capture-and-mute logger.warn so test assertions can pin grouped warning
@@ -223,6 +242,7 @@ describe("index.ts", () => {
         ToolName.ALTER_TOPIC_CONFIG,
         ToolName.GET_TOPIC_CONFIG,
         ToolName.LIST_CLUSTERS,
+        ToolName.DESCRIBE_TOOL_GATING,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
@@ -356,8 +376,47 @@ describe("index.ts", () => {
       });
 
       expect(() => outputInitConfig()).toThrow(/config\.yaml already exists/);
+      expect(() => outputInitConfig()).toThrow(/--init-config/);
       // Failed write must not be followed by gitignore mutation.
       expect(fsMocks.appendFileSync).not.toHaveBeenCalled();
+    });
+
+    it("should reference --init-oauth-config in the EEXIST error when oauth=true", () => {
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+      const eexist: NodeJS.ErrnoException = Object.assign(
+        new Error("EEXIST: file already exists"),
+        { code: "EEXIST" },
+      );
+      fsMocks.writeFileSync.mockImplementation(() => {
+        throw eexist;
+      });
+
+      expect(() => outputInitConfig(true)).toThrow(/--init-oauth-config/);
+    });
+
+    it("should read the OAuth example template when oauth=true", () => {
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+
+      outputInitConfig(true);
+
+      // The first readFileSync resolves the bundled template URL; assert
+      // the basename it points at matches the OAuth example, not the
+      // direct/api-key one. The second readFileSync (the gitignore) is
+      // skipped here — existsSync(false) short-circuits that path.
+      const sourceUrl = fsMocks.readFileSync.mock.calls[0]![0] as URL;
+      expect(sourceUrl.pathname).toMatch(/config\.oauth\.example\.yaml$/);
+    });
+
+    it("should read the direct example template when oauth is omitted", () => {
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+
+      outputInitConfig();
+
+      const sourceUrl = fsMocks.readFileSync.mock.calls[0]![0] as URL;
+      expect(sourceUrl.pathname).toMatch(/config\.example\.yaml$/);
+      expect(sourceUrl.pathname).not.toMatch(/oauth/);
     });
 
     it("should propagate non-EEXIST write errors verbatim", () => {
@@ -458,6 +517,170 @@ describe("index.ts", () => {
       outputInitConfig();
 
       expect(fsMocks.appendFileSync).not.toHaveBeenCalled();
+    });
+
+    it("should print the credential-edit hint when oauth is omitted", () => {
+      // The api-key template ships placeholder credentials the user must
+      // fill in before the server can connect, so the next-step message
+      // must call that out.
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+
+      outputInitConfig();
+
+      const messages = consoleLog.mock.calls.map((c) => c[0]).join(" ");
+      expect(messages).toContain("Next: edit credentials in config.yaml");
+    });
+
+    it("should print a credentials-free next-step hint when oauth=true", () => {
+      // OAuth has no credentials to provision; the bundled template is
+      // runnable as-is. The next-step message must not tell the user to
+      // edit credentials that don't exist.
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue(EXAMPLE_CONTENTS);
+
+      outputInitConfig(true);
+
+      const messages = consoleLog.mock.calls.map((c) => c[0]).join(" ");
+      expect(messages).toContain("Next: run with --config ./config.yaml");
+      expect(messages).not.toContain("credentials");
+    });
+  });
+
+  describe("handleEarlyExits()", () => {
+    const FAKE_BYTES = Buffer.alloc(32, 0xab);
+
+    let fsMocks: MockedFsWrappers;
+
+    beforeEach(() => {
+      fsMocks = createFsWrappers();
+      // Path stubs cover both the api-key and OAuth init-config branches
+      // (which share an outputInitConfig path), even when the test only
+      // exercises one of them — keeps each test's setup minimal.
+      vi.spyOn(nodeDeps.path, "resolve").mockReturnValue("/cwd/config.yaml");
+      vi.spyOn(nodeDeps.path, "dirname").mockReturnValue("/cwd");
+      vi.spyOn(nodeDeps.path, "basename").mockReturnValue("config.yaml");
+      vi.spyOn(nodeDeps.path, "join").mockReturnValue("/cwd/.gitignore");
+      // randomBytes only matters for the generate-key branch, but stubbing
+      // it unconditionally avoids real entropy use if a test accidentally
+      // exercises that path.
+      vi.spyOn(nodeCrypto, "randomBytes").mockReturnValue(FAKE_BYTES);
+    });
+
+    it("should return { handled: false } when no early-exit flag is set", () => {
+      expect(handleEarlyExits(makeCliOptions())).toEqual({ handled: false });
+    });
+
+    it("should print the API key and return { handled: true, exitCode: 0 } when generateKey is set", () => {
+      const result = handleEarlyExits(makeCliOptions({ generateKey: true }));
+
+      expect(result).toEqual({ handled: true, exitCode: 0 });
+      const allArgs = consoleLog.mock.calls.flat().join(" ");
+      expect(allArgs).toContain("Generated MCP API Key:");
+    });
+
+    it("should load the direct template and return success when initConfig is set", () => {
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue("");
+
+      const result = handleEarlyExits(makeCliOptions({ initConfig: true }));
+
+      expect(result).toEqual({ handled: true, exitCode: 0 });
+      const sourceUrl = fsMocks.readFileSync.mock.calls[0]![0] as URL;
+      expect(sourceUrl.pathname).toMatch(/config\.example\.yaml$/);
+      expect(sourceUrl.pathname).not.toMatch(/oauth/);
+    });
+
+    it("should load the OAuth template and return success when initOauthConfig is set", () => {
+      fsMocks.existsSync.mockReturnValue(false);
+      fsMocks.readFileSync.mockReturnValue("");
+
+      const result = handleEarlyExits(
+        makeCliOptions({ initOauthConfig: true }),
+      );
+
+      expect(result).toEqual({ handled: true, exitCode: 0 });
+      const sourceUrl = fsMocks.readFileSync.mock.calls[0]![0] as URL;
+      expect(sourceUrl.pathname).toMatch(/config\.oauth\.example\.yaml$/);
+    });
+
+    it("should return exitCode 1 with --init-config stderr prefix when initConfig fails with EEXIST", () => {
+      fsMocks.readFileSync.mockReturnValue("");
+      const eexist: NodeJS.ErrnoException = Object.assign(
+        new Error("EEXIST: file already exists"),
+        { code: "EEXIST" },
+      );
+      fsMocks.writeFileSync.mockImplementation(() => {
+        throw eexist;
+      });
+
+      const result = handleEarlyExits(makeCliOptions({ initConfig: true }));
+
+      expect(result).toMatchObject({
+        handled: true,
+        exitCode: 1,
+        stderr: expect.stringContaining("--init-config failed:"),
+      });
+    });
+
+    it("should return exitCode 1 with --init-oauth-config stderr prefix when initOauthConfig fails", () => {
+      // Same EEXIST failure shape as the previous test, but the prefix
+      // must be the OAuth flag — that mapping is the bit under test.
+      fsMocks.readFileSync.mockReturnValue("");
+      const eexist: NodeJS.ErrnoException = Object.assign(
+        new Error("EEXIST: file already exists"),
+        { code: "EEXIST" },
+      );
+      fsMocks.writeFileSync.mockImplementation(() => {
+        throw eexist;
+      });
+
+      const result = handleEarlyExits(
+        makeCliOptions({ initOauthConfig: true }),
+      );
+
+      expect(result).toMatchObject({
+        handled: true,
+        exitCode: 1,
+        stderr: expect.stringContaining("--init-oauth-config failed:"),
+      });
+    });
+
+    it("should print the tool list and return success when listTools is set", () => {
+      const result = handleEarlyExits(
+        makeCliOptions({
+          listTools: true,
+          allowTools: [ToolName.LIST_TOPICS],
+        }),
+      );
+
+      expect(result).toEqual({ handled: true, exitCode: 0 });
+      // outputToolList emits one console.log per tool name; with a single
+      // allow-listed tool we expect at least one call.
+      expect(consoleLog).toHaveBeenCalled();
+    });
+
+    it("should give generateKey precedence over other concurrently-set early-exit flags", () => {
+      // The parser enforces init-config XOR init-oauth-config, but the
+      // remaining four-way combinations aren't statically excluded.
+      // handleEarlyExits resolves them by source order — generateKey
+      // first — and this test pins that order so a future reorder
+      // can't silently change the user-visible behavior.
+      fsMocks.readFileSync.mockReturnValue("");
+
+      const result = handleEarlyExits(
+        makeCliOptions({
+          generateKey: true,
+          initConfig: true,
+          listTools: true,
+        }),
+      );
+
+      expect(result).toEqual({ handled: true, exitCode: 0 });
+      const allArgs = consoleLog.mock.calls.flat().join(" ");
+      expect(allArgs).toContain("Generated MCP API Key:");
+      // The init-config branch is bypassed entirely.
+      expect(fsMocks.writeFileSync).not.toHaveBeenCalled();
     });
   });
 });

@@ -16,15 +16,17 @@ const listTableFlowRegionsArguments = z.object({
     .number()
     .int()
     .positive()
+    .max(100)
     .optional()
     .describe(
-      "Maximum regions to return in this response. Server-side default applies if omitted.",
+      "Maximum regions to return in this response (1-100). Server-side default applies if omitted.",
     ),
   pageToken: z
     .string()
+    .max(255)
     .optional()
     .describe(
-      "Opaque pagination token from a previous response. Omit on first request.",
+      "Opaque pagination token from a previous response (max 255 characters). Omit on first request.",
     ),
 });
 

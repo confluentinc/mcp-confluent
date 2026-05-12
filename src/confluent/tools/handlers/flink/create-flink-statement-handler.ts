@@ -46,7 +46,7 @@ const createFlinkStatementArguments = z.object({
     .trim()
     .optional()
     .describe(
-      "The catalog name to be used for the statement. Typically the confluent environment name.",
+      "The catalog name to be used for the statement. Typically the environment's display name in Confluent Cloud.",
     ),
   databaseName: z
     .string()
@@ -81,7 +81,7 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
     const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
     const resolvedCatalogName = this.resolveOptionalParam(
       catalogName,
-      flink.environment_name,
+      flink.catalog_name,
     );
     const resolvedDatabaseName = this.resolveOptionalParam(
       databaseName,

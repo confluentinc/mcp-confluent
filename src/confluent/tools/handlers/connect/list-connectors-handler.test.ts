@@ -20,11 +20,13 @@ describe("list-connectors-handler.ts", () => {
       const cases: ConnectHandleCase[] = [
         {
           label:
-            "fall back to conn kafka env_id and cluster_id when args are absent",
+            "render connector names as a newline-separated list when the API returns a non-empty array",
           connectionConfig: CONNECT_CONN,
           args: {},
           mockResponse: { data: ["connector-a", "connector-b"] },
-          outcome: { resolves: "Active Connectors" },
+          outcome: {
+            resolves: "Active Connectors:\nconnector-a\nconnector-b",
+          },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
         },
@@ -34,9 +36,18 @@ describe("list-connectors-handler.ts", () => {
           connectionConfig: CONNECT_CONN,
           args: { environmentId: "env-from-arg", clusterId: "lkc-from-arg" },
           mockResponse: { data: ["connector-a"] },
-          outcome: { resolves: "Active Connectors" },
+          outcome: { resolves: "Active Connectors:\nconnector-a" },
           expectedEnvId: "env-from-arg",
           expectedClusterId: "lkc-from-arg",
+        },
+        {
+          label: "render '(none)' when the API returns an empty array",
+          connectionConfig: CONNECT_CONN,
+          args: {},
+          mockResponse: { data: [] },
+          outcome: { resolves: "Active Connectors: (none)" },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
         },
         {
           label: "throw when environment_id is absent from both arg and config",

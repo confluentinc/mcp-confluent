@@ -190,10 +190,19 @@ const configSchema = z
       )
       .trim()
       .startsWith("lfcp-"),
+    FLINK_CATALOG_NAME: z
+      .string()
+      .describe(
+        "Name of the Flink catalog used as `sql.current-catalog` in submitted statements. Typically the Confluent Cloud environment's display name.",
+      )
+      .trim()
+      .min(1),
+    // TODO: Remove FLINK_ENV_NAME in v1.4.0 — kept as a deprecated alias of
+    // FLINK_CATALOG_NAME for one release cycle. See issue #209.
     FLINK_ENV_NAME: z
       .string()
       .describe(
-        "Human-readable name for the Flink environment used for identification and display purposes",
+        "DEPRECATED: rename to FLINK_CATALOG_NAME. Will be removed in v1.4.0. Same meaning — the Flink catalog name used as `sql.current-catalog`.",
       )
       .trim()
       .min(1),

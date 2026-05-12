@@ -14,12 +14,12 @@ import { describe, expect, it } from "vitest";
 const FLINK_CONN = {
   flink: {
     ...BASE_FLINK_CONN.flink,
-    environment_name: "env-name-from-config",
+    catalog_name: "catalog-name-from-config",
     database_name: "db-name-from-config",
   },
 };
 
-// Flink config without the optional environment_name / database_name fields,
+// Flink config without the optional catalog_name / database_name fields,
 // used to verify that resolveOptionalParam() returns undefined (omitting the keys from
 // spec.properties) when neither the arg nor the config value is present.
 const FLINK_CONN_NO_NAMES = {
@@ -143,7 +143,7 @@ describe("create-flink-statement-handler.ts", () => {
             body: expect.objectContaining({
               spec: expect.objectContaining({
                 properties: {
-                  "sql.current-catalog": FLINK_CONN.flink.environment_name,
+                  "sql.current-catalog": FLINK_CONN.flink.catalog_name,
                   "sql.current-database": FLINK_CONN.flink.database_name,
                 },
               }),
@@ -249,7 +249,7 @@ describe("create-flink-statement-handler.ts", () => {
             body: expect.objectContaining({
               spec: expect.objectContaining({
                 properties: {
-                  "sql.current-catalog": FLINK_CONN.flink.environment_name,
+                  "sql.current-catalog": FLINK_CONN.flink.catalog_name,
                   "sql.current-database": FLINK_CONN.flink.database_name,
                 },
               }),

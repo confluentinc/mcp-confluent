@@ -22,13 +22,13 @@
 import type { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import type { ConfluentRestClient } from "@src/confluent/client-manager.js";
 import {
   type ConfluentAuth,
   createAuthMiddleware,
 } from "@src/confluent/middleware.js";
 import { kafkaDeps } from "@src/confluent/node-deps.js";
 import {
-  type CloudClient,
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
   resolveSchemaRegistryClusterId,
@@ -141,7 +141,7 @@ export class OAuthClientManager extends BaseClientManager {
   async getConfluentCloudKafkaRestClient(
     clusterId?: string,
     envId?: string,
-  ): Promise<CloudClient> {
+  ): Promise<ConfluentRestClient> {
     this.requireClusterArgs(clusterId, envId);
     // The bearer middleware reads `auth.getToken()` per-request, but failing
     // fast here gives the agent a clear error rather than letting an empty
@@ -162,7 +162,9 @@ export class OAuthClientManager extends BaseClientManager {
   }
 
   /** @inheritdoc */
-  async getSchemaRegistryRestClient(envId?: string): Promise<CloudClient> {
+  async getSchemaRegistryRestClient(
+    envId?: string,
+  ): Promise<ConfluentRestClient> {
     this.requireDataPlaneToken();
     if (!envId) {
       throw new Error(

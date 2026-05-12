@@ -33,7 +33,7 @@ const CCLOUD_OAUTH_FIXTURE = fileURLToPath(
  */
 export function runtimeWithConnections(
   connections: Record<string, Omit<DirectConnectionConfig, "type">>,
-  clientManagers?: Record<string, Mocked<DirectClientManager>>,
+  clientManagers?: Partial<Record<string, Mocked<DirectClientManager>>>,
 ): ServerRuntime {
   const directConnections: Record<string, DirectConnectionConfig> = {};
   const resolvedClientManagers: Record<

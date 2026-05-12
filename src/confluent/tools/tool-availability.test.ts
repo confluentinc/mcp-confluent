@@ -1,10 +1,10 @@
-import type { DirectConnectionConfig } from "@src/config/index.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   ConnectionPredicate,
   PredicateResult,
   ToolDisabledReason,
   alwaysEnabled,
+  hasKafka,
 } from "@src/confluent/tools/connection-predicates.js";
 import {
   buildToolGatingReport,
@@ -15,6 +15,7 @@ import {
   KAFKA_CONN,
   bareRuntime,
   runtimeWith,
+  runtimeWithConnections,
 } from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
@@ -38,19 +39,6 @@ const disabledForFlink: ConnectionPredicate = () => ({
 });
 
 /**
- * Predicate that enables only on direct connections carrying a `kafka` block.
- * Used to fabricate the "tool is enabled on connection A but not B" shape
- * that drives partial-enable / cross-connection-delta tests.
- */
-const enabledOnlyWithKafka: ConnectionPredicate = (conn) =>
-  conn.type === "direct" && conn.kafka !== undefined
-    ? { enabled: true }
-    : {
-        enabled: false,
-        reason: ToolDisabledReason.MissingKafkaBlock,
-      };
-
-/**
  * Returns a {@linkcode ToolHandler} whose `connectionVerdicts()` resolves
  * to an empty map — the invariant-violation shape the diagnostic tool
  * guards against. `BaseToolHandler.connectionVerdicts` is documented as
@@ -66,26 +54,6 @@ function handlerWithEmptyVerdicts(): ToolHandler {
     }
   ).connectionVerdicts = () => new Map();
   return handler;
-}
-
-/**
- * Splice an additional `direct`-typed connection into a runtime built by
- * `runtimeWith`. The factory's `Readonly<Record<…>>` typing is widened with
- * a cast so the helper can mutate the map in-place — the helpers under test
- * only read `runtime.config.connections`, so a fresh multi-connection
- * `MCPServerConfiguration` would be ceremony for no behavioural difference.
- */
-function addConnection(
-  runtime: ReturnType<typeof runtimeWith>,
-  id: string,
-  block: Omit<DirectConnectionConfig, "type">,
-): void {
-  (
-    runtime.config.connections as Record<
-      string,
-      (typeof runtime.config.connections)[string]
-    >
-  )[id] = { type: "direct", ...block };
 }
 
 describe("tool-availability.ts", () => {
@@ -163,10 +131,10 @@ describe("tool-availability.ts", () => {
     });
 
     it("should omit tools that are enabled on at least one connection (only fully-disabled tools group)", () => {
-      const handler = stubWithPredicate(enabledOnlyWithKafka);
-      const runtime = runtimeWith(KAFKA_CONN);
-      addConnection(runtime, "other", {
-        schema_registry: { endpoint: "http://sr" },
+      const handler = stubWithPredicate(hasKafka);
+      const runtime = runtimeWithConnections({
+        default: KAFKA_CONN,
+        other: { schema_registry: { endpoint: "http://sr" } },
       });
       expect(
         groupDisabledToolsByReason([[ToolName.LIST_TOPICS, handler]], runtime),
@@ -182,9 +150,9 @@ describe("tool-availability.ts", () => {
       // rely on declaration order.
       const kafkaTool = stubWithPredicate(disabledForKafka);
       const flinkTool = stubWithPredicate(disabledForFlink);
-      const runtime = runtimeWith({}, "zeta");
-      addConnection(runtime, "alpha", {
-        schema_registry: { endpoint: "http://sr-alpha" },
+      const runtime = runtimeWithConnections({
+        zeta: {},
+        alpha: { schema_registry: { endpoint: "http://sr-alpha" } },
       });
 
       const groups = groupDisabledToolsByReason(
@@ -264,9 +232,11 @@ describe("tool-availability.ts", () => {
       // ToolGatingReport JSDoc) is the proper fix for this. This test
       // exists so the lossy aggregation is documented in code rather
       // than implied by prose.
-      const handler = stubWithPredicate(enabledOnlyWithKafka);
-      const runtime = runtimeWith(KAFKA_CONN, "with-kafka");
-      addConnection(runtime, "without-kafka", {});
+      const handler = stubWithPredicate(hasKafka);
+      const runtime = runtimeWithConnections({
+        "with-kafka": KAFKA_CONN,
+        "without-kafka": {},
+      });
 
       const report = buildToolGatingReport(
         [[ToolName.LIST_TOPICS, handler]],

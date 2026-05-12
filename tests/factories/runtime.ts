@@ -42,6 +42,29 @@ export function runtimeWith(
   );
 }
 
+/**
+ * Multi-connection variant of {@linkcode runtimeWith}: builds a runtime whose
+ * `config.connections` carries one `direct`-typed entry per record key, each
+ * with a fresh stubbed `DirectClientManager`. Use when a test needs to
+ * exercise cross-connection behaviour (partial-enable, (connectionId, reason)
+ * grouping, lex-order pinning). Object-literal key order is preserved, so the
+ * caller controls insertion order for tests that pin ordering invariants.
+ */
+export function runtimeWithConnections(
+  connections: Record<string, Omit<DirectConnectionConfig, "type">>,
+): ServerRuntime {
+  const directConnections: Record<string, DirectConnectionConfig> = {};
+  const clientManagers: Record<string, Mocked<DirectClientManager>> = {};
+  for (const [id, conn] of Object.entries(connections)) {
+    directConnections[id] = { type: "direct", ...conn };
+    clientManagers[id] = createMockInstance(DirectClientManager);
+  }
+  return new ServerRuntime(
+    new MCPServerConfiguration({ connections: directConnections }),
+    clientManagers,
+  );
+}
+
 /** Runtime with no service blocks — the disabled-baseline shape used by predicate-derivation tests in `base-tools.test.ts` and as a no-config runtime by handlers that don't read connection state. */
 export function bareRuntime(): ServerRuntime {
   return runtimeWith();

@@ -54,8 +54,11 @@ export class ListConnectorsHandler extends ConnectToolHandler {
         true,
       );
     }
+    const names = response ?? [];
     return this.createResponse(
-      `Active Connectors: ${JSON.stringify(response?.join(","))}`,
+      names.length > 0
+        ? `Active Connectors:\n${names.join("\n")}`
+        : "Active Connectors: (none)",
     );
   }
 

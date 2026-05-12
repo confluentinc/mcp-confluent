@@ -7,8 +7,16 @@
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { SchemaRegistryClient } from "@confluentinc/schemaregistry";
-import { paths } from "@src/confluent/openapi-schema.js";
-import { Client } from "openapi-fetch";
+import type { paths } from "@src/confluent/openapi-schema.js";
+import type { Client } from "openapi-fetch";
+
+/**
+ * Typed openapi-fetch client over the project's OpenAPI {@link paths}.
+ * Shared alias so every REST surface in the codebase (cloud, flink,
+ * tableflow, kafka REST, schema-registry REST, telemetry) advertises and
+ * returns the same shape without restating the path-template generic.
+ */
+export type ConfluentRestClient = Client<paths, `${string}/${string}`>;
 
 /**
  * Interface for managing Kafka client connections and operations.
@@ -31,31 +39,40 @@ export interface KafkaClientManager {
  */
 export interface ConfluentCloudRestClientManager {
   /** Gets a configured REST client for Confluent Cloud Flink operations */
-  getConfluentCloudFlinkRestClient(): Client<paths, `${string}/${string}`>;
+  getConfluentCloudFlinkRestClient(): ConfluentRestClient;
   /** Gets a configured REST client for general Confluent Cloud operations */
-  getConfluentCloudRestClient(): Client<paths, `${string}/${string}`>;
+  getConfluentCloudRestClient(): ConfluentRestClient;
   /** Gets a configured REST client for Tableflow operations */
-  getConfluentCloudTableflowRestClient(): Client<paths, `${string}/${string}`>;
+  getConfluentCloudTableflowRestClient(): ConfluentRestClient;
   /** Gets a configured REST client for Confluent Cloud Schema Registry operations */
-  getConfluentCloudSchemaRegistryRestClient(): Client<
-    paths,
-    `${string}/${string}`
-  >;
+  getConfluentCloudSchemaRegistryRestClient(): ConfluentRestClient;
+  /**
+   * Env-aware REST client for Schema Registry operations. Use from handlers
+   * that need OAuth support; the existing sync getter above stays in use by
+   * direct-only handlers (catalog/tag/search) and is unaffected by this
+   * method.
+   *
+   * Under direct, `envId` is ignored; a client is built against the
+   * `schema_registry.endpoint` from the connection config (same configuration
+   * source as the sync getter). Under OAuth, `envId` is required: a fresh
+   * client is built per call against the resolved SR host for the env's SR
+   * cluster, with bearer auth + the `target-sr-cluster` default header.
+   */
+  getSchemaRegistryRestClient(envId?: string): Promise<ConfluentRestClient>;
   /**
    * Gets a configured REST client for Confluent Cloud Kafka operations.
    *
-   * Under direct, args are ignored and the eagerly-built singleton is returned
-   * (its baseUrl was set from `conn.kafka.rest_endpoint` at construction).
-   * Under OAuth, both `clusterId` and `envId` are required: a fresh client is
-   * built per call against the resolved `spec.http_endpoint` for the given
-   * cluster.
+   * Under direct, args are ignored; a client is built against
+   * `conn.kafka.rest_endpoint` from the connection config. Under OAuth, both
+   * `clusterId` and `envId` are required: a fresh client is built per call
+   * against the resolved `spec.http_endpoint` for the given cluster.
    */
   getConfluentCloudKafkaRestClient(
     clusterId?: string,
     envId?: string,
-  ): Promise<Client<paths, `${string}/${string}`>>;
+  ): Promise<ConfluentRestClient>;
   /** Gets a configured REST client for Confluent Cloud Telemetry/Metrics API */
-  getConfluentCloudTelemetryRestClient(): Client<paths, `${string}/${string}`>;
+  getConfluentCloudTelemetryRestClient(): ConfluentRestClient;
 }
 
 /**

@@ -10,6 +10,7 @@ import type { ClientConfig } from "@confluentinc/schemaregistry";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   type ConfluentCloudRestClientManager,
+  type ConfluentRestClient,
   type SchemaRegistryClientHandler,
 } from "@src/confluent/client-manager.js";
 import {
@@ -20,7 +21,7 @@ import {
 import { paths } from "@src/confluent/openapi-schema.js";
 import { Lazy } from "@src/lazy.js";
 import { logger } from "@src/logger.js";
-import createClient, { Client } from "openapi-fetch";
+import createClient from "openapi-fetch";
 
 export interface BaseClientManagerConfig {
   endpoints: ConfluentEndpoints;
@@ -57,24 +58,12 @@ export abstract class BaseClientManager
   private confluentCloudSchemaRegistryBaseUrl: string | undefined;
   private confluentCloudKafkaRestBaseUrl: string | undefined;
   private confluentCloudTelemetryBaseUrl: string | undefined;
-  private readonly confluentCloudFlinkRestClient: Lazy<
-    Client<paths, `${string}/${string}`>
-  >;
-  private readonly confluentCloudRestClient: Lazy<
-    Client<paths, `${string}/${string}`>
-  >;
-  private readonly confluentCloudTableflowRestClient: Lazy<
-    Client<paths, `${string}/${string}`>
-  >;
-  private readonly confluentCloudSchemaRegistryRestClient: Lazy<
-    Client<paths, `${string}/${string}`>
-  >;
-  private readonly confluentCloudKafkaRestClient: Lazy<
-    Client<paths, `${string}/${string}`>
-  >;
-  private readonly confluentCloudTelemetryRestClient: Lazy<
-    Client<paths, `${string}/${string}`>
-  >;
+  private readonly confluentCloudFlinkRestClient: Lazy<ConfluentRestClient>;
+  private readonly confluentCloudRestClient: Lazy<ConfluentRestClient>;
+  private readonly confluentCloudTableflowRestClient: Lazy<ConfluentRestClient>;
+  private readonly confluentCloudSchemaRegistryRestClient: Lazy<ConfluentRestClient>;
+  private readonly confluentCloudKafkaRestClient: Lazy<ConfluentRestClient>;
+  private readonly confluentCloudTelemetryRestClient: Lazy<ConfluentRestClient>;
   private readonly schemaRegistryClient: Lazy<SchemaRegistryClient>;
 
   constructor(config: BaseClientManagerConfig) {
@@ -208,25 +197,29 @@ export abstract class BaseClientManager
   }
 
   /** @inheritdoc */
-  getConfluentCloudFlinkRestClient(): Client<paths, `${string}/${string}`> {
+  getConfluentCloudFlinkRestClient(): ConfluentRestClient {
     return this.confluentCloudFlinkRestClient.get();
   }
 
   /** @inheritdoc */
-  getConfluentCloudRestClient(): Client<paths, `${string}/${string}`> {
+  getConfluentCloudRestClient(): ConfluentRestClient {
     return this.confluentCloudRestClient.get();
   }
 
   /** @inheritdoc */
-  getConfluentCloudTableflowRestClient(): Client<paths, `${string}/${string}`> {
+  getConfluentCloudTableflowRestClient(): ConfluentRestClient {
     return this.confluentCloudTableflowRestClient.get();
   }
 
   /** @inheritdoc */
-  getConfluentCloudSchemaRegistryRestClient(): Client<
-    paths,
-    `${string}/${string}`
-  > {
+  getConfluentCloudSchemaRegistryRestClient(): ConfluentRestClient {
+    return this.confluentCloudSchemaRegistryRestClient.get();
+  }
+
+  /** @inheritdoc */
+  async getSchemaRegistryRestClient(
+    _envId?: string,
+  ): Promise<ConfluentRestClient> {
     return this.confluentCloudSchemaRegistryRestClient.get();
   }
 
@@ -234,12 +227,12 @@ export abstract class BaseClientManager
   async getConfluentCloudKafkaRestClient(
     _clusterId?: string,
     _envId?: string,
-  ): Promise<Client<paths, `${string}/${string}`>> {
+  ): Promise<ConfluentRestClient> {
     return this.confluentCloudKafkaRestClient.get();
   }
 
   /** @inheritdoc */
-  getConfluentCloudTelemetryRestClient(): Client<paths, `${string}/${string}`> {
+  getConfluentCloudTelemetryRestClient(): ConfluentRestClient {
     return this.confluentCloudTelemetryRestClient.get();
   }
 

@@ -72,8 +72,17 @@ export class AuthContext {
       authCode,
       codeVerifier,
     );
+    // Explicit field copy: `TokenChainResult` carries identity fields
+    // (`resourceId`, `email`) that aren't part of `ConfluentTokenSet`; a
+    // spread would retain them on the long-lived context.
     return new AuthContext(auth0Config, {
-      ...result,
+      refreshToken: result.refreshToken,
+      refreshTokenAbsoluteExpiresAt: result.refreshTokenAbsoluteExpiresAt,
+      refreshTokenIdleExpiresAt: result.refreshTokenIdleExpiresAt,
+      controlPlaneToken: result.controlPlaneToken,
+      controlPlaneExpiresAt: result.controlPlaneExpiresAt,
+      dataPlaneToken: result.dataPlaneToken,
+      dataPlaneExpiresAt: result.dataPlaneExpiresAt,
       accessToken: generateOpaqueToken(),
     });
   }

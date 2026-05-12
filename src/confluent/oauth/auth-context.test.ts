@@ -7,15 +7,16 @@ import {
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
-import { MockedFetch, mockFetch } from "@tests/stubs/index.js";
+import {
+  jsonResponse,
+  MockedFetch,
+  mockFetch,
+  stubAuth0Ok,
+  stubCpOk,
+  stubDpOk,
+  stubSuccessfulChain,
+} from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-function jsonResponse(body: object, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
 
 /**
  * Test-only access to the context's private token state. Production callers
@@ -27,42 +28,6 @@ function jsonResponse(body: object, status = 200): Response {
 function internals(ctx: AuthContext): ConfluentTokenSet {
   return (ctx as unknown as { internalTokens: ConfluentTokenSet })
     .internalTokens;
-}
-
-function stubAuth0Ok(
-  fetchSpy: MockedFetch,
-  refreshToken: string,
-  idToken: string,
-): void {
-  fetchSpy.mockResolvedValueOnce(
-    jsonResponse({
-      id_token: idToken,
-      refresh_token: refreshToken,
-      access_token: "access",
-      token_type: "Bearer",
-      expires_in: 60,
-    }),
-  );
-}
-
-function stubCpOk(fetchSpy: MockedFetch, cpToken: string): void {
-  fetchSpy.mockResolvedValueOnce(jsonResponse({ token: cpToken }));
-}
-
-function stubDpOk(fetchSpy: MockedFetch, dpToken: string): void {
-  fetchSpy.mockResolvedValueOnce(jsonResponse({ token: dpToken }));
-}
-
-function stubSuccessfulChain(
-  fetchSpy: MockedFetch,
-  refreshToken = "refresh-token",
-  idToken = "id-token",
-  cpToken = "cp-token",
-  dpToken = "dp-token",
-): void {
-  stubAuth0Ok(fetchSpy, refreshToken, idToken);
-  stubCpOk(fetchSpy, cpToken);
-  stubDpOk(fetchSpy, dpToken);
 }
 
 async function newLoggedInContext(fetchSpy: MockedFetch): Promise<AuthContext> {
@@ -236,13 +201,12 @@ describe("oauth/auth-context.ts", () => {
     describe("refresh", () => {
       it("should rotate refresh + CP + DP on full success", async () => {
         const ctx = await newLoggedInContext(fetchSpy);
-        stubSuccessfulChain(
-          fetchSpy,
-          "new-refresh",
-          "new-id",
-          "new-cp",
-          "new-dp",
-        );
+        stubSuccessfulChain(fetchSpy, {
+          refreshToken: "new-refresh",
+          idToken: "new-id",
+          cpToken: "new-cp",
+          dpToken: "new-dp",
+        });
 
         await ctx.refresh();
 
@@ -253,7 +217,7 @@ describe("oauth/auth-context.ts", () => {
 
       it("should coalesce concurrent callers into a single Auth0 rotation", async () => {
         const ctx = await newLoggedInContext(fetchSpy);
-        stubSuccessfulChain(fetchSpy, "new-refresh");
+        stubSuccessfulChain(fetchSpy, { refreshToken: "new-refresh" });
         const callsBeforeRefresh = fetchSpy.mock.calls.length;
 
         await Promise.all([ctx.refresh(), ctx.refresh(), ctx.refresh()]);
@@ -309,7 +273,7 @@ describe("oauth/auth-context.ts", () => {
       it("should bump the idle expiry when the refresh token is rotated", async () => {
         const ctx = await newLoggedInContext(fetchSpy);
         const originalIdle = internals(ctx).refreshTokenIdleExpiresAt;
-        stubSuccessfulChain(fetchSpy, "new-refresh");
+        stubSuccessfulChain(fetchSpy, { refreshToken: "new-refresh" });
 
         await ctx.refresh();
 
@@ -324,7 +288,7 @@ describe("oauth/auth-context.ts", () => {
         const ctx = await newLoggedInContext(fetchSpy);
         const absoluteExpiry = Date.now() + 1000;
         internals(ctx).refreshTokenAbsoluteExpiresAt = absoluteExpiry;
-        stubSuccessfulChain(fetchSpy, "new-refresh");
+        stubSuccessfulChain(fetchSpy, { refreshToken: "new-refresh" });
 
         await ctx.refresh();
 
@@ -475,13 +439,12 @@ describe("oauth/auth-context.ts", () => {
         expect(ctx.getErrors().tokenRefresh!.isTransient).toBe(true);
 
         // Next refresh succeeds.
-        stubSuccessfulChain(
-          fetchSpy,
-          "new-refresh",
-          "new-id",
-          "new-cp",
-          "new-dp",
-        );
+        stubSuccessfulChain(fetchSpy, {
+          refreshToken: "new-refresh",
+          idToken: "new-id",
+          cpToken: "new-cp",
+          dpToken: "new-dp",
+        });
         await ctx.refresh();
 
         expect(ctx.getErrors().tokenRefresh).toBeUndefined();

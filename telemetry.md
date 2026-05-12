@@ -1,6 +1,6 @@
 # Telemetry and Usage Data
 
-*Last updated: March 2026*
+_Last updated: May 2026_
 
 The Confluent MCP Server collects anonymous usage data to help us understand how the server is used and improve the user experience.
 
@@ -16,13 +16,12 @@ When telemetry is disabled, no events are sent.
 
 ## What Events Are Tracked
 
-The server tracks tool call completions and failures, including the tool name, duration, and error details when applicable.
+The server tracks tool call completions and failures, server startup, and Confluent Cloud authentication outcomes.
 
 ### Captured Information
 
-- Tool name and execution duration
-- Success or failure status
-- Error type and message (on failure, truncated)
+- Tool name, execution duration, and success/error status
+- Confluent Cloud authentication outcome (success or failure reason). Successful logins also include `ccloudUserId` (the user's Confluent Cloud `resource_id`) and `ccloudDomain` (the domain portion of the user's email).
 
 ### Context Information (Sent with All Events)
 
@@ -31,7 +30,7 @@ The server tracks tool call completions and failures, including the tool name, d
 - Connected MCP client name and version
 - OS platform, version, and architecture
 
-A randomly generated machine ID is persisted in `~/.mcp-confluent/machine-id` and used as the anonymous user identifier. No personally identifiable information is collected.
+A randomly generated machine ID is persisted in `~/.mcp-confluent/machine-id` and used as the anonymous user identifier.
 
 ## Questions or Concerns?
 

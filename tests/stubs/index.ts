@@ -32,6 +32,13 @@ export {
   type MockedOpen,
 } from "./node-deps.js";
 export {
+  jsonResponse,
+  stubAuth0Ok,
+  stubCpOk,
+  stubDpOk,
+  stubSuccessfulChain,
+} from "./oauth-chain.js";
+export {
   MOCK_SESSION_ID,
   createMockSdkTransport,
   createMockTransportWithSession,
@@ -41,3 +48,8 @@ export { createMockSessionRegistry } from "./session-registry.js";
 export { createMockSseServerTransport } from "./sse-server-transport.js";
 export { createMockHttpServerTransport } from "./streamable-http-transport.js";
 export { StubHandler } from "./stub-handler.js";
+export {
+  mockTelemetryService,
+  resetTelemetryService,
+  type MockedTelemetryService,
+} from "./telemetry.js";

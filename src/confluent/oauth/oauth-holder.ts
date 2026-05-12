@@ -11,6 +11,7 @@ import type {
   Auth0Environment,
   ConfluentTokenSet,
 } from "@src/confluent/oauth/types.js";
+import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { logger } from "@src/logger.js";
 
 /**
@@ -113,12 +114,21 @@ export class OAuthHolder {
       // The MCP tool-call wrapper rethrows but doesn't log; surface the
       // failure here so server stderr captures the cause (timeout,
       // port_in_use, configuration, user_aborted).
+      const reason = err instanceof PkceLoginError ? err.reason : undefined;
       if (this.cleared) {
         logger.info({ env: this.env }, "OAuth login aborted by shutdown");
       } else {
-        const reason = err instanceof PkceLoginError ? err.reason : undefined;
         logger.error({ env: this.env, err, reason }, "OAuth login failed");
       }
+      TelemetryService.getInstance().track(
+        TelemetryEvent.CCLOUD_AUTHENTICATION,
+        {
+          status: "failure",
+          ccloud_user_id: undefined,
+          ccloud_domain: undefined,
+          failure_reason: reason,
+        },
+      );
       throw err;
     }
     if (this.cleared) {
@@ -139,5 +149,10 @@ export class OAuthHolder {
     ctx.startRefreshLoop();
     this.ctx = ctx;
     logger.info({ env: this.env }, "OAuth login successful");
+    TelemetryService.getInstance().track(TelemetryEvent.CCLOUD_AUTHENTICATION, {
+      status: "success",
+      ccloud_user_id: tokenChain.resourceId,
+      ccloud_domain: tokenChain.email?.split("@")[1],
+    });
   }
 }

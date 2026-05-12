@@ -47,9 +47,11 @@ describe("base-client-manager.ts", () => {
     // getConfluentCloudKafkaRestClient is now async + cluster-aware and is
     // covered by its own dedicated describe block below; exclude it from the
     // synchronous parameterized loop's getter union.
+    // getSchemaRegistryRestClient is the async env-aware parallel of
+    // getConfluentCloudSchemaRegistryRestClient; same exclusion reason.
     type RestGetterKey = Exclude<
       keyof ConfluentCloudRestClientManager,
-      "getConfluentCloudKafkaRestClient"
+      "getConfluentCloudKafkaRestClient" | "getSchemaRegistryRestClient"
     >;
 
     const restCases: Array<{
@@ -127,6 +129,32 @@ describe("base-client-manager.ts", () => {
         const cm = new DirectClientManager(buildConfig());
         await expect(cm.getConfluentCloudKafkaRestClient()).rejects.toThrow(
           "Confluent Cloud Kafka REST endpoint not configured",
+        );
+      });
+    });
+
+    // getSchemaRegistryRestClient is async + env-aware to make room for OAuth
+    // overrides; under direct it delegates to the same Lazy backing the sync
+    // getter, so the env arg is ignored and a usable client comes back either
+    // way. (Identity isn't asserted — the existing Lazy rebuilds on every
+    // call; the contract is "same configuration source," not "same object.")
+    describe("getSchemaRegistryRestClient()", () => {
+      const url = "https://psrc-abc.us-east-1.aws.confluent.cloud";
+
+      it("should return a client when the endpoint is configured, ignoring envId", async () => {
+        const cm = new DirectClientManager(
+          buildConfig({ endpoints: { schemaRegistry: url } }),
+        );
+        const client1 = await cm.getSchemaRegistryRestClient();
+        const client2 = await cm.getSchemaRegistryRestClient("env-ignored");
+        expect(typeof client1.GET).toBe("function");
+        expect(typeof client2.GET).toBe("function");
+      });
+
+      it("should reject when the endpoint is not configured", async () => {
+        const cm = new DirectClientManager(buildConfig());
+        await expect(cm.getSchemaRegistryRestClient()).rejects.toThrow(
+          "Confluent Cloud Schema Registry REST endpoint not configured",
         );
       });
     });

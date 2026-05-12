@@ -1,10 +1,7 @@
-import type { paths } from "@src/confluent/openapi-schema.js";
-import type { Client } from "openapi-fetch";
-
-type CloudClient = Client<paths, `${string}/${string}`>;
+import type { ConfluentRestClient } from "@src/confluent/client-manager.js";
 
 export async function resolveKafkaBootstrap(
-  cloudClient: CloudClient,
+  cloudClient: ConfluentRestClient,
   clusterId: string,
   envId: string,
 ): Promise<string> {
@@ -26,7 +23,7 @@ export async function resolveKafkaBootstrap(
 }
 
 export async function resolveKafkaRestEndpoint(
-  cloudClient: CloudClient,
+  cloudClient: ConfluentRestClient,
   clusterId: string,
   envId: string,
 ): Promise<string> {
@@ -48,7 +45,7 @@ export async function resolveKafkaRestEndpoint(
 }
 
 export async function resolveSchemaRegistryEndpoint(
-  cloudClient: CloudClient,
+  cloudClient: ConfluentRestClient,
   clusterId: string,
   envId: string,
 ): Promise<string> {
@@ -70,7 +67,7 @@ export async function resolveSchemaRegistryEndpoint(
 }
 
 export async function resolveSchemaRegistryClusterId(
-  cloudClient: CloudClient,
+  cloudClient: ConfluentRestClient,
   envId: string,
 ): Promise<string> {
   const { data, error } = await cloudClient.GET("/srcm/v3/clusters", {

@@ -22,6 +22,7 @@
 import type { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import type { ConfluentRestClient } from "@src/confluent/client-manager.js";
 import {
   type ConfluentAuth,
   createAuthMiddleware,
@@ -38,7 +39,7 @@ import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
 import type { paths } from "@src/confluent/openapi-schema.js";
 import { kafkaLogger } from "@src/logger.js";
-import createClient, { type Client } from "openapi-fetch";
+import createClient from "openapi-fetch";
 import { DATA_PLANE_TOKEN_LIFETIME_MS } from "./oauth/token-lifetimes.js";
 
 // Lifetime hint passed to librdkafka inside the OAUTHBEARER refresh callback
@@ -140,7 +141,7 @@ export class OAuthClientManager extends BaseClientManager {
   async getConfluentCloudKafkaRestClient(
     clusterId?: string,
     envId?: string,
-  ): Promise<Client<paths, `${string}/${string}`>> {
+  ): Promise<ConfluentRestClient> {
     this.requireClusterArgs(clusterId, envId);
     // The bearer middleware reads `auth.getToken()` per-request, but failing
     // fast here gives the agent a clear error rather than letting an empty
@@ -156,6 +157,35 @@ export class OAuthClientManager extends BaseClientManager {
       getToken: () => this.holder.getDataPlaneToken(),
     };
     const client = createClient<paths>({ baseUrl });
+    client.use(createAuthMiddleware(auth));
+    return client;
+  }
+
+  /** @inheritdoc */
+  async getSchemaRegistryRestClient(
+    envId?: string,
+  ): Promise<ConfluentRestClient> {
+    this.requireDataPlaneToken();
+    if (!envId) {
+      throw new Error(
+        "environment_id is required under OAuth for Schema Registry REST access. " +
+          "Call list-environments to discover available environments.",
+      );
+    }
+    const cloud = this.getConfluentCloudRestClient();
+    const lsrc = await resolveSchemaRegistryClusterId(cloud, envId);
+    const baseUrl = await resolveSchemaRegistryEndpoint(cloud, lsrc, envId);
+    const auth: ConfluentAuth = {
+      type: "oauth",
+      getToken: () => this.holder.getDataPlaneToken(),
+    };
+    const client = createClient<paths>({
+      baseUrl,
+      // The `target-sr-cluster` header pins all requests on this client to
+      // the right logical SR cluster — mirrors the SR SDK construction in
+      // `getSchemaRegistrySdkClient`.
+      headers: { "target-sr-cluster": lsrc },
+    });
     client.use(createAuthMiddleware(auth));
     return client;
   }

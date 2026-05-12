@@ -118,7 +118,7 @@ export interface FlinkDirectConfig {
   readonly environment_id: string;
   readonly organization_id: string;
   readonly compute_pool_id: string;
-  readonly environment_name?: string;
+  readonly catalog_name?: string;
   readonly database_name?: string;
 }
 
@@ -409,10 +409,10 @@ const directConnectionSchema = z
           .string()
           .trim()
           .startsWith("lfcp-", "flink.compute_pool_id must start with 'lfcp-'"),
-        environment_name: z
+        catalog_name: z
           .string()
           .trim()
-          .min(1, "flink.environment_name cannot be empty")
+          .min(1, "flink.catalog_name cannot be empty")
           .optional(),
         database_name: z
           .string()

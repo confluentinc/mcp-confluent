@@ -47,8 +47,7 @@ export function runtimeWith(
  * `config.connections` carries one `direct`-typed entry per record key, each
  * with a fresh stubbed `DirectClientManager`. Use when a test needs to
  * exercise cross-connection behaviour (partial-enable, (connectionId, reason)
- * grouping, lex-order pinning). Object-literal key order is preserved, so the
- * caller controls insertion order for tests that pin ordering invariants.
+ * grouping).
  */
 export function runtimeWithConnections(
   connections: Record<string, Omit<DirectConnectionConfig, "type">>,

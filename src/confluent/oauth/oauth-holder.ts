@@ -123,7 +123,7 @@ export class OAuthHolder {
       TelemetryService.getInstance().track(
         TelemetryEvent.CCLOUD_AUTHENTICATION,
         {
-          status: "failure",
+          status: "error",
           ccloudUserId: undefined,
           ccloudDomain: undefined,
           failureReason: reason,
@@ -134,15 +134,36 @@ export class OAuthHolder {
     if (this.cleared) {
       // shutdown() raced with PKCE completion — discard the tokens we just
       // obtained rather than attaching them to a holder that's been
-      // explicitly torn down.
+      // explicitly torn down. Emit a terminal-outcome event so the warehouse
+      // still counts this attempt; the `user_aborted` reason matches what
+      // an upstream shutdown signal implies.
       logger.info(
         { env: this.env },
         "OAuth login completed but holder was cleared; discarding tokens",
       );
+      TelemetryService.getInstance().track(
+        TelemetryEvent.CCLOUD_AUTHENTICATION,
+        {
+          status: "error",
+          ccloudUserId: undefined,
+          ccloudDomain: undefined,
+          failureReason: "user_aborted",
+        },
+      );
       return;
     }
+    // Explicit field copy: `TokenChainResult` carries identity fields
+    // (`resourceId`, `email`) that aren't part of `ConfluentTokenSet` and
+    // would otherwise be retained on the long-lived `AuthContext` via a
+    // spread. Pin the token set to just token material.
     const tokens: ConfluentTokenSet = {
-      ...tokenChain,
+      refreshToken: tokenChain.refreshToken,
+      refreshTokenAbsoluteExpiresAt: tokenChain.refreshTokenAbsoluteExpiresAt,
+      refreshTokenIdleExpiresAt: tokenChain.refreshTokenIdleExpiresAt,
+      controlPlaneToken: tokenChain.controlPlaneToken,
+      controlPlaneExpiresAt: tokenChain.controlPlaneExpiresAt,
+      dataPlaneToken: tokenChain.dataPlaneToken,
+      dataPlaneExpiresAt: tokenChain.dataPlaneExpiresAt,
       accessToken: generateOpaqueToken(),
     };
     const ctx = AuthContext.fromTokens(auth0Config, tokens);

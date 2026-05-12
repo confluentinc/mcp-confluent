@@ -389,7 +389,7 @@ describe("oauth/oauth-holder.ts", () => {
       }
     });
 
-    it("should track a failure event with the PKCE failure reason when login fails", async () => {
+    it("should track an error event with the PKCE failure reason when login fails", async () => {
       mockHttpServer();
       const openSpy = mockOpen();
       openSpy.mockRejectedValueOnce(new Error("browser-open-failed"));
@@ -401,7 +401,7 @@ describe("oauth/oauth-holder.ts", () => {
         expect(trackSpy).toHaveBeenCalledWith(
           TelemetryEvent.CCLOUD_AUTHENTICATION,
           {
-            status: "failure",
+            status: "error",
             ccloudUserId: undefined,
             ccloudDomain: undefined,
             failureReason: "configuration",
@@ -410,6 +410,31 @@ describe("oauth/oauth-holder.ts", () => {
       } finally {
         holder.shutdown();
       }
+    });
+
+    it("should track an error event with user_aborted when shutdown races PKCE completion", async () => {
+      const httpMock = mockHttpServer();
+      const openSpy = mockOpen();
+      stubSuccessfulChain(fetchSpy);
+
+      const holder = new OAuthHolder("devel");
+      // Race: PKCE completes, but shutdown fires before runLogin reaches the
+      // post-PKCE branch. We drive PKCE forward, then shut down before the
+      // token-chain promise resolves into the holder.
+      const inFlight = holder.ensureLoggedIn();
+      await completePkce(httpMock, openSpy);
+      holder.shutdown();
+      await inFlight.catch(() => undefined);
+
+      expect(trackSpy).toHaveBeenCalledWith(
+        TelemetryEvent.CCLOUD_AUTHENTICATION,
+        {
+          status: "error",
+          ccloudUserId: undefined,
+          ccloudDomain: undefined,
+          failureReason: "user_aborted",
+        },
+      );
     });
 
     it("should emit success with undefined identity fields when CP response omits `user`", async () => {

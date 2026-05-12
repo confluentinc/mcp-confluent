@@ -1,6 +1,6 @@
 # Telemetry and Usage Data
 
-_Last updated: March 2026_
+_Last updated: May 2026_
 
 The Confluent MCP Server collects anonymous usage data to help us understand how the server is used and improve the user experience.
 
@@ -20,8 +20,7 @@ The server tracks tool call completions and failures, server startup, and Conflu
 
 ### Captured Information
 
-- Tool name, execution duration, and success/failure status
-- Error type and message (on failure, truncated)
+- Tool name, execution duration, and success/error status
 - Confluent Cloud authentication outcome (success or failure reason)
 
 ### Context Information (Sent with All Events)

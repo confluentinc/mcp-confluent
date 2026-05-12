@@ -32,8 +32,8 @@ export function stubAuth0Ok(
 /**
  * Primes one CCloud `/api/sessions` success response on the fetch spy. The
  * optional `user` object lands in the response body and is what
- * {@link executeFullTokenChain} reads to populate `ccloud_user_id` /
- * `ccloud_domain` on telemetry events.
+ * {@link executeFullTokenChain} reads to populate `ccloudUserId` /
+ * `ccloudDomain` on telemetry events.
  */
 export function stubCpOk(
   fetchSpy: MockedFetch,

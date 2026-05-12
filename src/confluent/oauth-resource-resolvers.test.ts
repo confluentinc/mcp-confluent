@@ -1,18 +1,15 @@
+import type { ConfluentRestClient } from "@src/confluent/client-manager.js";
 import {
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
   resolveSchemaRegistryClusterId,
   resolveSchemaRegistryEndpoint,
 } from "@src/confluent/oauth-resource-resolvers.js";
-import type { paths } from "@src/confluent/openapi-schema.js";
-import type { Client } from "openapi-fetch";
 import { describe, expect, it, vi } from "vitest";
-
-type CloudClient = Client<paths, `${string}/${string}`>;
 
 function makeStubClient(
   responses: Record<string, { data?: unknown; error?: unknown }>,
-): CloudClient {
+): ConfluentRestClient {
   return {
     GET: vi.fn(
       async (
@@ -30,7 +27,7 @@ function makeStubClient(
         return responses[key] ?? { error: { message: `unhandled ${key}` } };
       },
     ),
-  } as unknown as CloudClient;
+  } as unknown as ConfluentRestClient;
 }
 
 describe("resolveKafkaBootstrap", () => {

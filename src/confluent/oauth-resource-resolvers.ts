@@ -1,7 +1,7 @@
 import type { paths } from "@src/confluent/openapi-schema.js";
 import type { Client } from "openapi-fetch";
 
-type CloudClient = Client<paths, `${string}/${string}`>;
+export type CloudClient = Client<paths, `${string}/${string}`>;
 
 export async function resolveKafkaBootstrap(
   cloudClient: CloudClient,

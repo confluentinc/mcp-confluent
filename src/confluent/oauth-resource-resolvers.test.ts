@@ -1,14 +1,11 @@
 import {
+  type CloudClient,
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
   resolveSchemaRegistryClusterId,
   resolveSchemaRegistryEndpoint,
 } from "@src/confluent/oauth-resource-resolvers.js";
-import type { paths } from "@src/confluent/openapi-schema.js";
-import type { Client } from "openapi-fetch";
 import { describe, expect, it, vi } from "vitest";
-
-type CloudClient = Client<paths, `${string}/${string}`>;
 
 function makeStubClient(
   responses: Record<string, { data?: unknown; error?: unknown }>,

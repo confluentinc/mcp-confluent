@@ -28,6 +28,7 @@ import {
 } from "@src/confluent/middleware.js";
 import { kafkaDeps } from "@src/confluent/node-deps.js";
 import {
+  type CloudClient,
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
   resolveSchemaRegistryClusterId,
@@ -38,7 +39,7 @@ import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
 import type { paths } from "@src/confluent/openapi-schema.js";
 import { kafkaLogger } from "@src/logger.js";
-import createClient, { type Client } from "openapi-fetch";
+import createClient from "openapi-fetch";
 import { DATA_PLANE_TOKEN_LIFETIME_MS } from "./oauth/token-lifetimes.js";
 
 // Lifetime hint passed to librdkafka inside the OAUTHBEARER refresh callback
@@ -140,7 +141,7 @@ export class OAuthClientManager extends BaseClientManager {
   async getConfluentCloudKafkaRestClient(
     clusterId?: string,
     envId?: string,
-  ): Promise<Client<paths, `${string}/${string}`>> {
+  ): Promise<CloudClient> {
     this.requireClusterArgs(clusterId, envId);
     // The bearer middleware reads `auth.getToken()` per-request, but failing
     // fast here gives the agent a clear error rather than letting an empty
@@ -161,9 +162,7 @@ export class OAuthClientManager extends BaseClientManager {
   }
 
   /** @inheritdoc */
-  async getSchemaRegistryRestClient(
-    envId?: string,
-  ): Promise<Client<paths, `${string}/${string}`>> {
+  async getSchemaRegistryRestClient(envId?: string): Promise<CloudClient> {
     this.requireDataPlaneToken();
     if (!envId) {
       throw new Error(

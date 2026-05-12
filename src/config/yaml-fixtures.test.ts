@@ -253,7 +253,7 @@ describe("config/yaml-fixtures.test.ts", () => {
       expect(conn.flink?.environment_id).toBe("env-abc123");
       expect(conn.flink?.organization_id).toBe("org-xyz789");
       expect(conn.flink?.compute_pool_id).toBe("lfcp-pool01");
-      expect(conn.flink?.environment_name).toBeUndefined();
+      expect(conn.flink?.catalog_name).toBeUndefined();
       expect(conn.flink?.database_name).toBeUndefined();
       expect(conn.kafka).toBeUndefined();
       expect(conn.schema_registry).toBeUndefined();
@@ -276,7 +276,7 @@ describe("config/yaml-fixtures.test.ts", () => {
       expect(conn.flink?.environment_id).toBe("env-abc123");
       expect(conn.flink?.organization_id).toBe("org-xyz789");
       expect(conn.flink?.compute_pool_id).toBe("lfcp-pool01");
-      expect(conn.flink?.environment_name).toBe("my-environment");
+      expect(conn.flink?.catalog_name).toBe("my-environment");
       expect(conn.flink?.database_name).toBe("my-kafka-cluster");
     });
 

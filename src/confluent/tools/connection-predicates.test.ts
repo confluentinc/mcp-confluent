@@ -25,7 +25,7 @@ import {
 } from "@src/confluent/tools/connection-predicates.js";
 import { describe, expect, it, vi } from "vitest";
 
-function conn(
+function directConn(
   fields: Omit<DirectConnectionConfig, "type">,
 ): DirectConnectionConfig {
   return { type: "direct", ...fields };
@@ -35,26 +35,26 @@ function disabledFor(reason: ToolDisabledReason): PredicateResult {
   return { enabled: false, reason };
 }
 
-const KAFKA_CONN = conn({ kafka: { bootstrap_servers: "broker:9092" } });
-const KAFKA_REST_CONN = conn({
+const KAFKA_CONN = directConn({ kafka: { bootstrap_servers: "broker:9092" } });
+const KAFKA_REST_CONN = directConn({
   kafka: { rest_endpoint: "http://kafka-rest:8082" },
 });
-const KAFKA_REST_WITH_AUTH_CONN = conn({
+const KAFKA_REST_WITH_AUTH_CONN = directConn({
   kafka: {
     rest_endpoint: "http://kafka-rest:8082",
     auth: { type: "api_key", key: "k", secret: "s" },
   },
 });
-const SCHEMA_REGISTRY_CONN = conn({
+const SCHEMA_REGISTRY_CONN = directConn({
   schema_registry: { endpoint: "http://schema-registry:8081" },
 });
-const CONFLUENT_CLOUD_CONN = conn({
+const CONFLUENT_CLOUD_CONN = directConn({
   confluent_cloud: {
     endpoint: "https://api.confluent.cloud",
     auth: { type: "api_key", key: "k", secret: "s" },
   },
 });
-const FLINK_CONN = conn({
+const FLINK_CONN = directConn({
   flink: {
     endpoint: "https://flink.confluent.cloud",
     auth: { type: "api_key", key: "k", secret: "s" },
@@ -63,25 +63,25 @@ const FLINK_CONN = conn({
     compute_pool_id: "lfcp-xyz",
   },
 });
-const TELEMETRY_CONN = conn({
+const TELEMETRY_CONN = directConn({
   telemetry: {
     endpoint: "https://api.telemetry.confluent.cloud",
     auth: { type: "api_key", key: "k", secret: "s" },
   },
 });
 
-const TABLEFLOW_CONN = conn({
+const TABLEFLOW_CONN = directConn({
   tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
 });
 
-const CCLOUD_SR_CONN = conn({
+const CCLOUD_SR_CONN = directConn({
   schema_registry: {
     endpoint: "https://psrc-abc.us-east-1.aws.confluent.cloud",
     auth: { type: "api_key", key: "k", secret: "s" },
   },
 });
 
-const DIRECT_CCLOUD_KAFKA_AUTH_CONN = conn({
+const DIRECT_CCLOUD_KAFKA_AUTH_CONN = directConn({
   confluent_cloud: {
     endpoint: "https://api.confluent.cloud",
     auth: { type: "api_key", key: "k", secret: "s" },
@@ -92,7 +92,7 @@ const DIRECT_CCLOUD_KAFKA_AUTH_CONN = conn({
   },
 });
 
-const FLINK_AND_TELEMETRY_CONN = conn({
+const FLINK_AND_TELEMETRY_CONN = directConn({
   flink: {
     endpoint: "https://flink.confluent.cloud",
     auth: { type: "api_key", key: "k", secret: "s" },

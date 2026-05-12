@@ -22,9 +22,38 @@ const CCLOUD_OAUTH_FIXTURE = fileURLToPath(
 );
 
 /**
- * Creates a ServerRuntime with a mocked ClientManager.
- *
- * Pass `connectionConfig` to populate the connection's service blocks (kafka,
+ * Multi-connection runtime factory — the primitive that owns the
+ * `new ServerRuntime(new MCPServerConfiguration(...))` ceremony. Builds a
+ * runtime whose `config.connections` carries one `direct`-typed entry per
+ * record key. For each id, the caller may supply a specific
+ * `Mocked<DirectClientManager>` via `clientManagers` (the pattern
+ * multi-connection handler tests reach for when one connection's REST GET
+ * resolves with data and another's errors); ids without an entry fall back
+ * to a fresh `createMockInstance(DirectClientManager)`.
+ */
+export function runtimeWithConnections(
+  connections: Record<string, Omit<DirectConnectionConfig, "type">>,
+  clientManagers?: Record<string, Mocked<DirectClientManager>>,
+): ServerRuntime {
+  const directConnections: Record<string, DirectConnectionConfig> = {};
+  const resolvedClientManagers: Record<
+    string,
+    Mocked<DirectClientManager>
+  > = {};
+  for (const [id, conn] of Object.entries(connections)) {
+    directConnections[id] = { type: "direct", ...conn };
+    resolvedClientManagers[id] =
+      clientManagers?.[id] ?? createMockInstance(DirectClientManager);
+  }
+  return new ServerRuntime(
+    new MCPServerConfiguration({ connections: directConnections }),
+    resolvedClientManagers,
+  );
+}
+
+/**
+ * Single-connection sugar over {@linkcode runtimeWithConnections}. Pass
+ * `connectionConfig` to populate the connection's service blocks (kafka,
  * flink, schema_registry, etc.).
  */
 export function runtimeWith(
@@ -34,33 +63,9 @@ export function runtimeWith(
     DirectClientManager,
   ),
 ): ServerRuntime {
-  return new ServerRuntime(
-    new MCPServerConfiguration({
-      connections: { [connectionId]: { type: "direct", ...connectionConfig } },
-    }),
+  return runtimeWithConnections(
+    { [connectionId]: connectionConfig },
     { [connectionId]: clientManager },
-  );
-}
-
-/**
- * Multi-connection variant of {@linkcode runtimeWith}: builds a runtime whose
- * `config.connections` carries one `direct`-typed entry per record key, each
- * with a fresh stubbed `DirectClientManager`. Use when a test needs to
- * exercise cross-connection behaviour (partial-enable, (connectionId, reason)
- * grouping).
- */
-export function runtimeWithConnections(
-  connections: Record<string, Omit<DirectConnectionConfig, "type">>,
-): ServerRuntime {
-  const directConnections: Record<string, DirectConnectionConfig> = {};
-  const clientManagers: Record<string, Mocked<DirectClientManager>> = {};
-  for (const [id, conn] of Object.entries(connections)) {
-    directConnections[id] = { type: "direct", ...conn };
-    clientManagers[id] = createMockInstance(DirectClientManager);
-  }
-  return new ServerRuntime(
-    new MCPServerConfiguration({ connections: directConnections }),
-    clientManagers,
   );
 }
 

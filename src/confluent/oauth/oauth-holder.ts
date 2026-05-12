@@ -124,9 +124,9 @@ export class OAuthHolder {
         TelemetryEvent.CCLOUD_AUTHENTICATION,
         {
           status: "failure",
-          ccloud_user_id: undefined,
-          ccloud_domain: undefined,
-          failure_reason: reason,
+          ccloudUserId: undefined,
+          ccloudDomain: undefined,
+          failureReason: reason,
         },
       );
       throw err;
@@ -151,8 +151,8 @@ export class OAuthHolder {
     logger.info({ env: this.env }, "OAuth login successful");
     TelemetryService.getInstance().track(TelemetryEvent.CCLOUD_AUTHENTICATION, {
       status: "success",
-      ccloud_user_id: tokenChain.resourceId,
-      ccloud_domain: tokenChain.email?.split("@")[1],
+      ccloudUserId: tokenChain.resourceId,
+      ccloudDomain: tokenChain.email?.split("@")[1],
     });
   }
 }

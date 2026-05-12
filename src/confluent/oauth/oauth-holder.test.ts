@@ -380,8 +380,8 @@ describe("oauth/oauth-holder.ts", () => {
           TelemetryEvent.CCLOUD_AUTHENTICATION,
           {
             status: "success",
-            ccloud_user_id: "u-abc123",
-            ccloud_domain: "example.com",
+            ccloudUserId: "u-abc123",
+            ccloudDomain: "example.com",
           },
         );
       } finally {
@@ -402,9 +402,9 @@ describe("oauth/oauth-holder.ts", () => {
           TelemetryEvent.CCLOUD_AUTHENTICATION,
           {
             status: "failure",
-            ccloud_user_id: undefined,
-            ccloud_domain: undefined,
-            failure_reason: "configuration",
+            ccloudUserId: undefined,
+            ccloudDomain: undefined,
+            failureReason: "configuration",
           },
         );
       } finally {
@@ -427,8 +427,8 @@ describe("oauth/oauth-holder.ts", () => {
           TelemetryEvent.CCLOUD_AUTHENTICATION,
           {
             status: "success",
-            ccloud_user_id: undefined,
-            ccloud_domain: undefined,
+            ccloudUserId: undefined,
+            ccloudDomain: undefined,
           },
         );
       } finally {

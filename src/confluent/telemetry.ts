@@ -9,7 +9,7 @@ export enum TelemetryEvent {
    */
   SERVER_START = "Server Start",
   /**
-   * Emitted once for evert tool call for telemetry on tool usage.
+   * Emitted once for every tool call for telemetry on tool usage.
    */
   TOOL_CALL = "Tool Call",
   /**

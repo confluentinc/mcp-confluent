@@ -28,6 +28,11 @@ All notable changes to this MCP server will be documented in this file.
   - `search-product-docs` for keyword search across product docs.
   - `get-product-doc-page` for fetching the full markdown content of a single page.
 - New tool `explain-disabled-tools` to diagnose why possible tools are not enabled at this time due to mismatches in configuration.
+- `FLINK_CATALOG_NAME` environment variable as the preferred spelling for the Flink catalog name (used as the `sql.current-catalog` property in submitted statements).
+
+### Deprecated
+
+- `FLINK_ENV_NAME` environment variable, in favor of `FLINK_CATALOG_NAME`. Both spellings remain accepted and map to the same internal field; setting both simultaneously throws at startup. Support for `FLINK_ENV_NAME` will be removed in v1.4.0.
 
 ## 1.2.1
 

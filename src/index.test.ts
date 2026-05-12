@@ -273,6 +273,8 @@ describe("index.ts", () => {
         ToolName.READ_CONNECTOR,
         ToolName.CREATE_CONNECTOR,
         ToolName.DELETE_CONNECTOR,
+        // Schema Registry (hasSchemaRegistry — delete-schema not yet OAuth-migrated)
+        ToolName.DELETE_SCHEMA,
         // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)
         ToolName.SEARCH_TOPICS_BY_TAG,
         ToolName.SEARCH_TOPICS_BY_NAME,

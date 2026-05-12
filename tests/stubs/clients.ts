@@ -190,6 +190,9 @@ export interface MockedClientManager extends Mocked<DirectClientManager> {
   >;
   getConfluentCloudTelemetryRestClient: Mock<() => MockedRestClient>;
   getSchemaRegistryClient: Mock<() => Mocked<SchemaRegistryClient>>;
+  getSchemaRegistrySdkClient: Mock<
+    (envId?: string) => Promise<Mocked<SchemaRegistryClient>>
+  >;
 }
 
 /**
@@ -251,6 +254,9 @@ export function getMockedClientManager(): MockedClientManager {
   );
 
   cm.getSchemaRegistryClient.mockReturnValue(getMockedSchemaRegistry());
+  cm.getSchemaRegistrySdkClient.mockImplementation(async () =>
+    cm.getSchemaRegistryClient(),
+  );
 
   return cm;
 }

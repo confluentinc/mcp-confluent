@@ -49,11 +49,23 @@ export interface Auth0TokenResponse {
 }
 
 /**
+ * User identity returned in the body of POST confluent.cloud/api/sessions.
+ * Sourced from the JSON response, not from any JWT claim. Fields beyond what
+ * we consume are intentionally omitted.
+ */
+export interface UserDetails {
+  id?: string;
+  email?: string;
+  resource_id?: string;
+}
+
+/**
  * Response from POST confluent.cloud/api/sessions
  */
 export interface ControlPlaneTokenResponse {
   token: string;
   expires_at: string;
+  user?: UserDetails;
 }
 
 /**

@@ -8,7 +8,15 @@ export enum TelemetryEvent {
    * of tool calls.
    */
   SERVER_START = "Server Start",
+  /**
+   * Emitted once for evert tool call for telemetry on tool usage.
+   */
   TOOL_CALL = "Tool Call",
+  /**
+   * Emitted once per terminal OAuth PKCE login attempt (success or failure).
+   * Refresh-token rotations are not tracked here.
+   */
+  CCLOUD_AUTHENTICATION = "CCloud Authentication",
 }
 
 /**

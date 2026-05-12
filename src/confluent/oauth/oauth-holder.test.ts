@@ -5,36 +5,20 @@ import {
   CONTROL_PLANE_TOKEN_LIFETIME_MS,
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
+import { TelemetryEvent } from "@src/confluent/telemetry.js";
 import {
   mockFetch,
   mockHttpServer,
   mockOpen,
+  mockTelemetryService,
+  resetTelemetryService,
+  stubSuccessfulChain,
   type MockedFetch,
   type MockedHttpServer,
   type MockedOpen,
+  type MockedTelemetryService,
 } from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-function jsonResponse(body: object, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function stubFullChain(fetchSpy: MockedFetch): void {
-  fetchSpy.mockResolvedValueOnce(
-    jsonResponse({
-      id_token: "id",
-      refresh_token: "refresh",
-      access_token: "access",
-      token_type: "Bearer",
-      expires_in: 60,
-    }),
-  );
-  fetchSpy.mockResolvedValueOnce(jsonResponse({ token: "cp" }));
-  fetchSpy.mockResolvedValueOnce(jsonResponse({ token: "dp" }));
-}
 
 /**
  * Drives one PKCE round-trip end-to-end against the mocked HTTP server / open
@@ -63,13 +47,16 @@ async function completePkce(
 
 describe("oauth/oauth-holder.ts", () => {
   let fetchSpy: MockedFetch;
+  let trackSpy: MockedTelemetryService;
 
   beforeEach(() => {
     fetchSpy = mockFetch();
+    trackSpy = mockTelemetryService();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    resetTelemetryService();
   });
 
   describe("constructor", () => {
@@ -95,7 +82,7 @@ describe("oauth/oauth-holder.ts", () => {
     it("should drive PKCE end-to-end and populate tokens on success", async () => {
       const httpMock = mockHttpServer();
       const openSpy = mockOpen();
-      stubFullChain(fetchSpy);
+      stubSuccessfulChain(fetchSpy);
 
       const holder = new OAuthHolder("devel");
       try {
@@ -103,8 +90,8 @@ describe("oauth/oauth-holder.ts", () => {
         await completePkce(httpMock, openSpy);
         await inFlight;
 
-        expect(holder.getControlPlaneToken()).toBe("cp");
-        expect(holder.getDataPlaneToken()).toBe("dp");
+        expect(holder.getControlPlaneToken()).toBe("cp-token");
+        expect(holder.getDataPlaneToken()).toBe("dp-token");
         expect(openSpy).toHaveBeenCalledOnce();
       } finally {
         holder.shutdown();
@@ -114,7 +101,7 @@ describe("oauth/oauth-holder.ts", () => {
     it("should share one in-flight PKCE flow across concurrent callers", async () => {
       const httpMock = mockHttpServer();
       const openSpy = mockOpen();
-      stubFullChain(fetchSpy);
+      stubSuccessfulChain(fetchSpy);
 
       const holder = new OAuthHolder("devel");
       try {
@@ -135,7 +122,7 @@ describe("oauth/oauth-holder.ts", () => {
     it("should be a no-op when called again after a successful login", async () => {
       const httpMock = mockHttpServer();
       const openSpy = mockOpen();
-      stubFullChain(fetchSpy);
+      stubSuccessfulChain(fetchSpy);
 
       const holder = new OAuthHolder("devel");
       try {
@@ -175,13 +162,13 @@ describe("oauth/oauth-holder.ts", () => {
         // because they're test-local mocks (the `mockHttpServer` returns a
         // fresh fake each call).
         const httpMock2 = mockHttpServer();
-        stubFullChain(fetchSpy);
+        stubSuccessfulChain(fetchSpy);
         const second = holder.ensureLoggedIn();
         await completePkce(httpMock2, openSpy);
         await second;
 
-        expect(holder.getControlPlaneToken()).toBe("cp");
-        expect(holder.getDataPlaneToken()).toBe("dp");
+        expect(holder.getControlPlaneToken()).toBe("cp-token");
+        expect(holder.getDataPlaneToken()).toBe("dp-token");
         // Two PKCE flows total: failed first + successful second.
         expect(openSpy).toHaveBeenCalledTimes(2);
       } finally {
@@ -193,14 +180,14 @@ describe("oauth/oauth-holder.ts", () => {
       vi.useFakeTimers({ now: 0 });
       const httpMock1 = mockHttpServer();
       const openSpy = mockOpen();
-      stubFullChain(fetchSpy);
+      stubSuccessfulChain(fetchSpy);
 
       const holder = new OAuthHolder("devel");
       try {
         const first = holder.ensureLoggedIn();
         await completePkce(httpMock1, openSpy);
         await first;
-        expect(holder.getControlPlaneToken()).toBe("cp");
+        expect(holder.getControlPlaneToken()).toBe("cp-token");
 
         // Jump past the refresh-family absolute lifetime so refreshTokenExpired()
         // returns true. Stop refresh loop first to avoid a stray timer firing.
@@ -212,18 +199,12 @@ describe("oauth/oauth-holder.ts", () => {
         // on the second chain so the assertion below proves the ctx was
         // rebuilt (rather than some stale cache returning the old value).
         const httpMock2 = mockHttpServer();
-        fetchSpy
-          .mockResolvedValueOnce(
-            jsonResponse({
-              id_token: "id-2",
-              refresh_token: "refresh-2",
-              access_token: "access-2",
-              token_type: "Bearer",
-              expires_in: 60,
-            }),
-          )
-          .mockResolvedValueOnce(jsonResponse({ token: "cp-2" }))
-          .mockResolvedValueOnce(jsonResponse({ token: "dp-2" }));
+        stubSuccessfulChain(fetchSpy, {
+          refreshToken: "refresh-2",
+          idToken: "id-2",
+          cpToken: "cp-2",
+          dpToken: "dp-2",
+        });
 
         const second = holder.ensureLoggedIn();
         await completePkce(httpMock2, openSpy);
@@ -245,7 +226,7 @@ describe("oauth/oauth-holder.ts", () => {
       vi.useFakeTimers({ now: 0 });
       const httpMock = mockHttpServer();
       const openSpy = mockOpen();
-      stubFullChain(fetchSpy);
+      stubSuccessfulChain(fetchSpy);
 
       const holder = new OAuthHolder("devel");
       try {
@@ -266,18 +247,12 @@ describe("oauth/oauth-holder.ts", () => {
         expect(holder.getControlPlaneToken()).toBeUndefined();
 
         // Stub the refresh-token rotation chain (auth0 + cp + dp).
-        fetchSpy
-          .mockResolvedValueOnce(
-            jsonResponse({
-              id_token: "id-2",
-              refresh_token: "refresh-2",
-              access_token: "access-2",
-              token_type: "Bearer",
-              expires_in: 60,
-            }),
-          )
-          .mockResolvedValueOnce(jsonResponse({ token: "cp-2" }))
-          .mockResolvedValueOnce(jsonResponse({ token: "dp-2" }));
+        stubSuccessfulChain(fetchSpy, {
+          refreshToken: "refresh-2",
+          idToken: "id-2",
+          cpToken: "cp-2",
+          dpToken: "dp-2",
+        });
 
         await holder.ensureLoggedIn();
 
@@ -298,7 +273,7 @@ describe("oauth/oauth-holder.ts", () => {
       vi.useFakeTimers({ now: 0 });
       const httpMock = mockHttpServer();
       const openSpy = mockOpen();
-      stubFullChain(fetchSpy);
+      stubSuccessfulChain(fetchSpy);
 
       const holder = new OAuthHolder("devel");
       try {
@@ -340,7 +315,7 @@ describe("oauth/oauth-holder.ts", () => {
     it("should start the refresh loop only on successful login", async () => {
       const httpMock = mockHttpServer();
       const openSpy = mockOpen();
-      stubFullChain(fetchSpy);
+      stubSuccessfulChain(fetchSpy);
       const startRefreshLoopSpy = vi.spyOn(
         AuthContext.prototype,
         "startRefreshLoop",
@@ -374,7 +349,7 @@ describe("oauth/oauth-holder.ts", () => {
     it("should abort an in-flight login", async () => {
       mockHttpServer();
       mockOpen();
-      stubFullChain(fetchSpy);
+      stubSuccessfulChain(fetchSpy);
 
       const holder = new OAuthHolder("devel");
       const inFlight = holder.ensureLoggedIn();
@@ -384,6 +359,81 @@ describe("oauth/oauth-holder.ts", () => {
       await expect(inFlight).rejects.toThrow(/aborted|shut down/);
       expect(holder.getControlPlaneToken()).toBeUndefined();
       expect(holder.getDataPlaneToken()).toBeUndefined();
+    });
+  });
+
+  describe("CCLOUD_AUTHENTICATION telemetry", () => {
+    it("should track a success event with ccloud_user_id and ccloud_domain on successful login", async () => {
+      const httpMock = mockHttpServer();
+      const openSpy = mockOpen();
+      stubSuccessfulChain(fetchSpy, {
+        user: { resource_id: "u-abc123", email: "alice@example.com" },
+      });
+
+      const holder = new OAuthHolder("devel");
+      try {
+        const inFlight = holder.ensureLoggedIn();
+        await completePkce(httpMock, openSpy);
+        await inFlight;
+
+        expect(trackSpy).toHaveBeenCalledWith(
+          TelemetryEvent.CCLOUD_AUTHENTICATION,
+          {
+            status: "success",
+            ccloud_user_id: "u-abc123",
+            ccloud_domain: "example.com",
+          },
+        );
+      } finally {
+        holder.shutdown();
+      }
+    });
+
+    it("should track a failure event with the PKCE failure reason when login fails", async () => {
+      mockHttpServer();
+      const openSpy = mockOpen();
+      openSpy.mockRejectedValueOnce(new Error("browser-open-failed"));
+
+      const holder = new OAuthHolder("devel");
+      try {
+        await expect(holder.ensureLoggedIn()).rejects.toThrow();
+
+        expect(trackSpy).toHaveBeenCalledWith(
+          TelemetryEvent.CCLOUD_AUTHENTICATION,
+          {
+            status: "failure",
+            ccloud_user_id: undefined,
+            ccloud_domain: undefined,
+            failure_reason: "configuration",
+          },
+        );
+      } finally {
+        holder.shutdown();
+      }
+    });
+
+    it("should emit success with undefined identity fields when CP response omits `user`", async () => {
+      const httpMock = mockHttpServer();
+      const openSpy = mockOpen();
+      stubSuccessfulChain(fetchSpy);
+
+      const holder = new OAuthHolder("devel");
+      try {
+        const inFlight = holder.ensureLoggedIn();
+        await completePkce(httpMock, openSpy);
+        await inFlight;
+
+        expect(trackSpy).toHaveBeenCalledWith(
+          TelemetryEvent.CCLOUD_AUTHENTICATION,
+          {
+            status: "success",
+            ccloud_user_id: undefined,
+            ccloud_domain: undefined,
+          },
+        );
+      } finally {
+        holder.shutdown();
+      }
     });
   });
 });

@@ -8,6 +8,11 @@ import type { MockedClientManager } from "./clients.js";
 export type Resolves = {
   /** Substring that must appear in the resolved response text. */
   resolves: string;
+  /** When set, asserts `result.isError` matches. Use `true` for handler-side
+   *  error responses (built with `createResponse(text, true)`) — those resolve
+   *  rather than throw, and without this check the test would pass on any
+   *  message-text match regardless of the isError flag. */
+  isError?: boolean;
 };
 
 export type Throws = {
@@ -132,7 +137,7 @@ export async function assertHandleCase(options: {
       `${name}: resolved successfully but outcome specifies { throws }`,
     ).toBe(true);
 
-    const { resolves } = outcome as Resolves;
+    const { resolves, isError } = outcome as Resolves;
     const responseText = result!.content
       .map((c) => ("text" in c ? c.text : ""))
       .join("");
@@ -140,6 +145,13 @@ export async function assertHandleCase(options: {
       responseText,
       `${name}: response text does not contain expected substring`,
     ).toContain(resolves);
+
+    if (isError !== undefined) {
+      expect(
+        result!.isError,
+        `${name}: result.isError does not match expected`,
+      ).toBe(isError);
+    }
 
     if (clientManager) {
       // every getter on a `Mocked<DirectClientManager>` is a `vi.fn()` assigned

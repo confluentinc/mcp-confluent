@@ -528,7 +528,7 @@ MCP_AUTH_DISABLED=true
 
 ## Telemetry
 
-This MCP server collects anonymous usage data to help make improvements. No personally identifiable information is collected. You can opt out by setting `DO_NOT_TRACK=true` in your environment. See [telemetry.md](telemetry.md) for full details on what is collected.
+This MCP server collects anonymous usage data to help make improvements. You can opt out by setting `DO_NOT_TRACK=true` in your environment. See [telemetry.md](telemetry.md) for full details on what is collected.
 
 ## Troubleshooting
 

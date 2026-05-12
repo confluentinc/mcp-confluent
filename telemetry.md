@@ -21,7 +21,7 @@ The server tracks tool call completions and failures, server startup, and Conflu
 ### Captured Information
 
 - Tool name, execution duration, and success/error status
-- Confluent Cloud authentication outcome (success or failure reason)
+- Confluent Cloud authentication outcome (success or failure reason). Successful logins also include `ccloudUserId` (the user's Confluent Cloud `resource_id`) and `ccloudDomain` (the domain portion of the user's email).
 
 ### Context Information (Sent with All Events)
 
@@ -30,7 +30,7 @@ The server tracks tool call completions and failures, server startup, and Conflu
 - Connected MCP client name and version
 - OS platform, version, and architecture
 
-A randomly generated machine ID is persisted in `~/.mcp-confluent/machine-id` and used as the anonymous user identifier. No personally identifiable information is collected.
+A randomly generated machine ID is persisted in `~/.mcp-confluent/machine-id` and used as the anonymous user identifier.
 
 ## Questions or Concerns?
 

@@ -363,7 +363,7 @@ describe("oauth/oauth-holder.ts", () => {
   });
 
   describe("CCLOUD_AUTHENTICATION telemetry", () => {
-    it("should track a success event with ccloud_user_id and ccloud_domain on successful login", async () => {
+    it("should track a success event with ccloudUserId and ccloudDomain on successful login", async () => {
       const httpMock = mockHttpServer();
       const openSpy = mockOpen();
       stubSuccessfulChain(fetchSpy, {

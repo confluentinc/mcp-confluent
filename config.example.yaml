@@ -123,7 +123,7 @@ connections:
       environment_id: "${FLINK_ENV_ID:-env-xxxxx}"
       compute_pool_id: "${FLINK_COMPUTE_POOL_ID:-lfcp-xxxxx}"
       # Optional human-readable labels surfaced to tools / prompts:
-      # environment_name: "${FLINK_ENV_NAME:-production}"
+      # catalog_name: "${FLINK_CATALOG_NAME:-production}"
       # database_name: "${FLINK_DATABASE_NAME:-my-cluster}"
 
     # --- Tableflow ---

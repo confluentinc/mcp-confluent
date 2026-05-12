@@ -1,6 +1,6 @@
 # Telemetry and Usage Data
 
-*Last updated: March 2026*
+_Last updated: March 2026_
 
 The Confluent MCP Server collects anonymous usage data to help us understand how the server is used and improve the user experience.
 
@@ -16,13 +16,13 @@ When telemetry is disabled, no events are sent.
 
 ## What Events Are Tracked
 
-The server tracks tool call completions and failures, including the tool name, duration, and error details when applicable.
+The server tracks tool call completions and failures, server startup, and Confluent Cloud authentication outcomes.
 
 ### Captured Information
 
-- Tool name and execution duration
-- Success or failure status
+- Tool name, execution duration, and success/failure status
 - Error type and message (on failure, truncated)
+- Confluent Cloud authentication outcome (success or failure reason)
 
 ### Context Information (Sent with All Events)
 

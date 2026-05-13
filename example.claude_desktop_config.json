@@ -3,9 +3,9 @@
     "confluent": {
       "command": "node",
       "args": [
-        "--env-file",
-        "/path/to/confluent-mcp-server/.env",
-        "/path/to/confluent-mcp-server/dist/index.js"
+        "/path/to/confluent-mcp-server/dist/index.js",
+        "--config",
+        "/path/to/confluent-mcp-server/config.yaml"
       ]
     }
   }

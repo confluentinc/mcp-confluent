@@ -12,6 +12,10 @@ Telemetry can be disabled by setting the `DO_NOT_TRACK` environment variable to 
 DO_NOT_TRACK=true
 ```
 
+Or, in a YAML config, set `server.do_not_track: true`. The `DO_NOT_TRACK` env
+var always wins over the YAML field — it's the floor, so opting out in the
+environment cannot be overridden by a stray `false` in a config file.
+
 When telemetry is disabled, no events are sent.
 
 ## What Events Are Tracked

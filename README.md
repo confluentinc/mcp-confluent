@@ -25,32 +25,19 @@ See [Getting Started](#getting-started) for full setup instructions and [Configu
 
 ## Table of Contents
 
-- [Confluent MCP Server](#confluent-mcp-server)
-  - [Quick Start](#quick-start)
-  - [Table of Contents](#table-of-contents)
-  - [Available Tools](#available-tools)
-    - [Always-Available Tools](#always-available-tools)
-    - [Available Tools for Confluent Cloud](#available-tools-for-confluent-cloud)
-    - [Available Tools for Confluent Local](#available-tools-for-confluent-local)
-  - [Getting Started](#getting-started)
-    - [Prerequisites](#prerequisites)
-    - [General Setup Steps](#general-setup-steps)
-  - [Configuration](#configuration)
-    - [Prerequisites \& setup for Tableflow commands](#prerequisites--setup-for-tableflow-commands)
-  - [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
-    - [Setup](#setup)
-  - [CLI Usage](#cli-usage)
-      - [Basic Usage](#basic-usage)
-      - [Example: Deploy using all transports](#example-deploy-using-all-transports)
-      - [Example: Allow Only Specific Tools](#example-allow-only-specific-tools)
-      - [Example: Block Certain Tools](#example-block-certain-tools)
-      - [Example: Use Tool Lists from Files](#example-use-tool-lists-from-files)
-      - [Example: List All Available Tools](#example-list-all-available-tools)
-  - [Configuring MCP Clients](#configuring-mcp-clients)
-  - [Telemetry](#telemetry)
-  - [Troubleshooting](#troubleshooting)
-  - [Contributing](#contributing)
-    - [Pre-release testing](#pre-release-testing)
+- [Quick Start](#quick-start)
+- [Available Tools](#available-tools)
+  - [Always Available](#always-available-tools)
+  - [Confluent Cloud](#available-tools-for-confluent-cloud)
+  - [Confluent Local](#available-tools-for-confluent-local)
+- [Getting Started](#getting-started)
+- [Configuration](#configuration)
+- [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
+- [CLI Usage](#cli-usage)
+- [Configuring MCP Clients](#configuring-mcp-clients)
+- [Telemetry](#telemetry)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 
 ## Available Tools
 
@@ -192,6 +179,7 @@ connections:
 See [CONFIGURATION.md → Authentication modes](CONFIGURATION.md#authentication-modes) for the full schema and ergonomics.
 
 The ¹-marked categories in [Available Tools for Confluent Cloud](#available-tools-for-confluent-cloud) work under OAuth today; everything else still needs a `direct` connection with static API keys.
+
 ## CLI Usage
 
 The MCP server provides a flexible command line interface (CLI) for advanced control. The CLI lets you pick the config file, transports, and fine-tune which tools are enabled or blocked.

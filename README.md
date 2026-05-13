@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@confluentinc/mcp-confluent.svg)](https://www.npmjs.com/package/@confluentinc/mcp-confluent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud and Confluent Local through natural language. It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
+An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud, Confluent Platform, and standalone Apache Kafka deployments through natural language. It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
 
 ## Quick Start
 
@@ -29,7 +29,7 @@ See [Getting Started](#getting-started) for full setup instructions and [Configu
 - [Available Tools](#available-tools)
   - [Always Available](#always-available-tools)
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
-  - [Confluent Local](#available-tools-for-confluent-local)
+  - [Local deployments](#available-tools-for-local-deployments)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [General Setup Steps](#general-setup-steps)
@@ -80,9 +80,9 @@ These tools require endpoints and authentication against specific Confluent Clou
 | **Metrics**                                | `list-available-metrics`, `query-metrics`                                                                                                                                                           | Discover and query Confluent Cloud operational metrics            |
 | **Billing**                                | `list-billing-costs`                                                                                                                                                                                | Query billing and cost data                                       |
 
-### Available Tools for Confluent Local
+### Available Tools for local deployments
 
-These tools only require Kafka or Schema Registry endpoints - no Confluent Cloud API key/secret is needed. Ideal for local development with Docker Compose or self-managed clusters.
+These tools only require Kafka or Schema Registry endpoints - no Confluent Cloud API key/secret is needed. Ideal for local development with self-managed clusters, including Confluent Platform.
 
 ```properties
 # minimal .env for local development
@@ -104,7 +104,7 @@ SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
   nvm install 22
   nvm use 22
   ```
-- A local development environment with Kafka or Schema Registry running, or a **Confluent Cloud** account with appropriate API keys or login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
+- A local environment with Kafka or Schema Registry running, or a **Confluent Cloud** account with appropriate API keys or login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
 
 ### General Setup Steps
 
@@ -140,7 +140,7 @@ npx @confluentinc/mcp-confluent --init-config
 
 ### Configuration Details
 
-> **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition — the server accepts both - but we plan to deprecate the latter in a near-future release.
+> **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition (and the server accepts both) but we plan to deprecate the latter in a near-future release.
 
 The `--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in ./config.yaml, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
 
@@ -150,7 +150,7 @@ If you have this repo cloned, `cp config.example.yaml config.yaml` works just as
 
 #### Side note: Why YAML over environment variables?
 
-Flat environment variables can only express a single implicit connection. A YAML file can define multiple named connections, which is necessary for real-world workflows — for example, a `local-dev` connection pointing at a local Docker Kafka alongside a `staging` connection to a Confluent Cloud cluster, all in one file.
+Flat environment variables can only express a single implicit connection. A YAML file can define multiple named connections, which is necessary for real-world workflows — for example, a `local-dev` connection pointing at a local Kafka cluster alongside a `staging` connection to a Confluent Cloud cluster, all in one file.
 
 #### All Legacy Environment Variables for Configuration
 
@@ -254,7 +254,7 @@ The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead 
 
 ### How it works
 
-On the first tool call that needs Confluent access, the server opens your browser to the Confluent Cloud sign-in page and waits for the redirect callback. Subsequent tool calls reuse the resulting session.
+On the first tool call that needs Confluent Cloud access, the server opens your browser to the Confluent Cloud sign-in page and waits for the redirect callback. Subsequent tool calls reuse the resulting session.
 
 ### YAML setup
 
@@ -299,7 +299,7 @@ exclusive — pick the template that matches the auth mode you want.
 
 The MCP server provides a flexible command line interface (CLI) for advanced configuration and control. The CLI allows you to specify environment files, transports, and fine-tune which tools are enabled or blocked.
 
-#### Basic Usage
+### Basic Usage
 
 You can view all CLI options and help with:
 
@@ -333,7 +333,7 @@ Options:
 
 </details>
 
-#### Example: Deploy using all transports
+### Example: Deploy using all transports
 
 ```bash
 npx @confluentinc/mcp-confluent -e .env --transport http,sse,stdio
@@ -355,7 +355,7 @@ npx @confluentinc/mcp-confluent -e .env --transport http,sse,stdio
 
 </details>
 
-#### Example: Allow Only Specific Tools
+### Example: Allow Only Specific Tools
 
 ```bash
 npx @confluentinc/mcp-confluent -e .env --allow-tools produce-message,consume-messages
@@ -363,7 +363,7 @@ npx @confluentinc/mcp-confluent -e .env --allow-tools produce-message,consume-me
 
 Only the specified tools will be enabled; all others will be disabled.
 
-#### Example: Block Certain Tools
+### Example: Block Certain Tools
 
 ```bash
 npx @confluentinc/mcp-confluent -e .env --block-tools produce-message,consume-messages
@@ -371,7 +371,7 @@ npx @confluentinc/mcp-confluent -e .env --block-tools produce-message,consume-me
 
 All tools except the specified ones will be enabled.
 
-#### Example: Use Tool Lists from Files
+### Example: Use Tool Lists from Files
 
 You can also maintain allow/block lists in files (one tool name per line):
 
@@ -379,7 +379,7 @@ You can also maintain allow/block lists in files (one tool name per line):
 npx -y @confluentinc/mcp-confluent -e .env --allow-tools-file allow.txt --block-tools-file block.txt
 ```
 
-#### Example: List All Available Tools
+### Example: List All Available Tools
 
 ```bash
 npx -y @confluentinc/mcp-confluent --list-tools

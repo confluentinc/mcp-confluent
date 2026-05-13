@@ -4,6 +4,8 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+## 1.3.0
+
 ### Added
 
 - **OAuth (PKCE) authentication for Confluent Cloud.** A `connections.<id>.type: oauth` connection signs the user in via the Confluent Cloud login page on the first tool call that needs Cloud access, then reuses the session — no static API keys to provision.

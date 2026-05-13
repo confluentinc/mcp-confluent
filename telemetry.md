@@ -2,7 +2,7 @@
 
 _Last updated: May 2026_
 
-The Confluent MCP Server collects anonymous usage data to help us understand how the server is used and improve the user experience.
+The Confluent MCP Server collects usage data to help us understand how the server is used and improve the user experience.
 
 ## How to Control Telemetry
 

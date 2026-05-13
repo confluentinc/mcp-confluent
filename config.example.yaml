@@ -64,9 +64,10 @@ server:
     # disabled: true
 
 connections:
-  # Connection name is freeform. Currently exactly one connection is supported,
-  # but the structure is plural so multi-connection support can land later
-  # without a breaking change.
+  # Connection name is freeform. Today exactly one connection is read at
+  # runtime; multi-connection support is the focus of the next release, and
+  # this plural structure is here so that landing it does not require any
+  # schema changes on your side.
   default:
     type: direct
 

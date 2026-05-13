@@ -2,39 +2,25 @@ services:
   mcp-server:
     build: . ## build Dockerfile
     ports:
-      - "${HTTP_PORT:-8080}:${HTTP_PORT:-8080}" # Use default (8080) if HTTP_PORT not set in .env
+      - "${HTTP_PORT:-8080}:${HTTP_PORT:-8080}"
 
     # keeping the container running
     stdin_open: true
     tty: true
 
-    # Docker Compose will automatically look for a .env file in the same directory
-    # You can also explicitly specify it with `env_file: ./.env`
+    # The MCP server reads its config from `config.yaml` (preferred) or, on the
+    # legacy path, from environment variables. See CONFIGURATION.md for the
+    # full reference. Typical setup:
+    #
+    #   1. Mount your `config.yaml` into the container and pass `--config` to
+    #      the entrypoint, e.g. via `command: ["--config", "/etc/mcp/config.yaml"]`
+    #      plus a `volumes:` entry.
+    #   2. Keep secrets in a `.env` (loaded via `env_file:` below) and
+    #      reference them from `config.yaml` with `${VAR}` interpolation.
     env_file:
       - .env
 
     environment:
-      # Required variables (with defaults if not in .env)
-      # Also hardcode env variables in the docker compose environment section below
-      HTTP_HOST: "${HTTP_HOST:-0.0.0.0}" # Default to 0.0.0.0 for container accessibility
-      # HTTP_PORT: "${HTTP_PORT:-8080}"    # Default to 8080
-      # BOOTSTRAP_SERVERS: "${BOOTSTRAP_SERVERS}"
-      # CONFLUENT_CLOUD_API_KEY: "${CONFLUENT_CLOUD_API_KEY}"
-      # CONFLUENT_CLOUD_API_SECRET: "${CONFLUENT_CLOUD_API_SECRET}"
-      # CONFLUENT_CLOUD_REST_ENDPOINT: "${CONFLUENT_CLOUD_REST_ENDPOINT}"
-      # FLINK_API_KEY: "${FLINK_API_KEY}"
-      # FLINK_API_SECRET: "${FLINK_API_SECRET}"
-      # FLINK_COMPUTE_POOL_ID: "${FLINK_COMPUTE_POOL_ID}"
-      # FLINK_DATABASE_NAME: "${FLINK_DATABASE_NAME}"
-      # FLINK_ENV_ID: "${FLINK_ENV_ID}"
-      # FLINK_CATALOG_NAME: "${FLINK_CATALOG_NAME}"
-      # FLINK_ORG_ID: "${FLINK_ORG_ID}"
-      # FLINK_REST_ENDPOINT: "${FLINK_REST_ENDPOINT}""
-      # KAFKA_API_KEY: "${KAFKA_API_KEY}"
-      # KAFKA_API_SECRET: "${KAFKA_API_SECRET}"
-      # KAFKA_CLUSTER_ID: "${KAFKA_CLUSTER_ID}"
-      # KAFKA_ENV_ID: "${KAFKA_ENV_ID}"
-      # KAFKA_REST_ENDPOINT: "${KAFKA_REST_ENDPOINT}"
-      # SCHEMA_REGISTRY_API_KEY: "${SCHEMA_REGISTRY_API_KEY}"
-      # SCHEMA_REGISTRY_API_SECRET: "${SCHEMA_REGISTRY_API_SECRET}"
-      # SCHEMA_REGISTRY_ENDPOINT: "${SCHEMA_REGISTRY_ENDPOINT}"
+      # 0.0.0.0 is the default inside containers so the host port mapping above
+      # can reach the server. Override server.http.host in YAML if you need to.
+      HTTP_HOST: "${HTTP_HOST:-0.0.0.0}"

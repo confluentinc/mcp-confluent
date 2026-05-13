@@ -31,20 +31,17 @@ See [Getting Started](#getting-started) for full setup instructions and [Configu
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
   - [Confluent Local](#available-tools-for-confluent-local)
 - [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [General Setup Steps](#general-setup-steps)
-  - [Configuration Details](#configuration-details)
+- [Configuration](#configuration)
 - [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
 - [CLI Usage](#cli-usage)
 - [Configuring MCP Clients](#configuring-mcp-clients)
-- [Authentication for HTTP/SSE Client Transports](#authentication-for-httpsse-client-transports)
 - [Telemetry](#telemetry)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
 ## Available Tools
 
-**Only the tools whose required environment variables are provided in the configuration file will be enabled.**
+Tools are auto-enabled based on which service blocks are present in your resolved configuration; see [CONFIGURATION.md](CONFIGURATION.md#tool-enablement-which-block-lights-up-what) for the full block-to-tool mapping.
 
 You can list all available tools via the CLI:
 
@@ -84,11 +81,18 @@ These tools require endpoints and authentication against specific Confluent Clou
 
 These tools only require Kafka or Schema Registry endpoints - no Confluent Cloud API key/secret is needed. Ideal for local development with Docker Compose or self-managed clusters.
 
-```properties
-# minimal .env for local development
-BOOTSTRAP_SERVERS="localhost:9092"
-SCHEMA_REGISTRY_ENDPOINT="http://localhost:8081"
+```yaml
+# minimal config.yaml for local development
+connections:
+  local:
+    type: direct
+    kafka:
+      bootstrap_servers: "localhost:9092"
+    schema_registry:
+      endpoint: "http://localhost:8081"
 ```
+
+Ready-to-use variants live in [`sample_configs/`](sample_configs/).
 
 | Category            | Tools                                                                                  | Description                             |
 | ------------------- | -------------------------------------------------------------------------------------- | --------------------------------------- |
@@ -120,7 +124,7 @@ The general steps to configure (if not using OAuth) and run this MCP are:
 npx @confluentinc/mcp-confluent --init-config
 ```
 
-2. **Populate the file:** Fill in the necessary values for your Confluent Cloud environment. Different tools will require & use different configuration variables. See the [Configuration Details](#configuration-details) section for details on which variables to fill in based on the tools you want to enable.
+2. **Populate the file:** Fill in the necessary values for your Confluent Cloud environment. See [CONFIGURATION.md](CONFIGURATION.md) for the full reference; only fill in the service blocks you need (each one enables a group of tools).
 
 3. **Start the Server:** You can run the MCP server in one of two ways:
    - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source. This typically involves:
@@ -132,143 +136,29 @@ npx @confluentinc/mcp-confluent --init-config
      npx @confluentinc/mcp-confluent --config /path/to/myconfig.yaml
      ```
 
-4. **Configure your MCP Client:** Each client (e.g., Claude, Goose) will have its own way of specifying the MCP server's address and any required credentials. You'll need to [configure your client](#configuring-mcp-clients) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on can be configured by an environment variable.
+4. **Configure your MCP Client:** Each client (e.g., Claude, Goose) will have its own way of specifying the MCP server's address and any required credentials. You'll need to [configure your client](#configuring-mcp-clients) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on is set via `server.http.port` in `config.yaml`.
 
 5. **Start your MCP Client:** Once your client is configured to connect to the MCP server, you can start your MCP client and on startup it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with resources on your behalf.
 
 6. **Interact with your resources through the Client:** Once the client is connected and configured, you can use the client's interface to interact with Confluent Cloud or local resources. The client will send requests to this MCP server, which will then interact with the available connections on your behalf.
 
-### Configuration Details
+## Configuration
 
-> **Note:** YAML-based configuration is actively being built out as the replacement for `.env`-based config. The two modes coexist during the transition — the server accepts both - but we plan to deprecate the latter in a near-future release.
+The full configuration reference — YAML schema, every service block, env-var interpolation, OAuth and HTTP/SSE auth setup, the (deprecated) legacy env-var table, and tool-to-block mapping — lives in [CONFIGURATION.md](CONFIGURATION.md).
 
-The `--init-config` CLI flag creates a copy of [`config.example.yaml`](config.example.yaml) in ./config.yaml, with every supported sub-block (`kafka`, `schema_registry`, `confluent_cloud`, `flink`, `tableflow`, `telemetry`) present, annotated and wired up with [`${ENV_VAR}` placeholders](#env-var-interpolation-in-yaml) so credentials can stay in your environment.
+> **Compatibility note.** This release ships full parity between YAML (`-c config.yaml`) and the legacy env-var path (`-e config.env`) for a single connection. The env-var-only path will emit a startup warning in a near-future release and be removed a release or two later. Multi-connection support (next release) will be YAML-only. See [CONFIGURATION.md → Two paths, one configuration](CONFIGURATION.md#two-paths-one-configuration).
 
-It also adds this file to a `.gitignore` (creating one if needed), so your filled-in copy can't slip into git. It will not overwrite an existing `config.yaml`, so a rerun won't overwrite your edits.
+### Prerequisites & setup for Tableflow commands
 
-If you have this repo cloned, `cp config.example.yaml config.yaml` works just as well. Every `*.yaml`/`*.yml` file at this repo root is gitignored by default, so an accidental `prod.yaml` or `secrets.yaml` cannot slip into a commit either.
+Tableflow tools interact with cloud storage (e.g. AWS S3) and a metadata catalog (e.g. AWS Glue) on your behalf via the Flink runtime in Confluent Cloud. The Flink runtime needs IAM permissions on your cloud account, and those have to be granted and linked into Confluent Cloud before any Tableflow tool will succeed.
 
-#### Side note: Why YAML over environment variables?
-
-Flat environment variables can only express a single implicit connection. A YAML file can define multiple named connections, which is necessary for real-world workflows — for example, a `local-dev` connection pointing at a local Docker Kafka alongside a `staging` connection to a Confluent Cloud cluster, all in one file.
-
-#### All Legacy Environment Variables for Configuration
-
-You can configure the MCP server using the following variables in your `.env` file. The `.env` file will be deprecated in favor of yaml config in the near future. See details above and update your project to configure these items in `config.yaml` instead.
-
-<details>
-<summary>Show Table</summary>
-
-| Variable                      | Description                                                                                                                                                                                                                                                       | Default Value                           | Required |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------- |
-| HTTP_HOST                     | Host to bind for HTTP transport. Defaults to localhost only for security.                                                                                                                                                                                         | "127.0.0.1"                             | Yes      |
-| HTTP_MCP_ENDPOINT_PATH        | HTTP endpoint path for MCP transport (e.g., '/mcp') (string)                                                                                                                                                                                                      | "/mcp"                                  | Yes      |
-| HTTP_PORT                     | Port to use for HTTP transport (number (min: 0))                                                                                                                                                                                                                  | 8080                                    | Yes      |
-| LOG_LEVEL                     | Log level for application logging (trace, debug, info, warn, error, fatal)                                                                                                                                                                                        | "info"                                  | Yes      |
-| MCP_API_KEY                   | API key for HTTP/SSE authentication. Generate using `--generate-key`. Required when auth is enabled.                                                                                                                                                              |                                         | No\*     |
-| MCP_AUTH_DISABLED             | Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.                                                                                                                                                                    | false                                   | No       |
-| MCP_ALLOWED_HOSTS             | Comma-separated list of allowed Host header values for DNS rebinding protection.                                                                                                                                                                                  | "localhost,127.0.0.1"                   | No       |
-| SSE_MCP_ENDPOINT_PATH         | SSE endpoint path for establishing SSE connections (e.g., '/sse', '/events') (string)                                                                                                                                                                             | "/sse"                                  | Yes      |
-| SSE_MCP_MESSAGE_ENDPOINT_PATH | SSE message endpoint path for receiving messages (e.g., '/messages', '/events/messages') (string)                                                                                                                                                                 | "/messages"                             | Yes      |
-| BOOTSTRAP_SERVERS             | List of Kafka broker addresses in the format host1:port1,host2:port2 used to establish initial connection to the Kafka cluster (string)                                                                                                                           |                                         | No       |
-| CONFLUENT_CLOUD_API_KEY       | Master API key for Confluent Cloud platform administration, enabling management of resources across your organization (string (min: 1))                                                                                                                           |                                         | No       |
-| CONFLUENT_CLOUD_API_SECRET    | Master API secret paired with CONFLUENT_CLOUD_API_KEY for comprehensive Confluent Cloud platform administration (string (min: 1))                                                                                                                                 |                                         | No       |
-| CONFLUENT_CLOUD_REST_ENDPOINT | Base URL for Confluent Cloud's REST API services (default)                                                                                                                                                                                                        | https://api.confluent.cloud             | No       |
-| FLINK_API_KEY                 | Authentication key for accessing Confluent Cloud's Flink services, including compute pools and SQL statement management (string (min: 1))                                                                                                                         |                                         | No       |
-| FLINK_API_SECRET              | Secret token paired with FLINK_API_KEY for authenticated access to Confluent Cloud's Flink services (string (min: 1))                                                                                                                                             |                                         | No       |
-| FLINK_CATALOG_NAME            | Name of the Flink catalog used as `sql.current-catalog` in submitted statements. Typically the Confluent Cloud environment's display name (string (min: 1))                                                                                                       |                                         | No       |
-| FLINK_COMPUTE_POOL_ID         | Unique identifier for the Flink compute pool, must start with 'lfcp-' prefix (string)                                                                                                                                                                             |                                         | No       |
-| FLINK_DATABASE_NAME           | Name of the associated Kafka cluster used as a database reference in Flink SQL operations (string (min: 1))                                                                                                                                                       |                                         | No       |
-| FLINK_ENV_ID                  | Unique identifier for the Flink environment, must start with 'env-' prefix (string)                                                                                                                                                                               |                                         | No       |
-| FLINK_ENV_NAME                | **DEPRECATED** (removed in v1.4.0): rename to `FLINK_CATALOG_NAME`. Same meaning — the Flink catalog name used as `sql.current-catalog` (string (min: 1))                                                                                                         |                                         | No       |
-| FLINK_ORG_ID                  | Organization identifier within Confluent Cloud for Flink resource management (string (min: 1))                                                                                                                                                                    |                                         | No       |
-| FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API endpoints used for SQL statement and compute pool management (string)                                                                                                                                               |                                         | No       |
-| KAFKA_API_KEY                 | Authentication credential (username) required to establish secure connection with the Kafka cluster (string (min: 1))                                                                                                                                             |                                         | No       |
-| KAFKA_API_SECRET              | Authentication credential (password) paired with KAFKA_API_KEY for secure Kafka cluster access (string (min: 1))                                                                                                                                                  |                                         | No       |
-| KAFKA_CLUSTER_ID              | Unique identifier for the Kafka cluster within Confluent Cloud ecosystem (string (min: 1))                                                                                                                                                                        |                                         | No       |
-| KAFKA_ENV_ID                  | Environment identifier for Kafka cluster, must start with 'env-' prefix (string)                                                                                                                                                                                  |                                         | No       |
-| KAFKA_REST_ENDPOINT           | REST API endpoint for Kafka cluster management and administration (string)                                                                                                                                                                                        |                                         | No       |
-| SCHEMA_REGISTRY_API_KEY       | Authentication key for accessing Schema Registry services to manage and validate data schemas (string (min: 1))                                                                                                                                                   |                                         | No       |
-| SCHEMA_REGISTRY_API_SECRET    | Authentication secret paired with SCHEMA_REGISTRY_API_KEY for secure Schema Registry access (string (min: 1))                                                                                                                                                     |                                         | No       |
-| SCHEMA_REGISTRY_ENDPOINT      | URL endpoint for accessing Schema Registry services to manage data schemas (string)                                                                                                                                                                               |                                         | No       |
-| TABLEFLOW_API_KEY             | Authentication key for accessing Confluent Cloud's Tableflow services (string (min: 1))                                                                                                                                                                           |                                         | No       |
-| TABLEFLOW_API_SECRET          | Authentication secret paired with TABLEFLOW_API_KEY for secure Tableflow access (string (min: 1))                                                                                                                                                                 |                                         | No       |
-| TELEMETRY_ENDPOINT            | Base URL for Confluent Cloud Telemetry API (metrics)                                                                                                                                                                                                              | "https://api.telemetry.confluent.cloud" | No       |
-| TELEMETRY_API_KEY             | Optional API key for telemetry access. Falls back to CONFLUENT_CLOUD_API_KEY if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).)       |                                         | No       |
-| TELEMETRY_API_SECRET          | Optional API secret for telemetry access. Falls back to CONFLUENT_CLOUD_API_SECRET if not set. (See [Metrics API authentication docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api).) |                                         | No       |
-| DO_NOT_TRACK                  | Set to `true` to opt out of anonymous telemetry data collection. See [Telemetry](#telemetry) for details.                                                                                                                                                         |                                         | No       |
-
-</details>
-
-#### Examples
-
-For more focused reference snippets, browse [test-fixtures/yaml_configs/valid/](test-fixtures/yaml_configs/valid/) — these files are executed as part of the test suite on every CI run, so they are always valid and current.
-
-#### Env-var interpolation in YAML
-
-`${VAR}` and `${VAR:-default}` syntax is supported anywhere in a config file, so secrets can stay in environment variables while structure lives in the YAML:
-
-```yaml
-connections:
-  production:
-    type: direct
-    kafka:
-      bootstrap_servers: "broker.confluent.cloud:9092"
-      auth:
-        type: api_key
-        key: "${KAFKA_API_KEY}"
-        secret: "${KAFKA_API_SECRET}"
-```
-
-#### Using `-e` for linked-library env vars
-
-mcp-confluent's own configuration flows through YAML (or, on the legacy path, through the env-var-to-config bridge). The `-e <file>` flag has a second job too: its entries land in `process.env`, which lets you supply env vars consumed by **linked libraries** that mcp-confluent has no explicit YAML knob for. Typical examples:
-
-- TLS: `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `NODE_TLS_REJECT_UNAUTHORIZED`
-- SASL plugin search: `SASL_PATH`, `SASL_CONF_PATH`
-- Kerberos / GSSAPI: `KRB5_CONFIG`, `KRB5CCNAME`, `KRB5_KTNAME`, `KRB5_TRACE`
-- HTTP proxy: `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`
-
-These are read directly by the C/Node libraries we link against (OpenSSL, cyrus-sasl, krb5, undici, librdkafka transitively) — outside mcp-confluent's control — so a corporate-environment user can drop them in `-e` alongside their interpolation tokens and have them honored.
-
-The same file feeds `${VAR}` interpolation inside YAML, so `-e` consistently serves both audiences from a single source.
-
-**Caveat**: env vars consumed by the dynamic linker (`LD_LIBRARY_PATH`, `LD_PRELOAD`, macOS `DYLD_*`) are read **before** Node starts and cannot be set via `-e`; supply those in the shell that launches mcp-confluent.
-
-#### Prerequisites & Setup for Tableflow Commands
-
-In order to leverage **Tableflow commands** to interact with your data ecosystem and successfully execute these Tableflow commands and manage resources (e.g., interacting with data storage like AWS S3 and metadata catalogs like AWS Glue), certain **IAM (Identity and Access Management) permissions** and configurations are essential.
-
-It is crucial to set up the necessary roles and policies in your cloud environment (e.g., AWS) and link them correctly within Confluent Cloud. This ensures your Flink SQL cluster, which powers Tableflow, has the required authorization to perform operations on your behalf.
-
-Please refer to the following Confluent Cloud documentation for detailed instructions on setting up these permissions and integrating with custom storage and Glue:
-
-- **Confluent Cloud Tableflow Quick Start with Custom Storage & Glue:**
-  [https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html)
-
-Ensuring these prerequisites are met will prevent authorization errors when the `mcp-server` attempts to provision or manage Tableflow-enabled tables.
+Follow the **[Tableflow quick start with custom storage & Glue](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html)** to set up the roles, policies, and provider integrations. Skipping this step leads to authorization errors when mcp-confluent tries to provision or manage Tableflow-enabled tables.
 
 ## OAuth Authentication for Confluent Cloud
 
-The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys defined in the YAML config.
+The MCP server can authenticate to Confluent Cloud via **OAuth (PKCE)** instead of static API keys. On the first tool call that needs Confluent access, the server opens your browser to the Confluent Cloud sign-in page; subsequent tool calls reuse the resulting session. No API keys to provision.
 
-### How it works
-
-On the first tool call that needs Confluent access, the server opens your browser to the Confluent Cloud sign-in page and waits for the redirect callback. Subsequent tool calls reuse the resulting session.
-
-### YAML setup
-
-Add the following to the yaml file to enable an OAuth Connection:
-
-```yaml
-connections:
-  ccloud-oauth:
-    type: oauth
-```
-
-Run with `--config oauth.yaml`. The server starts immediately; the browser sign-in opens on the first tool call that needs Confluent access.
-
-The CLI can drop a starter file into the current directory:
+### Setup
 
 ```bash
 npx @confluentinc/mcp-confluent --init-oauth-config
@@ -276,20 +166,25 @@ npx @confluentinc/mcp-confluent --init-oauth-config
 npx @confluentinc/mcp-confluent --config ./config.yaml
 ```
 
-`--init-oauth-config` is the OAuth analogue of `--init-config`: same
-destination (`./config.yaml`), same idempotent `.gitignore` append, same
-refusal to overwrite an existing file. The two flags are mutually
-exclusive — pick the template that matches the auth mode you want.
+`--init-oauth-config` drops a starter [`config.oauth.example.yaml`](config.oauth.example.yaml) into `./config.yaml`. The whole file is essentially:
+
+```yaml
+connections:
+  ccloud-oauth:
+    type: oauth
+```
+
+See [CONFIGURATION.md → Authentication modes](CONFIGURATION.md#authentication-modes) for the full schema and ergonomics.
 
 ### Supported tools under OAuth
 
-| Category                                   | Tools                                                                                  | Notes                                                                                                                                        |
-| ------------------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Requires arguments `cluster_id` + `environment_id`. SR serialization (AVRO, JSONSCHEMA) on produce/consume; PROTOBUF not supported yet.      |
-| **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               | Requires arguments `clusterId` + `environmentId`.                                                                                            |
-| **Schema Registry**                        | `list-schemas`, `delete-schema`                                                        | Requires argument `environment_id`. The SR cluster + endpoint are auto-resolved from it (single SR per environment is the CCloud invariant). |
-| **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         | —                                                                                                                                            |
-| **Billing**                                | `list-billing-costs`                                                                   | —                                                                                                                                            |
+| Category                                   | Tools                                                                                  | Notes                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Kafka (native)**                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Requires arguments `cluster_id` + `environment_id`. SR serialization works on produce/consume for `AVRO` and `JSON`; `PROTOBUF` is currently broken across the board ([issue #127](https://github.com/confluentinc/mcp-confluent/issues/127)) and will not be fixed for this release. |
+| **Kafka REST**                             | `get-topic-config`, `alter-topic-config`                                               | Requires arguments `clusterId` + `environmentId`.                                                                                                                                                                                                                                     |
+| **Schema Registry**                        | `list-schemas`, `delete-schema`                                                        | Requires argument `environment_id`. The SR cluster + endpoint are auto-resolved from it (single SR per environment is the CCloud invariant).                                                                                                                                          |
+| **Organizations, Environments & Clusters** | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         | —                                                                                                                                                                                                                                                                                     |
+| **Billing**                                | `list-billing-costs`                                                                   | —                                                                                                                                                                                                                                                                                     |
 
 ### Limitations
 
@@ -297,7 +192,7 @@ exclusive — pick the template that matches the auth mode you want.
 
 ## CLI Usage
 
-The MCP server provides a flexible command line interface (CLI) for advanced configuration and control. The CLI allows you to specify environment files, transports, and fine-tune which tools are enabled or blocked.
+The MCP server provides a flexible command line interface (CLI) for advanced control. The CLI lets you pick the config file, transports, and fine-tune which tools are enabled or blocked.
 
 #### Basic Usage
 
@@ -336,7 +231,7 @@ Options:
 #### Example: Deploy using all transports
 
 ```bash
-npx @confluentinc/mcp-confluent -e .env --transport http,sse,stdio
+npx @confluentinc/mcp-confluent -c config.yaml --transport http,sse,stdio
 ```
 
 <details>
@@ -358,7 +253,7 @@ npx @confluentinc/mcp-confluent -e .env --transport http,sse,stdio
 #### Example: Allow Only Specific Tools
 
 ```bash
-npx @confluentinc/mcp-confluent -e .env --allow-tools produce-message,consume-messages
+npx @confluentinc/mcp-confluent -c config.yaml --allow-tools produce-message,consume-messages
 ```
 
 Only the specified tools will be enabled; all others will be disabled.
@@ -366,7 +261,7 @@ Only the specified tools will be enabled; all others will be disabled.
 #### Example: Block Certain Tools
 
 ```bash
-npx @confluentinc/mcp-confluent -e .env --block-tools produce-message,consume-messages
+npx @confluentinc/mcp-confluent -c config.yaml --block-tools produce-message,consume-messages
 ```
 
 All tools except the specified ones will be enabled.
@@ -376,7 +271,7 @@ All tools except the specified ones will be enabled.
 You can also maintain allow/block lists in files (one tool name per line):
 
 ```bash
-npx -y @confluentinc/mcp-confluent -e .env --allow-tools-file allow.txt --block-tools-file block.txt
+npx -y @confluentinc/mcp-confluent -c config.yaml --allow-tools-file allow.txt --block-tools-file block.txt
 ```
 
 #### Example: List All Available Tools
@@ -455,77 +350,6 @@ Please refer to the following guides for step-by-step instructions on setting up
 - [VS Code](docs/configuring-vs-code.md)
 - [Windsurf](docs/configuring-windsurf.md)
 
-## Authentication for HTTP/SSE Client Transports
-
-When using HTTP or SSE transports, the MCP server requires API key authentication to prevent unauthorized access and protect against DNS rebinding attacks. This is **enabled by default**.
-
-### Generating an API Key
-
-Generate a secure API key using the built-in utility:
-
-```bash
-npx @confluentinc/mcp-confluent --generate-key
-```
-
-This will output a 64-character key generated using secure cryptography:
-
-```
-Generated MCP API Key:
-================================================================
-a1b2c3d4e5f6...your-64-char-key-here...
-================================================================
-
-```
-
-### Configuring Authentication
-
-Add the generated key to your `config.yaml` file:
-
-```properties
-# MCP Server Authentication (required for HTTP/SSE transports)
-MCP_API_KEY=your-generated-64-char-key-here
-```
-
-### Making Authenticated Requests
-
-Include the API key in the `cflt-mcp-api-Key` header for all HTTP/SSE requests:
-
-```bash
-curl -H "cflt-mcp-api-Key: your-api-key" http://localhost:8080/mcp
-```
-
-### DNS Rebinding Protection
-
-The server includes additional protections against DNS rebinding attacks:
-
-- **Host Header Validation**: Only requests with allowed Host headers are accepted
-
-Configure allowed hosts if needed:
-
-```properties
-# Allow additional hosts (comma-separated)
-MCP_ALLOWED_HOSTS=localhost,127.0.0.1,myhost.local
-```
-
-### Additional security to prevent internet exposure of MCP server
-
-- **Localhost Binding**: Server binds to `127.0.0.1` by default (not `0.0.0.0`)
-
-### Disabling Authentication (Development Only)
-
-For local development, you can disable authentication:
-
-```bash
-# Via CLI flag
-npx @confluentinc/mcp-confluent -e .env --transport http --disable-auth
-
-# Or via environment variable
-MCP_AUTH_DISABLED=true
-```
-
-> [!WARNING]
-> Never disable authentication in production or when the server is network-accessible.
-
 ## Telemetry
 
 This MCP server collects usage data to help make improvements. You can opt out by setting `DO_NOT_TRACK=true` in your environment. See [telemetry.md](telemetry.md) for full details on what is collected.
@@ -534,13 +358,13 @@ This MCP server collects usage data to help make improvements. You can opt out b
 
 **"Node.js version not supported"** -- This project requires Node.js 22 or later. Check your version with `node -v` and upgrade if needed.
 
-**Tools not appearing** -- Ensure the required environment variables for those tools are set in your `config.yaml` file. Tools are only enabled when their dependencies are configured. Run `--list-tools` to see which tools are active.
+**Tools not appearing** -- Each tool requires specific service blocks in your `config.yaml`. Run `--list-tools` to see which tools are active, or invoke the `explain-disabled-tools` MCP tool from your client for a per-tool reason. The block-to-tool mapping lives in [CONFIGURATION.md](CONFIGURATION.md#tool-enablement-which-block-lights-up-what).
 
-**Authentication errors on HTTP/SSE** -- Generate an API key with `npx @confluentinc/mcp-confluent --generate-key` and add it to your `config.yaml` file as `MCP_API_KEY`. See [Authentication for HTTP/SSE Client Transports](#authentication-for-httpsse-client-transports).
+**Authentication errors on HTTP/SSE** -- Generate an API key with `npx @confluentinc/mcp-confluent --generate-key` and add it to your `config.yaml` under `server.auth.api_key`. See [CONFIGURATION.md → HTTP/SSE transport security](CONFIGURATION.md#httpsse-transport-security).
 
-**Connection refused / port conflicts** -- The default HTTP port is 8080. If it's already in use, set a different port via `HTTP_PORT` in your `config.yaml` file.
+**Connection refused / port conflicts** -- The default HTTP port is 8080. Set `server.http.port` in your `config.yaml` to change it.
 
-**Tableflow authorization errors** -- Tableflow tools require specific IAM permissions in your cloud environment. See [Prerequisites & Setup for Tableflow Commands](#prerequisites--setup-for-tableflow-commands).
+**Tableflow authorization errors** -- Tableflow tools require specific IAM permissions in your cloud environment. See [Prerequisites & setup for Tableflow commands](#prerequisites--setup-for-tableflow-commands).
 
 ## Contributing
 

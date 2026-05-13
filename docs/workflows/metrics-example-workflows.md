@@ -41,4 +41,4 @@ Claude: Uses query-metrics(metric: "io.confluent.kafka.server/consumer_lag_offse
 Claude: "Consumer group 'analytics' has 1,200 offsets of lag."
 ```
 
-> **Note:** Kafka server metrics (e.g., `io.confluent.kafka.server/received_bytes`) require `CONFLUENT_CLOUD_API_KEY` and `CONFLUENT_CLOUD_API_SECRET`. The `KAFKA_CLUSTER_ID` environment variable is auto-injected as a filter when querying Kafka metrics. Flink compute pool metrics report at hourly granularity, so queries may need a wider time window than the default 1 hour.
+> **Note:** Kafka server metrics (e.g., `io.confluent.kafka.server/received_bytes`) require a `confluent_cloud:` block with api-key auth in your config (or the equivalent `CONFLUENT_CLOUD_API_KEY` / `CONFLUENT_CLOUD_API_SECRET` env vars on the legacy path). The `kafka.cluster_id` value from your config is auto-injected as a filter when querying Kafka metrics. Flink compute pool metrics report at hourly granularity, so queries may need a wider time window than the default 1 hour.

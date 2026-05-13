@@ -30,11 +30,19 @@ for the legacy env+CLI path. Both return a single `MCPServerConfiguration`. Then
 `ServerRuntime.fromConfig()` constructs one `DirectClientManager` per connection → iterates
 `ToolName` enum to build the enabled tool set → registers tools on `McpServer` → starts transports.
 
+YAML (`-c <path>`) is the preferred path. The env-var-only path is legacy: parity remains for a
+single connection in this release, but it's slated for a startup warning in a near-future release
+and removal a release or two later. Don't approve new code that reaches back into the legacy
+synthesizer or assumes env-only configuration as the canonical model. User-facing version of this
+story: `CONFIGURATION.md` at the repo root.
+
 **Tools are auto-enabled/disabled** at startup based on which service blocks are present in each
 connection's resolved config (which can come from a YAML file or, for backwards compatibility
-during the migration, from env vars + CLI args). Each handler declares its requirement via
-`enabledConnectionIds(runtime)`, which returns the ids of connections that satisfy a predicate
-from `src/confluent/tools/connection-predicates.ts`. An empty result disables the tool.
+during the migration, from env vars + CLI args). Each handler declares its requirement via a
+`predicate` property referencing a named export from
+`src/confluent/tools/connection-predicates.ts`; `BaseToolHandler` derives
+`enabledConnectionIds(runtime)` and `connectionVerdicts(runtime)` from it. An empty result
+disables the tool. Both methods are `@final` — handlers must not override them.
 
 ### Key layers
 

@@ -1,6 +1,6 @@
 # Configuring Gemini CLI
 
-For detailed information about Gemini CLI extensions and MCP servers, please refer to the official documentation:
+For detailed information about Gemini CLI extensions and MCP servers:
 
 - [Gemini CLI Extensions](https://geminicli.com/docs/extensions/)
 - [Gemini CLI MCP Server Tools](https://geminicli.com/docs/cli/tutorials/mcp-setup/#how-to-configure-gemini-cli)
@@ -10,34 +10,34 @@ Here's how to get `mcp-confluent` running with Gemini CLI:
 1. **Install Gemini CLI:**
    If you haven't already, install the Gemini CLI. You can find installation instructions on the [official GitHub repository](https://github.com/google-gemini/gemini-cli).
 
-2. **Install the `mcp-confluent` Extension:**
+2. **Install the `mcp-confluent` extension:**
 
    ```bash
    gemini extensions install https://github.com/confluentinc/mcp-confluent
-   # Navigate to the root directory of this project (where `gemini-extension.json` is located) and run:
+   # Or, from a local checkout (the directory containing gemini-extension.json):
    # gemini extensions install .
    ```
 
-   This command registers the `mcp-confluent` server with Gemini CLI and creates a dedicated directory for it under `~/.gemini/extensions/mcp-confluent`.
+   This registers the `mcp-confluent` server with Gemini CLI and creates a dedicated directory under `~/.gemini/extensions/mcp-confluent`.
 
-3. **Provide Environment Variables:**
-   The extension requires your Confluent Cloud credentials and configuration to be available in a `.env` file.
-   - First, ensure you have a correctly populated `.env` file in the root of this project. For instructions, see the [Configuration](../README.md#configuration) section.
-   - Next, copy your `.env` file into the extension's directory so Gemini CLI can access it (the Gemini extension expects the `.env` file at `${extensionPath}${pathSeparator}.env`; see [the variables documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md#variables) for details):
+3. **Provide credentials and config:**
+
+   The shipped Gemini extension currently invokes the MCP server with `-e ${extensionPath}${pathSeparator}.env` — that is, the **legacy env-var configuration path** with a `.env` file at a fixed location inside the extension directory. A future extension release will switch to the YAML path; until then, populate that `.env`:
 
    ```bash
-   cp .env ~/.gemini/extensions/mcp-confluent/.env
+   cp /path/to/your/.env ~/.gemini/extensions/mcp-confluent/.env
    ```
 
-4. **Verify and Use:**
-   You can now start using the Confluent tools via Gemini CLI. To verify that the tools are available, you can list them:
+   See [CONFIGURATION.md → Legacy env-var configuration](../CONFIGURATION.md#legacy-env-var-configuration-deprecated) for the variable reference. The same file can also carry `${VAR}` values that a future YAML config would interpolate, so any setup work you do here carries forward.
+
+4. **Verify and use:**
 
    ```bash
    gemini -l
    # or `gemini extensions list`
    ```
 
-   And here's an example of invoking a tool:
+   Example session:
 
    ```bash
 

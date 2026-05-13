@@ -9,14 +9,22 @@ import {
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
 import {
   buildToolGatingReport,
-  type DisabledToolsByReason,
+  type DisabledToolGroup,
+  disabledToolGroupKey,
   type ToolGatingReport,
 } from "@src/confluent/tools/tool-availability.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
-const explainDisabledToolsArguments = z.object({});
+const explainDisabledToolsArguments = z.object({
+  group_by: z
+    .enum(["reason", "domain"])
+    .default("reason")
+    .describe(
+      'Axis to bucket disabled tools by. "reason" (default) answers "what config piece would unlock these?" — each bucket is a ToolDisabledReason (MissingKafkaBlock, MissingFlinkBlock, …). "domain" answers "which functional area is offline?" — each bucket is a ToolDomain (kafka, flink, schema-registry, …). Flip to "domain" when triaging a misconfigured connection by functional area instead of by missing config piece.',
+    ),
+});
 
 /**
  * Diagnostic tool that surfaces *why* tools are absent from `tools/list`.
@@ -73,8 +81,18 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
     this.listHandlers = listHandlers;
   }
 
-  handle(runtime: ServerRuntime): CallToolResult {
-    const report = buildToolGatingReport(this.listHandlers(), runtime);
+  handle(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): CallToolResult {
+    const { group_by } = explainDisabledToolsArguments.parse(
+      toolArguments ?? {},
+    );
+    const report = buildToolGatingReport(
+      this.listHandlers(),
+      runtime,
+      group_by,
+    );
     return this.createResponse(renderReport(report), false, { ...report });
   }
 
@@ -82,7 +100,7 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
     return {
       name: ToolName.EXPLAIN_DISABLED_TOOLS,
       description:
-        'Call when the user asks why a tool is missing or unavailable (e.g., "why can\'t I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools grouped by the config gap each one is waiting on, so you can tell the user the exact YAML block or field to add. Prefer this over guessing about credentials, network, or auth.',
+        'Call when the user asks why a tool is missing or unavailable (e.g., "why can\'t I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools grouped by the config gap each one is waiting on, so you can tell the user the exact YAML block or field to add. Pass group_by="domain" to regroup by functional area (kafka, flink, schema-registry, …) when the user\'s question is framed by what\'s offline rather than by what\'s missing from config. Prefer this over guessing about credentials, network, or auth.',
       inputSchema: explainDisabledToolsArguments.shape,
       annotations: READ_ONLY,
     };
@@ -97,25 +115,28 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
  * the tool's response. Format is stable — handler tests pin specific
  * substrings so the AI/script-facing structure does not drift silently.
  *
- * v1 (single-connection) shape:
+ * The heading line varies by `report.groupBy`:
+ *
+ *   - `"reason"`: "{disabled} of {total} tools disabled for the following reasons:"
+ *   - `"domain"`: "{disabled} of {total} tools disabled across the following domains:"
+ *
+ * Body shape is identical for both axes — one header line per bucket
+ * followed by indented `- {tool}` bullets, separated by a blank line:
  *
  *   {disabled} of {total} tools disabled for the following reasons:
  *
- *     {reason} ({n}):
+ *     {reason or domain} ({n}):
  *       - {tool}
  *       - {tool}
  *       …
  *
- *     {next reason} ({n}):
+ *     {next bucket} ({n}):
  *       - {tool}
  *       …
  *
  *   {enabled} tools advertised via tools/list.
  *
- * Each disabled-reason group is a header line followed by one tool per
- * indented bullet (two-space indent on the reason header, four-space
- * indent on the bullets). Groups are separated by a blank line so
- * adjacent buckets stay visually distinct.
+ * Two-space indent on the bucket header, four-space indent on the bullets.
  *
  * v2 (multi-connection): grow a connection header per per-connection
  * section and an optional `Cross-connection deltas` section. See the
@@ -127,11 +148,16 @@ function renderReport(report: ToolGatingReport): string {
     return `All ${total} registered tools are advertised via tools/list.`;
   }
 
+  const headingTail =
+    report.groupBy === "reason"
+      ? "for the following reasons"
+      : "across the following domains";
+
   // Each group's render contains its own header line + indented bullets;
   // joining with a blank line separates groups visually so long bullet
   // lists from one group don't bleed into the next.
   return [
-    `${report.disabledCount} of ${total} tools disabled for the following reasons:`,
+    `${report.disabledCount} of ${total} tools disabled ${headingTail}:`,
     "",
     report.disabledGroups.map(renderGroup).join("\n\n"),
     "",
@@ -139,8 +165,8 @@ function renderReport(report: ToolGatingReport): string {
   ].join("\n");
 }
 
-function renderGroup(group: DisabledToolsByReason): string {
-  const header = `  ${group.reason} (${group.tools.length}):`;
+function renderGroup(group: DisabledToolGroup): string {
+  const header = `  ${disabledToolGroupKey(group)} (${group.tools.length}):`;
   const bullets = group.tools.map((tool) => `    - ${tool}`);
   return [header, ...bullets].join("\n");
 }

@@ -1,4 +1,4 @@
-import { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { ToolDomain, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   ConnectionPredicate,
   PredicateResult,
@@ -8,6 +8,7 @@ import {
 } from "@src/confluent/tools/connection-predicates.js";
 import {
   buildToolGatingReport,
+  disabledToolGroupKey,
   groupDisabledToolsByReason,
 } from "@src/confluent/tools/tool-availability.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -176,6 +177,7 @@ describe("tool-availability.ts", () => {
     it("should produce an empty report with zero counts when no tools are passed", () => {
       const report = buildToolGatingReport([], runtimeWith({}, "default"));
       expect(report).toEqual({
+        groupBy: "reason",
         disabledGroups: [],
         enabledCount: 0,
         disabledCount: 0,
@@ -189,6 +191,7 @@ describe("tool-availability.ts", () => {
         runtimeWith(KAFKA_CONN),
       );
       expect(report).toEqual({
+        groupBy: "reason",
         disabledGroups: [],
         enabledCount: 1,
         disabledCount: 0,
@@ -208,6 +211,7 @@ describe("tool-availability.ts", () => {
         runtimeWith({}, "default"),
       );
       expect(report).toEqual({
+        groupBy: "reason",
         disabledGroups: [
           {
             reason: ToolDisabledReason.MissingFlinkBlock,
@@ -244,6 +248,7 @@ describe("tool-availability.ts", () => {
       );
 
       expect(report).toEqual({
+        groupBy: "reason",
         disabledGroups: [],
         enabledCount: 1,
         disabledCount: 0,
@@ -292,6 +297,64 @@ describe("tool-availability.ts", () => {
           ],
         },
       ]);
+    });
+
+    describe('groupBy: "domain"', () => {
+      // StubHandler hard-codes `domain = ToolDomain.Kafka`; that's
+      // sufficient to prove the axis switch — the same handler under
+      // the default "reason" axis buckets by ToolDisabledReason
+      // (see preceding tests).
+      it("should bucket disabled tools by handler.domain when groupBy is 'domain'", () => {
+        const kafkaTool = stubWithPredicate(disabledForKafka);
+        const flinkTool = stubWithPredicate(disabledForFlink);
+        const report = buildToolGatingReport(
+          [
+            [ToolName.LIST_TOPICS, kafkaTool],
+            [ToolName.LIST_FLINK_STATEMENTS, flinkTool],
+          ],
+          runtimeWith({}, "default"),
+          "domain",
+        );
+        expect(report).toEqual({
+          groupBy: "domain",
+          disabledGroups: [
+            {
+              domain: ToolDomain.Kafka,
+              tools: [ToolName.LIST_TOPICS, ToolName.LIST_FLINK_STATEMENTS],
+            },
+          ],
+          enabledCount: 0,
+          disabledCount: 2,
+        });
+      });
+
+      it("should sort domain-keyed groups lex by domain", () => {
+        const a = new StubHandler();
+        (a as unknown as { predicate: ConnectionPredicate }).predicate =
+          disabledForKafka;
+        (a as unknown as { domain: ToolDomain }).domain = ToolDomain.Tableflow;
+
+        const b = new StubHandler();
+        (b as unknown as { predicate: ConnectionPredicate }).predicate =
+          disabledForKafka;
+        (b as unknown as { domain: ToolDomain }).domain = ToolDomain.Billing;
+
+        const report = buildToolGatingReport(
+          [
+            [ToolName.LIST_TABLEFLOW_TOPICS, a],
+            [ToolName.LIST_BILLING_COSTS, b],
+          ],
+          runtimeWith({}, "default"),
+          "domain",
+        );
+
+        // ToolDomain values are kebab-case strings; `billing` sorts
+        // before `tableflow` lexicographically regardless of insertion
+        // order.
+        expect(
+          report.disabledGroups.map((g) => disabledToolGroupKey(g)),
+        ).toEqual([ToolDomain.Billing, ToolDomain.Tableflow]);
+      });
     });
   });
 });

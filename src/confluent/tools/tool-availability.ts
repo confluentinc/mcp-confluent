@@ -1,4 +1,4 @@
-import { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { ToolDomain, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   PredicateResult,
   ToolDisabledReason,
@@ -7,14 +7,24 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
- * One bucket of disabled tools sharing a single {@linkcode ToolDisabledReason}
- * — the unit operators use to read the diagnostic surface ("what would I add
- * to the connection config to unlock these tools?"). Tool order within
- * `tools` follows the order handlers were iterated.
+ * One bucket of disabled tools sharing a single bucket key. The key field
+ * is discriminated by {@linkcode ToolGatingReport.groupBy}:
+ *
+ * - `groupBy: "reason"` ⇒ each bucket carries `reason: ToolDisabledReason`
+ *   (the default — "what config piece would unlock these tools?").
+ * - `groupBy: "domain"` ⇒ each bucket carries `domain: ToolDomain`
+ *   ("which area of functionality is offline?").
+ *
+ * Use `"reason" in group` (or `"domain" in group`) to narrow at the use site.
+ * Tool order within `tools` follows the order handlers were iterated.
  */
-export interface DisabledToolsByReason {
-  readonly reason: ToolDisabledReason;
-  readonly tools: readonly ToolName[];
+export type DisabledToolGroup =
+  | { readonly reason: ToolDisabledReason; readonly tools: readonly ToolName[] }
+  | { readonly domain: ToolDomain; readonly tools: readonly ToolName[] };
+
+/** Bucket-key projection for a {@linkcode DisabledToolGroup}, irrespective of axis. */
+export function disabledToolGroupKey(group: DisabledToolGroup): string {
+  return "reason" in group ? group.reason : group.domain;
 }
 
 /**
@@ -22,6 +32,9 @@ export interface DisabledToolsByReason {
  * `explain-disabled-tools` diagnostic tool. Tools advertised via
  * `tools/list` are intentionally absent — the report carries the
  * negative signal only.
+ *
+ * `groupBy` records which axis the bucket discriminators carry so
+ * consumers (renderer, MCP-client UIs) can pick the right framing.
  *
  * Single-connection scope today (the server enforces one connection; see
  * `enforceSingleConnectionOnly()` in `src/config/models.ts`). When
@@ -31,7 +44,8 @@ export interface DisabledToolsByReason {
  * connections but not others.
  */
 export interface ToolGatingReport {
-  readonly disabledGroups: readonly DisabledToolsByReason[];
+  readonly groupBy: "reason" | "domain";
+  readonly disabledGroups: readonly DisabledToolGroup[];
   readonly enabledCount: number;
   readonly disabledCount: number;
 }
@@ -39,9 +53,11 @@ export interface ToolGatingReport {
 /**
  * One bucket of tools sharing the same `(connectionId, reason)` pair — the
  * unit of one grouped log line at server startup. `toolNames` preserves
- * input iteration order.
+ * input iteration order. Distinct from {@linkcode DisabledToolGroup}, which
+ * is the operator-facing diagnostic-surface shape: this one carries the
+ * `connectionId` axis the multi-connection log line needs.
  */
-export interface DisabledToolGroup {
+export interface StartupLogToolGroup {
   readonly connectionId: string;
   readonly reason: ToolDisabledReason;
   readonly toolNames: ToolName[];
@@ -60,8 +76,8 @@ export interface DisabledToolGroup {
 export function groupDisabledToolsByReason(
   handlers: Iterable<readonly [ToolName, ToolHandler]>,
   runtime: ServerRuntime,
-): DisabledToolGroup[] {
-  const groups = new Map<string, DisabledToolGroup>();
+): StartupLogToolGroup[] {
+  const groups = new Map<string, StartupLogToolGroup>();
   for (const [toolName, handler] of handlers) {
     const verdicts = handler.connectionVerdicts(runtime);
     // Single pass over the verdicts: collect disabled entries, abort on
@@ -115,10 +131,13 @@ export function groupDisabledToolsByReason(
 export function buildToolGatingReport(
   handlers: Iterable<readonly [ToolName, ToolHandler]>,
   runtime: ServerRuntime,
+  groupBy: "reason" | "domain" = "reason",
 ): ToolGatingReport {
-  // Map<reason, ToolName[]>; insertion order doesn't matter — the projection
-  // step below sorts groups lex by reason.
-  const groupsByReason = new Map<ToolDisabledReason, ToolName[]>();
+  // Both axes' keys (ToolDisabledReason values, ToolDomain values) are
+  // string enums at runtime, so a single string-keyed Map drives both code
+  // paths. The discriminator on the emitted DisabledToolGroup is what
+  // tells the consumer which axis it's reading.
+  const groups = new Map<string, ToolName[]>();
   let enabledCount = 0;
   let disabledCount = 0;
 
@@ -129,19 +148,25 @@ export function buildToolGatingReport(
       continue;
     }
     disabledCount += 1;
-    let bucket = groupsByReason.get(classification.reason);
+    const key = groupBy === "reason" ? classification.reason : handler.domain;
+    let bucket = groups.get(key);
     bucket ??= [];
-    groupsByReason.set(classification.reason, bucket);
+    groups.set(key, bucket);
     bucket.push(toolName);
   }
 
-  const disabledGroups: DisabledToolsByReason[] = Array.from(
-    groupsByReason.entries(),
-  )
-    .map(([reason, tools]) => ({ reason, tools }))
-    .sort((a, b) => a.reason.localeCompare(b.reason));
+  const disabledGroups: DisabledToolGroup[] = Array.from(groups.entries())
+    .map(
+      ([key, tools]): DisabledToolGroup =>
+        groupBy === "reason"
+          ? { reason: key as ToolDisabledReason, tools }
+          : { domain: key as ToolDomain, tools },
+    )
+    .sort((a, b) =>
+      disabledToolGroupKey(a).localeCompare(disabledToolGroupKey(b)),
+    );
 
-  return { disabledGroups, enabledCount, disabledCount };
+  return { groupBy, disabledGroups, enabledCount, disabledCount };
 }
 
 /**

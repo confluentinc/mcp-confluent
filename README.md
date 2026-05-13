@@ -132,9 +132,9 @@ npx @confluentinc/mcp-confluent --init-config
      npx @confluentinc/mcp-confluent --config /path/to/myconfig.yaml
      ```
 
-4. **Configure your MCP Client:** Each client will have its own way of specifying the MCP server's address and any required credentials. You'll need to configure your client (e.g., Claude, Goose) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on can be configured by an environment variable.
+4. **Configure your MCP Client:** Each client (e.g., Claude, Goose) will have its own way of specifying the MCP server's address and any required credentials. You'll need to [configure your client](#configuring-mcp-clients) to connect to the address where this server is running (likely `localhost` with a specific port). The port the server runs on can be configured by an environment variable.
 
-5. **Start your MCP Client:** Once your client is configured to connect to the MCP server, you can start your mcp client and on startup it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with resources on your behalf.
+5. **Start your MCP Client:** Once your client is configured to connect to the MCP server, you can start your MCP client and on startup it will stand up an instance of this MCP server locally. This instance will be responsible for managing data schemas and interacting with resources on your behalf.
 
 6. **Interact with your resources through the Client:** Once the client is connected and configured, you can use the client's interface to interact with Confluent Cloud or local resources. The client will send requests to this MCP server, which will then interact with the available connections on your behalf.
 

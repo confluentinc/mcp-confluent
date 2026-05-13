@@ -4,17 +4,15 @@ Add the MCP server to your VS Code user settings (`settings.json`) or workspace 
 
 ```json
 {
-  "mcp": {
-    "servers": {
-      "confluent": {
-        "command": "npx",
-        "args": [
-          "-y",
-          "@confluentinc/mcp-confluent",
-          "--config",
-          "/path/to/config.yaml"
-        ]
-      }
+  "servers": {
+    "confluent": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@confluentinc/mcp-confluent",
+        "--config",
+        "/path/to/config.yaml"
+      ]
     }
   }
 }

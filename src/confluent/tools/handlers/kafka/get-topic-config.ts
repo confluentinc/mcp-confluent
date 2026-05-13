@@ -3,6 +3,7 @@ import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
+  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { resolveKafkaRestArgs } from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { kafkaRestWithAuthOrOAuth } from "@src/confluent/tools/connection-predicates.js";
@@ -95,5 +96,6 @@ export class GetTopicConfigHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
+  readonly domain = ToolDomain.Kafka;
   readonly predicate = kafkaRestWithAuthOrOAuth;
 }

@@ -3,6 +3,7 @@ import {
   BaseToolHandler,
   DESTRUCTIVE,
   ToolConfig,
+  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -55,5 +56,6 @@ export class DeleteTagHandler extends BaseToolHandler {
       annotations: DESTRUCTIVE,
     };
   }
+  readonly domain = ToolDomain.Catalog;
   readonly predicate = hasCCloudCatalogSupport;
 }

@@ -28,6 +28,27 @@ export const DESTRUCTIVE: ToolAnnotations = {
   readOnlyHint: false,
 } as const;
 
+/**
+ * Operator-facing taxonomy of tool kinds.
+ *
+ * Answers "what kind of tool is this?" — orthogonal to the
+ * {@linkcode ConnectionPredicate}-based "is this tool enabled?" question that
+ * lives next door. Predicates gate advertisement; domains classify intent.
+ */
+export enum ToolDomain {
+  Billing = "billing",
+  Catalog = "catalog",
+  ConfluentCloud = "confluent-cloud",
+  Connect = "connect",
+  Docs = "docs",
+  Flink = "flink",
+  Kafka = "kafka",
+  McpServerDiagnostics = "mcp-server-diagnostics",
+  Metrics = "metrics",
+  SchemaRegistry = "schema-registry",
+  Tableflow = "tableflow",
+}
+
 export interface ToolHandler {
   handle(
     runtime: ServerRuntime,
@@ -45,6 +66,13 @@ export interface ToolHandler {
    * {@linkcode BaseToolHandler.predicate} for the rules around setting it.
    */
   readonly predicate: ConnectionPredicate;
+
+  /**
+   * The {@linkcode ToolDomain} this tool belongs to — operator-facing
+   * taxonomy, orthogonal to {@linkcode predicate}. See
+   * {@linkcode BaseToolHandler.domain} for the rules around setting it.
+   */
+  readonly domain: ToolDomain;
 
   /**
    * IDs of connections that satisfy this tool's service requirements. A
@@ -114,6 +142,14 @@ export abstract class BaseToolHandler implements ToolHandler {
    * `runtime.config.connections` for you.
    */
   abstract readonly predicate: ConnectionPredicate;
+
+  /**
+   * The {@linkcode ToolDomain} this tool belongs to — operator-facing
+   * taxonomy answering "what kind of tool is this?" Orthogonal to
+   * {@linkcode predicate} (which gates advertisement); domain classifies
+   * intent for grouping in diagnostic surfaces and AI-client UX.
+   */
+  abstract readonly domain: ToolDomain;
 
   /**
    * IDs of connections that satisfy this tool's {@linkcode predicate}. A

@@ -11,6 +11,7 @@ import {
   BaseToolHandler,
   CREATE_UPDATE,
   ToolConfig,
+  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import {
   disposeIfOAuth,
@@ -244,5 +245,6 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     };
   }
 
+  readonly domain = ToolDomain.Kafka;
   readonly predicate = kafkaBootstrapOrOAuth;
 }

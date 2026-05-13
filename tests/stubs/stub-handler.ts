@@ -3,6 +3,7 @@ import {
   BaseToolHandler,
   READ_ONLY,
   type ToolConfig,
+  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import {
   ConnectionPredicate,
@@ -21,6 +22,7 @@ import type { ServerRuntime } from "@src/server-runtime.js";
  * any declared ToolName would do.
  */
 export class StubHandler extends BaseToolHandler {
+  readonly domain = ToolDomain.Kafka;
   readonly predicate: ConnectionPredicate;
 
   constructor({ enabled = true }: { enabled?: boolean } = {}) {

@@ -52,6 +52,7 @@ export function createMcpServer({
         description: config.description,
         inputSchema: config.inputSchema,
         annotations: config.annotations,
+        _meta: { domain: handler.domain },
       },
       async (args, context) => {
         const startTime = Date.now();

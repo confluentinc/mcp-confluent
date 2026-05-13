@@ -4,6 +4,7 @@ import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
+  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -281,6 +282,7 @@ export class GetProductDocPageHandler extends BaseToolHandler {
     };
   }
 
+  readonly domain = ToolDomain.Docs;
   readonly predicate = alwaysEnabled;
 }
 

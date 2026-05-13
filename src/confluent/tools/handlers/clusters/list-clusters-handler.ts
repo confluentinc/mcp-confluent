@@ -3,6 +3,7 @@ import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
+  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { resolveEnvArg } from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
@@ -190,5 +191,6 @@ Cluster: ${cluster.name}
       annotations: READ_ONLY,
     };
   }
+  readonly domain = ToolDomain.ConfluentCloud;
   readonly predicate = hasConfluentCloudOrOAuth;
 }

@@ -3,6 +3,7 @@ import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
+  ToolDomain,
   ToolHandler,
 } from "@src/confluent/tools/base-tools.js";
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
@@ -87,6 +88,7 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
     };
   }
 
+  readonly domain = ToolDomain.McpServerDiagnostics;
   readonly predicate = alwaysEnabled;
 }
 

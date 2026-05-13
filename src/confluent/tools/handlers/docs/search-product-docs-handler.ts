@@ -4,6 +4,7 @@ import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
+  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -234,6 +235,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     };
   }
 
+  readonly domain = ToolDomain.Docs;
   // No service-block requirement; enabled on any connection.
   readonly predicate = alwaysEnabled;
 }

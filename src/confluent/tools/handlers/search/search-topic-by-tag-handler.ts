@@ -3,6 +3,7 @@ import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
+  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -63,5 +64,6 @@ export class SearchTopicsByTagHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
+  readonly domain = ToolDomain.Catalog;
   readonly predicate = hasCCloudCatalogSupport;
 }

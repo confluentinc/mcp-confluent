@@ -140,7 +140,7 @@ npx @confluentinc/mcp-confluent --init-config
 
 3. **Start the Server:** You can run the MCP server in one of two ways:
    - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source.
-        This typically involves:
+     This typically involves:
      - Installing dependencies (`npm install`)
      - Building the project (`npm run build` or `npm run dev`)
    - **With npx:** You can start the server directly using npx, no build required:
@@ -362,6 +362,7 @@ Please refer to the following guides for step-by-step instructions on setting up
 - [Cursor](docs/configuring-cursor.md)
 - [Gemini CLI](docs/configuring-gemini-cli.md)
 - [Goose CLI](docs/configuring-goose-cli.md)
+- [IBM Bob](docs/configuring-ibm-bob.md)
 - [VS Code](docs/configuring-vs-code.md)
 - [Windsurf](docs/configuring-windsurf.md)
 

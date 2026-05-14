@@ -1,4 +1,4 @@
-import { ToolDomain, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   ConnectionPredicate,
   PredicateResult,
@@ -23,9 +23,9 @@ import { describe, expect, it } from "vitest";
 
 function stubWithPredicate(
   predicate: ConnectionPredicate,
-  domain: ToolDomain = ToolDomain.Kafka,
+  category: ToolCategory = ToolCategory.Kafka,
 ): ToolHandler {
-  const handler = new StubHandler({ domain });
+  const handler = new StubHandler({ category });
   // Override the readonly predicate via type assertion for test composition.
   (handler as unknown as { predicate: ConnectionPredicate }).predicate =
     predicate;
@@ -302,28 +302,28 @@ describe("tool-availability.ts", () => {
       ]);
     });
 
-    describe('groupBy: "domain"', () => {
-      // Both stubs land in ToolDomain.Kafka, but their predicates fail
+    describe('groupBy: "category"', () => {
+      // Both stubs land in ToolCategory.Kafka, but their predicates fail
       // for different reasons (MissingKafkaBlock vs MissingFlinkBlock).
       // Under the default "reason" axis they'd split into two buckets;
-      // the "domain" axis merges them — proving the bucket key really
-      // is the domain, not the reason.
-      it("should merge same-domain disabled tools under one bucket when groupBy is 'domain'", () => {
-        const sameDomainKafkaReasonStub = stubWithPredicate(disabledForKafka);
-        const sameDomainFlinkReasonStub = stubWithPredicate(disabledForFlink);
+      // the "category" axis merges them — proving the bucket key really
+      // is the category, not the reason.
+      it('should merge same-category disabled tools under one bucket when groupBy is "category"', () => {
+        const sameCategoryKafkaReasonStub = stubWithPredicate(disabledForKafka);
+        const sameCategoryFlinkReasonStub = stubWithPredicate(disabledForFlink);
         const report = buildToolGatingReport(
           [
-            [ToolName.LIST_TOPICS, sameDomainKafkaReasonStub],
-            [ToolName.LIST_FLINK_STATEMENTS, sameDomainFlinkReasonStub],
+            [ToolName.LIST_TOPICS, sameCategoryKafkaReasonStub],
+            [ToolName.LIST_FLINK_STATEMENTS, sameCategoryFlinkReasonStub],
           ],
           runtimeWith({}, "default"),
-          "domain",
+          "category",
         );
         expect(report).toEqual({
-          groupBy: "domain",
+          groupBy: "category",
           disabledGroups: [
             {
-              domain: ToolDomain.Kafka,
+              category: ToolCategory.Kafka,
               tools: [ToolName.LIST_TOPICS, ToolName.LIST_FLINK_STATEMENTS],
             },
           ],
@@ -332,35 +332,35 @@ describe("tool-availability.ts", () => {
         });
       });
 
-      it("should sort domain-keyed groups lex by domain", () => {
+      it("should sort category-keyed groups lex by category", () => {
         // Two stubs with the same predicate (so reasons are identical
-        // and the only differentiator is domain) but distinct domains —
+        // and the only differentiator is category) but distinct categories —
         // insertion order Tableflow-then-Billing, expected output
         // Billing-then-Tableflow.
-        const tableflowDomainStub = stubWithPredicate(
+        const tableflowCategoryStub = stubWithPredicate(
           disabledForKafka,
-          ToolDomain.Tableflow,
+          ToolCategory.Tableflow,
         );
-        const billingDomainStub = stubWithPredicate(
+        const billingCategoryStub = stubWithPredicate(
           disabledForKafka,
-          ToolDomain.Billing,
+          ToolCategory.Billing,
         );
 
         const report = buildToolGatingReport(
           [
-            [ToolName.LIST_TABLEFLOW_TOPICS, tableflowDomainStub],
-            [ToolName.LIST_BILLING_COSTS, billingDomainStub],
+            [ToolName.LIST_TABLEFLOW_TOPICS, tableflowCategoryStub],
+            [ToolName.LIST_BILLING_COSTS, billingCategoryStub],
           ],
           runtimeWith({}, "default"),
-          "domain",
+          "category",
         );
 
-        // ToolDomain values are kebab-case strings; `billing` sorts
+        // ToolCategory values are kebab-case strings; `billing` sorts
         // before `tableflow` lexicographically regardless of insertion
         // order.
         expect(
           report.disabledGroups.map((g) => disabledToolGroupKey(g)),
-        ).toEqual([ToolDomain.Billing, ToolDomain.Tableflow]);
+        ).toEqual([ToolCategory.Billing, ToolCategory.Tableflow]);
       });
     });
   });

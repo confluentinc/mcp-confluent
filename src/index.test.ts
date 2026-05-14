@@ -6,7 +6,7 @@ import {
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import {
-  ToolDomain,
+  ToolCategory,
   type ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -77,8 +77,8 @@ describe("index.ts", () => {
 
     /** Install a single mock handler that {@linkcode outputToolList} will
      *  pick up via `ToolHandlerRegistry.getToolHandler`. The default
-     *  StubHandler already declares `domain = ToolDomain.Kafka`, so callers
-     *  only need to override the description. */
+     *  StubHandler already declares `category = ToolCategory.Kafka`, so
+     *  callers only need to override the description. */
     function withStubbedConfig(description: string): void {
       const handler = new StubHandler();
       vi.spyOn(handler, "getToolConfig").mockReturnValue({
@@ -95,13 +95,13 @@ describe("index.ts", () => {
       expect(consoleLog).not.toHaveBeenCalled();
     });
 
-    it("should print a domain section header plus one tool row for a single tool", () => {
+    it("should print a category section header plus one tool row for a single tool", () => {
       outputToolList([ToolName.LIST_TOPICS]);
       // 1 header + 1 row, no trailing blank (last section).
       expect(consoleLog).toHaveBeenCalledTimes(2);
     });
 
-    it("should print one header plus N rows when N tools share a single domain", () => {
+    it("should print one header plus N rows when N tools share a single category", () => {
       outputToolList([
         ToolName.LIST_TOPICS,
         ToolName.CREATE_TOPICS,
@@ -111,7 +111,7 @@ describe("index.ts", () => {
       expect(consoleLog).toHaveBeenCalledTimes(4);
     });
 
-    it("should emit a blank-line separator between adjacent domain sections but not after the last", () => {
+    it("should emit a blank-line separator between adjacent category sections but not after the last", () => {
       outputToolList([ToolName.LIST_TOPICS, ToolName.LIST_FLINK_STATEMENTS]);
       // 2 headers + 2 rows + 1 separator (between the two sections) = 5.
       expect(consoleLog).toHaveBeenCalledTimes(5);
@@ -120,9 +120,9 @@ describe("index.ts", () => {
       expect(blankCalls).toHaveLength(1);
     });
 
-    it("should include the tool's domain header in the output", () => {
+    it("should include the tool's category header in the output", () => {
       outputToolList([ToolName.LIST_TOPICS]);
-      expect(allOutput(consoleLog)).toContain(ToolDomain.Kafka);
+      expect(allOutput(consoleLog)).toContain(ToolCategory.Kafka);
     });
 
     it("should include the tool name on its row", () => {

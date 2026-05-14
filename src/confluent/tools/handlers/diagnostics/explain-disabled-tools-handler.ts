@@ -2,8 +2,8 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
+  ToolCategory,
   ToolConfig,
-  ToolDomain,
   ToolHandler,
 } from "@src/confluent/tools/base-tools.js";
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
@@ -19,10 +19,10 @@ import { z } from "zod";
 
 const explainDisabledToolsArguments = z.object({
   group_by: z
-    .enum(["reason", "domain"])
+    .enum(["reason", "category"])
     .default("reason")
     .describe(
-      'Axis to bucket disabled tools by. "reason" (default) answers "what config piece would unlock these?" — each bucket is a ToolDisabledReason (MissingKafkaBlock, MissingFlinkBlock, …). "domain" answers "which functional area is offline?" — each bucket is a ToolDomain (kafka, flink, schema-registry, …). Flip to "domain" when triaging a misconfigured connection by functional area instead of by missing config piece.',
+      'Axis to bucket disabled tools by. "reason" (default) answers "what config piece would unlock these?" — each bucket is a ToolDisabledReason (MissingKafkaBlock, MissingFlinkBlock, …). "category" answers "which functional area is offline?" — each bucket is a ToolCategory (kafka, flink, schema-registry, …). Flip to "category" when triaging a misconfigured connection by functional area instead of by missing config piece.',
     ),
 });
 
@@ -100,13 +100,13 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
     return {
       name: ToolName.EXPLAIN_DISABLED_TOOLS,
       description:
-        'Call when the user asks why a tool is missing or unavailable (e.g., "why can\'t I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools grouped by the config gap each one is waiting on, so you can tell the user the exact YAML block or field to add. Pass group_by="domain" to regroup by functional area (kafka, flink, schema-registry, …) when the user\'s question is framed by what\'s offline rather than by what\'s missing from config. Prefer this over guessing about credentials, network, or auth.',
+        'Call when the user asks why a tool is missing or unavailable (e.g., "why can\'t I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools grouped by the config gap each one is waiting on, so you can tell the user the exact YAML block or field to add. Pass group_by="category" to regroup by functional area (kafka, flink, schema-registry, …) when the user\'s question is framed by what\'s offline rather than by what\'s missing from config. Prefer this over guessing about credentials, network, or auth.',
       inputSchema: explainDisabledToolsArguments.shape,
       annotations: READ_ONLY,
     };
   }
 
-  readonly domain = ToolDomain.McpServerDiagnostics;
+  readonly category = ToolCategory.McpServerDiagnostics;
   readonly predicate = alwaysEnabled;
 }
 
@@ -118,14 +118,14 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
  * The heading line varies by `report.groupBy`:
  *
  *   - `"reason"`: "{disabled} of {total} tools disabled for the following reasons:"
- *   - `"domain"`: "{disabled} of {total} tools disabled across the following domains:"
+ *   - `"category"`: "{disabled} of {total} tools disabled across the following categories:"
  *
  * Body shape is identical for both axes — one header line per bucket
  * followed by indented `- {tool}` bullets, separated by a blank line:
  *
  *   {disabled} of {total} tools disabled for the following reasons:
  *
- *     {reason or domain} ({n}):
+ *     {reason or category} ({n}):
  *       - {tool}
  *       - {tool}
  *       …
@@ -151,7 +151,7 @@ function renderReport(report: ToolGatingReport): string {
   const headingTail =
     report.groupBy === "reason"
       ? "for the following reasons"
-      : "across the following domains";
+      : "across the following categories";
 
   // Each group's render contains its own header line + indented bullets;
   // joining with a blank line separates groups visually so long bullet

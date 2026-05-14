@@ -2,8 +2,8 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
+  ToolCategory,
   ToolConfig,
-  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
@@ -120,6 +120,6 @@ Environment: ${environmentDetails.name}
       annotations: READ_ONLY,
     };
   }
-  readonly domain = ToolDomain.ConfluentCloud;
+  readonly category = ToolCategory.ConfluentCloud;
   readonly predicate = hasConfluentCloudOrOAuth;
 }

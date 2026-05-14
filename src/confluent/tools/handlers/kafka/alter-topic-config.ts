@@ -2,8 +2,8 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   CREATE_UPDATE,
+  ToolCategory,
   ToolConfig,
-  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { resolveKafkaRestArgs } from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { kafkaRestWithAuthOrOAuth } from "@src/confluent/tools/connection-predicates.js";
@@ -88,6 +88,6 @@ export class AlterTopicConfigHandler extends BaseToolHandler {
       annotations: CREATE_UPDATE,
     };
   }
-  readonly domain = ToolDomain.Kafka;
+  readonly category = ToolCategory.Kafka;
   readonly predicate = kafkaRestWithAuthOrOAuth;
 }

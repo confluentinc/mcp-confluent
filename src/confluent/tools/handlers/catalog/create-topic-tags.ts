@@ -2,8 +2,8 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   CREATE_UPDATE,
+  ToolCategory,
   ToolConfig,
-  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -69,6 +69,6 @@ export class CreateTopicTagsHandler extends BaseToolHandler {
       annotations: CREATE_UPDATE,
     };
   }
-  readonly domain = ToolDomain.Catalog;
+  readonly category = ToolCategory.Catalog;
   readonly predicate = hasCCloudCatalogSupport;
 }

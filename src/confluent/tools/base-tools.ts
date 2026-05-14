@@ -33,9 +33,9 @@ export const DESTRUCTIVE: ToolAnnotations = {
  *
  * Answers "what kind of tool is this?" — orthogonal to the
  * {@linkcode ConnectionPredicate}-based "is this tool enabled?" question that
- * lives next door. Predicates gate advertisement; domains classify intent.
+ * lives next door. Predicates gate advertisement; categories classify intent.
  */
-export enum ToolDomain {
+export enum ToolCategory {
   Billing = "billing",
   Catalog = "catalog",
   ConfluentCloud = "confluent-cloud",
@@ -68,11 +68,11 @@ export interface ToolHandler {
   readonly predicate: ConnectionPredicate;
 
   /**
-   * The {@linkcode ToolDomain} this tool belongs to — operator-facing
+   * The {@linkcode ToolCategory} this tool belongs to — operator-facing
    * taxonomy, orthogonal to {@linkcode predicate}. See
-   * {@linkcode BaseToolHandler.domain} for the rules around setting it.
+   * {@linkcode BaseToolHandler.category} for the rules around setting it.
    */
-  readonly domain: ToolDomain;
+  readonly category: ToolCategory;
 
   /**
    * IDs of connections that satisfy this tool's service requirements. A
@@ -144,12 +144,12 @@ export abstract class BaseToolHandler implements ToolHandler {
   abstract readonly predicate: ConnectionPredicate;
 
   /**
-   * The {@linkcode ToolDomain} this tool belongs to — operator-facing
+   * The {@linkcode ToolCategory} this tool belongs to — operator-facing
    * taxonomy answering "what kind of tool is this?" Orthogonal to
-   * {@linkcode predicate} (which gates advertisement); domain classifies
+   * {@linkcode predicate} (which gates advertisement); category classifies
    * intent for grouping in diagnostic surfaces and AI-client UX.
    */
-  abstract readonly domain: ToolDomain;
+  abstract readonly category: ToolCategory;
 
   /**
    * IDs of connections that satisfy this tool's {@linkcode predicate}. A

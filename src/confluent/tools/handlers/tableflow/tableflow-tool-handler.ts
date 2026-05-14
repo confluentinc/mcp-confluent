@@ -1,6 +1,6 @@
 import {
   BaseToolHandler,
-  ToolDomain,
+  ToolCategory,
 } from "@src/confluent/tools/base-tools.js";
 import { hasTableflow } from "@src/confluent/tools/connection-predicates.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -16,7 +16,7 @@ import { ServerRuntime } from "@src/server-runtime.js";
  * from both the call arguments and the connection config.
  */
 export abstract class TableflowToolHandler extends BaseToolHandler {
-  readonly domain = ToolDomain.Tableflow;
+  readonly category = ToolCategory.Tableflow;
   readonly predicate = hasTableflow;
 
   /**

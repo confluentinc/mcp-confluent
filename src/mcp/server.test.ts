@@ -38,19 +38,19 @@ describe("MCP server", () => {
     expect(tools).toHaveLength(ALL_TOOL_NAMES.length);
   });
 
-  it("should advertise each tool's domain via _meta on tools/list", async () => {
+  it("should advertise each tool's category via _meta on tools/list", async () => {
     const { tools } = await ctx.client.listTools();
 
-    // Spot-check two tools with different domains. Asserting every tool
-    // would just retread the registry-driven domain wiring; here we only
+    // Spot-check two tools with different categories. Asserting every tool
+    // would just retread the registry-driven category wiring; here we only
     // need to prove the meta field rides out on the wire.
     const listTopics = tools.find((t) => t.name === ToolName.LIST_TOPICS);
-    expect(listTopics?._meta).toEqual({ domain: "kafka" });
+    expect(listTopics?._meta).toEqual({ category: "kafka" });
 
     const searchDocs = tools.find(
       (t) => t.name === ToolName.SEARCH_PRODUCT_DOCS,
     );
-    expect(searchDocs?._meta).toEqual({ domain: "docs" });
+    expect(searchDocs?._meta).toEqual({ category: "docs" });
   });
 });
 

@@ -1,5 +1,5 @@
 import { CallToolResult } from "@src/confluent/schema.js";
-import { READ_ONLY, ToolDomain } from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY, ToolCategory } from "@src/confluent/tools/base-tools.js";
 import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
 import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
 import type { ToolGatingReport } from "@src/confluent/tools/tool-availability.js";
@@ -161,44 +161,46 @@ describe("explain-disabled-tools-handler.ts", () => {
         );
       });
 
-      describe('group_by: "domain"', () => {
-        it("should bucket disabled tools by handler.domain and tag the report with groupBy='domain'", async () => {
-          const result = handler.handle(bareRuntime(), { group_by: "domain" });
+      describe('group_by: "category"', () => {
+        it('should bucket disabled tools by handler.category and tag the report with groupBy="category"', async () => {
+          const result = handler.handle(bareRuntime(), {
+            group_by: "category",
+          });
           const report = getReport(result);
 
-          expect(report.groupBy).toBe("domain");
+          expect(report.groupBy).toBe("category");
 
           // Bare runtime → every block-gated tool is disabled. Kafka tools
-          // bucket under ToolDomain.Kafka regardless of the specific
+          // bucket under ToolCategory.Kafka regardless of the specific
           // ToolDisabledReason they each emit.
           const kafkaGroup = report.disabledGroups.find(
-            (g) => "domain" in g && g.domain === ToolDomain.Kafka,
+            (g) => "category" in g && g.category === ToolCategory.Kafka,
           );
           expect(
             kafkaGroup,
-            "expected a ToolDomain.Kafka bucket against a bare runtime",
+            "expected a ToolCategory.Kafka bucket against a bare runtime",
           ).toBeDefined();
           expect(kafkaGroup!.tools).toContain(ToolName.LIST_TOPICS);
           expect(kafkaGroup!.tools).toContain(ToolName.PRODUCE_MESSAGE);
         });
 
-        it("should render the heading with 'across the following domains' under group_by='domain'", async () => {
+        it("should render the heading with 'across the following categories' under group_by='category'", async () => {
           const text = getText(
-            handler.handle(bareRuntime(), { group_by: "domain" }),
+            handler.handle(bareRuntime(), { group_by: "category" }),
           );
           const totalRegistered = Array.from(
             ToolHandlerRegistry.allHandlers(),
           ).length;
           expect(text).toMatch(
             new RegExp(
-              String.raw`^\d+ of ${totalRegistered} tools disabled across the following domains:`,
+              String.raw`^\d+ of ${totalRegistered} tools disabled across the following categories:`,
             ),
           );
-          // A ToolDomain.Kafka bucket renders its kebab-case enum value as
+          // A ToolCategory.Kafka bucket renders its kebab-case enum value as
           // the group header — pins the renderer reading from
           // `disabledToolGroupKey` rather than the legacy `group.reason`.
           expect(text).toMatch(
-            new RegExp(String.raw`\n  ${ToolDomain.Kafka} \(\d+\):\n`),
+            new RegExp(String.raw`\n  ${ToolCategory.Kafka} \(\d+\):\n`),
           );
         });
 

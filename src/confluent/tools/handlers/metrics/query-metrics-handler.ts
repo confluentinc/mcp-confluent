@@ -2,8 +2,8 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
+  ToolCategory,
   ToolConfig,
-  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import { hasTelemetry } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -176,7 +176,7 @@ export class QueryMetricsHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-  readonly domain = ToolDomain.Metrics;
+  readonly category = ToolCategory.Metrics;
   readonly predicate = hasTelemetry;
 }
 

@@ -2,8 +2,8 @@ import type { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
+  ToolCategory,
   type ToolConfig,
-  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import {
   ConnectionPredicate,
@@ -19,20 +19,20 @@ import type { ServerRuntime } from "@src/server-runtime.js";
  * connections. The disabled-state reason is an arbitrary placeholder
  * (`MissingFlinkBlock`); tests check whether the tool is filtered out, not
  * which reason was reported. Uses ToolName.LIST_TOPICS as a placeholder —
- * any declared ToolName would do. `domain` defaults to `ToolDomain.Kafka`;
+ * any declared ToolName would do. `category` defaults to `ToolCategory.Kafka`;
  * pass an explicit value when a test needs to distinguish multiple stubs
- * by domain (e.g., the `buildToolGatingReport` domain-axis tests).
+ * by category (e.g., the `buildToolGatingReport` category-axis tests).
  */
 export class StubHandler extends BaseToolHandler {
-  readonly domain: ToolDomain;
+  readonly category: ToolCategory;
   readonly predicate: ConnectionPredicate;
 
   constructor({
     enabled = true,
-    domain = ToolDomain.Kafka,
-  }: { enabled?: boolean; domain?: ToolDomain } = {}) {
+    category = ToolCategory.Kafka,
+  }: { enabled?: boolean; category?: ToolCategory } = {}) {
     super();
-    this.domain = domain;
+    this.category = category;
     this.predicate = enabled
       ? alwaysEnabled
       : () => ({

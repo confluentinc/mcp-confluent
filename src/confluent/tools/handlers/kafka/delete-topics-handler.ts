@@ -2,8 +2,8 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   DESTRUCTIVE,
+  ToolCategory,
   ToolConfig,
-  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import {
   disposeIfOAuth,
@@ -64,6 +64,6 @@ export class DeleteTopicsHandler extends BaseToolHandler {
     };
   }
 
-  readonly domain = ToolDomain.Kafka;
+  readonly category = ToolCategory.Kafka;
   readonly predicate = kafkaBootstrapOrOAuth;
 }

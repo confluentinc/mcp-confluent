@@ -9,8 +9,8 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
+  ToolCategory,
   ToolConfig,
-  ToolDomain,
 } from "@src/confluent/tools/base-tools.js";
 import {
   formatKafkaError,
@@ -285,6 +285,6 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     };
   }
 
-  readonly domain = ToolDomain.Kafka;
+  readonly category = ToolCategory.Kafka;
   readonly predicate = kafkaBootstrapOrOAuth;
 }

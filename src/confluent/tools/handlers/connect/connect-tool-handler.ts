@@ -1,7 +1,7 @@
 import { DirectConnectionConfig } from "@src/config/models.js";
 import {
   BaseToolHandler,
-  ToolDomain,
+  ToolCategory,
 } from "@src/confluent/tools/base-tools.js";
 import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
 
@@ -11,7 +11,7 @@ import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js
  * `resolveConnectEnvAndClusterId` for consistent env/cluster resolution.
  */
 export abstract class ConnectToolHandler extends BaseToolHandler {
-  readonly domain = ToolDomain.Connect;
+  readonly category = ToolCategory.Connect;
   readonly predicate = hasConfluentCloud;
 
   /**

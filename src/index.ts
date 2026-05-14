@@ -16,7 +16,7 @@ import {
 import { buildConfigTelemetry } from "@src/confluent/config-telemetry.js";
 import { buildConfig, fs, path } from "@src/confluent/node-deps.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
-import { ToolDomain, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { groupDisabledToolsByReason } from "@src/confluent/tools/tool-availability.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
@@ -204,12 +204,12 @@ function ensureGitignoreEntry(filePath: string): string {
 export function outputToolList(filteredToolNames: ToolName[]): void {
   const MAX_DESC_LENGTH = 120;
 
-  // Bucket by ToolDomain: the input list is registry-declaration order,
-  // which happens to roughly group same-domain tools but isn't guaranteed.
+  // Bucket by ToolCategory: the input list is registry-declaration order,
+  // which happens to roughly group same-category tools but isn't guaranteed.
   // Regrouping here gives operators a "what's available in each area" view
   // independent of registration order.
-  const byDomain = new Map<
-    ToolDomain,
+  const byCategory = new Map<
+    ToolCategory,
     Array<{ name: ToolName; desc: string }>
   >();
   for (const toolName of filteredToolNames) {
@@ -219,24 +219,24 @@ export function outputToolList(filteredToolNames: ToolName[]): void {
     if (desc.length > MAX_DESC_LENGTH) {
       desc = desc.slice(0, MAX_DESC_LENGTH - 3) + "...";
     }
-    let bucket = byDomain.get(handler.domain);
+    let bucket = byCategory.get(handler.category);
     bucket ??= [];
-    byDomain.set(handler.domain, bucket);
+    byCategory.set(handler.category, bucket);
     bucket.push({ name: toolName, desc });
   }
 
-  // Domains rendered lex-sorted (kebab-case enum values sort cleanly);
-  // tools within each domain preserve handler iteration order.
-  const sortedDomains = Array.from(byDomain.keys()).sort((a, b) =>
+  // Categories rendered lex-sorted (kebab-case enum values sort cleanly);
+  // tools within each category preserve handler iteration order.
+  const sortedCategories = Array.from(byCategory.keys()).sort((a, b) =>
     a.localeCompare(b),
   );
-  sortedDomains.forEach((domain, idx) => {
-    console.log(`\x1b[1;36m${domain}:\x1b[0m`);
-    for (const { name, desc } of byDomain.get(domain)!) {
+  sortedCategories.forEach((category, idx) => {
+    console.log(`\x1b[1;36m${category}:\x1b[0m`);
+    for (const { name, desc } of byCategory.get(category)!) {
       console.log(`  \x1b[32m${name}\x1b[0m: ${desc}`);
     }
-    // Blank line between sections, but not after the last domain.
-    if (idx < sortedDomains.length - 1) console.log("");
+    // Blank line between sections, but not after the last category.
+    if (idx < sortedCategories.length - 1) console.log("");
   });
 }
 

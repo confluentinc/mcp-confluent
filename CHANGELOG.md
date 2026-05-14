@@ -4,6 +4,11 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+## Added
+
+- Tool categorization. The MCP server now associates each tool with a category.
+  These categories are now presented to the LLM agent at tool discovery time, and are referenced in either `--list-tools` command line invocation or in the output of the `explain-disabled-tools` tool.
+
 ## 1.3.0
 
 ### Added

@@ -2,6 +2,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   CREATE_UPDATE,
+  ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
@@ -96,5 +97,6 @@ export class CreateTopicsHandler extends BaseToolHandler {
     };
   }
 
+  readonly category = ToolCategory.Kafka;
   readonly predicate = kafkaBootstrapOrOAuth;
 }

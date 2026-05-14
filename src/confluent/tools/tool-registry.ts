@@ -1,4 +1,4 @@
-import { ToolConfig, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
 import { AddTagToTopicHandler } from "@src/confluent/tools/handlers/catalog/add-tags-to-topic.js";
 import { CreateTopicTagsHandler } from "@src/confluent/tools/handlers/catalog/create-topic-tags.js";
@@ -139,10 +139,6 @@ export class ToolHandlerRegistry {
 
   static getToolHandler(toolName: ToolName): ToolHandler {
     return this.handlers.get(toolName)!;
-  }
-
-  static getToolConfig(toolName: ToolName): ToolConfig {
-    return this.getToolHandler(toolName).getToolConfig();
   }
 
   /**

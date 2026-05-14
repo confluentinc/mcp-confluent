@@ -4,6 +4,13 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Tool category taxonomy.** Each tool is now classified into one of 11 `ToolCategory` values (`kafka`, `flink`, ...) — an operator-facing "what kind of tool is this?" axis, orthogonal to the existing "is this tool enabled?" gating. The category surfaces in three places:
+  - As `_meta.category` on every `tools/list` advertisement, so MCP clients (Claude, the inspector, etc.) can group or filter the catalog by functional area.
+  - In the `--list-tools` CLI output, which now buckets tools under one section header per category instead of printing them in registry-declaration order.
+  - On the `explain-disabled-tools` tool, which gains an optional `group_by: "reason" | "category"` argument (default `"reason"`). Pass `group_by: "category"` to regroup the same diagnostic data by functional area when the operator's question is "what's offline in my Flink setup?" rather than "what config piece is missing?".
+
 ## 1.3.0
 
 ### Added

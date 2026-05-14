@@ -2,6 +2,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   DESTRUCTIVE,
+  ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasSchemaRegistryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
@@ -117,5 +118,6 @@ export class DeleteSchemaHandler extends BaseToolHandler {
       annotations: DESTRUCTIVE,
     };
   }
+  readonly category = ToolCategory.SchemaRegistry;
   readonly predicate = hasSchemaRegistryOrOAuth;
 }

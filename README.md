@@ -203,7 +203,7 @@ See [CONFIGURATION.md → Authentication modes](CONFIGURATION.md#authentication-
 
 The ¹-marked categories in [Available Tools for Confluent Cloud](#available-tools-for-confluent-cloud) work under OAuth today; everything else still needs a `direct` connection with static API keys.
 
-[Note: if you are installing in \[IBM Bob](https://bob.ibm.com/)](https://bob.ibm.com/), you will need to set this in your `Users/{user_name}/.bob/settings/mcp_settings.json`:
+Note: if you are installing in \[IBM Bob](https://bob.ibm.com/)](https://bob.ibm.com/), you will need to set this in your `Users/{user_name}/.bob/settings/mcp_settings.json`:
 
 ```json
 {

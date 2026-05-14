@@ -1,6 +1,7 @@
 # Configuring the Confluent MCP Server
 
-This is the single reference for configuring mcp-confluent. It covers the YAML config file (`-c config.yaml`), the legacy env-var path (`-e config.env`) that the server still accepts during the transition, and how the two interact via `${VAR}` interpolation.
+This is the single reference for configuring mcp-confluent.
+It covers the YAML config file (`-c config.yaml`), the legacy env-var path (`-e config.env`) that the server still accepts during the transition, and how the two interact via `${VAR}` interpolation.
 
 ## Contents
 
@@ -27,9 +28,11 @@ mcp-confluent accepts configuration through either of two entry points, both of 
 
 The two paths are mutually exclusive: if you pass `-c`, the YAML file is the source of truth; otherwise the server reads the legacy environment variables listed in [Legacy env-var configuration](#legacy-env-var-configuration-deprecated).
 
-**Roadmap.** The two paths have full parity today. In a near-future release the env-var-only path will emit a startup warning; a release or two later it will be removed.
+**Roadmap.** The two paths have full parity today.
+In a near-future release the env-var-only path will emit a startup warning; a release or two later it will be removed.
 
-If you are starting fresh, begin with YAML. If you have an existing `.env`, [migrate when convenient](#legacy-env-var-configuration-deprecated) — both `-c` and `-e` continue to work for now.
+If you are starting fresh, begin with YAML.
+If you have an existing `.env`, [migrate when convenient](#legacy-env-var-configuration-deprecated) — both `-c` and `-e` continue to work for now.
 
 ## Quick start (YAML)
 
@@ -43,17 +46,22 @@ npx @confluentinc/mcp-confluent --init-config
 npx @confluentinc/mcp-confluent --config ./config.yaml
 ```
 
-`--init-config` copies [`config.example.yaml`](config.example.yaml) into `./config.yaml` and idempotently appends the filename to a sibling `.gitignore` so secrets cannot slip into a commit. It refuses to overwrite an existing `config.yaml`.
+`--init-config` copies [`config.example.yaml`](config.example.yaml) into `./config.yaml` and idempotently appends the filename to a sibling `.gitignore` so secrets cannot slip into a commit.
+It refuses to overwrite an existing `config.yaml`.
 
-For OAuth-only setups use `--init-oauth-config` instead; it drops [`config.oauth.example.yaml`](config.oauth.example.yaml) at the same destination. The two flags are mutually exclusive.
+For OAuth-only setups use `--init-oauth-config` instead; it drops [`config.oauth.example.yaml`](config.oauth.example.yaml) at the same destination.
+The two flags are mutually exclusive.
 
 ## Anatomy of a YAML config
 
-A config picks one of two connection flavors — OAuth or direct — and optionally adds a top-level `server:` block for transport/security/logging settings. The fully annotated reference is [`config.example.yaml`](config.example.yaml); per-field comments live there rather than being duplicated here. Compact examples for common local-Docker setups live in [`sample_configs/`](sample_configs/).
+A config picks one of two connection flavors — OAuth or direct — and optionally adds a top-level `server:` block for transport/security/logging settings.
+The fully annotated reference is [`config.example.yaml`](config.example.yaml); per-field comments live there rather than being duplicated here.
+Compact examples for common local-Docker setups live in [`sample_configs/`](sample_configs/).
 
 ### OAuth connection (`type: oauth`)
 
-Confluent Cloud login via PKCE: the browser opens on the first tool call that needs Cloud access, the resulting session is reused for the rest of the process, and there are no API keys to provision. The connection itself carries no service blocks — resource IDs (cluster, env) flow in as tool arguments at call time.
+Confluent Cloud login via PKCE: the browser opens on the first tool call that needs Cloud access, the resulting session is reused for the rest of the process, and there are no API keys to provision.
+The connection itself carries no service blocks — resource IDs (cluster, env) flow in as tool arguments at call time.
 
 ```yaml
 server:
@@ -65,11 +73,15 @@ connections:
     type: oauth
 ```
 
-Get a starter file via `--init-oauth-config`. Not every tool is OAuth-eligible yet — see [Authentication modes](#authentication-modes) for the supported list.
+Get a starter file via `--init-oauth-config`.
+Not every tool is OAuth-eligible yet — see [Authentication modes](#authentication-modes) for the supported list.
 
 ### Direct connection (`type: direct`)
 
-Credentials live in the YAML — API key/secret per service block, typically `${VAR}`-interpolated from your shell environment. Each service block under the connection is independently optional: include the ones you need and omit the rest. The [tools that depend on missing blocks disable themselves](#tool-enablement-which-block-lights-up-what). At least one service block must remain.
+Credentials live in the YAML — API key/secret per service block, typically `${VAR}`-interpolated from your shell environment.
+Each service block under the connection is independently optional: include the ones you need and omit the rest.
+The [tools that depend on missing blocks disable themselves](#tool-enablement-which-block-lights-up-what).
+At least one service block must remain.
 
 ```yaml
 server:
@@ -104,7 +116,9 @@ Field-level details, defaults, and which CLI/env-var each field replaces are in 
 
 ### The common `server:` block
 
-Both connection flavors above accept the same top-level `server:` block. It is entirely optional — omit it to accept the same defaults today's env-var users get. The fully annotated example is in [`config.example.yaml`](config.example.yaml); when present, it replaces these env vars:
+Both connection flavors above accept the same top-level `server:` block.
+It is entirely optional — omit it to accept the same defaults today's env-var users get.
+The fully annotated example is in [`config.example.yaml`](config.example.yaml); when present, it replaces these env vars:
 
 | Field                              | Replaces env var                                                      |
 | ---------------------------------- | --------------------------------------------------------------------- |
@@ -138,17 +152,21 @@ connections:
         secret: "${KAFKA_API_SECRET}"
 ```
 
-A missing variable with no `:-default` is a parse-time error. Plain literals also work; interpolation is a convenience, not a requirement.
+A missing variable with no `:-default` is a parse-time error.
+Plain literals also work; interpolation is a convenience, not a requirement.
 
 ## How env vars and `.env` files fit into the YAML world
 
-Even after the legacy env-var-only configuration path retires, env vars keep doing real work for mcp-confluent. They have **three jobs** with different lifecycles — keep them straight when you read the rest of this document:
+Even after the legacy env-var-only configuration path retires, env vars keep doing real work for mcp-confluent.
+They have **three jobs** with different lifecycles — keep them straight when you read the rest of this document:
 
 1. **Interpolation source for `${VAR}` in YAML.** _Long-term supported._ This is the recommended way to keep secrets out of version control: structure in `config.yaml`, secrets in your environment (or a dotenv loaded via `-e`).
-2. **Linked-library passthrough.** _Long-term supported._ Several libraries mcp-confluent depends on read environment variables directly — OpenSSL (`SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`, ...), cyrus-sasl (`SASL_PATH`), krb5 (`KRB5_CONFIG`, `KRB5CCNAME`, ...), undici (`HTTPS_PROXY`, `NO_PROXY`, ...). There is no YAML knob for these; they have to reach the server as env vars.
+2. **Linked-library passthrough.** _Long-term supported._ Several libraries mcp-confluent depends on read environment variables directly — OpenSSL (`SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`, ...), cyrus-sasl (`SASL_PATH`), krb5 (`KRB5_CONFIG`, `KRB5CCNAME`, ...), undici (`HTTPS_PROXY`, `NO_PROXY`, ...).
+   There is no YAML knob for these; they have to reach the server as env vars.
 3. **Sole configuration source on the legacy path.** _Deprecated; will be removed in a near-future release._ This is what happens when you start the server without `-c` — every `KAFKA_API_KEY`, `FLINK_REST_ENDPOINT`, etc. listed in [Legacy env-var configuration](#legacy-env-var-configuration-deprecated) is serving this job today and only this job.
 
-The `-e <file>` CLI flag loads a dotenv file into the server's environment once, at startup, and the resulting values then feed all three jobs above. Same flag, three lifecycles:
+The `-e <file>` CLI flag loads a dotenv file into the server's environment once, at startup, and the resulting values then feed all three jobs above.
+Same flag, three lifecycles:
 
 ```bash
 # Job 1 only: YAML structure, secrets and linked-library vars in the dotenv.
@@ -161,7 +179,8 @@ npx @confluentinc/mcp-confluent -c config.yaml -e env-with-tls-and-secrets.env
 npx @confluentinc/mcp-confluent -e legacy.env
 ```
 
-> **Caveat — dynamic-linker vars.** `LD_LIBRARY_PATH`, `LD_PRELOAD`, macOS `DYLD_*`, and anything else consumed before Node starts cannot be set via `-e`. Set those in the shell that launches mcp-confluent.
+> **Caveat — dynamic-linker vars.** `LD_LIBRARY_PATH`, `LD_PRELOAD`, macOS `DYLD_*`, and anything else consumed before Node starts cannot be set via `-e`.
+> Set those in the shell that launches mcp-confluent.
 
 ## Authentication modes
 
@@ -169,7 +188,8 @@ Two `type:` values on a connection, with different ergonomics:
 
 ### `type: direct` — API keys in YAML
 
-Each service block carries its own `auth: { type: api_key, key, secret }`. The keys can live in YAML literals (fine for local dev), or — much more commonly — `${VAR}` interpolated from the environment:
+Each service block carries its own `auth: { type: api_key, key, secret }`.
+The keys can live in YAML literals (fine for local dev), or — much more commonly — `${VAR}` interpolated from the environment:
 
 ```yaml
 connections:
@@ -184,7 +204,9 @@ connections:
 
 ### `type: oauth` — Confluent Cloud login (PKCE)
 
-The big new feature of this release. The server opens the Confluent Cloud sign-in page in your browser on the first tool call that needs Cloud access; the resulting session is reused for the rest of the process. No API keys to provision.
+The big new feature of this release.
+The server opens the Confluent Cloud sign-in page in your browser on the first tool call that needs Cloud access; the resulting session is reused for the rest of the process.
+No API keys to provision.
 
 ```yaml
 connections:
@@ -192,9 +214,12 @@ connections:
     type: oauth
 ```
 
-OAuth connections carry no service blocks. Resource IDs (cluster_id, environment_id, ...) that direct-mode connections pin in YAML instead flow in as tool arguments at call time. Get a starter file via `--init-oauth-config`.
+OAuth connections carry no service blocks.
+Resource IDs (cluster_id, environment_id, ...) that direct-mode connections pin in YAML instead flow in as tool arguments at call time.
+Get a starter file via `--init-oauth-config`.
 
-**OAuth-eligible tools.** Not every tool has been migrated to OAuth yet — REST-only categories (Connect, Tableflow, Flink, Metrics, Catalog & Tags) still require `type: direct`. The currently-supported list:
+**OAuth-eligible tools.** Not every tool has been migrated to OAuth yet — REST-only categories (Connect, Tableflow, Flink, Metrics, Catalog & Tags) still require `type: direct`.
+The currently-supported list:
 
 | Category                               | Tools                                                                                  | Notes                                                                                                                                                                                                                                                                                             |
 | -------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -206,7 +231,8 @@ OAuth connections carry no service blocks. Resource IDs (cluster_id, environment
 
 ## HTTP/SSE transport security
 
-HTTP and SSE transports require API-key authentication by default to prevent unauthorized access and DNS rebinding. Enable them by listing them in `server.transports` (or via `--transport http,sse`); auth is on unless you explicitly opt out.
+HTTP and SSE transports require API-key authentication by default to prevent unauthorized access and DNS rebinding.
+Enable them by listing them in `server.transports` (or via `--transport http,sse`); auth is on unless you explicitly opt out.
 
 ### Generating an API key
 
@@ -253,7 +279,8 @@ Or use `--disable-auth` on the command line. **Never** disable auth in productio
 
 ## Tool enablement: which block lights up what
 
-Tools auto-enable based on which service blocks are present in the resolved configuration. Run `--list-tools` to see the live set for your config, or use the `explain-disabled-tools` MCP tool to ask the running server why a specific tool is missing.
+Tools auto-enable based on which service blocks are present in the resolved configuration.
+Run `--list-tools` to see the live set for your config, or use the `explain-disabled-tools` MCP tool to ask the running server why a specific tool is missing.
 
 | Block(s) required                                        | Tools enabled                                                                                                                                                                                                                                                                                                                                                |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -274,7 +301,8 @@ Tools auto-enable based on which service blocks are present in the resolved conf
 
 > If you are starting fresh, skip this section — use [Quick start (YAML)](#quick-start-yaml) instead.
 >
-> **What "deprecated" means here.** Setting credentials and endpoints purely via env vars (job 3 in [How env vars and `.env` files fit into the YAML world](#how-env-vars-and-env-files-fit-into-the-yaml-world)) will emit a startup warning in a near-future release and be removed a release or two later. Using env vars to **feed `${VAR}` interpolation in YAML** (job 1) and to **pass through linked-library settings** (job 2) is long-term supported and unaffected.
+> **What "deprecated" means here.** Setting credentials and endpoints purely via env vars (job 3 in [How env vars and `.env` files fit into the YAML world](#how-env-vars-and-env-files-fit-into-the-yaml-world)) will emit a startup warning in a near-future release and be removed a release or two later.
+> Using env vars to **feed `${VAR}` interpolation in YAML** (job 1) and to **pass through linked-library settings** (job 2) is long-term supported and unaffected.
 
 Run the server without `-c` and these variables, read either from the parent shell or from a `-e <file>` dotenv, populate the same internal configuration the YAML path would build.
 
@@ -322,20 +350,30 @@ Run the server without `-c` and these variables, read either from the parent she
 
 </details>
 
-To migrate, run `--init-config`, then translate each variable you currently set into the matching block from [`config.example.yaml`](config.example.yaml). For a side-by-side, every `${VAR:-...}` placeholder in `config.example.yaml` names the env var that field used to come from. You can keep secrets in your existing `.env` and reference them via `${VAR}` from the YAML — that is job 1 above, and is the recommended migration target.
+To migrate, run `--init-config`, then translate each variable you currently set into the matching block from [`config.example.yaml`](config.example.yaml).
+For a side-by-side, every `${VAR:-...}` placeholder in `config.example.yaml` names the env var that field used to come from.
+You can keep secrets in your existing `.env` and reference them via `${VAR}` from the YAML — that is job 1 above, and is the recommended migration target.
 
 ## Future plans
 
-The configuration schema accepts multiple named entries under `connections:` and the YAML parser validates them, but today the server expects exactly one. Once the rest of the runtime catches up, a single `config.yaml` will be able to point at several Confluent Cloud or local clusters at the same time; you will not need to restructure existing configs for that to work. This capability will be YAML-only — the legacy env-var path has no way to express it.
+The configuration schema accepts multiple named entries under `connections:` and the YAML parser validates them, but today the server expects exactly one.
+Once the rest of the runtime catches up, a single `config.yaml` will be able to point at several Confluent Cloud or local clusters at the same time; you will not need to restructure existing configs for that to work.
+This capability will be YAML-only — the legacy env-var path has no way to express it.
 
 ## Troubleshooting
 
-**Tools not appearing.** The tool's required service block is not present in your resolved config. Run `--list-tools` to see the live set, or call the `explain-disabled-tools` MCP tool from your client — it prints exactly which YAML block or field is missing for each disabled tool.
+**Tools not appearing.** The tool's required service block is not present in your resolved config.
+Run `--list-tools` to see the live set, or call the `explain-disabled-tools` MCP tool from your client — it prints exactly which YAML block or field is missing for each disabled tool.
 
-**`${VAR}` parse-time error.** A `${VAR}` reference resolved to no value and had no `${VAR:-default}`. Either export the variable, pass it through `-e`, or add a default.
+**`${VAR}` parse-time error.** A `${VAR}` reference resolved to no value and had no `${VAR:-default}`.
+Either export the variable, pass it through `-e`, or add a default.
 
-**Authentication errors on HTTP/SSE.** Generate a key with `--generate-key`, put it in `server.auth.api_key`, and pass it in the `cflt-mcp-api-key` header on every request. Or run with `server.auth.disabled: true` if and only if you are on localhost-only development. See [HTTP/SSE transport security](#httpsse-transport-security).
+**Authentication errors on HTTP/SSE.** Generate a key with `--generate-key`, put it in `server.auth.api_key`, and pass it in the `cflt-mcp-api-key` header on every request.
+Or run with `server.auth.disabled: true` if and only if you are on localhost-only development.
+See [HTTP/SSE transport security](#httpsse-transport-security).
 
-**`HTTP_PORT` / port conflicts.** The default is 8080. Set `server.http.port` (YAML) or `HTTP_PORT` (env-var path) to something else.
+**`HTTP_PORT` / port conflicts.** The default is 8080.
+Set `server.http.port` (YAML) or `HTTP_PORT` (env-var path) to something else.
 
-**Tableflow authorization errors.** Tableflow tools require IAM roles in your cloud account that allow the Flink runtime to access your storage and catalog. See the [Confluent Tableflow quick start](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html).
+**Tableflow authorization errors.** Tableflow tools require IAM roles in your cloud account that allow the Flink runtime to access your storage and catalog.
+See the [Confluent Tableflow quick start](https://docs.confluent.io/cloud/current/topics/tableflow/get-started/quick-start-custom-storage-glue.html).

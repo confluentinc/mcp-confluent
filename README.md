@@ -159,7 +159,7 @@ npx @confluentinc/mcp-confluent --init-config
 6. **Interact with your resources through the Client:** Once the client is connected and configured, you can use the client's interface to interact with Confluent Cloud or local resources.
    The client will send requests to this MCP server, which will then interact with the available connections on your behalf.
 
-> Note: if you are installing in [IBM Bob](https://bob.ibm.com/), you will need to set this in your `Users/{user_name}/.bob/settings/mcp_settings.json`:
+> Note: if you are installing in [IBM Bob](https://bob.ibm.com/), you will need to set this in your `/Users/{user_name}/.bob/settings/mcp_settings.json`:
 
 ```json
 {

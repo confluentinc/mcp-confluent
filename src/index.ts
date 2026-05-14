@@ -204,10 +204,10 @@ function ensureGitignoreEntry(filePath: string): string {
 export function outputToolList(filteredToolNames: ToolName[]): void {
   const MAX_DESC_LENGTH = 120;
 
-  // Bucket by ToolCategory: the input list is registry-declaration order,
-  // which happens to roughly group same-category tools but isn't guaranteed.
-  // Regrouping here gives operators a "what's available in each area" view
-  // independent of registration order.
+  // Bucket by ToolCategory. Today's callers pass `filteredToolNames` in
+  // registry-declaration order, which already roughly groups same-category
+  // tools, but we re-bucket explicitly here so the rendered layout doesn't
+  // depend on that incidental ordering.
   const byCategory = new Map<
     ToolCategory,
     Array<{ name: ToolName; desc: string }>
@@ -226,7 +226,9 @@ export function outputToolList(filteredToolNames: ToolName[]): void {
   }
 
   // Categories rendered lex-sorted (kebab-case enum values sort cleanly);
-  // tools within each category preserve handler iteration order.
+  // within each category, tools preserve the order they appeared in
+  // `filteredToolNames` (today: registry-declaration order, as supplied
+  // by the caller).
   const sortedCategories = Array.from(byCategory.keys()).sort((a, b) =>
     a.localeCompare(b),
   );

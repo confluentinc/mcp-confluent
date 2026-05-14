@@ -12,6 +12,7 @@ import {
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 function getText(result: CallToolResult): string {
   const item = result.content[0]!;
@@ -215,10 +216,26 @@ describe("explain-disabled-tools-handler.ts", () => {
           expect(explicit.groupBy).toBe("reason");
         });
 
-        it("should reject group_by values outside the enum with a ZodError", () => {
-          expect(() =>
-            handler.handle(bareRuntime(), { group_by: "color" }),
-          ).toThrow(/ZodError|invalid_value/i);
+        it("should reject group_by values outside the enum with a Zod issue pinned to the group_by field", () => {
+          let caught: unknown;
+          try {
+            handler.handle(bareRuntime(), { group_by: "color" });
+          } catch (err) {
+            caught = err;
+          }
+          expect(caught).toBeInstanceOf(ZodError);
+          const issues = (caught as ZodError).issues;
+          expect(issues).toHaveLength(1);
+          // Path pins the offending field; code pins the validator class
+          // (Zod v4 collapses enum/literal mismatches under `invalid_value`).
+          // A future regression that loosened the schema in a different
+          // place — say, dropping the enum constraint entirely — would
+          // fail either by not throwing at all or by emitting a different
+          // path, both of which this assertion catches.
+          expect(issues[0]).toMatchObject({
+            path: ["group_by"],
+            code: "invalid_value",
+          });
         });
       });
     });

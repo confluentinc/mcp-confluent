@@ -19,14 +19,20 @@ import type { ServerRuntime } from "@src/server-runtime.js";
  * connections. The disabled-state reason is an arbitrary placeholder
  * (`MissingFlinkBlock`); tests check whether the tool is filtered out, not
  * which reason was reported. Uses ToolName.LIST_TOPICS as a placeholder —
- * any declared ToolName would do.
+ * any declared ToolName would do. `domain` defaults to `ToolDomain.Kafka`;
+ * pass an explicit value when a test needs to distinguish multiple stubs
+ * by domain (e.g., the `buildToolGatingReport` domain-axis tests).
  */
 export class StubHandler extends BaseToolHandler {
-  readonly domain = ToolDomain.Kafka;
+  readonly domain: ToolDomain;
   readonly predicate: ConnectionPredicate;
 
-  constructor({ enabled = true }: { enabled?: boolean } = {}) {
+  constructor({
+    enabled = true,
+    domain = ToolDomain.Kafka,
+  }: { enabled?: boolean; domain?: ToolDomain } = {}) {
     super();
+    this.domain = domain;
     this.predicate = enabled
       ? alwaysEnabled
       : () => ({

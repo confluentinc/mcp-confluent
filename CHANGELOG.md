@@ -4,10 +4,12 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
-## Added
+### Added
 
-- Tool categorization. The MCP server now associates each tool with a category.
-  These categories are now presented to the LLM agent at tool discovery time, and are referenced in either `--list-tools` command line invocation or in the output of the `explain-disabled-tools` tool.
+- **Tool domain taxonomy.** Each tool is now classified into one of 11 `ToolDomain` values (`kafka`, `flink`, `schema-registry`, `confluent-cloud`, `catalog`, `tableflow`, `connect`, `billing`, `metrics`, `docs`, `mcp-server-diagnostics`) — an operator-facing "what kind of tool is this?" axis, orthogonal to the existing "is this tool enabled?" gating. The domain surfaces in three places:
+  - As `_meta.domain` on every `tools/list` advertisement, so MCP clients (Claude, the inspector, etc.) can group or filter the catalog by functional area.
+  - In the `--list-tools` CLI output, which now buckets tools under one section header per domain instead of printing them in registry-declaration order.
+  - On the `explain-disabled-tools` tool, which gains an optional `group_by: "reason" | "domain"` argument (default `"reason"`). Pass `group_by: "domain"` to regroup the same diagnostic data by functional area when the operator's question is "what's offline in my Flink setup?" rather than "what config piece is missing?".
 
 ## 1.3.0
 

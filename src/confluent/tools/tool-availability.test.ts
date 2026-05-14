@@ -21,8 +21,11 @@ import {
 import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-function stubWithPredicate(predicate: ConnectionPredicate): ToolHandler {
-  const handler = new StubHandler();
+function stubWithPredicate(
+  predicate: ConnectionPredicate,
+  domain: ToolDomain = ToolDomain.Kafka,
+): ToolHandler {
+  const handler = new StubHandler({ domain });
   // Override the readonly predicate via type assertion for test composition.
   (handler as unknown as { predicate: ConnectionPredicate }).predicate =
     predicate;
@@ -300,17 +303,18 @@ describe("tool-availability.ts", () => {
     });
 
     describe('groupBy: "domain"', () => {
-      // StubHandler hard-codes `domain = ToolDomain.Kafka`; that's
-      // sufficient to prove the axis switch — the same handler under
-      // the default "reason" axis buckets by ToolDisabledReason
-      // (see preceding tests).
-      it("should bucket disabled tools by handler.domain when groupBy is 'domain'", () => {
-        const kafkaTool = stubWithPredicate(disabledForKafka);
-        const flinkTool = stubWithPredicate(disabledForFlink);
+      // Both stubs land in ToolDomain.Kafka, but their predicates fail
+      // for different reasons (MissingKafkaBlock vs MissingFlinkBlock).
+      // Under the default "reason" axis they'd split into two buckets;
+      // the "domain" axis merges them — proving the bucket key really
+      // is the domain, not the reason.
+      it("should merge same-domain disabled tools under one bucket when groupBy is 'domain'", () => {
+        const sameDomainKafkaReasonStub = stubWithPredicate(disabledForKafka);
+        const sameDomainFlinkReasonStub = stubWithPredicate(disabledForFlink);
         const report = buildToolGatingReport(
           [
-            [ToolName.LIST_TOPICS, kafkaTool],
-            [ToolName.LIST_FLINK_STATEMENTS, flinkTool],
+            [ToolName.LIST_TOPICS, sameDomainKafkaReasonStub],
+            [ToolName.LIST_FLINK_STATEMENTS, sameDomainFlinkReasonStub],
           ],
           runtimeWith({}, "default"),
           "domain",
@@ -329,20 +333,23 @@ describe("tool-availability.ts", () => {
       });
 
       it("should sort domain-keyed groups lex by domain", () => {
-        const a = new StubHandler();
-        (a as unknown as { predicate: ConnectionPredicate }).predicate =
-          disabledForKafka;
-        (a as unknown as { domain: ToolDomain }).domain = ToolDomain.Tableflow;
-
-        const b = new StubHandler();
-        (b as unknown as { predicate: ConnectionPredicate }).predicate =
-          disabledForKafka;
-        (b as unknown as { domain: ToolDomain }).domain = ToolDomain.Billing;
+        // Two stubs with the same predicate (so reasons are identical
+        // and the only differentiator is domain) but distinct domains —
+        // insertion order Tableflow-then-Billing, expected output
+        // Billing-then-Tableflow.
+        const tableflowDomainStub = stubWithPredicate(
+          disabledForKafka,
+          ToolDomain.Tableflow,
+        );
+        const billingDomainStub = stubWithPredicate(
+          disabledForKafka,
+          ToolDomain.Billing,
+        );
 
         const report = buildToolGatingReport(
           [
-            [ToolName.LIST_TABLEFLOW_TOPICS, a],
-            [ToolName.LIST_BILLING_COSTS, b],
+            [ToolName.LIST_TABLEFLOW_TOPICS, tableflowDomainStub],
+            [ToolName.LIST_BILLING_COSTS, billingDomainStub],
           ],
           runtimeWith({}, "default"),
           "domain",

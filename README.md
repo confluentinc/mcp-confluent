@@ -140,7 +140,7 @@ npx @confluentinc/mcp-confluent --init-config
 
 3. **Start the Server:** You can run the MCP server in one of two ways:
    - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source.
-        This typically involves:
+     This typically involves:
      - Installing dependencies (`npm install`)
      - Building the project (`npm run build` or `npm run dev`)
    - **With npx:** You can start the server directly using npx, no build required:
@@ -202,6 +202,24 @@ connections:
 See [CONFIGURATION.md → Authentication modes](CONFIGURATION.md#authentication-modes) for the full schema and ergonomics.
 
 The ¹-marked categories in [Available Tools for Confluent Cloud](#available-tools-for-confluent-cloud) work under OAuth today; everything else still needs a `direct` connection with static API keys.
+
+Note: if you are installing in [IBM Bob](https://bob.ibm.com/), you will need to set this in your `Users/{user_name}/.bob/settings/mcp_settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "confluent": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@confluentinc/mcp-confluent",
+        "-c",
+        "/Users/username/path-to-config/myconfig.yaml"
+      ]
+    }
+  }
+}
+```
 
 ## CLI Usage
 

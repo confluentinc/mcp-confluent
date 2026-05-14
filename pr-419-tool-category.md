@@ -1,7 +1,3 @@
-## Relationships
-
-Closes #419.
-
 ## Tool category taxonomy
 
 - Add a `ToolCategory` enum to [base-tools.ts](src/confluent/tools/base-tools.ts) — operator-facing classification of "what kind of tool is this?", orthogonal to the existing `ConnectionPredicate`-based "is this tool enabled?" question that lives next door.
@@ -60,3 +56,7 @@ confluent-cloud:
   read-environment: Get details of a specific environment by ID
 ...
 ```
+
+## Relationships
+
+Closes #419.

@@ -204,6 +204,29 @@ describe("explain-disabled-tools-handler.ts", () => {
           );
         });
 
+        it("should render category sections lex-sorted by kebab-case enum value", () => {
+          // Belt-and-suspenders against a regression that bypasses the
+          // localeCompare in tool-availability.ts and renders categories
+          // in (e.g.) handler-iteration or enum-declaration order. The
+          // data-shape test in tool-availability.test.ts pins the sorted
+          // disabledGroups; this one pins that the renderer doesn't
+          // re-order between data and text. Search for the `"  <name> ("`
+          // header prefix (two-space indent + name + count-paren) — that's
+          // unique to bucket headers and won't collide with tool-name
+          // bullets, which use a four-space `"    - "` prefix.
+          const text = getText(
+            handler.handle(bareRuntime(), { group_by: "category" }),
+          );
+          const billingAt = text.indexOf("  billing (");
+          const kafkaAt = text.indexOf("  kafka (");
+          const tableflowAt = text.indexOf("  tableflow (");
+          expect(billingAt, "billing header not found").toBeGreaterThan(-1);
+          expect(kafkaAt, "kafka header not found").toBeGreaterThan(-1);
+          expect(tableflowAt, "tableflow header not found").toBeGreaterThan(-1);
+          expect(billingAt).toBeLessThan(kafkaAt);
+          expect(kafkaAt).toBeLessThan(tableflowAt);
+        });
+
         it("should treat group_by as optional and default to 'reason' when absent", async () => {
           // Schema default makes an undefined arg equivalent to passing
           // group_by="reason" — pins the back-compat path so existing

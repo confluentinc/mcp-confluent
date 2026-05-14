@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@confluentinc/mcp-confluent.svg)](https://www.npmjs.com/package/@confluentinc/mcp-confluent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud and Confluent Local through natural language. It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
+An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud and Confluent Platform through natural language. It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
 
 ## Quick Start
 
@@ -29,7 +29,7 @@ See [Getting Started](#getting-started) for full setup instructions and [Configu
 - [Available Tools](#available-tools)
   - [Always Available](#always-available-tools)
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
-  - [Confluent Local](#available-tools-for-confluent-local)
+  - [Local deployments](#available-tools-for-local-deployments)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
 - [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
@@ -79,9 +79,9 @@ These tools require endpoints and authentication against specific Confluent Clou
 
 ¹ Also available under OAuth — see [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) for setup and caveats. Categories not marked currently require a `direct` connection with static API keys; OAuth migration is in progress.
 
-### Available Tools for Confluent Local
+### Available Tools for local deployments
 
-These tools only require Kafka or Schema Registry endpoints - no Confluent Cloud API key/secret is needed. Ideal for local development with Docker Compose or self-managed clusters.
+These tools only require Kafka or Schema Registry endpoints - no Confluent Cloud API key/secret is needed. Ideal for local development with self-managed clusters, including Confluent Platform.
 
 ```yaml
 # minimal config.yaml for local development
@@ -110,7 +110,7 @@ Ready-to-use variants live in [`sample_configs/`](sample_configs/).
   nvm install 22
   nvm use 22
   ```
-- A local development environment with Kafka or Schema Registry running, or a **Confluent Cloud** account with appropriate API keys or login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
+- A local environment with Kafka or Schema Registry running, or a **Confluent Cloud** account with appropriate API keys or login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
 
 ### General Setup Steps
 
@@ -184,7 +184,7 @@ The ¹-marked categories in [Available Tools for Confluent Cloud](#available-too
 
 The MCP server provides a flexible command line interface (CLI) for advanced control. The CLI lets you pick the config file, transports, and fine-tune which tools are enabled or blocked.
 
-#### Basic Usage
+### Basic Usage
 
 You can view all CLI options and help with:
 
@@ -218,7 +218,7 @@ Options:
 
 </details>
 
-#### Example: Deploy using all transports
+### Example: Deploy using all transports
 
 ```bash
 npx @confluentinc/mcp-confluent -c config.yaml --transport http,sse,stdio
@@ -240,7 +240,7 @@ npx @confluentinc/mcp-confluent -c config.yaml --transport http,sse,stdio
 
 </details>
 
-#### Example: Allow Only Specific Tools
+### Example: Allow Only Specific Tools
 
 ```bash
 npx @confluentinc/mcp-confluent -c config.yaml --allow-tools produce-message,consume-messages
@@ -248,7 +248,7 @@ npx @confluentinc/mcp-confluent -c config.yaml --allow-tools produce-message,con
 
 Only the specified tools will be enabled; all others will be disabled.
 
-#### Example: Block Certain Tools
+### Example: Block Certain Tools
 
 ```bash
 npx @confluentinc/mcp-confluent -c config.yaml --block-tools produce-message,consume-messages
@@ -256,7 +256,7 @@ npx @confluentinc/mcp-confluent -c config.yaml --block-tools produce-message,con
 
 All tools except the specified ones will be enabled.
 
-#### Example: Use Tool Lists from Files
+### Example: Use Tool Lists from Files
 
 You can also maintain allow/block lists in files (one tool name per line):
 
@@ -264,7 +264,7 @@ You can also maintain allow/block lists in files (one tool name per line):
 npx -y @confluentinc/mcp-confluent -c config.yaml --allow-tools-file allow.txt --block-tools-file block.txt
 ```
 
-#### Example: List All Available Tools
+### Example: List All Available Tools
 
 ```bash
 npx -y @confluentinc/mcp-confluent --list-tools

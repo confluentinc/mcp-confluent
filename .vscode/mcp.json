@@ -2,7 +2,7 @@
   "servers": {
     "confluent": {
       "command": "node",
-      "args": ["dist/index.js", "--config", "oauth.yaml"]
+      "args": ["dist/index.js", "--config", "config.oauth.example.yaml"]
     }
   }
 }

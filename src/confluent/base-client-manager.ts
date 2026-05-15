@@ -285,10 +285,65 @@ export abstract class BaseClientManager
    * call `connect()` and `disconnect()` (typically in a `try/finally`).
    */
   abstract buildKafkaConsumer(
-    clusterId?: string,
-    envId?: string,
-    groupId?: string,
+    opts?: ConsumerBuildOptions,
   ): Promise<KafkaJS.Consumer>;
 
   abstract disconnect(): Promise<void>;
+}
+
+/**
+ * Per-call options for {@link BaseClientManager.buildKafkaConsumer}. All
+ * fields are optional; each concrete manager validates only what its auth
+ * model requires (e.g. OAuth needs `clusterId` + `envId`, direct ignores
+ * both).
+ */
+export interface ConsumerBuildOptions {
+  /**
+   * Confluent Cloud logical Kafka cluster id (`lkc-...`). Required for
+   * OAuth (used to resolve the SASL/OAUTHBEARER bootstrap endpoint);
+   * ignored on direct (the bootstrap comes from connection config).
+   */
+  clusterId?: string;
+  /**
+   * Confluent Cloud environment id (`env-...`) that owns the cluster.
+   * Required for OAuth; ignored on direct.
+   */
+  envId?: string;
+  /**
+   * Consumer group identifier. On direct, appended as a suffix to the
+   * configured base group.id so concurrent MCP sessions don't share a
+   * group. On OAuth, used as the literal group id.
+   */
+  groupId?: string;
+  /**
+   * Tool-facing reset policy for the consumer. Defaults to `"earliest"`
+   * for backward compatibility with the pre-#459 behavior; handlers that
+   * want a different default (e.g. consume-messages picks `"latest"`)
+   * supply it explicitly.
+   *
+   * - `"earliest"` — start from the partition low watermark when no
+   *   committed offset exists. Maps to librdkafka `auto.offset.reset=earliest`.
+   * - `"latest"` — start from the partition high watermark (only newly
+   *   produced messages). Maps to librdkafka `auto.offset.reset=latest`.
+   * - `"none"` — fail rather than auto-pick when no committed offset
+   *   exists. With the fresh disposable group.id we mint per call, this
+   *   always fails unless the caller also issues a `consumer.seek(...)`
+   *   to a specific offset before the first poll. Maps to librdkafka
+   *   `auto.offset.reset=error` (librdkafka has no "none" — "error" is
+   *   the same semantics under a different name).
+   */
+  offsetReset?: "earliest" | "latest" | "none";
+}
+
+/**
+ * Translate the tool-facing {@link ConsumerBuildOptions.offsetReset} value
+ * to the librdkafka `auto.offset.reset` string that the broker config
+ * accepts. The user-facing "none" alias has no direct librdkafka spelling;
+ * "error" is the semantically equivalent value (fail rather than
+ * auto-pick).
+ */
+export function toLibrdkafkaOffsetReset(
+  reset: NonNullable<ConsumerBuildOptions["offsetReset"]>,
+): "earliest" | "latest" | "error" {
+  return reset === "none" ? "error" : reset;
 }

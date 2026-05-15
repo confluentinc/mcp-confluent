@@ -158,7 +158,7 @@ describe("oauth-client-manager.ts", () => {
       it("should throw when cluster_id is omitted under OAuth", async () => {
         const manager = buildManager();
         await expect(
-          manager.buildKafkaConsumer(undefined, "env-1"),
+          manager.buildKafkaConsumer({ envId: "env-1" }),
         ).rejects.toThrow(
           "OAuth client construction requires a cluster id and environment id",
         );
@@ -167,7 +167,7 @@ describe("oauth-client-manager.ts", () => {
       it("should throw when environment_id is omitted under OAuth", async () => {
         const manager = buildManager();
         await expect(
-          manager.buildKafkaConsumer("lkc-1", undefined),
+          manager.buildKafkaConsumer({ clusterId: "lkc-1" }),
         ).rejects.toThrow(
           "OAuth client construction requires a cluster id and environment id",
         );
@@ -182,13 +182,15 @@ describe("oauth-client-manager.ts", () => {
         mockKafkaConstructor({ consumer: consumerFn });
 
         const manager = buildManager();
-        await manager.buildKafkaConsumer("lkc-1", "env-1");
+        await manager.buildKafkaConsumer({
+          clusterId: "lkc-1",
+          envId: "env-1",
+        });
 
         expect(consumerFn).toHaveBeenCalledOnce();
         expect(consumerFn.mock.calls[0]![0]?.kafkaJS).toMatchObject({
           groupId: "mcp-confluent",
           autoCommit: false,
-          fromBeginning: true,
         });
       });
 
@@ -201,13 +203,67 @@ describe("oauth-client-manager.ts", () => {
         mockKafkaConstructor({ consumer: consumerFn });
 
         const manager = buildManager();
-        await manager.buildKafkaConsumer("lkc-1", "env-1", "session-42");
+        await manager.buildKafkaConsumer({
+          clusterId: "lkc-1",
+          envId: "env-1",
+          groupId: "session-42",
+        });
 
         expect(consumerFn).toHaveBeenCalledOnce();
         expect(consumerFn.mock.calls[0]![0]?.kafkaJS?.groupId).toBe(
           "session-42",
         );
       });
+
+      it("should default auto.offset.reset to 'earliest' when offsetReset is omitted (preserving prior fromBeginning:true behavior)", async () => {
+        vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
+          "broker:9092",
+        );
+        const fakeConsumer = getMockedConsumer();
+        const consumerFn = vi.fn().mockReturnValue(fakeConsumer);
+        mockKafkaConstructor({ consumer: consumerFn });
+
+        const manager = buildManager();
+        await manager.buildKafkaConsumer({
+          clusterId: "lkc-1",
+          envId: "env-1",
+        });
+
+        expect(consumerFn).toHaveBeenCalledOnce();
+        expect(consumerFn.mock.calls[0]![0]).toMatchObject({
+          "auto.offset.reset": "earliest",
+        });
+      });
+
+      it.each([
+        ["earliest", "earliest"],
+        ["latest", "latest"],
+        // "none" is the tool-facing alias; librdkafka has no "none" — its
+        // fail-rather-than-auto-pick value is "error".
+        ["none", "error"],
+      ] as const)(
+        "should propagate offsetReset=%s as native auto.offset.reset=%s",
+        async (offsetReset, expectedReset) => {
+          vi.spyOn(resolvers, "resolveKafkaBootstrap").mockResolvedValue(
+            "broker:9092",
+          );
+          const fakeConsumer = getMockedConsumer();
+          const consumerFn = vi.fn().mockReturnValue(fakeConsumer);
+          mockKafkaConstructor({ consumer: consumerFn });
+
+          const manager = buildManager();
+          await manager.buildKafkaConsumer({
+            clusterId: "lkc-1",
+            envId: "env-1",
+            offsetReset,
+          });
+
+          expect(consumerFn).toHaveBeenCalledOnce();
+          expect(consumerFn.mock.calls[0]![0]).toMatchObject({
+            "auto.offset.reset": expectedReset,
+          });
+        },
+      );
     });
 
     describe("getSchemaRegistrySdkClient()", () => {

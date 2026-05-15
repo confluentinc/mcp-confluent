@@ -195,6 +195,9 @@ describe("tool-registry.ts", () => {
         [ToolName.READ_CONNECTOR]: hasConfluentCloud,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
         [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_LOGS]: hasConfluentCloud,
         // Catalog + search (CCloud catalog support)
         [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
         [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
@@ -407,6 +410,13 @@ describe("tool-registry.ts", () => {
       [ToolName.READ_CONNECTOR]: { outcome: { throws: "ZodError" } },
       [ToolName.CREATE_CONNECTOR]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.GET_CONNECTOR_LOGS]: { outcome: { throws: "ZodError" } },
       // Catalog
       [ToolName.CREATE_TOPIC_TAGS]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_TAG]: { outcome: { throws: "ZodError" } },

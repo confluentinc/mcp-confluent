@@ -1,17 +1,11 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
-import { getEnsuredParam } from "@src/confluent/helpers.js";
-import { config, nodeFetch } from "@src/confluent/node-deps.js";
+import { DirectConnectionConfig } from "@src/config/models.js";
+import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import { nodeFetch } from "@src/confluent/node-deps.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
-  EnvVar,
-} from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -26,21 +20,21 @@ const getConnectorLogsArguments = z.object({
     .trim()
     .optional()
     .describe(
-      "The unique identifier for the environment this resource belongs to. Falls back to KAFKA_ENV_ID env var.",
+      "The unique identifier for the environment this resource belongs to. Falls back to the connection's kafka.env_id.",
     ),
   clusterId: z
     .string()
     .trim()
     .optional()
     .describe(
-      "The unique identifier for the Kafka cluster. Falls back to KAFKA_CLUSTER_ID env var.",
+      "The unique identifier for the Kafka cluster. Falls back to the connection's kafka.cluster_id.",
     ),
   organizationId: z
     .string()
     .trim()
     .optional()
     .describe(
-      "The Confluent Cloud organization ID. Falls back to CONFLUENT_CLOUD_ORG_ID env var, then auto-resolves via GET /org/v2/organizations.",
+      "The Confluent Cloud organization ID. Falls back to the connection's confluent_cloud.organization_id, then auto-resolves via GET /org/v2/organizations.",
     ),
   connectorName: z
     .string()
@@ -201,12 +195,13 @@ async function exchangeForDataPlaneToken(
 }
 
 async function resolveOrganizationId(
-  clientManager: ClientManager,
+  clientManager: BaseClientManager,
+  conn: DirectConnectionConfig,
   argOrgId: string | undefined,
 ): Promise<string> {
   if (argOrgId) return argOrgId;
-  const envOrgId = config.env.CONFLUENT_CLOUD_ORG_ID;
-  if (envOrgId) return envOrgId;
+  const configOrgId = conn.confluent_cloud?.organization_id;
+  if (configOrgId) return configOrgId;
 
   const pathBasedClient = wrapAsPathBasedClient(
     clientManager.getConfluentCloudRestClient(),
@@ -222,38 +217,37 @@ async function resolveOrganizationId(
   const first = data?.data?.[0]?.id;
   if (!first) {
     throw new Error(
-      "Failed to auto-resolve organization ID: GET /org/v2/organizations returned no organizations. Pass organizationId or set CONFLUENT_CLOUD_ORG_ID.",
+      "Failed to auto-resolve organization ID: GET /org/v2/organizations returned no organizations. Pass organizationId or set confluent_cloud.organization_id in the connection config.",
     );
   }
   return first;
 }
 
-export class GetConnectorLogsHandler extends BaseToolHandler {
+export class GetConnectorLogsHandler extends ConnectToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const args = getConnectorLogsArguments.parse(toolArguments);
-    const environment_id = getEnsuredParam(
-      "KAFKA_ENV_ID",
-      "Environment ID is required",
-      args.environmentId,
-    );
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-      args.clusterId,
-    );
-    const env = config.env;
-    const apiKey = env.CONFLUENT_CLOUD_API_KEY;
-    const apiSecret = env.CONFLUENT_CLOUD_API_SECRET;
-    if (!apiKey || !apiSecret) {
+
+    const conn = runtime.config.getSoleDirectConnection();
+    const { environment_id, kafka_cluster_id } =
+      this.resolveConnectEnvAndClusterId(
+        conn,
+        args.environmentId,
+        args.clusterId,
+      );
+
+    const ccAuth = conn.confluent_cloud?.auth;
+    if (!ccAuth) {
       throw new Error(
-        "CONFLUENT_CLOUD_API_KEY and CONFLUENT_CLOUD_API_SECRET are required to authenticate against the logging API.",
+        "confluent_cloud.auth is required to authenticate against the logging API.",
       );
     }
     const organization_id = await resolveOrganizationId(
       clientManager,
+      conn,
       args.organizationId,
     );
 
@@ -285,7 +279,10 @@ export class GetConnectorLogsHandler extends BaseToolHandler {
 
     let dataPlaneToken: string;
     try {
-      dataPlaneToken = await exchangeForDataPlaneToken(apiKey, apiSecret);
+      dataPlaneToken = await exchangeForDataPlaneToken(
+        ccAuth.key,
+        ccAuth.secret,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return this.createResponse(
@@ -388,13 +385,5 @@ export class GetConnectorLogsHandler extends BaseToolHandler {
       inputSchema: getConnectorLogsArguments.shape,
       annotations: READ_ONLY,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

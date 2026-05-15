@@ -1,16 +1,21 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { GetConnectorErrorSummaryHandler } from "@src/confluent/tools/handlers/connect/get-connector-error-summary-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS } from "@src/env-schema.js";
-import { createMockInstance } from "@tests/stubs/index.js";
-import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import {
+  CONNECT_CONN,
+  DEFAULT_CONNECTION_ID,
+  runtimeWith,
+} from "@tests/factories/runtime.js";
+import {
+  getMockedClientManager,
+  type MockedClientManager,
+} from "@tests/stubs/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 
 describe("get-connector-error-summary-handler.ts", () => {
   describe("GetConnectorErrorSummaryHandler", () => {
     const handler = new GetConnectorErrorSummaryHandler();
-    let clientManager: Mocked<DefaultClientManager>;
-    let restGet: ReturnType<typeof vi.fn>;
+    let clientManager: MockedClientManager;
 
     const baseArgs = {
       environmentId: "env-1",
@@ -19,13 +24,17 @@ describe("get-connector-error-summary-handler.ts", () => {
     };
 
     beforeEach(() => {
-      restGet = vi.fn();
-      clientManager = createMockInstance(DefaultClientManager);
-      clientManager.getConfluentCloudRestClient.mockReturnValue({
-        GET: restGet,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+      clientManager = getMockedClientManager();
     });
+
+    function callHandle(args: Record<string, unknown> = baseArgs) {
+      const runtime = runtimeWith(
+        CONNECT_CONN,
+        DEFAULT_CONNECTION_ID,
+        clientManager,
+      );
+      return handler.handle(runtime, args);
+    }
 
     describe("getToolConfig()", () => {
       it("should return GET_CONNECTOR_ERROR_SUMMARY with READ_ONLY annotations", () => {
@@ -35,33 +44,18 @@ describe("get-connector-error-summary-handler.ts", () => {
       });
     });
 
-    describe("getRequiredEnvVars()", () => {
-      it("should return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS", () => {
-        expect(handler.getRequiredEnvVars()).toBe(
-          CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
-        );
-      });
-    });
-
-    describe("isConfluentCloudOnly()", () => {
-      it("should return true", () => {
-        expect(handler.isConfluentCloudOnly()).toBe(true);
-      });
-    });
-
     describe("handle()", () => {
       it("should return a one-liner when the connector is healthy", async () => {
-        restGet.mockResolvedValue({
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: {
             name: "cypher-source",
             connector: { state: "RUNNING", worker_id: "w1", trace: "" },
             tasks: [{ id: 0, state: "RUNNING", worker_id: "w1" }],
             type: "source",
           },
-          error: undefined,
         });
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBeFalsy();
         const text = (result.content[0] as { text: string }).text;
@@ -78,7 +72,7 @@ describe("get-connector-error-summary-handler.ts", () => {
           'database.password: Error while validating connector config: FATAL: password authentication failed for user "postgres"',
           'database.dbname: Error while validating connector config: FATAL: password authentication failed for user "postgres"',
         ];
-        restGet.mockResolvedValue({
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: {
             name: "cypher-source",
             connector: {
@@ -107,10 +101,9 @@ describe("get-connector-error-summary-handler.ts", () => {
             error_recommendation_enabled: true,
             plugin_lifecycle: "ACTIVE",
           },
-          error: undefined,
         });
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBeFalsy();
         const text = (result.content[0] as { text: string }).text;
@@ -149,7 +142,7 @@ describe("get-connector-error-summary-handler.ts", () => {
       });
 
       it("should prefer override_message over error_summary", async () => {
-        restGet.mockResolvedValue({
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: {
             name: "cypher-source",
             connector: { state: "FAILED", worker_id: "w1", trace: "" },
@@ -158,10 +151,9 @@ describe("get-connector-error-summary-handler.ts", () => {
             error_summary: "Auto-generated summary",
             validation_errors: [],
           },
-          error: undefined,
         });
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
         const text = (result.content[0] as { text: string }).text;
         const projection = JSON.parse(text.slice(text.indexOf("{")));
         expect(projection.summary).toBe("Operator override: contact support.");
@@ -171,7 +163,7 @@ describe("get-connector-error-summary-handler.ts", () => {
         const longTrace = Array.from({ length: 30 }, (_, i) => `line${i}`).join(
           "\n",
         );
-        restGet.mockResolvedValue({
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: {
             name: "oss-connector",
             connector: {
@@ -189,10 +181,9 @@ describe("get-connector-error-summary-handler.ts", () => {
               },
             ],
           },
-          error: undefined,
         });
 
-        const result = await handler.handle(clientManager, {
+        const result = await callHandle({
           ...baseArgs,
           connectorName: "oss-connector",
         });
@@ -207,16 +198,15 @@ describe("get-connector-error-summary-handler.ts", () => {
 
       it("should truncate very long single-line traces by character limit", async () => {
         const longLine = "x".repeat(2000);
-        restGet.mockResolvedValue({
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: {
             name: "noisy",
             connector: { state: "FAILED", worker_id: "w1", trace: longLine },
             tasks: [],
           },
-          error: undefined,
         });
 
-        const result = await handler.handle(clientManager, {
+        const result = await callHandle({
           ...baseArgs,
           connectorName: "noisy",
         });
@@ -230,9 +220,11 @@ describe("get-connector-error-summary-handler.ts", () => {
 
       it("should return an error response when the REST call fails", async () => {
         const error = { error_code: 404, message: "missing" };
-        restGet.mockResolvedValue({ data: undefined, error });
+        clientManager
+          .getConfluentCloudRestClient()
+          .GET.mockResolvedValue({ error });
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBe(true);
         const text = (result.content[0] as { text: string }).text;

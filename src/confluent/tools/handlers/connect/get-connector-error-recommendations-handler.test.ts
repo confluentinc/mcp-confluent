@@ -1,16 +1,21 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { GetConnectorErrorRecommendationsHandler } from "@src/confluent/tools/handlers/connect/get-connector-error-recommendations-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS } from "@src/env-schema.js";
-import { createMockInstance } from "@tests/stubs/index.js";
-import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import {
+  CONNECT_CONN,
+  DEFAULT_CONNECTION_ID,
+  runtimeWith,
+} from "@tests/factories/runtime.js";
+import {
+  getMockedClientManager,
+  type MockedClientManager,
+} from "@tests/stubs/index.js";
+import { beforeEach, describe, expect, it } from "vitest";
 
 describe("get-connector-error-recommendations-handler.ts", () => {
   describe("GetConnectorErrorRecommendationsHandler", () => {
     const handler = new GetConnectorErrorRecommendationsHandler();
-    let clientManager: Mocked<DefaultClientManager>;
-    let restGet: ReturnType<typeof vi.fn>;
+    let clientManager: MockedClientManager;
 
     const baseArgs = {
       environmentId: "env-1",
@@ -19,33 +24,23 @@ describe("get-connector-error-recommendations-handler.ts", () => {
     };
 
     beforeEach(() => {
-      restGet = vi.fn();
-      clientManager = createMockInstance(DefaultClientManager);
-      clientManager.getConfluentCloudRestClient.mockReturnValue({
-        GET: restGet,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+      clientManager = getMockedClientManager();
     });
+
+    function callHandle(args: Record<string, unknown> = baseArgs) {
+      const runtime = runtimeWith(
+        CONNECT_CONN,
+        DEFAULT_CONNECTION_ID,
+        clientManager,
+      );
+      return handler.handle(runtime, args);
+    }
 
     describe("getToolConfig()", () => {
       it("should return GET_CONNECTOR_ERROR_RECOMMENDATIONS with READ_ONLY annotations", () => {
         const config = handler.getToolConfig();
         expect(config.name).toBe(ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS);
         expect(config.annotations).toBe(READ_ONLY);
-      });
-    });
-
-    describe("getRequiredEnvVars()", () => {
-      it("should return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS", () => {
-        expect(handler.getRequiredEnvVars()).toBe(
-          CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
-        );
-      });
-    });
-
-    describe("isConfluentCloudOnly()", () => {
-      it("should return true", () => {
-        expect(handler.isConfluentCloudOnly()).toBe(true);
       });
     });
 
@@ -56,16 +51,15 @@ describe("get-connector-error-recommendations-handler.ts", () => {
           "Ensure that the PostgreSQL server at 'database.hostname' (34.71.68.124) is accessible from Confluent Cloud and that the firewall or network settings allow connections on port 5432.",
           "Check that the PostgreSQL database 'test' exists and the user 'postgres' has the necessary permissions to access it, including the ability to read the database charset.",
         ];
-        restGet.mockResolvedValue({
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: {
             error: null,
             event_id: "lcc-oo0vvx_1777437507",
             recommendations,
           },
-          error: undefined,
         });
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBeFalsy();
         const text = (result.content[0] as { text: string }).text;
@@ -78,16 +72,15 @@ describe("get-connector-error-recommendations-handler.ts", () => {
       });
 
       it("should return a one-liner when there are no recommendations and no engine error", async () => {
-        restGet.mockResolvedValue({
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: {
             error: null,
             event_id: "lcc-oo0vvx_1",
             recommendations: [],
           },
-          error: undefined,
         });
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBeFalsy();
         const text = (result.content[0] as { text: string }).text;
@@ -97,16 +90,15 @@ describe("get-connector-error-recommendations-handler.ts", () => {
       });
 
       it("should surface engine errors as an error response", async () => {
-        restGet.mockResolvedValue({
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: {
             error: "recommendation engine throttled",
             event_id: "lcc-oo0vvx_2",
             recommendations: [],
           },
-          error: undefined,
         });
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBe(true);
         const text = (result.content[0] as { text: string }).text;
@@ -116,8 +108,7 @@ describe("get-connector-error-recommendations-handler.ts", () => {
       });
 
       it("should return the friendly one-liner when Cloud returns 400 'no stack trace yet'", async () => {
-        restGet.mockResolvedValue({
-          data: undefined,
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           error: {
             error: {
               code: 400,
@@ -127,7 +118,7 @@ describe("get-connector-error-recommendations-handler.ts", () => {
           },
         });
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBeFalsy();
         const text = (result.content[0] as { text: string }).text;
@@ -138,9 +129,11 @@ describe("get-connector-error-recommendations-handler.ts", () => {
 
       it("should return an error response when the REST call fails", async () => {
         const error = { error_code: 404, message: "missing" };
-        restGet.mockResolvedValue({ data: undefined, error });
+        clientManager
+          .getConfluentCloudRestClient()
+          .GET.mockResolvedValue({ error });
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBe(true);
         const text = (result.content[0] as { text: string }).text;

@@ -1,15 +1,18 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { GetConnectorLogsHandler } from "@src/confluent/tools/handlers/connect/get-connector-logs-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import {
-  createMockInstance,
-  mockEnv,
+  CONNECT_CONN,
+  DEFAULT_CONNECTION_ID,
+  runtimeWith,
+} from "@tests/factories/runtime.js";
+import {
+  getMockedClientManager,
   mockFetch,
+  type MockedClientManager,
   type MockedFetch,
 } from "@tests/stubs/index.js";
-import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const STACKTRACE = `io.debezium.DebeziumException: Couldn't obtain encoding for database test
 \tat io.debezium.connector.v2.postgresql.connection.PostgresConnection.getDatabaseCharset(PostgresConnection.java:608)
@@ -17,6 +20,25 @@ const STACKTRACE = `io.debezium.DebeziumException: Couldn't obtain encoding for 
 Caused by: org.postgresql.util.PSQLException: FATAL: password authentication failed for user "postgres"`;
 
 const TEST_DATAPLANE_TOKEN = "dp-test-token";
+
+/** Connection config with the confluent_cloud credentials the handler reads. */
+const CONNECT_CONN_WITH_CC = {
+  ...CONNECT_CONN,
+  confluent_cloud: {
+    endpoint: "https://api.confluent.cloud",
+    auth: { type: "api_key" as const, key: "test-key", secret: "test-secret" },
+  },
+};
+
+/** Same connection but with an explicit organization_id pinned in config. */
+const CONNECT_CONN_WITH_ORG_ID = {
+  ...CONNECT_CONN,
+  confluent_cloud: {
+    endpoint: "https://api.confluent.cloud",
+    auth: { type: "api_key" as const, key: "test-key", secret: "test-secret" },
+    organization_id: "config-org-id",
+  },
+};
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -32,7 +54,7 @@ function tokenResponse(token: string = TEST_DATAPLANE_TOKEN): Response {
 describe("get-connector-logs-handler.ts", () => {
   describe("GetConnectorLogsHandler", () => {
     const handler = new GetConnectorLogsHandler();
-    let clientManager: Mocked<DefaultClientManager>;
+    let clientManager: MockedClientManager;
     let fetchSpy: MockedFetch;
 
     const baseArgs = {
@@ -43,33 +65,29 @@ describe("get-connector-logs-handler.ts", () => {
     };
 
     beforeEach(() => {
-      clientManager = createMockInstance(DefaultClientManager);
+      clientManager = getMockedClientManager();
       fetchSpy = mockFetch();
-      mockEnv({
-        CONFLUENT_CLOUD_API_KEY: "test-key",
-        CONFLUENT_CLOUD_API_SECRET: "test-secret",
-      });
     });
+
+    function callHandle(
+      args: Record<string, unknown> = baseArgs,
+      connectionConfig: Parameters<
+        typeof runtimeWith
+      >[0] = CONNECT_CONN_WITH_CC,
+    ) {
+      const runtime = runtimeWith(
+        connectionConfig,
+        DEFAULT_CONNECTION_ID,
+        clientManager,
+      );
+      return handler.handle(runtime, args);
+    }
 
     describe("getToolConfig()", () => {
       it("should return GET_CONNECTOR_LOGS with READ_ONLY annotations", () => {
         const config = handler.getToolConfig();
         expect(config.name).toBe(ToolName.GET_CONNECTOR_LOGS);
         expect(config.annotations).toBe(READ_ONLY);
-      });
-    });
-
-    describe("getRequiredEnvVars()", () => {
-      it("should return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS", () => {
-        expect(handler.getRequiredEnvVars()).toBe(
-          CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
-        );
-      });
-    });
-
-    describe("isConfluentCloudOnly()", () => {
-      it("should return true", () => {
-        expect(handler.isConfluentCloudOnly()).toBe(true);
       });
     });
 
@@ -99,7 +117,7 @@ describe("get-connector-logs-handler.ts", () => {
           .mockResolvedValueOnce(tokenResponse())
           .mockResolvedValueOnce(jsonResponse({ data: entries }));
 
-        const result = await handler.handle(clientManager, {
+        const result = await callHandle({
           ...baseArgs,
           startTime: "2026-04-29T03:50:13Z",
           endTime: "2026-04-29T04:50:13Z",
@@ -158,7 +176,7 @@ describe("get-connector-logs-handler.ts", () => {
           .mockResolvedValueOnce(tokenResponse())
           .mockResolvedValueOnce(jsonResponse({ data: [] }));
 
-        await handler.handle(clientManager, {
+        await callHandle({
           ...baseArgs,
           connectorId: "lcc-oo0vvx",
           levels: ["ERROR", "WARN"],
@@ -191,7 +209,7 @@ describe("get-connector-logs-handler.ts", () => {
           }),
         );
 
-        const result = await handler.handle(clientManager, {
+        const result = await callHandle({
           ...baseArgs,
           pageToken: "incoming-page-token",
           startTime: "2026-04-29T03:50:13Z",
@@ -222,7 +240,7 @@ describe("get-connector-logs-handler.ts", () => {
           }),
         );
 
-        const result = await handler.handle(clientManager, {
+        const result = await callHandle({
           ...baseArgs,
           startTime: "2026-04-29T03:50:13Z",
           endTime: "2026-04-29T04:50:13Z",
@@ -246,7 +264,7 @@ describe("get-connector-logs-handler.ts", () => {
         vi.setSystemTime(fixedNow);
 
         try {
-          await handler.handle(clientManager, baseArgs);
+          await callHandle(baseArgs);
         } finally {
           vi.useRealTimers();
         }
@@ -262,7 +280,7 @@ describe("get-connector-logs-handler.ts", () => {
           .mockResolvedValueOnce(tokenResponse())
           .mockResolvedValueOnce(jsonResponse({ data: [] }));
 
-        const result = await handler.handle(clientManager, {
+        const result = await callHandle({
           ...baseArgs,
           startTime: "2026-04-29T03:50:13Z",
           endTime: "2026-04-29T04:50:13Z",
@@ -279,7 +297,7 @@ describe("get-connector-logs-handler.ts", () => {
           .mockResolvedValueOnce(tokenResponse())
           .mockResolvedValueOnce(new Response("forbidden", { status: 403 }));
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBe(true);
         const text = (result.content[0] as { text: string }).text;
@@ -292,7 +310,7 @@ describe("get-connector-logs-handler.ts", () => {
           new Response("unauthorized", { status: 401 }),
         );
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBe(true);
         const text = (result.content[0] as { text: string }).text;
@@ -306,7 +324,7 @@ describe("get-connector-logs-handler.ts", () => {
       it("should surface a token-exchange response missing the token field", async () => {
         fetchSpy.mockResolvedValueOnce(jsonResponse({}));
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBe(true);
         const text = (result.content[0] as { text: string }).text;
@@ -320,7 +338,7 @@ describe("get-connector-logs-handler.ts", () => {
           .mockResolvedValueOnce(tokenResponse())
           .mockRejectedValueOnce(new Error("ECONNRESET"));
 
-        const result = await handler.handle(clientManager, baseArgs);
+        const result = await callHandle();
 
         expect(result.isError).toBe(true);
         const text = (result.content[0] as { text: string }).text;
@@ -329,19 +347,15 @@ describe("get-connector-logs-handler.ts", () => {
       });
 
       it("should auto-resolve organization ID via /org/v2/organizations when not provided", async () => {
-        const restGet = vi.fn().mockResolvedValue({
+        const cloudRest = clientManager.getConfluentCloudRestClient();
+        cloudRest.GET.mockResolvedValue({
           data: { data: [{ id: "auto-resolved-org-id" }] },
-          error: undefined,
         });
-        clientManager.getConfluentCloudRestClient.mockReturnValue({
-          GET: restGet,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
         fetchSpy
           .mockResolvedValueOnce(tokenResponse())
           .mockResolvedValueOnce(jsonResponse({ data: [] }));
 
-        await handler.handle(clientManager, {
+        await callHandle({
           environmentId: "env-63yg9q",
           clusterId: "lkc-6p56yj",
           connectorName: "cypher-source",
@@ -349,54 +363,43 @@ describe("get-connector-logs-handler.ts", () => {
           endTime: "2026-04-29T04:50:13Z",
         });
 
-        expect(restGet).toHaveBeenCalledOnce();
-        expect(restGet.mock.calls[0]![0]).toBe("/org/v2/organizations");
+        expect(cloudRest.GET).toHaveBeenCalledOnce();
+        expect(cloudRest.GET.mock.calls[0]![0]).toBe("/org/v2/organizations");
         const [, logsInit] = fetchSpy.mock.calls[1]!;
         const sentBody = JSON.parse(logsInit?.body as string);
         expect(sentBody.crn).toContain("organization=auto-resolved-org-id");
       });
 
-      it("should prefer the env CONFLUENT_CLOUD_ORG_ID over auto-resolution", async () => {
-        const restGet = vi.fn();
-        clientManager.getConfluentCloudRestClient.mockReturnValue({
-          GET: restGet,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
-        mockEnv({
-          CONFLUENT_CLOUD_API_KEY: "test-key",
-          CONFLUENT_CLOUD_API_SECRET: "test-secret",
-          CONFLUENT_CLOUD_ORG_ID: "env-org-id",
-        });
+      it("should prefer confluent_cloud.organization_id from config over auto-resolution", async () => {
+        const cloudRest = clientManager.getConfluentCloudRestClient();
         fetchSpy
           .mockResolvedValueOnce(tokenResponse())
           .mockResolvedValueOnce(jsonResponse({ data: [] }));
 
-        await handler.handle(clientManager, {
-          environmentId: "env-63yg9q",
-          clusterId: "lkc-6p56yj",
-          connectorName: "cypher-source",
-          startTime: "2026-04-29T03:50:13Z",
-          endTime: "2026-04-29T04:50:13Z",
-        });
+        await callHandle(
+          {
+            environmentId: "env-63yg9q",
+            clusterId: "lkc-6p56yj",
+            connectorName: "cypher-source",
+            startTime: "2026-04-29T03:50:13Z",
+            endTime: "2026-04-29T04:50:13Z",
+          },
+          CONNECT_CONN_WITH_ORG_ID,
+        );
 
-        expect(restGet).not.toHaveBeenCalled();
+        expect(cloudRest.GET).not.toHaveBeenCalled();
         const [, logsInit] = fetchSpy.mock.calls[1]!;
         const sentBody = JSON.parse(logsInit?.body as string);
-        expect(sentBody.crn).toContain("organization=env-org-id");
+        expect(sentBody.crn).toContain("organization=config-org-id");
       });
 
       it("should throw when auto-resolution returns an empty organization list", async () => {
-        const restGet = vi.fn().mockResolvedValue({
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: { data: [] },
-          error: undefined,
         });
-        clientManager.getConfluentCloudRestClient.mockReturnValue({
-          GET: restGet,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
 
         await expect(
-          handler.handle(clientManager, {
+          callHandle({
             environmentId: "env-1",
             clusterId: "lkc-1",
             connectorName: "c",
@@ -405,17 +408,12 @@ describe("get-connector-logs-handler.ts", () => {
       });
 
       it("should throw when auto-resolution call itself fails", async () => {
-        const restGet = vi.fn().mockResolvedValue({
-          data: undefined,
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           error: { error_code: 401, message: "unauthenticated" },
         });
-        clientManager.getConfluentCloudRestClient.mockReturnValue({
-          GET: restGet,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
 
         await expect(
-          handler.handle(clientManager, {
+          callHandle({
             environmentId: "env-1",
             clusterId: "lkc-1",
             connectorName: "c",

@@ -273,6 +273,9 @@ describe("index.ts", () => {
         ToolName.READ_CONNECTOR,
         ToolName.CREATE_CONNECTOR,
         ToolName.DELETE_CONNECTOR,
+        ToolName.GET_CONNECTOR_ERROR_SUMMARY,
+        ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
+        ToolName.GET_CONNECTOR_LOGS,
         // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)
         ToolName.SEARCH_TOPICS_BY_TAG,
         ToolName.SEARCH_TOPICS_BY_NAME,

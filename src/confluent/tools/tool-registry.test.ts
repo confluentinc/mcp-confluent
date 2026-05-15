@@ -1,13 +1,46 @@
 import {
+  BaseToolHandler,
   CREATE_UPDATE,
   DESTRUCTIVE,
   READ_ONLY,
 } from "@src/confluent/tools/base-tools.js";
+import {
+  alwaysEnabled,
+  canCreateDirectConnector,
+  type ConnectionPredicate,
+  flinkWithTelemetry,
+  hasCCloudCatalogSupport,
+  hasConfluentCloud,
+  hasConfluentCloudOrOAuth,
+  hasFlink,
+  hasSchemaRegistryOrOAuth,
+  hasTableflow,
+  hasTelemetry,
+  kafkaBootstrapOrOAuth,
+  kafkaRestWithAuthOrOAuth,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
-import { describe, expect, it } from "vitest";
+import { initEnv } from "@src/env.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  runtimeWith,
+} from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+  type HandleOutcome,
+  type MockedClientManager,
+} from "@tests/stubs/index.js";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
+
+// Reverse map from enum value ("list-topics") → enum key ("LIST_TOPICS"),
+// used to generate copy-paste suggestions in failure messages.
+const TOOL_NAME_TO_KEY = Object.fromEntries(
+  Object.entries(ToolName).map(([k, v]) => [v, k]),
+) as Record<ToolName, string>;
 
 describe("tool-registry.ts", () => {
   describe("ToolHandlerRegistry", () => {
@@ -48,6 +81,18 @@ describe("tool-registry.ts", () => {
         }
       });
 
+      for (const name of ALL_TOOL_NAMES) {
+        it(`${name}: should not implement getRequiredEnvVars() (deleted in issue-228)`, () => {
+          const handler = ToolHandlerRegistry.getToolHandler(name);
+          expect("getRequiredEnvVars" in handler).toBe(false);
+        });
+
+        it(`${name}: should not implement isConfluentCloudOnly() (deleted in issue-228)`, () => {
+          const handler = ToolHandlerRegistry.getToolHandler(name);
+          expect("isConfluentCloudOnly" in handler).toBe(false);
+        });
+      }
+
       it("should use annotations that match the tool name prefix convention", () => {
         const readOnlyPrefixes = new Set([
           "list",
@@ -55,6 +100,7 @@ describe("tool-registry.ts", () => {
           "get",
           "search",
           "describe",
+          "explain",
           "check",
           "detect",
           "query",
@@ -113,5 +159,412 @@ describe("tool-registry.ts", () => {
         }
       });
     });
+
+    describe("predicate property", () => {
+      // Exhaustive mapping of every registered tool to the named export
+      // from connection-predicates.ts that its handler is expected to wire
+      // as its `predicate`.
+      //
+      // When adding a new tool or rewiring an existing one: edit a single
+      // entry. The `it.each` row label names the offending tool if a
+      // handler's `predicate` drifts from the table.
+      const EXPECTED_PREDICATES: Readonly<
+        Record<ToolName, ConnectionPredicate>
+      > = {
+        // Kafka
+        [ToolName.LIST_TOPICS]: kafkaBootstrapOrOAuth,
+        [ToolName.CREATE_TOPICS]: kafkaBootstrapOrOAuth,
+        [ToolName.DELETE_TOPICS]: kafkaBootstrapOrOAuth,
+        [ToolName.PRODUCE_MESSAGE]: kafkaBootstrapOrOAuth,
+        [ToolName.CONSUME_MESSAGES]: kafkaBootstrapOrOAuth,
+        [ToolName.ALTER_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
+        [ToolName.GET_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
+        // Flink
+        [ToolName.LIST_FLINK_STATEMENTS]: hasFlink,
+        [ToolName.CREATE_FLINK_STATEMENT]: hasFlink,
+        [ToolName.READ_FLINK_STATEMENT]: hasFlink,
+        [ToolName.DELETE_FLINK_STATEMENTS]: hasFlink,
+        [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: hasFlink,
+        [ToolName.LIST_FLINK_CATALOGS]: hasFlink,
+        [ToolName.LIST_FLINK_DATABASES]: hasFlink,
+        [ToolName.LIST_FLINK_TABLES]: hasFlink,
+        [ToolName.DESCRIBE_FLINK_TABLE]: hasFlink,
+        [ToolName.GET_FLINK_TABLE_INFO]: hasFlink,
+        [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlink,
+        [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
+        [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
+        // Connect
+        [ToolName.LIST_CONNECTORS]: hasConfluentCloud,
+        [ToolName.READ_CONNECTOR]: hasConfluentCloud,
+        [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
+        [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
+        [ToolName.PAUSE_CONNECTOR]: hasConfluentCloud,
+        [ToolName.RESUME_CONNECTOR]: hasConfluentCloud,
+        [ToolName.RESTART_CONNECTOR]: hasConfluentCloud,
+        [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloud,
+        // Catalog + search (CCloud catalog support)
+        [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
+        [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
+        [ToolName.CREATE_TOPIC_TAGS]: hasCCloudCatalogSupport,
+        [ToolName.DELETE_TAG]: hasCCloudCatalogSupport,
+        [ToolName.REMOVE_TAG_FROM_ENTITY]: hasCCloudCatalogSupport,
+        [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupport,
+        [ToolName.LIST_TAGS]: hasCCloudCatalogSupport,
+        // Clusters
+        [ToolName.LIST_CLUSTERS]: hasConfluentCloudOrOAuth,
+        // Environments + billing + organizations (Confluent Cloud control plane)
+        [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloudOrOAuth,
+        [ToolName.READ_ENVIRONMENT]: hasConfluentCloudOrOAuth,
+        [ToolName.LIST_BILLING_COSTS]: hasConfluentCloudOrOAuth,
+        [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
+        // Schema Registry
+        [ToolName.LIST_SCHEMAS]: hasSchemaRegistryOrOAuth,
+        [ToolName.DELETE_SCHEMA]: hasSchemaRegistryOrOAuth,
+        // Tableflow
+        [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.LIST_TABLEFLOW_REGIONS]: hasTableflow,
+        [ToolName.LIST_TABLEFLOW_TOPICS]: hasTableflow,
+        [ToolName.READ_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.UPDATE_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.DELETE_TABLEFLOW_TOPIC]: hasTableflow,
+        [ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS]: hasTableflow,
+        [ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        // Metrics (Telemetry API)
+        [ToolName.QUERY_METRICS]: hasTelemetry,
+        [ToolName.LIST_METRICS]: hasTelemetry,
+        // Documentation (no service-block requirement)
+        [ToolName.SEARCH_PRODUCT_DOCS]: alwaysEnabled,
+        [ToolName.GET_PRODUCT_DOC_PAGE]: alwaysEnabled,
+        // Diagnostics (no service-block requirement)
+        [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
+      };
+
+      it.each(
+        Object.entries(EXPECTED_PREDICATES) as [
+          ToolName,
+          ConnectionPredicate,
+        ][],
+      )(
+        "%s: handler.predicate must be exactly the expected named export",
+        (toolName, expectedPredicate) => {
+          const handler = ToolHandlerRegistry.getToolHandler(toolName);
+          // Every registered handler is expected to extend BaseToolHandler —
+          // that's where the `predicate` property lives. The instanceof check
+          // both narrows the type for the next assertion and enforces the
+          // class-extension invariant in its own right.
+          expect(
+            handler,
+            `Tool ${toolName}'s handler does not extend BaseToolHandler; ` +
+              `the predicate property lives on BaseToolHandler.`,
+          ).toBeInstanceOf(BaseToolHandler);
+          expect(
+            (handler as BaseToolHandler).predicate,
+            `Tool ${toolName}'s handler.predicate does not match the value ` +
+              `in EXPECTED_PREDICATES. Either: (1) the handler is wired to ` +
+              `the wrong predicate (or composes inline with allOf(...) / ` +
+              `widenForOAuth(...) at the use site — promote to a named const ` +
+              `export and reference it instead); or (2) the handler was ` +
+              `deliberately rewired and EXPECTED_PREDICATES needs updating.`,
+          ).toBe(expectedPredicate);
+        },
+      );
+    });
+  });
+
+  describe("handle() smoke tests", () => {
+    /**
+     * Builds a `ServerRuntime` with every service block populated, injecting
+     * `clientManager` so callers can verify which client getters were invoked.
+     */
+    function allServicesRuntime(clientManager: MockedClientManager) {
+      return runtimeWith(
+        {
+          kafka: {
+            bootstrap_servers: "broker:9092",
+            rest_endpoint: "https://rest.example.com",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
+          flink: {
+            endpoint: "https://flink.example.com",
+            auth: { type: "api_key", key: "k", secret: "s" },
+            environment_id: "env-1",
+            organization_id: "org-1",
+            compute_pool_id: "pool-1",
+          },
+          schema_registry: {
+            endpoint: "https://sr.example.com",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
+          confluent_cloud: {
+            endpoint: "https://api.confluent.cloud",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
+          tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
+          telemetry: {
+            endpoint: "https://telemetry.example.com",
+            auth: { type: "api_key", key: "k", secret: "s" },
+          },
+        },
+        DEFAULT_CONNECTION_ID,
+        clientManager,
+      );
+    }
+
+    /**
+     * Per-tool fixture: what each handler produces when called with no
+     * arguments, plus an optional `setup` that mocks the specific client
+     * method(s) the handler exercises. Tools that throw before reaching the
+     * client layer (ZodError, missing-ID errors) need no `setup`. Tools that
+     * resolve must `setup` whichever client they call so the bare `vi.fn()`
+     * mocks returned by {@linkcode getMockedClientManager} produce a usable
+     * response.
+     *
+     * Use `"DISCOVER"` as the outcome placeholder; the smoke test will run
+     * the handler and report the correct entry to paste in.
+     */
+    type SmokeFixture = {
+      outcome: HandleOutcome;
+      setup?: (cm: MockedClientManager) => Promise<void> | void;
+      /** Set for handlers that legitimately resolve without touching the
+       *  client layer (e.g. meta/diagnostic tools that read the registry
+       *  rather than calling Confluent Cloud). Skips the
+       *  "must have called a client getter" assertion in `assertHandleCase`. */
+      bypassesClientLayer?: boolean;
+    };
+
+    /** Stubs the Flink REST client to return a completed empty SQL query result.
+     *  Shared by the catalog/database/table listing tools that all run a SQL
+     *  query and stringify the empty result set. */
+    function mockFlinkSqlEmpty(cm: MockedClientManager) {
+      const flinkRest = cm.getConfluentCloudFlinkRestClient();
+      const sqlResponse = {
+        data: { status: { phase: "COMPLETED" }, results: { data: [] } },
+      };
+      flinkRest.POST.mockResolvedValue(sqlResponse);
+      flinkRest.GET.mockResolvedValue(sqlResponse);
+    }
+
+    const ZERO_ARG_OUTCOMES: Partial<Record<ToolName, SmokeFixture>> = {
+      // Kafka
+      [ToolName.LIST_TOPICS]: {
+        outcome: { resolves: "Kafka topics:" },
+        setup: async (cm) => {
+          (await cm.getAdminClient()).listTopics.mockResolvedValue([]);
+        },
+      },
+      [ToolName.CREATE_TOPICS]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_TOPICS]: { outcome: { throws: "ZodError" } },
+      [ToolName.PRODUCE_MESSAGE]: { outcome: { throws: "ZodError" } },
+      [ToolName.CONSUME_MESSAGES]: { outcome: { throws: "ZodError" } },
+      [ToolName.ALTER_TOPIC_CONFIG]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_TOPIC_CONFIG]: { outcome: { throws: "ZodError" } },
+      // Schema Registry
+      [ToolName.LIST_SCHEMAS]: {
+        outcome: { resolves: "{}" },
+        setup: (cm) => {
+          cm.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
+        },
+      },
+      [ToolName.DELETE_SCHEMA]: { outcome: { throws: "ZodError" } },
+      // Flink
+      [ToolName.LIST_FLINK_STATEMENTS]: {
+        outcome: { resolves: "{}" },
+        setup: (cm) => {
+          cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+            data: {},
+          });
+        },
+      },
+      [ToolName.CREATE_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
+      [ToolName.READ_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_FLINK_STATEMENTS]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.GET_FLINK_STATEMENT_PROFILE]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.LIST_FLINK_CATALOGS]: {
+        outcome: { resolves: "No catalogs found." },
+        setup: mockFlinkSqlEmpty,
+      },
+      [ToolName.LIST_FLINK_DATABASES]: {
+        outcome: { resolves: "No databases found." },
+        setup: mockFlinkSqlEmpty,
+      },
+      [ToolName.LIST_FLINK_TABLES]: {
+        outcome: { resolves: "No tables found in catalog" },
+        setup: mockFlinkSqlEmpty,
+      },
+      [ToolName.DESCRIBE_FLINK_TABLE]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_FLINK_TABLE_INFO]: { outcome: { throws: "ZodError" } },
+      // Connect
+      [ToolName.LIST_CONNECTORS]: {
+        outcome: { throws: "Environment ID is required" },
+      },
+      [ToolName.READ_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.CREATE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.PAUSE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.RESUME_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.RESTART_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.UPDATE_CONNECTOR_CONFIG]: { outcome: { throws: "ZodError" } },
+      // Catalog
+      [ToolName.CREATE_TOPIC_TAGS]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_TAG]: { outcome: { throws: "ZodError" } },
+      [ToolName.REMOVE_TAG_FROM_ENTITY]: { outcome: { throws: "ZodError" } },
+      [ToolName.ADD_TAGS_TO_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.LIST_TAGS]: {
+        outcome: { resolves: "Successfully retrieved tags" },
+        setup: (cm) => {
+          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
+            data: [],
+          });
+        },
+      },
+      // Search
+      [ToolName.SEARCH_TOPICS_BY_TAG]: {
+        outcome: { resolves: "{}" },
+        setup: (cm) => {
+          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
+            data: {},
+          });
+        },
+      },
+      [ToolName.SEARCH_TOPICS_BY_NAME]: { outcome: { throws: "ZodError" } },
+      // Environments
+      [ToolName.LIST_ENVIRONMENTS]: {
+        outcome: { resolves: "Successfully retrieved 0 environments" },
+        setup: (cm) => {
+          cm.getConfluentCloudRestClient().GET.mockResolvedValue({
+            data: {
+              api_version: "org/v2",
+              kind: "EnvironmentList",
+              data: [],
+            },
+          });
+        },
+      },
+      [ToolName.READ_ENVIRONMENT]: { outcome: { throws: "ZodError" } },
+      // Clusters
+      [ToolName.LIST_CLUSTERS]: {
+        // resolveEnvArg throws under direct when neither environmentId arg
+        // nor conn.kafka.env_id supplies a value — `allServicesRuntime`
+        // omits kafka.env_id, so this is the expected smoke-test path.
+        outcome: { throws: "environmentId is required" },
+      },
+      // Tableflow
+      [ToolName.CREATE_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.LIST_TABLEFLOW_REGIONS]: {
+        outcome: { resolves: "Tableflow Regions" },
+        setup: (cm) => {
+          cm.getConfluentCloudTableflowRestClient().GET.mockResolvedValue({
+            data: { data: [] },
+          });
+        },
+      },
+      [ToolName.LIST_TABLEFLOW_TOPICS]: {
+        outcome: { throws: "Environment ID is required" },
+      },
+      [ToolName.READ_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.UPDATE_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.DELETE_TABLEFLOW_TOPIC]: { outcome: { throws: "ZodError" } },
+      [ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS]: {
+        outcome: { throws: "Environment ID is required" },
+      },
+      [ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION]: {
+        outcome: { throws: "ZodError" },
+      },
+      // Billing
+      [ToolName.LIST_BILLING_COSTS]: { outcome: { throws: "ZodError" } },
+      // Metrics
+      [ToolName.QUERY_METRICS]: { outcome: { throws: "ZodError" } },
+      [ToolName.LIST_METRICS]: {
+        outcome: { resolves: "No metrics descriptors available" },
+        setup: (cm) => {
+          cm.getConfluentCloudTelemetryRestClient().GET.mockResolvedValue({
+            data: { data: [] },
+          });
+        },
+      },
+      // Documentation
+      [ToolName.SEARCH_PRODUCT_DOCS]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_PRODUCT_DOC_PAGE]: { outcome: { throws: "ZodError" } },
+      // Diagnostics — no client calls; the handler walks the registry's
+      // own predicate map. Against `allServicesRuntime` every gate passes
+      // and the handler emits its all-enabled summary.
+      [ToolName.EXPLAIN_DISABLED_TOOLS]: {
+        outcome: { resolves: "registered tools are advertised via tools/list" },
+        bypassesClientLayer: true,
+      },
+      // Organizations
+      [ToolName.LIST_ORGANIZATIONS]: {
+        outcome: { resolves: "Retrieved 0 organizations" },
+        setup: (cm) => {
+          cm.getConfluentCloudRestClient().GET.mockResolvedValue({
+            data: {
+              api_version: "org/v2",
+              kind: "OrganizationList",
+              data: [],
+            },
+          });
+        },
+      },
+    };
+
+    beforeAll(() => {
+      initEnv();
+    });
+
+    // One test per tool — each missing entry is its own failure with a copy-paste fix.
+    it.each(ALL_TOOL_NAMES)(
+      "%s: should have an entry in ZERO_ARG_OUTCOMES",
+      (name) => {
+        expect(
+          name in ZERO_ARG_OUTCOMES,
+          `Add [ToolName.${TOOL_NAME_TO_KEY[name]}]: "DISCOVER" to ZERO_ARG_OUTCOMES, ` +
+            `then run: npm test -- src/confluent/tools/tool-registry.test.ts`,
+        ).toBe(true);
+      },
+    );
+
+    it.each(Object.entries(ZERO_ARG_OUTCOMES) as [ToolName, SmokeFixture][])(
+      "%s: handle() should not crash before reaching the ClientManager",
+      async (name, fixture) => {
+        const clientManager = getMockedClientManager();
+        await fixture.setup?.(clientManager);
+        await assertHandleCase({
+          handler: ToolHandlerRegistry.getToolHandler(name),
+          runtime: allServicesRuntime(clientManager),
+          args: {},
+          outcome: fixture.outcome,
+          // Pass clientManager only when the handler exercises the client
+          // layer; meta/diagnostic tools that read the registry instead are
+          // exempt from the "must have called a client getter" assertion.
+          clientManager: fixture.bypassesClientLayer
+            ? undefined
+            : clientManager,
+          name,
+        });
+      },
+    );
   });
 });

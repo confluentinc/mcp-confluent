@@ -27,11 +27,14 @@ export interface CLIOptions {
   allowTools?: string[];
   blockTools?: string[];
   listTools?: boolean;
-  disableConfluentCloudTools?: boolean;
   kafkaConfig?: KeyValuePairObject;
   disableAuth?: boolean;
   allowedHosts?: string[];
   generateKey?: boolean;
+  initConfig?: boolean;
+  initOauthConfig?: boolean;
+  oauth?: boolean;
+  ccloudEnv?: "devel" | "stag" | "prod";
 }
 
 /**
@@ -162,7 +165,7 @@ export function parseCliArgs(argv: string[]): CLIOptions {
     .option("-e, --env-file <path>", "Load environment variables from file")
     .option(
       "-c, --config <path>",
-      "EXPERIMENTAL: Path to YAML configuration file describing connection settings (work in progress, not fully functional yet)",
+      "Path to YAML configuration file describing server and connection settings. See CONFIGURATION.md for the schema; mutually exclusive with --transport, --disable-auth, --allowed-hosts, --kafka-config-file, and --oauth (declare each of those in the YAML instead).",
     )
     .option(
       "-k, --kafka-config-file <file>",
@@ -198,10 +201,6 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       "Print the final set of enabled tool names (with descriptions) after allow/block filtering and exit. Does not start the server.",
     )
     .option(
-      "--disable-confluent-cloud-tools",
-      "Disable all tools that require Confluent Cloud REST APIs (cloud-only tools).",
-    )
-    .option(
       "--disable-auth",
       "Disable authentication for HTTP/SSE transports. WARNING: Only use in development environments.",
     )
@@ -212,6 +211,24 @@ export function parseCliArgs(argv: string[]): CLIOptions {
     .option(
       "--generate-key",
       "Generate a secure API key for MCP_API_KEY and print it to stdout, then exit. Use this to set MCP_API_KEY in your .env file.",
+    )
+    .option(
+      "--init-config",
+      "Bootstrap a starter config.yaml in the current working directory (also adds it to .gitignore), then exit. Refuses to overwrite an existing config.yaml.",
+    )
+    .option(
+      "--init-oauth-config",
+      "Bootstrap a starter config.yaml for OAuth auth in the current working directory (also adds it to .gitignore), then exit. Refuses to overwrite an existing config.yaml. Mutually exclusive with --init-config.",
+    )
+    .option(
+      "--oauth",
+      "Enable OAuth (PKCE) auth against Confluent Cloud (defaults to prod)",
+    )
+    .addOption(
+      new Option(
+        "--ccloud-env <env>",
+        "Override the Auth0 environment for --oauth (devel/stag/prod). Defaults to prod when omitted.",
+      ).choices(["devel", "stag", "prod"] as const),
     )
     .allowExcessArguments(false)
     .exitOverride();
@@ -226,6 +243,20 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       opts.allowedHosts,
       program.getOptionValueSource("transport") === "cli",
     );
+
+    if (opts.ccloudEnv && !opts.oauth) {
+      throw new Error("--ccloud-env requires --oauth");
+    }
+    if (opts.oauth && opts.config) {
+      throw new Error(
+        "--oauth and --config cannot be combined: declare OAuth as a connection inside the YAML (type: oauth) instead of passing --oauth",
+      );
+    }
+    if (opts.initConfig && opts.initOauthConfig) {
+      throw new Error(
+        "--init-config and --init-oauth-config are mutually exclusive: pick one template to bootstrap.",
+      );
+    }
 
     // Precedence: CLI > file > undefined
     let allowTools: string[] | undefined = undefined;
@@ -249,7 +280,6 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       allowTools,
       blockTools,
       listTools: !!opts.listTools,
-      disableConfluentCloudTools: !!opts.disableConfluentCloudTools,
       kafkaConfig: opts.kafkaConfigFile
         ? parsePropertiesFile(opts.kafkaConfigFile)
         : undefined,
@@ -260,6 +290,10 @@ export function parseCliArgs(argv: string[]): CLIOptions {
             .map((h: string) => h.trim().toLowerCase())
         : undefined,
       generateKey: !!opts.generateKey,
+      initConfig: !!opts.initConfig,
+      initOauthConfig: !!opts.initOauthConfig,
+      oauth: opts.oauth,
+      ccloudEnv: opts.ccloudEnv,
     };
   } catch (error: unknown) {
     if (
@@ -276,24 +310,36 @@ export function parseCliArgs(argv: string[]): CLIOptions {
 }
 
 /**
- * Load dotenv keys/values from file into process.env.
- * Throws if file not found or if dotenv returns an error.
- * Overwrites preexisting keys in process.env as a side effect.
+ * Parse a dotenv file, returning its entries as a `Record<string,string>` and
+ * (intentionally) writing the same entries into `process.env` with `override:
+ * true` so preexisting shell-environment values are replaced.
+ *
+ * Two channels, one source. The return value is what mcp-confluent application
+ * code consumes — fed into `buildConfigFromEnvAndCli` on the legacy env-var
+ * path, and supplied as the env source for `${VAR}` interpolation inside YAML.
+ * The `process.env` mutation exists for a different audience: **external
+ * libraries** (OpenSSL via `SSL_CERT_FILE` / `NODE_EXTRA_CA_CERTS`, cyrus-sasl
+ * via `SASL_PATH`, krb5 via `KRB5_CONFIG` / `KRB5CCNAME` / `KRB5_KTNAME`,
+ * undici via `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`, librdkafka transitively
+ * through these) read `process.env` directly outside our control, and a user
+ * supplying `-e` reasonably expects those settings to be honored.
+ *
+ * Do not "clean up" the side effect: application code is forbidden by lint
+ * from reading `process.env` outside the bootstrap allowlist, but the linked
+ * libraries that need this seed are unaffected by that rule.
+ *
+ * Throws if the file does not exist or `dotenv` returns an error.
+ *
  * @param envFile Path to the environment file
- * @returns Object containing the parsed key-value pairs from the environment file
- *          (primarily for test purposes, but updates process.env as a side effect)
+ * @returns The parsed entries — also reflected into `process.env`
  */
-export function loadDotEnvIntoProcessEnv(
-  envFile: string,
-): Record<string, string> {
+export function loadDotEnvFile(envFile: string): Record<string, string> {
   const envPath = path.resolve(envFile);
 
-  // Check if file exists
   if (!fs.existsSync(envPath)) {
     throw new Error(`Environment file not found: ${envPath}`);
   }
 
-  // Load environment variables from file
   const result = dotenvLib.config({ path: envPath, override: true });
 
   if (result.error) {
@@ -302,7 +348,6 @@ export function loadDotEnvIntoProcessEnv(
 
   logger.info(`Loaded environment variables from ${envPath}`);
 
-  // Return the parsed variables that are also now in process.env.
   return result.parsed || {};
 }
 

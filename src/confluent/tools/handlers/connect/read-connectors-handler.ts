@@ -1,16 +1,8 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
-  EnvVar,
-} from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -34,23 +26,19 @@ const readConnectorArguments = z.object({
     .describe("The unique name of the connector."),
 });
 
-export class ReadConnectorHandler extends BaseToolHandler {
+/** Fetches full details for a single named connector. */
+export class ReadConnectorHandler extends ConnectToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName } =
       readConnectorArguments.parse(toolArguments);
-    const environment_id = getEnsuredParam(
-      "KAFKA_ENV_ID",
-      "Environment ID is required",
-      environmentId,
-    );
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-      clusterId,
-    );
+
+    const conn = runtime.config.getSoleDirectConnection();
+    const { environment_id, kafka_cluster_id } =
+      this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudRestClient(),
@@ -61,8 +49,8 @@ export class ReadConnectorHandler extends BaseToolHandler {
       params: {
         path: {
           connector_name: connectorName,
-          environment_id: environment_id,
-          kafka_cluster_id: kafka_cluster_id,
+          environment_id,
+          kafka_cluster_id,
         },
       },
     });
@@ -76,6 +64,7 @@ export class ReadConnectorHandler extends BaseToolHandler {
       `Connector Details for ${connectorName}: ${JSON.stringify(response)}`,
     );
   }
+
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.READ_CONNECTOR,
@@ -83,13 +72,5 @@ export class ReadConnectorHandler extends BaseToolHandler {
       inputSchema: readConnectorArguments.shape,
       annotations: READ_ONLY,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

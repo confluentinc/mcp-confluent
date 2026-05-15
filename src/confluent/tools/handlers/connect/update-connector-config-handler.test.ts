@@ -1,38 +1,28 @@
-import { DefaultClientManager } from "@src/confluent/client-manager.js";
 import { CREATE_UPDATE } from "@src/confluent/tools/base-tools.js";
 import { UpdateConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/update-connector-config-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS } from "@src/env-schema.js";
-import { createMockInstance } from "@tests/stubs/index.js";
-import { beforeEach, describe, expect, it, type Mocked, vi } from "vitest";
+import {
+  CCLOUD_CONN,
+  CONNECT_CONN,
+  ConnectHandleCase,
+  DEFAULT_CONNECTION_ID,
+  runtimeWith,
+} from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
+import { describe, expect, it } from "vitest";
+
+const connectorConfig = {
+  "connector.class": "S3_SINK",
+  "tasks.max": "2",
+  topics: "events",
+};
 
 describe("update-connector-config-handler.ts", () => {
   describe("UpdateConnectorConfigHandler", () => {
     const handler = new UpdateConnectorConfigHandler();
-    let clientManager: Mocked<DefaultClientManager>;
-    let restPut: ReturnType<typeof vi.fn>;
-
-    const connectorConfig = {
-      "connector.class": "S3_SINK",
-      "tasks.max": "2",
-      topics: "events",
-    };
-
-    const baseArgs = {
-      environmentId: "env-1",
-      clusterId: "lkc-1",
-      connectorName: "my-connector",
-      connectorConfig,
-    };
-
-    beforeEach(() => {
-      restPut = vi.fn();
-      clientManager = createMockInstance(DefaultClientManager);
-      clientManager.getConfluentCloudRestClient.mockReturnValue({
-        PUT: restPut,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
-    });
 
     describe("getToolConfig()", () => {
       it("should return UPDATE_CONNECTOR_CONFIG with CREATE_UPDATE annotations", () => {
@@ -42,57 +32,116 @@ describe("update-connector-config-handler.ts", () => {
       });
     });
 
-    describe("getRequiredEnvVars()", () => {
-      it("should return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS", () => {
-        expect(handler.getRequiredEnvVars()).toBe(
-          CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
-        );
-      });
-    });
-
-    describe("isConfluentCloudOnly()", () => {
-      it("should return true", () => {
-        expect(handler.isConfluentCloudOnly()).toBe(true);
-      });
-    });
-
     describe("handle()", () => {
-      it("should send the connector config map directly as the PUT body", async () => {
-        const updated = { name: "my-connector", config: connectorConfig };
-        restPut.mockResolvedValue({ data: updated, error: undefined });
+      const cases: ConnectHandleCase[] = [
+        {
+          label:
+            "send the connector config as the PUT body, falling back to conn kafka env_id and cluster_id when args are absent",
+          connectionConfig: CONNECT_CONN,
+          args: { connectorName: "my-connector", connectorConfig },
+          mockResponse: {
+            data: { name: "my-connector", config: connectorConfig },
+          },
+          outcome: { resolves: "my-connector config updated" },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
+        },
+        {
+          label:
+            "prefer explicit environmentId and clusterId args over conn config",
+          connectionConfig: CONNECT_CONN,
+          args: {
+            connectorName: "my-connector",
+            connectorConfig,
+            environmentId: "env-from-arg",
+            clusterId: "lkc-from-arg",
+          },
+          mockResponse: {
+            data: { name: "my-connector", config: connectorConfig },
+          },
+          outcome: { resolves: "my-connector config updated" },
+          expectedEnvId: "env-from-arg",
+          expectedClusterId: "lkc-from-arg",
+        },
+        {
+          label: "throw when environment_id is absent from both arg and config",
+          connectionConfig: CCLOUD_CONN,
+          args: { connectorName: "my-connector", connectorConfig },
+          outcome: { throws: "Environment ID is required" },
+        },
+        {
+          label:
+            "throw when kafka_cluster_id is absent from both arg and config",
+          connectionConfig: {
+            ...CCLOUD_CONN,
+            kafka: {
+              env_id: "env-from-config",
+              rest_endpoint: "https://pkc-example.confluent.cloud:443",
+            },
+          },
+          args: { connectorName: "my-connector", connectorConfig },
+          outcome: { throws: "Kafka Cluster ID is required" },
+        },
+        {
+          label: "resolve with an error message when the API returns an error",
+          connectionConfig: CONNECT_CONN,
+          args: { connectorName: "my-connector", connectorConfig },
+          mockResponse: { error: { error_code: 409, message: "conflict" } },
+          outcome: {
+            resolves: "Failed to update connector my-connector config",
+          },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
+        },
+      ];
 
-        const result = await handler.handle(clientManager, baseArgs);
+      it.each(cases)(
+        "should $label",
+        async ({
+          connectionConfig: connConfig = {},
+          args,
+          mockResponse,
+          outcome,
+          expectedEnvId,
+          expectedClusterId,
+        }) => {
+          const clientManager = getMockedClientManager();
+          const cloudRest = clientManager.getConfluentCloudRestClient();
+          if (mockResponse !== undefined) {
+            cloudRest.PUT.mockResolvedValue(mockResponse);
+          }
 
-        expect(result.isError).toBeFalsy();
-        expect(restPut).toHaveBeenCalledOnce();
-        const [path, init] = restPut.mock.calls[0]!;
-        expect(path).toBe(
-          "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}/config",
-        );
-        expect(init.params.path).toEqual({
-          environment_id: "env-1",
-          kafka_cluster_id: "lkc-1",
-          connector_name: "my-connector",
-        });
-        // The flat config map must be the body, not wrapped in a {name, config} envelope.
-        expect(init.body).toEqual(connectorConfig);
+          await assertHandleCase({
+            handler,
+            runtime: runtimeWith(
+              connConfig,
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args,
+            outcome,
+            clientManager,
+          });
 
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain("my-connector");
-        expect(text).toContain("config updated");
-      });
-
-      it("should return an error response when the REST call fails", async () => {
-        const error = { error_code: 409, message: "conflict" };
-        restPut.mockResolvedValue({ data: undefined, error });
-
-        const result = await handler.handle(clientManager, baseArgs);
-
-        expect(result.isError).toBe(true);
-        const text = (result.content[0] as { text: string }).text;
-        expect(text).toContain("Failed to update connector");
-        expect(text).toContain(JSON.stringify(error));
-      });
+          if (typeof outcome === "object" && "resolves" in outcome) {
+            expect(cloudRest.PUT).toHaveBeenCalledOnce();
+            expect(cloudRest.PUT).toHaveBeenCalledWith(
+              expect.any(String),
+              expect.objectContaining({
+                params: expect.objectContaining({
+                  path: expect.objectContaining({
+                    connector_name: "my-connector",
+                    environment_id: expectedEnvId,
+                    kafka_cluster_id: expectedClusterId,
+                  }),
+                }),
+                // The flat config map must be the body, not wrapped in a {name, config} envelope.
+                body: connectorConfig,
+              }),
+            );
+          }
+        },
+      );
     });
   });
 });

@@ -1,16 +1,12 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasConfluentCloud,
-} from "@src/confluent/tools/connection-predicates.js";
+import { resolveEnvArg } from "@src/confluent/tools/cluster-arg-resolvers.js";
+import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import env from "@src/env.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -20,7 +16,9 @@ const listClustersArguments = z.object({
   environmentId: z
     .string()
     .optional()
-    .describe("The environment ID to filter clusters by"),
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments",
+    ),
 });
 
 /**
@@ -66,10 +64,12 @@ export type Cluster = z.infer<typeof clusterSchema>;
 
 export class ListClustersHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { environmentId } = listClustersArguments.parse(toolArguments);
+    const { environmentId } = listClustersArguments.parse(toolArguments ?? {});
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const resolvedEnv = resolveEnvArg({ environmentId }, runtime, connId);
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(
@@ -81,7 +81,7 @@ export class ListClustersHandler extends BaseToolHandler {
       ].GET({
         params: {
           query: {
-            environment: environmentId ?? env.KAFKA_ENV_ID ?? "",
+            environment: resolvedEnv,
             page_size: 100,
           },
         },
@@ -190,12 +190,5 @@ Cluster: ${cluster.name}
       annotations: READ_ONLY,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
+  readonly predicate = hasConfluentCloudOrOAuth;
 }

@@ -1,15 +1,9 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
-import { resolveCatalogName } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
+import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { FlinkCatalogToolHandler } from "@src/confluent/tools/handlers/flink/catalog/flink-catalog-tool-handler.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listCatalogsArguments = z.object({
@@ -30,37 +24,25 @@ const listCatalogsArguments = z.object({
     .describe("The id associated with the compute pool in context."),
 });
 
-export class ListCatalogsHandler extends BaseToolHandler {
+export class ListCatalogsHandler extends FlinkCatalogToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { organizationId, environmentId, computePoolId } =
       listCatalogsArguments.parse(toolArguments);
 
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const flink = this.getFlinkDirectConfig(runtime.config);
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      flink,
       organizationId,
-    );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
       environmentId,
     );
-    const compute_pool_id = getEnsuredParam(
-      "FLINK_COMPUTE_POOL_ID",
-      "Compute Pool ID is required",
-      computePoolId,
-    );
-    // Smart resolution: use FLINK_ENV_ID as the catalog name
-    const catalog_name = resolveCatalogName();
-    if (!catalog_name) {
-      return this.createResponse(
-        "Catalog name could not be resolved. Set FLINK_ENV_ID.",
-        true,
-      );
-    }
+    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    const catalog = this.resolveCatalogNameOrError(undefined, environment_id);
+    if (!catalog.ok) return catalog.error;
+    const catalog_name = catalog.name;
 
     // Query INFORMATION_SCHEMA.CATALOGS for all available catalogs
     // Must fully qualify with catalog and use backticks per Confluent Cloud requirements
@@ -97,13 +79,5 @@ export class ListCatalogsHandler extends BaseToolHandler {
       inputSchema: listCatalogsArguments.shape,
       annotations: READ_ONLY,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return FLINK_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

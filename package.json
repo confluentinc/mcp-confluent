@@ -1,7 +1,7 @@
 {
   "name": "@confluentinc/mcp-confluent",
   "description": "Confluent MCP Server",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "author": "Confluent Inc.",
   "license": "MIT",
   "repository": {
@@ -25,9 +25,14 @@
   "homepage": "https://www.confluent.io/blog/ai-agents-using-anthropic-mcp/",
   "scripts": {
     "dev": "concurrently \"tsc -p tsconfig.build.json --watch\" \"tsc-alias -p tsconfig.build.json --watch\"",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest",
+    "test": "npm run build && vitest run",
+    "test:coverage": "npm run test -- --coverage",
+    "test:unit": "vitest run --project unit --outputFile.junit=TEST-unit.xml",
+    "test:unit:coverage": "npm run test:unit -- --coverage",
+    "test:unit:watch": "vitest --project unit",
+    "test:integration": "npm run build && vitest run --project integration --outputFile.junit=TEST-integration.xml",
+    "test:integration:coverage": "npm run test:integration -- --coverage",
+    "test:harness": "vitest run --project harness --reporter=verbose",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js --env-file .env",
     "start:http": "node dist/index.js --env-file .env --transport http",
@@ -41,6 +46,7 @@
     "generate:openapi-types": "openapi-typescript ./openapi.json -o ./src/confluent/openapi-schema.d.ts --empty-objects-unknown",
     "print:schema": "node dist/print-md-schema.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js --env-file .env",
+    "inspector:yaml": "node scripts/inspector-yaml.mjs",
     "prepare": "husky",
     "prepack": "npm run build && node scripts/inject-build-config.mjs"
   },
@@ -49,6 +55,7 @@
     "@types/content-type": "^1.1.9",
     "@types/eslint__js": "^8.42.3",
     "@types/node": "^24.0.4",
+    "@types/turndown": "^5.0.6",
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.35.0",
     "@typescript-eslint/parser": "^8.35.0",
@@ -57,6 +64,7 @@
     "eslint": "^9.29.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.5.1",
+    "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^16.2.0",
     "husky": "^9.1.7",
     "openapi-typescript": "^7.8.0",
@@ -75,6 +83,7 @@
     "@fastify/swagger-ui": "^5.2.3",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@segment/analytics-node": "^3.0.0",
+    "cheerio": "^1.2.0",
     "commander": "^14.0.0",
     "dotenv": "^16.5.0",
     "fastify": "^5.7.3",
@@ -83,13 +92,17 @@
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.3",
     "properties-file": "^3.5.12",
+    "turndown": "^7.2.4",
     "yaml": "^2.8.3"
   },
   "overrides": {
     "zod": "^4.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "config.example.yaml",
+    "config.oauth.example.yaml",
+    "assets/oauth-templates"
   ],
   "engines": {
     "node": ">=22"

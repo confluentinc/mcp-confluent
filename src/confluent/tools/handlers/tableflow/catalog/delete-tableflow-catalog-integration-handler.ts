@@ -1,13 +1,8 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  DESTRUCTIVE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { DESTRUCTIVE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -25,25 +20,17 @@ const deleteTableflowCatalogIntegrationArguments = z.object({
     .describe("Scope the operation to the give Kafka cluster."),
 });
 
-export class DeleteTableFlowCatalogIntegrationHandler extends BaseToolHandler {
+export class DeleteTableFlowCatalogIntegrationHandler extends TableflowToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { id, environmentId, clusterId } =
       deleteTableflowCatalogIntegrationArguments.parse(toolArguments);
 
-    const environment_id = getEnsuredParam(
-      "KAFKA_ENV_ID",
-      "Environment ID is required",
-      environmentId,
-    );
-
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-      clusterId,
-    );
+    const { environment_id, kafka_cluster_id } =
+      this.resolveTableflowEnvAndClusterId(runtime, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),
@@ -78,13 +65,5 @@ export class DeleteTableFlowCatalogIntegrationHandler extends BaseToolHandler {
       inputSchema: deleteTableflowCatalogIntegrationArguments.shape,
       annotations: DESTRUCTIVE,
     };
-  }
-
-  getRequiredEnvVars(): EnvVar[] {
-    return ["TABLEFLOW_API_KEY", "TABLEFLOW_API_SECRET"];
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

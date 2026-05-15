@@ -1,14 +1,13 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { hasTelemetry } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, TELEMETRY_REQUIRED_ENV_VARS } from "@src/env-schema.js";
-import env from "@src/env.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const queryMetricsArguments = z.object({
@@ -70,9 +69,10 @@ interface TelemetryResponse {
 
 export class QueryMetricsHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const args = queryMetricsArguments.parse(toolArguments);
     const {
       metric,
@@ -84,66 +84,33 @@ export class QueryMetricsHandler extends BaseToolHandler {
       limit = 100,
     } = args;
 
-    // Resolve interval to a proper "start/end" range
-    let interval = args.interval;
-    if (!interval || !interval.includes("/")) {
-      // No interval provided, or a duration like "PT1H" was passed instead of a range
-      const now = new Date();
-      const durationMs = parseDuration(interval) ?? 60 * 60 * 1000; // default 1 hour
-      const start = new Date(now.getTime() - durationMs);
-      interval = `${start.toISOString()}/${now.toISOString()}`;
-    }
+    const interval = resolveInterval(args.interval);
 
     try {
       const telemetryClient =
         clientManager.getConfluentCloudTelemetryRestClient();
-
-      // Auto-inject resource.kafka.id for Kafka metrics if not provided
-      const effectiveFilter = { ...filter };
-      if (
-        metric.startsWith("io.confluent.kafka.server/") &&
-        !effectiveFilter["resource.kafka.id"] &&
-        env.KAFKA_CLUSTER_ID
-      ) {
-        effectiveFilter["resource.kafka.id"] = env.KAFKA_CLUSTER_ID;
-      }
-
-      // Build filter object
-      const filters = Object.entries(effectiveFilter).map(([field, value]) => ({
-        field,
-        op: "EQ" as const,
-        value,
-      }));
-
-      const filterObj =
-        filters.length > 0
-          ? filters.length === 1
-            ? filters[0]
-            : { op: "AND" as const, filters }
-          : undefined;
+      const connKafkaClusterId =
+        runtime.config.getSoleDirectConnection().kafka?.cluster_id;
+      const effectiveFilter = buildEffectiveFilter(
+        filter,
+        metric,
+        connKafkaClusterId,
+      );
 
       logger.debug(
         { metric, filter: effectiveFilter, granularity, interval },
         "Querying metrics",
       );
 
-      // Build request body
-      const useGrouped = group_by && group_by.length > 0;
-      const body: Record<string, unknown> = {
-        aggregations: [{ metric, agg: aggregation }],
+      const body = buildRequestBody(
+        metric,
+        aggregation,
         granularity,
-        intervals: [interval],
+        interval,
         limit,
-      };
-
-      if (filterObj) {
-        body.filter = filterObj;
-      }
-
-      if (useGrouped) {
-        body.group_by = group_by;
-        body.format = "GROUPED";
-      }
+        effectiveFilter,
+        group_by,
+      );
 
       const response = (await telemetryClient.POST(
         "/v2/metrics/{dataset}/query" as never,
@@ -172,7 +139,6 @@ export class QueryMetricsHandler extends BaseToolHandler {
         );
       }
 
-      // Format the response
       const output = formatMetricsResponse(
         data.data,
         metric,
@@ -209,16 +175,106 @@ export class QueryMetricsHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return TELEMETRY_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
+  readonly predicate = hasTelemetry;
 }
 
+/**
+ * Normalises the caller-supplied interval to a "start/end" pair.
+ * Accepts an already-resolved range ("2024-01-01T00:00:00Z/...") unchanged,
+ * an ISO 8601 duration ("PT30M", "P1D"), or undefined (defaults to 1 hour).
+ */
+export function resolveInterval(interval: string | undefined): string {
+  if (interval?.includes("/")) return interval;
+  const now = new Date();
+  const durationMs = parseDuration(interval) ?? 60 * 60 * 1000;
+  const start = new Date(now.getTime() - durationMs);
+  return `${start.toISOString()}/${now.toISOString()}`;
+}
+
+/**
+ * Returns a copy of `filter` with `resource.kafka.id` trimmed (removing
+ * space-padded values) and, for `io.confluent.kafka.server/*` metrics,
+ * auto-injected from `connKafkaClusterId` when absent.
+ */
+export function buildEffectiveFilter(
+  filter: Record<string, string> | undefined,
+  metric: string,
+  connKafkaClusterId: string | undefined,
+): Record<string, string> {
+  const effectiveFilter = { ...filter };
+  const rawKafkaId = effectiveFilter["resource.kafka.id"];
+  if (rawKafkaId !== undefined) {
+    const trimmed = rawKafkaId.trim();
+    if (trimmed) {
+      effectiveFilter["resource.kafka.id"] = trimmed;
+    } else {
+      delete effectiveFilter["resource.kafka.id"];
+    }
+  }
+  if (
+    metric.startsWith("io.confluent.kafka.server/") &&
+    !effectiveFilter["resource.kafka.id"] &&
+    connKafkaClusterId
+  ) {
+    effectiveFilter["resource.kafka.id"] = connKafkaClusterId;
+  }
+  return effectiveFilter;
+}
+
+/**
+ * Builds the Telemetry API request body. A single filter entry is sent as a
+ * flat EQ object; multiple entries are wrapped in an AND. Adds group_by and
+ * GROUPED format when group_by is non-empty.
+ */
+export function buildRequestBody(
+  metric: string,
+  aggregation: string,
+  granularity: string,
+  interval: string,
+  limit: number,
+  effectiveFilter: Record<string, string>,
+  group_by: string[] | undefined,
+): Record<string, unknown> {
+  const filters = Object.entries(effectiveFilter).map(([field, value]) => ({
+    field,
+    op: "EQ" as const,
+    value,
+  }));
+
+  let filterObj:
+    | (typeof filters)[0]
+    | { op: "AND"; filters: typeof filters }
+    | undefined;
+  if (filters.length === 1) {
+    filterObj = filters[0];
+  } else if (filters.length > 1) {
+    filterObj = { op: "AND" as const, filters };
+  }
+
+  const body: Record<string, unknown> = {
+    aggregations: [{ metric, agg: aggregation }],
+    granularity,
+    intervals: [interval],
+    limit,
+  };
+
+  if (filterObj) {
+    body.filter = filterObj;
+  }
+
+  if (group_by && group_by.length > 0) {
+    body.group_by = group_by;
+    body.format = "GROUPED";
+  }
+
+  return body;
+}
+
+/**
+ * Renders the Telemetry API response as a human-readable string. Detects flat
+ * vs. grouped format by inspecting whether the first element has a top-level
+ * `timestamp` field (flat) or a nested `points` array (grouped).
+ */
 function formatMetricsResponse(
   data: Array<Record<string, unknown>>,
   metric: string,
@@ -299,6 +355,9 @@ function formatMetricsResponse(
   return lines.join("\n").trimEnd();
 }
 
+/**
+ * Formats integers with locale separators; floats to 4 decimal places.
+ */
 function formatValue(value: number): string {
   if (Number.isInteger(value)) {
     return value.toLocaleString();
@@ -307,8 +366,8 @@ function formatValue(value: number): string {
 }
 
 /**
- * Parse an ISO 8601 duration string (e.g. "PT1H", "PT30M", "P1D") to milliseconds.
- * Returns undefined if the string is not a recognized duration.
+ * Parses an ISO 8601 duration string ("PT1H", "PT30M", "P1D") to milliseconds.
+ * Returns `undefined` for unrecognised strings so callers can apply a default.
  */
 function parseDuration(duration: string | undefined): number | undefined {
   if (!duration) return undefined;

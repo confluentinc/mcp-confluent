@@ -1,20 +1,17 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasSchemaRegistry,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 
 export class ListTagsHandler extends BaseToolHandler {
-  async handle(clientManager: ClientManager): Promise<CallToolResult> {
+  async handle(runtime: ServerRuntime): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );
@@ -41,12 +38,5 @@ export class ListTagsHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasSchemaRegistry);
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
+  readonly predicate = hasCCloudCatalogSupport;
 }

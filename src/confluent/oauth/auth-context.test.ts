@@ -1,20 +1,22 @@
 import { AuthContext } from "@src/confluent/oauth/auth-context.js";
 import { getAuth0Config } from "@src/confluent/oauth/auth0-config.js";
 import {
+  CONTROL_PLANE_TOKEN_LIFETIME_MS,
   MAX_CONSECUTIVE_TRANSIENT_FAILURES,
   REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
-import { MockedFetch, mockFetch } from "@tests/stubs/index.js";
+import {
+  jsonResponse,
+  MockedFetch,
+  mockFetch,
+  stubAuth0Ok,
+  stubCpOk,
+  stubDpOk,
+  stubSuccessfulChain,
+} from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-function jsonResponse(body: object, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
 
 /**
  * Test-only access to the context's private token state. Production callers
@@ -26,42 +28,6 @@ function jsonResponse(body: object, status = 200): Response {
 function internals(ctx: AuthContext): ConfluentTokenSet {
   return (ctx as unknown as { internalTokens: ConfluentTokenSet })
     .internalTokens;
-}
-
-function stubAuth0Ok(
-  fetchSpy: MockedFetch,
-  refreshToken: string,
-  idToken: string,
-): void {
-  fetchSpy.mockResolvedValueOnce(
-    jsonResponse({
-      id_token: idToken,
-      refresh_token: refreshToken,
-      access_token: "access",
-      token_type: "Bearer",
-      expires_in: 60,
-    }),
-  );
-}
-
-function stubCpOk(fetchSpy: MockedFetch, cpToken: string): void {
-  fetchSpy.mockResolvedValueOnce(jsonResponse({ token: cpToken }));
-}
-
-function stubDpOk(fetchSpy: MockedFetch, dpToken: string): void {
-  fetchSpy.mockResolvedValueOnce(jsonResponse({ token: dpToken }));
-}
-
-function stubSuccessfulChain(
-  fetchSpy: MockedFetch,
-  refreshToken = "refresh-token",
-  idToken = "id-token",
-  cpToken = "cp-token",
-  dpToken = "dp-token",
-): void {
-  stubAuth0Ok(fetchSpy, refreshToken, idToken);
-  stubCpOk(fetchSpy, cpToken);
-  stubDpOk(fetchSpy, dpToken);
 }
 
 async function newLoggedInContext(fetchSpy: MockedFetch): Promise<AuthContext> {
@@ -235,13 +201,12 @@ describe("oauth/auth-context.ts", () => {
     describe("refresh", () => {
       it("should rotate refresh + CP + DP on full success", async () => {
         const ctx = await newLoggedInContext(fetchSpy);
-        stubSuccessfulChain(
-          fetchSpy,
-          "new-refresh",
-          "new-id",
-          "new-cp",
-          "new-dp",
-        );
+        stubSuccessfulChain(fetchSpy, {
+          refreshToken: "new-refresh",
+          idToken: "new-id",
+          cpToken: "new-cp",
+          dpToken: "new-dp",
+        });
 
         await ctx.refresh();
 
@@ -252,7 +217,7 @@ describe("oauth/auth-context.ts", () => {
 
       it("should coalesce concurrent callers into a single Auth0 rotation", async () => {
         const ctx = await newLoggedInContext(fetchSpy);
-        stubSuccessfulChain(fetchSpy, "new-refresh");
+        stubSuccessfulChain(fetchSpy, { refreshToken: "new-refresh" });
         const callsBeforeRefresh = fetchSpy.mock.calls.length;
 
         await Promise.all([ctx.refresh(), ctx.refresh(), ctx.refresh()]);
@@ -308,7 +273,7 @@ describe("oauth/auth-context.ts", () => {
       it("should bump the idle expiry when the refresh token is rotated", async () => {
         const ctx = await newLoggedInContext(fetchSpy);
         const originalIdle = internals(ctx).refreshTokenIdleExpiresAt;
-        stubSuccessfulChain(fetchSpy, "new-refresh");
+        stubSuccessfulChain(fetchSpy, { refreshToken: "new-refresh" });
 
         await ctx.refresh();
 
@@ -323,7 +288,7 @@ describe("oauth/auth-context.ts", () => {
         const ctx = await newLoggedInContext(fetchSpy);
         const absoluteExpiry = Date.now() + 1000;
         internals(ctx).refreshTokenAbsoluteExpiresAt = absoluteExpiry;
-        stubSuccessfulChain(fetchSpy, "new-refresh");
+        stubSuccessfulChain(fetchSpy, { refreshToken: "new-refresh" });
 
         await ctx.refresh();
 
@@ -474,13 +439,12 @@ describe("oauth/auth-context.ts", () => {
         expect(ctx.getErrors().tokenRefresh!.isTransient).toBe(true);
 
         // Next refresh succeeds.
-        stubSuccessfulChain(
-          fetchSpy,
-          "new-refresh",
-          "new-id",
-          "new-cp",
-          "new-dp",
-        );
+        stubSuccessfulChain(fetchSpy, {
+          refreshToken: "new-refresh",
+          idToken: "new-id",
+          cpToken: "new-cp",
+          dpToken: "new-dp",
+        });
         await ctx.refresh();
 
         expect(ctx.getErrors().tokenRefresh).toBeUndefined();
@@ -553,6 +517,13 @@ describe("oauth/auth-context.ts", () => {
       // real setTimeout. Install fake timers only after the login resolves.
       ctx = await newLoggedInContext(fetchSpy);
       vi.useFakeTimers();
+      // Re-stamp controlPlaneExpiresAt from the fake clock so the absolute
+      // timestamp and the loop's Date.now() share a baseline. Without this,
+      // drift between login (real clock) and useFakeTimers() install
+      // shortens the first scheduled fire by a few ms, making
+      // `advanceTimersByTimeAsync(FIRST_FIRE_MS - 1)` flakily trip the timer.
+      internals(ctx).controlPlaneExpiresAt =
+        Date.now() + CONTROL_PLANE_TOKEN_LIFETIME_MS;
     });
 
     afterEach(() => {
@@ -560,45 +531,44 @@ describe("oauth/auth-context.ts", () => {
       vi.useRealTimers();
     });
 
-    it("should throw on invalid intervalMs", () => {
-      expect(() => ctx.startRefreshLoop(0)).toThrow(RangeError);
-      expect(() => ctx.startRefreshLoop(-1)).toThrow(RangeError);
-      expect(() => ctx.startRefreshLoop(NaN)).toThrow(RangeError);
-      expect(() => ctx.startRefreshLoop(Infinity)).toThrow(RangeError);
-    });
+    // The self-rescheduling loop schedules its first fire at
+    // `controlPlaneExpiresAt - REFRESH_WINDOW_MS` (~270s after a fresh login,
+    // given 5min lifetime + 30s window). Mocked refresh paths don't update
+    // `controlPlaneExpiresAt`, so subsequent fires hit the 1s floor.
+    const FIRST_FIRE_MS = 270_000;
+    const SUBSEQUENT_FIRE_MS = 1_000;
 
     it("should warn and skip when already running", () => {
-      ctx.startRefreshLoop(60_000);
-      ctx.startRefreshLoop(60_000);
+      ctx.startRefreshLoop();
+      ctx.startRefreshLoop();
     });
 
     it("should be a no-op when the context is already cleared", async () => {
       ctx.clear();
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       // No timer was ever created → no ticks fired.
       expect(refreshSpy).not.toHaveBeenCalled();
     });
 
-    it("should call refresh when CP is inside the refresh window", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+    it("should call refresh when the scheduled fire arrives", async () => {
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       expect(refreshSpy).toHaveBeenCalledOnce();
     });
 
-    it("should not call refresh when CP is still fresh", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(false);
+    it("should not call refresh before the scheduled fire arrives", async () => {
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      // Advance to just before the scheduled fire — refresh should not run yet.
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS - 1);
 
       expect(refreshSpy).not.toHaveBeenCalled();
     });
@@ -607,74 +577,71 @@ describe("oauth/auth-context.ts", () => {
       vi.spyOn(ctx, "refreshTokenExpired").mockReturnValue(true);
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
-      // Clear stops the loop, so subsequent ticks are no-ops.
-      await vi.advanceTimersByTimeAsync(60_000);
+      // refreshTokenExpired() is checked at scheduling time; if true at
+      // start-time, the loop clears and never schedules a timer.
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       expect(refreshSpy).not.toHaveBeenCalled();
     });
 
-    it("should skip a tick when the previous tick is still running", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
-      let resolveRefresh: () => void = () => {};
-      const refreshSpy = vi.spyOn(ctx, "refresh").mockReturnValue(
-        new Promise<void>((r) => {
-          resolveRefresh = r;
-        }),
-      );
-
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
-
-      expect(refreshSpy).toHaveBeenCalledOnce();
-      resolveRefresh();
-    });
-
-    it("should fire on every interval when no tick is in flight", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+    it("should fire repeatedly when no fire is in flight", async () => {
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
       expect(refreshSpy).toHaveBeenCalledOnce();
-      await vi.advanceTimersByTimeAsync(60_000);
+      // Mocked refresh didn't update tokens, so the next schedule hits the 1s
+      // floor and fires immediately.
+      await vi.advanceTimersByTimeAsync(SUBSEQUENT_FIRE_MS);
       expect(refreshSpy).toHaveBeenCalledTimes(2);
     });
 
     it("should swallow errors thrown by refresh and keep looping", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
       const refreshSpy = vi
         .spyOn(ctx, "refresh")
         .mockRejectedValueOnce(new Error("boom"))
         .mockResolvedValueOnce();
 
-      ctx.startRefreshLoop(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
+      ctx.startRefreshLoop();
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
+      await vi.advanceTimersByTimeAsync(SUBSEQUENT_FIRE_MS);
 
       expect(refreshSpy).toHaveBeenCalledTimes(2);
     });
 
-    it("should stop the loop when stopRefreshLoop is called", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
+    it("should stop scheduling after a non-transient refresh error", async () => {
+      // Simulate a non-transient error already recorded on the context.
+      // `recordRefreshError` is private; write the error shape directly.
+      ctx["errors"] = {
+        tokenRefresh: { message: "invalid_grant", isTransient: false },
+      };
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
-      ctx.startRefreshLoop(60_000);
+
+      ctx.startRefreshLoop();
+      // Advance well past the would-be first-fire — guard should have
+      // returned without scheduling a timer.
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS * 2);
+
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
+
+    it("should stop the loop when stopRefreshLoop is called", async () => {
+      const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
+      ctx.startRefreshLoop();
 
       ctx.stopRefreshLoop();
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       expect(refreshSpy).not.toHaveBeenCalled();
     });
 
     it("should stop the loop when clear() is called", async () => {
-      vi.spyOn(ctx, "shouldAttemptRefresh").mockReturnValue(true);
       const refreshSpy = vi.spyOn(ctx, "refresh").mockResolvedValue();
-      ctx.startRefreshLoop(60_000);
+      ctx.startRefreshLoop();
 
       ctx.clear();
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(FIRST_FIRE_MS);
 
       expect(refreshSpy).not.toHaveBeenCalled();
     });

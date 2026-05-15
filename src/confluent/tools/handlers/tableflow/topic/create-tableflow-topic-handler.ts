@@ -1,17 +1,24 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  CREATE_UPDATE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const createTableflowTopicArguments = z.object({
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "The unique identifier for the environment this resource belongs to.",
+    ),
+  clusterId: z
+    .string()
+    .trim()
+    .optional()
+    .describe("The unique identifier for the Kafka Cluster."),
   tableflowTopicConfig: z.object({
     // Required fields
     display_name: z
@@ -58,23 +65,17 @@ const createTableflowTopicArguments = z.object({
   }),
 });
 
-export class CreateTableFlowTopicHandler extends BaseToolHandler {
+export class CreateTableFlowTopicHandler extends TableflowToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { tableflowTopicConfig } =
+    const clientManager = runtime.clientManager;
+    const { environmentId, clusterId, tableflowTopicConfig } =
       createTableflowTopicArguments.parse(toolArguments);
 
-    const environment_id = getEnsuredParam(
-      "KAFKA_ENV_ID",
-      "Environment ID is required",
-    );
-
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-    );
+    const { environment_id, kafka_cluster_id } =
+      this.resolveTableflowEnvAndClusterId(runtime, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),
@@ -115,13 +116,5 @@ export class CreateTableFlowTopicHandler extends BaseToolHandler {
       inputSchema: createTableflowTopicArguments.shape,
       annotations: CREATE_UPDATE,
     };
-  }
-
-  getRequiredEnvVars(): EnvVar[] {
-    return ["TABLEFLOW_API_KEY", "TABLEFLOW_API_SECRET"];
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

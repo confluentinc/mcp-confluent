@@ -13,7 +13,9 @@ import { z } from "zod";
 /**
  * Connection configuration for a direct (local/Docker/Cloud) Kafka cluster.
  * Corresponds to `connections.<name>` (with `type: direct`) in the YAML configuration.
- * At least one of kafka, schema_registry, confluent_cloud, tableflow, flink, or telemetry must be present.
+ * Service blocks are all optional: a connection with no blocks is valid and enables
+ * only connection-agnostic tools (e.g. `search-product-docs`). Per-tool predicates
+ * in `connection-predicates.ts` decide which tools each connection enables.
  */
 export interface DirectConnectionConfig {
   readonly type: "direct";
@@ -23,6 +25,27 @@ export interface DirectConnectionConfig {
   readonly tableflow?: TableflowDirectConfig;
   readonly telemetry?: TelemetryDirectConfig;
   readonly flink?: FlinkDirectConfig;
+}
+
+/**
+ * OAuth (PKCE) connection variant. Peer arm of {@link DirectConnectionConfig}
+ * inside the `ConnectionConfig` discriminated union. The CCloud REST URL is
+ * derived from `ccloud_env` via `getCloudRestUrlForEnv` inside
+ * `OAuthClientManager`. No service blocks; OAuth-eligible tools auto-enable
+ * OAuth connections (see `connection-predicates.ts`). Resource IDs that direct
+ * connections supply via blocks must be passed as tool arguments under OAuth.
+ *
+ * `ccloud_env` defaults to "prod"
+ *
+ * `kafka_debug` is the optional librdkafka `debug` contexts string (e.g.
+ * "security,broker,protocol", or "all") used as a diagnostic knob when an
+ * OAuth/OAUTHBEARER SASL handshake misbehaves. Surfaced through to the
+ * `OAuthClientManager` and threaded into the rdkafka client config.
+ */
+export interface OAuthConnectionConfig {
+  readonly type: "oauth";
+  readonly ccloud_env: "devel" | "stag" | "prod";
+  readonly kafka_debug?: string;
 }
 
 /**
@@ -77,7 +100,7 @@ export interface TableflowDirectConfig {
 }
 
 /**
- * Telemetry API connection parameters.
+ * Telemetry API connection parameters (post-transform output type).
  * Corresponds to `connections.<name>.telemetry` in the YAML configuration.
  */
 export interface TelemetryDirectConfig {
@@ -95,15 +118,14 @@ export interface FlinkDirectConfig {
   readonly environment_id: string;
   readonly organization_id: string;
   readonly compute_pool_id: string;
-  readonly environment_name?: string;
+  readonly catalog_name?: string;
   readonly database_name?: string;
 }
 
 /**
- * Union of all connection types (future-proof discriminated union).
- * Currently only supports "direct" type.
+ * Discriminated union of all connection variants: direct (api-key) and oauth (PKCE).
  */
-export type ConnectionConfig = DirectConnectionConfig;
+export type ConnectionConfig = DirectConnectionConfig | OAuthConnectionConfig;
 
 /**
  * MCP server operational settings — transport, auth, and logging.
@@ -116,6 +138,22 @@ export interface ServerConfig {
   readonly do_not_track: boolean;
   readonly http: ServerHttpConfig;
   readonly auth: ServerAuthConfig;
+  readonly analytics?: ServerAnalyticsConfig;
+}
+
+/**
+ * Internal-developer-only override for the Segment write key used to emit
+ * anonymous usage analytics from this MCP server. Normal builds inject the
+ * right value at `npm pack` time via build-config injection; this knob exists
+ * so contributors can point analytics at a non-production Segment project
+ * during local development. End users should not set it.
+ *
+ * Deliberately undocumented in the user-facing example YAML templates
+ * (`config.example.yaml`, `config.oauth.example.yaml`) — surfacing it there
+ * would legitimize a knob that exists only for internal mcp-confluent dev.
+ */
+export interface ServerAnalyticsConfig {
+  readonly write_key: string;
 }
 
 /**
@@ -182,6 +220,22 @@ export class MCPServerConfiguration {
     return this.connections[connectionNames[0]!]!;
   }
 
+  /**
+   * Returns the sole connection narrowed to {@link DirectConnectionConfig}, throwing
+   * if it is OAuth-typed. Use from callers that need to read service-block fields
+   * (e.g., `kafka.cluster_id`, `flink.environment_id`) — the throw replaces what
+   * would otherwise be a `conn.type === "direct"` guard at every read site.
+   */
+  getSoleDirectConnection(): DirectConnectionConfig {
+    const conn = this.getSoleConnection();
+    if (conn.type !== "direct") {
+      throw new Error(
+        `Expected sole connection to be a direct connection; got type "${conn.type}"`,
+      );
+    }
+    return conn;
+  }
+
   getConnectionNames(): string[] {
     return Object.keys(this.connections).sort((a, b) => a.localeCompare(b));
   }
@@ -203,6 +257,22 @@ export const KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS = [
   "sasl.username",
   "sasl.password",
 ] as const;
+
+/**
+ * Requires at least one primary connectivity field (`bootstrap_servers` or `rest_endpoint`).
+ *
+ * (`cluster_id` and `env_id` are intentionally excluded: they are per-call defaults
+ * resolved at handler runtime. Each handler accepts the value as a tool argument and
+ * falls back to this block when the argument is absent, throwing only if neither
+ * source supplies it. Either field can therefore be omitted from config and supplied
+ * at call time, so partial presence is valid.)
+ */
+function kafkaBlockHasConnectivity(k: {
+  bootstrap_servers?: string;
+  rest_endpoint?: string;
+}): boolean {
+  return k.bootstrap_servers !== undefined || k.rest_endpoint !== undefined;
+}
 
 const apiKeyAuthSchema = z
   .object({
@@ -280,17 +350,10 @@ const directConnectionSchema = z
           .optional(),
       })
       .strict()
-      .refine(
-        (k) =>
-          k.bootstrap_servers !== undefined ||
-          k.rest_endpoint !== undefined ||
-          k.cluster_id !== undefined ||
-          k.env_id !== undefined,
-        {
-          message:
-            "kafka block must contain at least one of 'bootstrap_servers', 'rest_endpoint', 'cluster_id', or 'env_id'",
-        },
-      )
+      .refine(kafkaBlockHasConnectivity, {
+        message:
+          "kafka block must contain at least one of 'bootstrap_servers' or 'rest_endpoint'",
+      })
       .optional(),
     schema_registry: z
       .object({
@@ -317,6 +380,9 @@ const directConnectionSchema = z
           .trim()
           .check(z.url({ error: "telemetry.endpoint must be a valid URL" }))
           .optional(),
+        // Optional in raw input: absent auth falls back to confluent_cloud.auth in
+        // the connection-level transform, so TelemetryDirectConfig.auth is always
+        // non-null after parsing. See the transform below and TelemetryDirectConfig.
         auth: authConfigSchema.optional(),
       })
       .strict()
@@ -343,10 +409,10 @@ const directConnectionSchema = z
           .string()
           .trim()
           .startsWith("lfcp-", "flink.compute_pool_id must start with 'lfcp-'"),
-        environment_name: z
+        catalog_name: z
           .string()
           .trim()
-          .min(1, "flink.environment_name cannot be empty")
+          .min(1, "flink.catalog_name cannot be empty")
           .optional(),
         database_name: z
           .string()
@@ -362,30 +428,26 @@ const directConnectionSchema = z
 export const CONFLUENT_CLOUD_DEFAULT_ENDPOINT = "https://api.confluent.cloud";
 const TELEMETRY_DEFAULT_ENDPOINT = "https://api.telemetry.confluent.cloud";
 
+/** Zod schema for the OAuth (PKCE) connection arm. */
+const oauthConnectionSchema = z
+  .object({
+    type: z.literal("oauth"),
+    ccloud_env: z.enum(["devel", "stag", "prod"]).default("prod"),
+    kafka_debug: z
+      .string()
+      .trim()
+      .min(1, "kafka_debug cannot be empty")
+      .optional(),
+  })
+  .strict();
+
 /**
- * Discriminated union of all connection types (currently just direct).
+ * Discriminated union of all connection types: direct (api-key) and oauth (PKCE).
  */
 const connectionConfigSchema = z
-  .discriminatedUnion("type", [directConnectionSchema])
-  // superRefine calls are placed here (after the union) rather than on directConnectionSchema
+  .discriminatedUnion("type", [directConnectionSchema, oauthConnectionSchema])
+  // superRefine call is placed here (after the union) rather than on directConnectionSchema
   // because wrapping a ZodObject in ZodEffects breaks z.discriminatedUnion's discriminant lookup.
-  .superRefine((data, ctx) => {
-    if (
-      data.type === "direct" &&
-      !data.kafka &&
-      !data.schema_registry &&
-      !data.confluent_cloud &&
-      !data.tableflow &&
-      !data.flink &&
-      !data.telemetry
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined",
-      });
-    }
-  })
   .superRefine((data, ctx) => {
     // Reject endpoint-only telemetry when there is no auth available from either
     // telemetry.auth or the confluent_cloud.auth fallback. Without this check the
@@ -406,6 +468,9 @@ const connectionConfigSchema = z
     }
   })
   .transform((data): ConnectionConfig => {
+    // OAuth connections carry no service blocks — pass through untouched so the
+    // direct-arm telemetry/cc resolution below doesn't spread `undefined` onto them.
+    if (data.type !== "direct") return data;
     // Resolve the raw (optional-field) telemetry input into a fully-populated
     // TelemetryDirectConfig or undefined, applying two normalisation rules:
     //   1. If telemetry.auth is absent, fall back to confluent_cloud.auth.
@@ -419,6 +484,8 @@ const connectionConfigSchema = z
     if (rawTelemetry) {
       // superRefine above guarantees auth is non-null: endpoint-only telemetry without
       // any auth fallback is rejected before this transform runs.
+      // Post-condition: resolvedTelemetry.auth is always non-null — hasTelemetry() is
+      // sufficient to gate telemetry-dependent tools; a separate auth check is redundant.
       const auth = (rawTelemetry.auth ?? ccAuth)!;
       const endpoint = rawTelemetry.endpoint ?? TELEMETRY_DEFAULT_ENDPOINT;
       resolvedTelemetry = { endpoint, auth };
@@ -479,6 +546,15 @@ const serverAuthConfigSchema = z
       "server.auth.disabled and server.auth.api_key cannot both be set — remove the api_key or set disabled: false",
   });
 
+const serverAnalyticsConfigSchema = z
+  .object({
+    write_key: z
+      .string()
+      .trim()
+      .min(1, "server.analytics.write_key cannot be empty"),
+  })
+  .strict();
+
 // Zod v4 requires .default() to receive a value (or factory) matching the schema's
 // output type. Since each sub-schema's output type has required fields (those with
 // their own .default() calls), we use factory functions so Zod resolves field-level
@@ -511,6 +587,7 @@ const serverConfigSchema = z
     auth: serverAuthConfigSchema.default(() =>
       serverAuthConfigSchema.parse({}),
     ),
+    analytics: serverAnalyticsConfigSchema.optional(),
   })
   .strict();
 

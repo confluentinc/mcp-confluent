@@ -3,7 +3,7 @@
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) supports MCP servers natively. Add the server to your project configuration:
 
 ```bash
-claude mcp add confluent -- npx -y @confluentinc/mcp-confluent -e /path/to/.env
+claude mcp add confluent -- npx -y @confluentinc/mcp-confluent --config /path/to/config.yaml
 ```
 
 Or add it to your `.mcp.json` file directly:
@@ -13,8 +13,15 @@ Or add it to your `.mcp.json` file directly:
   "mcpServers": {
     "confluent": {
       "command": "npx",
-      "args": ["-y", "@confluentinc/mcp-confluent", "-e", "/path/to/.env"]
+      "args": [
+        "-y",
+        "@confluentinc/mcp-confluent",
+        "--config",
+        "/path/to/config.yaml"
+      ]
     }
   }
 }
 ```
+
+See [CONFIGURATION.md](../CONFIGURATION.md) for what to put in `config.yaml`. Legacy env-var configuration (`-e /path/to/config.env`) still works during the deprecation window.

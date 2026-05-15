@@ -1,15 +1,12 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS,
-  EnvVar,
-} from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -28,9 +25,10 @@ const searchTopicsByTagArguments = z.object({
 
 export class SearchTopicsByTagHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { topicTag, limit, offset } =
       searchTopicsByTagArguments.parse(toolArguments);
     const pathBasedClient = wrapAsPathBasedClient(
@@ -65,12 +63,5 @@ export class SearchTopicsByTagHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
+  readonly predicate = hasCCloudCatalogSupport;
 }

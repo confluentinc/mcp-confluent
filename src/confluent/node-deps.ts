@@ -1,22 +1,35 @@
 // Wrappers for easier stubbing in tests — ESM live bindings can't be stubbed at runtime,
 // but property access on these namespace objects can be (via `vi.spyOn`).
+import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Analytics } from "@segment/analytics-node";
 import { TELEMETRY_WRITE_KEY } from "@src/build-config.js";
-import envProxy from "@src/env.js";
 import * as dotenv from "dotenv";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer as httpCreateServer } from "node:http";
 import { arch, homedir, platform, release } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 export const buildConfig = { TELEMETRY_WRITE_KEY };
 export const dotenvLib = { config: dotenv.config };
-export const fs = { existsSync, readFileSync, writeFileSync, mkdirSync };
+export const fs = {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  appendFileSync,
+  mkdirSync,
+};
 export const os = { homedir, platform, release, arch };
-export const path = { join, resolve };
+export const path = { join, resolve, dirname, basename };
 export const segment = { Analytics };
-export const config = { env: envProxy };
 export const nodeFetch = { fetch: globalThis.fetch };
 // Wrapped as a single-signature arrow so spies don't have to disambiguate
 // between the sync and callback overloads of the underlying `node:crypto`
@@ -33,3 +46,10 @@ export const nodeOpen = {
     await open(target);
   },
 };
+export const sdkTransports = {
+  StreamableHTTPServerTransport,
+  SSEServerTransport,
+};
+// KafkaJS constructor wrapped so tests can spy on `kafkaDeps.Kafka` and return
+// a mock Kafka instance without needing vi.mock on the external module.
+export const kafkaDeps = { Kafka: KafkaJS.Kafka };

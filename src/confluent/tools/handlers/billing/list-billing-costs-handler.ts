@@ -1,14 +1,10 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasConfluentCloud,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -76,9 +72,10 @@ type BillingCostsList = z.infer<typeof billingCostsSchema>;
 
 export class ListBillingCostsHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { startDate, endDate, pageSize, pageToken } =
       listBillingCostsArguments.parse(toolArguments);
 
@@ -213,12 +210,5 @@ Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : "
       annotations: READ_ONLY,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasConfluentCloud);
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
+  readonly predicate = hasConfluentCloudOrOAuth;
 }

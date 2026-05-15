@@ -27,53 +27,23 @@ global_job_config:
       - cache store npm-cache-$(checksum package-lock.json) ~/.npm
 
 blocks:
-  - name: "Static Analysis"
+  - name: "Build & Test"
     dependencies: []
     task:
       jobs:
-        - name: "ESLint"
+        - name: "Build & Test"
           commands:
             - npm run lint
-        - name: "TypeScript"
-          commands:
             - npm run typecheck
-
-  - name: "Build"
-    dependencies: ["Static Analysis"]
-    task:
-      jobs:
-        - name: "Build"
-          commands:
             - npm run build
-
-  - name: "Test"
-    dependencies: ["Build"]
-    task:
-      jobs:
-        - name: "Test"
-          commands:
-            - npm run test:coverage
+            - npm run test:harness
+            - npm run test:unit:coverage
       epilogue:
         always:
           commands:
-            - >-
-              if [ -f TEST-result.xml ]; then
-                test-results publish TEST-result.xml --force;
-              fi
+            - make store-unit-test-results
             - sem-version java 17
             - emit-sonarqube-data --run_only_sonar_scan --enable_sonarqube_enterprise
-
-  - name: "Docker Image Scan"
-    dependencies: ["Static Analysis"]
-    task:
-      jobs:
-        - name: "Trivy Scan"
-          commands:
-            - docker build -t mcp-confluent:${SEMAPHORE_GIT_SHA:0:7} .
-            # fail the job only on CRITICAL vulnerabilities
-            - trivy image --exit-code 1 --severity CRITICAL mcp-confluent:${SEMAPHORE_GIT_SHA:0:7}
-            # report HIGH and MEDIUM vulnerabilities but don't fail the job
-            - trivy image --severity HIGH,MEDIUM mcp-confluent:${SEMAPHORE_GIT_SHA:0:7}
 
 after_pipeline:
   task:
@@ -81,3 +51,19 @@ after_pipeline:
       - name: Publish Test Results
         commands:
           - test-results gen-pipeline-report || true
+
+promotions:
+  - name: Docker Image Scan
+    pipeline_file: docker-image-scan.yml
+  - name: "Integration Tests"
+    pipeline_file: integration.yml
+    parameters:
+      env_vars:
+        - name: TOOL_GROUPS
+          description: "Pipe-separated vitest tags to run (e.g. @kafka|@schema)"
+          default_value: "@smoke|@kafka|@schema|@environments|@clusters|@connect|@metrics|@flink|@tableflow|@billing|@docs|@catalog"
+          required: true
+        - name: TRANSPORTS
+          description: "Pipe-separated MCP transports (stdio|http|sse)"
+          default_value: "stdio|http|sse"
+          required: true

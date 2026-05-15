@@ -4,9 +4,7 @@ import {
   TelemetryEvent,
   TelemetryService,
 } from "@src/confluent/telemetry.js";
-import { mockEnv } from "@tests/stubs/index.js";
 import {
-  afterEach,
   beforeEach,
   describe,
   expect,
@@ -67,22 +65,7 @@ describe("TelemetryService", () => {
       );
     vi.spyOn(nodeDeps.os, "homedir").mockReturnValue("/tmp/test-home");
 
-    // env stub (replaces Proxy that would throw before initEnv)
-    mockEnv({ DO_NOT_TRACK: false });
-
-    // default: no built-in write key (simulates unpacked/dev build)
-    vi.spyOn(
-      nodeDeps.buildConfig,
-      "TELEMETRY_WRITE_KEY",
-      "get",
-    ).mockReturnValue("");
-
     TelemetryService["instance"] = undefined;
-  });
-
-  afterEach(() => {
-    // not managed by restoreMocks, so clean up manually to avoid affecting other tests
-    delete process.env.TELEMETRY_WRITE_KEY;
   });
 
   describe("initialize / getInstance contract", () => {
@@ -93,14 +76,14 @@ describe("TelemetryService", () => {
     });
 
     it("should throw when initialize is called a second time", () => {
-      TelemetryService.initialize(false);
-      expect(() => TelemetryService.initialize(false)).toThrow(
-        /already been initialized/,
-      );
+      TelemetryService.initialize({ doNotTrack: false, writeKey: undefined });
+      expect(() =>
+        TelemetryService.initialize({ doNotTrack: false, writeKey: undefined }),
+      ).toThrow(/already been initialized/);
     });
 
     it("should return the same instance across multiple getInstance calls", () => {
-      TelemetryService.initialize(false);
+      TelemetryService.initialize({ doNotTrack: false, writeKey: undefined });
       const a = TelemetryService.getInstance();
       const b = TelemetryService.getInstance();
       expect(a).toBe(b);
@@ -108,25 +91,11 @@ describe("TelemetryService", () => {
   });
 
   describe("activation", () => {
-    it("should be enabled when the TELEMETRY_WRITE_KEY env var is set", () => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
-      TelemetryService.initialize(false);
-
-      const service = TelemetryService.getInstance();
-      service.track(TelemetryEvent.TOOL_CALL, {
-        toolName: "list_topics",
+    it("should be enabled when initialize receives a writeKey", () => {
+      TelemetryService.initialize({
+        doNotTrack: false,
+        writeKey: "real-key",
       });
-
-      expect(trackStub).toHaveBeenCalledOnce();
-    });
-
-    it("should be enabled when the built-in write key is present (no env var)", () => {
-      vi.spyOn(
-        nodeDeps.buildConfig,
-        "TELEMETRY_WRITE_KEY",
-        "get",
-      ).mockReturnValue("packed-key");
-      TelemetryService.initialize(false);
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
@@ -135,32 +104,12 @@ describe("TelemetryService", () => {
 
       expect(trackStub).toHaveBeenCalledOnce();
       expect(analyticsConstructorStub).toHaveBeenCalledWith(
-        expect.objectContaining({ writeKey: "packed-key" }),
+        expect.objectContaining({ writeKey: "real-key" }),
       );
     });
 
-    it("should prefer the env var over the built-in key", () => {
-      process.env.TELEMETRY_WRITE_KEY = "env-key";
-      vi.spyOn(
-        nodeDeps.buildConfig,
-        "TELEMETRY_WRITE_KEY",
-        "get",
-      ).mockReturnValue("packed-key");
-      TelemetryService.initialize(false);
-
-      const service = TelemetryService.getInstance();
-      service.track(TelemetryEvent.TOOL_CALL, {
-        toolName: "list_topics",
-      });
-
-      expect(trackStub).toHaveBeenCalledOnce();
-      expect(analyticsConstructorStub).toHaveBeenCalledWith(
-        expect.objectContaining({ writeKey: "env-key" }),
-      );
-    });
-
-    it("should be disabled when neither env var nor built-in key is set", () => {
-      TelemetryService.initialize(false);
+    it("should be disabled when initialize receives writeKey: undefined", () => {
+      TelemetryService.initialize({ doNotTrack: false, writeKey: undefined });
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
@@ -168,11 +117,23 @@ describe("TelemetryService", () => {
       });
 
       expect(trackStub).not.toHaveBeenCalled();
+      expect(analyticsConstructorStub).not.toHaveBeenCalled();
     });
 
-    it("should be disabled when initialized with doNotTrack: true, even with a valid write key", () => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
-      TelemetryService.initialize(true);
+    it("should be disabled when initialize receives an empty-string writeKey", () => {
+      TelemetryService.initialize({ doNotTrack: false, writeKey: "" });
+
+      const service = TelemetryService.getInstance();
+      service.track(TelemetryEvent.TOOL_CALL, {
+        toolName: "list_topics",
+      });
+
+      expect(trackStub).not.toHaveBeenCalled();
+      expect(analyticsConstructorStub).not.toHaveBeenCalled();
+    });
+
+    it("should be disabled when initialized with doNotTrack: true, even with a valid writeKey", () => {
+      TelemetryService.initialize({ doNotTrack: true, writeKey: "real-key" });
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {
@@ -187,8 +148,7 @@ describe("TelemetryService", () => {
     let service: TelemetryService;
 
     beforeEach(() => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
-      TelemetryService.initialize(false);
+      TelemetryService.initialize({ doNotTrack: false, writeKey: "real-key" });
       service = TelemetryService.getInstance();
     });
 
@@ -227,7 +187,7 @@ describe("TelemetryService", () => {
 
     it("should skip identify calls when initialized with doNotTrack: true", () => {
       TelemetryService["instance"] = undefined;
-      TelemetryService.initialize(true);
+      TelemetryService.initialize({ doNotTrack: true, writeKey: "real-key" });
 
       const disabled = TelemetryService.getInstance();
       disabled.identify("user-123", { org: "acme" });
@@ -238,8 +198,7 @@ describe("TelemetryService", () => {
 
   describe("machine ID persistence", () => {
     it("should generate and write a new UUID when no machine-id file exists", () => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
-      TelemetryService.initialize(false);
+      TelemetryService.initialize({ doNotTrack: false, writeKey: "real-key" });
 
       TelemetryService.getInstance();
 
@@ -252,9 +211,8 @@ describe("TelemetryService", () => {
     });
 
     it("should reuse an existing UUID when a machine-id file exists", () => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
       readFileSyncStub.mockReturnValue("existing-uuid");
-      TelemetryService.initialize(false);
+      TelemetryService.initialize({ doNotTrack: false, writeKey: "real-key" });
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {});
@@ -265,11 +223,10 @@ describe("TelemetryService", () => {
     });
 
     it("should fall back to an anonymous ID when the file system is not writable", () => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
       mkdirSyncStub.mockImplementation(() => {
         throw new Error("EACCES");
       });
-      TelemetryService.initialize(false);
+      TelemetryService.initialize({ doNotTrack: false, writeKey: "real-key" });
 
       const service = TelemetryService.getInstance();
       service.track(TelemetryEvent.TOOL_CALL, {});
@@ -282,8 +239,7 @@ describe("TelemetryService", () => {
 
   describe("shutdown", () => {
     it("should flush the analytics client on shutdown", async () => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
-      TelemetryService.initialize(false);
+      TelemetryService.initialize({ doNotTrack: false, writeKey: "real-key" });
 
       await TelemetryService.getInstance().shutdown();
 
@@ -292,7 +248,7 @@ describe("TelemetryService", () => {
     });
 
     it("should be a no-op when telemetry is disabled", async () => {
-      TelemetryService.initialize(false);
+      TelemetryService.initialize({ doNotTrack: false, writeKey: undefined });
 
       await TelemetryService.getInstance().shutdown();
 
@@ -304,8 +260,7 @@ describe("TelemetryService", () => {
     let service: TelemetryService;
 
     beforeEach(() => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
-      TelemetryService.initialize(false);
+      TelemetryService.initialize({ doNotTrack: false, writeKey: "real-key" });
       service = TelemetryService.getInstance();
     });
 
@@ -364,8 +319,7 @@ describe("TelemetryService", () => {
     let service: TelemetryService;
 
     beforeEach(() => {
-      process.env.TELEMETRY_WRITE_KEY = "real-key";
-      TelemetryService.initialize(false);
+      TelemetryService.initialize({ doNotTrack: false, writeKey: "real-key" });
       service = TelemetryService.getInstance();
     });
 

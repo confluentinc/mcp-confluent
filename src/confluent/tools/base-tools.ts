@@ -1,8 +1,12 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import { ClientManager } from "@src/confluent/client-manager.js";
+import type { ConnectionConfig } from "@src/config/models.js";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
+import {
+  ConnectionPredicate,
+  PredicateResult,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { ZodRawShape } from "zod";
 
@@ -26,7 +30,7 @@ export const DESTRUCTIVE: ToolAnnotations = {
 
 export interface ToolHandler {
   handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
     sessionId?: string,
   ): Promise<CallToolResult> | CallToolResult;
@@ -34,21 +38,33 @@ export interface ToolHandler {
   getToolConfig(): ToolConfig;
 
   /**
-   * Returns the IDs of connections that satisfy this tool's service requirements.
-   * A non-empty result enables the tool; an empty result disables it. Implementations
-   * should return a subset of the keys in runtime.config.connections.
+   * The connection predicate that gates this tool's enablement. Lifted onto
+   * the interface so the MCP tool-call wrapper can compare it against
+   * `alwaysEnabled` to skip the OAuth login gate for tools that don't touch
+   * the client manager (currently the doc-lookup tools). See
+   * {@linkcode BaseToolHandler.predicate} for the rules around setting it.
+   */
+  readonly predicate: ConnectionPredicate;
+
+  /**
+   * IDs of connections that satisfy this tool's service requirements. A
+   * non-empty result enables the tool; an empty result disables it. Always a
+   * subset of `runtime.config.connections` keys.
    *
-   * Each handler is intended to implement this by applying the appropriate predicate from
-   * connection-predicates.ts via connectionIdsWhere(), e.g.:
-   *   return connectionIdsWhere(runtime.config.connections, hasKafka);
+   * Implementations that extend {@linkcode BaseToolHandler} (the standard
+   * path for every tool in this codebase) must not override this — declare
+   * a {@linkcode BaseToolHandler.predicate} property and let the base class
+   * derive the result.
    */
   enabledConnectionIds(runtime: ServerRuntime): string[];
 
   /**
-   * Returns true if this tool can only be used with Confluent Cloud REST APIs.
-   * Override in subclasses for cloud-only tools.
+   * Per-connection verdict map for this tool: `{ enabled: true }` for
+   * connections that satisfy its requirements, `{ enabled: false; reason }`
+   * for those that don't. Powers startup-log grouping and the
+   * `describe-tool-availability` diagnostic tool.
    */
-  isConfluentCloudOnly(): boolean;
+  connectionVerdicts(runtime: ServerRuntime): Map<string, PredicateResult>;
 }
 
 export interface ToolConfig {
@@ -60,7 +76,7 @@ export interface ToolConfig {
 
 export abstract class BaseToolHandler implements ToolHandler {
   abstract handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
     sessionId?: string,
   ): Promise<CallToolResult> | CallToolResult;
@@ -68,39 +84,117 @@ export abstract class BaseToolHandler implements ToolHandler {
   abstract getToolConfig(): ToolConfig;
 
   /**
-   * Return the env var names required for this tool.
-   * Used by the enabledConnectionIds() shim; replaced by typed connection predicates
-   * when each handler migrates (issue-173 children). Remove once all handlers migrate.
+   * The connection predicate that gates this tool. The single customization
+   * seam for tool enablement — declared as a one-line readonly property:
+   *
+   *     readonly predicate = hasKafka;                  // base predicate
+   *     readonly predicate = kafkaBootstrapOrOAuth;     // named composite
+   *     readonly predicate = alwaysEnabled;             // no requirement
+   *
+   * **Must reference a named export from `connection-predicates.ts`.** Do
+   * not compose with `allOf(...)` or `widenForOAuth(...)` at the use site.
+   * If no existing named export expresses the gate you need, add one —
+   * with a per-predicate test in `connection-predicates.test.ts` matching
+   * the depth of the existing `hasKafka` / `flinkWithTelemetry` blocks —
+   * and reference that. Enforced mechanically: the `predicate property`
+   * block in `tool-registry.test.ts` maintains an explicit
+   * `Readonly<Record<ToolName, ConnectionPredicate>>` (`EXPECTED_PREDICATES`)
+   * pinning every tool to its expected predicate. The `Record` over
+   * `ToolName` makes exhaustiveness a compile-time check (a missing tool
+   * is a `tsc` error, not a runtime one), and the value type rejects
+   * combinators at compile time. The `it.each` over the record fails with
+   * the offending tool name in the row label whenever a handler's
+   * `predicate` drifts from the table. New tools or rewires are a one-line
+   * table edit.
+   *
+   * Both {@linkcode enabledConnectionIds} and {@linkcode connectionVerdicts}
+   * are derived from this property and are marked `@final`; never override
+   * either method. The retired iteration helpers `connectionIdsWhere` and
+   * `connectionReasonsWhere` are no longer exported — the base class walks
+   * `runtime.config.connections` for you.
    */
-  protected getRequiredEnvVars(): readonly EnvVar[] {
-    throw new Error(
-      `${this.constructor.name} must override enabledConnectionIds() or implement getRequiredEnvVars()`,
-    );
-  }
+  abstract readonly predicate: ConnectionPredicate;
 
   /**
-   * Determines which configured connections can serve this tool by inspecting
-   * their service blocks. If returns an empty array, the tool is disabled.
+   * IDs of connections that satisfy this tool's {@linkcode predicate}. A
+   * non-empty result enables the tool; an empty result disables it.
    *
-   * The canonical implementation is a one-liner:
-   *   return connectionIdsWhere(runtime.config.connections, some-predicate-function);
+   * Customize tool gating by declaring {@linkcode predicate}, never by
+   * replacing this derivation.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
    */
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    // Shim: delegates to getRequiredEnvVars() until all handlers migrate (issue-173).
-    const missingVars = this.getRequiredEnvVars().filter(
-      (varName) => !runtime.env[varName],
-    );
-    return missingVars.length === 0
-      ? Object.keys(runtime.config.connections)
-      : [];
+    return Object.entries(runtime.config.connections)
+      .filter(([, conn]) => this.predicate(conn).enabled)
+      .map(([id]) => id);
   }
 
   /**
-   * Default implementation returns false, indicating the tool is not Confluent Cloud only.
-   * Override in subclasses for cloud-only tools.
+   * Per-connection verdict map for this tool, derived from
+   * {@linkcode predicate}. Powers grouped startup logging and
+   * the diagnostic-tool surface.
+   *
+   * Customize tool gating by declaring {@linkcode predicate}, never by
+   * replacing this derivation.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
    */
-  isConfluentCloudOnly(): boolean {
-    return false;
+  connectionVerdicts(runtime: ServerRuntime): Map<string, PredicateResult> {
+    return new Map(
+      Object.entries(runtime.config.connections).map(([id, conn]) => [
+        id,
+        this.predicate(conn),
+      ]),
+    );
+  }
+
+  /**
+   * Resolves the single connection enabled for this tool, returning the
+   * connection id, its config, and the matching client manager. Designed
+   * for handlers that look up `runtime.clientManagers[connId]` (multi-
+   * connection-ready shape).
+   *
+   * Selects `enabledConnectionIds(runtime)[0]` — current runtime is single-
+   * connection, so this is unambiguous; if multi-connection support lands
+   * later, handlers can switch to iterating ids.
+   */
+  protected resolveSoleConnection(runtime: ServerRuntime): {
+    connId: string;
+    conn: ConnectionConfig;
+    clientManager: BaseClientManager;
+  } {
+    const connId = this.enabledConnectionIds(runtime)[0]!;
+    return {
+      connId,
+      conn: runtime.config.connections[connId]!,
+      clientManager: runtime.clientManagers[connId]!,
+    };
+  }
+
+  /**
+   * Resolves a required string from an explicit tool argument, falling back to
+   * a connection-config value. Throws if neither is present.
+   * `label` is the human-readable field name (e.g. `"Organization ID"`);
+   * the thrown message is `"${label} is required"`.
+   * The returned value is always trimmed.
+   */
+  protected resolveParam(
+    argValue: string | undefined,
+    configValue: string | undefined,
+    label: string,
+  ): string {
+    const resolved = argValue?.trim() || configValue?.trim();
+    if (!resolved) throw new Error(`${label} is required`);
+    return resolved;
+  }
+
+  /** Like resolveParam but returns undefined instead of throwing when both are absent or blank. The returned value is always trimmed. */
+  protected resolveOptionalParam(
+    argValue: string | undefined,
+    configValue: string | undefined,
+  ): string | undefined {
+    return argValue?.trim() || configValue?.trim() || undefined;
   }
 
   createResponse(

@@ -1,13 +1,13 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   DESTRUCTIVE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { hasSchemaRegistryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -26,23 +26,30 @@ const deleteSchemaArguments = z.object({
     )
     .default(false)
     .optional(),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Schema Registry. Discover via list-environments.",
+    ),
 });
 
 export class DeleteSchemaHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { subject, version, permanent } =
+    const { clientManager } = this.resolveSoleConnection(runtime);
+    const { subject, version, permanent, environment_id } =
       deleteSchemaArguments.parse(toolArguments);
 
     logger.debug(
-      { subject, version, permanent },
+      { subject, version, permanent, environment_id },
       "DeleteSchemaHandler.handle called with arguments",
     );
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getSchemaRegistryRestClient(environment_id),
     );
 
     if (version !== undefined) {
@@ -110,8 +117,5 @@ export class DeleteSchemaHandler extends BaseToolHandler {
       annotations: DESTRUCTIVE,
     };
   }
-
-  getRequiredEnvVars(): EnvVar[] {
-    return ["SCHEMA_REGISTRY_ENDPOINT"];
-  }
+  readonly predicate = hasSchemaRegistryOrOAuth;
 }

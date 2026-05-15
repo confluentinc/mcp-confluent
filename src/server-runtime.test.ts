@@ -1,11 +1,13 @@
+import { DEFAULT_CONNECTION_NAME } from "@src/config/env-config.js";
 import { type DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import {
-  constructClientManagerForConnection,
-  DefaultClientManager,
-} from "@src/confluent/client-manager.js";
+  constructDirectClientManager,
+  DirectClientManager,
+} from "@src/confluent/direct-client-manager.js";
+import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
+import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { envFactory } from "@tests/factories/env.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
@@ -15,30 +17,30 @@ function connWith(
   return { type: "direct", ...fields };
 }
 
-describe("constructClientManagerForConnection()", () => {
-  it("should return a DefaultClientManager instance", () => {
-    const manager = constructClientManagerForConnection(
+describe("constructDirectClientManager()", () => {
+  it("should return a DirectClientManager instance", () => {
+    const manager = constructDirectClientManager(
       connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     );
-    expect(manager).toBeInstanceOf(DefaultClientManager);
+    expect(manager).toBeInstanceOf(DirectClientManager);
   });
 
   it("should always set client.id to mcp-confluent", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     );
     expect(manager["kafkaConfig"]["client.id"]).toBe("mcp-confluent");
   });
 
   it("should set bootstrap.servers from the kafka block", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     );
     expect(manager["kafkaConfig"]["bootstrap.servers"]).toBe("broker:9092");
   });
 
   it("should include SASL config when the kafka block has auth", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({
         kafka: {
           bootstrap_servers: "broker:9092",
@@ -52,14 +54,14 @@ describe("constructClientManagerForConnection()", () => {
   });
 
   it("should omit SASL config when the kafka block has no auth", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     );
     expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
   });
 
   it("should omit SASL config when there is no kafka block", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({
         confluent_cloud: {
           endpoint: "https://api.confluent.cloud",
@@ -71,7 +73,7 @@ describe("constructClientManagerForConnection()", () => {
   });
 
   it("should spread kafka extra_properties into the GlobalConfig", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({
         kafka: {
           bootstrap_servers: "broker:9092",
@@ -83,7 +85,7 @@ describe("constructClientManagerForConnection()", () => {
   });
 
   it("should set confluentCloudBaseUrl from the confluent_cloud block endpoint", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({
         confluent_cloud: {
           endpoint: "https://my.cloud.api",
@@ -95,7 +97,7 @@ describe("constructClientManagerForConnection()", () => {
   });
 
   it("should set confluentCloudBaseUrl to https://api.confluent.cloud when the block uses the default endpoint", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({
         confluent_cloud: {
           endpoint: "https://api.confluent.cloud",
@@ -109,7 +111,7 @@ describe("constructClientManagerForConnection()", () => {
   });
 
   it("should default confluentCloudBaseUrl to https://api.confluent.cloud when there is no confluent_cloud block", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     );
     expect(manager["confluentCloudBaseUrl"]).toBe(
@@ -117,19 +119,8 @@ describe("constructClientManagerForConnection()", () => {
     );
   });
 
-  it("should set confluentCloudTableflowBaseUrl to https://api.confluent.cloud when only tableflow is configured", () => {
-    const manager = constructClientManagerForConnection(
-      connWith({
-        tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
-      }),
-    );
-    expect(manager["confluentCloudTableflowBaseUrl"]).toBe(
-      "https://api.confluent.cloud",
-    );
-  });
-
   it("should set confluentCloudTelemetryBaseUrl from the telemetry block", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({
         telemetry: {
           endpoint: "https://my.telemetry.api",
@@ -143,7 +134,7 @@ describe("constructClientManagerForConnection()", () => {
   });
 
   it("should leave confluentCloudTelemetryBaseUrl undefined when there is no telemetry block", () => {
-    const manager = constructClientManagerForConnection(
+    const manager = constructDirectClientManager(
       connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     );
     expect(manager["confluentCloudTelemetryBaseUrl"]).toBeUndefined();
@@ -156,40 +147,34 @@ describe("ServerRuntime", () => {
       "test-conn": connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
     },
   });
-  const env = envFactory();
 
   describe("constructor", () => {
-    it("should store config, clientManagers, and env as-is", () => {
-      const cm = createMockInstance(DefaultClientManager);
-      const runtime = new ServerRuntime(config, { "test-conn": cm }, env);
+    it("should store config and clientManagers as-is", () => {
+      const cm = createMockInstance(DirectClientManager);
+      const runtime = new ServerRuntime(config, { "test-conn": cm });
       expect(runtime.config).toBe(config);
       expect(runtime.clientManagers).toStrictEqual({ "test-conn": cm });
-      expect(runtime.env).toBe(env);
     });
   });
 
   describe("get clientManager()", () => {
     it("should return the sole client manager", () => {
-      const cm = createMockInstance(DefaultClientManager);
-      const runtime = new ServerRuntime(config, { "test-conn": cm }, env);
+      const cm = createMockInstance(DirectClientManager);
+      const runtime = new ServerRuntime(config, { "test-conn": cm });
       expect(runtime.clientManager).toBe(cm);
     });
 
     it("should throw when clientManagers is empty", () => {
-      const runtime = new ServerRuntime(config, {}, env);
+      const runtime = new ServerRuntime(config, {});
       expect(() => runtime.clientManager).toThrow(
         "ServerRuntime has no client managers",
       );
     });
 
     it("should throw when clientManagers has more than one entry", () => {
-      const cm1 = createMockInstance(DefaultClientManager);
-      const cm2 = createMockInstance(DefaultClientManager);
-      const runtime = new ServerRuntime(
-        config,
-        { conn1: cm1, conn2: cm2 },
-        env,
-      );
+      const cm1 = createMockInstance(DirectClientManager);
+      const cm2 = createMockInstance(DirectClientManager);
+      const runtime = new ServerRuntime(config, { conn1: cm1, conn2: cm2 });
       expect(() => runtime.clientManager).toThrow(
         "ServerRuntime has multiple client managers",
       );
@@ -197,7 +182,7 @@ describe("ServerRuntime", () => {
   });
 
   describe("fromConfig()", () => {
-    it("should create a DefaultClientManager for each connection", () => {
+    it("should create a DirectClientManager for each connection", () => {
       const twoConnConfig = new MCPServerConfiguration({
         connections: {
           conn1: connWith({ kafka: { bootstrap_servers: "broker1:9092" } }),
@@ -209,23 +194,79 @@ describe("ServerRuntime", () => {
           }),
         },
       });
-      const runtime = ServerRuntime.fromConfig(twoConnConfig, env);
+      const runtime = ServerRuntime.fromConfig(twoConnConfig);
       expect(Object.keys(runtime.clientManagers)).toStrictEqual([
         "conn1",
         "conn2",
       ]);
       expect(runtime.clientManagers["conn1"]).toBeInstanceOf(
-        DefaultClientManager,
+        DirectClientManager,
       );
       expect(runtime.clientManagers["conn2"]).toBeInstanceOf(
-        DefaultClientManager,
+        DirectClientManager,
       );
     });
 
-    it("should store the config and env on the returned runtime", () => {
-      const runtime = ServerRuntime.fromConfig(config, env);
+    it("should store the config on the returned runtime", () => {
+      const runtime = ServerRuntime.fromConfig(config);
       expect(runtime.config).toBe(config);
-      expect(runtime.env).toBe(env);
+    });
+
+    it("should leave oauthHolder undefined when the config has no ccloud-oauth", () => {
+      const noOauthConfig = new MCPServerConfiguration({
+        connections: {
+          [DEFAULT_CONNECTION_NAME]: connWith({
+            kafka: { bootstrap_servers: "broker:9092" },
+          }),
+        },
+      });
+      const runtime = ServerRuntime.fromConfig(noOauthConfig);
+      expect(runtime.oauthHolder).toBeUndefined();
+    });
+
+    it("should construct an OAuthHolder when a connection has type 'oauth'", () => {
+      const oauthConfig = new MCPServerConfiguration({
+        connections: {
+          [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "devel" },
+        },
+      });
+
+      const runtime = ServerRuntime.fromConfig(oauthConfig);
+
+      expect(runtime.oauthHolder).toBeInstanceOf(OAuthHolder);
+      expect(runtime.oauthHolder?.getControlPlaneToken()).toBeUndefined();
+      expect(runtime.oauthHolder?.getDataPlaneToken()).toBeUndefined();
+    });
+
+    it("should construct OAuthClientManager instances for every connection when an oauth connection is present", () => {
+      const oauthConfig = new MCPServerConfiguration({
+        connections: {
+          [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "stag" },
+        },
+      });
+
+      const runtime = ServerRuntime.fromConfig(oauthConfig);
+
+      expect(runtime.clientManagers[DEFAULT_CONNECTION_NAME]).toBeInstanceOf(
+        OAuthClientManager,
+      );
+    });
+
+    it("should throw when more than one OAuth connection is defined", () => {
+      // enforceSingleConnectionOnly() prevents multi-connection records today,
+      // so this case is reached only by callers that bypass the schema (tests
+      // constructing MCPServerConfiguration directly). The defensive throw
+      // becomes load-bearing when multi-connection support lands (#151).
+      const multiOauthConfig = new MCPServerConfiguration({
+        connections: {
+          "oauth-1": { type: "oauth", ccloud_env: "devel" },
+          "oauth-2": { type: "oauth", ccloud_env: "stag" },
+        },
+      });
+
+      expect(() => ServerRuntime.fromConfig(multiOauthConfig)).toThrow(
+        /Multiple OAuth connections defined/,
+      );
     });
   });
 });

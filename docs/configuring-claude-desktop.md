@@ -1,6 +1,6 @@
 # Configuring Claude Desktop
 
-See [here](https://modelcontextprotocol.io/quickstart/user) for more details about installing Claude Desktop and MCP servers.
+See [the MCP user quickstart](https://modelcontextprotocol.io/quickstart/user) for general background on Claude Desktop and MCP servers.
 
 To configure Claude Desktop to use this MCP server:
 
@@ -22,8 +22,8 @@ To configure Claude Desktop to use this MCP server:
          "command": "node",
          "args": [
            "/path/to/confluent-mcp-server/dist/index.js",
-           "--env-file",
-           "/path/to/confluent-mcp-server/.env"
+           "--config",
+           "/path/to/confluent-mcp-server/config.yaml"
          ]
        }
      }
@@ -43,8 +43,8 @@ To configure Claude Desktop to use this MCP server:
          "args": [
            "-y",
            "@confluentinc/mcp-confluent",
-           "-e",
-           "/path/to/confluent-mcp-server/.env"
+           "--config",
+           "/path/to/confluent-mcp-server/config.yaml"
          ]
        }
      }
@@ -59,6 +59,6 @@ To configure Claude Desktop to use this MCP server:
    - Close and reopen Claude Desktop for the changes to take effect
    - The MCP server will automatically start when Claude Desktop launches
 
-Now Claude Desktop will be configured to use your local MCP server for Confluent interactions.
+See [CONFIGURATION.md](../CONFIGURATION.md) for what to put in `config.yaml`. Legacy env-var configuration (`-e /path/to/config.env`) still works during the deprecation window.
 
 ![Claude Tools](../assets/claude-tools.png)

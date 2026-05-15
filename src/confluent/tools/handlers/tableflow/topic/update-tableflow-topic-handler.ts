@@ -1,12 +1,8 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  CREATE_UPDATE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -70,11 +66,12 @@ const updateTableflowTopicArguments = z.object({
   }),
 });
 
-export class UpdateTableFlowTopicHandler extends BaseToolHandler {
+export class UpdateTableFlowTopicHandler extends TableflowToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { display_name, tableflowTopicConfig } =
       updateTableflowTopicArguments.parse(toolArguments);
 
@@ -118,13 +115,5 @@ export class UpdateTableFlowTopicHandler extends BaseToolHandler {
       inputSchema: updateTableflowTopicArguments.shape,
       annotations: CREATE_UPDATE,
     };
-  }
-
-  getRequiredEnvVars(): EnvVar[] {
-    return ["TABLEFLOW_API_KEY", "TABLEFLOW_API_SECRET"];
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

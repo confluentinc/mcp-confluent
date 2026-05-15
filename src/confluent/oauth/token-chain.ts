@@ -27,6 +27,15 @@ export interface TokenChainResult {
   controlPlaneExpiresAt: number;
   dataPlaneToken: string;
   dataPlaneExpiresAt: number;
+  /**
+   * User identity fields lifted from the `/api/sessions` response body
+   * (`response.user`). Surface here so callers (the OAuth holder) can
+   * attach the user's identity to telemetry without having to parse the
+   * raw CP response themselves. Either field is `undefined` when the
+   * response omits `user` or the underlying field.
+   */
+  resourceId: string | undefined;
+  email: string | undefined;
 }
 
 /**
@@ -210,7 +219,6 @@ export async function executeFullTokenChain(
   );
 
   const now = Date.now();
-
   return {
     refreshToken: auth0Response.refresh_token,
     refreshTokenAbsoluteExpiresAt: now + REFRESH_TOKEN_ABSOLUTE_LIFETIME_MS,
@@ -219,5 +227,7 @@ export async function executeFullTokenChain(
     controlPlaneExpiresAt: now + CONTROL_PLANE_TOKEN_LIFETIME_MS,
     dataPlaneToken: dpResponse.token,
     dataPlaneExpiresAt: now + DATA_PLANE_TOKEN_LIFETIME_MS,
+    resourceId: cpResponse.user?.resource_id,
+    email: cpResponse.user?.email,
   };
 }

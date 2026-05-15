@@ -1,4 +1,4 @@
-import { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   ConnectionPredicate,
   PredicateResult,
@@ -8,6 +8,7 @@ import {
 } from "@src/confluent/tools/connection-predicates.js";
 import {
   buildToolGatingReport,
+  disabledToolGroupKey,
   groupDisabledToolsByReason,
 } from "@src/confluent/tools/tool-availability.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -20,8 +21,11 @@ import {
 import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-function stubWithPredicate(predicate: ConnectionPredicate): ToolHandler {
-  const handler = new StubHandler();
+function stubWithPredicate(
+  predicate: ConnectionPredicate,
+  category: ToolCategory = ToolCategory.Kafka,
+): ToolHandler {
+  const handler = new StubHandler({ category });
   // Override the readonly predicate via type assertion for test composition.
   (handler as unknown as { predicate: ConnectionPredicate }).predicate =
     predicate;
@@ -176,6 +180,7 @@ describe("tool-availability.ts", () => {
     it("should produce an empty report with zero counts when no tools are passed", () => {
       const report = buildToolGatingReport([], runtimeWith({}, "default"));
       expect(report).toEqual({
+        groupBy: "reason",
         disabledGroups: [],
         enabledCount: 0,
         disabledCount: 0,
@@ -189,6 +194,7 @@ describe("tool-availability.ts", () => {
         runtimeWith(KAFKA_CONN),
       );
       expect(report).toEqual({
+        groupBy: "reason",
         disabledGroups: [],
         enabledCount: 1,
         disabledCount: 0,
@@ -208,6 +214,7 @@ describe("tool-availability.ts", () => {
         runtimeWith({}, "default"),
       );
       expect(report).toEqual({
+        groupBy: "reason",
         disabledGroups: [
           {
             reason: ToolDisabledReason.MissingFlinkBlock,
@@ -244,6 +251,7 @@ describe("tool-availability.ts", () => {
       );
 
       expect(report).toEqual({
+        groupBy: "reason",
         disabledGroups: [],
         enabledCount: 1,
         disabledCount: 0,
@@ -292,6 +300,68 @@ describe("tool-availability.ts", () => {
           ],
         },
       ]);
+    });
+
+    describe('groupBy: "category"', () => {
+      // Both stubs land in ToolCategory.Kafka, but their predicates fail
+      // for different reasons (MissingKafkaBlock vs MissingFlinkBlock).
+      // Under the default "reason" axis they'd split into two buckets;
+      // the "category" axis merges them — proving the bucket key really
+      // is the category, not the reason.
+      it('should merge same-category disabled tools under one bucket when groupBy is "category"', () => {
+        const sameCategoryKafkaReasonStub = stubWithPredicate(disabledForKafka);
+        const sameCategoryFlinkReasonStub = stubWithPredicate(disabledForFlink);
+        const report = buildToolGatingReport(
+          [
+            [ToolName.LIST_TOPICS, sameCategoryKafkaReasonStub],
+            [ToolName.LIST_FLINK_STATEMENTS, sameCategoryFlinkReasonStub],
+          ],
+          runtimeWith({}, "default"),
+          "category",
+        );
+        expect(report).toEqual({
+          groupBy: "category",
+          disabledGroups: [
+            {
+              category: ToolCategory.Kafka,
+              tools: [ToolName.LIST_TOPICS, ToolName.LIST_FLINK_STATEMENTS],
+            },
+          ],
+          enabledCount: 0,
+          disabledCount: 2,
+        });
+      });
+
+      it("should sort category-keyed groups lex by category", () => {
+        // Two stubs with the same predicate (so reasons are identical
+        // and the only differentiator is category) but distinct categories —
+        // insertion order Tableflow-then-Billing, expected output
+        // Billing-then-Tableflow.
+        const tableflowCategoryStub = stubWithPredicate(
+          disabledForKafka,
+          ToolCategory.Tableflow,
+        );
+        const billingCategoryStub = stubWithPredicate(
+          disabledForKafka,
+          ToolCategory.Billing,
+        );
+
+        const report = buildToolGatingReport(
+          [
+            [ToolName.LIST_TABLEFLOW_TOPICS, tableflowCategoryStub],
+            [ToolName.LIST_BILLING_COSTS, billingCategoryStub],
+          ],
+          runtimeWith({}, "default"),
+          "category",
+        );
+
+        // ToolCategory values are kebab-case strings; `billing` sorts
+        // before `tableflow` lexicographically regardless of insertion
+        // order.
+        expect(
+          report.disabledGroups.map((g) => disabledToolGroupKey(g)),
+        ).toEqual([ToolCategory.Billing, ToolCategory.Tableflow]);
+      });
     });
   });
 });

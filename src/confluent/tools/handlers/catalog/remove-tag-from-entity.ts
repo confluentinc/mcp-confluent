@@ -2,6 +2,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   DESTRUCTIVE,
+  ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
@@ -72,5 +73,6 @@ export class RemoveTagFromEntityHandler extends BaseToolHandler {
       annotations: DESTRUCTIVE,
     };
   }
+  readonly category = ToolCategory.Catalog;
   readonly predicate = hasCCloudCatalogSupport;
 }

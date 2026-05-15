@@ -3,6 +3,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
+  ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasSchemaRegistryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
@@ -173,5 +174,6 @@ export class ListSchemasHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
+  readonly category = ToolCategory.SchemaRegistry;
   readonly predicate = hasSchemaRegistryOrOAuth;
 }

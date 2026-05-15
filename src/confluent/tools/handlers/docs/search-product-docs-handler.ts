@@ -3,6 +3,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
+  ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
@@ -234,6 +235,7 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     };
   }
 
+  readonly category = ToolCategory.Docs;
   // No service-block requirement; enabled on any connection.
   readonly predicate = alwaysEnabled;
 }

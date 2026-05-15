@@ -1,8 +1,8 @@
 {
   "servers": {
-    "confluent": {
-      "command": "node",
-      "args": ["dist/index.js", "--config", "config.oauth.example.yaml"]
+    "confluent-dev": {
+      "type": "http",
+      "url": "http://127.0.0.1:18080/mcp"
     }
   }
 }

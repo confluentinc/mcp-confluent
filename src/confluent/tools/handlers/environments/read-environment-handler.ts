@@ -1,20 +1,17 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
   Environment,
   environmentSchema,
 } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
-  EnvVar,
-} from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -27,9 +24,10 @@ const readEnvironmentArguments = z.object({
 
 export class ReadEnvironmentHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { environmentId } = readEnvironmentArguments.parse(toolArguments);
 
     try {
@@ -121,12 +119,5 @@ Environment: ${environmentDetails.name}
       annotations: READ_ONLY,
     };
   }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
+  readonly predicate = hasConfluentCloudOrOAuth;
 }

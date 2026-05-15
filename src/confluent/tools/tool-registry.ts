@@ -13,6 +13,9 @@ import { GetConnectorErrorSummaryHandler } from "@src/confluent/tools/handlers/c
 import { GetConnectorLogsHandler } from "@src/confluent/tools/handlers/connect/get-connector-logs-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
+import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
+import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
+import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
 import { DescribeTableHandler } from "@src/confluent/tools/handlers/flink/catalog/describe-table-handler.js";
@@ -37,6 +40,7 @@ import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topi
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
 import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
+import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organizations/list-organizations-handler.js";
 import { DeleteSchemaHandler } from "@src/confluent/tools/handlers/schema/delete-schema-handler.js";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
@@ -58,7 +62,10 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
  * Central registry for all tool call handlers.
  */
 export class ToolHandlerRegistry {
-  private static handlers: Map<ToolName, ToolHandler> = new Map([
+  private static readonly handlers: Map<ToolName, ToolHandler> = new Map<
+    ToolName,
+    ToolHandler
+  >([
     [ToolName.LIST_TOPICS, new ListTopicsHandler()],
     [ToolName.CREATE_TOPICS, new CreateTopicsHandler()],
     [ToolName.DELETE_TOPICS, new DeleteTopicsHandler()],
@@ -133,6 +140,13 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_BILLING_COSTS, new ListBillingCostsHandler()],
     [ToolName.QUERY_METRICS, new QueryMetricsHandler()],
     [ToolName.LIST_METRICS, new ListMetricsHandler()],
+    [ToolName.SEARCH_PRODUCT_DOCS, new SearchProductDocsHandler()],
+    [ToolName.GET_PRODUCT_DOC_PAGE, new GetProductDocPageHandler()],
+    [ToolName.LIST_ORGANIZATIONS, new ListOrganizationsHandler()],
+    [
+      ToolName.EXPLAIN_DISABLED_TOOLS,
+      new ExplainDisabledToolsHandler(() => ToolHandlerRegistry.allHandlers()),
+    ],
   ]);
 
   static getToolHandler(toolName: ToolName): ToolHandler {
@@ -141,5 +155,15 @@ export class ToolHandlerRegistry {
 
   static getToolConfig(toolName: ToolName): ToolConfig {
     return this.getToolHandler(toolName).getToolConfig();
+  }
+
+  /**
+   * Iterable over every (ToolName, ToolHandler) pair in the registry, in
+   * declaration order. Consumed by the `explain-disabled-tools` diagnostic
+   * tool to walk the full handler set without a back-channel into the
+   * private map. Read-only — callers must not mutate the underlying map.
+   */
+  static allHandlers(): Iterable<readonly [ToolName, ToolHandler]> {
+    return this.handlers.entries();
   }
 }

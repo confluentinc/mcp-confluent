@@ -9,7 +9,7 @@ paths:
 ## Framework & Location
 
 - Co-located `.test.ts` files alongside source code using Vitest
-- Run with `npm run test` (single run) or `npm run test:watch` (watch mode)
+- Run with `npm run test:unit` (single run) or `npm run test:unit:watch` (watch mode). `npm run test` runs both unit and integration; reach for it only when you want the full sweep.
 - Config in `vitest.config.ts`; `@src/*` aliases resolved via `resolve.tsconfigPaths`
 - `restoreMocks: true` is set project-wide, so every `vi.spyOn` call is automatically restored
   after each test - no per-test restore hooks needed
@@ -27,13 +27,54 @@ paths:
   - `expect(mock).toHaveBeenCalledWith(arg)`
   - `expect(mock).toHaveBeenCalledTimes(n)`
   - `expect(mock).not.toHaveBeenCalled()`
-- For argument matching inside calls: `expect.any(String)`, `expect.objectContaining({...})`,
-  `expect.stringContaining("...")`, `expect.anything()`
+
+### Literal arguments over loose matchers (default)
+
+When the test owns the inputs to the unit under test, assert the resulting call with
+**literal deep-equality**, not partial matchers. `toHaveBeenCalledWith` uses `toEqual`
+semantics, so a literal object pins the exact contract and produces precise diffs on
+drift. Vitest treats `{ k: undefined }` and `{}` as equal, so an explicit `undefined`
+in the expected literal stays robust whether the call site passes the key or omits
+it.
+
+```typescript
+// Prefer: literal pins the contract — extra keys, renamed keys, regressed shapes all fail loudly.
+expect(client.GET).toHaveBeenCalledWith("/tableflow/v1/regions", {
+  params: {
+    query: { cloud: "AWS", page_size: undefined, page_token: undefined },
+  },
+});
+
+// Avoid: lets a buggy call shape slip through silently.
+expect(client.GET).toHaveBeenCalledWith(
+  expect.any(String),
+  expect.objectContaining({
+    params: expect.objectContaining({
+      query: expect.objectContaining({ cloud: "AWS" }),
+    }),
+  }),
+);
+```
+
+Reach for `expect.any(...)`, `expect.objectContaining(...)`, `expect.stringContaining(...)`,
+or `expect.anything()` only when there is **genuine non-determinism** the test can't
+compute — timestamps, generated UUIDs, opaque tokens minted by the unit under test, or
+fields whose value the test deliberately doesn't pin (e.g. a free-port-allocated URL).
+"I don't want to spell out the full object" is not non-determinism.
+
+**Cautionary tale.** Issue #129 (`ListTableFlowRegions sends cloud=undefined`) was a path
+key built via template literal — the colocated test used `expect.any(String)` for that
+path and `expect.objectContaining({ params: { path: { cloud: "AWS" } } })` for the
+options. The matchers were internally consistent with the broken implementation, so the
+test passed even though the call sent `/tableflow/v1/regions?cloud=undefined` to CCloud.
+A literal assertion on the path string and the options object would have failed against
+the buggy code and prevented the bug from shipping. The loose matcher and the bug were
+two sides of the same coin.
 
 ## Key Patterns
 
-- Use `createMockInstance(DefaultClientManager)` (from `@tests/stubs/index.js`) for handler tests
-  with one class dependency. The returned object is typed as `Mocked<DefaultClientManager>` so
+- Use `createMockInstance(DirectClientManager)` (from `@tests/stubs/index.js`) for handler tests
+  with one class dependency. The returned object is typed as `Mocked<DirectClientManager>` so
   method-chain autocomplete works (`.mockResolvedValue`, etc.)
 - Don't wrap simple one-liners in helper functions
 - Use `createTestServer()` from `@tests/server` for integration-style tests that need a full MCP
@@ -61,30 +102,57 @@ limitation (Sinon had the same constraint).
 
 ### ESM Live Bindings and `node-deps.ts`
 
-`@src/confluent/node-deps.js` re-exports Node builtins, third-party constructors, and env access
-as plain objects whose properties Vitest can spy on:
+`@src/confluent/node-deps.js` re-exports Node builtins and third-party constructors as plain
+objects whose properties Vitest can spy on:
 
 ```typescript
 // source file
-import { fs, os, segment, config } from "@src/confluent/node-deps.js";
+import { fs, os, segment } from "@src/confluent/node-deps.js";
 fs.readFileSync(path); // node builtins
 new segment.Analytics({ key }); // third-party constructors
-config.env.DO_NOT_TRACK; // env proxy
 
 // test file
 import * as nodeDeps from "@src/confluent/node-deps.js";
 vi.spyOn(nodeDeps.fs, "readFileSync").mockReturnValue("content");
-vi.spyOn(nodeDeps.segment, "Analytics").mockImplementation(function () {
-  return { track: trackStub };
-} as any);
-vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue({
-  DO_NOT_TRACK: false,
-} as any);
+vi.spyOn(nodeDeps.segment, "Analytics").mockImplementation(
+  class FakeAnalytics {
+    constructor() {
+      return {
+        track: trackStub,
+      } as unknown as InstanceType<typeof nodeDeps.segment.Analytics>;
+    }
+  } as unknown as typeof nodeDeps.segment.Analytics,
+);
 ```
 
-**Constructor note**: `vi.spyOn` on a `new`-called function requires `mockImplementation` with a
-**regular function** (not arrow — arrows can't be constructors). Return the instance from inside
-the function.
+The env proxy is intentionally **not** wrapped in `node-deps.ts`. Production code receives an
+already-validated `Environment` as an explicit parameter from the bootstrap; it doesn't reach
+into a global. Tests therefore don't need to stub the env — if a code path under test reads
+process state, that state should be a parameter you pass in.
+
+**Constructor note**: `vi.spyOn` on a `new`-called function rejects `mockReturnValue` outright —
+Vitest throws at construction time with `Cannot use \`mockReturnValue\` when called with \`new\`.
+Use \`mockImplementation\` with a \`class\` keyword instead.` Follow that guidance:
+
+```typescript
+vi.spyOn(nodeDeps.someNs, "Ctor").mockImplementation(
+  class FakeCtor {
+    constructor() {
+      return fake as unknown as RealCtor;
+    }
+  } as unknown as typeof RealCtor,
+);
+```
+
+Arrow-function implementations can't be constructed at all. A regular `function () { ... }` body
+also works and can avoid `as any` entirely when its signature satisfies the constructor type —
+declaring `this: unknown` as the first parameter is usually enough (see
+`function MockAnalytics(this: unknown) { ... }` in `src/confluent/telemetry.test.ts`). Without
+that escape hatch the function shape collides with the constructor shape and you'll need an
+outer `as any` cast plus an `eslint-disable` for the explicit-any rule; the class-keyword form
+sidesteps the question and reads cleaner for multi-method fakes. When the same construct-spy
+pattern recurs across tests, wrap it in a helper next to `getMockedAdmin()` /
+`getMockedProducer()`; `mockKafkaConstructor` in `tests/stubs/clients.ts` is the worked example.
 
 Add new deps to `node-deps.ts` as needed. For shared mutable objects like `logger`, spy methods
 directly on the object without a wrapper.
@@ -125,8 +193,9 @@ The project settled on the `vi.spyOn` + namespace-object combination because it 
 - **Type safety on the real boundary.** Spies land on the actual imported value, so if the
   real module's API changes, TypeScript flags the test immediately. `vi.mock` factories drift
   silently when the real module's shape changes.
-- **Accessor-mode spies for getters.** `vi.spyOn(obj, "prop", "get")` powers the `config.env`
-  and `buildConfig` patterns; there's no clean `vi.mock` equivalent for per-test value changes.
+- **Accessor-mode spies for getters.** `vi.spyOn(obj, "prop", "get")` powers the `buildConfig`
+  pattern (and any future getter-on-namespace seam); there's no clean `vi.mock` equivalent for
+  per-test value changes.
 - **No hoisting surprises.** Execution order in tests matches source order. `vi.mock` is
   hoisted by the Vitest transformer, which can confuse readers trying to trace setup.
 - **Integration tests stay simple.** `*.integration.test.ts` files default to real I/O. A
@@ -139,14 +208,151 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 
 ## Handler Tests
 
-- Test config (`getToolConfig()`), required env vars (`getRequiredEnvVars()`), and behavior (`handle()`)
-- Stub `ClientManager` methods with `createMockInstance(DefaultClientManager)`
+- Test `getToolConfig()` (name, description, input schema, annotations).
+- Test `enabledConnectionIds(runtime)` against representative `ServerRuntime` fixtures: a runtime
+  whose connection has the relevant service block (expect the connection id) and a bare runtime
+  without that block (expect `[]`). Helper factories live in `tests/factories/runtime.ts`
+  (`flinkRuntime()`, `tableflowRuntime()`, `bareRuntime()`, etc.).
+- Test `handle()` for typical and edge-case inputs using `getMockedClientManager` +
+  `assertHandleCase` from `@tests/stubs/index.js`. The standard three cases per
+  config-backed parameter: (1) throws when arg absent and not in config, (2) resolves
+  using config fallback, (3) resolves using explicit arg. Use `HandleCaseWithConn` to
+  carry a per-case runtime shape (`connectionConfig: {}` for throw cases; domain fixture
+  as default for success cases). Pass `"DISCOVER"` as the `outcome` sentinel to run the
+  handler and get a copy-paste suggestion for the correct expectation; replace before
+  committing.
+
+  `getMockedClientManager()` returns a `MockedClientManager` (a
+  `Mocked<DirectClientManager>` whose client-getters are narrowed to return
+  `Mocked<...>` of the corresponding production client). Tests retrieve a typed
+  mock from the manager and configure return values per-method on the
+  specific client(s) the handler exercises. Sync getters (the six REST clients
+  and Schema Registry) return the mock directly; async Kafka getters need an
+  `await`:
+
+  ```typescript
+  const clientManager = getMockedClientManager();
+
+  // openapi-fetch (sync getter):
+  clientManager
+    .getConfluentCloudFlinkRestClient()
+    .GET.mockResolvedValue({ data: { items: [] } });
+
+  // KafkaJS (async getter):
+  const admin = await clientManager.getAdminClient();
+  admin.listTopics.mockResolvedValue(["topic-a"]);
+
+  // SchemaRegistryClient (sync getter):
+  clientManager.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
+
+  await assertHandleCase({
+    handler,
+    runtime: runtimeWith(
+      connectionConfig,
+      DEFAULT_CONNECTION_ID,
+      clientManager,
+    ),
+    args,
+    outcome,
+    clientManager,
+  });
+  ```
+
+  Two invariants are load-bearing:
+  - **Same getter, same mock.** Each `cm.getXxx()` getter is wired with
+    `mockReturnValue`, so every call returns the same mock instance. A
+    `const flinkRest = cm.getConfluentCloudFlinkRestClient()` captured in
+    setup stays valid for assertions after the handler runs, and the
+    handler's own getter call lands on the same mock the test configured.
+  - **Build per test, not per suite.** Invoke `getMockedClientManager()`
+    once per test — either inline in each `it` body or by reassigning a
+    suite-scope `let` from a `beforeEach`. The anti-pattern is a
+    suite-scope `const cm = getMockedClientManager()` that runs once: with
+    that shape, vitest's
+    [`restoreMocks: true`](https://vitest.dev/config/restoremocks) (which
+    only restores `vi.spyOn` originals) won't touch the manager's
+    `vi.fn()`s, so call histories and configured return values leak across
+    tests in the suite. To share setup across tests, rebuild in
+    `beforeEach`:
+
+    ```typescript
+    let clientManager: MockedClientManager;
+
+    beforeEach(() => {
+      clientManager = getMockedClientManager();
+    });
+
+    it("...", async () => {
+      const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+      flinkRest.GET.mockResolvedValue({ data: { items: [] } });
+      // ...
+    });
+    ```
+
+  For poll-then-fetch flows or any case where a method returns different data
+  on successive calls, chain `mockResolvedValueOnce`:
+
+  ```typescript
+  const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+  flinkRest.GET.mockResolvedValueOnce({
+    data: { status: { phase: "RUNNING" } },
+  }).mockResolvedValue({ data: { data: [] } });
+  ```
+
+  Asserting a POST body (when `outcome.resolves` doesn't prove the payload):
+
+  ```typescript
+  const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+  expect(flinkRest.POST).toHaveBeenCalledOnce();
+  expect(flinkRest.POST).toHaveBeenCalledWith(
+    expect.stringContaining("/statements"),
+    expect.objectContaining({
+      body: expect.objectContaining({
+        spec: expect.objectContaining({
+          properties: expect.objectContaining({
+            "sql.current-catalog": "env-name-from-config",
+          }),
+        }),
+      }),
+    }),
+  );
+  ```
+
+  Asserting that a different client was not touched (negative assertions are
+  first-class because each seam has its own mock):
+
+  ```typescript
+  expect(
+    clientManager.getConfluentCloudKafkaRestClient().POST,
+  ).not.toHaveBeenCalled();
+  expect(
+    clientManager.getConfluentCloudFlinkRestClient().GET,
+  ).not.toHaveBeenCalled();
+  ```
+
+  For tests that need a single typed mock without the full
+  `getMockedClientManager` wiring (e.g., focused unit tests against one seam),
+  the per-client helpers are exported directly: `getMockedRestClient()`,
+  `getMockedAdmin()`, `getMockedProducer()`, `getMockedConsumer()`,
+  `getMockedSchemaRegistry()`.
+
+- When a test would otherwise extend `HandleCaseWithConn` with extra per-case fields (e.g.
+  `mockResponse`, `expectedEnvId`, body-of-the-mocked-GET), check the existing exports in
+  `tests/factories/runtime.ts` first — common shapes are already shared there. If the same
+  extension would appear (or already does) in another test file, hoist it next to the
+  existing exports rather than declaring a fresh per-file alias; future readers grepping
+  for the right type to import shouldn't be greeted by N differently-named copies of the
+  same shape.
+
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
-  `listTopics`), not on the `ClientManager` mock itself — add an eslint-disable comment when needed
+  `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.
 
-## Environment Proxy
+## Test Server & Runtime Fixtures
 
-- `createTestServer()` calls `initEnv()` automatically so Zod `.default()` callbacks in tool
-  schemas don't throw
-- For handler-only tests that don't use `createTestServer()`, call `initEnv()` in `beforeAll` if
-  the handler's Zod schema references `env.*` in `.default()` callbacks
+- `createTestServer(clientManager, toolNames?)` from `@tests/server.js` boots a real `McpServer`
+  with all tools (or a passed subset) wired to a stubbed `ClientManager` over `InMemoryTransport`.
+  Use it for protocol-level integration tests.
+- For `enabledConnectionIds()` tests, build a `ServerRuntime` via the named factories in
+  `@tests/factories/runtime.js`: `bareRuntime()`, `kafkaRuntime()`, `flinkRuntime()`,
+  `tableflowRuntime()`, `schemaRegistryRuntime()`, `confluentCloudRuntime()`,
+  `telemetryRuntime()`, etc. For uncommon shapes, use `runtimeWith(connectionConfig?, connectionId?)` (both args optional; `connectionId` defaults to `"default"`).

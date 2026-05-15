@@ -1,6 +1,7 @@
 import pluginJs from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
+import unusedImports from "eslint-plugin-unused-imports";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
@@ -9,11 +10,88 @@ export default [
   { files: ["**/*.{js,mjs,cjs,ts}"] },
   { languageOptions: { globals: globals.browser } },
   {
-    ignores: ["dist/**", "src/confluent/openapi-schema.d.ts", "coverage/**"],
+    ignores: [
+      "dist/**",
+      "src/confluent/openapi-schema.d.ts",
+      "coverage/**",
+      ".worktrees/**",
+    ],
   },
   { files: ["scripts/**"], languageOptions: { globals: globals.node } },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   eslintPluginPrettierRecommended,
+  {
+    plugins: {
+      "unused-imports": unusedImports,
+    },
+    rules: {
+      // Hand unused-variable/import detection to unused-imports, which adds
+      // auto-fix support for import removal. Disabling both the core and TS
+      // rules avoids double-reporting on JS and TS files respectively.
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
+        "error",
+        {
+          vars: "all",
+          varsIgnorePattern: "^_",
+          args: "after-used",
+          argsIgnorePattern: "^_",
+        },
+      ],
+      // Production code reads service config from `ConnectionConfig`, not the
+      // process env. The env singleton in `@src/env.js` only legitimately
+      // serves the bootstrap (`initEnv` named export from `src/index.ts`) and
+      // the legacy YAML-vs-env-config bridge (`Environment` type from
+      // `src/config/env-config.ts`). The default export was retired in #234;
+      // this rule slams the door so any future regression surfaces with a
+      // useful message rather than a generic TypeScript "no default export"
+      // error.
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@src/env.js",
+              importNames: ["default"],
+              message:
+                "Use ConnectionConfig instead. The env singleton is consumed only by the bootstrap (initEnv) and the legacy env-config bridge; production code should not read it directly.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Production code reads configuration from `MCPServerConfiguration` /
+  // `ConnectionConfig`, never from `process.env`. The bootstrap allowlist
+  // below is the only place that consults it: index.ts orchestrates startup,
+  // cli.ts performs the -e dotenv mutation, env.ts parses the legacy env-var
+  // schema, logger.ts reads LOG_LEVEL/LOG_PRETTY at module-load (before
+  // main()). The dotenv mutation in cli.ts is intentional — it seeds
+  // linked-library env-var consumption (OpenSSL, cyrus-sasl, krb5, undici)
+  // outside our control. See #186 for the full rationale.
+  {
+    files: ["src/**/*.ts"],
+    ignores: [
+      "src/index.ts",
+      "src/cli.ts",
+      "src/env.ts",
+      "src/logger.ts",
+      "**/*.test.ts",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            "process.env may only be read in the bootstrap allowlist (src/index.ts, src/cli.ts, src/env.ts, src/logger.ts). Read from MCPServerConfiguration or ConnectionConfig instead.",
+        },
+      ],
+    },
+  },
 ];

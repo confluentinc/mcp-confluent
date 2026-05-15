@@ -2,7 +2,7 @@ import { CommanderError } from "@commander-js/extra-typings";
 import {
   DisplayedCommandLineUsageError,
   getFilteredToolNames,
-  loadDotEnvIntoProcessEnv,
+  loadDotEnvFile,
   parseCliArgs,
 } from "@src/cli.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
@@ -108,7 +108,7 @@ describe("cli.ts", () => {
     });
   });
 
-  describe("loadDotEnvIntoProcessEnv()", () => {
+  describe("loadDotEnvFile()", () => {
     let existsSyncSpy: MockInstance<typeof nodeDeps.fs.existsSync>;
     let resolveSpy: MockInstance<typeof nodeDeps.path.resolve>;
     let dotenvConfigSpy: MockedDotenv;
@@ -123,7 +123,7 @@ describe("cli.ts", () => {
       resolveSpy.mockReturnValue("/resolved/.env");
       existsSyncSpy.mockReturnValue(false);
 
-      expect(() => loadDotEnvIntoProcessEnv(".env")).toThrow(
+      expect(() => loadDotEnvFile(".env")).toThrow(
         "Environment file not found: /resolved/.env",
       );
     });
@@ -132,7 +132,7 @@ describe("cli.ts", () => {
       resolveSpy.mockReturnValue("/abs/path/.env");
       existsSyncSpy.mockReturnValue(false);
 
-      expect(() => loadDotEnvIntoProcessEnv("relative/.env")).toThrow();
+      expect(() => loadDotEnvFile("relative/.env")).toThrow();
 
       expect(resolveSpy).toHaveBeenCalledWith("relative/.env");
       expect(existsSyncSpy).toHaveBeenCalledWith("/abs/path/.env");
@@ -143,7 +143,7 @@ describe("cli.ts", () => {
       existsSyncSpy.mockReturnValue(true);
       dotenvConfigSpy.mockReturnValue({ error: new Error("parse error") });
 
-      expect(() => loadDotEnvIntoProcessEnv(".env")).toThrow(
+      expect(() => loadDotEnvFile(".env")).toThrow(
         "Error loading environment variables:",
       );
     });
@@ -153,7 +153,7 @@ describe("cli.ts", () => {
       existsSyncSpy.mockReturnValue(true);
       dotenvConfigSpy.mockReturnValue({ parsed: {} });
 
-      loadDotEnvIntoProcessEnv("relative/.env");
+      loadDotEnvFile("relative/.env");
 
       // Should call with the resolved absolute path and override: true
       // to ensure CLI env vars take precedence over existing ones in process.env
@@ -169,7 +169,7 @@ describe("cli.ts", () => {
       existsSyncSpy.mockReturnValue(true);
       dotenvConfigSpy.mockReturnValue({ parsed: { FOO: "bar", BAZ: "qux" } });
 
-      const result = loadDotEnvIntoProcessEnv(".env");
+      const result = loadDotEnvFile(".env");
 
       expect(result).toEqual({ FOO: "bar", BAZ: "qux" });
     });
@@ -179,7 +179,7 @@ describe("cli.ts", () => {
       existsSyncSpy.mockReturnValue(true);
       dotenvConfigSpy.mockReturnValue({ parsed: undefined });
 
-      const result = loadDotEnvIntoProcessEnv(".env");
+      const result = loadDotEnvFile(".env");
 
       expect(result).toEqual({});
     });
@@ -308,13 +308,6 @@ describe("cli.ts", () => {
         expect(result.listTools).toBe(true);
       });
 
-      it("should set disableConfluentCloudTools to true when --disable-confluent-cloud-tools is specified", () => {
-        const result = parseCliArgs(
-          makeArgs(["--disable-confluent-cloud-tools"]),
-        );
-        expect(result.disableConfluentCloudTools).toBe(true);
-      });
-
       it("should throw when --allow-tools-file does not exist", () => {
         resolveSpy.mockReturnValue("/abs/allow.txt");
         fsMocks.existsSync.mockReturnValue(false);
@@ -324,10 +317,9 @@ describe("cli.ts", () => {
         ).toThrow("Tool list file not found: /abs/allow.txt");
       });
 
-      it("should default listTools and disableConfluentCloudTools to false", () => {
+      it("should default listTools to false", () => {
         const result = parseCliArgs(makeArgs([]));
         expect(result.listTools).toBe(false);
-        expect(result.disableConfluentCloudTools).toBe(false);
       });
     });
 
@@ -341,6 +333,30 @@ describe("cli.ts", () => {
 
     it("should set generateKey to true when --generate-key is specified", () => {
       expect(parseCliArgs(makeArgs(["--generate-key"])).generateKey).toBe(true);
+    });
+
+    it("should set initConfig to true when --init-config is specified", () => {
+      expect(parseCliArgs(makeArgs(["--init-config"])).initConfig).toBe(true);
+    });
+
+    it("should leave initConfig false when --init-config is not specified", () => {
+      expect(parseCliArgs(makeArgs([])).initConfig).toBe(false);
+    });
+
+    it("should set initOauthConfig to true when --init-oauth-config is specified", () => {
+      expect(
+        parseCliArgs(makeArgs(["--init-oauth-config"])).initOauthConfig,
+      ).toBe(true);
+    });
+
+    it("should leave initOauthConfig false when --init-oauth-config is not specified", () => {
+      expect(parseCliArgs(makeArgs([])).initOauthConfig).toBe(false);
+    });
+
+    it("should throw when both --init-config and --init-oauth-config are supplied", () => {
+      expect(() =>
+        parseCliArgs(makeArgs(["--init-config", "--init-oauth-config"])),
+      ).toThrow(/mutually exclusive/);
     });
 
     it("should parse --allowed-hosts into a lowercased array", () => {
@@ -426,5 +442,85 @@ describe("cli.ts", () => {
         });
       },
     );
+
+    describe("--oauth flags", () => {
+      it("should parse --oauth alone with ccloudEnv undefined", () => {
+        const result = parseCliArgs(["node", "mcp-confluent", "--oauth"]);
+        expect(result.oauth).toBe(true);
+        expect(result.ccloudEnv).toBeUndefined();
+      });
+
+      it("should parse --oauth with --ccloud-env=devel", () => {
+        const result = parseCliArgs([
+          "node",
+          "mcp-confluent",
+          "--oauth",
+          "--ccloud-env",
+          "devel",
+        ]);
+        expect(result.oauth).toBe(true);
+        expect(result.ccloudEnv).toBe("devel");
+      });
+
+      it("should accept stag and prod for --ccloud-env", () => {
+        expect(
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--ccloud-env",
+            "stag",
+          ]).ccloudEnv,
+        ).toBe("stag");
+        expect(
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--ccloud-env",
+            "prod",
+          ]).ccloudEnv,
+        ).toBe("prod");
+      });
+
+      it("should reject --ccloud-env without --oauth", () => {
+        expect(() =>
+          parseCliArgs(["node", "mcp-confluent", "--ccloud-env", "devel"]),
+        ).toThrow(/--ccloud-env requires --oauth/);
+      });
+
+      it("should reject --ccloud-env with an unknown value", () => {
+        expect(() =>
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--ccloud-env",
+            "bogus",
+          ]),
+        ).toThrow();
+      });
+
+      it("should reject --oauth combined with --config at parse time", () => {
+        // The check fires at parse time so a malformed YAML can't mask the
+        // friendlier "--oauth and --config cannot be combined" message
+        // behind a generic YAML parse error.
+        expect(() =>
+          parseCliArgs([
+            "node",
+            "mcp-confluent",
+            "--oauth",
+            "--config",
+            "/tmp/foo.yaml",
+          ]),
+        ).toThrow(/--oauth and --config cannot be combined/);
+      });
+
+      it("should leave oauth and ccloudEnv undefined when neither flag is set", () => {
+        const result = parseCliArgs(["node", "mcp-confluent"]);
+        expect(result.oauth).toBeUndefined();
+        expect(result.ccloudEnv).toBeUndefined();
+      });
+    });
   });
 });

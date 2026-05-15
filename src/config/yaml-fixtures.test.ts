@@ -1,4 +1,6 @@
 import { loadConfigFromYaml } from "@src/config/index.js";
+import { combinedSchema } from "@src/env-schema.js";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -20,7 +22,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-only.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.type).toBe("direct");
       expect(conn.kafka?.bootstrap_servers).toBe("localhost:9092");
       expect(conn.kafka?.auth).toBeUndefined();
@@ -32,7 +34,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/sr-only.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.type).toBe("direct");
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
       expect(conn.schema_registry?.auth).toBeUndefined();
@@ -44,7 +46,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-and-sr.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.kafka?.bootstrap_servers).toBe("localhost:9092");
       expect(conn.kafka?.auth).toBeUndefined();
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
@@ -56,7 +58,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.kafka?.auth).toEqual({
         type: "api_key",
         key: "mykafkakey",
@@ -70,7 +72,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/sr-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.schema_registry?.auth).toEqual({
         type: "api_key",
         key: "mysrkey",
@@ -84,7 +86,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-and-sr-both-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.kafka?.auth).toEqual({
         type: "api_key",
         key: "mykafkakey",
@@ -102,7 +104,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-with-interpolated-auth.yaml"),
         { KAFKA_API_KEY: "envkey", KAFKA_API_SECRET: "envsecret" },
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.kafka?.auth).toEqual({
         type: "api_key",
         key: "envkey",
@@ -117,7 +119,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/ccloud-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.confluent_cloud?.auth).toEqual({
         type: "api_key",
         key: "mycloudkey",
@@ -136,7 +138,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/ccloud-with-endpoint-and-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.confluent_cloud?.endpoint).toBe(
         "https://custom.confluent.cloud",
       );
@@ -152,7 +154,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/tableflow-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.tableflow?.auth).toEqual({
         type: "api_key",
         key: "mytableflowkey",
@@ -168,7 +170,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/ccloud-and-tableflow-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.confluent_cloud?.endpoint).toBe(
         "https://api.confluent.cloud",
       );
@@ -185,13 +187,29 @@ describe("config/yaml-fixtures.test.ts", () => {
     });
   });
 
+  describe("oauth fixtures", () => {
+    it("should load ccloud-oauth with type=oauth and the configured ccloud_env", () => {
+      const config = loadConfigFromYaml(
+        fixtureFile("valid/ccloud-oauth.yaml"),
+        NO_ENV,
+      );
+      const conn = config.getSoleConnection();
+      expect(conn.type).toBe("oauth");
+      // Narrow off the discriminant before reading ccloud_env so the assertion
+      // also serves as a compile-time check on the OAuth arm of ConnectionConfig.
+      if (conn.type !== "oauth")
+        throw new Error("expected oauth connection after type assertion");
+      expect(conn.ccloud_env).toBe("devel");
+    });
+  });
+
   describe("kafka extra_properties fixtures", () => {
     it("should load kafka-with-extra-properties and parse the extra_properties block", () => {
       const config = loadConfigFromYaml(
         fixtureFile("valid/kafka-with-extra-properties.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.kafka?.bootstrap_servers).toBe("broker.confluent.cloud:9092");
       expect(conn.kafka?.extra_properties).toEqual({
         "socket.timeout.ms": "30000",
@@ -207,7 +225,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-with-rest-metadata.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.kafka?.bootstrap_servers).toBe("broker.confluent.cloud:9092");
       expect(conn.kafka?.rest_endpoint).toBe(
         "https://pkc-abc123.us-east-1.aws.confluent.cloud:443",
@@ -223,7 +241,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/flink-with-required-fields.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.flink?.auth).toEqual({
         type: "api_key",
         key: "myflinkkey",
@@ -235,7 +253,7 @@ describe("config/yaml-fixtures.test.ts", () => {
       expect(conn.flink?.environment_id).toBe("env-abc123");
       expect(conn.flink?.organization_id).toBe("org-xyz789");
       expect(conn.flink?.compute_pool_id).toBe("lfcp-pool01");
-      expect(conn.flink?.environment_name).toBeUndefined();
+      expect(conn.flink?.catalog_name).toBeUndefined();
       expect(conn.flink?.database_name).toBeUndefined();
       expect(conn.kafka).toBeUndefined();
       expect(conn.schema_registry).toBeUndefined();
@@ -248,7 +266,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/flink-with-all-fields.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.flink?.endpoint).toBe("https://flink.confluent.cloud");
       expect(conn.flink?.auth).toEqual({
         type: "api_key",
@@ -258,7 +276,7 @@ describe("config/yaml-fixtures.test.ts", () => {
       expect(conn.flink?.environment_id).toBe("env-abc123");
       expect(conn.flink?.organization_id).toBe("org-xyz789");
       expect(conn.flink?.compute_pool_id).toBe("lfcp-pool01");
-      expect(conn.flink?.environment_name).toBe("my-environment");
+      expect(conn.flink?.catalog_name).toBe("my-environment");
       expect(conn.flink?.database_name).toBe("my-kafka-cluster");
     });
 
@@ -267,7 +285,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/ccloud-and-flink-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.confluent_cloud?.auth).toEqual({
         type: "api_key",
         key: "mycloudkey",
@@ -288,7 +306,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/telemetry-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.telemetry).toEqual({
         endpoint: "https://api.telemetry.confluent.cloud",
         auth: {
@@ -306,7 +324,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/telemetry-with-endpoint-and-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.telemetry?.endpoint).toBe(
         "https://api.telemetry.confluent.cloud",
       );
@@ -389,7 +407,7 @@ describe("config/yaml-fixtures.test.ts", () => {
     // point by users as the codebase evolves.
 
     // Minimal env: supply values for every ${VAR} placeholder that has no :-default.
-    // Placeholders with defaults (e.g. ${KAFKA_BOOTSTRAP_SERVERS:-pkc-xxxxx...}) resolve
+    // Placeholders with defaults (e.g. ${BOOTSTRAP_SERVERS:-pkc-xxxxx...}) resolve
     // on their own; only the bare auth fields need values to pass schema validation.
     const EXAMPLE_ENV: Record<string, string> = {
       KAFKA_API_KEY: "example-kafka-key",
@@ -411,6 +429,18 @@ describe("config/yaml-fixtures.test.ts", () => {
 
     it("should parse without error", () => {
       expect(() => loadConfigFromYaml(EXAMPLE_FILE, EXAMPLE_ENV)).not.toThrow();
+    });
+
+    it("should only reference var names that exist in env-schema", () => {
+      const raw = readFileSync(EXAMPLE_FILE, "utf-8");
+      const placeholderRe = /\$\{([A-Za-z_]\w*)(?::-.*)?\}/g;
+      const found = new Set([...raw.matchAll(placeholderRe)].map((m) => m[1]!));
+      // "VAR" appears only in the documentation-prose comment on line 10;
+      // it is not a real env-var placeholder.
+      found.delete("VAR");
+      const knownKeys = new Set(Object.keys(combinedSchema.shape));
+      const unknown = [...found].filter((name) => !knownKeys.has(name));
+      expect(unknown).toEqual([]);
     });
   });
 

@@ -72,12 +72,11 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+# dotenv environment variable files — catch all variants (incl. editor backups
+# like .env.integration~ or .env.bak) while keeping the checked-in examples.
+.env*
+!.env.example
+!.env.integration.example
 
 # project-root yaml/yml files are blanket-ignored as a guard against accidentally
 # committing a personal `config.yaml` (or similar) containing credentials. The
@@ -87,6 +86,7 @@ web_modules/
 /*.yaml
 /*.yml
 !/config.example.yaml
+!/config.oauth.example.yaml
 !/docker-compose.yml
 !/service.yml
 
@@ -141,8 +141,9 @@ dist
 .pnp.*
 
 
-# test results
-TEST-result*.xml
+# test results (per-lane outputFile names live alongside the legacy
+# TEST-result.xml; see vitest.config.ts and package.json scripts)
+TEST-*.xml
 
 # vscode (ignore everything except local dev configs)
 .vscode/*
@@ -157,3 +158,6 @@ connector-config.json
 
 # GSD planning directory
 .planning
+
+# Worktree directories
+.worktrees/

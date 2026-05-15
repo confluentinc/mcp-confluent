@@ -1,14 +1,8 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  CREATE_UPDATE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
-import env from "@src/env.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -50,26 +44,25 @@ const createFlinkStatementArguments = z.object({
   catalogName: z
     .string()
     .trim()
-    .nonempty()
-    .default(() => env.FLINK_ENV_NAME ?? "")
+    .optional()
     .describe(
-      "The catalog name to be used for the statement. Typically the confluent environment name.",
+      "The catalog name to be used for the statement. Typically the environment's display name in Confluent Cloud.",
     ),
   databaseName: z
     .string()
     .trim()
-    .nonempty()
-    .default(() => env.FLINK_DATABASE_NAME ?? "")
+    .optional()
     .describe(
       "The database name to be used for the statement. Typically the Kafka cluster name.",
     ),
 });
 
-export class CreateFlinkStatementHandler extends BaseToolHandler {
+export class CreateFlinkStatementHandler extends FlinkToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const {
       catalogName,
       databaseName,
@@ -79,20 +72,20 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
       environmentId,
       organizationId,
     } = createFlinkStatementArguments.parse(toolArguments);
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const flink = this.getFlinkDirectConfig(runtime.config);
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      flink,
       organizationId,
-    );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
       environmentId,
     );
-    const compute_pool_id = getEnsuredParam(
-      "FLINK_COMPUTE_POOL_ID",
-      "Compute Pool ID is required",
-      computePoolId,
+    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    const resolvedCatalogName = this.resolveOptionalParam(
+      catalogName,
+      flink.catalog_name,
+    );
+    const resolvedDatabaseName = this.resolveOptionalParam(
+      databaseName,
+      flink.database_name,
     );
 
     const pathBasedClient = wrapAsPathBasedClient(
@@ -116,9 +109,11 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
           statement: statement,
           properties: {
             // only include the catalog and database properties if they are defined
-            ...(catalogName && { "sql.current-catalog": catalogName }),
-            ...(databaseName && {
-              "sql.current-database": databaseName,
+            ...(resolvedCatalogName && {
+              "sql.current-catalog": resolvedCatalogName,
+            }),
+            ...(resolvedDatabaseName && {
+              "sql.current-database": resolvedDatabaseName,
             }),
           },
         },
@@ -139,13 +134,5 @@ export class CreateFlinkStatementHandler extends BaseToolHandler {
       inputSchema: createFlinkStatementArguments.shape,
       annotations: CREATE_UPDATE,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return FLINK_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

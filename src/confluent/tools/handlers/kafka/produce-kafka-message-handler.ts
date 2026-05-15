@@ -1,6 +1,5 @@
 import { RecordMetadata } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
-import { ClientManager } from "@src/confluent/client-manager.js";
 import {
   checkSchemaNeeded,
   MessageOptions,
@@ -14,9 +13,11 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
-  connectionIdsWhere,
-  hasKafkaBootstrap,
-} from "@src/confluent/tools/connection-predicates.js";
+  disposeIfOAuth,
+  formatKafkaError,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/cluster-arg-resolvers.js";
+import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -63,6 +64,18 @@ const produceKafkaMessageArguments = z.object({
     .describe("Name of the kafka topic to produce the message to"),
   value: valueOptions,
   key: keyOptions.optional(),
+  cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments.",
+    ),
 });
 type ProduceKafkaMessageArguments = z.infer<
   typeof produceKafkaMessageArguments
@@ -113,18 +126,23 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
    * @returns A CallToolResult describing the outcome of the produce operation
    */
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { topicName, value, key }: ProduceKafkaMessageArguments =
+    const parsed: ProduceKafkaMessageArguments =
       produceKafkaMessageArguments.parse(toolArguments);
+    const { topicName, value, key } = parsed;
 
-    // Only create registry if needed
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
+
     const needsRegistry =
-      value.useSchemaRegistry || (key && key.useSchemaRegistry);
-    const registry: SchemaRegistryClient | undefined = needsRegistry
-      ? clientManager.getSchemaRegistryClient()
-      : undefined;
+      (value && value.useSchemaRegistry) || (key && key.useSchemaRegistry);
+
+    let registry: SchemaRegistryClient | undefined;
+    if (needsRegistry) {
+      registry = await clientManager.getSchemaRegistrySdkClient(resolved.envId);
+    }
 
     // Check for latest schema if needed (value)
     const valueSchemaCheck = await checkSchemaNeeded(
@@ -166,41 +184,51 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
         );
       }
     } catch (err) {
+      // Serialization errors come from user input (bad payload shape vs schema),
+      // not the Kafka client — keep the simpler formatter here.
       return this.createResponse(
         `Failed to serialize: ${err instanceof Error ? err.message : err}`,
         true,
       );
     }
 
-    // Send the message
-    let deliveryReport: RecordMetadata[];
+    const producer = await clientManager.getKafkaProducer(
+      resolved.clusterId,
+      resolved.envId,
+    );
     try {
-      deliveryReport = await (
-        await clientManager.getProducer()
-      ).send({
-        topic: topicName,
-        messages: [
-          typeof keyToSend !== "undefined"
-            ? { key: keyToSend, value: valueToSend }
-            : { value: valueToSend },
-        ],
-      });
-    } catch (err) {
-      return this.createResponse(
-        `Failed to produce message: ${err instanceof Error ? err.message : err}`,
-        true,
+      // Send the message
+      let deliveryReport: RecordMetadata[];
+      try {
+        deliveryReport = await producer.send({
+          topic: topicName,
+          messages: [
+            typeof keyToSend !== "undefined"
+              ? { key: keyToSend, value: valueToSend }
+              : { value: valueToSend },
+          ],
+        });
+      } catch (err) {
+        return this.createResponse(
+          `Failed to produce message: ${formatKafkaError(err)}`,
+          true,
+        );
+      }
+      const formattedResponse = deliveryReport
+        .map((metadata) => {
+          if (metadata.errorCode !== 0) {
+            return `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`;
+          }
+          return `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`;
+        })
+        .join("\n");
+      const isError = deliveryReport.some(
+        (metadata) => metadata.errorCode !== 0,
       );
+      return this.createResponse(formattedResponse, isError);
+    } finally {
+      await disposeIfOAuth(runtime, connId, producer);
     }
-    const formattedResponse = deliveryReport
-      .map((metadata) => {
-        if (metadata.errorCode !== 0) {
-          return `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`;
-        }
-        return `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`;
-      })
-      .join("\n");
-    const isError = deliveryReport.some((metadata) => metadata.errorCode !== 0);
-    return this.createResponse(formattedResponse, isError);
   }
 
   /**
@@ -216,7 +244,5 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     };
   }
 
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaBootstrap);
-  }
+  readonly predicate = kafkaBootstrapOrOAuth;
 }

@@ -1,8 +1,16 @@
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
-import env from "@src/env.js";
 import { logger } from "@src/logger.js";
-import { AuthConfig, createAuthHook } from "@src/mcp/transports/auth.js";
+import {
+  AuthConfig,
+  CFLT_MCP_API_KEY_HEADER,
+  createAuthHook,
+} from "@src/mcp/transports/auth.js";
+import {
+  pingHandler,
+  pingRequestSchema,
+  pingResponseSchema,
+} from "@src/mcp/transports/ping.js";
 import { ServerConfig } from "@src/mcp/transports/types.js";
 import {
   default as Fastify,
@@ -35,7 +43,7 @@ export class HttpServer {
     }
   }
 
-  async prepare(): Promise<void> {
+  async prepare(config: ServerConfig): Promise<void> {
     if (this.isSwaggerConfigured) {
       return;
     }
@@ -59,7 +67,7 @@ export class HttpServer {
         },
         servers: [
           {
-            url: `http://${env.HTTP_HOST}:${env.HTTP_PORT}`,
+            url: `http://${config.host}:${config.port}`,
             description: "Local development server",
           },
         ],
@@ -67,7 +75,7 @@ export class HttpServer {
           securitySchemes: {
             apiKey: {
               type: "apiKey",
-              name: "cflt-mcp-api-Key",
+              name: CFLT_MCP_API_KEY_HEADER,
               in: "header",
             },
           },
@@ -87,6 +95,23 @@ export class HttpServer {
       },
       staticCSP: true,
     });
+
+    // Register /ping at the server level (not per-transport) so HTTP+SSE configurations
+    // don't fail at startup with a duplicate-route error
+    this.fastify.post(
+      "/ping",
+      {
+        schema: {
+          tags: ["mcp"],
+          summary: "JSON-RPC 2.0 ping endpoint",
+          body: pingRequestSchema,
+          response: {
+            200: pingResponseSchema,
+          },
+        },
+      },
+      pingHandler(),
+    );
 
     this.isSwaggerConfigured = true;
   }

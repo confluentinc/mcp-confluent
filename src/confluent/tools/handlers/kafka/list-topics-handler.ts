@@ -1,4 +1,3 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -6,25 +5,47 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
-  connectionIdsWhere,
-  hasKafkaBootstrap,
-} from "@src/confluent/tools/connection-predicates.js";
+  disposeIfOAuth,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/cluster-arg-resolvers.js";
+import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listTopicArgs = z.object({
-  // No arguments
+  cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments.",
+    ),
 });
 
 export class ListTopicsHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const topics = await (await clientManager.getAdminClient()).listTopics();
-    return this.createResponse(`Kafka topics: ${topics.join(",")}`);
+    const parsed = listTopicArgs.parse(toolArguments);
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
+    const admin = await clientManager.getKafkaAdminClient(
+      resolved.clusterId,
+      resolved.envId,
+    );
+    try {
+      const topics = await admin.listTopics();
+      return this.createResponse(`Kafka topics: ${topics.join(",")}`);
+    } finally {
+      await disposeIfOAuth(runtime, connId, admin);
+    }
   }
 
   getToolConfig(): ToolConfig {
@@ -36,7 +57,5 @@ export class ListTopicsHandler extends BaseToolHandler {
     };
   }
 
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaBootstrap);
-  }
+  readonly predicate = kafkaBootstrapOrOAuth;
 }

@@ -1,12 +1,8 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -17,42 +13,50 @@ const listTableFlowRegionsArguments = z.object({
     .optional()
     .describe("Filter the results by exact match for cloud."),
   pageSize: z
-    .string()
-    .trim()
+    .number()
+    .int()
+    .positive()
+    .max(100)
     .optional()
-    .default("10")
-    .describe("The pagination size of collection requests."),
+    .describe(
+      "Maximum regions to return in this response (1-100). Server-side default applies if omitted.",
+    ),
   pageToken: z
     .string()
-    .trim()
+    .max(255)
     .optional()
-    .default("0")
-    .describe("An opaque pagination token for collection requests."),
+    .describe(
+      "Opaque pagination token from a previous response (max 255 characters). Omit on first request.",
+    ),
 });
 
-export class ListTableFlowRegionsHandler extends BaseToolHandler {
+export class ListTableFlowRegionsHandler extends TableflowToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { cloud } = listTableFlowRegionsArguments.parse(toolArguments);
+    const clientManager = runtime.clientManager;
+    const { cloud, pageSize, pageToken } =
+      listTableFlowRegionsArguments.parse(toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),
     );
 
     const { data: response, error } = await pathBasedClient[
-      `/tableflow/v1/regions?cloud=${cloud}`
+      "/tableflow/v1/regions"
     ].GET({
       params: {
-        path: {
-          cloud: cloud,
+        query: {
+          cloud,
+          page_size: pageSize,
+          page_token: pageToken,
         },
       },
     });
     if (error) {
       return this.createResponse(
-        `Failed to list Tableflow regions for  ${cloud}: ${JSON.stringify(error)}`,
+        `Failed to list Tableflow regions: ${JSON.stringify(error)}`,
         true,
       );
     }
@@ -67,13 +71,5 @@ export class ListTableFlowRegionsHandler extends BaseToolHandler {
       inputSchema: listTableFlowRegionsArguments.shape,
       annotations: READ_ONLY,
     };
-  }
-
-  getRequiredEnvVars(): EnvVar[] {
-    return ["TABLEFLOW_API_KEY", "TABLEFLOW_API_SECRET"];
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

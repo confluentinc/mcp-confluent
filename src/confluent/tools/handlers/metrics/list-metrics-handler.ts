@@ -1,13 +1,13 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { hasTelemetry } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, TELEMETRY_REQUIRED_ENV_VARS } from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listMetricsArguments = z.object({
@@ -141,9 +141,10 @@ const KAFKA_SERVER_METRICS = [
 
 export class ListMetricsHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { resource_type } = listMetricsArguments.parse(toolArguments);
 
     try {
@@ -260,12 +261,5 @@ export class ListMetricsHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return TELEMETRY_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
+  readonly predicate = hasTelemetry;
 }

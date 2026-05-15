@@ -1,16 +1,8 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  DESTRUCTIVE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { DESTRUCTIVE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS,
-  EnvVar,
-} from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -31,23 +23,19 @@ const deleteConnectorArguments = z.object({
     .describe("The name of the connector to delete."),
 });
 
-export class DeleteConnectorHandler extends BaseToolHandler {
+/** Deletes a named connector from the given environment and cluster. */
+export class DeleteConnectorHandler extends ConnectToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName } =
       deleteConnectorArguments.parse(toolArguments);
-    const environment_id = getEnsuredParam(
-      "KAFKA_ENV_ID",
-      "Environment ID is required",
-      environmentId,
-    );
-    const kafka_cluster_id = getEnsuredParam(
-      "KAFKA_CLUSTER_ID",
-      "Kafka Cluster ID is required",
-      clusterId,
-    );
+
+    const conn = runtime.config.getSoleDirectConnection();
+    const { environment_id, kafka_cluster_id } =
+      this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudRestClient(),
@@ -57,8 +45,8 @@ export class DeleteConnectorHandler extends BaseToolHandler {
     ].DELETE({
       params: {
         path: {
-          environment_id: environment_id,
-          kafka_cluster_id: kafka_cluster_id,
+          environment_id,
+          kafka_cluster_id,
           connector_name: connectorName,
         },
       },
@@ -83,13 +71,5 @@ export class DeleteConnectorHandler extends BaseToolHandler {
       inputSchema: deleteConnectorArguments.shape,
       annotations: DESTRUCTIVE,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

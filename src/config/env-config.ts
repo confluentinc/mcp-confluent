@@ -7,12 +7,23 @@ import {
   MCPServerConfiguration,
 } from "@src/config/models.js";
 import type { Environment } from "@src/env.js";
+import { logger } from "@src/logger.js";
 import { type KeyValuePairObject } from "properties-file";
 
-const ENV_CONNECTION_NAME = "env-connection";
+/**
+ * Connection name synthesized by the env-var path. Chosen as `"_default"` so
+ * the YAML loader can reuse the same name as the zero-config fallback.
+ *
+ * Fallback contract: with no CLI args and no env vars, this module produces
+ * `connections: { _default: { type: "direct" } }` alongside the
+ * always-present `server` block. This yields a config with no service
+ * blocks, so only connection-agnostic tools are enabled. When the env-var
+ * path is retired, the YAML loader must preserve this connection shape.
+ */
+export const DEFAULT_CONNECTION_NAME = "_default";
 
 /** The manufactured document path prefix for the single connection configured from env vars. */
-const CONN = `connections.${ENV_CONNECTION_NAME}`;
+const CONN = `connections.${DEFAULT_CONNECTION_NAME}`;
 
 /**
  * Maps each environment variable in type Environment (and handled by buildConfigFromEnvAndCli)
@@ -45,12 +56,20 @@ const ENV_VAR_TO_ZPATH = {
   FLINK_ENV_ID: `${CONN}.flink.environment_id`,
   FLINK_ORG_ID: `${CONN}.flink.organization_id`,
   FLINK_COMPUTE_POOL_ID: `${CONN}.flink.compute_pool_id`,
-  FLINK_ENV_NAME: `${CONN}.flink.environment_name`,
+  // FLINK_CATALOG_NAME comes before FLINK_ENV_NAME so error-message humanization
+  // (which iterates this map in insertion order) surfaces the preferred name.
+  FLINK_CATALOG_NAME: `${CONN}.flink.catalog_name`,
+  FLINK_ENV_NAME: `${CONN}.flink.catalog_name`,
   FLINK_DATABASE_NAME: `${CONN}.flink.database_name`,
   // Telemetry parameters
   TELEMETRY_ENDPOINT: `${CONN}.telemetry.endpoint`,
   TELEMETRY_API_KEY: `${CONN}.telemetry.auth.key`,
   TELEMETRY_API_SECRET: `${CONN}.telemetry.auth.secret`,
+  // Analytics (internal-dev-only: Segment write key override)
+  TELEMETRY_WRITE_KEY: "server.analytics.write_key",
+  // OAuth diagnostic knob — only meaningful when --oauth is also set, in which
+  // case buildConfigFromEnv synthesizes the OAuth connection arm that carries it.
+  OAUTH_KAFKA_DEBUG: `${CONN}.kafka_debug`,
   // Server configuration
   LOG_LEVEL: "server.log_level",
   HTTP_PORT: "server.http.port",
@@ -78,7 +97,40 @@ function buildConfigFromEnv(
   env: Environment,
   authOverrides: Pick<EnvPathCliOverrides, "disableAuth" | "allowedHosts"> = {},
   kafkaConfig?: KeyValuePairObject,
+  oauth?: { ccloudEnv?: "devel" | "stag" | "prod" },
 ): MCPServerConfiguration {
+  // OAuth path: synthesize a single OAuth-typed connection. No surface blocks,
+  // no auth fields. ccloud_env defaults to "prod" via the schema.
+  if (oauth) {
+    const rawDocument: Record<string, unknown> = {
+      connections: {
+        [DEFAULT_CONNECTION_NAME]: {
+          type: "oauth",
+          ...(oauth.ccloudEnv && {
+            ccloud_env: oauth.ccloudEnv,
+          }),
+          ...(env.OAUTH_KAFKA_DEBUG !== undefined && {
+            kafka_debug: env.OAUTH_KAFKA_DEBUG,
+          }),
+        },
+      },
+      ...buildServerBlock(env, authOverrides),
+    };
+    const result = mcpConfigSchema.safeParse(rawDocument);
+    if (!result.success) {
+      // Server-config validation can still fail on the OAuth path
+      // (e.g., MCP_API_KEY length / disabled+api_key conflict). Run the
+      // env-var humanizer so users see env-var names, not schema paths.
+      const formattedIssues = humanizeEnvConfigPaths(
+        formatZodIssues(result.error.issues),
+      );
+      throw new Error(
+        `Failed to construct OAuth MCPServerConfiguration from environment variables:\n${formattedIssues}`,
+      );
+    }
+    return new MCPServerConfiguration(result.data);
+  }
+
   const connection: Record<string, unknown> = { type: "direct" };
 
   // Each connection builder returns { <blockKey>: { ...fields } } or null — the key is owned
@@ -108,7 +160,7 @@ function buildConfigFromEnv(
   // authOverrides are folded in here so Zod validates the final combined state,
   // including the disabled+api_key mutual exclusion refine.
   const rawDocument: Record<string, unknown> = {
-    connections: { [ENV_CONNECTION_NAME]: connection },
+    connections: { [DEFAULT_CONNECTION_NAME]: connection },
     ...buildServerBlock(env, authOverrides),
   };
 
@@ -131,11 +183,13 @@ function buildConfigFromEnv(
   return new MCPServerConfiguration(result.data);
 }
 
-/** CLI flags that may override values in the env-var config path. Mutually exclusive with --config (YAML path). */
+/** CLI flags that may override values in the env-var config path. */
 export interface EnvPathCliOverrides {
   disableAuth?: boolean;
   allowedHosts?: string[];
   kafkaConfig?: KeyValuePairObject;
+  oauth?: boolean;
+  ccloudEnv?: "devel" | "stag" | "prod";
 }
 
 /**
@@ -158,6 +212,7 @@ export function buildConfigFromEnvAndCli(
       allowedHosts: overrides.allowedHosts,
     },
     overrides.kafkaConfig,
+    overrides.oauth ? { ccloudEnv: overrides.ccloudEnv } : undefined,
   );
 }
 
@@ -336,7 +391,7 @@ function buildTelemetryBlock(
  *   environment_id: "${FLINK_ENV_ID}"
  *   organization_id: "${FLINK_ORG_ID}"
  *   compute_pool_id: "${FLINK_COMPUTE_POOL_ID}"
- *   environment_name: "${FLINK_ENV_NAME}"
+ *   catalog_name: "${FLINK_CATALOG_NAME}"
  *   database_name: "${FLINK_DATABASE_NAME}"
  *   auth:
  *     type: api_key
@@ -350,7 +405,7 @@ function buildFlinkBlock(env: Environment): {
     environment_id?: string;
     organization_id?: string;
     compute_pool_id?: string;
-    environment_name?: string;
+    catalog_name?: string;
     database_name?: string;
   };
 } | null {
@@ -361,10 +416,12 @@ function buildFlinkBlock(env: Environment): {
     !env.FLINK_ENV_ID &&
     !env.FLINK_ORG_ID &&
     !env.FLINK_COMPUTE_POOL_ID &&
+    !env.FLINK_CATALOG_NAME &&
     !env.FLINK_ENV_NAME &&
     !env.FLINK_DATABASE_NAME
   )
     return null;
+  const catalogName = resolveFlinkCatalogName(env);
   return {
     flink: {
       ...(env.FLINK_REST_ENDPOINT && { endpoint: env.FLINK_REST_ENDPOINT }),
@@ -374,12 +431,37 @@ function buildFlinkBlock(env: Environment): {
       ...(env.FLINK_COMPUTE_POOL_ID && {
         compute_pool_id: env.FLINK_COMPUTE_POOL_ID,
       }),
-      ...(env.FLINK_ENV_NAME && { environment_name: env.FLINK_ENV_NAME }),
+      ...(catalogName && { catalog_name: catalogName }),
       ...(env.FLINK_DATABASE_NAME && {
         database_name: env.FLINK_DATABASE_NAME,
       }),
     },
   };
+}
+
+/**
+ * Resolves the Flink catalog name from env vars, accepting either the preferred
+ * `FLINK_CATALOG_NAME` or the deprecated `FLINK_ENV_NAME`. Throws when both are
+ * set (unambiguous conflict — user must remove the legacy one). Emits a single
+ * `logger.warn` when only the legacy var is set so the deprecation lands in
+ * server logs at startup.
+ *
+ * TODO: Remove FLINK_ENV_NAME support in v1.4.0. See issue #209.
+ */
+function resolveFlinkCatalogName(env: Environment): string | undefined {
+  if (env.FLINK_CATALOG_NAME && env.FLINK_ENV_NAME) {
+    throw new Error(
+      "Both FLINK_CATALOG_NAME and the deprecated FLINK_ENV_NAME are set; remove FLINK_ENV_NAME.",
+    );
+  }
+  if (env.FLINK_CATALOG_NAME) return env.FLINK_CATALOG_NAME;
+  if (env.FLINK_ENV_NAME) {
+    logger.warn(
+      "FLINK_ENV_NAME is deprecated and will be removed in v1.4.0; rename to FLINK_CATALOG_NAME.",
+    );
+    return env.FLINK_ENV_NAME;
+  }
+  return undefined;
 }
 
 /**
@@ -422,6 +504,9 @@ function buildServerBlock(
         disabled: authOverrides.disableAuth ?? env.MCP_AUTH_DISABLED,
         allowed_hosts: authOverrides.allowedHosts ?? env.MCP_ALLOWED_HOSTS,
       },
+      ...(env.TELEMETRY_WRITE_KEY !== undefined && {
+        analytics: { write_key: env.TELEMETRY_WRITE_KEY },
+      }),
     },
   };
 }

@@ -13,13 +13,15 @@ import { type MockInstance, vi } from "vitest";
  *
  * Read methods (`existsSync`, `readFileSync`) call through to the real fs
  * by default; tests should override with `.mockReturnValue(...)`. Write
- * methods (`writeFileSync`, `mkdirSync`) are no-op-by-default to prevent
- * an unmocked call from accidentally mutating the real filesystem.
+ * methods (`writeFileSync`, `appendFileSync`, `mkdirSync`) are
+ * no-op-by-default to prevent an unmocked call from accidentally mutating
+ * the real filesystem.
  */
 export type MockedFsWrappers = {
   existsSync: MockInstance<typeof nodeDeps.fs.existsSync>;
   readFileSync: MockInstance<typeof nodeDeps.fs.readFileSync>;
   writeFileSync: MockInstance<typeof nodeDeps.fs.writeFileSync>;
+  appendFileSync: MockInstance<typeof nodeDeps.fs.appendFileSync>;
   mkdirSync: MockInstance<typeof nodeDeps.fs.mkdirSync>;
 };
 
@@ -29,8 +31,8 @@ export type MockedFsWrappers = {
  * Read spies (`existsSync`, `readFileSync`) call through by default; real
  * `existsSync` on a non-existent path returns `false` and real `readFileSync`
  * throws ENOENT, both of which surface a missed mock loudly. Write spies
- * (`writeFileSync`, `mkdirSync`) are no-op-by-default so an unmocked call
- * doesn't accidentally mutate the real filesystem.
+ * (`writeFileSync`, `appendFileSync`, `mkdirSync`) are no-op-by-default
+ * so an unmocked call doesn't accidentally mutate the real filesystem.
  *
  * @example
  * ```ts
@@ -46,28 +48,15 @@ export function createFsWrappers(): MockedFsWrappers {
     writeFileSync: vi
       .spyOn(nodeDeps.fs, "writeFileSync")
       .mockImplementation(() => undefined),
+    appendFileSync: vi
+      .spyOn(nodeDeps.fs, "appendFileSync")
+      .mockImplementation(() => undefined),
     mkdirSync: vi
       .spyOn(nodeDeps.fs, "mkdirSync")
       .mockImplementation(
         () => undefined as ReturnType<typeof nodeDeps.fs.mkdirSync>,
       ),
   };
-}
-
-/**
- * Spy on the env-proxy getter ({@linkcode nodeDeps.config.env}) and return
- * the supplied partial as the full env object. Lets tests express only the
- * env vars they actually care about without listing every other field.
- *
- * @example
- * ```ts
- * mockEnv({ DO_NOT_TRACK: true });
- * ```
- */
-export function mockEnv(overrides: Partial<typeof nodeDeps.config.env>): void {
-  vi.spyOn(nodeDeps.config, "env", "get").mockReturnValue(
-    overrides as unknown as typeof nodeDeps.config.env,
-  );
 }
 
 /**

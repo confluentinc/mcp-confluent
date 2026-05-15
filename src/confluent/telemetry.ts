@@ -1,15 +1,33 @@
-import {
-  buildConfig,
-  fs,
-  os,
-  path,
-  segment,
-} from "@src/confluent/node-deps.js";
+import { fs, os, path, segment } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
 import { randomUUID } from "node:crypto";
 
 export enum TelemetryEvent {
+  /**
+   * Emitted once after successful startup so we can count boots independently
+   * of tool calls.
+   */
+  SERVER_START = "Server Start",
+  /**
+   * Emitted once for every tool call for telemetry on tool usage.
+   */
   TOOL_CALL = "Tool Call",
+  /**
+   * Emitted once per terminal OAuth PKCE login attempt (success or failure).
+   * Refresh-token rotations are not tracked here.
+   */
+  CCLOUD_AUTHENTICATION = "CCloud Authentication",
+}
+
+/**
+ * Inputs to {@link TelemetryService.initialize}. `writeKey` is whatever the
+ * caller resolved (YAML override, build-config injected value, or undefined);
+ * the service treats `undefined`/`""` as "telemetry off" and otherwise hands
+ * the value to the Segment Analytics constructor.
+ */
+export interface TelemetryInitOptions {
+  readonly doNotTrack: boolean;
+  readonly writeKey: string | undefined;
 }
 
 export const FALLBACK_MACHINE_ID = "00000000-0000-0000-0000-000000000000";
@@ -57,11 +75,8 @@ export class TelemetryService {
   private serverSessionId: string;
   private commonProperties: Record<string, unknown>;
 
-  private constructor(doNotTrack: boolean) {
-    // runtime env var can override the build-time value for local dev/testing
-    const writeKey =
-      process.env.TELEMETRY_WRITE_KEY || buildConfig.TELEMETRY_WRITE_KEY;
-    const enabled = !doNotTrack && !!writeKey;
+  private constructor(opts: TelemetryInitOptions) {
+    const enabled = !opts.doNotTrack && !!opts.writeKey;
 
     this.machineId = getOrCreateMachineId();
     this.serverSessionId = randomUUID();
@@ -73,20 +88,27 @@ export class TelemetryService {
     };
 
     if (enabled) {
-      this.analytics = new segment.Analytics({ writeKey });
+      this.analytics = new segment.Analytics({ writeKey: opts.writeKey });
       logger.info("Telemetry enabled");
     } else {
       logger.info("Telemetry disabled");
     }
   }
 
-  static initialize(doNotTrack: boolean): void {
+  /**
+   * Bootstrap-time entry point. The caller (main()) is responsible for
+   * resolving `writeKey` from its sources — typically
+   * `mcpConfig.server.analytics?.write_key ?? buildConfig.TELEMETRY_WRITE_KEY`
+   * — before invoking this. A falsy `writeKey` (`undefined` or `""`) keeps
+   * analytics disabled even when `doNotTrack` is false.
+   */
+  static initialize(opts: TelemetryInitOptions): void {
     if (TelemetryService.instance) {
       throw new Error(
         "TelemetryService has already been initialized — initialize() must be called exactly once before getInstance()",
       );
     }
-    TelemetryService.instance = new TelemetryService(doNotTrack);
+    TelemetryService.instance = new TelemetryService(opts);
   }
 
   static getInstance(): TelemetryService {

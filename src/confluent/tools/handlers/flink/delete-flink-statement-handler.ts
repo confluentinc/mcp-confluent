@@ -1,13 +1,8 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  DESTRUCTIVE,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { DESTRUCTIVE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -36,21 +31,18 @@ const deleteFlinkStatementArguments = z.object({
     ),
 });
 
-export class DeleteFlinkStatementHandler extends BaseToolHandler {
+export class DeleteFlinkStatementHandler extends FlinkToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { statementName, environmentId, organizationId } =
       deleteFlinkStatementArguments.parse(toolArguments);
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const flink = this.getFlinkDirectConfig(runtime.config);
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      flink,
       organizationId,
-    );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
       environmentId,
     );
 
@@ -85,13 +77,5 @@ export class DeleteFlinkStatementHandler extends BaseToolHandler {
       inputSchema: deleteFlinkStatementArguments.shape,
       annotations: DESTRUCTIVE,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return FLINK_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

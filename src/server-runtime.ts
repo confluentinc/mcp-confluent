@@ -1,40 +1,44 @@
-import { MCPServerConfiguration } from "@src/config/index.js";
 import {
-  constructClientManagerForConnection,
-  type ClientManager,
-} from "@src/confluent/client-manager.js";
-import type { Environment } from "@src/env.js";
+  type OAuthConnectionConfig,
+  MCPServerConfiguration,
+} from "@src/config/index.js";
+import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import { constructDirectClientManager } from "@src/confluent/direct-client-manager.js";
+import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
+import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 
 /**
  * Aggregate of all runtime state threaded through the server.
  *
- * Carries config, per-connection client managers, and (temporarily) the validated
- * Environment. The `env` field is a shim for the issue-173 migration timeline:
- * it is read by `getToolHandlersToRegister()` and the `enabledConnectionIds()` shim
- * in `BaseToolHandler` to check `getRequiredEnvVars()`. Once that migration is
- * complete and `getRequiredEnvVars()` is deleted, remove `env` from this class.
+ * Carries config and per-connection client managers.
  */
 export class ServerRuntime {
   readonly config: MCPServerConfiguration;
-  readonly clientManagers: Record<string, ClientManager>;
-  /** @deprecated Shim field — remove after issue-173 cutover. */
-  readonly env: Environment;
+  readonly clientManagers: Record<string, BaseClientManager>;
+  /**
+   * The active OAuth holder when any connection in the config has `type === "oauth"`.
+   * Constructed by {@link ServerRuntime.fromConfig}; `undefined` on api_key paths.
+   * Construction is side-effect-free — PKCE runs lazily on the first
+   * `holder.ensureLoggedIn()` call, which the MCP tool-call wrapper invokes
+   * before any handler that needs Confluent access.
+   */
+  readonly oauthHolder: OAuthHolder | undefined;
 
   constructor(
     config: MCPServerConfiguration,
-    clientManagers: Record<string, ClientManager>,
-    env: Environment,
+    clientManagers: Record<string, BaseClientManager>,
+    oauthHolder: OAuthHolder | undefined = undefined,
   ) {
     this.config = config;
     this.clientManagers = clientManagers;
-    this.env = env;
+    this.oauthHolder = oauthHolder;
   }
 
   /**
    * Convenience accessor for the single-connection period.
    * Remove (or make multi-connection-aware) when issue #151 lands.
    */
-  get clientManager(): ClientManager {
+  get clientManager(): BaseClientManager {
     const managers = Object.values(this.clientManagers);
     if (managers.length === 0) {
       throw new Error("ServerRuntime has no client managers");
@@ -49,20 +53,48 @@ export class ServerRuntime {
     return managers[0]!;
   }
 
-  static fromConfig(
-    config: MCPServerConfiguration,
-    env: Environment,
-  ): ServerRuntime {
-    // Construct a ClientManager for each connection in the config.
-    // (although currently there will only be one, see `enforceSingleConnectionOnly()`)
-
-    const clientManagers = Object.fromEntries(
-      Object.entries(config.connections).map(([id, conn]) => [
-        id,
-        constructClientManagerForConnection(conn),
-      ]),
+  static fromConfig(config: MCPServerConfiguration): ServerRuntime {
+    const oauthConns = Object.values(config.connections).filter(
+      (c): c is OAuthConnectionConfig => c.type === "oauth",
     );
-    // Wrap in ServerRuntime and return.
-    return new ServerRuntime(config, clientManagers, env);
+    if (oauthConns.length > 1) {
+      // `enforceSingleConnectionOnly()` already prevents this today; keep the
+      // defensive check so that when multi-connection support lands (#151),
+      // multi-OAuth is rejected explicitly rather than silently picking one.
+      throw new Error(
+        `Multiple OAuth connections defined in configuration; only one is supported`,
+      );
+    }
+    const oauthConn = oauthConns[0];
+    const oauthHolder = oauthConn
+      ? new OAuthHolder(oauthConn.ccloud_env)
+      : undefined;
+
+    // Construct a client manager for each connection in the config.
+    // (although currently there will only be one, see `enforceSingleConnectionOnly()`)
+    // When OAuth is in play, every connection's manager is bearer-auth-backed by
+    // the shared holder; otherwise, fall back to the per-connection direct factory.
+    const clientManagers = Object.fromEntries(
+      Object.entries(config.connections).map(([id, conn]) => {
+        if (oauthHolder && oauthConn) {
+          return [
+            id,
+            new OAuthClientManager(
+              oauthHolder,
+              oauthConn.ccloud_env,
+              oauthConn.kafka_debug,
+            ),
+          ] as const;
+        }
+        // No OAuth connection found, so every connection is direct.
+        if (conn.type !== "direct") {
+          throw new Error(
+            `Internal error: connection ${id} is not direct but no OAuth holder was constructed`,
+          );
+        }
+        return [id, constructDirectClientManager(conn)] as const;
+      }),
+    );
+    return new ServerRuntime(config, clientManagers, oauthHolder);
   }
 }

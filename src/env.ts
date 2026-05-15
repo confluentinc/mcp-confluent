@@ -33,8 +33,19 @@ export function initEnv(): Environment {
   return envValues;
 }
 
-// Create a module to provide access to environment variables
-const env = new Proxy({} as Environment, {
+/**
+ * Lazy proxy over the validated environment values. Reading any property
+ * before {@linkcode initEnv} has run throws — this is what catches code that
+ * tries to consult the env outside the bootstrap.
+ *
+ * The default-export shape was retired in #234 to make accidental consumers
+ * visibly fail at the import site, and an ESLint rule slams the door behind
+ * it. The intended pattern is: `main()` calls `initEnv()` once, captures the
+ * returned `Environment` into a local, and passes it explicitly to the few
+ * call sites that need it. No global env consultation lives in handler code,
+ * test infrastructure, or anywhere else.
+ */
+export const env = new Proxy({} as Environment, {
   get: (_, property: string) => {
     if (!isInitialized) {
       throw new Error(
@@ -44,5 +55,3 @@ const env = new Proxy({} as Environment, {
     return envValues[property as keyof Environment];
   },
 });
-
-export default env;

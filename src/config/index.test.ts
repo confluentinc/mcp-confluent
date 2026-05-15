@@ -19,7 +19,10 @@ describe("config/index.ts", () => {
       bootstrap_servers: "localhost:9092"
 `;
 
-      const conn = parseYamlConfiguration(yamlContent, {}).getSoleConnection();
+      const conn = parseYamlConfiguration(
+        yamlContent,
+        {},
+      ).getSoleDirectConnection();
 
       expect(conn.type).toBe("direct");
       expect(conn.kafka!.bootstrap_servers).toBe("localhost:9092");
@@ -36,7 +39,10 @@ describe("config/index.ts", () => {
       endpoint: "http://localhost:8081"
 `;
 
-      const conn = parseYamlConfiguration(yamlContent, {}).getSoleConnection();
+      const conn = parseYamlConfiguration(
+        yamlContent,
+        {},
+      ).getSoleDirectConnection();
 
       expect(conn.schema_registry).toBeDefined();
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
@@ -50,7 +56,10 @@ describe("config/index.ts", () => {
       bootstrap_servers: "broker1:9092,broker2:9092,broker3:9092"
 `;
 
-      const conn = parseYamlConfiguration(yamlContent, {}).getSoleConnection();
+      const conn = parseYamlConfiguration(
+        yamlContent,
+        {},
+      ).getSoleDirectConnection();
 
       expect(conn.kafka!.bootstrap_servers).toBe(
         "broker1:9092,broker2:9092,broker3:9092",
@@ -115,18 +124,14 @@ describe("config/index.ts", () => {
       );
     });
 
-    it("should throw error when neither kafka nor schema_registry is defined", () => {
+    it("should accept a direct connection with no service blocks", () => {
       const yamlContent = `connections:
   local:
     type: "direct"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /Configuration validation failed/,
-      );
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /At least one of 'kafka', 'schema_registry', 'confluent_cloud', 'tableflow', 'flink', or 'telemetry' must be defined/,
-      );
+      const config = parseYamlConfiguration(yamlContent, {});
+      expect(config.getSoleDirectConnection()).toEqual({ type: "direct" });
     });
 
     it("should throw error when bootstrap_servers is missing", () => {
@@ -264,7 +269,7 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      expect(config.getSoleConnection().schema_registry?.endpoint).toBe(
+      expect(config.getSoleDirectConnection().schema_registry?.endpoint).toBe(
         "https://schema-registry.example.com:8081",
       );
     });
@@ -279,9 +284,50 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
       expect(conn.kafka).toBeUndefined();
+    });
+
+    it("should parse a minimal oauth connection and apply the prod default", () => {
+      const yamlContent = `connections:
+  prod-oauth:
+    type: "oauth"
+`;
+
+      const config = parseYamlConfiguration(yamlContent, {});
+
+      expect(config.getSoleConnection()).toEqual({
+        type: "oauth",
+        ccloud_env: "prod",
+      });
+    });
+
+    it("should parse an explicit oauth ccloud_env value", () => {
+      const yamlContent = `connections:
+  stag-oauth:
+    type: "oauth"
+    ccloud_env: "stag"
+`;
+
+      const config = parseYamlConfiguration(yamlContent, {});
+
+      expect(config.getSoleConnection()).toEqual({
+        type: "oauth",
+        ccloud_env: "stag",
+      });
+    });
+
+    it("should reject an oauth connection with an unknown ccloud_env", () => {
+      const yamlContent = `connections:
+  bad-oauth:
+    type: "oauth"
+    ccloud_env: "bogus"
+`;
+
+      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
+        /ccloud_env/,
+      );
     });
 
     it("should interpolate ${VAR} references using provided env before Zod validation", () => {
@@ -299,7 +345,7 @@ describe("config/index.ts", () => {
         SR_URL: "http://localhost:8081",
       });
 
-      const conn = config.getSoleConnection();
+      const conn = config.getSoleDirectConnection();
       expect(conn.kafka!.bootstrap_servers).toBe("broker1:9092");
       expect(conn.schema_registry!.endpoint).toBe("http://localhost:8081");
     });
@@ -418,7 +464,7 @@ describe("config/index.ts", () => {
 
       const config = loadConfigFromYaml("/path/to/config.yaml", {});
 
-      expect(config.getSoleConnection().kafka!.bootstrap_servers).toBe(
+      expect(config.getSoleDirectConnection().kafka!.bootstrap_servers).toBe(
         "localhost:9092",
       );
     });
@@ -437,7 +483,7 @@ describe("config/index.ts", () => {
         BOOTSTRAP_SERVERS: "broker1:9092",
       });
 
-      expect(config.getSoleConnection().kafka!.bootstrap_servers).toBe(
+      expect(config.getSoleDirectConnection().kafka!.bootstrap_servers).toBe(
         "broker1:9092",
       );
     });
@@ -463,7 +509,9 @@ describe("config/index.ts", () => {
       const invalidYaml = `connections:
   local:
     type: "direct"
-    # missing both kafka and schema_registry
+    kafka:
+      # missing required bootstrap_servers / rest_endpoint
+      cluster_id: "lkc-bogus"
 `;
       fsMocks.existsSync.mockReturnValue(true);
       fsMocks.readFileSync.mockReturnValue(invalidYaml);

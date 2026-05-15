@@ -1,14 +1,14 @@
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import { hasSchemaRegistryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar } from "@src/env-schema.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listSchemasArguments = z.object({
@@ -26,14 +26,21 @@ const listSchemasArguments = z.object({
     .describe("List deleted schemas. (Only used if latestOnly is false)")
     .default(false)
     .optional(),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Schema Registry. Discover via list-environments.",
+    ),
 });
 
 export class ListSchemasHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { latestOnly, subjectPrefix, deleted } =
+    const { clientManager } = this.resolveSoleConnection(runtime);
+    const { latestOnly, subjectPrefix, deleted, environment_id } =
       listSchemasArguments.parse(toolArguments);
 
     logger.debug(
@@ -41,12 +48,13 @@ export class ListSchemasHandler extends BaseToolHandler {
         latestOnly,
         subjectPrefix,
         deleted,
+        environment_id,
       },
       "ListSchemasHandler.handle called with arguments",
     );
 
     const registry: SchemaRegistryClient =
-      clientManager.getSchemaRegistryClient();
+      await clientManager.getSchemaRegistrySdkClient(environment_id);
 
     try {
       let subjects: string[] = await registry.getAllSubjects();
@@ -165,8 +173,5 @@ export class ListSchemasHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
-
-  getRequiredEnvVars(): EnvVar[] {
-    return ["SCHEMA_REGISTRY_ENDPOINT"];
-  }
+  readonly predicate = hasSchemaRegistryOrOAuth;
 }

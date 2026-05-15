@@ -1,13 +1,8 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
-import { getEnsuredParam } from "@src/confluent/helpers.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  BaseToolHandler,
-  READ_ONLY,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { EnvVar, FLINK_REQUIRED_ENV_VARS } from "@src/env-schema.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -43,25 +38,22 @@ const readFlinkStatementArguments = z.object({
     ),
 });
 
-export class ReadFlinkStatementHandler extends BaseToolHandler {
+export class ReadFlinkStatementHandler extends FlinkToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const {
       timeoutInMilliseconds,
       statementName,
       environmentId,
       organizationId,
     } = readFlinkStatementArguments.parse(toolArguments);
-    const organization_id = getEnsuredParam(
-      "FLINK_ORG_ID",
-      "Organization ID is required",
+    const flink = this.getFlinkDirectConfig(runtime.config);
+    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
+      flink,
       organizationId,
-    );
-    const environment_id = getEnsuredParam(
-      "FLINK_ENV_ID",
-      "Environment ID is required",
       environmentId,
     );
 
@@ -118,13 +110,5 @@ export class ReadFlinkStatementHandler extends BaseToolHandler {
       inputSchema: readFlinkStatementArguments.shape,
       annotations: READ_ONLY,
     };
-  }
-
-  getRequiredEnvVars(): readonly EnvVar[] {
-    return FLINK_REQUIRED_ENV_VARS;
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
   }
 }

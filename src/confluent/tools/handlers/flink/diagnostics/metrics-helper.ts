@@ -1,4 +1,4 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
+import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 
 /**
  * Flink statement metrics from the Confluent Cloud Telemetry API.
@@ -104,7 +104,7 @@ const LONG_MIN_VALUE = -9223372036854776000;
  * @returns Aggregated metrics for the statement
  */
 export async function getStatementMetrics(
-  clientManager: ClientManager,
+  clientManager: BaseClientManager,
   options: {
     statementName: string;
     computePoolId: string;
@@ -452,7 +452,7 @@ export function analyzeMetrics(metrics: FlinkStatementMetrics): {
  */
 async function queryTaskMetrics(
   telemetryClient: ReturnType<
-    ClientManager["getConfluentCloudTelemetryRestClient"]
+    BaseClientManager["getConfluentCloudTelemetryRestClient"]
   >,
   options: {
     statementName: string;
@@ -553,7 +553,7 @@ async function queryTaskMetrics(
  */
 async function querySplitMetrics(
   telemetryClient: ReturnType<
-    ClientManager["getConfluentCloudTelemetryRestClient"]
+    BaseClientManager["getConfluentCloudTelemetryRestClient"]
   >,
   options: {
     statementName: string;

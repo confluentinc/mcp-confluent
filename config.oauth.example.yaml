@@ -1,0 +1,45 @@
+# Example MCP Confluent Server configuration — OAuth connection.
+#
+# Generate `config.yaml` from this template with:
+#   npx @confluentinc/mcp-confluent --init-oauth-config
+#
+# OAuth authenticates against Confluent Cloud via PKCE; no API keys to
+# provision. The browser sign-in opens automatically on server start; tools
+# that depend on OAuth begin working once sign-in completes. OAuth-eligible
+# tools auto-enable — there are no per-service blocks like there are for
+# direct (api-key) connections. Resource IDs (cluster_id, env_id, etc.) are
+# passed as tool arguments at call time rather than declared here.
+
+# --- Server ---
+# MCP server transport, authentication, and logging settings.
+# All fields are optional — uncomment and edit only what you need.
+# (See `config.example.yaml` for the fully-annotated server block; the same
+# fields apply here. Stdio users can leave the entire block commented out.)
+# server:
+#   transports: [stdio]
+#   log_level: "${LOG_LEVEL:-info}"
+#   http:
+#     port: ${HTTP_PORT:-8080}
+#     host: "${HTTP_HOST:-127.0.0.1}"
+#     mcp_endpoint: "${HTTP_MCP_ENDPOINT_PATH:-/mcp}"
+#     sse_endpoint: "${SSE_MCP_ENDPOINT_PATH:-/sse}"
+#     sse_message_endpoint: "${SSE_MCP_MESSAGE_ENDPOINT_PATH:-/messages}"
+#   auth:
+#     # api_key: "${MCP_API_KEY}"
+#     allowed_hosts:
+#       - localhost
+#       - "127.0.0.1"
+#     # disabled: true
+
+connections:
+  # Connection name is freeform. The `type: oauth` declaration is the only
+  # required field.
+  ccloud-oauth:
+    type: oauth
+
+    # librdkafka `debug` contexts to emit on stderr for this OAuth connection's
+    # native Kafka client. Reach for it when an OAuth/OAUTHBEARER SASL handshake
+    # misbehaves and you need to see which side broke — works the same in
+    # production as in dev. Common values: "security,broker,protocol", "all".
+    # The output is verbose; turn it off again once the investigation is done.
+    # kafka_debug: "${OAUTH_KAFKA_DEBUG:-security,broker,protocol}"

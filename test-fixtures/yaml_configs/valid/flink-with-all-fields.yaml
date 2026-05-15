@@ -10,5 +10,5 @@ connections:
       environment_id: "env-abc123"
       organization_id: "org-xyz789"
       compute_pool_id: "lfcp-pool01"
-      environment_name: "my-environment"
+      catalog_name: "my-environment"
       database_name: "my-kafka-cluster"

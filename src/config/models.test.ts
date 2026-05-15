@@ -1,3 +1,5 @@
+import { DEFAULT_CONNECTION_NAME } from "@src/config/env-config.js";
+import type { DirectConnectionConfig } from "@src/config/models.js";
 import {
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
   MCPServerConfiguration,
@@ -68,7 +70,7 @@ describe("config/models.ts", () => {
       expect(result.success).toBe(false);
     });
 
-    it.each(["environment_name", "database_name"])(
+    it.each(["catalog_name", "database_name"])(
       "should reject flink block with empty string for optional field '%s'",
       (field) => {
         const flink = { ...validFlinkBlock, [field]: "" };
@@ -152,6 +154,20 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it.each([
+      { cluster_id: "lkc-abc123" },
+      { env_id: "env-xyz789" },
+      { cluster_id: "lkc-abc123", env_id: "env-xyz789" },
+    ])(
+      "should reject kafka block with no bootstrap_servers or rest_endpoint: %o",
+      (kafka) => {
+        const result = mcpConfigSchema.safeParse({
+          connections: { production: { type: "direct", kafka } },
+        });
+        expect(result.success).toBe(false);
+      },
+    );
   });
 
   describe("kafka extra_properties", () => {
@@ -203,7 +219,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.telemetry).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.telemetry,
+        ).toEqual({
           endpoint: "https://api.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "k", secret: "s" },
         });
@@ -241,7 +263,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.telemetry).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.telemetry,
+        ).toEqual({
           endpoint: "https://custom.telemetry.example.com",
           auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
         });
@@ -262,7 +290,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.telemetry).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.telemetry,
+        ).toEqual({
           endpoint: "https://api.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "k", secret: "s" },
         });
@@ -282,7 +316,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.telemetry).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.telemetry,
+        ).toEqual({
           endpoint: "https://api.telemetry.confluent.cloud",
           auth: { type: "api_key", key: "cckey", secret: "ccsecret" },
         });
@@ -517,6 +557,55 @@ describe("config/models.ts", () => {
     });
   });
 
+  describe("server.analytics block", () => {
+    const validConnection = {
+      type: "direct" as const,
+      kafka: { bootstrap_servers: "broker:9092" },
+    };
+
+    it("should accept server.analytics.write_key when supplied", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { analytics: { write_key: "segment-write-key" } },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.analytics?.write_key).toBe(
+          "segment-write-key",
+        );
+      }
+    });
+
+    it("should leave server.analytics undefined when the block is omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.server.analytics).toBeUndefined();
+      }
+    });
+
+    it("should reject unknown keys in server.analytics", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { analytics: { write_key: "k", bogus: 1 } },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject empty server.analytics.write_key", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { production: validConnection },
+        server: { analytics: { write_key: "" } },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatZodIssues(result.error.issues)).toMatch(/write_key/);
+      }
+    });
+  });
+
   describe("confluent_cloud block", () => {
     const baseCC = {
       auth: { type: "api_key" as const, key: "k", secret: "s" },
@@ -530,7 +619,13 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.connections["production"]?.confluent_cloud).toEqual({
+        expect(
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.confluent_cloud,
+        ).toEqual({
           endpoint: "https://api.confluent.cloud",
           auth: { type: "api_key", key: "k", secret: "s" },
         });
@@ -552,7 +647,11 @@ describe("config/models.ts", () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(
-          result.data.connections["production"]?.confluent_cloud?.endpoint,
+          (
+            result.data.connections["production"] as
+              | DirectConnectionConfig
+              | undefined
+          )?.confluent_cloud?.endpoint,
         ).toBe("https://custom.confluent.cloud");
       }
     });
@@ -622,6 +721,137 @@ describe("config/models.ts", () => {
           /Multiple connections defined/,
         );
       });
+    });
+
+    describe("getSoleDirectConnection", () => {
+      it("should return the connection narrowed to direct when sole connection is direct", () => {
+        const config = new MCPServerConfiguration({
+          connections: { local: directConnection },
+        });
+
+        const conn = config.getSoleDirectConnection();
+        expect(conn).toBe(directConnection);
+        expect(conn.type).toBe("direct");
+      });
+
+      it("should throw when the sole connection is OAuth-typed", () => {
+        const config = new MCPServerConfiguration({
+          connections: {
+            [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "devel" },
+          },
+        });
+
+        expect(() => config.getSoleDirectConnection()).toThrow(
+          /Expected sole connection to be a direct connection; got type "oauth"/,
+        );
+      });
+
+      it("should propagate the underlying getSoleConnection throw on zero connections", () => {
+        const config = new MCPServerConfiguration({ connections: {} });
+
+        expect(() => config.getSoleDirectConnection()).toThrow(
+          /No connections defined/,
+        );
+      });
+    });
+  });
+
+  describe("oauth connection arm", () => {
+    it("should default ccloud_env to 'prod' when omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth" } },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.connections.foo).toEqual({
+          type: "oauth",
+          ccloud_env: "prod",
+        });
+      }
+    });
+
+    it("should accept explicit devel/stag/prod for ccloud_env", () => {
+      for (const env of ["devel", "stag", "prod"] as const) {
+        const result = mcpConfigSchema.safeParse({
+          connections: { foo: { type: "oauth", ccloud_env: env } },
+        });
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it("should reject an unknown ccloud_env value", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth", ccloud_env: "bogus" } },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject unknown extra keys on the oauth arm", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: { type: "oauth", ccloud_env: "devel", clientId: "x" },
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should not spread direct-arm fields onto an oauth connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth" } },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const conn = result.data.connections.foo as unknown as Record<
+          string,
+          unknown
+        >;
+        expect(conn).not.toHaveProperty("confluent_cloud");
+        expect(conn).not.toHaveProperty("telemetry");
+      }
+    });
+
+    it("should accept kafka_debug as an optional librdkafka debug-contexts string", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: {
+            type: "oauth",
+            ccloud_env: "prod",
+            kafka_debug: "security,broker",
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.connections.foo).toEqual({
+          type: "oauth",
+          ccloud_env: "prod",
+          kafka_debug: "security,broker",
+        });
+      }
+    });
+
+    it("should leave kafka_debug undefined when omitted on an oauth connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth" } },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const conn = result.data.connections.foo as unknown as Record<
+          string,
+          unknown
+        >;
+        expect(conn.kafka_debug).toBeUndefined();
+      }
+    });
+
+    it("should reject empty kafka_debug string", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: { foo: { type: "oauth", kafka_debug: "" } },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(formatZodIssues(result.error.issues)).toMatch(/kafka_debug/);
+      }
     });
   });
 });

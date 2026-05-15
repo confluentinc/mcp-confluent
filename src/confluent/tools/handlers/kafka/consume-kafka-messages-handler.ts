@@ -1,7 +1,6 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
-import { ClientManager } from "@src/confluent/client-manager.js";
 import {
   deserializeMessage,
   getLatestSchemaIfExists,
@@ -13,9 +12,10 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
-  connectionIdsWhere,
-  hasKafkaBootstrap,
-} from "@src/confluent/tools/connection-predicates.js";
+  formatKafkaError,
+  resolveKafkaClusterArgs,
+} from "@src/confluent/tools/cluster-arg-resolvers.js";
+import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -66,6 +66,18 @@ export const consumeKafkaMessagesArgs = z.object({
     ),
   value: valueOptions,
   key: keyOptions.optional(),
+  cluster_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud logical Kafka cluster ID (lkc-...). Discover via list-clusters.",
+    ),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments.",
+    ),
 });
 
 interface ProcessedMessage {
@@ -176,23 +188,34 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    * @returns A CallToolResult containing the consumed messages or error information
    */
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,
     sessionId?: string,
   ): Promise<CallToolResult> {
-    const { topicNames, maxMessages, timeoutMs, value, key } =
-      consumeKafkaMessagesArgs.parse(toolArguments);
+    const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
+    const { topicNames, maxMessages, timeoutMs, value, key } = parsed;
+
+    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
+
+    const needsRegistry =
+      (value && value.useSchemaRegistry) || (key && key.useSchemaRegistry);
+
+    let registry: SchemaRegistryClient | undefined;
+    if (needsRegistry) {
+      registry = await clientManager.getSchemaRegistrySdkClient(resolved.envId);
+    }
 
     const consumedMessages: ProcessedMessage[] = [];
     let timeoutReached = false;
     let consumer: KafkaJS.Consumer | undefined;
-    const registry: SchemaRegistryClient | undefined =
-      value.useSchemaRegistry || (key && key.useSchemaRegistry)
-        ? clientManager.getSchemaRegistryClient()
-        : undefined;
 
     try {
-      consumer = await clientManager.getConsumer(sessionId);
+      consumer = await clientManager.buildKafkaConsumer(
+        resolved.clusterId,
+        resolved.envId,
+        sessionId,
+      );
       await consumer.connect();
       await consumer.subscribe({ topics: topicNames });
 
@@ -236,14 +259,8 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         false,
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : error instanceof KafkaJS.KafkaJSError
-            ? `Kafka error (${error.code}): ${error.message}`
-            : String(error);
       return this.createResponse(
-        `Failed to consume messages: ${errorMessage}`,
+        `Failed to consume messages: ${formatKafkaError(error)}`,
         true,
       );
     } finally {
@@ -267,7 +284,5 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     };
   }
 
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasKafkaBootstrap);
-  }
+  readonly predicate = kafkaBootstrapOrOAuth;
 }

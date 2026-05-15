@@ -190,10 +190,19 @@ const configSchema = z
       )
       .trim()
       .startsWith("lfcp-"),
+    FLINK_CATALOG_NAME: z
+      .string()
+      .describe(
+        "Name of the Flink catalog used as `sql.current-catalog` in submitted statements. Typically the Confluent Cloud environment's display name.",
+      )
+      .trim()
+      .min(1),
+    // TODO: Remove FLINK_ENV_NAME in v1.4.0 — kept as a deprecated alias of
+    // FLINK_CATALOG_NAME for one release cycle. See issue #209.
     FLINK_ENV_NAME: z
       .string()
       .describe(
-        "Human-readable name for the Flink environment used for identification and display purposes",
+        "DEPRECATED: rename to FLINK_CATALOG_NAME. Will be removed in v1.4.0. Same meaning — the Flink catalog name used as `sql.current-catalog`.",
       )
       .trim()
       .min(1),
@@ -263,6 +272,20 @@ const configSchema = z
       )
       .trim()
       .min(1),
+    TELEMETRY_WRITE_KEY: z
+      .string()
+      .describe(
+        "Developer-only override for the Segment write key used to emit anonymous usage analytics from this MCP server. Normal builds inject the right value at npm pack time; setting this is only useful when developing mcp-confluent against a non-production telemetry sink.",
+      )
+      .trim()
+      .min(1),
+    OAUTH_KAFKA_DEBUG: z
+      .string()
+      .describe(
+        "librdkafka `debug` contexts for the native Kafka client of an --oauth-synthesized connection. Common values: 'security,broker,protocol', 'all'. Useful when diagnosing a SASL/OAUTHBEARER handshake failure under OAuth. YAML configs supply this via the OAuth connection's kafka_debug field instead.",
+      )
+      .trim()
+      .min(1),
   })
   .partial();
 
@@ -270,39 +293,3 @@ export const combinedSchema = envSchema.merge(configSchema);
 
 // Export type for environment variable names
 export type EnvVar = keyof z.infer<typeof combinedSchema>;
-
-export const TELEMETRY_REQUIRED_ENV_VARS = [
-  // Configuring the telemetry client will first look for TELEMETRY_API_KEY/SECRET, then fall back to CONFLUENT_CLOUD_API_KEY/SECRET, so
-  // the only absolute required env vars for telemetry are the Confluent Cloud API key/secret.
-  // Likewise, TELEMETRY_ENDPOINT is optional: config/models.ts defaults it to TELEMETRY_DEFAULT_ENDPOINT
-  // and can synthesize a telemetry block entirely from confluent_cloud.auth.
-
-  // The fallback behavior for the configuration of telemetry
-  // in DefaultClientManager indicates that the entire concept
-  // of BaseToolHandler.getRequiredEnvVars() is ill designed, and that tool enablement
-  // needs to be made more flexible, which should happen in conjunction with
-  // migrating configuration to primarily be YAML based, not env var based.
-
-  // For now, though, we describe the truly required env vars for telemetry as
-  // just the Confluent Cloud API key/secret, for better or worse.
-
-  "CONFLUENT_CLOUD_API_KEY",
-  "CONFLUENT_CLOUD_API_SECRET",
-] as const;
-
-export const CCLOUD_CONTROL_PLANE_REQUIRED_ENV_VARS = [
-  "CONFLUENT_CLOUD_API_KEY",
-  "CONFLUENT_CLOUD_API_SECRET",
-] as const;
-
-export const CCLOUD_SCHEMA_REGISTRY_REQUIRED_ENV_VARS = [
-  "SCHEMA_REGISTRY_ENDPOINT",
-  "SCHEMA_REGISTRY_API_KEY",
-  "SCHEMA_REGISTRY_API_SECRET",
-] as const;
-
-export const FLINK_REQUIRED_ENV_VARS = [
-  "FLINK_REST_ENDPOINT",
-  "FLINK_API_KEY",
-  "FLINK_API_SECRET",
-] as const;

@@ -120,9 +120,9 @@ Before you begin, ensure you have the following installed on your system:
 
 Docker Desktop (or Docker Engine and Docker Compose): <https://www.docker.com/products/docker-desktop>
 
-##### Environment Variables
+##### Local credentials and config
 
-The MCP server requires several environment variables to connect to Confluent Cloud and other relevant services. These should be provided in the `.env` file in the root directory of this project. Or you can add them directly in the `docker-compose.yml`
+The container needs a `config.yaml` (or, on the legacy path, a `.env`) describing which Confluent Cloud resources to talk to. Keep secrets in a `.env` and reference them from `config.yaml` via `${VAR}` interpolation — see [CONFIGURATION.md](CONFIGURATION.md). Mount or bind in whichever file(s) you use; `docker-compose.yml` also accepts inline `environment:` entries for ad-hoc overrides.
 
 #### Building and Running with Docker
 
@@ -177,7 +177,7 @@ Here's how to build your Docker image and run it in different modes.
 
    The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
 
-   The server will be accessible on <http://localhost:8080> (or the port specified in HTTP_PORT in your .env file).
+   The server will be accessible on <http://localhost:8080> (or the port specified by `server.http.port` in `config.yaml`, or `HTTP_PORT` if you're on the legacy env-var path).
 
 3. **Stopping the Server**
    To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
@@ -191,6 +191,65 @@ Here's how to build your Docker image and run it in different modes.
    This command stops and removes the containers, networks, and volumes created by docker compose up.
 
 ### Testing
+
+#### Unit Tests
+
+```bash
+npm run test:unit           # single run (fast, no build)
+npm run test:unit:watch     # watch mode
+npm run test:unit:coverage  # with coverage report
+```
+
+(`npm run test` runs unit **and** integration — use it for the full sweep.
+`npm run test:coverage` does the same with coverage.)
+
+Unit tests are co-located with source files as `*.test.ts`. Conventions (naming, stubbing, assertion style, `node-deps.ts` indirection pattern) live in `.claude/rules/unit-tests.md`.
+
+#### Integration Tests
+
+Integration tests exercise the real MCP server as a child process against a real Confluent Cloud account, over both stdio and streamable HTTP transports. They live alongside handlers as `*.integration.test.ts` and run in a separate Vitest project from unit tests.
+
+##### Prerequisites
+
+- A `.env.integration` file with credentials for the tool groups you want to run. `dist/` is rebuilt automatically by `test`, `test:coverage`, `test:integration`, and `test:integration:coverage`. If you're iterating rapidly on handler code, keep `npm run dev` running in a separate terminal so the build prefix becomes a no-op incremental check.
+
+##### Option A: Vault-backed setup (team workflow)
+
+If you have Vault CLI access to the team's secrets path:
+
+```bash
+make setup-test-env                     # fetches secrets from Vault into .env.integration (chmod 600)
+npm run test:integration -- --tags-filter=@kafka
+```
+
+`make setup-test-env` fails fast if the Vault CLI isn't on `PATH` or you're not authed. If an individual Vault field is missing or unreadable, the line is skipped rather than written with an empty value (writing empty would fail the spawned server's env validation); tests that need that credential skip themselves via their predicate gate. See `.env.integration.example` for the full expected shape.
+
+##### Option B: Bring your own cluster (no Vault required)
+
+```bash
+cp .env.integration.example .env.integration
+# edit .env.integration — fill in the vars for the tool group(s) you want
+npm run test:integration -- --tags-filter=@kafka
+```
+
+Each tool group needs a specific credential subset; `.env.integration.example` annotates which var feeds which tests. Tests whose credentials aren't populated skip themselves with a clear reason — you don't have to fill in every var to run a subset.
+
+Minimum for `@kafka` tests: `KAFKA_API_KEY`, `KAFKA_API_SECRET`. Non-secret config (bootstrap servers, REST endpoint, cluster id) lives in `test-fixtures/yaml_configs/integration.yaml` and doesn't need to be set in the env file.
+
+##### Timing expectations
+
+- Cold start per test file: ~5-10s (server spawn + MCP handshake + first CCloud round-trip).
+- Per-test CCloud round-trip: 1-30s depending on call and region.
+- `vitest.config.ts` sets a 60s testTimeout for this project; don't lower it without measuring first.
+
+##### Other useful commands
+
+- Filter to one test file: `npm run test:integration -- --tags-filter=@kafka path/to/my.integration.test.ts`.
+- Just the tool-group tag: `npm run test:integration -- --tags-filter=@kafka`.
+- Run both unit and integration in one shot: `npm run test`.
+- Clean up the secrets file: `make remove-test-env`.
+
+For patterns, conventions, and write-path test lifecycle rules, see `.claude/rules/integration-tests.md`.
 
 #### MCP Inspector
 
@@ -256,7 +315,7 @@ tail -f server.log
 
 The repository includes checked-in configs for debugging the MCP server and connecting MCP clients (Claude Code, GitHub Copilot) to a local dev instance.
 
-**Prerequisites:** `npm install`, a `.env` file populated from `.env.example`.
+**Prerequisites:** `npm install`, plus a `config.yaml` (preferred — see [CONFIGURATION.md](CONFIGURATION.md)) or a legacy `.env` populated from `.env.example`.
 
 #### Starting the Dev Server
 
@@ -278,16 +337,18 @@ After pressing F5, your MCP client should automatically discover the `confluent-
 
 ### Adding a New Tool
 
-Tools are auto-enabled at startup based on which environment variables are present: each handler declares its requirements via `getRequiredEnvVars()`, and the server only exposes handlers whose requirements are satisfied. There is no manual enabled-tools list to maintain.
+Tools are auto-enabled at startup based on which service blocks are present in each connection's resolved `ConnectionConfig` (whether from YAML or the legacy env-var synthesizer). Each handler declares its requirement via a `predicate` property pointing at a named export from `src/confluent/tools/connection-predicates.ts`, and `BaseToolHandler` derives `enabledConnectionIds()` and `connectionVerdicts()` from it. There is no manual enabled-tools list to maintain.
 
 1. Add a new entry to the `ToolName` enum in `src/confluent/tools/tool-name.ts`.
-2. Create a handler class under `src/confluent/tools/handlers/<domain>/` (pick the existing domain directory that matches the Confluent service the tool wraps, or add a new one). The class must extend `BaseToolHandler`.
+2. Create a handler class under `src/confluent/tools/handlers/<domain>/` (pick the existing domain directory that matches the Confluent service the tool wraps, or add a new one). Extend the domain base class if one exists (e.g., `FlinkToolHandler`, `TableflowToolHandler`); otherwise extend `BaseToolHandler` directly.
 3. On your handler, implement:
-   - `getToolConfig()` — returns the tool name, description, Zod input schema, and annotations (`READ_ONLY`, `CREATE_UPDATE`, `DESTRUCTIVE`). For tools with no parameters, pass `inputSchema: {}`, not an omitted field.
+   - `getToolConfig()` — returns the tool name, description, Zod input schema, and annotations (`READ_ONLY`, `CREATE_UPDATE`, `DESTRUCTIVE`). For tools with no parameters, pass `inputSchema: {}`, not an omitted field. Every input field needs a `.describe()` call.
    - `handle()` — the runtime implementation.
-   - `getRequiredEnvVars()` — the env vars that must be set for the server to expose this tool.
+   - `predicate` — a `readonly predicate = <namedExport>` referencing one of the named predicates in `connection-predicates.ts`. If no existing predicate fits, add one there first (with a test in `connection-predicates.test.ts` and a row in `EXPECTED_PREDICATES` inside `tool-registry.test.ts`), then reference it from the handler. **Do not** compose predicates inline at the handler use site — combinators like `allOf` and `widenForOAuth` are for defining new named exports, not handler-side glue.
 4. Register the handler in the `ToolHandlerRegistry.handlers` map in `src/confluent/tools/tool-registry.ts`.
 5. If the tool calls a Confluent Cloud REST endpoint whose path or response shape isn't already in `openapi.json`, add it and regenerate the typed client — see [Generating Types](#generating-types) below.
+
+Project-specific conventions for handler structure, input-schema rules, and the predicate-selection checklist live in `.claude/rules/tool-handlers.md`.
 
 ### Generating Types
 

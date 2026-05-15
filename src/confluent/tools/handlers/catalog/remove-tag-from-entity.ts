@@ -1,14 +1,10 @@
-import { ClientManager } from "@src/confluent/client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   DESTRUCTIVE,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import {
-  connectionIdsWhere,
-  hasSchemaRegistry,
-} from "@src/confluent/tools/connection-predicates.js";
+import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -34,9 +30,10 @@ const removeTagFromEntityArguments = z.object({
 
 export class RemoveTagFromEntityHandler extends BaseToolHandler {
   async handle(
-    clientManager: ClientManager,
+    runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
+    const clientManager = runtime.clientManager;
     const { tagName, typeName, qualifiedName } =
       removeTagFromEntityArguments.parse(toolArguments);
 
@@ -75,12 +72,5 @@ export class RemoveTagFromEntityHandler extends BaseToolHandler {
       annotations: DESTRUCTIVE,
     };
   }
-
-  enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return connectionIdsWhere(runtime.config.connections, hasSchemaRegistry);
-  }
-
-  isConfluentCloudOnly(): boolean {
-    return true;
-  }
+  readonly predicate = hasCCloudCatalogSupport;
 }

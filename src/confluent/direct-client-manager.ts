@@ -10,7 +10,6 @@ import {
 } from "@src/config/models.js";
 import {
   BaseClientManager,
-  toLibrdkafkaOffsetReset,
   type BaseClientManagerConfig,
   type ConsumerBuildOptions,
 } from "@src/confluent/base-client-manager.js";
@@ -115,21 +114,17 @@ export class DirectClientManager
     const groupId = opts?.groupId
       ? `${baseGroupId}-${opts.groupId}`
       : baseGroupId;
-    // opts.offsetReset is the tool-facing alias ("none" included); the
-    // user's YAML kafkaConfig already speaks native librdkafka, so don't
-    // run that through the translator.
-    const offsetReset = opts?.offsetReset
-      ? toLibrdkafkaOffsetReset(opts.offsetReset)
-      : (this.kafkaConfig["auto.offset.reset"] ?? "earliest");
+    const offsetReset =
+      opts?.offsetReset ?? this.kafkaConfig["auto.offset.reset"] ?? "earliest";
     const consumerConfig = {
-      // Spread all user-provided config
       ...this.kafkaConfig,
-      // Override with our logic
       "group.id": groupId,
       "auto.offset.reset": offsetReset,
-      "allow.auto.create.topics":
-        this.kafkaConfig["allow.auto.create.topics"] || false,
-      "enable.auto.commit": this.kafkaConfig["enable.auto.commit"] || false,
+      // This tool is a snapshot read, not a stream resumption. Committing
+      // offsets back would silently shift the start position for the next
+      // call — not part of the tool contract — so hardcode it off rather
+      // than honoring user kafkaConfig for this key.
+      "enable.auto.commit": false,
     };
     return this.kafkaClient.get().consumer(consumerConfig);
   }

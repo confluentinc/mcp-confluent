@@ -316,34 +316,10 @@ export interface ConsumerBuildOptions {
    */
   groupId?: string;
   /**
-   * Tool-facing reset policy for the consumer. Defaults to `"earliest"`
-   * for backward compatibility with the pre-#459 behavior; handlers that
-   * want a different default (e.g. consume-messages picks `"latest"`)
-   * supply it explicitly.
-   *
-   * - `"earliest"` — start from the partition low watermark when no
-   *   committed offset exists. Maps to librdkafka `auto.offset.reset=earliest`.
-   * - `"latest"` — start from the partition high watermark (only newly
-   *   produced messages). Maps to librdkafka `auto.offset.reset=latest`.
-   * - `"none"` — fail rather than auto-pick when no committed offset
-   *   exists. With the fresh disposable group.id we mint per call, this
-   *   always fails unless the caller also issues a `consumer.seek(...)`
-   *   to a specific offset before the first poll. Maps to librdkafka
-   *   `auto.offset.reset=error` (librdkafka has no "none" — "error" is
-   *   the same semantics under a different name).
+   * Reset policy for the consumer. Defaults to `"earliest"` for backward
+   * compatibility with the pre-#459 behavior; handlers that want a
+   * different default (e.g. consume-messages picks `"latest"`) supply it
+   * explicitly. Maps straight to librdkafka `auto.offset.reset`.
    */
-  offsetReset?: "earliest" | "latest" | "none";
-}
-
-/**
- * Translate the tool-facing {@link ConsumerBuildOptions.offsetReset} value
- * to the librdkafka `auto.offset.reset` string that the broker config
- * accepts. The user-facing "none" alias has no direct librdkafka spelling;
- * "error" is the semantically equivalent value (fail rather than
- * auto-pick).
- */
-export function toLibrdkafkaOffsetReset(
-  reset: NonNullable<ConsumerBuildOptions["offsetReset"]>,
-): "earliest" | "latest" | "error" {
-  return reset === "none" ? "error" : reset;
+  offsetReset?: "earliest" | "latest";
 }

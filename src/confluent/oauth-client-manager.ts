@@ -23,7 +23,6 @@ import type { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   BaseClientManager,
-  toLibrdkafkaOffsetReset,
   type ConsumerBuildOptions,
 } from "@src/confluent/base-client-manager.js";
 import type { ConfluentRestClient } from "@src/confluent/client-manager.js";
@@ -247,12 +246,7 @@ export class OAuthClientManager extends BaseClientManager {
         groupId: opts?.groupId ?? "mcp-confluent",
         autoCommit: false,
       },
-      // Native librdkafka key (not kafkaJS.fromBeginning) so we can express
-      // "none" alongside "earliest"/"latest". kafkaJS.fromBeginning is a
-      // boolean and can't represent the no-default-seek case.
-      "auto.offset.reset": toLibrdkafkaOffsetReset(
-        opts?.offsetReset ?? "earliest",
-      ),
+      "auto.offset.reset": opts?.offsetReset ?? "earliest",
     });
   }
 

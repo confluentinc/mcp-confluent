@@ -57,15 +57,9 @@ describe("direct-client-manager.ts", () => {
         });
       });
 
-      it.each([
-        ["earliest", "earliest"],
-        ["latest", "latest"],
-        // "none" is the tool-facing alias; librdkafka has no "none" — its
-        // fail-rather-than-auto-pick value is "error".
-        ["none", "error"],
-      ] as const)(
-        "should propagate offsetReset=%s as native auto.offset.reset=%s",
-        async (offsetReset, expectedReset) => {
+      it.each(["earliest", "latest"] as const)(
+        "should propagate offsetReset=%s to auto.offset.reset",
+        async (offsetReset) => {
           const fakeConsumer = getMockedConsumer();
           const consumerFn = vi.fn().mockReturnValue(fakeConsumer);
           mockKafkaConstructor({ consumer: consumerFn });
@@ -75,7 +69,7 @@ describe("direct-client-manager.ts", () => {
 
           expect(consumerFn).toHaveBeenCalledOnce();
           expect(consumerFn.mock.calls[0]![0]).toMatchObject({
-            "auto.offset.reset": expectedReset,
+            "auto.offset.reset": offsetReset,
           });
         },
       );

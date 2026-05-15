@@ -56,7 +56,7 @@ describe("consume-kafka-messages-handler.ts", () => {
       expect(parsed.offsetReset).toBe("latest");
     });
 
-    it.each(["earliest", "latest", "none"] as const)(
+    it.each(["earliest", "latest"] as const)(
       "should accept offsetReset='%s'",
       (offsetReset) => {
         const parsed = consumeKafkaMessagesArgs.parse({

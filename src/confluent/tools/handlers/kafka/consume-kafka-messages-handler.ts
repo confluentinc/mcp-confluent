@@ -79,22 +79,16 @@ const topicConsumeOptions = z
       )
       .optional()
       .describe(
-        "Absolute starting offset within the partition. Kafka offsets " +
-          "are int64; pass as a string to preserve precision beyond JS's " +
-          "2^53 safe-integer range. Mutually exclusive with `timestamp`.",
+        "Absolute starting offset within the partition, as a digit-only " +
+          "string. Mutually exclusive with `timestamp`.",
       ),
     timestamp: z
-      .union([
-        z.string().datetime({ offset: true }),
-        z.number().int().positive(),
-      ])
+      .union([z.iso.datetime({ offset: true }), z.number().int().positive()])
       .optional()
       .describe(
         "Start consuming from this point in time. ISO 8601 preferred " +
           '(e.g. "2026-05-14T17:00:00Z" or "2026-05-14T13:00:00-04:00"); ' +
-          "ms-since-epoch accepted as an escape hatch for programmatic " +
-          "callers. Resolved to a partition offset server-side via " +
-          "fetchTopicOffsetsByTimestamp. Mutually exclusive with `offset`.",
+          "ms-since-epoch also accepted. Mutually exclusive with `offset`.",
       ),
   })
   .superRefine((data, ctx) => {
@@ -145,16 +139,14 @@ export const consumeKafkaMessagesArgs = z
         "Maximum time in milliseconds to wait for messages before stopping.",
       ),
     offsetReset: z
-      .enum(["earliest", "latest", "none"])
+      .enum(["earliest", "latest"])
       .optional()
       .default("latest")
       .describe(
         "Starting position when no committed offset exists: 'latest' " +
           "(default) reads only newly-produced messages from the partition " +
           "high watermark; 'earliest' reads from the partition low watermark " +
-          "(the entire retained history); 'none' fails rather than auto-pick, " +
-          "useful when the caller plans to seek to a specific offset and " +
-          "wants a loud error if that seek doesn't take effect.",
+          "(the entire retained history).",
       ),
     value: valueOptions,
     key: keyOptions.optional(),

@@ -2,6 +2,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
+  ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasTelemetry } from "@src/confluent/tools/connection-predicates.js";
@@ -261,5 +262,6 @@ export class ListMetricsHandler extends BaseToolHandler {
       annotations: READ_ONLY,
     };
   }
+  readonly category = ToolCategory.Metrics;
   readonly predicate = hasTelemetry;
 }

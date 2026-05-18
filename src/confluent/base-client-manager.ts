@@ -285,10 +285,41 @@ export abstract class BaseClientManager
    * call `connect()` and `disconnect()` (typically in a `try/finally`).
    */
   abstract buildKafkaConsumer(
-    clusterId?: string,
-    envId?: string,
-    groupId?: string,
+    opts?: ConsumerBuildOptions,
   ): Promise<KafkaJS.Consumer>;
 
   abstract disconnect(): Promise<void>;
+}
+
+/**
+ * Per-call options for {@link BaseClientManager.buildKafkaConsumer}. All
+ * fields are optional; each concrete manager validates only what its auth
+ * model requires (e.g. OAuth needs `clusterId` + `envId`, direct ignores
+ * both).
+ */
+export interface ConsumerBuildOptions {
+  /**
+   * Confluent Cloud logical Kafka cluster id (`lkc-...`). Required for
+   * OAuth (used to resolve the SASL/OAUTHBEARER bootstrap endpoint);
+   * ignored on direct (the bootstrap comes from connection config).
+   */
+  clusterId?: string;
+  /**
+   * Confluent Cloud environment id (`env-...`) that owns the cluster.
+   * Required for OAuth; ignored on direct.
+   */
+  envId?: string;
+  /**
+   * Consumer group identifier. On direct, appended as a suffix to the
+   * configured base group.id so concurrent MCP sessions don't share a
+   * group. On OAuth, used as the literal group id.
+   */
+  groupId?: string;
+  /**
+   * Reset policy for the consumer. Defaults to `"earliest"` for backward
+   * compatibility with the pre-#459 behavior; handlers that want a
+   * different default (e.g. consume-messages picks `"latest"`) supply it
+   * explicitly. Maps straight to librdkafka `auto.offset.reset`.
+   */
+  offsetReset?: "earliest" | "latest";
 }

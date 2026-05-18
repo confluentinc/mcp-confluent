@@ -11,6 +11,7 @@ import { spawnConfigPath } from "@tests/harness/runtime.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { resolve } from "node:path";
+import type { Readable } from "node:stream";
 
 export interface StartServerOptions {
   transport: TransportType;
@@ -27,6 +28,11 @@ export interface StartServerOptions {
    * tests omit this and run with auth disabled. Ignored for stdio.
    */
   auth?: { apiKey: string };
+  /**
+   * Spawn against the OAuth YAML fixture instead of the default direct one. Pipes child stderr
+   * so {@linkcode driveOAuthFlow} can read the Auth0 authorization URL from it.
+   */
+  oauth?: boolean;
 }
 
 export interface StartedServer {
@@ -38,6 +44,11 @@ export interface StartedServer {
    * deliberately-bad headers).
    */
   baseUrl?: string;
+  /**
+   * Child's stderr stream when {@linkcode StartServerOptions.oauth} is set, otherwise undefined.
+   * Read by {@linkcode driveOAuthFlow} to extract the Auth0 authorization URL.
+   */
+  stderr?: Readable;
   /** Sends SIGTERM to the child, awaits exit, and closes the MCP client. */
   stop: () => Promise<void>;
 }
@@ -89,7 +100,12 @@ async function startHttp(options: StartServerOptions): Promise<StartedServer> {
   const client = newClient();
   await client.connect(transport);
 
-  return { client, baseUrl, stop: makeHttpStop(client, child) };
+  return {
+    client,
+    baseUrl,
+    stderr: options.oauth ? (child.stderr ?? undefined) : undefined,
+    stop: makeHttpStop(client, child),
+  };
 }
 
 /**
@@ -114,7 +130,12 @@ async function startSse(options: StartServerOptions): Promise<StartedServer> {
   const client = newClient();
   await client.connect(transport);
 
-  return { client, baseUrl, stop: makeHttpStop(client, child) };
+  return {
+    client,
+    baseUrl,
+    stderr: options.oauth ? (child.stderr ?? undefined) : undefined,
+    stop: makeHttpStop(client, child),
+  };
 }
 
 /** Header object the auth middleware checks (see {@linkcode CFLT_MCP_API_KEY_HEADER}). */
@@ -135,10 +156,15 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
       "--no-deprecation",
       SERVER_ENTRY,
       "--config",
-      spawnConfigPath({ transport: options.transport }),
+      spawnConfigPath({
+        transport: options.transport,
+        oauth: options.oauth,
+      }),
     ],
     env: buildEnv(options.env),
-    stderr: "inherit",
+    // pipe stderr only for OAuth spawns so `driveOAuthFlow` can read the auth URL; default
+    // `inherit` keeps normal test output flowing to the parent terminal
+    stderr: options.oauth ? "pipe" : "inherit",
   });
   const client = newClient();
   await client.connect(transport);
@@ -163,7 +189,11 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
     }
   };
 
-  return { client, stop };
+  return {
+    client,
+    stderr: options.oauth ? (child?.stderr ?? undefined) : undefined,
+    stop,
+  };
 }
 
 /**
@@ -264,6 +294,7 @@ async function spawnHttpChild(
         httpPort: port,
         authDisabled: !options.auth,
         apiKey: options.auth?.apiKey,
+        oauth: options.oauth,
       }),
     ],
     {

@@ -18,6 +18,7 @@ export enum Tag {
   FLINK = "@flink",
   KAFKA = "@kafka",
   METRICS = "@metrics",
+  ORGANIZATIONS = "@organizations",
   SCHEMA = "@schema",
   SEARCH = "@search",
   TABLEFLOW = "@tableflow",

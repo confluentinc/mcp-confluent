@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { Analytics } from "@segment/analytics-node";
 import { TELEMETRY_WRITE_KEY } from "@src/build-config.js";
 import * as dotenv from "dotenv";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   appendFileSync,
   existsSync,
@@ -36,6 +36,7 @@ export const nodeFetch = { fetch: globalThis.fetch };
 // `randomBytes`. The codebase only uses the sync form.
 export const nodeCrypto = {
   randomBytes: (size: number): Buffer => randomBytes(size),
+  randomUUID: (): string => randomUUID(),
 };
 export const nodeHttp = { createServer: httpCreateServer };
 // `open` is loaded lazily so non-OAuth runs don't pay the import cost (it

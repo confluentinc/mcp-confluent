@@ -7,6 +7,8 @@ which is hosted by [Confluent Inc.](https://github.com/confluentinc)
 on GitHub. This document lists rules, guidelines, and help getting started,
 so if you feel something is missing feel free to send a pull request.
 
+_Internal Confluent Contributors: Please inform `#mcp-confluent` before proposing new development to prevent contradiction of in progress work._
+
 ## What should I know before I get started?
 
 ### Contributor Agreement

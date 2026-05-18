@@ -3,21 +3,26 @@
 // filesystem is the only shared coordination point between forks. The lock content is the
 // holder's PID so a crashed test (whose afterAll never runs) can be detected and stolen.
 
+import { createHash } from "node:crypto";
 import {
   closeSync,
   existsSync,
-  mkdirSync,
   openSync,
   readFileSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-const LOCK_PATH = resolve(
-  process.cwd(),
-  "node_modules/.cache/mcp-oauth-port-26640.lock",
-);
+// `os.tmpdir()` works regardless of whether `node_modules` exists or is
+// writable. The cwd-hash namespace prevents collisions between multiple
+// mcp-confluent worktrees running OAuth tests on the same host.
+const LOCK_PATH = join(tmpdir(), `mcp-oauth-port-26640-${cwdNamespace()}.lock`);
+
+function cwdNamespace(): string {
+  return createHash("sha256").update(process.cwd()).digest("hex").slice(0, 12);
+}
 
 const POLL_INTERVAL_MS = 500;
 
@@ -26,7 +31,6 @@ const POLL_INTERVAL_MS = 500;
  * file. Stale locks (holder PID no longer alive) are reclaimed automatically.
  */
 export async function acquireOAuthPortLock(timeoutMs = 300_000): Promise<void> {
-  mkdirSync(dirname(LOCK_PATH), { recursive: true });
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (tryAcquire()) return;

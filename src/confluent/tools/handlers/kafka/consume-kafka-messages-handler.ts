@@ -1127,8 +1127,11 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         // Per-invocation unique group id: each consume call becomes
         // the sole member of its own Kafka consumer group, so two
         // concurrent calls can't race for the same partition
-        // assignment via rebalance. The base manager will prefix
-        // this with its `mcp-confluent` namespace.
+        // assignment via rebalance. (How the value reaches `group.id`
+        // depends on the manager: `DirectClientManager` appends it as
+        // a suffix to its base `mcp-confluent` group; `OAuthClientManager`
+        // uses it as the literal group id. Both yield a unique-per-call
+        // group, which is what the no-contention contract requires.)
         groupId: nodeCrypto.randomUUID(),
         offsetReset,
       });

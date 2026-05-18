@@ -472,6 +472,28 @@ function createWatermarkCache(admin: KafkaJS.Admin): WatermarkCache {
 }
 
 /**
+ * Encapsulate the "is consumption restricted to one partition, or
+ * unrestricted across the whole topic?" decision behind two operations:
+ * `filter(items)` (subset to the restricted partition, or pass through
+ * unchanged) and `phrase()` (a human-readable description for use in
+ * error messages and logs). Centralizes the `restrictToPartition ===
+ * undefined` check in one place so the seek resolvers don't each
+ * re-derive it.
+ */
+function partitionScope(restrictToPartition: number | undefined) {
+  return {
+    filter: <T extends { partition: number }>(items: T[]): T[] =>
+      restrictToPartition === undefined
+        ? items
+        : items.filter((i) => i.partition === restrictToPartition),
+    phrase: (): string =>
+      restrictToPartition === undefined
+        ? "every partition"
+        : `partition ${restrictToPartition}`,
+  };
+}
+
+/**
  * Validate an explicit `start: {offset}` against the partition's
  * `[low, high)` watermarks and return the seek target. Throws if the
  * partition has no offset metadata or the requested offset is out of
@@ -533,10 +555,8 @@ async function resolveTimestampSeeks(
     watermarkByPartition.set(w.partition, { low: w.low, high: w.high });
   }
 
-  const candidates =
-    restrictToPartition !== undefined
-      ? resolved.filter((r) => r.partition === restrictToPartition)
-      : resolved;
+  const scope = partitionScope(restrictToPartition);
+  const candidates = scope.filter(resolved);
 
   const active: typeof candidates = [];
   const silent: number[] = [];
@@ -571,10 +591,7 @@ async function resolveTimestampSeeks(
   }
 
   if (active.length === 0) {
-    const partitionPhrase =
-      restrictToPartition !== undefined
-        ? `partition ${restrictToPartition} has`
-        : `every partition has`;
+    const partitionPhrase = `${scope.phrase()} has`;
     throw new Error(
       `Topic "${topic}" has no messages at or after timestamp ` +
         `${new Date(timestampMs).toISOString()} ` +
@@ -611,10 +628,7 @@ async function resolveEarliestMinoritySeeks(
   getWatermarks: WatermarkCache,
 ): Promise<PreflightPlan["seeks"]> {
   const offsets = await getWatermarks(topic);
-  const partitionsToSeek =
-    restrictToPartition !== undefined
-      ? offsets.filter((o) => o.partition === restrictToPartition)
-      : offsets;
+  const partitionsToSeek = partitionScope(restrictToPartition).filter(offsets);
   return partitionsToSeek.map((p) => ({
     topic,
     partition: p.partition,

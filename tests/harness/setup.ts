@@ -12,7 +12,8 @@ if (existsSync(envFile)) {
   loadDotenv({ path: envFile, override: false });
 }
 
-// signal for downstream test-aware behavior (skip system-browser open, headless playwright,
-// etc.). inherits into spawned children via the harness's env-copy, so the same flag covers
-// both processes. always set during integration runs; production users never see it.
-process.env.MCP_INTEGRATION_TEST = "1";
+// signal for downstream test-aware behavior (e.g. node-deps.ts skipping the
+// system-browser open during PKCE). inherits into spawned children via the
+// harness's env-copy, so the same flag covers both processes. always set
+// during integration runs; production users never see it.
+process.env.INTEGRATION_TEST = "1";

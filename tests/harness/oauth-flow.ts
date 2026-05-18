@@ -53,8 +53,7 @@ export async function startOAuthServer({
 
 /**
  * Stops the server and releases the OAuth callback-port lock. Safe on
- * `undefined` (the lock release still runs, matching the pattern of bare
- * `releaseOAuthPortLock` calls in test cleanup).
+ * `undefined`; the lock release still runs.
  */
 export async function stopOAuthServer(
   server: StartedServer | undefined,
@@ -88,9 +87,11 @@ export async function driveOAuthFlow(
   const authUrlPromise = waitForAuthUrl(server.stderr);
   const authUrl = await authUrlPromise;
 
-  // unset MCP_INTEGRATION_TEST for one run to debug the flow visually
+  // Default to headless; set INTEGRATION_TEST_PLAYWRIGHT_HEADLESS=false to
+  // watch the Auth0 sign-in happen in a visible window (useful when Auth0
+  // changes its form structure and locators stop matching).
   const browser = await chromium.launch({
-    headless: process.env.MCP_INTEGRATION_TEST === "1",
+    headless: process.env.INTEGRATION_TEST_PLAYWRIGHT_HEADLESS !== "false",
   });
   try {
     const context = await browser.newContext();

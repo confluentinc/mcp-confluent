@@ -1,7 +1,70 @@
 // Playwright-driven PKCE driver: reads the Auth0 authorization URL from server stderr, drives
 // the sign-in page via headless chromium, lets the server's PKCE callback resolve naturally.
 
-import type { StartedServer } from "@tests/harness/start-server.js";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { TransportType } from "@src/mcp/transports/types.js";
+import {
+  acquireOAuthPortLock,
+  releaseOAuthPortLock,
+} from "@tests/harness/oauth-port-lock.js";
+import {
+  startServer,
+  type StartedServer,
+} from "@tests/harness/start-server.js";
+// Chromium binary install lives in `npm run setup:oauth-browsers` and runs
+// unconditionally in CI's integration prologue. Local contributors run it
+// once; see CONTRIBUTING.md's "OAuth integration tests" section.
+import { chromium } from "playwright-core";
+
+/** Skip reason when the OAuth fixture failed to load (creds missing from .env.integration). */
+export const OAUTH_FIXTURE_NOT_LOADED_REASON =
+  "requires an OAuth connection in test-fixtures/yaml_configs/integration-oauth.yaml";
+
+/** Skip reason when the CCloud user creds for playwright-driven Auth0 sign-in are absent. */
+export const OAUTH_USER_CREDS_MISSING_REASON =
+  "requires CONFLUENT_CLOUD_USERNAME + CONFLUENT_CLOUD_PASSWORD for playwright-driven Auth0 sign-in";
+
+/**
+ * Returns CCloud user creds from process.env, or `undefined` if either var is
+ * missing. Callers pair this with an `it.skip(OAUTH_USER_CREDS_MISSING_REASON)`
+ * + return early when the result is `undefined`.
+ */
+export function getOAuthCredentialsFromEnv():
+  | { email: string; password: string }
+  | undefined {
+  const email = process.env.CONFLUENT_CLOUD_USERNAME;
+  const password = process.env.CONFLUENT_CLOUD_PASSWORD;
+  if (!email || !password) return undefined;
+  return { email, password };
+}
+
+/**
+ * Acquires the OAuth callback-port lock, then spawns the server with
+ * `oauth: true`. Pair with {@linkcode stopOAuthServer} in `afterAll`.
+ */
+export async function startOAuthServer({
+  transport,
+}: {
+  transport: TransportType;
+}): Promise<StartedServer> {
+  await acquireOAuthPortLock();
+  return await startServer({ transport, oauth: true });
+}
+
+/**
+ * Stops the server and releases the OAuth callback-port lock. Safe on
+ * `undefined` (the lock release still runs, matching the pattern of bare
+ * `releaseOAuthPortLock` calls in test cleanup).
+ */
+export async function stopOAuthServer(
+  server: StartedServer | undefined,
+): Promise<void> {
+  try {
+    await server?.stop();
+  } finally {
+    releaseOAuthPortLock();
+  }
+}
 
 const AUTH_URL_LOG_MSG = "Opening Auth0 authorization URL";
 
@@ -23,8 +86,6 @@ export async function driveOAuthFlow(
   // attach the stderr listener synchronously so a fast log line emitted before our first await
   // isn't lost
   const authUrlPromise = waitForAuthUrl(server.stderr);
-  // lazy chromium load so non-OAuth test files don't pay the import cost
-  const { chromium } = await import("@playwright/test");
   const authUrl = await authUrlPromise;
 
   // unset MCP_INTEGRATION_TEST for one run to debug the flow visually
@@ -62,6 +123,31 @@ export async function driveOAuthFlow(
   } finally {
     await browser.close();
   }
+}
+
+type CallToolArgs = Parameters<Client["callTool"]>[0];
+type CallToolResponse = Awaited<ReturnType<Client["callTool"]>>;
+
+/**
+ * Drives PKCE concurrently with a tool call that triggers it. The server only
+ * begins PKCE when an OAuth-eligible tool is invoked, so the caller's tool
+ * call kicks the flow on the server side while {@linkcode driveOAuthFlow}
+ * completes the sign-in. Returns the tool call's result once Auth0 has
+ * redirected and the server has exchanged the auth code for tokens.
+ *
+ * Use as warmup in `beforeAll` (discard the result, subsequent `it` blocks
+ * reuse the holder's cached bearer tokens), or directly in an `it` body when
+ * the test asserts on the PKCE round-trip itself.
+ */
+export async function callToolWithPkceFlow(
+  server: StartedServer,
+  credentials: { email: string; password: string },
+  toolCall: CallToolArgs,
+): Promise<CallToolResponse> {
+  const flowPromise = driveOAuthFlow(server, credentials);
+  const callPromise = server.client.callTool(toolCall);
+  const [, result] = await Promise.all([flowPromise, callPromise]);
+  return result;
 }
 
 /** Reads pino JSON log lines from stderr, resolves with the `authUrl` field once the

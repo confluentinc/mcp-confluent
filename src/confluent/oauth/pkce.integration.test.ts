@@ -1,15 +1,15 @@
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { TransportType } from "@src/mcp/transports/types.js";
-import { driveOAuthFlow } from "@tests/harness/oauth-flow.js";
 import {
-  acquireOAuthPortLock,
-  releaseOAuthPortLock,
-} from "@tests/harness/oauth-port-lock.js";
+  callToolWithPkceFlow,
+  getOAuthCredentialsFromEnv,
+  OAUTH_FIXTURE_NOT_LOADED_REASON,
+  OAUTH_USER_CREDS_MISSING_REASON,
+  startOAuthServer,
+  stopOAuthServer,
+} from "@tests/harness/oauth-flow.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
-import {
-  startServer,
-  type StartedServer,
-} from "@tests/harness/start-server.js";
+import { type StartedServer } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -20,37 +20,27 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const runtime = integrationRuntime({ oauth: true });
 
-describe("OAuth PKCE flow", { tags: [Tag.SMOKE] }, () => {
+describe("OAuth PKCE flow", { tags: [Tag.SMOKE, Tag.OAUTH] }, () => {
   if (Object.keys(runtime.config.connections).length === 0) {
-    it.skip("requires an OAuth connection in test-fixtures/yaml_configs/integration-oauth.yaml", () => {});
+    it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
     return;
   }
   // playwright drives the prod Auth0 sign-in form with these creds; populated by
   // `make setup-test-env` from vault path confluent-cloud-user.
-  if (
-    !process.env.CONFLUENT_CLOUD_USERNAME ||
-    !process.env.CONFLUENT_CLOUD_PASSWORD
-  ) {
-    it.skip("requires CONFLUENT_CLOUD_USERNAME + CONFLUENT_CLOUD_PASSWORD for playwright-driven Auth0 sign-in", () => {});
+  const credentials = getOAuthCredentialsFromEnv();
+  if (!credentials) {
+    it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
     return;
   }
-  const email = process.env.CONFLUENT_CLOUD_USERNAME;
-  const password = process.env.CONFLUENT_CLOUD_PASSWORD;
 
   let server: StartedServer;
 
   beforeAll(async () => {
-    // serialize against any other OAuth-flow file; stale locks auto-recover
-    await acquireOAuthPortLock();
-    server = await startServer({ transport: TransportType.STDIO, oauth: true });
+    server = await startOAuthServer({ transport: TransportType.STDIO });
   }, 180_000);
 
   afterAll(async () => {
-    try {
-      await server?.stop();
-    } finally {
-      releaseOAuthPortLock();
-    }
+    await stopOAuthServer(server);
   });
 
   it(
@@ -58,15 +48,10 @@ describe("OAuth PKCE flow", { tags: [Tag.SMOKE] }, () => {
     // covers the Auth0 sign-in round-trip (form fill + consent + redirect) plus the cloud REST call
     { timeout: 120_000 },
     async () => {
-      // drive PKCE and the triggering tool call concurrently: the call kicks PKCE on the server
-      // side, the driver catches the auth URL from stderr and completes the sign-in
-      const flowPromise = driveOAuthFlow(server, { email, password });
-      const callPromise = server.client.callTool({
+      const result = await callToolWithPkceFlow(server, credentials, {
         name: ToolName.LIST_ORGANIZATIONS,
         arguments: {},
       });
-
-      const [, result] = await Promise.all([flowPromise, callPromise]);
 
       expect(textContent(result)).toMatch(/^Retrieved \d+ organizations?:/);
     },

@@ -4,6 +4,7 @@ import type {
   KafkaMessage,
 } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import * as nodeDeps from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import {
   applyPostAssignmentHook,
@@ -12,6 +13,7 @@ import {
   createEachMessageHandler,
   formatMessageTimestamp,
   normalizeStart,
+  partitionScope,
   waitForAssignment,
   type ProcessedMessage,
 } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
@@ -306,6 +308,20 @@ describe("consume-kafka-messages-handler.ts", () => {
       });
     });
 
+    it("should accept `start: {timestamp: 0}` (Unix epoch) — symmetry with the ISO arm, which accepts '1970-01-01T00:00:00Z'", () => {
+      // The numeric arm uses `.nonnegative()` so it stays in lockstep
+      // with the ISO arm; rejecting 0 here while accepting the same
+      // instant in ISO form would be a schema asymmetry.
+      const parsed = consumeKafkaMessagesArgs.parse({
+        topics: [{ name: "t", start: { timestamp: 0 } }],
+        valueFormat: {},
+      });
+      expect(parsed.topics[0]).toEqual({
+        name: "t",
+        start: { timestamp: 0 },
+      });
+    });
+
     it("should reject a malformed `start: {timestamp}` string with the path drilling into `start.timestamp`", () => {
       // Same Zod-4 granular-path behavior as the offset case: the
       // timestamp arm matches structurally; the inner validation fails.
@@ -322,7 +338,9 @@ describe("consume-kafka-messages-handler.ts", () => {
       ]);
     });
 
-    it("should reject a non-positive `start: {timestamp}` number with the path drilling into `start.timestamp`", () => {
+    it("should reject a negative `start: {timestamp}` number with the path drilling into `start.timestamp`", () => {
+      // The numeric arm uses `.nonnegative()` — negative values are
+      // still rejected; only zero and positive integers pass.
       const result = consumeKafkaMessagesArgs.safeParse({
         topics: [{ name: "t", start: { timestamp: -1 } }],
         valueFormat: {},
@@ -374,7 +392,10 @@ describe("consume-kafka-messages-handler.ts", () => {
         expect(clientManager.buildKafkaConsumer).toHaveBeenCalledWith({
           clusterId: undefined,
           envId: undefined,
-          groupId: undefined,
+          // Per-invocation UUID — loose matcher per the unit-tests
+          // rule's explicit allowance for generated UUIDs. A focused
+          // test below pins the exact derivation contract.
+          groupId: expect.stringMatching(/^[0-9a-f-]{36}$/i),
           offsetReset: "earliest",
         });
       });
@@ -407,7 +428,52 @@ describe("consume-kafka-messages-handler.ts", () => {
         expect(clientManager.buildKafkaConsumer).toHaveBeenCalledWith({
           clusterId: undefined,
           envId: undefined,
-          groupId: undefined,
+          // Per-invocation UUID — loose matcher per the unit-tests
+          // rule's explicit allowance for generated UUIDs. A focused
+          // test below pins the exact derivation contract.
+          groupId: expect.stringMatching(/^[0-9a-f-]{36}$/i),
+          offsetReset: "earliest",
+        });
+      });
+
+      it("should pass a fresh `nodeCrypto.randomUUID()` as groupId so each consume call is the sole member of its own Kafka consumer group (no concurrent-call partition contention)", async () => {
+        // Pin the exact derivation: groupId is whatever
+        // `nodeCrypto.randomUUID()` returned. Two concurrent calls
+        // can't race for the same partition assignment because each
+        // joins a different group of size 1.
+        const stubbedUuid = "deadbeef-cafe-1234-5678-abcdef012345";
+        vi.spyOn(nodeDeps.nodeCrypto, "randomUUID").mockReturnValue(
+          stubbedUuid,
+        );
+
+        const clientManager = getMockedClientManager();
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke" }],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        expect(clientManager.buildKafkaConsumer).toHaveBeenCalledWith({
+          clusterId: undefined,
+          envId: undefined,
+          groupId: stubbedUuid,
           offsetReset: "earliest",
         });
       });
@@ -1037,7 +1103,10 @@ describe("consume-kafka-messages-handler.ts", () => {
         expect(clientManager.buildKafkaConsumer).toHaveBeenCalledWith({
           clusterId: undefined,
           envId: undefined,
-          groupId: undefined,
+          // Per-invocation UUID — loose matcher per the unit-tests
+          // rule's explicit allowance for generated UUIDs. A focused
+          // test below pins the exact derivation contract.
+          groupId: expect.stringMatching(/^[0-9a-f-]{36}$/i),
           offsetReset: "latest",
         });
         // topic-a's partitions seek to their per-partition low watermarks
@@ -1093,7 +1162,10 @@ describe("consume-kafka-messages-handler.ts", () => {
         expect(clientManager.buildKafkaConsumer).toHaveBeenCalledWith({
           clusterId: undefined,
           envId: undefined,
-          groupId: undefined,
+          // Per-invocation UUID — loose matcher per the unit-tests
+          // rule's explicit allowance for generated UUIDs. A focused
+          // test below pins the exact derivation contract.
+          groupId: expect.stringMatching(/^[0-9a-f-]{36}$/i),
           offsetReset: "earliest",
         });
         // The fast path means no admin probing and no per-partition
@@ -1663,6 +1735,49 @@ describe("consume-kafka-messages-handler.ts", () => {
       expect(await pending).toBeNull();
       // At least three polls before the deadline trips on iter 4.
       expect(consumer.assignment.mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe("partitionScope()", () => {
+    // Pin both branches of both methods so a future reshuffle of the
+    // "unrestricted vs restricted" framing can't silently land a bug
+    // — every caller routes through this helper, so any drift here
+    // ripples through the seek resolvers.
+    const items: { partition: number; tag: string }[] = [
+      { partition: 0, tag: "a" },
+      { partition: 1, tag: "b" },
+      { partition: 2, tag: "c" },
+    ];
+
+    describe(".filter(items)", () => {
+      it("should pass items through unchanged when no partition restriction", () => {
+        const scope = partitionScope(undefined);
+        expect(scope.filter(items)).toEqual(items);
+      });
+
+      it("should return only items matching the restricted partition when one is set", () => {
+        const scope = partitionScope(1);
+        expect(scope.filter(items)).toEqual([{ partition: 1, tag: "b" }]);
+      });
+
+      it("should return an empty array when the restricted partition has no matching items", () => {
+        // Defensive — the upstream validators normally guarantee the
+        // requested partition exists, but the helper itself must stay
+        // total: no matches means an empty array, not a throw.
+        const scope = partitionScope(99);
+        expect(scope.filter(items)).toEqual([]);
+      });
+    });
+
+    describe(".phrase()", () => {
+      it("should describe an unrestricted scope as 'every partition'", () => {
+        expect(partitionScope(undefined).phrase()).toBe("every partition");
+      });
+
+      it("should describe a restricted scope as 'partition N' with the partition index inlined", () => {
+        expect(partitionScope(0).phrase()).toBe("partition 0");
+        expect(partitionScope(7).phrase()).toBe("partition 7");
+      });
     });
   });
 

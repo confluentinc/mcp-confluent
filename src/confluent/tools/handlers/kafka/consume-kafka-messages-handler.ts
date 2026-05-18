@@ -4,6 +4,7 @@ import type {
   KafkaMessage,
 } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import { nodeCrypto } from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
@@ -88,7 +89,10 @@ const startOption = z
     }),
     z.strictObject({
       timestamp: z
-        .union([z.iso.datetime({ offset: true }), z.number().int().positive()])
+        .union([
+          z.iso.datetime({ offset: true }),
+          z.number().int().nonnegative(),
+        ])
         .describe(
           'ISO 8601 timestamp (e.g. "2026-05-14T17:00:00Z" or ' +
             '"2026-05-14T13:00:00-04:00") or ms-since-epoch number. The ' +
@@ -184,11 +188,20 @@ export interface ProcessedMessage {
   key: unknown;
   value: unknown;
   /**
-   * Message timestamp as an ISO 8601 UTC string (e.g.
-   * `"2026-03-01T17:00:00.000Z"`). Surfaced in this format so an LLM
-   * consumer can immediately spot mismatches between a requested
-   * `timestamp` filter and the actual delivered records — ms-since-epoch
-   * makes such drift invisible without arithmetic.
+   * Message timestamp, normalized by {@link formatMessageTimestamp}.
+   * Usual case: an ISO 8601 UTC string like `"2026-03-01T17:00:00.000Z"`
+   * — surfaced in this format so an LLM consumer can immediately spot
+   * mismatches between a requested `start: {timestamp}` filter and the
+   * delivered records (ms-since-epoch makes such drift invisible
+   * without arithmetic). Two non-ISO outcomes are possible:
+   *
+   * - The literal sentinel `"(no timestamp)"` when the underlying
+   *   Kafka message has no timestamp (Kafka's `-1` sentinel for
+   *   pre-0.10.0 message formats, or any record whose producer didn't
+   *   set one).
+   * - The raw input string passed through unchanged when
+   *   `Number(input)` is non-finite — a defensive escape hatch for
+   *   degenerate library inputs.
    */
   timestamp: string;
   offset: string;
@@ -537,7 +550,7 @@ function createWatermarkCache(admin: KafkaJS.Admin): WatermarkCache {
  * undefined` check in one place so the seek resolvers don't each
  * re-derive it.
  */
-function partitionScope(restrictToPartition: number | undefined) {
+export function partitionScope(restrictToPartition: number | undefined) {
   return {
     filter: <T extends { partition: number }>(items: T[]): T[] =>
       restrictToPartition === undefined
@@ -1028,13 +1041,6 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    * @param toolArguments - Parsed args matching `consumeKafkaMessagesArgs`.
    *   The handler re-parses internally to apply defaults at the
    *   boundary.
-   * @param sessionId - Per-transport session identifier the MCP server
-   *   dispatcher hands in from `context?.sessionId`. Becomes the
-   *   consumer's `group.id` suffix (direct) or literal value (OAuth) so
-   *   concurrent MCP sessions don't share consumer-group state. NOT
-   *   part of the tool's input schema — the LLM cannot supply or
-   *   influence this value; it's sourced from the underlying HTTP/SSE
-   *   transport and is `undefined` for stdio.
    * @returns A {@link CallToolResult}. Success path emits a text block
    *   summarizing the consumed messages; failures (build/preflight/run
    *   errors) surface via `createResponse(text, true)` with the
@@ -1043,7 +1049,6 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,
-    sessionId?: string,
   ): Promise<CallToolResult> {
     const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
     const { maxMessages, timeoutMs, valueFormat, keyFormat } = parsed;
@@ -1119,7 +1124,12 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       consumer = await clientManager.buildKafkaConsumer({
         clusterId: resolved.clusterId,
         envId: resolved.envId,
-        groupId: sessionId,
+        // Per-invocation unique group id: each consume call becomes
+        // the sole member of its own Kafka consumer group, so two
+        // concurrent calls can't race for the same partition
+        // assignment via rebalance. The base manager will prefix
+        // this with its `mcp-confluent` namespace.
+        groupId: nodeCrypto.randomUUID(),
         offsetReset,
       });
       await consumer.connect();

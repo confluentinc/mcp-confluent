@@ -21,11 +21,14 @@
 
 import type { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
-import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import {
+  BaseClientManager,
+  type ConsumerBuildOptions,
+} from "@src/confluent/base-client-manager.js";
 import type { ConfluentRestClient } from "@src/confluent/client-manager.js";
 import {
-  type ConfluentAuth,
   createAuthMiddleware,
+  type ConfluentAuth,
 } from "@src/confluent/middleware.js";
 import { kafkaDeps } from "@src/confluent/node-deps.js";
 import {
@@ -231,18 +234,19 @@ export class OAuthClientManager extends BaseClientManager {
 
   /** @inheritdoc */
   async buildKafkaConsumer(
-    clusterId?: string,
-    envId?: string,
-    groupId?: string,
+    opts?: ConsumerBuildOptions,
   ): Promise<KafkaJS.Consumer> {
-    this.requireClusterArgs(clusterId, envId);
-    const kafka = await this.buildOAuthKafkaClient(clusterId!, envId!);
+    this.requireClusterArgs(opts?.clusterId, opts?.envId);
+    const kafka = await this.buildOAuthKafkaClient(
+      opts!.clusterId!,
+      opts!.envId!,
+    );
     return kafka.consumer({
       kafkaJS: {
-        groupId: groupId ?? "mcp-confluent",
+        groupId: opts?.groupId ?? "mcp-confluent",
         autoCommit: false,
-        fromBeginning: true,
       },
+      "auto.offset.reset": opts?.offsetReset ?? "earliest",
     });
   }
 

@@ -10,6 +10,17 @@ All notable changes to this MCP server will be documented in this file.
   - As `_meta.category` on every `tools/list` advertisement, so MCP clients (Claude, the inspector, etc.) can group or filter the catalog by functional area.
   - In the `--list-tools` CLI output, which now buckets tools under one section header per category instead of printing them in registry-declaration order.
   - On the `explain-disabled-tools` tool, which gains an optional `group_by: "reason" | "category"` argument (default `"reason"`). Pass `group_by: "category"` to regroup the same diagnostic data by functional area when the operator's question is "what's offline in my Flink setup?" rather than "what config piece is missing?".
+- **`consume-messages` per-topic partition + starting-position controls.** Each `topics[]` entry on the consume tool now accepts an optional `partition` (restrict consumption to a single 0-indexed partition; the other assigned partitions are paused after the first poll so the consumer only delivers records from the requested one) and an optional `start` tagged-union field for picking where to begin: `"earliest"` (partition low watermark), `"latest"` (high watermark, only newly-produced messages), `{offset: "N"}` (absolute partition offset as a digit-only string so int64 values past JS's 2^53 safe-integer range stay precise; requires `partition`), or `{timestamp: ...}` (ISO 8601 string or ms-since-epoch number, broker-resolved per-partition via `admin.fetchTopicOffsetsByTimestamp`). Examples:
+  - `{name: "orders", partition: 0, start: {offset: "42"}}` — read partition 0 starting at offset 42.
+  - `{name: "orders", start: {timestamp: "2026-05-14T17:00:00Z"}}` — every partition seeks to the broker-resolved offset for that timestamp.
+  - `{name: "A", start: "earliest"}, {name: "B", start: "latest"}` — mixed-direction call: topic A replays its history while topic B parks at its high watermark.
+
+### Changed
+
+- **`consume-messages` tool: breaking shape changes alongside the new controls above.**
+  - **Top-level `offsetReset` field removed.** Position control is consolidated into the per-topic `start` tagged union (see Added); the consumer-level `auto.offset.reset` is derived from the call. The consolidation enables mixed-direction calls the prior consumer-wide `offsetReset` couldn't express ("topic A from earliest, topic B from latest" in one call now works). The starting-position default stays at `"earliest"` (no behavior change for bare-name calls); pass `start: "latest"` on the topic entries that should read only newly-produced messages.
+  - **`value` / `key` deserialization options renamed to `valueFormat` / `keyFormat`.** The old names read as data peers to `topics` (especially `value`, which looks like "the value to produce"); the new names describe what the fields do — the format/encoding of the bytes. Both are also now omit-by-default (defaulting to `{useSchemaRegistry: false}`), so the simple raw-bytes consume no longer needs `value: {}` filler.
+  - **`topicNames: string[]` removed in favor of the richer `topics[]` shape.** The single required field is now `topics`, an array of per-topic option objects. The minimal call is `{topics: [{name: "orders"}]}`; the same array carries optional `partition` and `start` controls on the entries that need them.
 
 ## 1.3.0
 

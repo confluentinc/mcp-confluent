@@ -23,7 +23,7 @@ import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
-const messageOptions = z
+const schemaRegistryOptions = z
   .object({
     useSchemaRegistry: z
       .boolean()
@@ -47,12 +47,12 @@ const messageOptions = z
   .default({ useSchemaRegistry: false });
 
 // `ValueOptions` and `KeyOptions` are structurally identical to
-// `messageOptions` — they exist as named types only to make the
+// `schemaRegistryOptions` — they exist as named types only to make the
 // value-side vs key-side distinction explicit at `processMessage`'s
-// signature. The schema fields below use `messageOptions` directly;
+// signature. The schema fields below use `schemaRegistryOptions` directly;
 // no separate runtime schema is needed for each side.
-type ValueOptions = z.infer<typeof messageOptions>;
-type KeyOptions = z.infer<typeof messageOptions>;
+type ValueOptions = z.infer<typeof schemaRegistryOptions>;
+type KeyOptions = z.infer<typeof schemaRegistryOptions>;
 
 /**
  * Per-entry "where to start consuming" tagged union. Collapses the prior
@@ -154,8 +154,8 @@ export const consumeKafkaMessagesArgs = z.object({
     .describe(
       "Maximum time in milliseconds to wait for messages before stopping.",
     ),
-  valueFormat: messageOptions,
-  keyFormat: messageOptions,
+  valueFormat: schemaRegistryOptions,
+  keyFormat: schemaRegistryOptions,
   cluster_id: z
     .string()
     .optional()

@@ -26,6 +26,11 @@ Please check if your PR fulfills the following (if applicable):
 - [ ] Updated existing
 - [ ] Deleted existing
 
+<!-- Internal Contributors
+
+ Please inform `#mcp-confluent` before proposing new development to avoid conflicting with or duplicating work in progress.
+ -->
+
 #### Release notes
 
 <!-- prettier-ignore -->

@@ -408,6 +408,55 @@ Skipped-transport iterations are never registered, so their `beforeAll`s don't
 spawn servers. `make test-integration TRANSPORT=stdio` sets the env var; CI
 sets it per-block (see CI Matrix below).
 
+## Connection-Type Filtering
+
+`activeConnectionTypes` (from `@tests/harness/connection-types.js`) mirrors
+`activeTransports` along a second axis: dual-mode tests use it to iterate the
+connection shapes (direct vs OAuth) they support.
+It honors the `INTEGRATION_TEST_CONNECTION_TYPE` env var:
+
+- **unset** → iterate every connection type (default for local runs / full coverage)
+- **`direct`** or **`oauth`** → iterate only that connection type
+
+Single-mode tests (the vast majority; everything that needs only direct
+api-key auth) don't need to touch this; they default to direct via the
+`integrationRuntime()` / `startServer({ transport })` calls.
+
+Dual-mode tests pair the two axes:
+
+```ts
+for (const connection of activeConnectionTypes) {
+  const isOAuth = connection === ConnectionType.OAUTH;
+  const tags = isOAuth
+    ? [Tag.<GROUP>, Tag.OAUTH]
+    : [Tag.<GROUP>];
+  const runtime = integrationRuntime({ oauth: isOAuth });
+  describe(`<handler> under ${connection} connection`, { tags }, () => {
+    // skip gate (per connection type)
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      // setup branches inline on isOAuth (port lock + driveOAuthFlow for OAuth)
+    });
+  });
+}
+```
+
+The outer iteration is a `for` loop rather than `describe.each(...)` so
+each connection's describe can carry its own `tags` (required for CI lanes
+that filter `=@oauth` / `!@oauth`). The inner transport iteration stays as
+`describe.each(activeTransports)`.
+
+See `src/confluent/tools/handlers/organizations/list-organizations-handler.integration.test.ts`
+for the canonical worked example.
+
+### `Tag.OAUTH` semantics (asymmetric on purpose)
+
+`Tag.OAUTH` marks tests (or per-iteration describes) that exercise the OAuth
+PKCE flow. There is **no** `Tag.DIRECT`: direct is the unmarked majority,
+and CI lanes that want only direct tests use `!@oauth` exclusion rather than
+positive `@direct` selection. This means new direct-only tests don't need to
+remember to tag themselves; "not tagged with @oauth" reliably catches every
+direct test by construction.
+
 ## CI Matrix
 
 `.semaphore/integration.yml` has one block per MCP transport (stdio, http,

@@ -1,7 +1,19 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type {
+  EachMessagePayload,
+  KafkaMessage,
+} from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import {
-  ConsumeKafkaMessagesHandler,
+  applyPostAssignmentHook,
   consumeKafkaMessagesArgs,
+  ConsumeKafkaMessagesHandler,
+  createEachMessageHandler,
+  formatMessageTimestamp,
+  normalizeStart,
+  waitForAssignment,
+  type ProcessedMessage,
 } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
@@ -10,8 +22,9 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  getMockedConsumer,
 } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Build a fake `admin.fetchTopicMetadata` result that mirrors what the
@@ -42,141 +55,139 @@ function fakeFetchTopicMetadataResult(
   >;
 }
 
+/**
+ * Build a synthetic `RecordBatchEntry`-shaped `KafkaMessage` for tests.
+ * The cast to `KafkaMessage` hides the fields the handler doesn't read
+ * (`attributes`, `size`, `leaderEpoch`) so each test focuses on what's
+ * load-bearing for the branch under test. Uses `in` checks so an
+ * explicit `key: null` (a legitimate `KafkaMessage` shape) stays null
+ * instead of falling through `??` to the default Buffer — the latter
+ * would mask the null-key branch.
+ */
+function fakeMessage(
+  overrides: {
+    key?: Buffer | null;
+    value?: Buffer | null;
+    timestamp?: string;
+    offset?: string;
+    headers?: KafkaMessage["headers"];
+  } = {},
+): KafkaMessage {
+  return {
+    key: "key" in overrides ? overrides.key : Buffer.from("k"),
+    value: "value" in overrides ? overrides.value : Buffer.from("v"),
+    timestamp: overrides.timestamp ?? "1747234567000",
+    offset: overrides.offset ?? "42",
+    headers: overrides.headers,
+  } as unknown as KafkaMessage;
+}
+
 describe("consume-kafka-messages-handler.ts", () => {
-  describe("consumeKafkaMessagesArgs (schema)", () => {
-    it("should default offsetReset to 'latest' when omitted", () => {
-      // The behavior change from #459: prior to this work, the handler
-      // forced "earliest" via fromBeginning:true (OAuth) or
-      // auto.offset.reset:"earliest" (direct). Natural-language asks
-      // ("show me the latest X") expect "latest" by default.
+  describe("consumeKafkaMessagesArgs (schema, per-topic `start` default)", () => {
+    it("should default each entry's `start` to 'earliest' when omitted", () => {
+      // The default lives on the per-topic entry now (was on a
+      // top-level `offsetReset` knob before #459). It defaults to
+      // "earliest" to preserve the pre-#459 read-everything behavior
+      // for bare-name calls: a caller asking for "the latest messages"
+      // is expected to pass `start: "latest"` explicitly on the topic
+      // entry that needs it.
       const parsed = consumeKafkaMessagesArgs.parse({
-        topicNames: ["t"],
-        value: {},
+        topics: [{ name: "t" }],
+        valueFormat: {},
       });
-      expect(parsed.offsetReset).toBe("latest");
+      expect(parsed.topics).toEqual([{ name: "t", start: "earliest" }]);
     });
 
     it.each(["earliest", "latest"] as const)(
-      "should accept offsetReset='%s'",
-      (offsetReset) => {
+      "should accept the literal `start: '%s'` direction value",
+      (start) => {
         const parsed = consumeKafkaMessagesArgs.parse({
-          topicNames: ["t"],
-          value: {},
-          offsetReset,
+          topics: [{ name: "t", start }],
+          valueFormat: {},
         });
-        expect(parsed.offsetReset).toBe(offsetReset);
+        expect(parsed.topics).toEqual([{ name: "t", start }]);
       },
     );
 
-    it("should reject an unknown offsetReset value with a Zod enum error citing the field", () => {
+    it("should reject an unknown `start` direction literal as a union miss on the `start` path", () => {
+      // The path lands on the union field itself; a future rename of the
+      // field (e.g. start → position) would shift the path and fail this
+      // test rather than passing under a generic /validation failed/.
       const result = consumeKafkaMessagesArgs.safeParse({
-        topicNames: ["t"],
-        value: {},
-        offsetReset: "from-the-middle",
+        topics: [{ name: "t", start: "from-the-middle" }],
+        valueFormat: {},
       });
       expect(result.success).toBe(false);
       if (result.success) return;
-      // Pin both the path and the error code so a future schema rename
-      // (e.g. offsetReset → resetPolicy) doesn't pass with a generic
-      // /validation failed/ regex match.
       expect(result.error.issues).toEqual([
-        expect.objectContaining({
-          path: ["offsetReset"],
-          code: "invalid_value",
-        }),
+        expect.objectContaining({ path: ["topics", 0, "start"] }),
       ]);
     });
   });
 
-  describe("consumeKafkaMessagesArgs (schema, topics[] xor topicNames)", () => {
-    it("should accept just `topics`", () => {
+  describe("consumeKafkaMessagesArgs (schema, topics[] presence + emptiness)", () => {
+    it("should accept a `topics` array with one minimal entry", () => {
       const parsed = consumeKafkaMessagesArgs.parse({
-        topics: [{ topicName: "t" }],
-        value: {},
+        topics: [{ name: "t" }],
+        valueFormat: {},
       });
-      expect(parsed.topics).toEqual([{ topicName: "t" }]);
-      expect(parsed.topicNames).toBeUndefined();
+      // The defaulted `start: "earliest"` lands on the parsed shape
+      // even when the caller omits it on input — pin both fields here
+      // so a future default flip is caught.
+      expect(parsed.topics).toEqual([{ name: "t", start: "earliest" }]);
     });
 
-    it("should reject when both `topicNames` and `topics` are present", () => {
-      const result = consumeKafkaMessagesArgs.safeParse({
-        topicNames: ["t"],
-        topics: [{ topicName: "t" }],
-        value: {},
-      });
+    it("should reject when `topics` is absent", () => {
+      const result = consumeKafkaMessagesArgs.safeParse({ valueFormat: {} });
       expect(result.success).toBe(false);
       if (result.success) return;
+      // Required-field error from Zod cites the missing path.
       expect(result.error.issues).toEqual([
-        expect.objectContaining({
-          // The xor check is a top-level superRefine, so the issue path
-          // is empty (the whole object is the problem, not one field).
-          path: [],
-          // "exactly one of" + "not both" together pin the both-present
-          // branch and resist message rewording without losing
-          // specificity. "either" lives in the both-absent branch only.
-          message: expect.stringContaining("not both"),
-        }),
+        expect.objectContaining({ path: ["topics"] }),
       ]);
     });
 
-    it("should reject when both `topicNames` and `topics` are absent", () => {
-      const result = consumeKafkaMessagesArgs.safeParse({ value: {} });
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error.issues).toEqual([
-        expect.objectContaining({
-          path: [],
-          message: expect.stringContaining("either"),
-        }),
-      ]);
-    });
-
-    it("should reject an empty topicNames array", () => {
-      const result = consumeKafkaMessagesArgs.safeParse({
-        topicNames: [],
-        value: {},
-      });
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      // Either the inner nonempty-array check fires, or the xor superRefine
-      // does (since an empty array is "absent" semantically). Pin the
-      // observable behavior: at least one issue exists naming the empty
-      // input.
-      expect(result.error.issues.length).toBeGreaterThan(0);
-    });
-
-    it("should reject an empty topics array", () => {
+    it("should reject an empty `topics` array", () => {
       const result = consumeKafkaMessagesArgs.safeParse({
         topics: [],
-        value: {},
+        valueFormat: {},
       });
       expect(result.success).toBe(false);
       if (result.success) return;
-      expect(result.error.issues.length).toBeGreaterThan(0);
+      // The nonempty-array check fires on the `topics` path.
+      expect(result.error.issues).toEqual([
+        expect.objectContaining({ path: ["topics"] }),
+      ]);
     });
   });
 
   describe("consumeKafkaMessagesArgs (schema, per-topic entry)", () => {
-    it("should accept an entry with only `topicName`", () => {
+    it("should accept an entry with only `name`", () => {
       const parsed = consumeKafkaMessagesArgs.parse({
-        topics: [{ topicName: "t" }],
-        value: {},
+        topics: [{ name: "t" }],
+        valueFormat: {},
       });
-      expect(parsed.topics).toEqual([{ topicName: "t" }]);
+      // `start` is filled in by the schema default — the input entry is
+      // bare-name but the parsed shape carries the defaulted direction.
+      expect(parsed.topics).toEqual([{ name: "t", start: "earliest" }]);
     });
 
-    it("should accept an entry with topicName + partition=0 (lowest valid partition index)", () => {
+    it("should accept an entry with name + partition=0 (lowest valid partition index)", () => {
       const parsed = consumeKafkaMessagesArgs.parse({
-        topics: [{ topicName: "t", partition: 0 }],
-        value: {},
+        topics: [{ name: "t", partition: 0 }],
+        valueFormat: {},
       });
-      expect(parsed.topics?.[0]?.partition).toBe(0);
+      expect(parsed.topics[0]).toEqual({
+        name: "t",
+        partition: 0,
+        start: "earliest",
+      });
     });
 
     it("should reject a negative partition with a path naming the entry", () => {
       const result = consumeKafkaMessagesArgs.safeParse({
-        topics: [{ topicName: "t", partition: -1 }],
-        value: {},
+        topics: [{ name: "t", partition: -1 }],
+        valueFormat: {},
       });
       expect(result.success).toBe(false);
       if (result.success) return;
@@ -189,8 +200,8 @@ describe("consume-kafka-messages-handler.ts", () => {
 
     it("should reject a non-integer partition", () => {
       const result = consumeKafkaMessagesArgs.safeParse({
-        topics: [{ topicName: "t", partition: 1.5 }],
-        value: {},
+        topics: [{ name: "t", partition: 1.5 }],
+        valueFormat: {},
       });
       expect(result.success).toBe(false);
       if (result.success) return;
@@ -201,52 +212,68 @@ describe("consume-kafka-messages-handler.ts", () => {
       ]);
     });
 
-    it("should accept a digit-only `offset` string", () => {
+    it("should accept a digit-only `start: {offset}` string", () => {
       const parsed = consumeKafkaMessagesArgs.parse({
-        topics: [{ topicName: "t", offset: "12345" }],
-        value: {},
+        topics: [{ name: "t", start: { offset: "12345" } }],
+        valueFormat: {},
       });
-      expect(parsed.topics?.[0]?.offset).toBe("12345");
+      expect(parsed.topics[0]).toEqual({
+        name: "t",
+        start: { offset: "12345" },
+      });
     });
 
-    it("should accept an int64-shaped `offset` string beyond JS safe-integer range (2^53)", () => {
+    it("should accept an int64-shaped `start: {offset}` string beyond JS safe-integer range (2^53)", () => {
       // Kafka offsets are int64; the schema accepts strings precisely so
       // values past 2^53 don't lose precision via JS number coercion.
       const parsed = consumeKafkaMessagesArgs.parse({
-        topics: [{ topicName: "t", offset: "9999999999999999999" }],
-        value: {},
+        topics: [{ name: "t", start: { offset: "9999999999999999999" } }],
+        valueFormat: {},
       });
-      expect(parsed.topics?.[0]?.offset).toBe("9999999999999999999");
+      expect(parsed.topics[0]).toEqual({
+        name: "t",
+        start: { offset: "9999999999999999999" },
+      });
     });
 
-    it("should reject a non-digit `offset` string", () => {
+    it("should reject a non-digit `start: {offset}` string with the path drilling into `start.offset`", () => {
+      // Zod 4 reports the granular inner path when only one union arm
+      // matches structurally — here the `offset` arm wins on shape but
+      // the regex inner-validation fails, so the path is
+      // ["topics", 0, "start", "offset"] rather than a generic union
+      // miss at ["topics", 0, "start"].
       const result = consumeKafkaMessagesArgs.safeParse({
-        topics: [{ topicName: "t", offset: "ten" }],
-        value: {},
+        topics: [{ name: "t", start: { offset: "ten" } }],
+        valueFormat: {},
       });
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error.issues).toEqual([
         expect.objectContaining({
-          path: ["topics", 0, "offset"],
+          path: ["topics", 0, "start", "offset"],
         }),
       ]);
     });
 
-    it("should reject an entry that supplies both `offset` and `timestamp`", () => {
+    it("should reject a `start` object that supplies both `offset` and `timestamp` (strictObject rejects the extra key)", () => {
+      // Each object arm of the union is strict, so `{offset, timestamp}`
+      // matches neither arm and falls through as a union miss. This is
+      // the structural replacement for the old `offset` ⊻ `timestamp`
+      // superRefine — Zod refuses the value rather than silently picking
+      // an arm.
       const result = consumeKafkaMessagesArgs.safeParse({
         topics: [
-          { topicName: "t", offset: "10", timestamp: "2026-05-14T17:00:00Z" },
+          {
+            name: "t",
+            start: { offset: "10", timestamp: "2026-05-14T17:00:00Z" },
+          },
         ],
-        value: {},
+        valueFormat: {},
       });
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error.issues).toEqual([
-        expect.objectContaining({
-          path: ["topics", 0],
-          message: expect.stringMatching(/only one of .offset. or .timestamp./),
-        }),
+        expect.objectContaining({ path: ["topics", 0, "start"] }),
       ]);
     });
 
@@ -254,46 +281,57 @@ describe("consume-kafka-messages-handler.ts", () => {
       "2026-05-14T17:00:00Z",
       "2026-05-14T13:00:00-04:00",
       "2026-05-14T20:00:00.500+00:00",
-    ] as const)("should accept ISO 8601 timestamp '%s'", (timestamp) => {
+    ] as const)(
+      "should accept ISO 8601 `start: {timestamp: '%s'}`",
+      (timestamp) => {
+        const parsed = consumeKafkaMessagesArgs.parse({
+          topics: [{ name: "t", start: { timestamp } }],
+          valueFormat: {},
+        });
+        expect(parsed.topics[0]).toEqual({
+          name: "t",
+          start: { timestamp },
+        });
+      },
+    );
+
+    it("should accept a positive integer ms-since-epoch `start: {timestamp}`", () => {
       const parsed = consumeKafkaMessagesArgs.parse({
-        topics: [{ topicName: "t", timestamp }],
-        value: {},
+        topics: [{ name: "t", start: { timestamp: 1747234567000 } }],
+        valueFormat: {},
       });
-      expect(parsed.topics?.[0]?.timestamp).toBe(timestamp);
+      expect(parsed.topics[0]).toEqual({
+        name: "t",
+        start: { timestamp: 1747234567000 },
+      });
     });
 
-    it("should accept a positive integer ms-since-epoch timestamp", () => {
-      const parsed = consumeKafkaMessagesArgs.parse({
-        topics: [{ topicName: "t", timestamp: 1747234567000 }],
-        value: {},
-      });
-      expect(parsed.topics?.[0]?.timestamp).toBe(1747234567000);
-    });
-
-    it("should reject a malformed timestamp string", () => {
+    it("should reject a malformed `start: {timestamp}` string with the path drilling into `start.timestamp`", () => {
+      // Same Zod-4 granular-path behavior as the offset case: the
+      // timestamp arm matches structurally; the inner validation fails.
       const result = consumeKafkaMessagesArgs.safeParse({
-        topics: [{ topicName: "t", timestamp: "not-a-date" }],
-        value: {},
+        topics: [{ name: "t", start: { timestamp: "not-a-date" } }],
+        valueFormat: {},
       });
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error.issues).toEqual([
         expect.objectContaining({
-          path: ["topics", 0, "timestamp"],
+          path: ["topics", 0, "start", "timestamp"],
         }),
       ]);
     });
 
-    it("should reject a non-positive timestamp number", () => {
+    it("should reject a non-positive `start: {timestamp}` number with the path drilling into `start.timestamp`", () => {
       const result = consumeKafkaMessagesArgs.safeParse({
-        topics: [{ topicName: "t", timestamp: -1 }],
-        value: {},
+        topics: [{ name: "t", start: { timestamp: -1 } }],
+        valueFormat: {},
       });
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error.issues).toEqual([
         expect.objectContaining({
-          path: ["topics", 0, "timestamp"],
+          path: ["topics", 0, "start", "timestamp"],
         }),
       ]);
     });
@@ -303,11 +341,12 @@ describe("consume-kafka-messages-handler.ts", () => {
     const handler = new ConsumeKafkaMessagesHandler();
 
     describe("handle()", () => {
-      it("should pass the parsed offsetReset through to buildKafkaConsumer", async () => {
-        // Pin the chunk-2 wiring: whatever Zod resolves for offsetReset
-        // (default "latest" or an explicit value) is what the manager
-        // sees. Consumer.run resolves immediately so we don't process
-        // any messages; the assertion is the buildKafkaConsumer call.
+      it("should pass derived offsetReset='earliest' to buildKafkaConsumer when every entry agrees on `start: 'earliest'`", async () => {
+        // The consumer's `auto.offset.reset` is no longer a peer top-level
+        // input; the handler derives it from the per-topic `start` values.
+        // When every direction-only entry asks for 'earliest', that
+        // becomes the consumer-wide reset and no explicit watermark seeks
+        // are needed (the simple-call fast path is preserved).
         const clientManager = getMockedClientManager();
         const consumer = await clientManager.getConsumer();
         consumer.connect.mockResolvedValue(undefined);
@@ -323,11 +362,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topicNames: ["smoke"],
+            topics: [{ name: "smoke", start: "earliest" }],
             maxMessages: 1,
             timeoutMs: 50,
-            value: {},
-            offsetReset: "earliest",
+            valueFormat: {},
           },
           outcome: { resolves: "Consumed 0 messages from topics smoke" },
           clientManager,
@@ -341,7 +379,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
       });
 
-      it("should propagate the default offsetReset ('latest') to buildKafkaConsumer when caller omits it", async () => {
+      it("should propagate the default offsetReset ('earliest') to buildKafkaConsumer when every entry omits `start`", async () => {
         const clientManager = getMockedClientManager();
         const consumer = await clientManager.getConsumer();
         consumer.connect.mockResolvedValue(undefined);
@@ -357,10 +395,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topicNames: ["smoke"],
+            topics: [{ name: "smoke" }],
             maxMessages: 1,
             timeoutMs: 50,
-            value: {},
+            valueFormat: {},
           },
           outcome: { resolves: "Consumed 0 messages from topics smoke" },
           clientManager,
@@ -370,7 +408,7 @@ describe("consume-kafka-messages-handler.ts", () => {
           clusterId: undefined,
           envId: undefined,
           groupId: undefined,
-          offsetReset: "latest",
+          offsetReset: "earliest",
         });
       });
 
@@ -393,10 +431,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topicNames: ["smoke"],
+            topics: [{ name: "smoke" }],
             maxMessages: 1,
             timeoutMs: 1000,
-            value: {},
+            valueFormat: {},
           },
           outcome: {
             resolves: "Failed to consume messages: group rebalance failed",
@@ -430,10 +468,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topicNames: ["smoke"],
+            topics: [{ name: "smoke" }],
             maxMessages: 1,
             timeoutMs: 50,
-            value: {},
+            valueFormat: {},
           },
           outcome: { resolves: "Consumed 0 messages from topics smoke" },
           clientManager,
@@ -466,10 +504,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topicNames: ["smoke"],
+            topics: [{ name: "smoke" }],
             maxMessages: 1,
             timeoutMs: 50,
-            value: { useSchemaRegistry: true },
+            valueFormat: { useSchemaRegistry: true },
           },
           outcome: { resolves: "Consumed 0 messages from topics smoke" },
           clientManager,
@@ -480,7 +518,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         );
       });
 
-      it("should reject `offset` without `partition` as a tool error citing the partition-scoped semantics", async () => {
+      it("should reject `start: {offset}` without `partition` as a tool error citing the partition-scoped semantics", async () => {
         // Absolute offsets are partition-scoped: offset 10 on partition 0 is
         // a different message than offset 10 on partition 1. The handler
         // rejects ambiguity at pre-flight, before any broker call beyond
@@ -498,10 +536,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topics: [{ topicName: "smoke", offset: "10" }],
+            topics: [{ name: "smoke", start: { offset: "10" } }],
             maxMessages: 1,
             timeoutMs: 50,
-            value: {},
+            valueFormat: {},
           },
           outcome: {
             resolves: "Absolute offsets are partition-scoped",
@@ -525,10 +563,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topics: [{ topicName: "smoke", partition: 7 }],
+            topics: [{ name: "smoke", partition: 7 }],
             maxMessages: 1,
             timeoutMs: 50,
-            value: {},
+            valueFormat: {},
           },
           outcome: {
             resolves: "requested partition 7 is out of range",
@@ -555,10 +593,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topics: [{ topicName: "smoke", partition: 0, offset: "50" }],
+            topics: [{ name: "smoke", partition: 0, start: { offset: "50" } }],
             maxMessages: 1,
             timeoutMs: 50,
-            value: {},
+            valueFormat: {},
           },
           outcome: {
             resolves: "offset 50 is out of range [low=100, high=200)",
@@ -585,10 +623,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topics: [{ topicName: "smoke", partition: 0, offset: "200" }],
+            topics: [{ name: "smoke", partition: 0, start: { offset: "200" } }],
             maxMessages: 1,
             timeoutMs: 50,
-            value: {},
+            valueFormat: {},
           },
           outcome: {
             resolves: "offset 200 is out of range [low=100, high=200)",
@@ -612,13 +650,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topics: [
-              { topicName: "smoke", partition: 0 },
-              { topicName: "smoke" },
-            ],
+            topics: [{ name: "smoke", partition: 0 }, { name: "smoke" }],
             maxMessages: 1,
             timeoutMs: 50,
-            value: {},
+            valueFormat: {},
           },
           outcome: {
             resolves:
@@ -663,10 +698,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topics: [{ topicName: "smoke", partition: 0, offset: "42" }],
+            topics: [{ name: "smoke", partition: 0, start: { offset: "42" } }],
             maxMessages: 1,
             timeoutMs: 500,
-            value: {},
+            valueFormat: {},
           },
           outcome: { resolves: "Consumed 0 messages from topics smoke" },
           clientManager,
@@ -696,6 +731,13 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 0, offset: "12" },
           { partition: 1, offset: "34" },
         ]);
+        // The timestamp branch cross-checks watermarks to detect the
+        // binding's silent high-watermark substitution. Both resolved
+        // offsets are well below `high` here, so neither is filtered.
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "0", high: "100", offset: "100" },
+          { partition: 1, low: "0", high: "100", offset: "100" },
+        ]);
 
         const consumer = await clientManager.getConsumer();
         consumer.connect.mockResolvedValue(undefined);
@@ -720,10 +762,10 @@ describe("consume-kafka-messages-handler.ts", () => {
             clientManager,
           ),
           args: {
-            topics: [{ topicName: "smoke", timestamp: isoTimestamp }],
+            topics: [{ name: "smoke", start: { timestamp: isoTimestamp } }],
             maxMessages: 1,
             timeoutMs: 500,
-            value: {},
+            valueFormat: {},
           },
           outcome: { resolves: "Consumed 0 messages from topics smoke" },
           clientManager,
@@ -748,6 +790,1029 @@ describe("consume-kafka-messages-handler.ts", () => {
           offset: "34",
         });
       });
+
+      it("should skip the seek for a partition whose timestamp resolution equals the high watermark (silent-substitution case), and still seek the active partition", async () => {
+        // `@confluentinc/kafka-javascript`'s fetchTopicOffsetsByTimestamp
+        // silently substitutes the high watermark when a partition has no
+        // message at or after the requested timestamp. The handler
+        // cross-checks against fetchTopicOffsets and filters those partitions
+        // out of the seek list (seeking to high == OFFSET_END would silently
+        // park the consumer waiting for new messages with no diagnostic).
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
+        );
+        // Partition 0: resolved offset 42 well below high 200 → active.
+        // Partition 1: resolved offset 100 equal to high 100 → silent
+        //              substitution fired, skip the seek.
+        admin.fetchTopicOffsetsByTimestamp.mockResolvedValue([
+          { partition: 0, offset: "42" },
+          { partition: 1, offset: "100" },
+        ]);
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "0", high: "200", offset: "200" },
+          { partition: 1, low: "0", high: "100", offset: "100" },
+        ]);
+
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+        consumer.assignment.mockReturnValue([
+          { topic: "smoke", partition: 0 },
+          { topic: "smoke", partition: 1 },
+        ]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [
+              { name: "smoke", start: { timestamp: "2026-05-14T17:00:00Z" } },
+            ],
+            maxMessages: 1,
+            timeoutMs: 500,
+            valueFormat: {},
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        // Active partition seeks; silent partition does not.
+        expect(consumer.seek).toHaveBeenCalledWith({
+          topic: "smoke",
+          partition: 0,
+          offset: "42",
+        });
+        expect(consumer.seek).not.toHaveBeenCalledWith({
+          topic: "smoke",
+          partition: 1,
+          offset: "100",
+        });
+        expect(consumer.seek).toHaveBeenCalledTimes(1);
+      });
+
+      it("should throw a tool-error response naming the timestamp when every partition's data ends before it (binding silent-substitution case)", async () => {
+        // All partitions return offset == high watermark → all silent.
+        // The handler must reject loudly rather than silently seeking
+        // every partition to OFFSET_END (which would idle the consumer
+        // until timeout and return 0 with no clue why).
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
+        );
+        admin.fetchTopicOffsetsByTimestamp.mockResolvedValue([
+          { partition: 0, offset: "200" },
+          { partition: 1, offset: "100" },
+        ]);
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "0", high: "200", offset: "200" },
+          { partition: 1, low: "0", high: "100", offset: "100" },
+        ]);
+
+        const consumer = await clientManager.getConsumer();
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [
+              { name: "smoke", start: { timestamp: "2026-05-14T17:00:00Z" } },
+            ],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          // Pin both the ISO timestamp (the literal user input echoed back)
+          // and the "every partition" phrasing so future message rewording
+          // doesn't pass a vacuous /failed/ match. The handler converts the
+          // ISO input to ms then back to an ISO string for the message; the
+          // round-trip lands on the same UTC instant.
+          outcome: {
+            resolves:
+              'Topic "smoke" has no messages at or after timestamp 2026-05-14T17:00:00.000Z (every partition has no record produced past that point)',
+          },
+          clientManager,
+        });
+      });
+
+      it("should pick offsetReset='latest' on mixed-direction calls and explicit-seek the 'earliest' minority to its partition low watermarks", async () => {
+        // Two topics, opposite directions: A wants earliest, B wants
+        // latest. The consumer can only have one auto.offset.reset, so
+        // the handler picks "latest" — librdkafka's own default and the
+        // option that keeps the explicit-seek work localized to the
+        // "earliest" minority. The handler issues explicit low-watermark
+        // seeks for A so it actually replays its history; B inherits the
+        // consumer-wide "latest" and needs no explicit seek.
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([
+            { name: "topic-a", numPartitions: 2 },
+            { name: "topic-b", numPartitions: 1 },
+          ]),
+        );
+        // Only topic-a is fetched — topic-b's direction matches the
+        // consumer default so the handler doesn't need its watermarks.
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "10", high: "100", offset: "100" },
+          { partition: 1, low: "20", high: "100", offset: "100" },
+        ]);
+
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+        consumer.assignment.mockReturnValue([
+          { topic: "topic-a", partition: 0 },
+          { topic: "topic-a", partition: 1 },
+          { topic: "topic-b", partition: 0 },
+        ]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [
+              { name: "topic-a", start: "earliest" },
+              { name: "topic-b", start: "latest" },
+            ],
+            maxMessages: 1,
+            timeoutMs: 500,
+            valueFormat: {},
+          },
+          outcome: {
+            resolves: "Consumed 0 messages from topics topic-a, topic-b",
+          },
+          clientManager,
+        });
+
+        // Consumer-wide reset goes "latest" because not every
+        // direction-only entry agrees on "earliest".
+        expect(clientManager.buildKafkaConsumer).toHaveBeenCalledWith({
+          clusterId: undefined,
+          envId: undefined,
+          groupId: undefined,
+          offsetReset: "latest",
+        });
+        // topic-a's partitions seek to their per-partition low watermarks
+        // (10 and 20). topic-b stays at the consumer default.
+        expect(consumer.seek).toHaveBeenCalledWith({
+          topic: "topic-a",
+          partition: 0,
+          offset: "10",
+        });
+        expect(consumer.seek).toHaveBeenCalledWith({
+          topic: "topic-a",
+          partition: 1,
+          offset: "20",
+        });
+        expect(consumer.seek).toHaveBeenCalledTimes(2);
+      });
+
+      it("should skip preflight entirely when every entry's `start` agrees on 'earliest' (no admin client call)", async () => {
+        // Both entries direction-only and both pick "earliest" → the
+        // consumer's auto.offset.reset is set to "earliest" and no per-
+        // partition seek is needed. The handler should skip the admin
+        // round-trip entirely — bare-direction-uniform is a fast path.
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [
+              { name: "topic-a", start: "earliest" },
+              { name: "topic-b", start: "earliest" },
+            ],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          outcome: {
+            resolves: "Consumed 0 messages from topics topic-a, topic-b",
+          },
+          clientManager,
+        });
+
+        expect(clientManager.buildKafkaConsumer).toHaveBeenCalledWith({
+          clusterId: undefined,
+          envId: undefined,
+          groupId: undefined,
+          offsetReset: "earliest",
+        });
+        // The fast path means no admin probing and no per-partition
+        // seeks — only consumer.subscribe + the librdkafka-honored
+        // consumer reset.
+        expect(admin.fetchTopicMetadata).not.toHaveBeenCalled();
+        expect(admin.fetchTopicOffsets).not.toHaveBeenCalled();
+        expect(consumer.seek).not.toHaveBeenCalled();
+        expect(consumer.pause).not.toHaveBeenCalled();
+      });
+
+      it("should resolve with 0 messages when applyPostAssignmentHook's waitForAssignment exhausts its deadline without an assignment (orchestrator's onAssignmentTimedOut callback)", async () => {
+        // needsPreflight=true (because of `partition: 0`) so the
+        // preflightHook arm of the race is active. consumer.assignment
+        // always returns [] — waitForAssignment polls until its
+        // deadlineMs catches up, then returns null and triggers the
+        // orchestrator's `onAssignmentTimedOut` arrow (the body of
+        // `accepting = false; timedOut.resolve()`).
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
+        );
+
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+        consumer.assignment.mockReturnValue([]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke", partition: 0 }],
+            maxMessages: 1,
+            timeoutMs: 100,
+            valueFormat: {},
+            keyFormat: {},
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        // No assignment ever landed, so the post-assignment pause step
+        // is never reached.
+        expect(consumer.pause).not.toHaveBeenCalled();
+      });
+
+      it("should log via the disconnect-catch path when consumer.disconnect throws during cleanup", async () => {
+        // Disconnect failures are caught inside the outer finally so
+        // the surface response stays the success-shaped "Consumed N
+        // messages..." text rather than getting replaced by a teardown
+        // error. The orchestrator's only response is a logger.error;
+        // the test verifies the response shape is preserved AND the
+        // logger.error catch arm of the disconnect path was reached.
+        const clientManager = getMockedClientManager();
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockRejectedValue(new Error("disconnect kaboom"));
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke" }],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+            keyFormat: {},
+          },
+          // Disconnect failure during teardown does NOT corrupt the
+          // success-shaped response — only the user-facing path is
+          // pinned here, the log line itself is intentionally not
+          // asserted (per the project's "do not test logging" rule).
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        expect(consumer.disconnect).toHaveBeenCalledOnce();
+      });
+
+      it("should resolve with exactly maxMessages records when consumer.run delivers more than that via the captured eachMessage (orchestrator's maxReached race arm)", async () => {
+        // Capture the eachMessage callback from consumer.run and drive
+        // it from the test. consumer.run's promise never resolves — the
+        // race only finishes via maxReached.resolve() from onMaxReached.
+        // Drives the post-refactor `Promise.race([maxReached.promise,
+        // timedOut.promise, rejectOnly(runPromise), rejectOnly(preflightHook)])`
+        // via its first arm.
+        const clientManager = getMockedClientManager();
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        let captured:
+          | ((payload: EachMessagePayload) => Promise<void>)
+          | undefined;
+        consumer.run.mockImplementation(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ((opts: any) => {
+            captured = opts.eachMessage;
+            // Engine "still running" — never settles so it doesn't end the
+            // race on its own.
+            return new Promise<void>(() => {});
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          }) as any,
+        );
+
+        // Pre-parse so the args object satisfies the handler's
+        // z.infer<>-typed `toolArguments` parameter (post-default
+        // shape) — mirrors what the MCP framework hands the handler
+        // in production, where the SDK has already validated and
+        // defaulted the inputs.
+        const handlePromise = handler.handle(
+          runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          consumeKafkaMessagesArgs.parse({
+            topics: [{ name: "smoke" }],
+            maxMessages: 2,
+            timeoutMs: 5000,
+            valueFormat: {},
+            keyFormat: {},
+          }),
+        );
+
+        // Yield so consumer.run's mockImplementation runs and `captured`
+        // is set before we attempt to invoke it.
+        await new Promise<void>((r) => setImmediate(r));
+        expect(captured).toBeDefined();
+
+        // Drive three deliveries; the third should be suppressed by the
+        // orchestrator's `accepting = false` flip inside `onMaxReached`,
+        // so consumedMessages caps at 2.
+        await captured!({
+          topic: "smoke",
+          partition: 0,
+          message: fakeMessage({ value: Buffer.from("v1") }),
+        } as unknown as EachMessagePayload);
+        await captured!({
+          topic: "smoke",
+          partition: 0,
+          message: fakeMessage({ value: Buffer.from("v2") }),
+        } as unknown as EachMessagePayload);
+        await captured!({
+          topic: "smoke",
+          partition: 0,
+          message: fakeMessage({ value: Buffer.from("v3") }),
+        } as unknown as EachMessagePayload);
+
+        const result = await handlePromise;
+        const text = result.content
+          .map((c) => ("text" in c ? c.text : ""))
+          .join("");
+
+        // Exactly two messages — proves the maxReached signal fired AND
+        // the post-resolution `accepting` gate suppressed the third
+        // delivery from being pushed.
+        expect(text).toContain("Consumed 2 messages from topics smoke");
+        // Disconnect runs from the outer finally even when the race
+        // exits via the maxReached signal (not via an error).
+        expect(consumer.disconnect).toHaveBeenCalledOnce();
+      });
+    });
+
+    describe("processMessage()", () => {
+      it("should return raw key/value strings + ISO-formatted timestamp when neither side uses schema registry", async () => {
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage(),
+          undefined,
+          { useSchemaRegistry: false },
+          { useSchemaRegistry: false },
+        );
+        // Literal-equal the whole shape so every field is pinned — drift
+        // in any branch (key conversion, value conversion, timestamp
+        // formatting, headers default, topic/partition passthrough) fails
+        // here with a precise diff.
+        expect(result).toEqual({
+          key: "k",
+          value: "v",
+          timestamp: "2025-05-14T14:56:07.000Z",
+          offset: "42",
+          headers: undefined,
+          topic: "topic-x",
+          partition: 0,
+        });
+      });
+
+      it("should leave the key undefined when the Kafka message has a null key", async () => {
+        // `message.key` arrives as `null` (Buffer | null per the kafkajs
+        // type), and the handler's `message.key?.toString()` initialization
+        // plus the `if (message.key)` guard means the processed key stays
+        // at its initial value of `undefined`.
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage({ key: null }),
+          undefined,
+          { useSchemaRegistry: false },
+          { useSchemaRegistry: false },
+        );
+        expect(result.key).toBeUndefined();
+      });
+
+      it("should convert defined headers to a record of stringified values (Buffer → string, undefined → empty string)", async () => {
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage({
+            headers: {
+              "x-trace": Buffer.from("abc"),
+              "x-empty": undefined,
+            },
+          }),
+          undefined,
+          { useSchemaRegistry: false },
+          { useSchemaRegistry: false },
+        );
+        expect(result.headers).toEqual({
+          "x-trace": "abc",
+          "x-empty": "",
+        });
+      });
+
+      it("should pass message.timestamp through formatMessageTimestamp (integration with the '-1' sentinel)", async () => {
+        // Cross-check that processMessage actually wires through
+        // formatMessageTimestamp — the unit-test for that helper above
+        // pins the four branches; this one pins the *integration*.
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage({ timestamp: "-1" }),
+          undefined,
+          { useSchemaRegistry: false },
+          { useSchemaRegistry: false },
+        );
+        expect(result.timestamp).toBe("(no timestamp)");
+      });
+
+      describe("with schema registry", () => {
+        // The handler imports `getLatestSchemaIfExists` and
+        // `deserializeMessage` via a namespace alias precisely so these
+        // tests can spy on them via property lookup (ESM live bindings
+        // refuse direct named-import interception). The fake registry is
+        // an empty object cast — the spies short-circuit before the real
+        // SDK is touched, so its surface doesn't matter.
+        const fakeRegistry = {} as SchemaRegistryClient;
+
+        it("should deserialize the value via schema registry when useSchemaRegistry is true and a schema exists", async () => {
+          const getLatestSpy = vi
+            .spyOn(schemaRegistryHelper, "getLatestSchemaIfExists")
+            .mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          const deserializeSpy = vi
+            .spyOn(schemaRegistryHelper, "deserializeMessage")
+            .mockResolvedValue({ field: 42 });
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage(),
+            fakeRegistry,
+            { useSchemaRegistry: true },
+            { useSchemaRegistry: false },
+          );
+
+          // Value travels through the SR helpers; key stays raw.
+          expect(result.value).toEqual({ field: 42 });
+          expect(result.key).toBe("k");
+          // Pin the default subject derivation: "<topic>-value" /
+          // "<topic>-key" when options.subject is omitted.
+          expect(getLatestSpy).toHaveBeenCalledWith(
+            fakeRegistry,
+            "topic-x-value",
+          );
+          expect(deserializeSpy).toHaveBeenCalledWith(
+            "topic-x",
+            Buffer.from("v"),
+            "AVRO",
+            fakeRegistry,
+            SerdeType.VALUE,
+          );
+        });
+
+        it("should honor a caller-supplied subject instead of the default `${topic}-value`", async () => {
+          const getLatestSpy = vi
+            .spyOn(schemaRegistryHelper, "getLatestSchemaIfExists")
+            .mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          vi.spyOn(
+            schemaRegistryHelper,
+            "deserializeMessage",
+          ).mockResolvedValue("ok");
+
+          await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage(),
+            fakeRegistry,
+            { useSchemaRegistry: true, subject: "custom-subject-v1" },
+            { useSchemaRegistry: false },
+          );
+
+          expect(getLatestSpy).toHaveBeenCalledWith(
+            fakeRegistry,
+            "custom-subject-v1",
+          );
+        });
+
+        it("should fall back to the raw string when getLatestSchemaIfExists returns null (no schema registered)", async () => {
+          vi.spyOn(
+            schemaRegistryHelper,
+            "getLatestSchemaIfExists",
+          ).mockResolvedValue(null);
+          const deserializeSpy = vi.spyOn(
+            schemaRegistryHelper,
+            "deserializeMessage",
+          );
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage(),
+            fakeRegistry,
+            { useSchemaRegistry: true },
+            { useSchemaRegistry: false },
+          );
+
+          expect(result.value).toBe("v");
+          // No deserialization attempt at all — the null short-circuits
+          // before the deserializer is consulted.
+          expect(deserializeSpy).not.toHaveBeenCalled();
+        });
+
+        it("should fall back to the raw string when deserializeMessage throws (corrupt payload or schema mismatch)", async () => {
+          vi.spyOn(
+            schemaRegistryHelper,
+            "getLatestSchemaIfExists",
+          ).mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          vi.spyOn(
+            schemaRegistryHelper,
+            "deserializeMessage",
+          ).mockRejectedValue(new Error("payload corrupt"));
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage(),
+            fakeRegistry,
+            { useSchemaRegistry: true },
+            { useSchemaRegistry: false },
+          );
+
+          // The catch arm logs and returns the raw string — the consumer
+          // gets *something* rather than a propagated error that kills
+          // the run.
+          expect(result.value).toBe("v");
+        });
+
+        it("should deserialize the key with SerdeType.KEY when keyOptions.useSchemaRegistry is true and the message has a key", async () => {
+          const getLatestSpy = vi
+            .spyOn(schemaRegistryHelper, "getLatestSchemaIfExists")
+            .mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          const deserializeSpy = vi
+            .spyOn(schemaRegistryHelper, "deserializeMessage")
+            .mockResolvedValue("key-deserialized");
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage(),
+            fakeRegistry,
+            { useSchemaRegistry: false },
+            { useSchemaRegistry: true },
+          );
+
+          expect(result.key).toBe("key-deserialized");
+          expect(result.value).toBe("v");
+          // Default key subject is "<topic>-key" and SerdeType.KEY drives
+          // the deserializer selection.
+          expect(getLatestSpy).toHaveBeenCalledWith(
+            fakeRegistry,
+            "topic-x-key",
+          );
+          expect(deserializeSpy).toHaveBeenCalledWith(
+            "topic-x",
+            Buffer.from("k"),
+            "AVRO",
+            fakeRegistry,
+            SerdeType.KEY,
+          );
+        });
+
+        it("should skip key deserialization entirely when message.key is null (the SR branch never fires for an absent key)", async () => {
+          const getLatestSpy = vi.spyOn(
+            schemaRegistryHelper,
+            "getLatestSchemaIfExists",
+          );
+          const deserializeSpy = vi.spyOn(
+            schemaRegistryHelper,
+            "deserializeMessage",
+          );
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage({ key: null }),
+            fakeRegistry,
+            { useSchemaRegistry: false },
+            { useSchemaRegistry: true },
+          );
+
+          expect(result.key).toBeUndefined();
+          // The `if (message.key)` guard prevents any SR plumbing from
+          // running on the key side.
+          expect(getLatestSpy).not.toHaveBeenCalled();
+          expect(deserializeSpy).not.toHaveBeenCalled();
+        });
+      });
+    });
+  });
+
+  describe("formatMessageTimestamp()", () => {
+    it.each([
+      // [input, expected, why]
+      [
+        undefined,
+        "(no timestamp)",
+        "absent timestamps (pre-0.10.0 message format)",
+      ],
+      ["-1", "(no timestamp)", "Kafka sentinel for 'producer left it unset'"],
+      [
+        "1747234567000",
+        "2025-05-14T14:56:07.000Z",
+        "valid ms-since-epoch string → ISO 8601 UTC",
+      ],
+      [
+        "banana",
+        "banana",
+        "non-numeric garbage → pass through verbatim (Number() returns NaN)",
+      ],
+      [
+        "",
+        "1970-01-01T00:00:00.000Z",
+        "empty string → Number('') is 0 (finite) → epoch ISO (defensive edge case)",
+      ],
+    ] as const)("should map %j to %j (%s)", (input, expected, _why) => {
+      expect(formatMessageTimestamp(input)).toBe(expected);
+    });
+  });
+
+  describe("normalizeStart()", () => {
+    // The literal-equal target is the same ISO instant in both timestamp
+    // rows below; the difference is whether the input arrived as a string
+    // (Date.parse path) or as a number (passthrough path). Pinning both
+    // proves the two arms produce identical downstream targets — which
+    // is precisely what callers need when they don't want to think about
+    // which form the LLM picked.
+    const sharedMs = 1747234567000;
+
+    it.each([
+      // [input, expected, why]
+      ["earliest" as const, { kind: "earliest" }, "literal `earliest` arm"],
+      ["latest" as const, { kind: "latest" }, "literal `latest` arm"],
+      [
+        { offset: "42" } as const,
+        { kind: "offset", value: "42" },
+        "object arm with absolute partition offset",
+      ],
+      [
+        { timestamp: "2025-05-14T14:56:07.000Z" } as const,
+        { kind: "timestamp", ms: sharedMs },
+        "object arm with ISO 8601 string → Date.parse path",
+      ],
+      [
+        { timestamp: sharedMs } as const,
+        { kind: "timestamp", ms: sharedMs },
+        "object arm with ms-since-epoch number → passthrough path",
+      ],
+    ])("should collapse %j to %j (%s)", (input, expected, _why) => {
+      expect(normalizeStart(input)).toEqual(expected);
+    });
+  });
+
+  describe("waitForAssignment()", () => {
+    // Fake timers because the function's loop body awaits a 50ms
+    // setTimeout between polls. Real wall-clock waits would make tests
+    // either flaky or slow; fake timers let us pump iterations
+    // deterministically. `restoreMocks: true` only restores vi.spyOn
+    // installs, not fake-timer state, so the afterEach reverter is
+    // load-bearing.
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should return the assignment immediately when consumer.assignment() is already populated on the first poll", async () => {
+      const populated = [{ topic: "x", partition: 0 }];
+      const consumer = getMockedConsumer();
+      consumer.assignment.mockReturnValue(populated);
+
+      const result = await waitForAssignment(consumer, Date.now() + 5000);
+
+      expect(result).toEqual(populated);
+      // Single poll, no sleep entered.
+      expect(consumer.assignment).toHaveBeenCalledOnce();
+    });
+
+    it("should return null when the deadline is already in the past and the assignment is still empty", async () => {
+      const consumer = getMockedConsumer();
+      consumer.assignment.mockReturnValue([]);
+
+      // `Date.now() >= deadline` fires on the first iteration's
+      // post-empty check, so the function returns null without entering
+      // the setTimeout sleep.
+      const result = await waitForAssignment(consumer, Date.now());
+
+      expect(result).toBeNull();
+      expect(consumer.assignment).toHaveBeenCalledOnce();
+    });
+
+    it("should poll, sleep, and return the assignment once a later iteration sees it populated", async () => {
+      const populated = [{ topic: "x", partition: 0 }];
+      const consumer = getMockedConsumer();
+      consumer.assignment
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce([])
+        .mockReturnValue(populated);
+
+      const pending = waitForAssignment(consumer, Date.now() + 5000);
+      // Each iteration awaits a 50ms sleep. Advance fake time so the
+      // first two sleeps resolve and the third poll runs against the
+      // populated mock.
+      await vi.advanceTimersByTimeAsync(50);
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(await pending).toEqual(populated);
+      // Iter 1 empty → sleep, iter 2 empty → sleep, iter 3 populated →
+      // return. Exactly three polls.
+      expect(consumer.assignment).toHaveBeenCalledTimes(3);
+    });
+
+    it("should return null after polling past the deadline without the assignment populating", async () => {
+      const consumer = getMockedConsumer();
+      consumer.assignment.mockReturnValue([]);
+
+      // deadline = now + 150ms; with 50ms sleeps the loop ticks at
+      // t=0, 50, 100, 150 and the t=150 iteration's deadline check
+      // (`>=`) fires.
+      const pending = waitForAssignment(consumer, Date.now() + 150);
+      await vi.advanceTimersByTimeAsync(200);
+
+      expect(await pending).toBeNull();
+      // At least three polls before the deadline trips on iter 4.
+      expect(consumer.assignment.mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe("createEachMessageHandler()", () => {
+    // Default processed-shape stand-in; tests that don't care about
+    // contents reuse this so the assertions stay focused on
+    // gating/signalling behavior.
+    function makeProcessed(): ProcessedMessage {
+      return {
+        key: "k",
+        value: "v",
+        timestamp: "2025-05-14T14:56:07.000Z",
+        offset: "42",
+        headers: undefined,
+        topic: "topic-x",
+        partition: 0,
+      };
+    }
+
+    function buildHandler(
+      stateOverrides: {
+        isAccepting?: () => boolean;
+        isPreflightApplied?: () => boolean;
+        maxMessages?: number;
+      } = {},
+    ) {
+      const consumedMessages: ProcessedMessage[] = [];
+      const onMaxReached = vi.fn();
+      const processMessage = vi.fn().mockResolvedValue(makeProcessed());
+      const handler = createEachMessageHandler({
+        state: {
+          consumedMessages,
+          isAccepting: stateOverrides.isAccepting ?? (() => true),
+          isPreflightApplied: stateOverrides.isPreflightApplied ?? (() => true),
+        },
+        maxMessages: stateOverrides.maxMessages ?? 10,
+        onMaxReached,
+        processMessage,
+      });
+      return { handler, consumedMessages, onMaxReached, processMessage };
+    }
+
+    function payload(): EachMessagePayload {
+      return {
+        topic: "topic-x",
+        partition: 0,
+        message: fakeMessage(),
+      } as unknown as EachMessagePayload;
+    }
+
+    it("should call processMessage with (topic, partition, message) and push the result to consumedMessages on the happy path", async () => {
+      const { handler, processMessage, consumedMessages, onMaxReached } =
+        buildHandler({ maxMessages: 10 });
+      const inst = payload();
+
+      await handler(inst);
+
+      expect(processMessage).toHaveBeenCalledWith("topic-x", 0, inst.message);
+      expect(consumedMessages).toEqual([makeProcessed()]);
+      // Far below maxMessages → the signal must not fire.
+      expect(onMaxReached).not.toHaveBeenCalled();
+    });
+
+    it("should drop the message without calling processMessage when isAccepting() returns false (post-resolution gate)", async () => {
+      const { handler, processMessage, consumedMessages, onMaxReached } =
+        buildHandler({ isAccepting: () => false });
+
+      await handler(payload());
+
+      expect(processMessage).not.toHaveBeenCalled();
+      expect(consumedMessages).toHaveLength(0);
+      expect(onMaxReached).not.toHaveBeenCalled();
+    });
+
+    it("should drop the message without calling processMessage when isPreflightApplied() returns false (pre-pause gate)", async () => {
+      // Pre-pause messages arrive from librdkafka's fetch buffer for
+      // partitions we intend to pause. The synchronous gate drops them
+      // on arrival rather than letting them sneak into consumedMessages.
+      const { handler, processMessage, consumedMessages, onMaxReached } =
+        buildHandler({ isPreflightApplied: () => false });
+
+      await handler(payload());
+
+      expect(processMessage).not.toHaveBeenCalled();
+      expect(consumedMessages).toHaveLength(0);
+      expect(onMaxReached).not.toHaveBeenCalled();
+    });
+
+    it("should fire onMaxReached exactly once when the count reaches maxMessages", async () => {
+      const { handler, consumedMessages, onMaxReached } = buildHandler({
+        maxMessages: 2,
+      });
+
+      await handler(payload());
+      expect(onMaxReached).not.toHaveBeenCalled();
+      expect(consumedMessages).toHaveLength(1);
+
+      await handler(payload());
+      expect(onMaxReached).toHaveBeenCalledOnce();
+      expect(consumedMessages).toHaveLength(2);
+    });
+
+    it("should keep firing onMaxReached on subsequent calls once the count is at-or-above maxMessages (the orchestrator's `accepting` gate is what stops the bleed; the factory itself stays branch-simple)", async () => {
+      // Pin the actual contract: the factory always re-fires onMaxReached
+      // once length >= maxMessages. Suppression of follow-up calls is
+      // the orchestrator's job (via its accepting=false flip in the
+      // onMaxReached handler). This test exists so a future "smart" gate
+      // inside the factory fails loudly rather than silently changing
+      // the orchestrator's responsibility.
+      const { handler, consumedMessages, onMaxReached } = buildHandler({
+        maxMessages: 1,
+        // Stay accepting throughout so we exercise the inner branch.
+        isAccepting: () => true,
+      });
+
+      await handler(payload());
+      await handler(payload());
+      await handler(payload());
+
+      expect(consumedMessages).toHaveLength(3);
+      expect(onMaxReached).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe("applyPostAssignmentHook()", () => {
+    // Fake timers because the timeout branch drives waitForAssignment's
+    // 50ms polling loop without burning wall-clock seconds.
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should resolve onApplied (and not onAssignmentTimedOut) when the assignment populates and the pause step completes", async () => {
+      const consumer = getMockedConsumer();
+      // Assigned to partition 1; the plan asks us to keep only partition 0,
+      // so applyPauseAfterAssignment should pause partition 1.
+      consumer.assignment.mockReturnValue([{ topic: "topic-x", partition: 1 }]);
+      consumer.pause.mockReturnValue(undefined);
+      const onApplied = vi.fn();
+      const onAssignmentTimedOut = vi.fn();
+
+      await applyPostAssignmentHook({
+        consumer,
+        plan: {
+          topicNames: ["topic-x"],
+          keepPartitions: new Map([["topic-x", new Set([0])]]),
+          seeks: [],
+        },
+        deadlineMs: Date.now() + 5000,
+        onApplied,
+        onAssignmentTimedOut,
+      });
+
+      expect(consumer.pause).toHaveBeenCalledWith([
+        { topic: "topic-x", partitions: [1] },
+      ]);
+      expect(onApplied).toHaveBeenCalledOnce();
+      expect(onAssignmentTimedOut).not.toHaveBeenCalled();
+    });
+
+    it("should fire onAssignmentTimedOut (and not onApplied or consumer.pause) when waitForAssignment exhausts the deadline without an assignment", async () => {
+      const consumer = getMockedConsumer();
+      consumer.assignment.mockReturnValue([]);
+      const onApplied = vi.fn();
+      const onAssignmentTimedOut = vi.fn();
+
+      // Deadline already in the past — waitForAssignment returns null on
+      // its first poll, so we never reach the pause step.
+      await applyPostAssignmentHook({
+        consumer,
+        plan: {
+          topicNames: ["topic-x"],
+          keepPartitions: new Map([["topic-x", new Set([0])]]),
+          seeks: [],
+        },
+        deadlineMs: Date.now(),
+        onApplied,
+        onAssignmentTimedOut,
+      });
+
+      expect(consumer.pause).not.toHaveBeenCalled();
+      expect(onApplied).not.toHaveBeenCalled();
+      expect(onAssignmentTimedOut).toHaveBeenCalledOnce();
+    });
+
+    it("should reject when consumer.pause throws during the post-assignment pause step", async () => {
+      const consumer = getMockedConsumer();
+      consumer.assignment.mockReturnValue([{ topic: "topic-x", partition: 1 }]);
+      consumer.pause.mockImplementation(() => {
+        throw new Error("pause kaboom");
+      });
+      const onApplied = vi.fn();
+      const onAssignmentTimedOut = vi.fn();
+
+      await expect(
+        applyPostAssignmentHook({
+          consumer,
+          plan: {
+            topicNames: ["topic-x"],
+            // Keep only partition 0 → partition 1 must be paused → throws.
+            keepPartitions: new Map([["topic-x", new Set([0])]]),
+            seeks: [],
+          },
+          deadlineMs: Date.now() + 5000,
+          onApplied,
+          onAssignmentTimedOut,
+        }),
+      ).rejects.toThrow("pause kaboom");
+
+      // Neither completion callback fires on failure — the rejection
+      // is the only signal so the orchestrator's `rejectOnly` wrapper
+      // can surface it as the race-losing error.
+      expect(onApplied).not.toHaveBeenCalled();
+      expect(onAssignmentTimedOut).not.toHaveBeenCalled();
     });
   });
 });

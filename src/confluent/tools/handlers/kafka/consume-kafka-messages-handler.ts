@@ -154,8 +154,18 @@ export const consumeKafkaMessagesArgs = z.object({
     .describe(
       "Maximum time in milliseconds to wait for messages before stopping.",
     ),
-  valueFormat: schemaRegistryOptions,
-  keyFormat: schemaRegistryOptions,
+  valueFormat: schemaRegistryOptions.describe(
+    "How to interpret each message's VALUE bytes. Default: returned as a " +
+      "raw UTF-8 string. Set `useSchemaRegistry: true` (optionally with a " +
+      "`subject` override) to deserialize via the registered AVRO / JSON / " +
+      "PROTOBUF schema in Schema Registry.",
+  ),
+  keyFormat: schemaRegistryOptions.describe(
+    "How to interpret each message's KEY bytes. Default: returned as a " +
+      "raw UTF-8 string. Set `useSchemaRegistry: true` (optionally with a " +
+      "`subject` override) to deserialize via the registered AVRO / JSON / " +
+      "PROTOBUF schema in Schema Registry.",
+  ),
   cluster_id: z
     .string()
     .optional()
@@ -417,6 +427,53 @@ function validateRequestedPartitions(
 }
 
 /**
+ * Reject entries that target the same effective partition set more than
+ * once — those are ambiguous (each subscribed partition can have only
+ * one starting position; whichever seek/reset wins the race silently
+ * decides the behavior, and the caller never learns their request was
+ * over-specified). Two shapes of duplicate are rejected:
+ *
+ *  - **Unrestricted-mode topic** (no entry on this topic carries
+ *    `partition`): only one entry per topic is allowed. Two entries
+ *    targeting "every partition" with different `start` directions
+ *    (one `earliest`, one `latest`) is the canonical ambiguous case
+ *    and is what this branch catches.
+ *  - **Partition-mode topic** (every entry on this topic carries
+ *    `partition`): each `partition` index may appear at most once.
+ *    Two entries for the same `(topic, partition)` with different
+ *    `start` offsets/timestamps is the second ambiguous case.
+ *
+ * Assumes the caller has already invoked `buildKeepPartitions` (or its
+ * equivalent all-or-nothing check), so every topic group is consistently
+ * either fully unrestricted or fully partition-restricted.
+ */
+function validateNoDuplicateTargets(
+  byTopic: Map<string, NormalizedTopicTarget[]>,
+): void {
+  for (const [topic, list] of byTopic) {
+    if (list.length === 1) continue;
+    const partitioned = list[0]?.partition !== undefined;
+    if (!partitioned) {
+      throw new Error(
+        `Topic "${topic}" has ${list.length} entries without partition restrictions; ` +
+          `specify each topic at most once at the unrestricted level (or restrict each entry to a distinct partition).`,
+      );
+    }
+    const seen = new Set<number>();
+    for (const t of list) {
+      const p = t.partition!;
+      if (seen.has(p)) {
+        throw new Error(
+          `Topic "${topic}" has multiple entries for partition ${p}; ` +
+            `specify each (topic, partition) pair at most once.`,
+        );
+      }
+      seen.add(p);
+    }
+  }
+}
+
+/**
  * Derive the per-topic keep-set for partition pause/skip filtering.
  * Per-topic mode is all-or-nothing: every entry for a given topic
  * must specify `partition`, or none of them may. Mixing the two is
@@ -596,8 +653,8 @@ async function resolveTimestampSeeks(
       `Topic "${topic}" has no messages at or after timestamp ` +
         `${new Date(timestampMs).toISOString()} ` +
         `(${partitionPhrase} no record produced past that point). ` +
-        `Try a more recent timestamp, or omit \`timestamp\` to consume ` +
-        `from the live position.`,
+        `Try an earlier timestamp, or use \`start: "latest"\` to consume ` +
+        `from the live position instead.`,
     );
   }
   if (silent.length > 0) {
@@ -647,6 +704,7 @@ async function buildPreflightPlan(
   const numPartitionsByTopic = await fetchPartitionCounts(admin, topicNames);
   validateRequestedPartitions(targets, numPartitionsByTopic);
   const keepPartitions = buildKeepPartitions(byTopic);
+  validateNoDuplicateTargets(byTopic);
 
   const getWatermarks = createWatermarkCache(admin);
   const seeks: PreflightPlan["seeks"] = [];
@@ -998,7 +1056,16 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
 
     let registry: SchemaRegistryClient | undefined;
     if (needsRegistry) {
-      registry = await clientManager.getSchemaRegistrySdkClient(resolved.envId);
+      try {
+        registry = await clientManager.getSchemaRegistrySdkClient(
+          resolved.envId,
+        );
+      } catch (error: unknown) {
+        return this.createResponse(
+          `Failed to consume messages: ${formatKafkaError(error)}`,
+          true,
+        );
+      }
     }
 
     const targets = normalizeTopicTargets(parsed);
@@ -1007,11 +1074,17 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
 
     let plan: PreflightPlan;
     if (needsPreflight) {
-      const admin = await clientManager.getKafkaAdminClient(
-        resolved.clusterId,
-        resolved.envId,
-      );
+      // `admin` is acquired INSIDE the try so a failed
+      // getKafkaAdminClient() (auth/network) becomes a tool-error
+      // response rather than propagating up unhandled. The finally
+      // guards against running disposeIfOAuth on an undefined admin
+      // (which would happen if the acquisition itself threw).
+      let admin: KafkaJS.Admin | undefined;
       try {
+        admin = await clientManager.getKafkaAdminClient(
+          resolved.clusterId,
+          resolved.envId,
+        );
         plan = await buildPreflightPlan(admin, targets, offsetReset);
       } catch (error: unknown) {
         return this.createResponse(
@@ -1019,7 +1092,9 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
           true,
         );
       } finally {
-        await disposeIfOAuth(runtime, connId, admin);
+        if (admin !== undefined) {
+          await disposeIfOAuth(runtime, connId, admin);
+        }
       }
     } else {
       plan = {

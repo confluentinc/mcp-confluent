@@ -663,6 +663,74 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
       });
 
+      it("should reject multiple unrestricted entries on the same topic (ambiguous: only one starting position per partition is honorable)", async () => {
+        // Two entries for "smoke" both at the topic level, with
+        // conflicting `start` directions. The schema/handler can't honor
+        // both — exactly one start wins the race silently. Reject loudly
+        // at preflight with a message naming the topic and the count.
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [
+              { name: "smoke", start: "earliest" },
+              { name: "smoke", start: "latest" },
+            ],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          outcome: {
+            resolves:
+              'Topic "smoke" has 2 entries without partition restrictions',
+          },
+          clientManager,
+        });
+      });
+
+      it("should reject duplicate `(topic, partition)` pairs (ambiguous: each subscribed partition has one starting position)", async () => {
+        // Two entries for the same partition with different `start`
+        // offsets — librdkafka would honor the seek that wins the
+        // pre-run-stash race, silently dropping the other.
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [
+              { name: "smoke", partition: 0, start: { offset: "10" } },
+              { name: "smoke", partition: 0, start: { offset: "20" } },
+            ],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          outcome: {
+            resolves: 'Topic "smoke" has multiple entries for partition 0',
+          },
+          clientManager,
+        });
+      });
+
       it("should pause unassigned-to-target partitions and seek to the explicit offset for the requested partition", async () => {
         // Happy path of the seek/pause dance: caller restricts to
         // partition 0 with an explicit offset. The broker assigns three
@@ -1135,16 +1203,14 @@ describe("consume-kafka-messages-handler.ts", () => {
         let captured:
           | ((payload: EachMessagePayload) => Promise<void>)
           | undefined;
-        consumer.run.mockImplementation(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ((opts: any) => {
-            captured = opts.eachMessage;
-            // Engine "still running" — never settles so it doesn't end the
-            // race on its own.
-            return new Promise<void>(() => {});
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          }) as any,
-        );
+        consumer.run.mockImplementation((opts) => {
+          // `opts` infers as `ConsumerRunConfig | undefined` from the
+          // mocked `consumer.run` signature; no `any` needed.
+          captured = opts?.eachMessage;
+          // Engine "still running" — never settles so it doesn't end
+          // the race on its own.
+          return new Promise<void>(() => {});
+        });
 
         // Pre-parse so the args object satisfies the handler's
         // z.infer<>-typed `toolArguments` parameter (post-default

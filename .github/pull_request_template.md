@@ -28,8 +28,8 @@ Please check if your PR fulfills the following (if applicable):
 
 <!-- Internal Contributors
 
-Please inform #mcp-confluent before proposing new development to prevent contradiction of in progress work.
--->
+ Please inform `#mcp-confluent` before proposing new development to avoid conflicting with or duplicating work in progress.
+ -->
 
 #### Release notes
 

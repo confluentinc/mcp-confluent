@@ -23,27 +23,36 @@ import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
-const messageOptions = z.object({
-  useSchemaRegistry: z
-    .boolean()
-    .optional()
-    .default(false)
-    .describe(
-      "Whether to use schema registry for deserialization. If false, messages will be returned as raw.",
-    ),
-  subject: z
-    .string()
-    .optional()
-    .describe(
-      "Schema registry subject. Defaults to '<topic>-value' or '<topic>-key'.",
-    ),
-});
+const messageOptions = z
+  .object({
+    useSchemaRegistry: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        "Whether to use schema registry for deserialization. If false, messages will be returned as raw.",
+      ),
+    subject: z
+      .string()
+      .optional()
+      .describe(
+        "Schema registry subject. Defaults to '<topic>-value' or '<topic>-key'.",
+      ),
+  })
+  // The optional() + default() wrapping lives here on the shared
+  // schema so `valueFormat` and `keyFormat` declarations downstream
+  // are bare references — one place to change if the omit-by-default
+  // contract ever evolves.
+  .optional()
+  .default({ useSchemaRegistry: false });
 
-const valueOptions = z.object({}).extend(messageOptions.shape);
-const keyOptions = z.object({}).extend(messageOptions.shape);
-
-type ValueOptions = z.infer<typeof valueOptions>;
-type KeyOptions = z.infer<typeof keyOptions>;
+// `ValueOptions` and `KeyOptions` are structurally identical to
+// `messageOptions` — they exist as named types only to make the
+// value-side vs key-side distinction explicit at `processMessage`'s
+// signature. The schema fields below use `messageOptions` directly;
+// no separate runtime schema is needed for each side.
+type ValueOptions = z.infer<typeof messageOptions>;
+type KeyOptions = z.infer<typeof messageOptions>;
 
 /**
  * Per-entry "where to start consuming" tagged union. Collapses the prior
@@ -51,10 +60,9 @@ type KeyOptions = z.infer<typeof keyOptions>;
  * knob into a single per-topic position control with four arms:
  *
  *   - `"earliest"` — begin at the partition low watermark (entire retained
- *     history).
+ *     history). This is the default when `start` is omitted.
  *   - `"latest"` — begin at the partition high watermark (only
- *     newly-produced messages). This is the default when `start` is
- *     omitted.
+ *     newly-produced messages).
  *   - `{ offset: "..." }` — begin at an absolute partition offset
  *     (digit-only string; requires `partition`).
  *   - `{ timestamp: ... }` — begin at the broker-resolved offset for the
@@ -146,8 +154,8 @@ export const consumeKafkaMessagesArgs = z.object({
     .describe(
       "Maximum time in milliseconds to wait for messages before stopping.",
     ),
-  valueFormat: valueOptions.optional().default({ useSchemaRegistry: false }),
-  keyFormat: keyOptions.optional().default({ useSchemaRegistry: false }),
+  valueFormat: messageOptions,
+  keyFormat: messageOptions,
   cluster_id: z
     .string()
     .optional()
@@ -316,26 +324,6 @@ function planNeedsPreflight(
   );
 }
 
-/**
- * Validates the requested targets against broker metadata and watermarks,
- * resolves any timestamp-based seeks to concrete partition offsets, issues
- * explicit watermark seeks for direction-only entries that don't match the
- * consumer's chosen `auto.offset.reset`, and produces the canonical
- * {@link PreflightPlan}. Thrown errors are caught one frame up and rendered
- * as a tool-error response.
- *
- * Validation rules (handler-side; the Zod schema covers field-level shape):
- * - `start: {offset}` requires `partition` — absolute offsets are
- *   partition-scoped; different partitions have different offset spaces.
- * - All-or-nothing partition mode per topic: every entry for a given
- *   topic must specify `partition`, or none of them may. Mixing is
- *   ambiguous (does the bare entry override the partitioned one or
- *   coexist with it?) and rejected loudly.
- * - Requested partitions must exist (cross-check with
- *   `admin.fetchTopicMetadata`).
- * - Absolute offsets must lie in `[low, high)` for their partition
- *   (cross-check with `admin.fetchTopicOffsets`).
- */
 /**
  * Reject any target that supplies `start: {offset}` without a
  * `partition` — absolute offsets are partition-scoped (offset 10 on
@@ -801,16 +789,36 @@ export async function applyPostAssignmentHook(opts: {
  * Pulled out of the orchestrator so the synchronous gates and the
  * "did we hit `maxMessages`?" signal are individually testable.
  *
- * The synchronous boolean getters (`isAccepting`, `isPreflightApplied`)
- * intentionally stay synchronous — `await`ing a Deferred in their place
- * would change behavior, because pre-pause deliveries from librdkafka's
- * fetch buffer must be dropped on arrival rather than queued through.
+ * The synchronous boolean/predicate getters (`isAccepting`,
+ * `isPreflightApplied`, `shouldKeepDuringPrePause`) intentionally stay
+ * synchronous — `await`ing a Deferred in their place would change
+ * behavior, because pre-pause deliveries from librdkafka's fetch buffer
+ * must be filtered on arrival rather than queued through.
+ *
+ * Pre-pause gate semantics: before the post-assignment pause step has
+ * run, drop a delivery **only** when its `(topic, partition)` is one
+ * we'd pause anyway (i.e. outside the topic's keep-set). Keep-set
+ * deliveries arriving during the brief window between assignment-landing
+ * and pause-being-applied are real records the caller asked for; the
+ * pre-run-stashed seeks have already positioned the consumer, so
+ * librdkafka can hand them to `eachMessage` immediately. Dropping them
+ * would be silent data loss. After `preflightApplied` flips, the gate
+ * doesn't fire (pause has already kept the unwanted partitions silent).
  */
 export function createEachMessageHandler(opts: {
   state: {
     consumedMessages: ProcessedMessage[];
     isAccepting: () => boolean;
     isPreflightApplied: () => boolean;
+    /**
+     * Returns `true` if this `(topic, partition)` is in the topic's
+     * keep-set (or the topic has no partition restriction at all). Used
+     * by the pre-pause gate to let legitimate caller-requested records
+     * through immediately while still dropping the about-to-be-paused
+     * partitions that librdkafka may deliver in the assignment-to-pause
+     * window.
+     */
+    shouldKeepDuringPrePause: (topic: string, partition: number) => boolean;
   };
   maxMessages: number;
   onMaxReached: () => void;
@@ -826,7 +834,12 @@ export function createEachMessageHandler(opts: {
 }) => Promise<void> {
   return async ({ topic, partition, message }) => {
     if (!opts.state.isAccepting()) return;
-    if (!opts.state.isPreflightApplied()) return;
+    if (
+      !opts.state.isPreflightApplied() &&
+      !opts.state.shouldKeepDuringPrePause(topic, partition)
+    ) {
+      return;
+    }
     const processed = await opts.processMessage(topic, partition, message);
     opts.state.consumedMessages.push(processed);
     if (opts.state.consumedMessages.length >= opts.maxMessages) {
@@ -1045,6 +1058,15 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
           consumedMessages,
           isAccepting: () => accepting,
           isPreflightApplied: () => preflightApplied,
+          // Pre-pause gate predicate: a (topic, partition) is "keep" if
+          // the topic has no partition restriction (keepPartitions omits
+          // it) or the partition is in the topic's keep-set. The
+          // orchestrator's `plan.keepPartitions` is built so absence of
+          // an entry means "no restriction"; we honor that contract here.
+          shouldKeepDuringPrePause: (topic, partition) => {
+            const keepSet = plan.keepPartitions.get(topic);
+            return keepSet === undefined || keepSet.has(partition);
+          },
         },
         maxMessages,
         onMaxReached: () => {

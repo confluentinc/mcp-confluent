@@ -1620,6 +1620,10 @@ describe("consume-kafka-messages-handler.ts", () => {
       stateOverrides: {
         isAccepting?: () => boolean;
         isPreflightApplied?: () => boolean;
+        shouldKeepDuringPrePause?: (
+          topic: string,
+          partition: number,
+        ) => boolean;
         maxMessages?: number;
       } = {},
     ) {
@@ -1631,6 +1635,8 @@ describe("consume-kafka-messages-handler.ts", () => {
           consumedMessages,
           isAccepting: stateOverrides.isAccepting ?? (() => true),
           isPreflightApplied: stateOverrides.isPreflightApplied ?? (() => true),
+          shouldKeepDuringPrePause:
+            stateOverrides.shouldKeepDuringPrePause ?? (() => true),
         },
         maxMessages: stateOverrides.maxMessages ?? 10,
         onMaxReached,
@@ -1671,18 +1677,86 @@ describe("consume-kafka-messages-handler.ts", () => {
       expect(onMaxReached).not.toHaveBeenCalled();
     });
 
-    it("should drop the message without calling processMessage when isPreflightApplied() returns false (pre-pause gate)", async () => {
-      // Pre-pause messages arrive from librdkafka's fetch buffer for
-      // partitions we intend to pause. The synchronous gate drops them
-      // on arrival rather than letting them sneak into consumedMessages.
+    it("should drop the message without calling processMessage when isPreflightApplied() is false AND the partition is outside the keep-set (pre-pause gate, partition-aware)", async () => {
+      // Pre-pause: a delivery from a partition we intend to pause
+      // arrives via librdkafka's fetch buffer between assignment-landing
+      // and pause-being-applied. The gate must drop it; if it sneaked
+      // through it'd corrupt consumedMessages with an off-target record.
       const { handler, processMessage, consumedMessages, onMaxReached } =
-        buildHandler({ isPreflightApplied: () => false });
+        buildHandler({
+          isPreflightApplied: () => false,
+          shouldKeepDuringPrePause: () => false,
+        });
 
       await handler(payload());
 
       expect(processMessage).not.toHaveBeenCalled();
       expect(consumedMessages).toHaveLength(0);
       expect(onMaxReached).not.toHaveBeenCalled();
+    });
+
+    it("should let a keep-set partition through during the pre-pause window when isPreflightApplied() is still false (no silent data loss on the partitions the caller asked for)", async () => {
+      // The bug Copilot caught: a partition-restricted consume can have
+      // librdkafka deliver records for the keep-set partition as soon
+      // as the rebalance assigns it (the pre-run-stashed seek is already
+      // baked in), well before the post-assignment hook flips
+      // preflightApplied. The earlier unconditional drop swallowed those
+      // records silently. The partition-aware gate must let them through.
+      const { handler, processMessage, consumedMessages } = buildHandler({
+        isPreflightApplied: () => false,
+        shouldKeepDuringPrePause: () => true,
+      });
+
+      const inst = payload();
+      await handler(inst);
+
+      expect(processMessage).toHaveBeenCalledWith("topic-x", 0, inst.message);
+      expect(consumedMessages).toEqual([makeProcessed()]);
+    });
+
+    it("should consult shouldKeepDuringPrePause with the actual (topic, partition) of the delivery so the keep-set check is per-message, not per-call", async () => {
+      // Pin the call shape: the gate must hand the real topic/partition
+      // of each delivery to the predicate. A bug where the gate dropped
+      // (or kept) every message regardless of partition would slip past
+      // the tests above; this one calls the same handler twice with
+      // different partitions and asserts both invocations land in the
+      // predicate as their own observable call.
+      const consumedMessages: ProcessedMessage[] = [];
+      const onMaxReached = vi.fn();
+      const processMessage = vi.fn().mockResolvedValue(makeProcessed());
+      const shouldKeepDuringPrePause = vi
+        .fn<(topic: string, partition: number) => boolean>()
+        .mockImplementation((_topic, partition) => partition === 0);
+      const handler = createEachMessageHandler({
+        state: {
+          consumedMessages,
+          isAccepting: () => true,
+          isPreflightApplied: () => false,
+          shouldKeepDuringPrePause,
+        },
+        maxMessages: 10,
+        onMaxReached,
+        processMessage,
+      });
+
+      await handler({
+        topic: "topic-x",
+        partition: 0,
+        message: fakeMessage(),
+      } as unknown as EachMessagePayload);
+      await handler({
+        topic: "topic-x",
+        partition: 1,
+        message: fakeMessage(),
+      } as unknown as EachMessagePayload);
+
+      // The predicate was consulted twice with the matching args.
+      expect(shouldKeepDuringPrePause).toHaveBeenCalledTimes(2);
+      expect(shouldKeepDuringPrePause).toHaveBeenNthCalledWith(1, "topic-x", 0);
+      expect(shouldKeepDuringPrePause).toHaveBeenNthCalledWith(2, "topic-x", 1);
+      // Only the partition-0 message landed; partition-1 was dropped.
+      expect(processMessage).toHaveBeenCalledOnce();
+      expect(consumedMessages).toHaveLength(1);
     });
 
     it("should fire onMaxReached exactly once when the count reaches maxMessages", async () => {

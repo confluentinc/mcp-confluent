@@ -120,10 +120,15 @@ export class DirectClientManager
       ...this.kafkaConfig,
       "group.id": groupId,
       "auto.offset.reset": offsetReset,
-      // This tool is a snapshot read, not a stream resumption. Committing
-      // offsets back would silently shift the start position for the next
-      // call — not part of the tool contract — so hardcode it off rather
-      // than honoring user kafkaConfig for this key.
+      // The consume-messages tool is a read-only snapshot; never a topic
+      // creator. Hardcode auto-create off so a typo'd topic name can't
+      // silently bring a topic into existence via librdkafka's
+      // default-`true` for this setting.
+      "allow.auto.create.topics": false,
+      // Same hardcode-rather-than-honor logic: this tool is a snapshot
+      // read, not a stream resumption. Committing offsets back would
+      // silently shift the start position for the next call — not part
+      // of the tool contract.
       "enable.auto.commit": false,
     };
     return this.kafkaClient.get().consumer(consumerConfig);

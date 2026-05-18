@@ -316,10 +316,11 @@ export interface ConsumerBuildOptions {
    */
   groupId?: string;
   /**
-   * Reset policy for the consumer. Defaults to `"earliest"` for backward
-   * compatibility with the pre-#459 behavior; handlers that want a
-   * different default (e.g. consume-messages picks `"latest"`) supply it
-   * explicitly. Maps straight to librdkafka `auto.offset.reset`.
+   * Reset policy for the consumer. Defaults to `"earliest"` when the
+   * caller omits it. Handlers that derive the value from per-call inputs
+   * (e.g. `consume-messages`, which inspects each topic entry's `start`
+   * field) pass it explicitly. Maps straight to librdkafka
+   * `auto.offset.reset`.
    */
   offsetReset?: "earliest" | "latest";
 }

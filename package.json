@@ -47,12 +47,12 @@
     "print:schema": "node dist/print-md-schema.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js --env-file .env",
     "inspector:yaml": "node scripts/inspector-yaml.mjs",
+    "setup:oauth-browsers": "npx -y playwright install chromium",
     "prepare": "husky",
     "prepack": "npm run build && node scripts/inject-build-config.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
-    "@playwright/test": "^1.60.0",
     "@types/content-type": "^1.1.9",
     "@types/eslint__js": "^8.42.3",
     "@types/node": "^24.0.4",
@@ -69,6 +69,7 @@
     "globals": "^16.2.0",
     "husky": "^9.1.7",
     "openapi-typescript": "^7.8.0",
+    "playwright-core": "^1.60.0",
     "prettier": "3.6.1",
     "prettier-plugin-organize-imports": "^4.3.0",
     "tsc-alias": "^1.8.16",

@@ -18,7 +18,10 @@ import {
   formatKafkaError,
   resolveKafkaClusterArgs,
 } from "@src/confluent/tools/cluster-arg-resolvers.js";
-import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
+import {
+  hasSchemaRegistryOrOAuth,
+  kafkaBootstrapOrOAuth,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -34,7 +37,7 @@ const schemaRegistryOptions = z
         "Set to true to skip Schema Registry decoding and return raw UTF-8 bytes. " +
           "When false (the default), messages are auto-decoded via the registered " +
           "AVRO / JSON / PROTOBUF schema if the connection has Schema Registry " +
-          "configured and a schema exists for the subject; otherwise left as raw bytes ",
+          "configured and a schema exists for the subject; otherwise left as raw bytes.",
       ),
     subject: z
       .string()
@@ -992,12 +995,12 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
     // Auto-decode when SR is reachable on this connection (OAuth always; direct
-    // requires a `schema_registry` block) and the caller hasn't opted out on
+    // requires a `schema_registry` block — single source of truth lives in the
+    // `hasSchemaRegistryOrOAuth` predicate) and the caller hasn't opted out on
     // BOTH sides. Either side wanting decode triggers the SR fetch.
     const userDisabled =
       valueFormat.disableSchemaRegistry && keyFormat.disableSchemaRegistry;
-    const srReachable =
-      conn.type === "oauth" || conn.schema_registry !== undefined;
+    const srReachable = hasSchemaRegistryOrOAuth(conn).enabled;
 
     let registry: SchemaRegistryClient | undefined;
     if (!userDisabled && srReachable) {

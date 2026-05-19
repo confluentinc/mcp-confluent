@@ -53,6 +53,32 @@ To configure Claude Desktop to use this MCP server:
 
    </details>
 
+   <details>
+   <summary>Option 3: Run from npx with a local tool-call guard</summary>
+
+   ```json
+   {
+     "mcpServers": {
+       "confluent": {
+         "command": "armorer-guard",
+         "args": [
+           "mcp-proxy",
+           "--",
+           "npx",
+           "-y",
+           "@confluentinc/mcp-confluent",
+           "--config",
+           "/path/to/confluent-mcp-server/config.yaml"
+         ]
+       }
+     }
+   }
+   ```
+
+   This optional configuration uses [Armorer Guard](https://github.com/ArmorerLabs/Armorer-Guard) as a local MCP proxy. It inspects tool-call arguments for prompt injection, credential leakage, exfiltration risk, and dangerous actions before forwarding safe calls to the Confluent MCP server.
+
+   </details>
+
    Replace `/path/to/confluent-mcp-server/` with the actual path where you've installed this MCP server.
 
 3. **Restart Claude Desktop**

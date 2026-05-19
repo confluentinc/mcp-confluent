@@ -22,14 +22,12 @@ global_job_config:
       - checkout
       - cache restore npm-cache-
       - npm ci --prefer-offline --include=dev
-      # chromium is needed by @oauth-tagged tests - skip when only running 'direct' tests
+      # chromium is needed for any @oauth-tagged tests as well as the OAuth smoke test
       - |
-        if [ "$CONNECTION_TYPE" = "oauth" ]; then
-          PLAYWRIGHT_VERSION=$(node -p "require('playwright-core/package.json').version")
-          cache restore "playwright-chromium-${PLAYWRIGHT_VERSION}"
-          npx playwright-core install chromium && \
-            cache store "playwright-chromium-${PLAYWRIGHT_VERSION}" ~/.cache/ms-playwright
-        fi
+        PLAYWRIGHT_VERSION=$(node -p "require('playwright-core/package.json').version")
+        cache restore "playwright-chromium-${PLAYWRIGHT_VERSION}"
+        npx playwright-core install chromium && \
+          cache store "playwright-chromium-${PLAYWRIGHT_VERSION}" ~/.cache/ms-playwright
       - . vault-setup --version v3 --role mcp-confluent
       - make setup-test-env
       - npm run build

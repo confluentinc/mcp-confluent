@@ -31,6 +31,8 @@ export interface SpawnConfigOptions {
    * disabled.
    */
   apiKey?: string;
+  /** Use the OAuth YAML fixture ({@linkcode OAUTH_FIXTURE_PATH}) instead of the direct one. */
+  oauth?: boolean;
 }
 
 /**
@@ -46,9 +48,12 @@ export interface SpawnConfigOptions {
  * return an empty runtime so handlers' gates yield a clean skip with the
  * tool's `requiredConnectionPath` as the reason.
  */
-export function integrationRuntime(): ServerRuntime {
+export function integrationRuntime(
+  options: { oauth?: boolean } = {},
+): ServerRuntime {
+  const fixturePath = options.oauth ? OAUTH_FIXTURE_PATH : BASE_FIXTURE_PATH;
   try {
-    const config = loadConfigFromYaml(BASE_FIXTURE_PATH, process.env);
+    const config = loadConfigFromYaml(fixturePath, process.env);
     return ServerRuntime.fromConfig(config);
   } catch {
     return new ServerRuntime(
@@ -69,7 +74,8 @@ export function integrationRuntime(): ServerRuntime {
  * YAML.
  */
 export function spawnConfigPath(options: SpawnConfigOptions): string {
-  const parsed = parse(readFileSync(BASE_FIXTURE_PATH, "utf-8")) as Record<
+  const fixturePath = options.oauth ? OAUTH_FIXTURE_PATH : BASE_FIXTURE_PATH;
+  const parsed = parse(readFileSync(fixturePath, "utf-8")) as Record<
     string,
     unknown
   >;
@@ -102,4 +108,9 @@ export function spawnConfigPath(options: SpawnConfigOptions): string {
 const BASE_FIXTURE_PATH = resolve(
   process.cwd(),
   "test-fixtures/yaml_configs/integration.yaml",
+);
+
+const OAUTH_FIXTURE_PATH = resolve(
+  process.cwd(),
+  "test-fixtures/yaml_configs/integration-oauth.yaml",
 );

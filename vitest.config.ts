@@ -69,6 +69,8 @@ export default defineConfig({
           retry: 2,
           // one fork per test file so each test spawns its own MCP server process and binds its own
           // HTTP port without collisions
+          // tests on the hardcoded OAUTH_CALLBACK_PORT self-serialize via `acquireOAuthPortLock()`
+          // rather than disabling file parallelism project-wide
           pool: "forks",
           // Silence Node's DEP0040 (punycode) deprecation warning from transitive deps in
           // the worker process. --no-deprecation also silences any other deprecation warnings

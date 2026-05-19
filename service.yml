@@ -63,6 +63,10 @@ semaphore:
           required: true
           default_value: "stdio|http|sse"
           description: 'Pipe-separated MCP transport(s) to test.'
+        - name: CONNECTION_TYPE
+          required: true
+          default_value: "direct"
+          description: 'Connection type to test (direct or oauth).'
     - name: scheduled-npm-audit
       branch: main
       pipeline_file: .semaphore/npm-audit.yml

@@ -198,11 +198,13 @@ export async function runPkceLogin(
   let authCode: string;
   try {
     await Promise.race([bindResult, abortPromise]);
+    const authUrl = buildAuthorizationUrl(auth0Config, codeChallenge, state);
+    // log the URL so users whose default browser misbehaves can open it manually. safe to log:
+    // the URL carries only the one-time PKCE code_challenge + state, both bound to this single
+    // login attempt and discarded once the callback resolves.
+    logger.info({ authUrl }, "Opening Auth0 authorization URL");
     try {
-      await Promise.race([
-        nodeOpen.open(buildAuthorizationUrl(auth0Config, codeChallenge, state)),
-        abortPromise,
-      ]);
+      await Promise.race([nodeOpen.open(authUrl), abortPromise]);
     } catch (err) {
       // Preserve user_aborted from the race; wrap any other open() failure.
       if (err instanceof PkceLoginError) throw err;

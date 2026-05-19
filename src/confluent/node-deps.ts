@@ -42,6 +42,10 @@ export const nodeHttp = { createServer: httpCreateServer };
 // pulls in is-wsl, default-browser, etc.).
 export const nodeOpen = {
   open: async (target: string): Promise<void> => {
+    // skip during integration test runs: playwright drives auth headlessly, so a system-browser
+    // open is redundant and would race on the OAuth callback port.
+    // eslint-disable-next-line no-restricted-syntax -- localized test seam, not a config read
+    if (process.env.INTEGRATION_TEST === "1") return;
     const { default: open } = await import("open");
     await open(target);
   },

@@ -13,7 +13,7 @@ if (existsSync(envFile)) {
 }
 
 // signal for downstream test-aware behavior (e.g. node-deps.ts skipping the
-// system-browser open during PKCE). inherits into spawned children via the
+// system-browser open during the OAuth flow). inherits into spawned children via the
 // harness's env-copy, so the same flag covers both processes. always set
 // during integration runs; production users never see it.
 process.env.INTEGRATION_TEST = "1";

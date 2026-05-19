@@ -1,4 +1,4 @@
-# OAuth (PKCE) integration test config; parallel to integration.yaml. `ccloud_env: prod` pins
+# CCloud OAuth integration test config; parallel to integration.yaml. `ccloud_env: prod` pins
 # the Auth0 tenant + CCloud REST URL to production. Override to stag/devel as needed (the test
 # account creds in .env.integration must match the chosen env).
 server:

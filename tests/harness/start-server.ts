@@ -179,6 +179,12 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
   // as of v1.x).
   const child = (transport as unknown as { _process?: ChildProcess })._process;
 
+  if (options.oauth) {
+    // keep the piped stderr draining after driveOAuthFlow's scraper detaches; otherwise the
+    // child stalls once the OS pipe buffer fills
+    child?.stderr?.on("data", () => {});
+  }
+
   // No SIGTERM here: client.close() routes through transport.close() which
   // already kills the SDK-owned child; we just await its exit afterward.
   const stop = async () => {

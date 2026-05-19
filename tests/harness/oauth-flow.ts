@@ -11,9 +11,6 @@ import {
   startServer,
   type StartedServer,
 } from "@tests/harness/start-server.js";
-// Chromium binary install lives in `npm run setup:oauth-browsers` and runs
-// unconditionally in CI's integration prologue. Local contributors run it
-// once; see CONTRIBUTING.md's "OAuth integration tests" section.
 import { chromium } from "playwright-core";
 
 /** Skip reason when the OAuth fixture failed to load (creds missing from .env.integration). */
@@ -87,10 +84,8 @@ export async function driveOAuthFlow(
   const authUrlPromise = waitForAuthUrl(server.stderr);
   const authUrl = await authUrlPromise;
 
-  // Default to headless; set INTEGRATION_TEST_PLAYWRIGHT_HEADLESS=false to
-  // watch the Auth0 sign-in happen in a visible window (useful when Auth0
-  // changes its form structure and locators stop matching).
   const browser = await chromium.launch({
+    // set INTEGRATION_TEST_PLAYWRIGHT_HEADLESS=false to watch the CCloud OAuth flow in a browser for debugging
     headless: process.env.INTEGRATION_TEST_PLAYWRIGHT_HEADLESS !== "false",
   });
   try {
@@ -131,15 +126,9 @@ type CallToolResponse = Awaited<ReturnType<Client["callTool"]>>;
 
 /**
  * Drives the CCloud OAuth flow concurrently with a tool call that triggers it.
- * The server only begins the flow when an OAuth-eligible tool is invoked, so
- * the caller's tool call kicks it on the server side while
- * {@linkcode driveOAuthFlow} completes the sign-in. Returns the tool call's
- * result once Auth0 has redirected and the server has exchanged the auth code
- * for tokens.
- *
- * Use as warmup in `beforeAll` (discard the result, subsequent `it` blocks
- * reuse the holder's cached bearer tokens), or directly in an `it` body when
- * the test asserts on the sign-in round-trip itself.
+ * The server only starts the flow when an OAuth-eligible tool is invoked, so
+ * {@linkcode driveOAuthFlow} completes the sign-in while the tool call waits
+ * for the resulting bearer token. Returns the tool result.
  */
 export async function callToolWithOAuthFlow(
   server: StartedServer,

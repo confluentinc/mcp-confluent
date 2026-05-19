@@ -371,18 +371,6 @@ function guardOffsetRequiresPartition(targets: NormalizedTopicTarget[]): void {
  * for both the all-or-nothing partition-mode check and the keep-set
  * derivation; computing it once means subsequent iterations stay O(N).
  */
-function groupByTopic(
-  targets: NormalizedTopicTarget[],
-): Map<string, NormalizedTopicTarget[]> {
-  const byTopic = new Map<string, NormalizedTopicTarget[]>();
-  for (const t of targets) {
-    const list = byTopic.get(t.name);
-    if (list) list.push(t);
-    else byTopic.set(t.name, [t]);
-  }
-  return byTopic;
-}
-
 /**
  * Fetch partition counts for the supplied topics via
  * `admin.fetchTopicMetadata`. Throws if any requested topic returned no
@@ -524,28 +512,6 @@ function createWatermarkCache(admin: KafkaJS.Admin): WatermarkCache {
 }
 
 /**
- * Encapsulate the "is consumption restricted to one partition, or
- * unrestricted across the whole topic?" decision behind two operations:
- * `filter(items)` (subset to the restricted partition, or pass through
- * unchanged) and `phrase()` (a human-readable description for use in
- * error messages and logs). Centralizes the `restrictToPartition ===
- * undefined` check in one place so the seek resolvers don't each
- * re-derive it.
- */
-export function partitionScope(restrictToPartition: number | undefined) {
-  return {
-    filter: <T extends { partition: number }>(items: T[]): T[] =>
-      restrictToPartition === undefined
-        ? items
-        : items.filter((i) => i.partition === restrictToPartition),
-    phrase: (): string =>
-      restrictToPartition === undefined
-        ? "every partition"
-        : `partition ${restrictToPartition}`,
-  };
-}
-
-/**
  * Validate an explicit `start: {offset}` against the partition's
  * `[low, high)` watermarks and return the seek target. Throws if the
  * partition has no offset metadata or the requested offset is out of
@@ -607,8 +573,10 @@ async function resolveTimestampSeeks(
     watermarkByPartition.set(w.partition, { low: w.low, high: w.high });
   }
 
-  const scope = partitionScope(restrictToPartition);
-  const candidates = scope.filter(resolved);
+  const candidates =
+    restrictToPartition === undefined
+      ? resolved
+      : resolved.filter((r) => r.partition === restrictToPartition);
 
   const active: typeof candidates = [];
   const silent: number[] = [];
@@ -643,11 +611,14 @@ async function resolveTimestampSeeks(
   }
 
   if (active.length === 0) {
-    const partitionPhrase = `${scope.phrase()} has`;
+    const scopePhrase =
+      restrictToPartition === undefined
+        ? "every partition"
+        : `partition ${restrictToPartition}`;
     throw new Error(
       `Topic "${topic}" has no messages at or after timestamp ` +
         `${new Date(timestampMs).toISOString()} ` +
-        `(${partitionPhrase} no record produced past that point). ` +
+        `(${scopePhrase} has no record produced past that point). ` +
         `Try an earlier timestamp, or use \`start: "latest"\` to consume ` +
         `from the live position instead.`,
     );
@@ -680,7 +651,10 @@ async function resolveEarliestMinoritySeeks(
   getWatermarks: WatermarkCache,
 ): Promise<PreflightPlan["seeks"]> {
   const offsets = await getWatermarks(topic);
-  const partitionsToSeek = partitionScope(restrictToPartition).filter(offsets);
+  const partitionsToSeek =
+    restrictToPartition === undefined
+      ? offsets
+      : offsets.filter((o) => o.partition === restrictToPartition);
   return partitionsToSeek.map((p) => ({
     topic,
     partition: p.partition,
@@ -694,7 +668,12 @@ async function buildPreflightPlan(
   consumerOffsetReset: "earliest" | "latest",
 ): Promise<PreflightPlan> {
   guardOffsetRequiresPartition(targets);
-  const byTopic = groupByTopic(targets);
+  const byTopic = new Map<string, NormalizedTopicTarget[]>();
+  for (const t of targets) {
+    const list = byTopic.get(t.name);
+    if (list) list.push(t);
+    else byTopic.set(t.name, [t]);
+  }
   const topicNames = [...byTopic.keys()];
   const numPartitionsByTopic = await fetchPartitionCounts(admin, topicNames);
   validateRequestedPartitions(targets, numPartitionsByTopic);

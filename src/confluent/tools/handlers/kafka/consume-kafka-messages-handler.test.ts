@@ -13,7 +13,6 @@ import {
   createEachMessageHandler,
   formatMessageTimestamp,
   normalizeStart,
-  partitionScope,
   waitForAssignment,
   type ProcessedMessage,
 } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
@@ -1042,6 +1041,56 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
       });
 
+      it("should name the restricted partition in the no-messages error when the caller targets a single partition that has no record at or after the timestamp", async () => {
+        // Sibling of the prior test, but with `partition: 1` on the topic
+        // entry so the filter narrows to one partition before the
+        // silent-substitution check. Pins the "partition N has no record"
+        // phrasing — the restricted-scope branch of the error message
+        // that the every-partition test above doesn't cover.
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
+        );
+        admin.fetchTopicOffsetsByTimestamp.mockResolvedValue([
+          { partition: 0, offset: "50" },
+          { partition: 1, offset: "100" },
+        ]);
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "0", high: "200", offset: "200" },
+          { partition: 1, low: "0", high: "100", offset: "100" },
+        ]);
+
+        const consumer = await clientManager.getConsumer();
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [
+              {
+                name: "smoke",
+                partition: 1,
+                start: { timestamp: "2026-05-14T17:00:00Z" },
+              },
+            ],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          outcome: {
+            resolves:
+              'Topic "smoke" has no messages at or after timestamp 2026-05-14T17:00:00.000Z (partition 1 has no record produced past that point)',
+          },
+          clientManager,
+        });
+      });
+
       it("should pick offsetReset='latest' on mixed-direction calls and explicit-seek the 'earliest' minority to its partition low watermarks", async () => {
         // Two topics, opposite directions: A wants earliest, B wants
         // latest. The consumer can only have one auto.offset.reset, so
@@ -1735,49 +1784,6 @@ describe("consume-kafka-messages-handler.ts", () => {
       expect(await pending).toBeNull();
       // At least three polls before the deadline trips on iter 4.
       expect(consumer.assignment.mock.calls.length).toBeGreaterThanOrEqual(3);
-    });
-  });
-
-  describe("partitionScope()", () => {
-    // Pin both branches of both methods so a future reshuffle of the
-    // "unrestricted vs restricted" framing can't silently land a bug
-    // — every caller routes through this helper, so any drift here
-    // ripples through the seek resolvers.
-    const items: { partition: number; tag: string }[] = [
-      { partition: 0, tag: "a" },
-      { partition: 1, tag: "b" },
-      { partition: 2, tag: "c" },
-    ];
-
-    describe(".filter(items)", () => {
-      it("should pass items through unchanged when no partition restriction", () => {
-        const scope = partitionScope(undefined);
-        expect(scope.filter(items)).toEqual(items);
-      });
-
-      it("should return only items matching the restricted partition when one is set", () => {
-        const scope = partitionScope(1);
-        expect(scope.filter(items)).toEqual([{ partition: 1, tag: "b" }]);
-      });
-
-      it("should return an empty array when the restricted partition has no matching items", () => {
-        // Defensive — the upstream validators normally guarantee the
-        // requested partition exists, but the helper itself must stay
-        // total: no matches means an empty array, not a throw.
-        const scope = partitionScope(99);
-        expect(scope.filter(items)).toEqual([]);
-      });
-    });
-
-    describe(".phrase()", () => {
-      it("should describe an unrestricted scope as 'every partition'", () => {
-        expect(partitionScope(undefined).phrase()).toBe("every partition");
-      });
-
-      it("should describe a restricted scope as 'partition N' with the partition index inlined", () => {
-        expect(partitionScope(0).phrase()).toBe("partition 0");
-        expect(partitionScope(7).phrase()).toBe("partition 7");
-      });
     });
   });
 

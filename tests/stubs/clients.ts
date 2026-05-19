@@ -1,5 +1,6 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
+import type { ConsumerBuildOptions } from "@src/confluent/base-client-manager.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { kafkaDeps } from "@src/confluent/node-deps.js";
 import { paths } from "@src/confluent/openapi-schema.js";
@@ -172,11 +173,7 @@ export interface MockedClientManager extends Mocked<DirectClientManager> {
     (clusterId?: string, envId?: string) => Promise<Mocked<KafkaJS.Producer>>
   >;
   buildKafkaConsumer: Mock<
-    (
-      clusterId?: string,
-      envId?: string,
-      groupId?: string,
-    ) => Promise<Mocked<KafkaJS.Consumer>>
+    (opts?: ConsumerBuildOptions) => Promise<Mocked<KafkaJS.Consumer>>
   >;
   getConfluentCloudFlinkRestClient: Mock<() => MockedRestClient>;
   getConfluentCloudRestClient: Mock<() => MockedRestClient>;
@@ -249,8 +246,8 @@ export function getMockedClientManager(): MockedClientManager {
   // canonical configuration point so existing test setup keeps working.
   cm.getKafkaAdminClient.mockImplementation(() => cm.getAdminClient());
   cm.getKafkaProducer.mockImplementation(() => cm.getProducer());
-  cm.buildKafkaConsumer.mockImplementation((_cluster, _env, groupId) =>
-    cm.getConsumer(groupId),
+  cm.buildKafkaConsumer.mockImplementation((opts) =>
+    cm.getConsumer(opts?.groupId),
   );
 
   cm.getSchemaRegistryClient.mockReturnValue(getMockedSchemaRegistry());

@@ -67,3 +67,7 @@ promotions:
           description: "Pipe-separated MCP transports (stdio|http|sse)"
           default_value: "stdio|http|sse"
           required: true
+        - name: CONNECTION_TYPE
+          description: "Connection type to test (direct or oauth)"
+          default_value: "direct"
+          required: true

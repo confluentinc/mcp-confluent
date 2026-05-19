@@ -22,6 +22,14 @@ global_job_config:
       - checkout
       - cache restore npm-cache-
       - npm ci --prefer-offline --include=dev
+      # chromium is needed by @oauth-tagged tests - skip when only running 'direct' tests
+      - |
+        if [ "$CONNECTION_TYPE" = "oauth" ]; then
+          PLAYWRIGHT_VERSION=$(node -p "require('playwright-core/package.json').version")
+          cache restore "playwright-chromium-${PLAYWRIGHT_VERSION}"
+          npx playwright-core install chromium && \
+            cache store "playwright-chromium-${PLAYWRIGHT_VERSION}" ~/.cache/ms-playwright
+        fi
       - . vault-setup --version v3 --role mcp-confluent
       - make setup-test-env
       - npm run build
@@ -40,6 +48,11 @@ blocks:
       env_vars:
         - name: TRANSPORT
           value: stdio
+        # Default `direct` keeps CI on the existing direct matrix; ops can
+        # override at promotion time. OAuth coverage in CI lands with #380's
+        # matrix restructure.
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
       # task-level epilogue so $TOOL_GROUP / $TRANSPORT from the matrix axis
       # are unambiguously in scope when result-publishing runs.
       epilogue: &transport-epilogue
@@ -67,6 +80,8 @@ blocks:
       env_vars:
         - name: TRANSPORT
           value: http
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
       epilogue: *transport-epilogue
       jobs: *transport-jobs
 
@@ -78,6 +93,8 @@ blocks:
       env_vars:
         - name: TRANSPORT
           value: sse
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
       epilogue: *transport-epilogue
       jobs: *transport-jobs
 

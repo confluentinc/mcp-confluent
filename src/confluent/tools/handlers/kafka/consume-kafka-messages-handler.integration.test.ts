@@ -71,7 +71,7 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
           topics: [{ name: topic }],
           maxMessages: seededValues.length,
           timeoutMs: 15_000,
-          valueFormat: { useSchemaRegistry: false },
+          valueFormat: { disableSchemaRegistry: true },
         },
       });
 
@@ -110,7 +110,7 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
             // via the negative-presence checks rather than by count.
             maxMessages: 10,
             timeoutMs: 15_000,
-            valueFormat: { useSchemaRegistry: false },
+            valueFormat: { disableSchemaRegistry: true },
           },
         });
 
@@ -163,7 +163,7 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
             ],
             maxMessages: 2,
             timeoutMs: 15_000,
-            valueFormat: { useSchemaRegistry: false },
+            valueFormat: { disableSchemaRegistry: true },
           },
         });
 
@@ -225,7 +225,7 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
             topics: [{ name: tsTopic, start: { timestamp: midpointMs } }],
             maxMessages: 3,
             timeoutMs: 15_000,
-            valueFormat: { useSchemaRegistry: false },
+            valueFormat: { disableSchemaRegistry: true },
           },
         });
 
@@ -292,7 +292,7 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
             // to it during the window.
             maxMessages: 3,
             timeoutMs: 15_000,
-            valueFormat: { useSchemaRegistry: false },
+            valueFormat: { disableSchemaRegistry: true },
           },
         });
 

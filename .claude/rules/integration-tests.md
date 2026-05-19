@@ -450,8 +450,8 @@ for the canonical worked example.
 
 ### `Tag.OAUTH` semantics (asymmetric on purpose)
 
-`Tag.OAUTH` marks tests (or per-iteration describes) that exercise the OAuth
-PKCE flow. There is **no** `Tag.DIRECT`: direct is the unmarked majority,
+`Tag.OAUTH` marks tests (or per-iteration describes) that exercise the
+CCloud OAuth flow. There is **no** `Tag.DIRECT`: direct is the unmarked majority,
 and CI lanes that want only direct tests use `!@oauth` exclusion rather than
 positive `@direct` selection. This means new direct-only tests don't need to
 remember to tag themselves; "not tagged with @oauth" reliably catches every

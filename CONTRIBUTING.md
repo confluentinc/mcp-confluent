@@ -240,7 +240,7 @@ Minimum for `@kafka` tests: `KAFKA_API_KEY`, `KAFKA_API_SECRET`. Non-secret conf
 
 ##### OAuth integration tests (one-time setup)
 
-`@oauth`-tagged tests drive the Auth0 PKCE flow through a real headless browser via [`playwright-core`](https://playwright.dev/docs/library).
+`@oauth`-tagged tests drive the CCloud OAuth (Auth0 PKCE) flow through a real headless browser via [`playwright-core`](https://playwright.dev/docs/library).
 The project depends on `playwright-core` (API only, no browser auto-download) rather than `@playwright/test` to keep regular `npm install` lightweight for contributors who never run OAuth tests.
 Before running OAuth integration tests locally for the first time, install Chromium:
 

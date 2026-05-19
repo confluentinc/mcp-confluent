@@ -1,5 +1,5 @@
 // Cross-process serialization for tests whose spawned MCP server binds OAUTH_CALLBACK_PORT
-// (26640) during PKCE. vitest's `pool: "forks"` puts each test file in its own process, so the
+// (26640) during the CCloud OAuth flow. vitest's `pool: "forks"` puts each test file in its own process, so the
 // filesystem is the only shared coordination point between forks. The lock content is the
 // holder's PID so a crashed test (whose afterAll never runs) can be detected and stolen.
 

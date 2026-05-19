@@ -1,5 +1,5 @@
-// Playwright-driven PKCE driver: reads the Auth0 authorization URL from server stderr, drives
-// the sign-in page via headless chromium, lets the server's PKCE callback resolve naturally.
+// Playwright-driven CCloud OAuth driver: reads the Auth0 authorization URL from server stderr,
+// drives the sign-in page via headless chromium, lets the server's OAuth callback resolve naturally.
 
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { TransportType } from "@src/mcp/transports/types.js";
@@ -71,8 +71,8 @@ const WAIT_FOR_AUTH_URL_TIMEOUT_MS = 30_000;
 const CONSENT_BUTTON_TIMEOUT_MS = 5_000;
 const CALLBACK_REDIRECT_TIMEOUT_MS = 30_000;
 
-/** Drives PKCE end-to-end against the prod Auth0 tenant. Resolves once Auth0 has redirected to
- * the local callback URL; the server then exchanges the auth code for tokens. */
+/** Drives the CCloud OAuth flow end-to-end against the prod Auth0 tenant. Resolves once Auth0
+ * has redirected to the local callback URL; the server then exchanges the auth code for tokens. */
 export async function driveOAuthFlow(
   server: StartedServer,
   credentials: { email: string; password: string },
@@ -130,17 +130,18 @@ type CallToolArgs = Parameters<Client["callTool"]>[0];
 type CallToolResponse = Awaited<ReturnType<Client["callTool"]>>;
 
 /**
- * Drives PKCE concurrently with a tool call that triggers it. The server only
- * begins PKCE when an OAuth-eligible tool is invoked, so the caller's tool
- * call kicks the flow on the server side while {@linkcode driveOAuthFlow}
- * completes the sign-in. Returns the tool call's result once Auth0 has
- * redirected and the server has exchanged the auth code for tokens.
+ * Drives the CCloud OAuth flow concurrently with a tool call that triggers it.
+ * The server only begins the flow when an OAuth-eligible tool is invoked, so
+ * the caller's tool call kicks it on the server side while
+ * {@linkcode driveOAuthFlow} completes the sign-in. Returns the tool call's
+ * result once Auth0 has redirected and the server has exchanged the auth code
+ * for tokens.
  *
  * Use as warmup in `beforeAll` (discard the result, subsequent `it` blocks
  * reuse the holder's cached bearer tokens), or directly in an `it` body when
- * the test asserts on the PKCE round-trip itself.
+ * the test asserts on the sign-in round-trip itself.
  */
-export async function callToolWithPkceFlow(
+export async function callToolWithOAuthFlow(
   server: StartedServer,
   credentials: { email: string; password: string },
   toolCall: CallToolArgs,

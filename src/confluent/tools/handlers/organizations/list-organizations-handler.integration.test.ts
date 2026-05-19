@@ -22,11 +22,8 @@ import { activeTransports } from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// Dual-mode test: the handler's `hasConfluentCloudOrOAuth` predicate accepts
-// either an api-key-authed `confluent_cloud` block (direct) or an OAuth
-// connection. We iterate `activeConnectionTypes` x `activeTransports` so a CI
-// lane can clip either axis via `INTEGRATION_TEST_CONNECTION_TYPE` /
-// `INTEGRATION_TEST_TRANSPORT`.
+// the handler's `hasConfluentCloudOrOAuth` predicate accepts either an API-key-authed
+// `confluent_cloud` block or an OAuth connection
 
 const handler = new ListOrganizationsHandler();
 
@@ -72,8 +69,7 @@ for (const connection of activeConnectionTypes) {
         ).toBeDefined();
       });
 
-      // First auth-required call: kicks off the CCloud OAuth flow (cached for
-      // any subsequent auth-required `it`s a future contributor adds).
+      // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
       it("should return at least one organization from CCloud", async () => {
         const callArgs = {
           name: ToolName.LIST_ORGANIZATIONS,

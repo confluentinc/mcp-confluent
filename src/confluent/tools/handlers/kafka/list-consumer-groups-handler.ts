@@ -95,8 +95,9 @@ export const listConsumerGroupsArgs = z.object({
     .nonempty()
     .optional()
     .describe(
-      "Restrict to groups currently in these states. Omit to return groups in any state. " +
-        'Common filters: ["Stable"] for live consumers, ["Empty"] for orphaned groups.',
+      "Filter to groups in any of these states. Omit to return all. " +
+        'Options: "Stable" (live), "Empty" (orphaned), "Dead", ' +
+        '"PreparingRebalance", "CompletingRebalance", "Unknown".',
     ),
   matchType: z
     .enum(TYPE_NAMES)

@@ -33,6 +33,7 @@ import { ConsumeKafkaMessagesHandler } from "@src/confluent/tools/handlers/kafka
 import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-topics-handler.js";
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
 import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
+import { ListConsumerGroupsHandler } from "@src/confluent/tools/handlers/kafka/list-consumer-groups-handler.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
@@ -98,6 +99,7 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],
     [ToolName.DELETE_SCHEMA, new DeleteSchemaHandler()],
     [ToolName.CONSUME_MESSAGES, new ConsumeKafkaMessagesHandler()],
+    [ToolName.LIST_CONSUMER_GROUPS, new ListConsumerGroupsHandler()],
     [ToolName.GET_TOPIC_CONFIG, new GetTopicConfigHandler()],
     [ToolName.CREATE_TABLEFLOW_TOPIC, new CreateTableFlowTopicHandler()],
     [ToolName.LIST_TABLEFLOW_REGIONS, new ListTableFlowRegionsHandler()],

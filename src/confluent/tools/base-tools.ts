@@ -258,10 +258,6 @@ export abstract class BaseToolHandler implements ToolHandler {
    * The `message` carries the human-readable summary on `content`; the
    * `structuredContent` field carries the typed JSON payload callers (or
    * `outputSchema` validators) can consume directly.
-   *
-   * Issue #435 tracks rolling the channel out across the paginated list
-   * handlers; first adopters are this branch and the in-flight
-   * `get-partition-offsets` branch.
    */
   createStructuredResponse(
     message: string,

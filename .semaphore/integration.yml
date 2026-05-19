@@ -22,11 +22,14 @@ global_job_config:
       - checkout
       - cache restore npm-cache-
       - npm ci --prefer-offline --include=dev
-      # Chromium is needed by @oauth-tagged tests; install unconditionally so
-      # any CONNECTION_TYPE override "just works" without per-block wiring.
-      # Uses the locally-installed playwright-core CLI so the chromium version
-      # stays aligned with our playwright-core devDep (no fresh registry fetch).
-      - npx playwright-core install chromium
+      # chromium is needed by @oauth-tagged tests - skip when only running 'direct' tests
+      - |
+        if [ "$CONNECTION_TYPE" = "oauth" ]; then
+          PLAYWRIGHT_VERSION=$(node -p "require('playwright-core/package.json').version")
+          cache restore "playwright-chromium-${PLAYWRIGHT_VERSION}"
+          npx playwright-core install chromium && \
+            cache store "playwright-chromium-${PLAYWRIGHT_VERSION}" ~/.cache/ms-playwright
+        fi
       - . vault-setup --version v3 --role mcp-confluent
       - make setup-test-env
       - npm run build

@@ -1,5 +1,9 @@
 import { ListDatabasesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-databases-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import {
+  trackStatementsFromMeta,
+  withSharedFlinkStatementCleanup,
+} from "@tests/harness/flink.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
@@ -18,6 +22,9 @@ describe("list-databases-handler", { tags: [Tag.FLINK] }, () => {
     it.skip("requires flink config", () => {});
     return;
   }
+
+  // sweeps mcp-query-* statements surfaced via _meta.flinkStatementsCreated
+  const { createdStatements } = withSharedFlinkStatementCleanup();
 
   describe.each(activeTransports)("via %s transport", (transport) => {
     let server: StartedServer;
@@ -43,6 +50,7 @@ describe("list-databases-handler", { tags: [Tag.FLINK] }, () => {
         name: ToolName.LIST_FLINK_DATABASES,
         arguments: {},
       });
+      trackStatementsFromMeta(result, createdStatements);
 
       // fresh test account may have no databases; either response shape is valid
       expect(textContent(result)).toMatch(/^(Databases:|No databases found)/);

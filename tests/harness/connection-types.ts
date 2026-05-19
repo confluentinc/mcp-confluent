@@ -10,20 +10,10 @@ export enum ConnectionType {
 }
 
 /**
- * Resolves the set of connection types active for the current test run
- * from the `INTEGRATION_TEST_CONNECTION_TYPE` env var:
- *
- * - unset → run every connection type (local default; full coverage)
- * - one of {@linkcode ConnectionType} (case-insensitive) → run only that
- *   connection type (CI per-block filter, or a dev iterating on one
- *   connection's behavior)
- *
- * Use the resulting array as the source for the outer iteration on
- * dual-mode tests. Iterations for excluded connection types are never
- * registered, so nested `beforeAll`s for those iterations don't run.
- *
- * @throws if `INTEGRATION_TEST_CONNECTION_TYPE` is set but not a known
- * connection type name.
+ * Resolves active connection types based on whether `INTEGRATION_TEST_CONNECTION_TYPE` is set.
+ * If unset, both 'direct' and 'oauth' connection types will be used.
+ * If set, must be a case-insensitive value of either 'direct' or 'oauth'.
+ * @throws on unknown values.
  */
 function resolveActiveConnectionTypes(): ConnectionType[] {
   const known = Object.values(ConnectionType);

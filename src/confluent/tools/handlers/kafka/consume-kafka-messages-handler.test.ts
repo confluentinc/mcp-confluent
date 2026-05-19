@@ -352,6 +352,75 @@ describe("consume-kafka-messages-handler.ts", () => {
         }),
       ]);
     });
+
+    it("should accept a positive integer `start: {tail}` count", () => {
+      const parsed = consumeKafkaMessagesArgs.parse({
+        topics: [{ name: "t", partition: 0, start: { tail: 5 } }],
+        valueFormat: {},
+      });
+      expect(parsed.topics[0]).toEqual({
+        name: "t",
+        partition: 0,
+        start: { tail: 5 },
+      });
+    });
+
+    it.each([
+      // [tailValue, why]
+      [0, "rejects zero (positive() requires N > 0)"],
+      [-3, "rejects negative N"],
+    ] as const)(
+      "should reject `start: {tail: %j}` with the path drilling into `start.tail` (%s)",
+      (tail, _why) => {
+        // Same Zod-4 granular-path behavior as offset's regex check: the
+        // tail arm matches structurally; the inner value-range validation
+        // (`.positive()`) fails inside it.
+        const result = consumeKafkaMessagesArgs.safeParse({
+          topics: [{ name: "t", partition: 0, start: { tail } }],
+          valueFormat: {},
+        });
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.issues).toEqual([
+          expect.objectContaining({
+            path: ["topics", 0, "start", "tail"],
+          }),
+        ]);
+      },
+    );
+
+    it("should reject a non-integer `start: {tail}` as a union miss at the `start` path (Zod 4's `.int()` participates in structural matching, unlike `.positive()`)", () => {
+      // Empirical Zod 4 behavior: `.positive()` (value-range) drills to
+      // `start.tail`; `.int()` (integer-ness) is treated as part of the
+      // arm's structural shape, so a non-integer fails the union match
+      // overall and the error sits at `start`. The path divergence is
+      // pinned here so a future Zod upgrade that unifies the behavior
+      // surfaces as a test diff rather than silent drift.
+      const result = consumeKafkaMessagesArgs.safeParse({
+        topics: [{ name: "t", partition: 0, start: { tail: 1.5 } }],
+        valueFormat: {},
+      });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.issues).toEqual([
+        expect.objectContaining({ path: ["topics", 0, "start"] }),
+      ]);
+    });
+
+    it("should reject a `start` object combining `tail` with another arm's key (strictObject rejects the extra key)", () => {
+      // Each object arm of the union is strict, so `{tail, offset}`
+      // matches no arm structurally and falls through as a union miss
+      // at the `start` path itself rather than at a nested key.
+      const result = consumeKafkaMessagesArgs.safeParse({
+        topics: [{ name: "t", partition: 0, start: { tail: 1, offset: "10" } }],
+        valueFormat: {},
+      });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.issues).toEqual([
+        expect.objectContaining({ path: ["topics", 0, "start"] }),
+      ]);
+    });
   });
 
   describe("ConsumeKafkaMessagesHandler", () => {
@@ -613,6 +682,36 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
       });
 
+      it("should reject `start: {tail}` without `partition` as a tool error citing the partition-scoped semantics", async () => {
+        // Tail is partition-scoped — "the last N messages" across all
+        // partitions of a topic requires a freshness ordering decision
+        // (broker timestamp vs producer timestamp vs payload field) that
+        // the issue defers as out-of-scope. Reject loudly rather than
+        // pick a default that surprises a caller.
+        const clientManager = getMockedClientManager();
+        const consumer = await clientManager.getConsumer();
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke", start: { tail: 5 } }],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          outcome: {
+            resolves: "Tail is partition-scoped",
+          },
+          clientManager,
+        });
+      });
+
       it("should reject a partition index >= numPartitions returned by fetchTopicMetadata", async () => {
         const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
@@ -847,6 +946,141 @@ describe("consume-kafka-messages-handler.ts", () => {
           topic: "smoke",
           partition: 0,
           offset: "42",
+        });
+      });
+
+      it("should seek to `high - N` for `start: {tail: N}` on a partition with enough retained messages", async () => {
+        // Tail with low=10, high=20, N=1 → seek target = max(low, high-N)
+        //   = max(10, 19) = 19. Consumer parks at offset 19 and the next
+        // record delivered to eachMessage is the one whose offset == 19,
+        // i.e. the last already-written record on the partition.
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
+        );
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "10", high: "20", offset: "20" },
+        ]);
+
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+        consumer.assignment.mockReturnValue([{ topic: "smoke", partition: 0 }]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke", partition: 0, start: { tail: 1 } }],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        expect(consumer.seek).toHaveBeenCalledWith({
+          topic: "smoke",
+          partition: 0,
+          offset: "19",
+        });
+      });
+
+      it("should clamp `start: {tail: N}` to the partition low watermark when N exceeds the retained-message count", async () => {
+        // Tail with low=5, high=10, N=1000 → seek target = max(5, 10-1000)
+        //   = max(5, -990) = 5. Asking for more messages than the partition
+        // retains returns whatever's there, never an out-of-range error.
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
+        );
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "5", high: "10", offset: "10" },
+        ]);
+
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+        consumer.assignment.mockReturnValue([{ topic: "smoke", partition: 0 }]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke", partition: 0, start: { tail: 1000 } }],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        expect(consumer.seek).toHaveBeenCalledWith({
+          topic: "smoke",
+          partition: 0,
+          offset: "5",
+        });
+      });
+
+      it("should seek to the (equal) low/high watermark on an empty partition and return zero messages without error", async () => {
+        // Empty partition: low === high === "0". Seek target collapses to
+        // `high` (== `low`), the consumer parks at OFFSET_END, no records
+        // flow, the timeoutMs budget elapses, and the orchestrator returns
+        // an empty success response — exactly the issue's "tail: 1 on an
+        // empty partition returns zero, no error" contract.
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.fetchTopicMetadata.mockResolvedValue(
+          fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
+        );
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "0", high: "0", offset: "0" },
+        ]);
+
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+        consumer.assignment.mockReturnValue([{ topic: "smoke", partition: 0 }]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke", partition: 0, start: { tail: 1 } }],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        expect(consumer.seek).toHaveBeenCalledWith({
+          topic: "smoke",
+          partition: 0,
+          offset: "0",
         });
       });
 
@@ -1705,6 +1939,11 @@ describe("consume-kafka-messages-handler.ts", () => {
         { timestamp: sharedMs } as const,
         { kind: "timestamp", ms: sharedMs },
         "object arm with ms-since-epoch number → passthrough path",
+      ],
+      [
+        { tail: 5 } as const,
+        { kind: "tail", count: 5 },
+        "object arm with last-N tail count",
       ],
     ])("should collapse %j to %j (%s)", (input, expected, _why) => {
       expect(normalizeStart(input)).toEqual(expected);

@@ -548,12 +548,85 @@ describe("consume-kafka-messages-handler.ts", () => {
         expect(consumer.disconnect).toHaveBeenCalledOnce();
       });
 
-      it("should call getSchemaRegistrySdkClient with the resolved envId when value.useSchemaRegistry is true", async () => {
-        // Pin the SR-under-OAuth wiring at the handler-test layer. Under
-        // direct-mode runtime, `resolveKafkaClusterArgs` returns
-        // `envId: undefined`, so the manager call is `(undefined)`. The
-        // assertion is on the call shape, not message processing — the
-        // mocked `consumer.run` resolves without invoking `eachMessage`.
+      it("should call getSchemaRegistrySdkClient with the resolved envId when SR is reachable on the connection", async () => {
+        // Auto-decode default: with a `schema_registry` block on the
+        // connection, the handler fetches the SR client even with no
+        // explicit format args. Under direct-mode runtime,
+        // `resolveKafkaClusterArgs` returns `envId: undefined`, so the
+        // manager call is `(undefined)`. The assertion is on the call
+        // shape, not message processing — the mocked `consumer.run`
+        // resolves without invoking `eachMessage`.
+        const clientManager = getMockedClientManager();
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            {
+              kafka: { bootstrap_servers: "broker:9092" },
+              schema_registry: { endpoint: "https://sr.example" },
+            },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke" }],
+            maxMessages: 1,
+            timeoutMs: 50,
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        expect(clientManager.getSchemaRegistrySdkClient).toHaveBeenCalledWith(
+          undefined,
+        );
+      });
+
+      it("should skip the SR client fetch when both sides set disableSchemaRegistry: true even with SR reachable", async () => {
+        // Even with `schema_registry` configured, an explicit opt-out on
+        // BOTH sides short-circuits the SR fetch. A single-side opt-out
+        // still triggers the fetch — covered by the auto-decode test
+        // above (caller omits both, so neither side is disabled).
+        const clientManager = getMockedClientManager();
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            {
+              kafka: { bootstrap_servers: "broker:9092" },
+              schema_registry: { endpoint: "https://sr.example" },
+            },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke" }],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: { disableSchemaRegistry: true },
+            keyFormat: { disableSchemaRegistry: true },
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
+
+        expect(clientManager.getSchemaRegistrySdkClient).not.toHaveBeenCalled();
+      });
+
+      it("should skip the SR client fetch when the connection has no schema_registry block", async () => {
+        // No SR reachable → no auto-fetch. This is the bare-kafka
+        // connection path: the tool stays enabled (predicate is
+        // kafkaBootstrapOrOAuth), just operates on raw bytes.
         const clientManager = getMockedClientManager();
         const consumer = await clientManager.getConsumer();
         consumer.connect.mockResolvedValue(undefined);
@@ -572,15 +645,48 @@ describe("consume-kafka-messages-handler.ts", () => {
             topics: [{ name: "smoke" }],
             maxMessages: 1,
             timeoutMs: 50,
-            valueFormat: { useSchemaRegistry: true },
           },
           outcome: { resolves: "Consumed 0 messages from topics smoke" },
           clientManager,
         });
 
-        expect(clientManager.getSchemaRegistrySdkClient).toHaveBeenCalledWith(
-          undefined,
+        expect(clientManager.getSchemaRegistrySdkClient).not.toHaveBeenCalled();
+      });
+
+      it("should fall back to raw bytes (not error) when SR client fetch throws on the auto-decode path", async () => {
+        // Graceful degradation: the caller didn't explicitly opt in to
+        // SR, so a transport-level SR failure (auth, network, etc.)
+        // shouldn't fail an otherwise-satisfiable consume. The handler
+        // proceeds with `registry = undefined`, and per-message decoding
+        // short-circuits to raw inside processMessage.
+        const clientManager = getMockedClientManager();
+        clientManager.getSchemaRegistrySdkClient.mockRejectedValue(
+          new Error("SR auth failed"),
         );
+        const consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            {
+              kafka: { bootstrap_servers: "broker:9092" },
+              schema_registry: { endpoint: "https://sr.example" },
+            },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [{ name: "smoke" }],
+            maxMessages: 1,
+            timeoutMs: 50,
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+        });
       });
 
       it("should reject `start: {offset}` without `partition` as a tool error citing the partition-scoped semantics", async () => {
@@ -1399,8 +1505,8 @@ describe("consume-kafka-messages-handler.ts", () => {
           0,
           fakeMessage(),
           undefined,
-          { useSchemaRegistry: false },
-          { useSchemaRegistry: false },
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
         );
         // Literal-equal the whole shape so every field is pinned — drift
         // in any branch (key conversion, value conversion, timestamp
@@ -1427,8 +1533,8 @@ describe("consume-kafka-messages-handler.ts", () => {
           0,
           fakeMessage({ key: null }),
           undefined,
-          { useSchemaRegistry: false },
-          { useSchemaRegistry: false },
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
         );
         expect(result.key).toBeUndefined();
       });
@@ -1444,8 +1550,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             },
           }),
           undefined,
-          { useSchemaRegistry: false },
-          { useSchemaRegistry: false },
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
         );
         expect(result.headers).toEqual({
           "x-trace": "abc",
@@ -1462,8 +1568,8 @@ describe("consume-kafka-messages-handler.ts", () => {
           0,
           fakeMessage({ timestamp: "-1" }),
           undefined,
-          { useSchemaRegistry: false },
-          { useSchemaRegistry: false },
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
         );
         expect(result.timestamp).toBe("(no timestamp)");
       });
@@ -1477,7 +1583,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         // SDK is touched, so its surface doesn't matter.
         const fakeRegistry = {} as SchemaRegistryClient;
 
-        it("should deserialize the value via schema registry when useSchemaRegistry is true and a schema exists", async () => {
+        it("should deserialize the value via schema registry when decoding is enabled and a schema exists", async () => {
           const getLatestSpy = vi
             .spyOn(schemaRegistryHelper, "getLatestSchemaIfExists")
             .mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
@@ -1490,8 +1596,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             0,
             fakeMessage(),
             fakeRegistry,
-            { useSchemaRegistry: true },
-            { useSchemaRegistry: false },
+            { disableSchemaRegistry: false },
+            { disableSchemaRegistry: true },
           );
 
           // Value travels through the SR helpers; key stays raw.
@@ -1526,8 +1632,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             0,
             fakeMessage(),
             fakeRegistry,
-            { useSchemaRegistry: true, subject: "custom-subject-v1" },
-            { useSchemaRegistry: false },
+            { disableSchemaRegistry: false, subject: "custom-subject-v1" },
+            { disableSchemaRegistry: true },
           );
 
           expect(getLatestSpy).toHaveBeenCalledWith(
@@ -1551,8 +1657,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             0,
             fakeMessage(),
             fakeRegistry,
-            { useSchemaRegistry: true },
-            { useSchemaRegistry: false },
+            { disableSchemaRegistry: false },
+            { disableSchemaRegistry: true },
           );
 
           expect(result.value).toBe("v");
@@ -1576,8 +1682,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             0,
             fakeMessage(),
             fakeRegistry,
-            { useSchemaRegistry: true },
-            { useSchemaRegistry: false },
+            { disableSchemaRegistry: false },
+            { disableSchemaRegistry: true },
           );
 
           // The catch arm logs and returns the raw string — the consumer
@@ -1586,7 +1692,7 @@ describe("consume-kafka-messages-handler.ts", () => {
           expect(result.value).toBe("v");
         });
 
-        it("should deserialize the key with SerdeType.KEY when keyOptions.useSchemaRegistry is true and the message has a key", async () => {
+        it("should deserialize the key with SerdeType.KEY when key-side decoding is enabled and the message has a key", async () => {
           const getLatestSpy = vi
             .spyOn(schemaRegistryHelper, "getLatestSchemaIfExists")
             .mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
@@ -1599,8 +1705,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             0,
             fakeMessage(),
             fakeRegistry,
-            { useSchemaRegistry: false },
-            { useSchemaRegistry: true },
+            { disableSchemaRegistry: true },
+            { disableSchemaRegistry: false },
           );
 
           expect(result.key).toBe("key-deserialized");
@@ -1635,8 +1741,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             0,
             fakeMessage({ key: null }),
             fakeRegistry,
-            { useSchemaRegistry: false },
-            { useSchemaRegistry: true },
+            { disableSchemaRegistry: true },
+            { disableSchemaRegistry: false },
           );
 
           expect(result.key).toBeUndefined();

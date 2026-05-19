@@ -26,12 +26,15 @@ import { z } from "zod";
 
 const schemaRegistryOptions = z
   .object({
-    useSchemaRegistry: z
+    disableSchemaRegistry: z
       .boolean()
       .optional()
       .default(false)
       .describe(
-        "Whether to use schema registry for deserialization. If false, messages will be returned as raw.",
+        "Set to true to skip Schema Registry decoding and return raw UTF-8 bytes. " +
+          "When false (the default), messages are auto-decoded via the registered " +
+          "AVRO / JSON / PROTOBUF schema if the connection has Schema Registry " +
+          "configured and a schema exists for the subject; otherwise left as raw bytes ",
       ),
     subject: z
       .string()
@@ -45,7 +48,7 @@ const schemaRegistryOptions = z
   // are bare references — one place to change if the omit-by-default
   // contract ever evolves.
   .optional()
-  .default({ useSchemaRegistry: false });
+  .default({ disableSchemaRegistry: false });
 
 // `ValueOptions` and `KeyOptions` are structurally identical to
 // `schemaRegistryOptions` — they exist as named types only to make the
@@ -159,16 +162,12 @@ export const consumeKafkaMessagesArgs = z.object({
       "Maximum time in milliseconds to wait for messages before stopping.",
     ),
   valueFormat: schemaRegistryOptions.describe(
-    "How to interpret each message's VALUE bytes. Default: returned as a " +
-      "raw UTF-8 string. Set `useSchemaRegistry: true` (optionally with a " +
-      "`subject` override) to deserialize via the registered AVRO / JSON / " +
-      "PROTOBUF schema in Schema Registry.",
+    "VALUE format. Default: auto-decode via Schema Registry when configured. " +
+      "Set `disableSchemaRegistry: true` for raw UTF-8.",
   ),
   keyFormat: schemaRegistryOptions.describe(
-    "How to interpret each message's KEY bytes. Default: returned as a " +
-      "raw UTF-8 string. Set `useSchemaRegistry: true` (optionally with a " +
-      "`subject` override) to deserialize via the registered AVRO / JSON / " +
-      "PROTOBUF schema in Schema Registry.",
+    "KEY format. Default: auto-decode via Schema Registry when configured. " +
+      "Set `disableSchemaRegistry: true` for raw UTF-8.",
   ),
   cluster_id: z
     .string()
@@ -901,7 +900,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<unknown> => {
-      if (!options.useSchemaRegistry || !registry) {
+      if (options.disableSchemaRegistry || !registry) {
         return buffer?.toString();
       }
       const subject =
@@ -989,22 +988,30 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
     const { maxMessages, timeoutMs, valueFormat, keyFormat } = parsed;
 
-    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, conn, clientManager } = this.resolveSoleConnection(runtime);
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
-    const needsRegistry =
-      valueFormat.useSchemaRegistry || keyFormat.useSchemaRegistry;
+    // Auto-decode when SR is reachable on this connection (OAuth always; direct
+    // requires a `schema_registry` block) and the caller hasn't opted out on
+    // BOTH sides. Either side wanting decode triggers the SR fetch.
+    const userDisabled =
+      valueFormat.disableSchemaRegistry && keyFormat.disableSchemaRegistry;
+    const srReachable =
+      conn.type === "oauth" || conn.schema_registry !== undefined;
 
     let registry: SchemaRegistryClient | undefined;
-    if (needsRegistry) {
+    if (!userDisabled && srReachable) {
       try {
         registry = await clientManager.getSchemaRegistrySdkClient(
           resolved.envId,
         );
       } catch (error: unknown) {
-        return this.createResponse(
-          `Failed to consume messages: ${formatKafkaError(error)}`,
-          true,
+        // Graceful fallback: user didn't explicitly opt in, so an SR-transport
+        // failure shouldn't fail an otherwise-satisfiable consume. Per-message
+        // decode errors already fall back to raw inside processMessage.
+        logger.warn(
+          { error, connId },
+          "Schema Registry client unavailable; consuming as raw bytes.",
         );
       }
     }
@@ -1195,7 +1202,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     return {
       name: ToolName.CONSUME_MESSAGES,
       description:
-        "Consume messages from Kafka topics. Optionally restrict to a partition, start from an offset, timestamp, or 'earliest'/'latest'. Auto-deserializes Schema Registry messages (AVRO/JSON/PROTOBUF).",
+        "Consume messages from Kafka topics. Optionally restrict to a partition, start from an offset, timestamp, or 'earliest'/'latest'. Auto-deserializes Schema Registry messages (AVRO/JSON/PROTOBUF) when SR is configured on the connection; pass `valueFormat: {disableSchemaRegistry: true}` (or `keyFormat`) to skip decoding per side.",
       inputSchema: consumeKafkaMessagesArgs.shape,
       annotations: READ_ONLY,
     };

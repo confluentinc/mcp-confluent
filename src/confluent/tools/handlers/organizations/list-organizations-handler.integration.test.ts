@@ -5,7 +5,7 @@ import {
   ConnectionType,
 } from "@tests/harness/connection-types.js";
 import {
-  callToolWithPkceFlow,
+  callToolWithOAuthFlow,
   getOAuthCredentialsFromEnv,
   OAUTH_FIXTURE_NOT_LOADED_REASON,
   OAUTH_USER_CREDS_MISSING_REASON,
@@ -72,8 +72,8 @@ for (const connection of activeConnectionTypes) {
         ).toBeDefined();
       });
 
-      // First auth-required call: drives PKCE for OAuth (cached for any
-      // subsequent auth-required `it`s a future contributor adds).
+      // First auth-required call: kicks off the CCloud OAuth flow (cached for
+      // any subsequent auth-required `it`s a future contributor adds).
       it("should return at least one organization from CCloud", async () => {
         const callArgs = {
           name: ToolName.LIST_ORGANIZATIONS,
@@ -81,7 +81,7 @@ for (const connection of activeConnectionTypes) {
         };
         const result =
           isOAuth && credentials
-            ? await callToolWithPkceFlow(server, credentials, callArgs)
+            ? await callToolWithOAuthFlow(server, credentials, callArgs)
             : await server.client.callTool(callArgs);
 
         expect(textContent(result)).toMatch(/^Retrieved \d+ organizations?:/);

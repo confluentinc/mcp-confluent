@@ -1,6 +1,10 @@
 import { DescribeTableHandler } from "@src/confluent/tools/handlers/flink/catalog/describe-table-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { findFriendlySchemaName } from "@tests/harness/flink.js";
+import {
+  findFriendlySchemaName,
+  trackStatementsFromMeta,
+  withSharedFlinkStatementCleanup,
+} from "@tests/harness/flink.js";
 import {
   getTestClusterId,
   withSharedAdminClient,
@@ -39,6 +43,10 @@ describe("describe-table-handler", { tags: [Tag.FLINK] }, () => {
 
   // installs beforeAll/afterAll at this describe scope (admin client + topic cleanup)
   const { admin, createdTopics } = withSharedAdminClient();
+  // sweeps mcp-query-* statements surfaced via _meta.flinkStatementsCreated.
+  // expect.poll() retries grow the array with every attempt (all leaks land
+  // in the sweep, not just the final one).
+  const { createdStatements } = withSharedFlinkStatementCleanup();
   const tableName = uniqueName("flink-tbl");
 
   beforeAll(async () => {
@@ -74,6 +82,7 @@ describe("describe-table-handler", { tags: [Tag.FLINK] }, () => {
         name: ToolName.LIST_FLINK_DATABASES,
         arguments: {},
       });
+      trackStatementsFromMeta(dbResult, createdStatements);
       expect(
         dbResult.isError,
         `list-databases failed: ${textContent(dbResult)}`,
@@ -95,6 +104,7 @@ describe("describe-table-handler", { tags: [Tag.FLINK] }, () => {
               name: ToolName.DESCRIBE_FLINK_TABLE,
               arguments: { tableName, databaseName },
             });
+            trackStatementsFromMeta(result, createdStatements);
             if (result.isError === true) throw new Error(textContent(result));
             return textContent(result);
           },

@@ -410,52 +410,83 @@ sets it per-block (see CI Matrix below).
 
 ## Connection-Type Filtering
 
-`activeConnectionTypes` (from `@tests/harness/connection-types.js`) mirrors
-`activeTransports` along a second axis: dual-mode tests use it to iterate the
-connection shapes (direct vs OAuth) they support.
+`activeConnectionTypes` (from `@tests/harness/connection-types.js`) mirrors `activeTransports` along a second axis: dual-mode tests use it to gate the connection shapes (direct vs OAuth) they support.
 It honors the `INTEGRATION_TEST_CONNECTION_TYPE` env var:
 
-- **unset** → iterate every connection type (default for local runs / full coverage)
-- **`direct`** or **`oauth`** → iterate only that connection type
+- **unset** → both connection types active (default for local runs / full coverage)
+- **`direct`** or **`oauth`** → only that connection type active
 
-Single-mode tests (the vast majority; everything that needs only direct
-api-key auth) don't need to touch this; they default to direct via the
-`integrationRuntime()` / `startServer({ transport })` calls.
+Single-mode tests (the vast majority; everything that needs only direct api-key auth) don't need to touch this; they default to direct via the `integrationRuntime()` / `startServer({ transport })` calls.
 
-Dual-mode tests pair the two axes:
+Dual-mode tests nest **one outer `describe` per handler with two inner connection-specific describes** (one per `ConnectionType` enum value, titled via template strings like `` `with a ${ConnectionType.DIRECT} connection` `` so the title stays in sync if the enum changes).
+Each inner describe is linear (no `isOAuth` branching inside) and gates itself via three early-return skip checks in cost order: connection-type filter, predicate gate, OAuth creds (OAuth describe only).
+The runtime is loaded **after** the filter gate so a CI run that excludes one mode never parses that mode's YAML.
 
 ```ts
-for (const connection of activeConnectionTypes) {
-  const isOAuth = connection === ConnectionType.OAUTH;
-  const tags = isOAuth
-    ? [Tag.<GROUP>, Tag.OAUTH]
-    : [Tag.<GROUP>];
-  const runtime = integrationRuntime({ oauth: isOAuth });
-  describe(`<handler> under ${connection} connection`, { tags }, () => {
-    // skip gate (per connection type)
+describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
+  describe(`with a ${ConnectionType.DIRECT} connection`, () => {
+    if (!activeConnectionTypes.includes(ConnectionType.DIRECT)) {
+      it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
+      return;
+    }
+    const directRuntime = integrationRuntime({ oauth: false });
+    if (handler.enabledConnectionIds(directRuntime).length === 0) {
+      it.skip("requires <dotted.path> in test-fixtures/yaml_configs/integration.yaml", () => {});
+      return;
+    }
+
     describe.each(activeTransports)("via %s transport", (transport) => {
-      // setup branches inline on isOAuth (port lock + driveOAuthFlow for OAuth)
+      // direct-only beforeAll (startServer) / afterAll (server.stop()) + tests
     });
   });
-}
+
+  describe(`with a ${ConnectionType.OAUTH} connection`, { tags: [Tag.OAUTH] }, () => {
+    if (!activeConnectionTypes.includes(ConnectionType.OAUTH)) {
+      it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
+      return;
+    }
+    const oauthRuntime = integrationRuntime({ oauth: true });
+    if (handler.enabledConnectionIds(oauthRuntime).length === 0) {
+      it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+      return;
+    }
+    const credentials = getOAuthCredentialsFromEnv();
+    if (!credentials) {
+      it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
+      return;
+    }
+
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      // oauth-only beforeAll (startOAuthServer + 180_000 timeout) / afterAll (stopOAuthServer)
+      // tool calls dispatch via callToolWithOAuthFlow(server, credentials, ...)
+    });
+  });
+});
 ```
 
-The outer iteration is a `for` loop rather than `describe.each(...)` so
-each connection's describe can carry its own `tags` (required for CI lanes
-that filter `=@oauth` / `!@oauth`). The inner transport iteration stays as
-`describe.each(activeTransports)`.
+Tags are **additive down the describe tree**: the outer describe carries the group tag (`Tag.<GROUP>`), the inner `oauth` describe adds `Tag.OAUTH`, the inner `direct` describe adds nothing.
+A test inside `direct` therefore runs under `[Tag.<GROUP>]`; a test inside `oauth` runs under `[Tag.<GROUP>, Tag.OAUTH]`.
+This matches the project's asymmetric `Tag.OAUTH` rule (direct is the unmarked baseline; OAuth is the marked deviation) without per-describe tag duplication.
 
-See `src/confluent/tools/handlers/organizations/list-organizations-handler.integration.test.ts`
-for the canonical worked example.
+Skip-gate constants used above live with the harness module they belong to:
+
+- `CONNECTION_TYPE_DIRECT_FILTERED_REASON` and `CONNECTION_TYPE_OAUTH_FILTERED_REASON` from `@tests/harness/connection-types.js` (the filter gate is the same in every dual-mode test, so the strings are exported rather than re-typed per file).
+- `OAUTH_FIXTURE_NOT_LOADED_REASON` and `OAUTH_USER_CREDS_MISSING_REASON` from `@tests/harness/oauth-flow.js` (used only by the OAuth describe).
+
+The gate ORDER (filter → runtime → predicate → creds) is intentional: cheapest gate first.
+A run that filters out one connection type short-circuits the unwanted describe at the array-includes check without ever loading the other fixture or reading the env for creds.
+
+Why nested describes rather than one `for...of` loop or two top-level siblings?
+A loop body has to thread an `isOAuth` ternary through every site that differs between modes (server start, teardown, tags array, tool-call dispatch, predicate skip reason).
+Nesting under a single outer describe makes each inner body linear, lets the outer describe carry the group tag once (no duplication), and turns the "extend an existing direct-only test to OAuth" story into a pure addition: the direct describe stays byte-identical, and the OAuth describe gets appended as a sibling.
+
+See `src/confluent/tools/handlers/organizations/list-organizations-handler.integration.test.ts` for the canonical worked example.
 
 ### `Tag.OAUTH` semantics (asymmetric on purpose)
 
-`Tag.OAUTH` marks tests (or per-iteration describes) that exercise the
-CCloud OAuth flow. There is **no** `Tag.DIRECT`: direct is the unmarked majority,
-and CI lanes that want only direct tests use `!@oauth` exclusion rather than
-positive `@direct` selection. This means new direct-only tests don't need to
-remember to tag themselves; "not tagged with @oauth" reliably catches every
-direct test by construction.
+`Tag.OAUTH` marks the inner `oauth` describe of a dual-mode test (and any single-mode test that exercises the CCloud OAuth flow).
+There is **no** `Tag.DIRECT`: direct is the unmarked majority, and CI lanes that want only direct tests use `!@oauth` exclusion rather than positive `@direct` selection.
+This means new direct-only tests don't need to remember to tag themselves; "not tagged with @oauth" reliably catches every direct test by construction.
 
 ## CI Matrix
 

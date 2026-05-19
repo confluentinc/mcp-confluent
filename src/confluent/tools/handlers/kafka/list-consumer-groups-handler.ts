@@ -103,8 +103,8 @@ export const listConsumerGroupsArgs = z.object({
     .enum(TYPE_NAMES)
     .optional()
     .describe(
-      "Restrict to groups of this protocol type. Omit to return both types. " +
-        '"Consumer" is the new KIP-848 protocol; "Classic" is the legacy generation-based one.',
+      "Filter to groups of this protocol type. Omit to return both. " +
+        'Options: "Consumer" (new, KIP-848), "Classic" (legacy generation-based).',
     ),
   cluster_id: z
     .string()

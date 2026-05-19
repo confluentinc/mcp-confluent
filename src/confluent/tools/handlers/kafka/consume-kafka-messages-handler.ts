@@ -744,34 +744,10 @@ export async function waitForAssignment(
 }
 
 /**
- * Stash per-partition seeks on the consumer *before* `consumer.run()` is
- * invoked. The kafkajs-compat library queues these as "pending seeks" via
- * its `#addPendingOperation` → `#seekInternal` path; when the first
- * rebalance fires inside `run()`, the assignment handler calls
- * `#assignAsPerSeekedOffsets` and modifies the assignment to include the
- * seeked offsets *before* calling `assignmentFn`, so the partition is
- * assigned at the seek target atomically.
- *
- * This avoids the `ERR__STATE` race that the post-assignment seek path
- * trips: even after `consumer.assignment()` returns the partition, the
- * native librdkafka client can briefly reject seeks because its internal
- * state hasn't fully transitioned from "rebalancing" to "ready." The
- * pre-run path bypasses native seek calls entirely.
- */
-function stashSeeksBeforeRun(
-  consumer: KafkaJS.Consumer,
-  plan: PreflightPlan,
-): void {
-  for (const s of plan.seeks) {
-    consumer.seek({ topic: s.topic, partition: s.partition, offset: s.offset });
-  }
-}
-
-/**
  * After the consumer assignment lands, pause any assigned partition that
- * isn't in the keep-set. Seeks happen pre-run via {@link stashSeeksBeforeRun}
- * so the per-partition seek targets are already baked into the assignment
- * by the time this runs.
+ * isn't in the keep-set. Seeks were stashed before `consumer.run()` (see
+ * the inline comment in the orchestrator) so the per-partition seek
+ * targets are already baked into the assignment by the time this runs.
  */
 async function applyPauseAfterAssignment(
   consumer: KafkaJS.Consumer,
@@ -1098,14 +1074,27 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       await consumer.connect();
       await consumer.subscribe({ topics: plan.topicNames });
 
-      // Stash per-partition seeks BEFORE `consumer.run()`. The kafkajs-compat
-      // library queues these as pending seeks and applies them atomically
-      // during the first rebalance via `#assignAsPerSeekedOffsets`, so the
-      // partition is assigned at the seek target directly. Calling
-      // `consumer.seek()` after the rebalance trips an `ERR__STATE` race
-      // because the native librdkafka client can briefly reject seeks even
-      // after `consumer.assignment()` reports the partition as assigned.
-      stashSeeksBeforeRun(consumer, plan);
+      // Stash per-partition seeks on the consumer BEFORE `consumer.run()`
+      // is invoked. The kafkajs-compat library queues these as "pending
+      // seeks" via its `#addPendingOperation` → `#seekInternal` path; when
+      // the first rebalance fires inside `run()`, the assignment handler
+      // calls `#assignAsPerSeekedOffsets` and modifies the assignment to
+      // include the seeked offsets BEFORE calling `assignmentFn`, so the
+      // partition is assigned at the seek target atomically.
+      //
+      // This avoids the `ERR__STATE` race that the post-assignment seek
+      // path trips: even after `consumer.assignment()` returns the
+      // partition, the native librdkafka client can briefly reject seeks
+      // because its internal state hasn't fully transitioned from
+      // "rebalancing" to "ready." The pre-run path bypasses native seek
+      // calls entirely.
+      for (const s of plan.seeks) {
+        consumer.seek({
+          topic: s.topic,
+          partition: s.partition,
+          offset: s.offset,
+        });
+      }
 
       // Named exit conditions. Each Deferred resolves only its own
       // promise — the prior shared `timeoutReached` boolean was written

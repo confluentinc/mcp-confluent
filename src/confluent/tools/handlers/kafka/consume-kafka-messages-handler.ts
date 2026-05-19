@@ -22,6 +22,10 @@ import {
   hasSchemaRegistryOrOAuth,
   kafkaBootstrapOrOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
+import {
+  createWatermarkCache,
+  type WatermarkCache,
+} from "@src/confluent/tools/handlers/kafka/partition-offsets.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -64,7 +68,7 @@ type KeyOptions = z.infer<typeof schemaRegistryOptions>;
 /**
  * Per-entry "where to start consuming" tagged union. Collapses the prior
  * `offset` and `timestamp` peer fields plus the top-level `offsetReset`
- * knob into a single per-topic position control with four arms:
+ * knob into a single per-topic position control with five arms:
  *
  *   - `"earliest"` — begin at the partition low watermark (entire retained
  *     history). This is the default when `start` is omitted.
@@ -74,9 +78,13 @@ type KeyOptions = z.infer<typeof schemaRegistryOptions>;
  *     (digit-only string; requires `partition`).
  *   - `{ timestamp: ... }` — begin at the broker-resolved offset for the
  *     supplied time (ISO 8601 preferred; ms-since-epoch also accepted).
+ *   - `{ tail: N }` — begin at `max(low, high - N)` on the partition, so
+ *     the consumer returns up to the last N already-written messages
+ *     without waiting for new traffic (requires `partition`).
  *
- * The object arms are `strictObject` so `{offset, timestamp}` together is
- * a union miss rather than a silent strip of one key.
+ * The object arms are `strictObject` so `{offset, timestamp}`,
+ * `{tail, offset}`, etc. together are a union miss rather than a silent
+ * strip of one key.
  */
 const startOption = z
   .union([
@@ -105,13 +113,31 @@ const startOption = z
             "broker resolves this to a per-partition offset.",
         ),
     }),
+    z.strictObject({
+      tail: z
+        .number()
+        .int()
+        .positive()
+        .describe(
+          "Consume the most recent N already-written messages from this partition. " +
+            "REQUIRES `partition` to be set on the same topic entry — there " +
+            "is no implicit partition default; consumption is " +
+            "single-partition only. N must be a positive integer. The " +
+            "consumer seeks to max(lowWatermark, highWatermark - N) and " +
+            "returns immediately with whatever is already there — it does " +
+            "not block waiting for new writes.",
+        ),
+    }),
   ])
   .describe(
     "Where to begin consuming this topic. Use 'earliest' for the entire " +
       "retained history; 'latest' for " +
       "newly-produced messages only; {offset: 'N'} for an absolute " +
-      "partition offset (requires `partition`); or {timestamp: '...'} " +
-      "to seek to the broker-resolved offset for a point in time.",
+      "partition offset (requires `partition`); {timestamp: '...'} " +
+      "to seek to the broker-resolved offset for a point in time; or " +
+      "{tail: N} for the last N already-written messages on the " +
+      "partition (requires `partition`, returns without waiting for new " +
+      "traffic).",
   );
 
 /**
@@ -145,7 +171,7 @@ export const consumeKafkaMessagesArgs = z.object({
         '[{name: "orders"}]. The `partition` and `start` fields let ' +
         "callers restrict to a specific partition and/or pick where in " +
         "the topic to begin consuming (e.g. " +
-        '[{name: "orders", partition: 0, start: {offset: "42"}}] or ' +
+        '[{name: "orders", partition: 0, start: {offset: "42"}}], ' +
         '[{name: "orders", start: {timestamp: "2026-05-14T17:00:00Z"}}]).',
     ),
   maxMessages: z
@@ -237,7 +263,8 @@ type NormalizedStart =
   | { kind: "earliest" }
   | { kind: "latest" }
   | { kind: "offset"; value: string }
-  | { kind: "timestamp"; ms: number };
+  | { kind: "timestamp"; ms: number }
+  | { kind: "tail"; count: number };
 
 interface NormalizedTopicTarget {
   name: string;
@@ -276,6 +303,7 @@ export function normalizeStart(
   if (start === "earliest") return { kind: "earliest" };
   if (start === "latest") return { kind: "latest" };
   if ("offset" in start) return { kind: "offset", value: start.offset };
+  if ("tail" in start) return { kind: "tail", count: start.tail };
   return {
     kind: "timestamp",
     ms:
@@ -332,7 +360,7 @@ function deriveConsumerOffsetReset(
 /**
  * Returns true when any target requires the admin pre-flight + seek/pause
  * dance. Bare-name-only calls (no partition restrictions, no explicit
- * offset/timestamp seeks, and a `start` whose direction matches the
+ * offset/timestamp/tail seeks, and a `start` whose direction matches the
  * consumer's chosen reset) skip the whole dance — the consumer's
  * `auto.offset.reset` handles them naturally.
  */
@@ -345,24 +373,35 @@ function planNeedsPreflight(
       t.partition !== undefined ||
       t.start.kind === "offset" ||
       t.start.kind === "timestamp" ||
+      t.start.kind === "tail" ||
       (t.start.kind === "earliest" && consumerOffsetReset === "latest"),
   );
 }
 
 /**
- * Reject any target that supplies `start: {offset}` without a
- * `partition` — absolute offsets are partition-scoped (offset 10 on
- * partition 0 is a different message than offset 10 on partition 1),
- * so picking a default is footgun-prone; rejecting at the boundary is
- * louder.
+ * Reject any target whose `start` arm is partition-scoped but supplies
+ * no `partition`. Both `{offset}` and `{tail}` need partition context
+ * (different partitions have different offset spaces and different
+ * message counts), so picking a default is footgun-prone; rejecting at
+ * the boundary is louder.
  */
-function guardOffsetRequiresPartition(targets: NormalizedTopicTarget[]): void {
+function guardScopedStartRequiresPartition(
+  targets: NormalizedTopicTarget[],
+): void {
   for (const t of targets) {
     if (t.start.kind === "offset" && t.partition === undefined) {
       throw new Error(
         `Topic "${t.name}" has an explicit offset (${t.start.value}) but no partition. ` +
           `Absolute offsets are partition-scoped — different partitions have different offset spaces. ` +
           `Either also supply a partition for this entry, or use a timestamp (which resolves per-partition).`,
+      );
+    }
+    if (t.start.kind === "tail" && t.partition === undefined) {
+      throw new Error(
+        `Topic "${t.name}" requested tail of ${t.start.count} messages but no partition. ` +
+          `Tail is partition-scoped — different partitions have different message counts, and ` +
+          `cross-partition freshness ordering is not defined for this tool. ` +
+          `Supply a partition for this entry.`,
       );
     }
   }
@@ -489,31 +528,6 @@ function validateAndBuildKeepPartitions(
 }
 
 /**
- * Per-topic memoization wrapper around `admin.fetchTopicOffsets` so
- * three resolution paths (explicit-offset bounds check, timestamp's
- * silent-substitution cross-check, earliest-minority low-watermark
- * seek) share one admin round-trip per topic per call.
- */
-type WatermarkCache = (
-  topic: string,
-) => Promise<Awaited<ReturnType<KafkaJS.Admin["fetchTopicOffsets"]>>>;
-
-function createWatermarkCache(admin: KafkaJS.Admin): WatermarkCache {
-  const cache = new Map<
-    string,
-    Awaited<ReturnType<KafkaJS.Admin["fetchTopicOffsets"]>>
-  >();
-  return async (topic) => {
-    let wm = cache.get(topic);
-    if (!wm) {
-      wm = await admin.fetchTopicOffsets(topic);
-      cache.set(topic, wm);
-    }
-    return wm;
-  };
-}
-
-/**
  * Validate an explicit `start: {offset}` against the partition's
  * `[low, high)` watermarks and return the seek target. Throws if the
  * partition has no offset metadata or the requested offset is out of
@@ -543,6 +557,40 @@ async function resolveExplicitOffsetSeek(
     );
   }
   return { topic, partition, offset };
+}
+
+/**
+ * Resolve a `start: {tail: N}` to a single seek target on the requested
+ * partition. Computes `target = max(low, high - N)` using `BigInt`
+ * (Kafka offsets are int64; `N` may legitimately be large).
+ *
+ * Empty-partition contract (`low === high`): the seek target collapses
+ * to `high` (`max(high, high - N) === high`), which parks the consumer
+ * at `OFFSET_END`. No records flow, the orchestrator's `timeoutMs`
+ * budget fires, and the call returns an empty success response — the
+ * issue's "tail on empty partition returns zero, no error" path. The
+ * `BigInt` subtraction stays well-defined for huge `N` because the
+ * arithmetic compares signed values and `max` clamps back into the
+ * `[low, high)` range before serializing.
+ */
+async function resolveTailSeek(
+  topic: string,
+  partition: number,
+  count: number,
+  getWatermarks: WatermarkCache,
+): Promise<PreflightPlan["seeks"][number]> {
+  const offsets = await getWatermarks(topic);
+  const partOffsets = offsets.find((o) => o.partition === partition);
+  if (!partOffsets) {
+    throw new Error(
+      `Topic "${topic}" partition ${partition} returned no offset metadata.`,
+    );
+  }
+  const low = BigInt(partOffsets.low);
+  const high = BigInt(partOffsets.high);
+  const candidate = high - BigInt(count);
+  const target = candidate < low ? low : candidate;
+  return { topic, partition, offset: target.toString() };
 }
 
 /**
@@ -669,7 +717,7 @@ async function buildPreflightPlan(
   targets: NormalizedTopicTarget[],
   consumerOffsetReset: "earliest" | "latest",
 ): Promise<PreflightPlan> {
-  guardOffsetRequiresPartition(targets);
+  guardScopedStartRequiresPartition(targets);
   const byTopic = new Map<string, NormalizedTopicTarget[]>();
   for (const t of targets) {
     const list = byTopic.get(t.name);
@@ -702,6 +750,15 @@ async function buildPreflightPlan(
           t.start.ms,
           getWatermarks,
         )),
+      );
+    } else if (t.start.kind === "tail" && t.partition !== undefined) {
+      seeks.push(
+        await resolveTailSeek(
+          t.name,
+          t.partition,
+          t.start.count,
+          getWatermarks,
+        ),
       );
     } else if (
       t.start.kind === "earliest" &&
@@ -1205,7 +1262,8 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     return {
       name: ToolName.CONSUME_MESSAGES,
       description:
-        "Consume messages from Kafka topics. Optionally restrict to a partition, start from an offset, timestamp, or 'earliest'/'latest'. Auto-deserializes Schema Registry messages (AVRO/JSON/PROTOBUF) when SR is configured on the connection; pass `valueFormat: {disableSchemaRegistry: true}` (or `keyFormat`) to skip decoding per side.",
+        "Consume messages from Kafka topics. Optionally restrict to a partition, start from an offset, timestamp, earliest, latest, or tailmost pre-existing messages." +
+        " Auto-deserializes Schema Registry messages (AVRO/JSON/PROTOBUF) when SR is configured on the connection; pass `valueFormat: {disableSchemaRegistry: true}` (or `keyFormat`) to skip decoding per side.",
       inputSchema: consumeKafkaMessagesArgs.shape,
       annotations: READ_ONLY,
     };

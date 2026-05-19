@@ -1,11 +1,11 @@
 import {
   createWatermarkCache,
   fetchPartitionWatermarks,
-} from "@src/confluent/tools/handlers/kafka/partition-offsets.js";
+} from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
 import { getMockedAdmin } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-describe("partition-offsets.ts", () => {
+describe("partition-watermarks.ts", () => {
   describe("fetchPartitionWatermarks()", () => {
     it("should narrow admin.fetchTopicOffsets's response to {partition, low, high}, dropping the unused committed `offset` field", async () => {
       // The committed `offset` field on the upstream response isn't the

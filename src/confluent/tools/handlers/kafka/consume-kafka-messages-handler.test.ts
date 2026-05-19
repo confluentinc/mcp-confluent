@@ -427,19 +427,32 @@ describe("consume-kafka-messages-handler.ts", () => {
     const handler = new ConsumeKafkaMessagesHandler();
 
     describe("handle()", () => {
+      // Fresh per-test client manager + consumer with the four no-op
+      // lifecycle stubs every successful path needs. Tests that exercise
+      // failure modes override the relevant method (e.g.
+      // `consumer.run.mockRejectedValue(...)`); tests whose preflight
+      // throws before the consumer is touched simply don't reference it.
+      // Rebuilt in `beforeEach` rather than initialized once because
+      // Vitest's `restoreMocks: true` only restores `vi.spyOn` originals,
+      // not `vi.fn()` call histories or configured return values.
+      let clientManager: ReturnType<typeof getMockedClientManager>;
+      let consumer: ReturnType<typeof getMockedConsumer>;
+
+      beforeEach(async () => {
+        clientManager = getMockedClientManager();
+        consumer = await clientManager.getConsumer();
+        consumer.connect.mockResolvedValue(undefined);
+        consumer.subscribe.mockResolvedValue(undefined);
+        consumer.run.mockResolvedValue(undefined);
+        consumer.disconnect.mockResolvedValue(undefined);
+      });
+
       it("should pass derived offsetReset='earliest' to buildKafkaConsumer when every entry agrees on `start: 'earliest'`", async () => {
         // The consumer's `auto.offset.reset` is no longer a peer top-level
         // input; the handler derives it from the per-topic `start` values.
         // When every direction-only entry asks for 'earliest', that
         // becomes the consumer-wide reset and no explicit watermark seeks
         // are needed (the simple-call fast path is preserved).
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
-
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -469,13 +482,6 @@ describe("consume-kafka-messages-handler.ts", () => {
       });
 
       it("should propagate the default offsetReset ('earliest') to buildKafkaConsumer when every entry omits `start`", async () => {
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
-
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -514,13 +520,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           stubbedUuid,
         );
 
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
-
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -550,12 +549,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         // The outer `catch (error)` in the consume handler catches errors
         // from connect/subscribe/run and renders them via formatKafkaError.
         // Mocking `consumer.run` to reject reaches this branch directly.
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
         consumer.run.mockRejectedValue(new Error("group rebalance failed"));
-        consumer.disconnect.mockResolvedValue(undefined);
 
         await assertHandleCase({
           handler,
@@ -587,12 +581,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // or (b) `timeoutMs` elapsing. The mocked `consumer.run` resolves
         // immediately and never invokes `eachMessage`, so the test reaches
         // path (b) after the configured timeoutMs.
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
 
         await assertHandleCase({
           handler,
@@ -625,12 +613,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // manager call is `(undefined)`. The assertion is on the call
         // shape, not message processing — the mocked `consumer.run`
         // resolves without invoking `eachMessage`.
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
 
         await assertHandleCase({
           handler,
@@ -661,12 +643,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // BOTH sides short-circuits the SR fetch. A single-side opt-out
         // still triggers the fetch — covered by the auto-decode test
         // above (caller omits both, so neither side is disabled).
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
 
         await assertHandleCase({
           handler,
@@ -696,12 +672,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // No SR reachable → no auto-fetch. This is the bare-kafka
         // connection path: the tool stays enabled (predicate is
         // kafkaBootstrapOrOAuth), just operates on raw bytes.
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
 
         await assertHandleCase({
           handler,
@@ -728,15 +698,9 @@ describe("consume-kafka-messages-handler.ts", () => {
         // shouldn't fail an otherwise-satisfiable consume. The handler
         // proceeds with `registry = undefined`, and per-message decoding
         // short-circuits to raw inside processMessage.
-        const clientManager = getMockedClientManager();
         clientManager.getSchemaRegistrySdkClient.mockRejectedValue(
           new Error("SR auth failed"),
         );
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
 
         await assertHandleCase({
           handler,
@@ -764,10 +728,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // rejects ambiguity at pre-flight, before any broker call beyond
         // the admin probe (and in fact before that — the guard is the
         // first thing buildPreflightPlan does).
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.disconnect.mockResolvedValue(undefined);
-
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -794,10 +754,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // (broker timestamp vs producer timestamp vs payload field) that
         // the issue defers as out-of-scope. Reject loudly rather than
         // pick a default that surprises a caller.
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.disconnect.mockResolvedValue(undefined);
-
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -819,7 +775,6 @@ describe("consume-kafka-messages-handler.ts", () => {
       });
 
       it("should reject a partition index >= numPartitions returned by fetchTopicMetadata", async () => {
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
@@ -846,7 +801,6 @@ describe("consume-kafka-messages-handler.ts", () => {
       });
 
       it("should reject an `offset` below the partition's low watermark", async () => {
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
@@ -876,7 +830,6 @@ describe("consume-kafka-messages-handler.ts", () => {
       });
 
       it("should reject an `offset` >= the partition's high watermark", async () => {
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
@@ -906,7 +859,6 @@ describe("consume-kafka-messages-handler.ts", () => {
       });
 
       it("should reject a topic that mixes partition-specific entries with unrestricted entries", async () => {
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
@@ -938,7 +890,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // conflicting `start` directions. The schema/handler can't honor
         // both — exactly one start wins the race silently. Reject loudly
         // at preflight with a message naming the topic and the count.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
@@ -972,7 +923,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // Two entries for the same partition with different `start`
         // offsets — librdkafka would honor the seek that wins the
         // pre-run-stash race, silently dropping the other.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
@@ -1006,7 +956,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // partition 0 with an explicit offset. The broker assigns three
         // partitions (0, 1, 2); we expect pause on partitions 1 and 2,
         // and seek on partition 0 to the requested offset.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 3 }]),
@@ -1017,11 +966,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 2, low: "0", high: "100", offset: "100" },
         ]);
 
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
         consumer.assignment.mockReturnValue([
           { topic: "smoke", partition: 0 },
           { topic: "smoke", partition: 1 },
@@ -1060,7 +1004,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         //   = max(10, 19) = 19. Consumer parks at offset 19 and the next
         // record delivered to eachMessage is the one whose offset == 19,
         // i.e. the last already-written record on the partition.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
@@ -1069,11 +1012,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 0, low: "10", high: "20", offset: "20" },
         ]);
 
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
         consumer.assignment.mockReturnValue([{ topic: "smoke", partition: 0 }]);
 
         await assertHandleCase({
@@ -1104,7 +1042,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // Tail with low=5, high=10, N=1000 → seek target = max(5, 10-1000)
         //   = max(5, -990) = 5. Asking for more messages than the partition
         // retains returns whatever's there, never an out-of-range error.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
@@ -1113,11 +1050,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 0, low: "5", high: "10", offset: "10" },
         ]);
 
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
         consumer.assignment.mockReturnValue([{ topic: "smoke", partition: 0 }]);
 
         await assertHandleCase({
@@ -1150,7 +1082,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // flow, the timeoutMs budget elapses, and the orchestrator returns
         // an empty success response — exactly the issue's "tail: 1 on an
         // empty partition returns zero, no error" contract.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
@@ -1159,11 +1090,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 0, low: "0", high: "0", offset: "0" },
         ]);
 
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
         consumer.assignment.mockReturnValue([{ topic: "smoke", partition: 0 }]);
 
         await assertHandleCase({
@@ -1195,7 +1121,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // server-side to a per-partition offset map and seek each
         // partition independently. ISO 8601 inputs are normalized to ms
         // before the admin call.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
@@ -1212,11 +1137,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 1, low: "0", high: "100", offset: "100" },
         ]);
 
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
         consumer.assignment.mockReturnValue([
           { topic: "smoke", partition: 0 },
           { topic: "smoke", partition: 1 },
@@ -1271,7 +1191,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // cross-checks against fetchTopicOffsets and filters those partitions
         // out of the seek list (seeking to high == OFFSET_END would silently
         // park the consumer waiting for new messages with no diagnostic).
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
@@ -1288,11 +1207,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 1, low: "0", high: "100", offset: "100" },
         ]);
 
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
         consumer.assignment.mockReturnValue([
           { topic: "smoke", partition: 0 },
           { topic: "smoke", partition: 1 },
@@ -1336,7 +1250,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // The handler must reject loudly rather than silently seeking
         // every partition to OFFSET_END (which would idle the consumer
         // until timeout and return 0 with no clue why).
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
@@ -1349,9 +1262,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 0, low: "0", high: "200", offset: "200" },
           { partition: 1, low: "0", high: "100", offset: "100" },
         ]);
-
-        const consumer = await clientManager.getConsumer();
-        consumer.disconnect.mockResolvedValue(undefined);
 
         await assertHandleCase({
           handler,
@@ -1387,7 +1297,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // silent-substitution check. Pins the "partition N has no record"
         // phrasing — the restricted-scope branch of the error message
         // that the every-partition test above doesn't cover.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 2 }]),
@@ -1400,9 +1309,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 0, low: "0", high: "200", offset: "200" },
           { partition: 1, low: "0", high: "100", offset: "100" },
         ]);
-
-        const consumer = await clientManager.getConsumer();
-        consumer.disconnect.mockResolvedValue(undefined);
 
         await assertHandleCase({
           handler,
@@ -1439,7 +1345,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // "earliest" minority. The handler issues explicit low-watermark
         // seeks for A so it actually replays its history; B inherits the
         // consumer-wide "latest" and needs no explicit seek.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([
@@ -1454,11 +1359,6 @@ describe("consume-kafka-messages-handler.ts", () => {
           { partition: 1, low: "20", high: "100", offset: "100" },
         ]);
 
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
         consumer.assignment.mockReturnValue([
           { topic: "topic-a", partition: 0 },
           { topic: "topic-a", partition: 1 },
@@ -1518,13 +1418,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         // consumer's auto.offset.reset is set to "earliest" and no per-
         // partition seek is needed. The handler should skip the admin
         // round-trip entirely — bare-direction-uniform is a fast path.
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
 
         await assertHandleCase({
           handler,
@@ -1573,17 +1467,11 @@ describe("consume-kafka-messages-handler.ts", () => {
         // deadlineMs catches up, then returns null and triggers the
         // orchestrator's `onAssignmentTimedOut` arrow (the body of
         // `accepting = false; timedOut.resolve()`).
-        const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
         admin.fetchTopicMetadata.mockResolvedValue(
           fakeFetchTopicMetadataResult([{ name: "smoke", numPartitions: 1 }]),
         );
 
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
         consumer.assignment.mockReturnValue([]);
 
         await assertHandleCase({
@@ -1616,11 +1504,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // error. The orchestrator's only response is a logger.error;
         // the test verifies the response shape is preserved AND the
         // logger.error catch arm of the disconnect path was reached.
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.run.mockResolvedValue(undefined);
         consumer.disconnect.mockRejectedValue(new Error("disconnect kaboom"));
 
         await assertHandleCase({
@@ -1655,12 +1538,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         // Drives the post-refactor `Promise.race([maxReached.promise,
         // timedOut.promise, rejectOnly(runPromise), rejectOnly(preflightHook)])`
         // via its first arm.
-        const clientManager = getMockedClientManager();
-        const consumer = await clientManager.getConsumer();
-        consumer.connect.mockResolvedValue(undefined);
-        consumer.subscribe.mockResolvedValue(undefined);
-        consumer.disconnect.mockResolvedValue(undefined);
-
         let captured:
           | ((payload: EachMessagePayload) => Promise<void>)
           | undefined;

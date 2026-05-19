@@ -25,7 +25,7 @@ import {
 import {
   createWatermarkCache,
   type WatermarkCache,
-} from "@src/confluent/tools/handlers/kafka/partition-offsets.js";
+} from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";

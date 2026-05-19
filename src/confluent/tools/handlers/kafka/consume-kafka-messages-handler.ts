@@ -440,41 +440,51 @@ function validateRequestedPartitions(
 }
 
 /**
- * Reject entries that target the same effective partition set more than
- * once — those are ambiguous (each subscribed partition can have only
- * one starting position; whichever seek/reset wins the race silently
- * decides the behavior, and the caller never learns their request was
- * over-specified). Two shapes of duplicate are rejected:
+ * Validate per-topic consistency and derive the keep-partitions map in
+ * a single pass over `byTopic`. Three rejections fire here, each a
+ * shape of "starting position is ambiguous" the consumer can't honor:
  *
- *  - **Unrestricted-mode topic** (no entry on this topic carries
- *    `partition`): only one entry per topic is allowed. Two entries
- *    targeting "every partition" with different `start` directions
- *    (one `earliest`, one `latest`) is the canonical ambiguous case
- *    and is what this branch catches.
- *  - **Partition-mode topic** (every entry on this topic carries
- *    `partition`): each `partition` index may appear at most once.
- *    Two entries for the same `(topic, partition)` with different
- *    `start` offsets/timestamps is the second ambiguous case.
+ *  - **Mixed mode**: a topic with some entries restricting to a partition
+ *    and others not — does the bare entry coexist with or override the
+ *    partitioned one? Reject loudly.
+ *  - **Duplicate unrestricted**: a topic with multiple entries that all
+ *    omit `partition`. Two "every partition" entries with conflicting
+ *    `start` directions silently let one win the seek/reset race; reject.
+ *  - **Duplicate (topic, partition)**: the same partition index referenced
+ *    twice within one topic — same ambiguity at finer granularity.
  *
- * Assumes the caller has already invoked `buildKeepPartitions` (or its
- * equivalent all-or-nothing check), so every topic group is consistently
- * either fully unrestricted or fully partition-restricted.
+ * Topics whose entries are all unrestricted are omitted from the
+ * returned map (downstream: "keep every assigned partition for that
+ * topic"). For topics that restrict, the keep-set is exactly the
+ * requested partition indices.
  */
-function validateNoDuplicateTargets(
+function validateAndBuildKeepPartitions(
   byTopic: Map<string, NormalizedTopicTarget[]>,
-): void {
+): Map<string, Set<number>> {
+  const keepPartitions = new Map<string, Set<number>>();
   for (const [topic, list] of byTopic) {
-    if (list.length === 1) continue;
-    const partitioned = list[0]?.partition !== undefined;
-    if (!partitioned) {
+    const explicit = list
+      .map((t) => t.partition)
+      .filter((p): p is number => p !== undefined);
+    const allPartitioned = explicit.length === list.length;
+    const nonePartitioned = explicit.length === 0;
+    if (!allPartitioned && !nonePartitioned) {
       throw new Error(
-        `Topic "${topic}" has ${list.length} entries without partition restrictions; ` +
-          `specify each topic at most once at the unrestricted level (or restrict each entry to a distinct partition).`,
+        `Topic "${topic}" mixes entries with explicit partitions and entries without one. ` +
+          `Pick one mode per topic: either every entry restricts to a partition, or none do.`,
       );
     }
+    if (nonePartitioned) {
+      if (list.length > 1) {
+        throw new Error(
+          `Topic "${topic}" has ${list.length} entries without partition restrictions; ` +
+            `specify each topic at most once at the unrestricted level (or restrict each entry to a distinct partition).`,
+        );
+      }
+      continue;
+    }
     const seen = new Set<number>();
-    for (const t of list) {
-      const p = t.partition!;
+    for (const p of explicit) {
       if (seen.has(p)) {
         throw new Error(
           `Topic "${topic}" has multiple entries for partition ${p}; ` +
@@ -483,35 +493,7 @@ function validateNoDuplicateTargets(
       }
       seen.add(p);
     }
-  }
-}
-
-/**
- * Derive the per-topic keep-set for partition pause/skip filtering.
- * Per-topic mode is all-or-nothing: every entry for a given topic
- * must specify `partition`, or none of them may. Mixing the two is
- * ambiguous (does the bare entry override the partitioned one or
- * coexist with it?) and rejected loudly. Topics whose entries never
- * specify a partition are omitted from the map (downstream: "keep
- * every assigned partition for that topic").
- */
-function buildKeepPartitions(
-  byTopic: Map<string, NormalizedTopicTarget[]>,
-): Map<string, Set<number>> {
-  const keepPartitions = new Map<string, Set<number>>();
-  for (const [topic, list] of byTopic) {
-    const explicit = list
-      .map((t) => t.partition)
-      .filter((p): p is number => p !== undefined);
-    if (explicit.length === list.length) {
-      keepPartitions.set(topic, new Set(explicit));
-    } else if (explicit.length > 0) {
-      throw new Error(
-        `Topic "${topic}" mixes entries with explicit partitions and entries without one. ` +
-          `Pick one mode per topic: either every entry restricts to a partition, or none do.`,
-      );
-    }
-    // explicit.length === 0 → no restriction; keepPartitions omits the topic.
+    keepPartitions.set(topic, seen);
   }
   return keepPartitions;
 }
@@ -716,8 +698,7 @@ async function buildPreflightPlan(
   const topicNames = [...byTopic.keys()];
   const numPartitionsByTopic = await fetchPartitionCounts(admin, topicNames);
   validateRequestedPartitions(targets, numPartitionsByTopic);
-  const keepPartitions = buildKeepPartitions(byTopic);
-  validateNoDuplicateTargets(byTopic);
+  const keepPartitions = validateAndBuildKeepPartitions(byTopic);
 
   const getWatermarks = createWatermarkCache(admin);
   const seeks: PreflightPlan["seeks"] = [];

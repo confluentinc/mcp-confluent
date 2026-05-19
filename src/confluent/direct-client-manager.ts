@@ -11,8 +11,10 @@ import {
 import {
   BaseClientManager,
   type BaseClientManagerConfig,
+  type ConsumerBuildOptions,
 } from "@src/confluent/base-client-manager.js";
 import { type ClientManager } from "@src/confluent/client-manager.js";
+import { kafkaDeps } from "@src/confluent/node-deps.js";
 import { AsyncLazy, Lazy } from "@src/lazy.js";
 import { kafkaLogger, logger } from "@src/logger.js";
 
@@ -38,7 +40,7 @@ export class DirectClientManager
     this.kafkaConfig = config.kafka;
     this.kafkaClient = new Lazy(
       () =>
-        new KafkaJS.Kafka({
+        new kafkaDeps.Kafka({
           ...this.kafkaConfig,
           kafkaJS: {
             logger: kafkaLogger,
@@ -69,21 +71,7 @@ export class DirectClientManager
 
   /** @inheritdoc */
   async getConsumer(sessionId?: string): Promise<KafkaJS.Consumer> {
-    // Build the config inline, merging with defaults
-    const baseGroupId =
-      (this.kafkaConfig["group.id"] as string) || "mcp-confluent";
-    const groupId = sessionId ? `${baseGroupId}-${sessionId}` : baseGroupId;
-    const consumerConfig = {
-      // Spread all user-provided config
-      ...this.kafkaConfig,
-      // Override with our logic
-      "group.id": groupId,
-      "auto.offset.reset": this.kafkaConfig["auto.offset.reset"] || "earliest",
-      "allow.auto.create.topics":
-        this.kafkaConfig["allow.auto.create.topics"] || false,
-      "enable.auto.commit": this.kafkaConfig["enable.auto.commit"] || false,
-    };
-    return this.kafkaClient.get().consumer(consumerConfig);
+    return this.buildKafkaConsumer({ groupId: sessionId });
   }
 
   /** @inheritdoc */
@@ -119,11 +107,31 @@ export class DirectClientManager
 
   /** @inheritdoc */
   async buildKafkaConsumer(
-    _clusterId?: string,
-    _envId?: string,
-    groupId?: string,
+    opts?: ConsumerBuildOptions,
   ): Promise<KafkaJS.Consumer> {
-    return this.getConsumer(groupId);
+    const baseGroupId =
+      (this.kafkaConfig["group.id"] as string) || "mcp-confluent";
+    const groupId = opts?.groupId
+      ? `${baseGroupId}-${opts.groupId}`
+      : baseGroupId;
+    const offsetReset =
+      opts?.offsetReset ?? this.kafkaConfig["auto.offset.reset"] ?? "earliest";
+    const consumerConfig = {
+      ...this.kafkaConfig,
+      "group.id": groupId,
+      "auto.offset.reset": offsetReset,
+      // The consume-messages tool is a read-only snapshot; never a topic
+      // creator. Hardcode auto-create off so a typo'd topic name can't
+      // silently bring a topic into existence via librdkafka's
+      // default-`true` for this setting.
+      "allow.auto.create.topics": false,
+      // Same hardcode-rather-than-honor logic: this tool is a snapshot
+      // read, not a stream resumption. Committing offsets back would
+      // silently shift the start position for the next call — not part
+      // of the tool contract.
+      "enable.auto.commit": false,
+    };
+    return this.kafkaClient.get().consumer(consumerConfig);
   }
 
   /** @inheritdoc */

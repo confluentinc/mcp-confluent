@@ -32,3 +32,11 @@ function resolveActiveConnectionTypes(): ConnectionType[] {
 
 export const activeConnectionTypes: ConnectionType[] =
   resolveActiveConnectionTypes();
+
+/** Skip reason when `INTEGRATION_TEST_CONNECTION_TYPE` skips the `direct` block of a dual-connection test. */
+export const CONNECTION_TYPE_DIRECT_FILTERED_REASON =
+  "INTEGRATION_TEST_CONNECTION_TYPE doesn't include 'direct'";
+
+/** Skip reason when `INTEGRATION_TEST_CONNECTION_TYPE` skips the `oauth` block of a dual-connection test. */
+export const CONNECTION_TYPE_OAUTH_FILTERED_REASON =
+  "INTEGRATION_TEST_CONNECTION_TYPE doesn't include 'oauth'";

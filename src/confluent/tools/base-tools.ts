@@ -250,4 +250,27 @@ export abstract class BaseToolHandler implements ToolHandler {
     };
     return response;
   }
+
+  /**
+   * Variant of {@link createResponse} that surfaces the response's
+   * machine-readable payload via MCP's `structuredContent` channel (per the
+   * [2025-11-25 spec](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)).
+   * The `message` carries the human-readable summary on `content`; the
+   * `structuredContent` field carries the typed JSON payload callers (or
+   * `outputSchema` validators) can consume directly.
+   *
+   * Issue #435 tracks rolling the channel out across the paginated list
+   * handlers; first adopters are this branch and the in-flight
+   * `get-partition-offsets` branch.
+   */
+  createStructuredResponse(
+    message: string,
+    structuredContent: Record<string, unknown>,
+  ): CallToolResult {
+    return {
+      content: [{ type: "text", text: message }],
+      structuredContent,
+      isError: false,
+    };
+  }
 }

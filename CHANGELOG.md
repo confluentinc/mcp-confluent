@@ -6,6 +6,8 @@ All notable changes to this MCP server will be documented in this file.
 
 ### Added
 
+- **`list-consumer-groups` tool.** Read-only enumeration of consumer groups on a Kafka cluster, wrapping the broker's native `listGroups` admin call. Optional `matchStates` (array of TitleCase state names — `Stable`, `Empty`, etc.) and `matchType` (scalar `Classic` | `Consumer`) filter server-side so callers can ask "show me only Stable groups" or "only the orphaned ones" without a second round trip. Per-broker partial failures surface verbatim through the response's `errors` array; total failures (no groups at all) become a tool-level error citing the first broker message. Closes #489; first of the consumer-group analysis tools under #488.
+- **`BaseToolHandler.createStructuredResponse(text, structured)`.** Additive helper that surfaces a tool's machine-readable payload via MCP's [`structuredContent` channel](https://modelcontextprotocol.io/specification/2025-11-25/server/tools), with the text content keeping its human-readable summary role. First adopter is `list-consumer-groups`; the broader migration across paginated list handlers is tracked in #435.
 - **Tool category taxonomy.** Each tool is now classified into one of 11 `ToolCategory` values (`kafka`, `flink`, ...) — an operator-facing "what kind of tool is this?" axis, orthogonal to the existing "is this tool enabled?" gating. The category surfaces in three places:
   - As `_meta.category` on every `tools/list` advertisement, so MCP clients (Claude, the inspector, etc.) can group or filter the catalog by functional area.
   - In the `--list-tools` CLI output, which now buckets tools under one section header per category instead of printing them in registry-declaration order.

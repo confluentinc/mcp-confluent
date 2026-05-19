@@ -321,7 +321,7 @@ get-flink-statement-exceptions: Retrieve the 10 most recent exceptions for a Fli
 get-topic-config: Retrieve configuration details for a specific Kafka topic.
 list-clusters: Get all clusters in the Confluent Cloud environment
 list-connectors: Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.
-list-consumer-groups: Enumerate consumer groups on a Kafka cluster. Read-only — wraps the broker's listGroups admin call. Optional matchSta...
+list-consumer-groups: List consumer groups on a Kafka cluster — wraps the broker's listGroups admin call. Optional filters narrow the resul...
 list-environments: Get all environments in Confluent Cloud with pagination support
 list-flink-statements: Retrieve a sorted, filtered, paginated list of all statements.
 list-schemas: List all schemas in the Schema Registry.

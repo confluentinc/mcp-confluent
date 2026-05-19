@@ -143,11 +143,11 @@ export class ListConsumerGroupsHandler extends BaseToolHandler {
     return {
       name: ToolName.LIST_CONSUMER_GROUPS,
       description:
-        "Enumerate consumer groups on a Kafka cluster. Read-only — wraps " +
-        "the broker's listGroups admin call. Optional matchStates / matchType " +
-        "filters narrow the result server-side. Response carries one entry " +
-        "per group ({groupId, state, type, protocolType, isSimpleConsumerGroup}) " +
-        "plus an errors array carrying any per-broker partial failures.",
+        "List consumer groups on a Kafka cluster — wraps the broker's " +
+        "listGroups admin call. Optional filters narrow the result " +
+        "server-side. Response carries one entry per group with groupId, " +
+        "state, type, protocolType, and isSimpleConsumerGroup, plus an " +
+        "errors array of any per-broker partial failures.",
       inputSchema: listConsumerGroupsArgs.shape,
       annotations: READ_ONLY,
     };

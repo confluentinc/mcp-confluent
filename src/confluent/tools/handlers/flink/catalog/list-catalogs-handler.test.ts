@@ -68,6 +68,39 @@ describe("list-catalogs-handler.ts", () => {
         },
       );
 
+      it("should surface the executeFlinkSql statement name via _meta.flinkStatementsCreated on success", async () => {
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+        expect(result.isError).not.toBe(true);
+        // statement name is minted client-side by executeFlinkSql via Date.now()
+        // + Math.random(), so it's genuinely non-deterministic from the test's
+        // POV; pin only the prefix the cleanup script keys on
+        expect(result._meta?.flinkStatementsCreated).toEqual([
+          expect.stringMatching(/^mcp-query-/),
+        ]);
+      });
+
+      it("should still surface the statement name via _meta on the error path", async () => {
+        // status poll returning FAILED forces executeFlinkSql into its
+        // error-with-statementName branch (statement was created, just bombed)
+        flinkRest.GET.mockResolvedValue({
+          data: {
+            ...SQL_RESPONSE,
+            status: { phase: "FAILED", detail: "synthetic failure" },
+          },
+        });
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+        expect(result.isError).toBe(true);
+        expect(result._meta?.flinkStatementsCreated).toEqual([
+          expect.stringMatching(/^mcp-query-/),
+        ]);
+      });
+
       it("should embed config environment_id as catalog name in the POST SQL statement", async () => {
         await assertHandleCase({
           handler,

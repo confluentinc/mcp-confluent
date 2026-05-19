@@ -1,5 +1,9 @@
 import { ListTablesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-tables-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import {
+  trackStatementsFromMeta,
+  withSharedFlinkStatementCleanup,
+} from "@tests/harness/flink.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
@@ -18,6 +22,9 @@ describe("list-tables-handler", { tags: [Tag.FLINK] }, () => {
     it.skip("requires flink config", () => {});
     return;
   }
+
+  // sweeps mcp-query-* statements surfaced via _meta.flinkStatementsCreated
+  const { createdStatements } = withSharedFlinkStatementCleanup();
 
   describe.each(activeTransports)("via %s transport", (transport) => {
     let server: StartedServer;
@@ -43,6 +50,7 @@ describe("list-tables-handler", { tags: [Tag.FLINK] }, () => {
         name: ToolName.LIST_FLINK_TABLES,
         arguments: {},
       });
+      trackStatementsFromMeta(result, createdStatements);
 
       // handler filters out INFORMATION_SCHEMA; a fresh env may have no user tables
       expect(textContent(result)).toMatch(

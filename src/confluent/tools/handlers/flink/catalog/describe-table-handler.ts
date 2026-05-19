@@ -6,7 +6,10 @@ import {
   resolveToSchemaName,
 } from "@src/confluent/tools/handlers/flink/catalog/catalog-resolver.js";
 import { FlinkCatalogToolHandler } from "@src/confluent/tools/handlers/flink/catalog/flink-catalog-tool-handler.js";
-import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
+import {
+  executeFlinkSql,
+  type FlinkStatementMeta,
+} from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -77,15 +80,20 @@ export class DescribeTableHandler extends FlinkCatalogToolHandler {
     // Database name is optional - if provided, resolve it to friendly SCHEMA_NAME
     const database_input = resolveDatabaseName(databaseName, conn);
 
-    // If a database was specified, resolve cluster ID to friendly name
-    let schema_name: string | undefined;
-    if (database_input) {
-      const mappings = await getSchemaMapping(clientManager, catalog_name, {
+    const statementsCreated: string[] = [];
+
+    // Only run getSchemaMapping for lkc-* inputs; resolveToSchemaName
+    // passes friendly names through, so the roundtrip would just leak a
+    // statement.
+    let schema_name: string | undefined = database_input;
+    if (database_input?.startsWith("lkc-")) {
+      const lookup = await getSchemaMapping(clientManager, catalog_name, {
         organizationId: organization_id,
         environmentId: environment_id,
         computePoolId: compute_pool_id,
       });
-      schema_name = resolveToSchemaName(database_input, mappings);
+      if (lookup.statementName) statementsCreated.push(lookup.statementName);
+      schema_name = resolveToSchemaName(database_input, lookup.mappings);
     }
 
     // Query INFORMATION_SCHEMA.COLUMNS for full schema details
@@ -101,11 +109,16 @@ export class DescribeTableHandler extends FlinkCatalogToolHandler {
       environmentId: environment_id,
       computePoolId: compute_pool_id,
     });
+    if (result.statementName) statementsCreated.push(result.statementName);
+    const meta: FlinkStatementMeta = {
+      flinkStatementsCreated: statementsCreated,
+    };
 
     if (!result.success) {
       return this.createResponse(
         `Failed to describe table: ${result.error}`,
         true,
+        meta,
       );
     }
 
@@ -117,12 +130,15 @@ export class DescribeTableHandler extends FlinkCatalogToolHandler {
       return this.createResponse(
         `Table ${scope} not found or has no columns.`,
         true,
+        meta,
       );
     }
 
     // Include TABLE_SCHEMA in response so user knows which database the table is in
     return this.createResponse(
       `Table '${tableName}' schema:\n${JSON.stringify(columns, null, 2)}`,
+      false,
+      meta,
     );
   }
 

@@ -41,8 +41,12 @@ const TYPE_NAMES = ["Classic", "Consumer"] as const;
 type StateName = (typeof STATE_NAMES)[number];
 type TypeName = (typeof TYPE_NAMES)[number];
 
-/** Zod-input name → numeric enum value forwarded to `admin.listGroups`. */
-const STATE_NAME_TO_ENUM: Readonly<
+/**
+ * Zod-input name → numeric enum value forwarded to `admin.listGroups`.
+ * Exported for the colocated pin test that asserts coverage against the
+ * upstream `KafkaJS.ConsumerGroupStates` enum.
+ */
+export const STATE_NAME_TO_ENUM: Readonly<
   Record<StateName, KafkaJS.ConsumerGroupStates>
 > = {
   Unknown: KafkaJS.ConsumerGroupStates.UNKNOWN,
@@ -53,7 +57,13 @@ const STATE_NAME_TO_ENUM: Readonly<
   Empty: KafkaJS.ConsumerGroupStates.EMPTY,
 };
 
-const TYPE_NAME_TO_ENUM: Readonly<
+/**
+ * Zod-input name → numeric enum value forwarded to `admin.listGroups`.
+ * Exported for the colocated pin test that asserts coverage against the
+ * upstream `KafkaJS.ConsumerGroupTypes` enum (minus the UNKNOWN slot,
+ * which is deliberately excluded from the input vocabulary).
+ */
+export const TYPE_NAME_TO_ENUM: Readonly<
   Record<TypeName, KafkaJS.ConsumerGroupTypes>
 > = {
   Classic: KafkaJS.ConsumerGroupTypes.CLASSIC,

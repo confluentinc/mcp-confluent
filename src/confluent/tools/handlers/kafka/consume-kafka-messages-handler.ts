@@ -589,6 +589,9 @@ async function resolveTailSeek(
   const low = BigInt(partOffsets.low);
   const high = BigInt(partOffsets.high);
   const candidate = high - BigInt(count);
+  // Manual clamp instead of Math.max: Math.max rejects BigInt operands
+  // (TypeError: Cannot convert a BigInt value to a number), and the
+  // BigInt path is load-bearing because Kafka offsets are int64.
   const target = candidate < low ? low : candidate;
   return { topic, partition, offset: target.toString() };
 }

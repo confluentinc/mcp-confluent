@@ -24,7 +24,9 @@ global_job_config:
       - npm ci --prefer-offline --include=dev
       # Chromium is needed by @oauth-tagged tests; install unconditionally so
       # any CONNECTION_TYPE override "just works" without per-block wiring.
-      - npm run setup:oauth-browsers
+      # Uses the locally-installed playwright-core CLI so the chromium version
+      # stays aligned with our playwright-core devDep (no fresh registry fetch).
+      - npx playwright-core install chromium
       - . vault-setup --version v3 --role mcp-confluent
       - make setup-test-env
       - npm run build

@@ -174,6 +174,7 @@ describe("tool-registry.ts", () => {
         [ToolName.DELETE_TOPICS]: kafkaBootstrapOrOAuth,
         [ToolName.PRODUCE_MESSAGE]: kafkaBootstrapOrOAuth,
         [ToolName.CONSUME_MESSAGES]: kafkaBootstrapOrOAuth,
+        [ToolName.LIST_CONSUMER_GROUPS]: kafkaBootstrapOrOAuth,
         [ToolName.ALTER_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         [ToolName.GET_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         // Flink
@@ -346,6 +347,15 @@ describe("tool-registry.ts", () => {
         outcome: { resolves: "Kafka topics:" },
         setup: async (cm) => {
           (await cm.getAdminClient()).listTopics.mockResolvedValue([]);
+        },
+      },
+      [ToolName.LIST_CONSUMER_GROUPS]: {
+        outcome: { resolves: "Found 0 consumer group" },
+        setup: async (cm) => {
+          (await cm.getAdminClient()).listGroups.mockResolvedValue({
+            groups: [],
+            errors: [],
+          });
         },
       },
       [ToolName.CREATE_TOPICS]: { outcome: { throws: "ZodError" } },

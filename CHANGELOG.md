@@ -14,6 +14,7 @@ All notable changes to this MCP server will be documented in this file.
   - `{name: "orders", partition: 0, start: {offset: "42"}}` — read partition 0 starting at offset 42.
   - `{name: "orders", start: {timestamp: "2026-05-14T17:00:00Z"}}` — every partition seeks to the broker-resolved offset for that timestamp.
   - `{name: "A", start: "earliest"}, {name: "B", start: "latest"}` — mixed-direction call: topic A replays its history while topic B parks at its high watermark.
+- **`consume-messages` tail mode: `start: {tail: N}`.** The handler resolves the partition's watermarks server-side, seeks to `max(lowWatermark, highWatermark - N)`, and returns immediately with whatever already-written messages sit between that offset and the high watermark — no waiting for new traffic to arrive. Empty partitions (`low === high`) return zero messages without error. Allows for nonblocking reads of the most recent messages in a partition.
 
 ### Changed
 

@@ -79,8 +79,9 @@ export type DescribeConsumerGroupCoordinator = {
  * Deliberately omits the raw `memberAssignment` / `memberMetadata` Buffer
  * fields the upstream {@link MemberDescription} carries — they're
  * librdkafka's protocol-level encoded form and useless to an LLM caller.
- * The cooked {@link TopicPartition}[] on `assignment` is the equivalent
- * information in a callable shape.
+ * Each member's {@link AssignedPartition}[] on `assignment` is the
+ * equivalent information in a callable shape, narrower than the upstream
+ * {@link KafkaJS} `TopicPartition` (no `error` / `leaderEpoch` fields).
  */
 export type DescribeConsumerGroupResponse = {
   groupId: string;
@@ -104,8 +105,8 @@ export class DescribeConsumerGroupHandler extends BaseToolHandler {
         "Describe a single consumer group on a Kafka cluster — wraps the " +
         "broker's describeGroups admin call for one group ID. Returns the " +
         "group's state, type, protocol, partition assignor, coordinator, " +
-        "and per-member assignment (cooked TopicPartition[] form, not the " +
-        "raw librdkafka memberAssignment Buffer).",
+        "and per-member assignment as a flat array of {topic, partition} " +
+        "pairs (the raw librdkafka memberAssignment Buffer is dropped).",
       inputSchema: describeConsumerGroupArgs.shape,
       annotations: READ_ONLY,
     };

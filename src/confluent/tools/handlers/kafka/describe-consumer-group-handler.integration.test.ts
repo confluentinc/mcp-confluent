@@ -69,9 +69,13 @@ describe("describe-consumer-group-handler", { tags: [Tag.KAFKA] }, () => {
       // every success path (Stable / Empty / etc.), and the requested id
       // appears verbatim in the text — so this proves the tool ran
       // end-to-end against a real broker AND returned the right group.
-      expect(textContent(result)).toMatch(
-        new RegExp(`^Consumer group "${discoveredGroupId}" is `),
-      );
+      // Use a literal `startsWith` (via the text-and-message expect form)
+      // rather than `new RegExp(...)` — consumer group IDs can legally
+      // contain regex metacharacters (`.`, `[`, etc.), which would either
+      // throw on RegExp construction or false-match in the assertion.
+      const text = textContent(result);
+      const expectedPrefix = `Consumer group "${discoveredGroupId}" is `;
+      expect(text.startsWith(expectedPrefix), text).toBe(true);
     });
 
     it("should return the caller-friendly not-found error for an unknown group ID", async () => {

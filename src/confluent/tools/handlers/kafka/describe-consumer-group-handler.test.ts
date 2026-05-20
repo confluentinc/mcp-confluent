@@ -137,6 +137,20 @@ describe("describe-consumer-group-handler.ts", () => {
         "groupId",
       ]);
     });
+
+    it("should describe the per-member assignment shape honestly (not as 'TopicPartition[]', which the handler narrows past)", () => {
+      // The response narrows `assignment` to `AssignedPartition[]`
+      // (`{ topic, partition }` only — `error` / `leaderEpoch` stripped).
+      // An earlier draft of this description, the response-type
+      // docstring, and the CHANGELOG all advertised the wider
+      // `TopicPartition[]` upstream shape — a literal-truth lie that
+      // Copilot flagged. This test pins the description against
+      // recurrence: the surfaced text must not advertise a wider shape
+      // than the code actually returns.
+      const description = handler.getToolConfig().description;
+      expect(description).not.toMatch(/TopicPartition\[\]/);
+      expect(description).toMatch(/\{ ?topic, ?partition ?\}/);
+    });
   });
 
   describe("enabledConnectionIds()", () => {

@@ -1,9 +1,23 @@
 import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
+  activeConnectionTypes,
+  CONNECTION_TYPE_DIRECT_FILTERED_REASON,
+  CONNECTION_TYPE_OAUTH_FILTERED_REASON,
+  ConnectionType,
+} from "@tests/harness/connection-types.js";
+import {
   getTestClusterId,
   withSharedAdminClient,
 } from "@tests/harness/kafka-admin.js";
+import {
+  callToolWithOAuthFlow,
+  getOAuthCredentialsFromEnv,
+  OAUTH_FIXTURE_NOT_LOADED_REASON,
+  OAUTH_USER_CREDS_MISSING_REASON,
+  startOAuthServer,
+  stopOAuthServer,
+} from "@tests/harness/oauth-flow.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
@@ -16,47 +30,113 @@ import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new GetTopicConfigHandler();
-const runtime = integrationRuntime();
 
 describe("get-topic-config", { tags: [Tag.KAFKA] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires kafka.rest_endpoint + kafka.auth config", () => {});
-    return;
-  }
+  // the handler's `kafkaRestWithAuthOrOAuth` predicate accepts either a direct
+  // `kafka.rest_endpoint + kafka.auth` block or an OAuth connection; sibling describes exercise each path
 
-  const clusterId = getTestClusterId();
-  // installs beforeAll/afterAll at this describe scope (shared admin client, topic cleanup)
-  const { admin, createdTopics } = withSharedAdminClient();
+  describe(`with a ${ConnectionType.DIRECT} connection`, () => {
+    if (!activeConnectionTypes.includes(ConnectionType.DIRECT)) {
+      it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
+      return;
+    }
+    const directRuntime = integrationRuntime({ oauth: false });
+    if (handler.enabledConnectionIds(directRuntime).length === 0) {
+      it.skip("requires kafka.rest_endpoint + kafka.auth in test-fixtures/yaml_configs/integration.yaml", () => {});
+      return;
+    }
 
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    const clusterId = getTestClusterId();
+    // installs beforeAll/afterAll at this describe scope (shared admin client, topic cleanup)
+    const { admin, createdTopics } = withSharedAdminClient();
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should return the topic configuration for an existing topic", async () => {
-      const topic = uniqueName(`get-config-${transport}`);
-      createdTopics.push(topic);
-      await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
-
-      const result = await server.client.callTool({
-        name: ToolName.GET_TOPIC_CONFIG,
-        arguments: {
-          clusterId,
-          topicName: topic,
-        },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      // handler embeds a JSON blob with both topicDetails and topicConfig
-      const text = textContent(result);
-      expect(text).toContain(`Topic configuration for '${topic}'`);
-      expect(text).toContain("topicDetails");
-      expect(text).toContain("topicConfig");
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should return the topic configuration for an existing topic", async () => {
+        const topic = uniqueName(`get-config-${transport}`);
+        createdTopics.push(topic);
+        await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
+
+        const result = await server.client.callTool({
+          name: ToolName.GET_TOPIC_CONFIG,
+          arguments: {
+            clusterId,
+            topicName: topic,
+          },
+        });
+
+        // handler embeds a JSON blob with both topicDetails and topicConfig
+        const text = textContent(result);
+        expect(text).toContain(`Topic configuration for '${topic}'`);
+        expect(text).toContain("topicDetails");
+        expect(text).toContain("topicConfig");
+      });
     });
   });
+
+  describe(
+    `with a ${ConnectionType.OAUTH} connection`,
+    { tags: [Tag.OAUTH] },
+    () => {
+      if (!activeConnectionTypes.includes(ConnectionType.OAUTH)) {
+        it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
+        return;
+      }
+      const oauthRuntime = integrationRuntime({ oauth: true });
+      if (handler.enabledConnectionIds(oauthRuntime).length === 0) {
+        it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+        return;
+      }
+      const credentials = getOAuthCredentialsFromEnv();
+      if (!credentials) {
+        it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
+        return;
+      }
+
+      const clusterId = getTestClusterId();
+      // seed via the api-key-authed admin client; GET_TOPIC_CONFIG goes via OAuth
+      const { admin, createdTopics } = withSharedAdminClient();
+
+      describe.each(activeTransports)("via %s transport", (transport) => {
+        let server: StartedServer;
+
+        beforeAll(async () => {
+          server = await startOAuthServer({ transport });
+        }, 180_000);
+
+        afterAll(async () => {
+          await stopOAuthServer(server);
+        });
+
+        // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+        it("should return the topic configuration for an existing topic", async () => {
+          const topic = uniqueName(`get-config-oauth-${transport}`);
+          createdTopics.push(topic);
+          await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
+
+          const result = await callToolWithOAuthFlow(server, credentials, {
+            name: ToolName.GET_TOPIC_CONFIG,
+            arguments: {
+              clusterId,
+              topicName: topic,
+            },
+          });
+
+          const text = textContent(result);
+          expect(text).toContain(`Topic configuration for '${topic}'`);
+          expect(text).toContain("topicDetails");
+          expect(text).toContain("topicConfig");
+        });
+      });
+    },
+  );
 });

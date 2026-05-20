@@ -1,3 +1,4 @@
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { GetPartitionOffsetsHandler } from "@src/confluent/tools/handlers/kafka/get-partition-offsets-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -208,11 +209,13 @@ describe("get-partition-offsets-handler.ts", () => {
       );
     });
 
-    it("should surface a clean 'topic not found' error and not leak the librdkafka message when fetchTopicOffsets rejects with an unknown-topic error", async () => {
+    it("should surface a clean 'topic not found' error for a KafkaJSError carrying ERR_UNKNOWN_TOPIC_OR_PART (broker-issued unknown-topic code)", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchTopicOffsets.mockRejectedValue(
-        new Error("Broker: Unknown topic or partition"),
+        new KafkaJS.KafkaJSError("Broker: Unknown topic or partition", {
+          code: KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART,
+        }),
       );
 
       const result = await handler.handle(buildRuntime(clientManager), {
@@ -223,11 +226,80 @@ describe("get-partition-offsets-handler.ts", () => {
       expect(textOf(result)).toContain(
         'Topic "no-such-topic" not found on this cluster',
       );
-      // The librdkafka raw text should not be the headline; the clean
-      // tool-level message wraps it.
-      expect(textOf(result)).not.toMatch(
-        /^Broker: Unknown topic or partition$/,
+      // The friendly path replaces the librdkafka text entirely; the broker
+      // wording must not leak through as the headline.
+      expect(textOf(result)).not.toContain(
+        "Broker: Unknown topic or partition",
       );
+    });
+
+    it("should surface a clean 'topic not found' error for a KafkaJSError carrying ERR__UNKNOWN_TOPIC (local librdkafka unknown-topic code)", async () => {
+      // librdkafka emits two distinct codes for the same conceptual failure:
+      // the broker-issued ERR_UNKNOWN_TOPIC_OR_PART (tested above) and the
+      // local-side ERR__UNKNOWN_TOPIC (double underscore, fires when the
+      // client's own metadata cache says the topic doesn't exist before a
+      // round trip happens). Both must funnel into the same friendly path.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchTopicOffsets.mockRejectedValue(
+        new KafkaJS.KafkaJSError("Local: Unknown topic", {
+          code: KafkaJS.ErrorCodes.ERR__UNKNOWN_TOPIC,
+        }),
+      );
+
+      const result = await handler.handle(buildRuntime(clientManager), {
+        topicName: "no-such-topic",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toContain(
+        'Topic "no-such-topic" not found on this cluster',
+      );
+    });
+
+    it("should surface the real Kafka error (NOT 'topic not found') when fetchTopicOffsets rejects with a connection/auth/timeout failure", async () => {
+      // The whole point of this branch: an auth denial, a TLS handshake
+      // failure, a broker timeout, or any other non-unknown-topic error
+      // must NOT be misclassified as "topic not found" — that would hide
+      // actionable troubleshooting detail from callers. Anything that
+      // isn't one of the two unknown-topic codes flows through
+      // formatKafkaError so the real cause reaches the agent.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchTopicOffsets.mockRejectedValue(
+        new KafkaJS.KafkaJSConnectionError("broker unreachable: ETIMEDOUT", {
+          code: KafkaJS.ErrorCodes.ERR__TRANSPORT,
+        }),
+      );
+
+      const result = await handler.handle(buildRuntime(clientManager), {
+        topicName: "orders",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toContain("broker unreachable: ETIMEDOUT");
+      expect(textOf(result)).not.toContain("not found on this cluster");
+    });
+
+    it("should surface the underlying message (NOT 'topic not found') when fetchTopicOffsets rejects with a non-Kafka error shape", async () => {
+      // Defensive coverage of the "library threw something we don't
+      // recognize" path: a plain Error has no `code` field, so it must
+      // not satisfy the unknown-topic guard. formatKafkaError handles
+      // arbitrary unknown shapes by stringifying them; the assertion
+      // pins that the agent sees the real text, not the friendly one.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchTopicOffsets.mockRejectedValue(
+        new Error("unexpected library failure"),
+      );
+
+      const result = await handler.handle(buildRuntime(clientManager), {
+        topicName: "orders",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toContain("unexpected library failure");
+      expect(textOf(result)).not.toContain("not found on this cluster");
     });
 
     it("should surface a clean out-of-range error citing the actual partition span when a `partition` arg is past the topic's range", async () => {

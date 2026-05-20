@@ -1,3 +1,4 @@
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -7,6 +8,7 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   disposeIfOAuth,
+  formatKafkaError,
   resolveKafkaClusterArgs,
 } from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
@@ -141,16 +143,31 @@ export class GetPartitionOffsetsHandler extends BaseToolHandler {
       try {
         watermarks = await fetchPartitionWatermarks(admin, parsed.topicName);
       } catch (err: unknown) {
-        // Don't leak librdkafka's raw text — the issue is explicit that the
-        // tool-level message is what callers should see. Log the underlying
-        // error so operators debugging from the server side can still find
-        // the librdkafka detail.
-        logger.warn(
-          { error: err, topicName: parsed.topicName },
-          `fetchTopicOffsets rejected for "${parsed.topicName}" — surfacing as topic-not-found`,
-        );
+        // Two distinct librdkafka codes report the same conceptual failure:
+        //   - ERR_UNKNOWN_TOPIC_OR_PART (broker-issued, single underscore)
+        //   - ERR__UNKNOWN_TOPIC (local-side, double underscore — fires when
+        //     the client's own metadata cache rejects the topic before
+        //     reaching the broker)
+        // Only those two get the friendly "topic not found" message;
+        // everything else (auth denials, TLS failures, broker timeouts,
+        // unknown shapes) flows through formatKafkaError so callers see
+        // actionable signal instead of a misleading not-found label.
+        const isUnknownTopic =
+          err instanceof KafkaJS.KafkaJSError &&
+          (err.code === KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART ||
+            err.code === KafkaJS.ErrorCodes.ERR__UNKNOWN_TOPIC);
+        if (isUnknownTopic) {
+          logger.warn(
+            { error: err, topicName: parsed.topicName },
+            `fetchTopicOffsets rejected for "${parsed.topicName}" — surfacing as topic-not-found`,
+          );
+          return this.createResponse(
+            `Topic "${parsed.topicName}" not found on this cluster.`,
+            true,
+          );
+        }
         return this.createResponse(
-          `Topic "${parsed.topicName}" not found on this cluster.`,
+          `Failed to fetch partition offsets for "${parsed.topicName}": ${formatKafkaError(err)}`,
           true,
         );
       }

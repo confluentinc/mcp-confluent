@@ -5,6 +5,7 @@ export enum ToolName {
   PRODUCE_MESSAGE = "produce-message",
   CONSUME_MESSAGES = "consume-messages",
   LIST_CONSUMER_GROUPS = "list-consumer-groups",
+  DESCRIBE_CONSUMER_GROUP = "describe-consumer-group",
   LIST_FLINK_STATEMENTS = "list-flink-statements",
   CREATE_FLINK_STATEMENT = "create-flink-statement",
   READ_FLINK_STATEMENT = "read-flink-statement",

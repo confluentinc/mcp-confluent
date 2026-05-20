@@ -22,6 +22,18 @@ export const OAUTH_USER_CREDS_MISSING_REASON =
   "requires CONFLUENT_CLOUD_USERNAME + CONFLUENT_CLOUD_PASSWORD for playwright-driven Auth0 sign-in";
 
 /**
+ * Skip reason for an OAuth describe that relies on direct-fixture-backed test-side seeding or
+ * verification helpers (admin/SR clients, env-id discovery). The MCP server under test is
+ * OAuth-authed, but the test harness still needs to create the resource the tool acts on (or
+ * verify the broker/SR state after the tool runs), and those helpers read api-key creds out of
+ * `integration.yaml`. An OAuth-only CI lane that lacks the direct fixture creds should skip
+ * cleanly via this gate rather than crash inside a `beforeAll`. Pair with the predicate-against-
+ * direct-runtime check shown in the OAuth describe of any test that seeds.
+ */
+export const DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON =
+  "OAuth describe uses direct-fixture-backed test-side seeding/verification helpers; missing required block in test-fixtures/yaml_configs/integration.yaml";
+
+/**
  * Returns CCloud user creds from process.env, or `undefined` if either var is
  * missing. Callers pair this with an `it.skip(OAUTH_USER_CREDS_MISSING_REASON)`
  * + return early when the result is `undefined`.

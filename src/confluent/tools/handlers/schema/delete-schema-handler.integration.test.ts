@@ -8,6 +8,7 @@ import {
 } from "@tests/harness/connection-types.js";
 import {
   callToolWithOAuthFlow,
+  DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
   getOAuthCredentialsFromEnv,
   OAUTH_FIXTURE_NOT_LOADED_REASON,
   OAUTH_USER_CREDS_MISSING_REASON,
@@ -110,8 +111,16 @@ describe("delete-schema-handler", { tags: [Tag.SCHEMA] }, () => {
         it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
         return;
       }
+      // `withSharedSrClient()` builds an api-key SR client from the direct fixture; gate the
+      // OAuth describe on the same predicate the direct describe uses so an OAuth-only CI lane
+      // without direct creds skips cleanly instead of crashing in beforeAll
+      const directRuntime = integrationRuntime({ oauth: false });
+      if (handler.enabledConnectionIds(directRuntime).length === 0) {
+        it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+        return;
+      }
 
-      // seed via the test-side SR client (api-key auth) — the server-side OAuth path is what
+      // seed via the test-side SR client (api-key auth); the server-side OAuth path is what
       // we're exercising via the DELETE_SCHEMA call below
       const { client, createdSubjects } = withSharedSrClient();
 

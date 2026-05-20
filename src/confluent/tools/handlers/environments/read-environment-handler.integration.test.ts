@@ -1,6 +1,6 @@
 import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { getFirstTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
+import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
   CONNECTION_TYPE_DIRECT_FILTERED_REASON,
@@ -42,12 +42,7 @@ describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
       it.skip("requires confluent_cloud.auth in test-fixtures/yaml_configs/integration.yaml", () => {});
       return;
     }
-
-    // resolve once per file - same env id across all transport iterations
-    let environmentId: string;
-    beforeAll(async () => {
-      environmentId = await getFirstTestEnvironmentId();
-    });
+    const environmentId = getTestEnvironmentId();
 
     describe.each(activeTransports)("via %s transport", (transport) => {
       let server: StartedServer;
@@ -96,20 +91,16 @@ describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
         it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
         return;
       }
-      // `getFirstTestEnvironmentId()` builds an api-key CCloud client from the direct fixture;
-      // gate the OAuth describe on the same predicate the direct describe uses so an OAuth-only
-      // CI lane without direct creds skips cleanly instead of crashing in beforeAll
+      // `getTestEnvironmentId()` reads `kafka.env_id` out of the direct YAML; gate the OAuth
+      // describe on the same predicate the direct describe uses so an OAuth-only CI lane without
+      // direct creds skips cleanly instead of crashing on missing fixture
       const directRuntime = integrationRuntime({ oauth: false });
       if (handler.enabledConnectionIds(directRuntime).length === 0) {
         it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
         return;
       }
-
-      // env id discovery uses direct CCloud creds — the OAuth handler itself talks to CCloud via OAuth
-      let environmentId: string;
-      beforeAll(async () => {
-        environmentId = await getFirstTestEnvironmentId();
-      });
+      // env id is read from the direct YAML; the OAuth-mode handler itself talks to CCloud via OAuth
+      const environmentId = getTestEnvironmentId();
 
       describe.each(activeTransports)("via %s transport", (transport) => {
         let server: StartedServer;

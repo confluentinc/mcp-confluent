@@ -20,12 +20,15 @@ When telemetry is disabled, no events are sent.
 
 ## What Events Are Tracked
 
-The server tracks tool call completions and failures, server startup, and Confluent Cloud authentication outcomes.
+The server tracks tool call completions and failures, server startup, Confluent Cloud authentication outcomes, and clicks on the agent-skills install hint shown on the OAuth success page.
 
 ### Captured Information
 
 - Tool name, execution duration, and success/error status
-- Confluent Cloud authentication outcome (success or failure reason). Successful logins also include `ccloudUserId` (the user's Confluent Cloud `resource_id`) and `ccloudDomain` (the domain portion of the user's email).
+- Confluent Cloud authentication outcome (success or failure reason).
+  Successful logins also include `ccloudUserId` (the user's Confluent Cloud `resource_id`) and `ccloudDomain` (the domain portion of the user's email).
+- Clicks on the "Copy" button for the agent-skills install command on the OAuth success page.
+  No payload is captured beyond the event itself and the shared context information below.
 
 ### Context Information (Sent with All Events)
 

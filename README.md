@@ -68,7 +68,7 @@ Categories marked with ¹ also work with [OAuth authentication](#oauth-authentic
 
 | Category                                     | Tools                                                                                                                                                                                               | Description                                                                                |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Kafka** ¹                                  | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `list-consumer-groups`, `alter-topic-config`, `get-topic-config`                                            | Manage topics, produce/consume messages, inspect consumer groups, configure topic settings |
+| **Kafka** ¹                                  | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `list-consumer-groups`, `describe-consumer-group`, `alter-topic-config`, `get-topic-config`                 | Manage topics, produce/consume messages, inspect consumer groups, configure topic settings |
 | **Flink SQL**                                | `create-flink-statement`, `list-flink-statements`, `read-flink-statement`, `delete-flink-statements`, `get-flink-statement-exceptions`                                                              | Create and manage Flink SQL statements                                                     |
 | **Flink Catalog**                            | `list-flink-catalogs`, `list-flink-databases`, `list-flink-tables`, `describe-flink-table`, `get-flink-table-info`                                                                                  | Explore Flink catalogs, databases, and table schemas                                       |
 | **Flink Diagnostics**                        | `check-flink-statement-health`, `detect-flink-statement-issues`, `get-flink-statement-profile`                                                                                                      | Health checks, issue detection, and query profiling                                        |
@@ -102,10 +102,10 @@ connections:
 
 Ready-to-use variants live in [`sample_configs/`](sample_configs/).
 
-| Category            | Tools                                                                                                          | Description                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `list-consumer-groups` | Manage topics, produce/consume messages, inspect consumer groups |
-| **Schema Registry** | `list-schemas`, `delete-schema`                                                                                | List, inspect, and delete data schemas                           |
+| Category            | Tools                                                                                                                                     | Description                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `list-consumer-groups`, `describe-consumer-group` | Manage topics, produce/consume messages, inspect consumer groups |
+| **Schema Registry** | `list-schemas`, `delete-schema`                                                                                                           | List, inspect, and delete data schemas                           |
 
 ## Getting Started
 
@@ -310,6 +310,7 @@ delete-flink-statements: Make a request to delete a statement.
 delete-tag: Delete a tag definition from Confluent Cloud.
 delete-topics: Delete the topic with the given names.
 check-flink-statement-health: Perform an aggregate health check for a Flink SQL statement.
+describe-consumer-group: Describe a single consumer group on a Kafka cluster — wraps the broker's describeGroups admin call for one group ID. Returns state, type, protocol, coordinator, and per-member assignment.
 describe-flink-table: Get full schema details for a Flink table via INFORMATION_SCHEMA.COLUMNS.
 detect-flink-statement-issues: Detect issues for a Flink SQL statement by analyzing status, exceptions, and metrics.
 get-flink-statement-profile: Get Query Profiler data with task graph, metrics, and automated issue detection.

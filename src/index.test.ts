@@ -274,6 +274,7 @@ describe("index.ts", () => {
         ToolName.PRODUCE_MESSAGE,
         ToolName.CONSUME_MESSAGES,
         ToolName.LIST_CONSUMER_GROUPS,
+        ToolName.DESCRIBE_CONSUMER_GROUP,
         ToolName.LIST_ENVIRONMENTS,
         ToolName.READ_ENVIRONMENT,
         ToolName.LIST_ORGANIZATIONS,

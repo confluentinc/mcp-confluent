@@ -1,5 +1,6 @@
 import { DeleteSchemaHandler } from "@src/confluent/tools/handlers/schema/delete-schema-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
   CONNECTION_TYPE_DIRECT_FILTERED_REASON,
@@ -120,6 +121,10 @@ describe("delete-schema-handler", { tags: [Tag.SCHEMA] }, () => {
         return;
       }
 
+      // OAuth handlers don't carry a `schema_registry` block, so the SR endpoint is resolved at
+      // call time from `environment_id`; under OAuth the handler errors when this arg is omitted
+      const environmentId = getTestEnvironmentId();
+
       // seed via the test-side SR client (api-key auth); the server-side OAuth path is what
       // we're exercising via the DELETE_SCHEMA call below
       const { client, createdSubjects } = withSharedSrClient();
@@ -149,7 +154,7 @@ describe("delete-schema-handler", { tags: [Tag.SCHEMA] }, () => {
 
           const result = await callToolWithOAuthFlow(server, credentials, {
             name: ToolName.DELETE_SCHEMA,
-            arguments: { subject },
+            arguments: { subject, environment_id: environmentId },
           });
 
           expect(textContent(result)).toContain(

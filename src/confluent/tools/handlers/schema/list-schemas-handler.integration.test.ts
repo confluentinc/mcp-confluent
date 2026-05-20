@@ -1,5 +1,6 @@
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
   CONNECTION_TYPE_DIRECT_FILTERED_REASON,
@@ -117,6 +118,10 @@ describe("list-schemas-handler", { tags: [Tag.SCHEMA] }, () => {
         return;
       }
 
+      // OAuth handlers don't carry a `schema_registry` block, so the SR endpoint is resolved at
+      // call time from `environment_id`; under OAuth the handler errors when this arg is omitted
+      const environmentId = getTestEnvironmentId();
+
       // seed via the test-side SR client (api-key auth); the server-side OAuth path is what
       // we're exercising via the LIST_SCHEMAS call below
       const { client, createdSubjects } = withSharedSrClient();
@@ -150,7 +155,10 @@ describe("list-schemas-handler", { tags: [Tag.SCHEMA] }, () => {
         it("should return a subject map that includes the seeded subject", async () => {
           const result = await callToolWithOAuthFlow(server, credentials, {
             name: ToolName.LIST_SCHEMAS,
-            arguments: { subjectPrefix: subject },
+            arguments: {
+              subjectPrefix: subject,
+              environment_id: environmentId,
+            },
           });
 
           expect(result.isError, textContent(result)).not.toBe(true);

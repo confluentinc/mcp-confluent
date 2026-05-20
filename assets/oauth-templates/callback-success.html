@@ -19,8 +19,7 @@
     <div class="install-hint">
       <h2>Next: install the Confluent agent skills</h2>
       <p>
-        Run this in your terminal to add Confluent's agent skills to your
-        agent:
+        Run this in your terminal to add Confluent's agent skills to your agent:
       </p>
       <div class="install-hint__cmd-row">
         <code id="install-cmd" class="install-hint__cmd"
@@ -39,6 +38,22 @@
 
     <script>
       (function () {
+        // Open an EventSource so the local CLI's callback server knows the
+        // user is still on this page. The server keeps its listener bound
+        // while at least one stream is connected, and closes it as soon as
+        // this stream disconnects (tab close / refresh / navigation away) —
+        // so beacons from the Copy button below are guaranteed to land on
+        // a live listener.
+        try {
+          var stream = new EventSource("{{streamPath}}");
+          // The CLI only writes a comment frame and never sends events; if it
+          // does close the stream we don't want EventSource's auto-reconnect
+          // to keep hammering the now-dead port.
+          stream.onerror = function () {
+            stream.close();
+          };
+        } catch (e) {}
+
         var btn = document.getElementById("install-cmd-copy");
         var cmdEl = document.getElementById("install-cmd");
         if (!btn || !cmdEl) return;
@@ -53,7 +68,7 @@
           var afterCopy = function (ok) {
             done(ok ? "Copied!" : "Copy failed");
             try {
-              fetch("/skills-hint-copied", {
+              fetch("{{copiedPath}}", {
                 method: "POST",
                 keepalive: true,
               }).catch(function () {});

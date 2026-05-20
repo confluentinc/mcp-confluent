@@ -20,7 +20,7 @@ When telemetry is disabled, no events are sent.
 
 ## What Events Are Tracked
 
-The server tracks tool call completions and failures, server startup, Confluent Cloud authentication outcomes, and clicks on the agent-skills install hint shown on the OAuth success page.
+The server tracks tool call completions and failures, server startup, Confluent Cloud authentication outcomes, and clicks on the "Copy" button next to the agent-skills install command on the OAuth success page.
 
 ### Captured Information
 

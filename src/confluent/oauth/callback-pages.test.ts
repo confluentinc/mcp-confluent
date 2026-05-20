@@ -12,8 +12,13 @@ describe("oauth/callback-pages.ts", () => {
   });
 
   describe("renderSuccessPage", () => {
+    const paths = {
+      copiedPath: "/skills-hint-copied",
+      streamPath: "/skills-hint-stream",
+    };
+
     it("should produce HTML containing the Confluent branding and success copy", () => {
-      const html = renderSuccessPage();
+      const html = renderSuccessPage(paths);
       expect(html.toLowerCase()).toContain("<!doctype html>");
       expect(html).toContain("Authentication Complete");
       // SVG logo from the template
@@ -23,23 +28,35 @@ describe("oauth/callback-pages.ts", () => {
       expect(html).not.toContain("{#include styles/}");
     });
 
-    it("should include the agent-skills install hint, copy button, and beacon endpoint", () => {
-      const html = renderSuccessPage();
+    it("should include the agent-skills install hint, copy button, and injected endpoints", () => {
+      const html = renderSuccessPage(paths);
       // Verbatim install command users will copy
       expect(html).toContain("npx skills add confluentinc/agent-skills");
       // Copy button and target box are wired by id
       expect(html).toContain('id="install-cmd"');
       expect(html).toContain('id="install-cmd-copy"');
-      // Telemetry beacon path is referenced from the inline script
-      expect(html).toContain("/skills-hint-copied");
+      // The server's path constants land verbatim in the rendered HTML so the
+      // template and server can't drift.
+      expect(html).toContain(paths.copiedPath);
+      expect(html).toContain(paths.streamPath);
+      // Placeholders are fully substituted.
+      expect(html).not.toContain("{{copiedPath}}");
+      expect(html).not.toContain("{{streamPath}}");
     });
 
-    it("should cache the rendered page across calls", () => {
+    it("should substitute different paths per call without rereading the template", () => {
       const readSpy = vi.spyOn(nodeDeps.fs, "readFileSync");
-      const first = renderSuccessPage();
+      const first = renderSuccessPage(paths);
       const callsAfterFirst = readSpy.mock.calls.length;
-      const second = renderSuccessPage();
-      expect(second).toBe(first);
+      const second = renderSuccessPage({
+        copiedPath: "/alt-copied",
+        streamPath: "/alt-stream",
+      });
+      expect(first).toContain(paths.copiedPath);
+      expect(second).toContain("/alt-copied");
+      expect(second).toContain("/alt-stream");
+      // Template is cached after the first read — placeholder substitution
+      // doesn't trigger another readFileSync.
       expect(readSpy.mock.calls.length).toBe(callsAfterFirst);
     });
   });

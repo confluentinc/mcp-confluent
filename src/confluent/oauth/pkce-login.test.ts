@@ -7,8 +7,9 @@ import {
   PKCE_LOGIN_TIMEOUT_MS,
   PkceLoginError,
   runPkceLogin,
-  SKILLS_HINT_BEACON_GRACE_MS,
   SKILLS_HINT_COPIED_PATH,
+  SKILLS_HINT_STREAM_PATH,
+  SUCCESS_PAGE_MAX_LIFETIME_MS,
 } from "@src/confluent/oauth/pkce-login.js";
 import { TelemetryEvent } from "@src/confluent/telemetry.js";
 import {
@@ -102,9 +103,11 @@ describe("oauth/pkce-login.ts", () => {
       expect(result.dataPlaneToken).toBe("dp-token");
       expect(result.refreshToken).toBe("refresh-token");
 
-      // After successful auth the listener stays alive for the beacon grace
-      // window; advance fake timers past it before asserting close.
-      await vi.advanceTimersByTimeAsync(SKILLS_HINT_BEACON_GRACE_MS);
+      // After successful auth the listener stays bound to wait for the
+      // success page's EventSource; without any stream connecting it sits
+      // open until the safety timer fires.
+      expect(httpMock.closed()).toBe(false);
+      await vi.advanceTimersByTimeAsync(SUCCESS_PAGE_MAX_LIFETIME_MS);
       expect(httpMock.closed()).toBe(true);
     });
 
@@ -266,7 +269,7 @@ describe("oauth/pkce-login.ts", () => {
     });
   });
 
-  describe("install hint beacon", () => {
+  describe("install hint beacon + stream", () => {
     let trackSpy: MockedTelemetryService;
 
     beforeEach(() => {
@@ -290,39 +293,72 @@ describe("oauth/pkce-login.ts", () => {
       await loginPromise;
     }
 
-    it("should defer closing the callback server until the beacon grace period elapses", async () => {
+    it("should respond 200 with event-stream headers on the stream path", async () => {
       vi.useFakeTimers();
       await driveSuccessfulCallback();
 
-      // server is still listening for the beacon
+      const stream = httpMock.openStream(SKILLS_HINT_STREAM_PATH);
+      expect(stream.statusCode).toBe(200);
+      expect(stream.headers["Content-Type"]).toBe("text/event-stream");
+    });
+
+    it("should close the listener when the success-page stream disconnects", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      const stream = httpMock.openStream(SKILLS_HINT_STREAM_PATH);
+      // While the stream is connected the listener stays bound.
       expect(httpMock.closed()).toBe(false);
 
-      await vi.advanceTimersByTimeAsync(SKILLS_HINT_BEACON_GRACE_MS);
+      stream.disconnect();
       expect(httpMock.closed()).toBe(true);
     });
 
-    it("should track AGENT_SKILLS_HINT_COPIED and close immediately when the beacon arrives", async () => {
+    it("should close the listener via the safety timer if no stream ever connects", async () => {
       vi.useFakeTimers();
       await driveSuccessfulCallback();
 
-      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH);
+      expect(httpMock.closed()).toBe(false);
+      await vi.advanceTimersByTimeAsync(SUCCESS_PAGE_MAX_LIFETIME_MS);
+      expect(httpMock.closed()).toBe(true);
+    });
+
+    it("should track AGENT_SKILLS_HINT_COPIED on POST to the beacon path", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH, {
+        method: "POST",
+      });
       expect(response.statusCode).toBe(204);
       expect(trackSpy).toHaveBeenCalledWith(
         TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
         {},
       );
-      expect(httpMock.closed()).toBe(true);
     });
 
-    it("should still track AGENT_SKILLS_HINT_COPIED if the beacon arrives before auth completes", async () => {
+    it("should reject non-POST methods on the beacon path with 405", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH, {
+        method: "GET",
+      });
+      expect(response.statusCode).toBe(405);
+      expect(trackSpy).not.toHaveBeenCalled();
+    });
+
+    it("should still record beacons that arrive before auth completes", async () => {
       vi.useFakeTimers();
       const loginPromise = runPkceLogin(auth0Config);
       await httpMock.listening;
       await flushMicrotasks(3);
 
-      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH);
-      // beacon path still 204s (defensive — telemetry is best-effort and the
-      // page may post even if the user navigates away mid-auth)
+      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH, {
+        method: "POST",
+      });
+      // Telemetry is best-effort and the endpoint stays open across the
+      // whole login lifetime — a pre-auth beacon still records.
       expect(response.statusCode).toBe(204);
       expect(trackSpy).toHaveBeenCalledWith(
         TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
@@ -337,7 +373,7 @@ describe("oauth/pkce-login.ts", () => {
         `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
       );
       await loginPromise;
-      await vi.advanceTimersByTimeAsync(SKILLS_HINT_BEACON_GRACE_MS);
+      await vi.advanceTimersByTimeAsync(SUCCESS_PAGE_MAX_LIFETIME_MS);
     });
   });
 });

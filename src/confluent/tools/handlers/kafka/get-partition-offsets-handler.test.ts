@@ -6,21 +6,9 @@ import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
   kafkaRuntime,
-  runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  getMockedClientManager,
-  type MockedClientManager,
-} from "@tests/stubs/index.js";
+import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
-
-function buildRuntime(clientManager: MockedClientManager) {
-  return runtimeWith(
-    { kafka: { bootstrap_servers: "broker:9092" } },
-    DEFAULT_CONNECTION_ID,
-    clientManager,
-  );
-}
 
 function textOf(result: CallToolResult): string {
   return result.content.map((c) => ("text" in c ? c.text : "")).join("");
@@ -69,7 +57,7 @@ describe("get-partition-offsets-handler.ts", () => {
         { partition: 2, low: "0", high: "0", offset: "0" },
       ]);
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "orders",
       });
 
@@ -114,7 +102,7 @@ describe("get-partition-offsets-handler.ts", () => {
         { partition: 2, low: "10", high: "20", offset: "20" },
       ]);
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "orders",
         partition: 1,
       });
@@ -143,7 +131,7 @@ describe("get-partition-offsets-handler.ts", () => {
         { partition: 0, low: "42", high: "42", offset: "42" },
       ]);
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "empty-topic",
       });
 
@@ -176,7 +164,7 @@ describe("get-partition-offsets-handler.ts", () => {
         },
       ]);
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "bigint-topic",
       });
 
@@ -199,7 +187,7 @@ describe("get-partition-offsets-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.fetchTopicOffsets.mockResolvedValue([]);
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "no-such-topic",
       });
 
@@ -218,7 +206,7 @@ describe("get-partition-offsets-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "no-such-topic",
       });
 
@@ -247,7 +235,7 @@ describe("get-partition-offsets-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "no-such-topic",
       });
 
@@ -272,7 +260,7 @@ describe("get-partition-offsets-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "orders",
       });
 
@@ -293,7 +281,7 @@ describe("get-partition-offsets-handler.ts", () => {
         new Error("unexpected library failure"),
       );
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "orders",
       });
 
@@ -311,7 +299,7 @@ describe("get-partition-offsets-handler.ts", () => {
         { partition: 2, low: "0", high: "30", offset: "30" },
       ]);
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         topicName: "orders",
         partition: 5,
       });
@@ -325,21 +313,21 @@ describe("get-partition-offsets-handler.ts", () => {
     it("should reject a missing topicName at the Zod boundary", async () => {
       const clientManager = getMockedClientManager();
       await expect(
-        handler.handle(buildRuntime(clientManager), {}),
+        handler.handle(kafkaRuntime(clientManager), {}),
       ).rejects.toThrowError(/topicName/);
     });
 
     it("should reject an empty topicName at the Zod boundary", async () => {
       const clientManager = getMockedClientManager();
       await expect(
-        handler.handle(buildRuntime(clientManager), { topicName: "" }),
+        handler.handle(kafkaRuntime(clientManager), { topicName: "" }),
       ).rejects.toThrowError(/topicName/);
     });
 
     it("should reject a negative partition at the Zod boundary", async () => {
       const clientManager = getMockedClientManager();
       await expect(
-        handler.handle(buildRuntime(clientManager), {
+        handler.handle(kafkaRuntime(clientManager), {
           topicName: "orders",
           partition: -1,
         }),

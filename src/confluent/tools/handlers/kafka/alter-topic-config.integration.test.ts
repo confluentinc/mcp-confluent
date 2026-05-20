@@ -12,6 +12,7 @@ import {
 } from "@tests/harness/kafka-admin.js";
 import {
   callToolWithOAuthFlow,
+  DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
   getOAuthCredentialsFromEnv,
   OAUTH_FIXTURE_NOT_LOADED_REASON,
   OAUTH_USER_CREDS_MISSING_REASON,
@@ -105,6 +106,14 @@ describe("alter-topic-config", { tags: [Tag.KAFKA] }, () => {
       const credentials = getOAuthCredentialsFromEnv();
       if (!credentials) {
         it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
+        return;
+      }
+      // `getTestClusterId()`/`withSharedAdminClient()` read api-key kafka config from the direct
+      // fixture; gate the OAuth describe on the same predicate the direct describe uses so an
+      // OAuth-only CI lane without direct creds skips cleanly instead of crashing in beforeAll
+      const directRuntime = integrationRuntime({ oauth: false });
+      if (handler.enabledConnectionIds(directRuntime).length === 0) {
+        it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
         return;
       }
 

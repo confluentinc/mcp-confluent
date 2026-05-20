@@ -32,6 +32,7 @@ import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alt
 import { ConsumeKafkaMessagesHandler } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
 import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-topics-handler.js";
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
+import { GetPartitionOffsetsHandler } from "@src/confluent/tools/handlers/kafka/get-partition-offsets-handler.js";
 import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
 import { ListConsumerGroupsHandler } from "@src/confluent/tools/handlers/kafka/list-consumer-groups-handler.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
@@ -99,6 +100,7 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],
     [ToolName.DELETE_SCHEMA, new DeleteSchemaHandler()],
     [ToolName.CONSUME_MESSAGES, new ConsumeKafkaMessagesHandler()],
+    [ToolName.GET_PARTITION_OFFSETS, new GetPartitionOffsetsHandler()],
     [ToolName.LIST_CONSUMER_GROUPS, new ListConsumerGroupsHandler()],
     [ToolName.GET_TOPIC_CONFIG, new GetTopicConfigHandler()],
     [ToolName.CREATE_TABLEFLOW_TOPIC, new CreateTableFlowTopicHandler()],

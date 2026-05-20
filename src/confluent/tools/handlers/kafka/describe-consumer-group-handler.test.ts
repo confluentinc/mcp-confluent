@@ -15,22 +15,10 @@ import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
   kafkaRuntime,
-  runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  getMockedClientManager,
-  type MockedClientManager,
-} from "@tests/stubs/index.js";
+import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-
-function buildRuntime(clientManager: MockedClientManager) {
-  return runtimeWith(
-    { kafka: { bootstrap_servers: "broker:9092" } },
-    DEFAULT_CONNECTION_ID,
-    clientManager,
-  );
-}
 
 function textOf(result: CallToolResult): string {
   return result.content.map((c) => ("text" in c ? c.text : "")).join("");
@@ -177,7 +165,7 @@ describe("describe-consumer-group-handler.ts", () => {
         groups: [fakeGroupDescription({ groupId: "my-group" })],
       });
 
-      await handler.handle(buildRuntime(clientManager), {
+      await handler.handle(kafkaRuntime(clientManager), {
         groupId: "my-group",
       });
 
@@ -227,7 +215,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "orders-consumer",
       });
 
@@ -279,7 +267,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "orphan",
       });
 
@@ -297,7 +285,7 @@ describe("describe-consumer-group-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.describeGroups.mockRejectedValue(fakeError());
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "no-such-group",
       });
 
@@ -319,7 +307,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "no-such-group",
       });
 
@@ -352,7 +340,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "no-such-group",
       });
 
@@ -381,7 +369,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "rip-old-group",
       });
 
@@ -407,7 +395,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g",
       });
 
@@ -421,7 +409,7 @@ describe("describe-consumer-group-handler.ts", () => {
       admin.describeGroups.mockRejectedValue(new Error("network unreachable"));
 
       await expect(
-        handler.handle(buildRuntime(clientManager), { groupId: "g" }),
+        handler.handle(kafkaRuntime(clientManager), { groupId: "g" }),
       ).rejects.toThrow("network unreachable");
     });
 
@@ -448,7 +436,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "mixed-membership",
       });
 
@@ -488,7 +476,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "fanout",
       });
 
@@ -530,7 +518,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g",
       });
 
@@ -574,7 +562,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g",
       });
 
@@ -613,7 +601,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g",
       });
 
@@ -638,7 +626,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g",
       });
 
@@ -662,7 +650,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g",
       });
 
@@ -688,7 +676,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g",
       });
 
@@ -709,7 +697,7 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g",
       });
 
@@ -724,7 +712,7 @@ describe("describe-consumer-group-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.describeGroups.mockResolvedValue({ groups: [] });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "no-such-group",
       });
 

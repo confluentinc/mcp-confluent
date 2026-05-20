@@ -13,22 +13,10 @@ import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
   kafkaRuntime,
-  runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  getMockedClientManager,
-  type MockedClientManager,
-} from "@tests/stubs/index.js";
+import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-
-function buildRuntime(clientManager: MockedClientManager) {
-  return runtimeWith(
-    { kafka: { bootstrap_servers: "broker:9092" } },
-    DEFAULT_CONNECTION_ID,
-    clientManager,
-  );
-}
 
 function textOf(result: CallToolResult): string {
   return result.content.map((c) => ("text" in c ? c.text : "")).join("");
@@ -141,7 +129,7 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      const result = await handler.handle(buildRuntime(clientManager), {});
+      const result = await handler.handle(kafkaRuntime(clientManager), {});
 
       expect(admin.listGroups).toHaveBeenCalledOnce();
       expect(admin.listGroups).toHaveBeenCalledWith({});
@@ -181,7 +169,7 @@ describe("list-consumer-groups-handler.ts", () => {
         errors: [],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {});
+      const result = await handler.handle(kafkaRuntime(clientManager), {});
 
       expect(result.isError).toBe(false);
       expect(result.structuredContent).toEqual({
@@ -218,7 +206,7 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      await handler.handle(buildRuntime(clientManager), {
+      await handler.handle(kafkaRuntime(clientManager), {
         matchStates: ["Stable", "Empty"],
       });
 
@@ -236,7 +224,7 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      await handler.handle(buildRuntime(clientManager), {
+      await handler.handle(kafkaRuntime(clientManager), {
         matchType: "Consumer",
       });
 
@@ -251,7 +239,7 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      await handler.handle(buildRuntime(clientManager), {
+      await handler.handle(kafkaRuntime(clientManager), {
         matchStates: ["Stable"],
         matchType: "Classic",
       });
@@ -271,7 +259,7 @@ describe("list-consumer-groups-handler.ts", () => {
         errors: [],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         matchStates: ["Stable"],
       });
 
@@ -289,7 +277,7 @@ describe("list-consumer-groups-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {});
+      const result = await handler.handle(kafkaRuntime(clientManager), {});
 
       expect(result.isError).toBe(false);
       expect(result.structuredContent).toEqual({
@@ -320,7 +308,7 @@ describe("list-consumer-groups-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {});
+      const result = await handler.handle(kafkaRuntime(clientManager), {});
 
       expect(result.isError).toBe(true);
       expect(textOf(result)).toContain("all brokers down");
@@ -332,7 +320,7 @@ describe("list-consumer-groups-handler.ts", () => {
       admin.listGroups.mockRejectedValue(new Error("network unreachable"));
 
       await expect(
-        handler.handle(buildRuntime(clientManager), {}),
+        handler.handle(kafkaRuntime(clientManager), {}),
       ).rejects.toThrow("network unreachable");
     });
   });

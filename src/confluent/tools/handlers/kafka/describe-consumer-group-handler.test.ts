@@ -530,6 +530,88 @@ describe("describe-consumer-group-handler.ts", () => {
       expect("error" in assignment[0]!).toBe(false);
     });
 
+    it("should unwrap the {topicPartitions: TopicPartition[]} shape the native binding actually returns (despite the .d.ts claiming a flat array)", async () => {
+      // Discovered via live MCP usage (May 2026): the kafkajs
+      // .d.ts declares `assignment: TopicPartition[]` (flat array),
+      // but the C++ binding in
+      // node_modules/@confluentinc/kafka-javascript/src/common.cc →
+      // FromMemberDescription actually returns
+      // `assignment: { topicPartitions: TopicPartition[] }` (wrapped
+      // object). The handler must unwrap this shape; the cast lets
+      // the test fixture express the real runtime shape past the
+      // upstream type lie.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.describeGroups.mockResolvedValue({
+        groups: [
+          fakeGroupDescription({
+            members: [
+              fakeMember({
+                memberId: "wrapped-member",
+                assignment: {
+                  topicPartitions: [
+                    { topic: "orders", partition: 0 },
+                    { topic: "orders", partition: 1 },
+                  ],
+                },
+              } as unknown as Partial<MemberDescription>),
+            ],
+          }),
+        ],
+      });
+
+      const result = await handler.handle(buildRuntime(clientManager), {
+        groupId: "g",
+      });
+
+      const member = (
+        result.structuredContent as {
+          members: Array<{
+            assignment: Array<{ topic: string; partition: number }>;
+          }>;
+        }
+      ).members[0]!;
+      expect(member.assignment).toEqual([
+        { topic: "orders", partition: 0 },
+        { topic: "orders", partition: 1 },
+      ]);
+    });
+
+    it("should fall through to an empty assignment (the Wacky branch) for an unrecognized assignment shape", async () => {
+      // Negative pin: if the binding ever delivers a third shape we
+      // haven't seen (a Buffer, a string, etc.), the handler must
+      // return a usable response with an empty assignment rather
+      // than crashing. The Wacky log line provides the visibility.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.describeGroups.mockResolvedValue({
+        groups: [
+          fakeGroupDescription({
+            members: [
+              fakeMember({
+                memberId: "unknown-shape-member",
+                assignment: Buffer.from([
+                  0xde, 0xad, 0xbe, 0xef,
+                ]) as unknown as MemberDescription["assignment"],
+              }),
+            ],
+          }),
+        ],
+      });
+
+      const result = await handler.handle(buildRuntime(clientManager), {
+        groupId: "g",
+      });
+
+      expect(result.isError).toBe(false);
+      const member = (
+        result.structuredContent as {
+          members: Array<{ assignment: unknown[] }>;
+        }
+      ).members[0]!;
+      expect(member.assignment).toEqual([]);
+    });
+
     it("should drop the raw memberAssignment / memberMetadata Buffer fields the upstream type carries", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();

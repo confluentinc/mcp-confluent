@@ -7,14 +7,20 @@ import {
   PKCE_LOGIN_TIMEOUT_MS,
   PkceLoginError,
   runPkceLogin,
+  SKILLS_HINT_BEACON_GRACE_MS,
+  SKILLS_HINT_COPIED_PATH,
 } from "@src/confluent/oauth/pkce-login.js";
+import { TelemetryEvent } from "@src/confluent/telemetry.js";
 import {
   mockFetch,
   mockHttpServer,
   mockOpen,
+  mockTelemetryService,
+  resetTelemetryService,
   type MockedFetch,
   type MockedHttpServer,
   type MockedOpen,
+  type MockedTelemetryService,
 } from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -64,6 +70,7 @@ describe("oauth/pkce-login.ts", () => {
 
   describe("runPkceLogin", () => {
     it("should bind the callback server, open the browser, exchange the code, and return tokens", async () => {
+      vi.useFakeTimers();
       stubFullChain(fetchSpy);
 
       const loginPromise = runPkceLogin(auth0Config);
@@ -94,6 +101,10 @@ describe("oauth/pkce-login.ts", () => {
       expect(result.controlPlaneToken).toBe("cp-token");
       expect(result.dataPlaneToken).toBe("dp-token");
       expect(result.refreshToken).toBe("refresh-token");
+
+      // After successful auth the listener stays alive for the beacon grace
+      // window; advance fake timers past it before asserting close.
+      await vi.advanceTimersByTimeAsync(SKILLS_HINT_BEACON_GRACE_MS);
       expect(httpMock.closed()).toBe(true);
     });
 
@@ -252,6 +263,81 @@ describe("oauth/pkce-login.ts", () => {
       expect(openSpy).not.toHaveBeenCalled();
       // `closed()` is false because we never bound (so there was nothing to close).
       expect(httpMock.closed()).toBe(false);
+    });
+  });
+
+  describe("install hint beacon", () => {
+    let trackSpy: MockedTelemetryService;
+
+    beforeEach(() => {
+      trackSpy = mockTelemetryService();
+    });
+
+    afterEach(() => {
+      resetTelemetryService();
+    });
+
+    async function driveSuccessfulCallback(): Promise<void> {
+      stubFullChain(fetchSpy);
+      const loginPromise = runPkceLogin(auth0Config);
+      await httpMock.listening;
+      await flushMicrotasks(3);
+      const openedUrl = openSpy.mock.calls[0]![0];
+      const state = new URL(openedUrl).searchParams.get("state")!;
+      await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+      );
+      await loginPromise;
+    }
+
+    it("should defer closing the callback server until the beacon grace period elapses", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      // server is still listening for the beacon
+      expect(httpMock.closed()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(SKILLS_HINT_BEACON_GRACE_MS);
+      expect(httpMock.closed()).toBe(true);
+    });
+
+    it("should track AGENT_SKILLS_HINT_COPIED and close immediately when the beacon arrives", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH);
+      expect(response.statusCode).toBe(204);
+      expect(trackSpy).toHaveBeenCalledWith(
+        TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
+        {},
+      );
+      expect(httpMock.closed()).toBe(true);
+    });
+
+    it("should still track AGENT_SKILLS_HINT_COPIED if the beacon arrives before auth completes", async () => {
+      vi.useFakeTimers();
+      const loginPromise = runPkceLogin(auth0Config);
+      await httpMock.listening;
+      await flushMicrotasks(3);
+
+      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH);
+      // beacon path still 204s (defensive — telemetry is best-effort and the
+      // page may post even if the user navigates away mid-auth)
+      expect(response.statusCode).toBe(204);
+      expect(trackSpy).toHaveBeenCalledWith(
+        TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
+        {},
+      );
+
+      // Drive the real callback so the outer login resolves and afterEach is clean.
+      stubFullChain(fetchSpy);
+      const openedUrl = openSpy.mock.calls[0]![0];
+      const state = new URL(openedUrl).searchParams.get("state")!;
+      await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+      );
+      await loginPromise;
+      await vi.advanceTimersByTimeAsync(SKILLS_HINT_BEACON_GRACE_MS);
     });
   });
 });

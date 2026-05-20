@@ -20,10 +20,21 @@ import {
   type TokenChainResult,
 } from "@src/confluent/oauth/token-chain.js";
 import type { Auth0Config } from "@src/confluent/oauth/types.js";
+import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { logger } from "@src/logger.js";
 
 /** Maximum time to wait for the user to complete the browser PKCE flow. */
 export const PKCE_LOGIN_TIMEOUT_MS = 120_000;
+
+/** Path the success page beacons to when the user copies the install hint. */
+export const SKILLS_HINT_COPIED_PATH = "/skills-hint-copied";
+
+/**
+ * Grace period to keep the callback server listening after a successful auth
+ * so the browser's "install hint copied" beacon can land. Short — telemetry
+ * is best-effort and we don't want to delay shutdown noticeably.
+ */
+export const SKILLS_HINT_BEACON_GRACE_MS = 5_000;
 
 /** Reasons a PKCE login can fail. Carried on {@link PkceLoginError}. */
 export type PkceLoginFailureReason =
@@ -106,9 +117,33 @@ export async function runPkceLogin(
     rejectFlow = reject;
   });
 
+  // Tracks whether the success page was served. The finally block reads this
+  // to defer server.close() so the page's "install hint copied" beacon can
+  // land before the listener tears down.
+  let successServed = false;
+  let beaconCloseTimer: ReturnType<typeof setTimeout> | undefined;
+
   const server = nodeHttp.createServer((req, res) => {
     const reqUrl = req.url ?? "";
     const parsed = new URL(reqUrl, "http://127.0.0.1");
+    if (parsed.pathname === SKILLS_HINT_COPIED_PATH) {
+      try {
+        TelemetryService.getInstance().track(
+          TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
+          {},
+        );
+      } catch (err) {
+        logger.warn({ err }, "Failed to track agent-skills hint copied event");
+      }
+      res.writeHead(204);
+      res.end();
+      if (beaconCloseTimer) {
+        clearTimeout(beaconCloseTimer);
+        beaconCloseTimer = undefined;
+        if (bound) server.close();
+      }
+      return;
+    }
     if (parsed.pathname !== OAUTH_CALLBACK_PATH) {
       sendHtml(res, 404, renderErrorPage("Not found"));
       return;
@@ -139,6 +174,7 @@ export async function runPkceLogin(
       return;
     }
     sendHtml(res, 200, renderSuccessPage());
+    successServed = true;
     resolveCode(code);
   });
 
@@ -221,7 +257,20 @@ export async function runPkceLogin(
       signal.removeEventListener("abort", abortListener);
     }
     clearTimeout(timer);
-    if (bound) server.close();
+    if (bound) {
+      if (successServed) {
+        // Keep the listener alive briefly so the success page's "install hint
+        // copied" beacon can land. The beacon handler also clears this timer
+        // and closes the server immediately when it arrives.
+        beaconCloseTimer = setTimeout(() => {
+          beaconCloseTimer = undefined;
+          server.close();
+        }, SKILLS_HINT_BEACON_GRACE_MS);
+        beaconCloseTimer.unref?.();
+      } else {
+        server.close();
+      }
+    }
   }
 
   logger.info("PKCE auth code received; exchanging for token chain");

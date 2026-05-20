@@ -23,6 +23,17 @@ describe("oauth/callback-pages.ts", () => {
       expect(html).not.toContain("{#include styles/}");
     });
 
+    it("should include the agent-skills install hint, copy button, and beacon endpoint", () => {
+      const html = renderSuccessPage();
+      // Verbatim install command users will copy
+      expect(html).toContain("npx skills add confluentinc/agent-skills");
+      // Copy button and target box are wired by id
+      expect(html).toContain('id="install-cmd"');
+      expect(html).toContain('id="install-cmd-copy"');
+      // Telemetry beacon path is referenced from the inline script
+      expect(html).toContain("/skills-hint-copied");
+    });
+
     it("should cache the rendered page across calls", () => {
       const readSpy = vi.spyOn(nodeDeps.fs, "readFileSync");
       const first = renderSuccessPage();

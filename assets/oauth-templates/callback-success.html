@@ -15,5 +15,64 @@
       <p>You have successfully authenticated with Confluent Cloud.</p>
       <p>You may close this page and return to your terminal.</p>
     </div>
+
+    <div class="install-hint">
+      <h2>Next: install the Confluent agent skills</h2>
+      <p>
+        Run this in your terminal to add Confluent's authoring skills to your
+        agent:
+      </p>
+      <div class="install-hint__cmd-row">
+        <code id="install-cmd" class="install-hint__cmd"
+          >npx skills add confluentinc/agent-skills</code
+        >
+        <button
+          type="button"
+          id="install-cmd-copy"
+          class="install-hint__copy"
+          aria-label="Copy install command"
+        >
+          Copy
+        </button>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var btn = document.getElementById("install-cmd-copy");
+        var cmdEl = document.getElementById("install-cmd");
+        if (!btn || !cmdEl) return;
+        btn.addEventListener("click", function () {
+          var cmd = cmdEl.textContent || "";
+          var done = function (label) {
+            btn.textContent = label;
+            setTimeout(function () {
+              btn.textContent = "Copy";
+            }, 2000);
+          };
+          var afterCopy = function (ok) {
+            done(ok ? "Copied!" : "Copy failed");
+            try {
+              fetch("/skills-hint-copied", {
+                method: "POST",
+                keepalive: true,
+              }).catch(function () {});
+            } catch (e) {}
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(cmd).then(
+              function () {
+                afterCopy(true);
+              },
+              function () {
+                afterCopy(false);
+              },
+            );
+          } else {
+            afterCopy(false);
+          }
+        });
+      })();
+    </script>
   </body>
 </html>

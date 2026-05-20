@@ -273,6 +273,7 @@ describe("index.ts", () => {
         ToolName.DELETE_TOPICS,
         ToolName.PRODUCE_MESSAGE,
         ToolName.CONSUME_MESSAGES,
+        ToolName.GET_PARTITION_OFFSETS,
         ToolName.LIST_CONSUMER_GROUPS,
         ToolName.LIST_ENVIRONMENTS,
         ToolName.READ_ENVIRONMENT,

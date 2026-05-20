@@ -9,6 +9,7 @@ import {
 } from "@tests/harness/connection-types.js";
 import {
   callToolWithOAuthFlow,
+  DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
   getOAuthCredentialsFromEnv,
   OAUTH_FIXTURE_NOT_LOADED_REASON,
   OAUTH_USER_CREDS_MISSING_REASON,
@@ -95,10 +96,16 @@ describe("read-environment-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
         it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
         return;
       }
+      // `getFirstTestEnvironmentId()` builds an api-key CCloud client from the direct fixture;
+      // gate the OAuth describe on the same predicate the direct describe uses so an OAuth-only
+      // CI lane without direct creds skips cleanly instead of crashing in beforeAll
+      const directRuntime = integrationRuntime({ oauth: false });
+      if (handler.enabledConnectionIds(directRuntime).length === 0) {
+        it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+        return;
+      }
 
-      // env id discovery uses direct CCloud creds — OAuth-mode CI lanes that
-      // run this group still have `.env.integration` loaded, so the helper is
-      // a cheap shared lookup. The handler itself talks to CCloud via OAuth.
+      // env id discovery uses direct CCloud creds — the OAuth handler itself talks to CCloud via OAuth
       let environmentId: string;
       beforeAll(async () => {
         environmentId = await getFirstTestEnvironmentId();

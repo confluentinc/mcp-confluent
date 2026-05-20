@@ -1,7 +1,10 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { FlinkCatalogToolHandler } from "@src/confluent/tools/handlers/flink/catalog/flink-catalog-tool-handler.js";
-import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
+import {
+  executeFlinkSql,
+  type FlinkStatementMeta,
+} from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -53,21 +56,29 @@ export class ListCatalogsHandler extends FlinkCatalogToolHandler {
       environmentId: environment_id,
       computePoolId: compute_pool_id,
     });
+    const meta: FlinkStatementMeta = {
+      flinkStatementsCreated: result.statementName
+        ? [result.statementName]
+        : [],
+    };
 
     if (!result.success) {
       return this.createResponse(
         `Failed to list catalogs: ${result.error}`,
         true,
+        meta,
       );
     }
 
     const catalogs = result.data ?? [];
     if (catalogs.length === 0) {
-      return this.createResponse("No catalogs found.");
+      return this.createResponse("No catalogs found.", false, meta);
     }
 
     return this.createResponse(
       `Catalogs:\n${JSON.stringify(catalogs, null, 2)}`,
+      false,
+      meta,
     );
   }
 

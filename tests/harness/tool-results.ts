@@ -5,7 +5,7 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
  *  the discriminated union of the current `CallToolResult` shape and the
  *  legacy `CompatibilityCallToolResult` shape with `toolResult` instead of
  *  `content`. */
-type CallToolResponse = Awaited<ReturnType<Client["callTool"]>>;
+export type CallToolResponse = Awaited<ReturnType<Client["callTool"]>>;
 
 /**
  * Concatenates all text-typed content blocks from a tool call result. Empty

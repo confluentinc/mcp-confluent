@@ -67,6 +67,34 @@ describe("list-databases-handler.ts", () => {
         },
       );
 
+      it("should surface the executeFlinkSql statement name via _meta.flinkStatementsCreated on success", async () => {
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+        expect(result.isError).not.toBe(true);
+        expect(result._meta?.flinkStatementsCreated).toEqual([
+          expect.stringMatching(/^mcp-query-/),
+        ]);
+      });
+
+      it("should still surface the statement name via _meta on the error path", async () => {
+        flinkRest.GET.mockResolvedValue({
+          data: {
+            ...SQL_RESPONSE,
+            status: { phase: "FAILED", detail: "synthetic failure" },
+          },
+        });
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+        expect(result.isError).toBe(true);
+        expect(result._meta?.flinkStatementsCreated).toEqual([
+          expect.stringMatching(/^mcp-query-/),
+        ]);
+      });
+
       it.each([
         {
           label: "use config environment_id when catalogName arg is absent",

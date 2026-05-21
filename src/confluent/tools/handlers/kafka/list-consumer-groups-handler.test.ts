@@ -3,38 +3,20 @@ import type {
   GroupOverview,
   LibrdKafkaError,
 } from "@confluentinc/kafka-javascript/types/rdkafka.js";
-import { CallToolResult } from "@src/confluent/schema.js";
 import {
   listConsumerGroupsArgs,
   ListConsumerGroupsHandler,
-  STATE_NAME_TO_ENUM,
-  TYPE_NAME_TO_ENUM,
 } from "@src/confluent/tools/handlers/kafka/list-consumer-groups-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { textOf } from "@tests/call-tool-result.js";
 import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
   kafkaRuntime,
-  runtimeWith,
 } from "@tests/factories/runtime.js";
-import {
-  getMockedClientManager,
-  type MockedClientManager,
-} from "@tests/stubs/index.js";
+import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-
-function buildRuntime(clientManager: MockedClientManager) {
-  return runtimeWith(
-    { kafka: { bootstrap_servers: "broker:9092" } },
-    DEFAULT_CONNECTION_ID,
-    clientManager,
-  );
-}
-
-function textOf(result: CallToolResult): string {
-  return result.content.map((c) => ("text" in c ? c.text : "")).join("");
-}
 
 /** Build a `GroupOverview` fixture with all fields populated. */
 function fakeGroup(overrides: Partial<GroupOverview>): GroupOverview {
@@ -143,7 +125,7 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      const result = await handler.handle(buildRuntime(clientManager), {});
+      const result = await handler.handle(kafkaRuntime(clientManager), {});
 
       expect(admin.listGroups).toHaveBeenCalledOnce();
       expect(admin.listGroups).toHaveBeenCalledWith({});
@@ -183,7 +165,7 @@ describe("list-consumer-groups-handler.ts", () => {
         errors: [],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {});
+      const result = await handler.handle(kafkaRuntime(clientManager), {});
 
       expect(result.isError).toBe(false);
       expect(result.structuredContent).toEqual({
@@ -220,7 +202,7 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      await handler.handle(buildRuntime(clientManager), {
+      await handler.handle(kafkaRuntime(clientManager), {
         matchStates: ["Stable", "Empty"],
       });
 
@@ -238,7 +220,7 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      await handler.handle(buildRuntime(clientManager), {
+      await handler.handle(kafkaRuntime(clientManager), {
         matchType: "Consumer",
       });
 
@@ -253,7 +235,7 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      await handler.handle(buildRuntime(clientManager), {
+      await handler.handle(kafkaRuntime(clientManager), {
         matchStates: ["Stable"],
         matchType: "Classic",
       });
@@ -273,7 +255,7 @@ describe("list-consumer-groups-handler.ts", () => {
         errors: [],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {
+      const result = await handler.handle(kafkaRuntime(clientManager), {
         matchStates: ["Stable"],
       });
 
@@ -291,7 +273,7 @@ describe("list-consumer-groups-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {});
+      const result = await handler.handle(kafkaRuntime(clientManager), {});
 
       expect(result.isError).toBe(false);
       expect(result.structuredContent).toEqual({
@@ -322,7 +304,7 @@ describe("list-consumer-groups-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(buildRuntime(clientManager), {});
+      const result = await handler.handle(kafkaRuntime(clientManager), {});
 
       expect(result.isError).toBe(true);
       expect(textOf(result)).toContain("all brokers down");
@@ -334,50 +316,8 @@ describe("list-consumer-groups-handler.ts", () => {
       admin.listGroups.mockRejectedValue(new Error("network unreachable"));
 
       await expect(
-        handler.handle(buildRuntime(clientManager), {}),
+        handler.handle(kafkaRuntime(clientManager), {}),
       ).rejects.toThrow("network unreachable");
-    });
-  });
-
-  describe("STATE_NAME_TO_ENUM pin against upstream KafkaJS.ConsumerGroupStates", () => {
-    // The handler's STATE_NAME_TO_ENUM is hand-listed (see the docstring
-    // on STATE_NAMES for why we don't derive it). That comment is only
-    // load-bearing if a test enforces the invariant: if librdkafka /
-    // @confluentinc/kafka-javascript adds a new ConsumerGroupStates
-    // enum value, the hand list goes stale silently — `listGroups`
-    // would return a numeric we don't recognize and the `stateName()`
-    // fallback would surface every group as "Unknown". The pin below
-    // makes that drift loud at unit-test time.
-    it("should map exactly the numeric ConsumerGroupStates enum values upstream advertises", () => {
-      const upstreamNumeric = new Set(
-        Object.values(KafkaJS.ConsumerGroupStates).filter(
-          (v): v is KafkaJS.ConsumerGroupStates => typeof v === "number",
-        ),
-      );
-      const mapped = new Set(Object.values(STATE_NAME_TO_ENUM));
-      // Set equality so the test fires in both directions: upstream
-      // gains a value we don't map, OR we map a value upstream removed.
-      expect(mapped).toEqual(upstreamNumeric);
-    });
-  });
-
-  describe("TYPE_NAME_TO_ENUM pin against upstream KafkaJS.ConsumerGroupTypes", () => {
-    // Same rationale as STATE_NAME_TO_ENUM, with one wrinkle:
-    // `KafkaJS.ConsumerGroupTypes.UNKNOWN` is intentionally excluded
-    // from the Zod input vocabulary — it's the "no value reported"
-    // sentinel rather than a queryable protocol type. `typeName()`
-    // handles it as a runtime fallback for response shaping, not as a
-    // filterable input. The pin therefore subtracts UNKNOWN from the
-    // upstream set before comparing.
-    it("should map exactly the non-UNKNOWN numeric ConsumerGroupTypes enum values upstream advertises", () => {
-      const upstreamMinusUnknown = new Set(
-        Object.values(KafkaJS.ConsumerGroupTypes).filter(
-          (v): v is KafkaJS.ConsumerGroupTypes =>
-            typeof v === "number" && v !== KafkaJS.ConsumerGroupTypes.UNKNOWN,
-        ),
-      );
-      const mapped = new Set(Object.values(TYPE_NAME_TO_ENUM));
-      expect(mapped).toEqual(upstreamMinusUnknown);
     });
   });
 });

@@ -488,6 +488,29 @@ See `src/confluent/tools/handlers/organizations/list-organizations-handler.integ
 There is **no** `Tag.DIRECT`: direct is the unmarked majority, and CI lanes that want only direct tests use `!@oauth` exclusion rather than positive `@direct` selection.
 This means new direct-only tests don't need to remember to tag themselves; "not tagged with @oauth" reliably catches every direct test by construction.
 
+### OAuth-required optional arguments
+
+Some `.optional()` tool args become **required at call time under OAuth** because OAuth connections carry no service blocks for the handler to fall back on (e.g. `environment_id` on `list-schemas`/`delete-schema` — direct gets it from the `schema_registry` block, OAuth must be told).
+Omit it and the handler errors with `<arg> is required under OAuth ...`.
+Pass `getTestEnvironmentId()` (from `@tests/harness/confluent-cloud.js`) — or the equivalent YAML-pinned helper — in the OAuth describe's `callToolWithOAuthFlow` arguments; leave the direct describe alone.
+Spot these in advance by scanning the handler's Zod schema for `.optional()` args whose `.describe()` mentions OAuth or environment.
+
+### Direct-fixture gate for OAuth describes that seed
+
+OAuth describes that need test-side seeding (admin client, SR client, env-id lookup) route through api-key-authed helpers that read the direct fixture — so an OAuth-only CI run with no direct creds crashes inside `beforeAll`.
+Gate after the OAuth credential check:
+
+```ts
+const directRuntime = integrationRuntime({ oauth: false });
+if (handler.enabledConnectionIds(directRuntime).length === 0) {
+  it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+  return;
+}
+```
+
+Reuses the handler's own `widenForOAuth(...)` predicate against `directRuntime` — strips the OAuth special case, falls back to the direct check the seeding helper needs.
+OAuth describes that don't seed (e.g. `list-organizations`, `list-billing-costs`) skip this gate.
+
 ## CI Matrix
 
 `.semaphore/integration.yml` has one block per MCP transport (stdio, http,

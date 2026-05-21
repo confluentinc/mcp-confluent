@@ -174,7 +174,9 @@ describe("tool-registry.ts", () => {
         [ToolName.DELETE_TOPICS]: kafkaBootstrapOrOAuth,
         [ToolName.PRODUCE_MESSAGE]: kafkaBootstrapOrOAuth,
         [ToolName.CONSUME_MESSAGES]: kafkaBootstrapOrOAuth,
+        [ToolName.GET_PARTITION_OFFSETS]: kafkaBootstrapOrOAuth,
         [ToolName.LIST_CONSUMER_GROUPS]: kafkaBootstrapOrOAuth,
+        [ToolName.DESCRIBE_CONSUMER_GROUP]: kafkaBootstrapOrOAuth,
         [ToolName.ALTER_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         [ToolName.GET_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         // Flink
@@ -358,10 +360,12 @@ describe("tool-registry.ts", () => {
           });
         },
       },
+      [ToolName.DESCRIBE_CONSUMER_GROUP]: { outcome: { throws: "ZodError" } },
       [ToolName.CREATE_TOPICS]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_TOPICS]: { outcome: { throws: "ZodError" } },
       [ToolName.PRODUCE_MESSAGE]: { outcome: { throws: "ZodError" } },
       [ToolName.CONSUME_MESSAGES]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_PARTITION_OFFSETS]: { outcome: { throws: "ZodError" } },
       [ToolName.ALTER_TOPIC_CONFIG]: { outcome: { throws: "ZodError" } },
       [ToolName.GET_TOPIC_CONFIG]: { outcome: { throws: "ZodError" } },
       // Schema Registry

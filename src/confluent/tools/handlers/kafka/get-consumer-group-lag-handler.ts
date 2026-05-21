@@ -16,7 +16,7 @@ import {
   describeGroupOutcome,
   isGroupIdNotFoundError,
   notFoundGroupMessage,
-} from "@src/confluent/tools/handlers/kafka/consumer-group-not-found.js";
+} from "@src/confluent/tools/handlers/kafka/consumer-group-helpers.js";
 import {
   createWatermarkCache,
   narrowMessageCount,

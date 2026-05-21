@@ -22,7 +22,7 @@ import {
 import {
   describeGroupOutcome,
   notFoundGroupMessage,
-} from "@src/confluent/tools/handlers/kafka/consumer-group-not-found.js";
+} from "@src/confluent/tools/handlers/kafka/consumer-group-helpers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";

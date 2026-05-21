@@ -135,16 +135,32 @@ export function mockOpen(): MockedOpen {
 }
 
 /**
+ * Handle to a long-lived (SSE-style) request opened against the fake server.
+ * Tests use `disconnect()` to simulate the client tearing the connection down
+ * (e.g. tab close), which production code observes via `req.on("close")`.
+ */
+export type MockedStreamHandle = {
+  statusCode: number;
+  headers: Record<string, string>;
+  disconnect: () => void;
+};
+
+/**
  * Test handle returned by {@linkcode mockHttpServer}. Tests drive the fake
  * server by:
  *  - awaiting `listening` (resolves once production code calls `.listen`)
- *  - calling `fireRequest(url)` to deliver a synthetic request to the registered listener
+ *  - calling `fireRequest(url, { method })` to deliver a synthetic one-shot request
+ *  - calling `openStream(url)` to hold a long-lived connection open
  *  - asserting `closed` after the production code finishes
  */
 export type MockedHttpServer = {
   spy: MockInstance<typeof nodeDeps.nodeHttp.createServer>;
   listening: Promise<number>;
-  fireRequest: (url: string) => Promise<{ statusCode: number; body: string }>;
+  fireRequest: (
+    url: string,
+    options?: { method?: string },
+  ) => Promise<{ statusCode: number; body: string }>;
+  openStream: (url: string) => MockedStreamHandle;
   setListenError: (err: NodeJS.ErrnoException) => void;
   closed: () => boolean;
 };
@@ -204,6 +220,12 @@ export function mockHttpServer(): MockedHttpServer {
       }
       return fakeServer as HttpServer;
     },
+    unref() {
+      return fakeServer as HttpServer;
+    },
+    ref() {
+      return fakeServer as HttpServer;
+    },
   };
 
   const spy = vi
@@ -215,17 +237,23 @@ export function mockHttpServer(): MockedHttpServer {
 
   const fireRequest = async (
     url: string,
+    options?: { method?: string },
   ): Promise<{ statusCode: number; body: string }> => {
     if (!requestHandler) {
       throw new Error("mockHttpServer.fireRequest called before createServer");
     }
     let statusCode = 200;
     let body = "";
-    const fakeReq = { url, method: "GET" } as unknown as IncomingMessage;
+    const fakeReq = {
+      url,
+      method: options?.method ?? "GET",
+      on: () => fakeReq,
+    } as unknown as IncomingMessage;
     const fakeRes = {
       writeHead: (code: number) => {
         statusCode = code;
       },
+      write: () => true,
       end: (text?: string) => {
         if (typeof text === "string") body = text;
       },
@@ -235,10 +263,46 @@ export function mockHttpServer(): MockedHttpServer {
     return { statusCode, body };
   };
 
+  const openStream = (url: string): MockedStreamHandle => {
+    if (!requestHandler) {
+      throw new Error("mockHttpServer.openStream called before createServer");
+    }
+    let statusCode = 200;
+    const headers: Record<string, string> = {};
+    const reqCloseListeners: Array<() => void> = [];
+    const fakeReq = {
+      url,
+      method: "GET",
+      on(event: unknown, listener: unknown) {
+        if (event === "close") reqCloseListeners.push(listener as () => void);
+        return fakeReq;
+      },
+    } as unknown as IncomingMessage;
+    const fakeRes = {
+      writeHead: (code: number, h?: Record<string, string>) => {
+        statusCode = code;
+        if (h) Object.assign(headers, h);
+      },
+      write: () => true,
+      end: () => undefined,
+      setHeader: () => undefined,
+    } as unknown as ServerResponse;
+    requestHandler(fakeReq, fakeRes);
+    return {
+      statusCode,
+      headers,
+      disconnect: () => {
+        for (const fn of reqCloseListeners) fn();
+        reqCloseListeners.length = 0;
+      },
+    };
+  };
+
   return {
     spy,
     listening,
     fireRequest,
+    openStream,
     setListenError: (err) => {
       listenError = err;
     },

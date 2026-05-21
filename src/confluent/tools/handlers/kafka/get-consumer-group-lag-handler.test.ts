@@ -1,5 +1,8 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import type { LibrdKafkaError } from "@confluentinc/kafka-javascript/types/rdkafka.js";
+import type {
+  GroupDescription,
+  LibrdKafkaError,
+} from "@confluentinc/kafka-javascript/types/rdkafka.js";
 import {
   getConsumerGroupLagArgs,
   GetConsumerGroupLagHandler,
@@ -64,6 +67,42 @@ function fakeWatermark(overrides: {
     high,
     offset: high,
     ...overrides,
+  };
+}
+
+/** Build a `GroupDescription` fixture that explicitly does NOT match the
+ *  dead-tombstone fingerprint, so `groupExists` returns `true` on the
+ *  probe path. Tests that want to mock fetchOffsets returning `[]` for a
+ *  REAL never-committed group must seed describeGroups with one of these. */
+function fakeRealGroup(groupId: string): GroupDescription {
+  return {
+    groupId,
+    members: [],
+    protocol: "range",
+    isSimpleConsumerGroup: false,
+    protocolType: "consumer",
+    partitionAssignor: "range",
+    state: KafkaJS.ConsumerGroupStates.EMPTY,
+    type: KafkaJS.ConsumerGroupTypes.CONSUMER,
+    coordinator: { id: 0, host: "broker.example.com", port: 9092 },
+  };
+}
+
+/** Build a `GroupDescription` shaped like the CCloud unknown-group
+ *  tombstone (state=Dead, no members, empty protocol/partitionAssignor).
+ *  Used by probe-path tests to drive `groupExists` to return `false`
+ *  without the broker rejection. */
+function fakeUnknownGroupTombstone(groupId: string): GroupDescription {
+  return {
+    groupId,
+    members: [],
+    protocol: "",
+    isSimpleConsumerGroup: false,
+    protocolType: "",
+    partitionAssignor: "",
+    state: KafkaJS.ConsumerGroupStates.DEAD,
+    type: KafkaJS.ConsumerGroupTypes.CONSUMER,
+    coordinator: { id: 0, host: "broker.example.com", port: 9092 },
   };
 }
 
@@ -178,6 +217,11 @@ describe("get-consumer-group-lag-handler.ts", () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockResolvedValue([]);
+      // Empty fetchOffsets triggers the existence probe; seed it with a
+      // real (non-tombstone) group so the handler continues past.
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeRealGroup("g1")],
+      });
 
       await handler.handle(kafkaRuntime(clientManager), { groupId: "g1" });
 
@@ -189,6 +233,11 @@ describe("get-consumer-group-lag-handler.ts", () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockResolvedValue([]);
+      // Empty fetchOffsets triggers the existence probe; seed describeGroups
+      // with a real group so the handler proceeds to the topics-filter loop.
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeRealGroup("g1")],
+      });
       // The filter is forwarded so the broker can server-side-restrict; the
       // handler still resolves never-committed topics in the filter from the
       // watermark cache afterwards.
@@ -447,10 +496,17 @@ describe("get-consumer-group-lag-handler.ts", () => {
       });
     });
 
-    it("should return zero topics and totalLag:0 when admin.fetchOffsets resolves with an empty array (group has never committed)", async () => {
+    it("should return zero topics and totalLag:0 when admin.fetchOffsets resolves empty and the existence probe confirms the group exists", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockResolvedValue([]);
+      // CCloud's fetchOffsets returns `[]` for both "unknown group" and
+      // "real group, never committed"; the probe disambiguates. A
+      // non-tombstone describeGroups response means the group exists —
+      // proceed to the zero-topics-zero-lag success path.
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeRealGroup("g1")],
+      });
 
       const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g1",
@@ -465,6 +521,134 @@ describe("get-consumer-group-lag-handler.ts", () => {
       // The watermark cache should not have been hit — no topics in the
       // response means no per-topic watermark round-trips.
       expect(admin.fetchTopicOffsets).not.toHaveBeenCalled();
+    });
+
+    it("should surface the friendly not-found error when fetchOffsets resolves empty and the probe returns the CCloud dead-tombstone shape", async () => {
+      // This is the path the live integration test discovered: CCloud's
+      // fetchOffsets resolves cleanly with `[]` for an unknown group ID
+      // rather than rejecting with ERR_GROUP_ID_NOT_FOUND. The handler
+      // probes via describeGroups, which on CCloud returns the
+      // state=Dead/empty-protocol tombstone shape. That fingerprint maps
+      // to the same friendly tool-level error as the documented
+      // rejection path.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeUnknownGroupTombstone("ghost-group")],
+      });
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "ghost-group",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe(
+        'Consumer group "ghost-group" not found on this cluster.',
+      );
+    });
+
+    it("should surface the friendly not-found error when fetchOffsets resolves empty and the probe describeGroups rejects with ERR_GROUP_ID_NOT_FOUND", async () => {
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockRejectedValue(fakeNotFoundError());
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "ghost-group",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe(
+        'Consumer group "ghost-group" not found on this cluster.',
+      );
+    });
+
+    it("should surface the friendly not-found error when the probe returns a per-group GroupDescription.error with ERR_GROUP_ID_NOT_FOUND", async () => {
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockResolvedValue({
+        groups: [
+          {
+            ...fakeRealGroup("ghost-group"),
+            error: fakeNotFoundError(),
+          },
+        ],
+      });
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "ghost-group",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe(
+        'Consumer group "ghost-group" not found on this cluster.',
+      );
+    });
+
+    it("should NOT call describeGroups (probe is skipped) when fetchOffsets returns at least one topic", async () => {
+      // The probe only fires on the empty-result path. A happy-path call
+      // pays nothing for the existence-disambiguation logic.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([
+        {
+          topic: "orders",
+          partitions: [fakeFetchedPartition({ partition: 0, offset: "10" })],
+        },
+      ]);
+      admin.fetchTopicOffsets.mockResolvedValue([
+        fakeWatermark({ partition: 0, high: "30" }),
+      ]);
+
+      await handler.handle(kafkaRuntime(clientManager), { groupId: "g1" });
+
+      expect(admin.describeGroups).not.toHaveBeenCalled();
+    });
+
+    it("should surface group-not-found before topic-not-found when a topics-filter call hits an unknown group", async () => {
+      // Ordering invariant: a caller who supplies both a wrong groupId and
+      // a wrong topic gets "group not found" (the load-bearing fact), not
+      // "topic not found" (which would mislead them into investigating
+      // the topic spelling first).
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeUnknownGroupTombstone("ghost-group")],
+      });
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "ghost-group",
+        topics: ["does-not-exist"],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe(
+        'Consumer group "ghost-group" not found on this cluster.',
+      );
+      // The topic-existence path (via the watermark cache) never fires
+      // because the probe short-circuits first.
+      expect(admin.fetchTopicOffsets).not.toHaveBeenCalled();
+    });
+
+    it("should propagate a non-not-found rejection from the probe describeGroups call", async () => {
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockRejectedValue(
+        fakeLibrdKafkaError({
+          code: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
+          message: "Broker: Group authorization failed",
+        }),
+      );
+
+      await expect(
+        handler.handle(kafkaRuntime(clientManager), { groupId: "g1" }),
+      ).rejects.toMatchObject({
+        code: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
+      });
     });
 
     it("should include a never-committed topic (in the filter but not in fetchOffsets output) as {topic, partitions: []} when its watermark fetch succeeds", async () => {
@@ -506,6 +690,11 @@ describe("get-consumer-group-lag-handler.ts", () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockResolvedValue([]);
+      // The group exists (probe seed); the unknown-topic path is what's
+      // under test here, not the unknown-group path.
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeRealGroup("g1")],
+      });
       // Watermark fetch rejects with the librdkafka unknown-topic code
       // for the filtered topic — same posture get-partition-offsets
       // takes for its own "topic not found" mapping.
@@ -534,6 +723,10 @@ describe("get-consumer-group-lag-handler.ts", () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockResolvedValue([]);
+      // The group exists; the unknown-topic path is what's under test.
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeRealGroup("g1")],
+      });
       const unknownTopicErr = new KafkaJS.KafkaJSError("Local: Unknown topic", {
         code: KafkaJS.ErrorCodes.ERR__UNKNOWN_TOPIC,
       });

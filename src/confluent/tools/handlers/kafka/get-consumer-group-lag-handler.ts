@@ -1,5 +1,6 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { FetchOffsetsPartition } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import type { GroupDescription } from "@confluentinc/kafka-javascript/types/rdkafka.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -12,6 +13,11 @@ import {
   resolveKafkaClusterArgs,
 } from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
+import {
+  isGroupIdNotFoundError,
+  isUnknownGroupTombstone,
+  notFoundGroupMessage,
+} from "@src/confluent/tools/handlers/kafka/consumer-group-not-found.js";
 import {
   createWatermarkCache,
   narrowMessageCount,
@@ -149,6 +155,23 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
         throw err;
       }
 
+      // Disambiguate "unknown group" from "real group, no commits". CCloud's
+      // fetchOffsets resolves with `[]` for an unknown group ID rather than
+      // rejecting with ERR_GROUP_ID_NOT_FOUND (the documented path the catch
+      // above handles), which means an empty result by itself can't tell the
+      // caller whether the group exists or not. Probe via describeGroups
+      // before continuing — only on the empty path, so happy-path calls pay
+      // nothing.
+      if (committedByTopic.length === 0) {
+        const exists = await groupExists(admin, parsed.groupId);
+        if (!exists) {
+          return this.createResponse(
+            notFoundGroupMessage(parsed.groupId),
+            true,
+          );
+        }
+      }
+
       const watermarkCache = createWatermarkCache(admin);
       const responseTopics: ConsumerGroupLagTopic[] = [];
       let totalLag = 0;
@@ -262,19 +285,34 @@ function buildLagRow(
 }
 
 /**
- * Narrow an unknown rejection to a librdkafka `ERR_GROUP_ID_NOT_FOUND` error.
- * The kafkajs-flavored `fetchOffsets` surfaces an unknown group as a
- * top-level rejection on this code; map it into the same caller-friendly
- * tool-level error the sibling describe-consumer-group handler uses.
+ * Best-effort group-existence probe used to disambiguate the
+ * `fetchOffsets`-resolves-empty path. Returns `true` if the group is known
+ * to exist on the cluster, `false` if the broker reported it as unknown
+ * via any of the three shapes the project handles (top-level rejection,
+ * per-group `GroupDescription.error` with the same code, or the
+ * dead-tombstone — see {@link isUnknownGroupTombstone} for why the
+ * tombstone path matters on Confluent Cloud). Propagates any other error.
  */
-function isGroupIdNotFoundError(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: unknown }).code ===
-      KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND
-  );
+async function groupExists(
+  admin: KafkaJS.Admin,
+  groupId: string,
+): Promise<boolean> {
+  let result: { groups: GroupDescription[] };
+  try {
+    result = await admin.describeGroups([groupId]);
+  } catch (err) {
+    if (isGroupIdNotFoundError(err)) return false;
+    throw err;
+  }
+  const desc = result.groups[0];
+  if (desc === undefined) return false;
+  if (desc.error !== undefined) {
+    if (desc.error.code === KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND) {
+      return false;
+    }
+    throw new Error(desc.error.message);
+  }
+  return !isUnknownGroupTombstone(desc);
 }
 
 /**
@@ -291,8 +329,4 @@ function isUnknownTopicError(err: unknown): boolean {
     err.code === KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART ||
     err.code === KafkaJS.ErrorCodes.ERR__UNKNOWN_TOPIC
   );
-}
-
-function notFoundGroupMessage(groupId: string): string {
-  return `Consumer group "${groupId}" not found on this cluster.`;
 }

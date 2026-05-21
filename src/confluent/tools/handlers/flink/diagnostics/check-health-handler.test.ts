@@ -1,5 +1,6 @@
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { CheckHealthHandler } from "@src/confluent/tools/handlers/flink/diagnostics/check-health-handler.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -26,7 +27,7 @@ describe("check-health-handler.ts", () => {
     describe("getToolConfig()", () => {
       it("should describe the check-flink-statement-health tool as read-only", () => {
         const config = handler.getToolConfig();
-        expect(config.name).toBe("check-flink-statement-health");
+        expect(config.name).toBe(ToolName.CHECK_FLINK_STATEMENT_HEALTH);
         expect(config.description).toContain("health check");
         expect(config.inputSchema).toHaveProperty("statementName");
         expect(config.annotations).toBe(READ_ONLY);

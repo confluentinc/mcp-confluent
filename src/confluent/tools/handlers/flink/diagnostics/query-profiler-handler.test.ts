@@ -1,5 +1,6 @@
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -35,7 +36,7 @@ describe("query-profiler-handler.ts", () => {
     describe("getToolConfig()", () => {
       it("should describe the get-flink-statement-profile tool as read-only", () => {
         const config = handler.getToolConfig();
-        expect(config.name).toBe("get-flink-statement-profile");
+        expect(config.name).toBe(ToolName.GET_FLINK_STATEMENT_PROFILE);
         expect(config.description).toContain("Query Profiler");
         expect(config.inputSchema).toHaveProperty("statementName");
         expect(config.inputSchema).toHaveProperty("intervalMinutes");

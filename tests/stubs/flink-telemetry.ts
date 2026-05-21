@@ -6,8 +6,12 @@ export type FlinkTelemetryPoint = {
   splitName?: string;
 };
 
-/** Long.MIN_VALUE; the Flink telemetry surface uses it as a sentinel for
- *  "no watermark yet" on both per-task and per-split metrics. */
+/** Approximate Long.MIN_VALUE watermark sentinel, matching the production
+ *  Flink diagnostics code's comparison sentinel for "no watermark yet" on
+ *  both per-task and per-split metrics. This is intentionally not the
+ *  exact Java Long.MIN_VALUE literal — the value exceeds JS's safe-integer
+ *  range, so it's the same approximate double the production code compares
+ *  against. */
 export const LONG_MIN_SENTINEL = -9_223_372_036_854_776_000;
 
 /** Configure the Flink telemetry POST mock to respond per metric-name

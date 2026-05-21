@@ -1,5 +1,6 @@
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { DetectIssuesHandler } from "@src/confluent/tools/handlers/flink/diagnostics/detect-issues-handler.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -34,7 +35,7 @@ describe("detect-issues-handler.ts", () => {
     describe("getToolConfig()", () => {
       it("should describe the detect-flink-statement-issues tool as read-only", () => {
         const config = handler.getToolConfig();
-        expect(config.name).toBe("detect-flink-statement-issues");
+        expect(config.name).toBe(ToolName.DETECT_FLINK_STATEMENT_ISSUES);
         expect(config.description).toContain("Detect issues");
         expect(config.inputSchema).toHaveProperty("statementName");
         expect(config.inputSchema).toHaveProperty("includeMetrics");

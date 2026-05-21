@@ -409,7 +409,7 @@ describe("query-metrics-handler.ts", () => {
           'Filter: {"resource.kafka.id":"lkc-from-config"}',
         );
         expect(text).toContain("Data Points: 3");
-        expect(text).toContain("1,234,567");
+        expect(text).toContain((1234567).toLocaleString());
         expect(text).toContain("0.1235");
         expect(text).toContain("2024-06-01T12:02:00.000Z: N/A");
         expect(result._meta).toEqual({

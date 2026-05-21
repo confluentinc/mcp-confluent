@@ -150,6 +150,13 @@ export async function runPkceLogin(
     const reqUrl = req.url ?? "";
     const parsed = new URL(reqUrl, "http://127.0.0.1");
     if (parsed.pathname === SKILLS_HINT_COPIED_PATH) {
+      // Only reachable once we've served the success page. Anything earlier
+      // would be a stray request on localhost, not a copy of the install hint.
+      if (!successServed) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
       if (req.method !== "POST") {
         res.writeHead(405, { Allow: "POST" });
         res.end();
@@ -168,6 +175,13 @@ export async function runPkceLogin(
       return;
     }
     if (parsed.pathname === SKILLS_HINT_STREAM_PATH) {
+      // Same gate as the beacon: the stream only makes sense once the success
+      // page has been served. Pre-auth requests get a 404.
+      if (!successServed) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",

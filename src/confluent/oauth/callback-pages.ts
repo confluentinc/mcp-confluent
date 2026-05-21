@@ -47,9 +47,11 @@ export function renderSuccessPage(opts: {
   streamPath: string;
 }): string {
   cachedSuccessTemplate ??= inlinePartials(readTemplate(SUCCESS_TEMPLATE_FILE));
+  // Replacer-function form so `$&`, `$$`, etc. in path values are taken literally
+  // rather than processed as String.prototype.replace substitution patterns.
   return cachedSuccessTemplate
-    .replaceAll("{{copiedPath}}", opts.copiedPath)
-    .replaceAll("{{streamPath}}", opts.streamPath);
+    .replaceAll("{{copiedPath}}", () => opts.copiedPath)
+    .replaceAll("{{streamPath}}", () => opts.streamPath);
 }
 
 export function renderErrorPage(message: string): string {

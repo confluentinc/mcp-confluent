@@ -348,7 +348,7 @@ describe("oauth/pkce-login.ts", () => {
       expect(trackSpy).not.toHaveBeenCalled();
     });
 
-    it("should still record beacons that arrive before auth completes", async () => {
+    it("should 404 beacons that arrive before the success page is served", async () => {
       vi.useFakeTimers();
       const loginPromise = runPkceLogin(auth0Config);
       await httpMock.listening;
@@ -357,13 +357,11 @@ describe("oauth/pkce-login.ts", () => {
       const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH, {
         method: "POST",
       });
-      // Telemetry is best-effort and the endpoint stays open across the
-      // whole login lifetime — a pre-auth beacon still records.
-      expect(response.statusCode).toBe(204);
-      expect(trackSpy).toHaveBeenCalledWith(
-        TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
-        {},
-      );
+      // The beacon path is gated on the success page having been served.
+      // Anything earlier is a stray localhost request, not a Copy click —
+      // attributing it to the user would be wrong.
+      expect(response.statusCode).toBe(404);
+      expect(trackSpy).not.toHaveBeenCalled();
 
       // Drive the real callback so the outer login resolves and afterEach is clean.
       stubFullChain(fetchSpy);

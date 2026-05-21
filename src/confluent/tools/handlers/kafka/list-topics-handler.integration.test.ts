@@ -13,39 +13,43 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new ListTopicsHandler();
 const runtime = integrationRuntime();
 
-describe("list-topics-handler", { tags: [Tag.KAFKA] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires kafka.bootstrap_servers config", () => {});
-    return;
-  }
+describe(
+  "list-topics-handler",
+  { tags: [Tag.KAFKA, Tag.REQUIRES_KAFKA_CONFIG] },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires kafka.bootstrap_servers config", () => {});
+      return;
+    }
 
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
-
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should expose list-topics in tools/list", async () => {
-      const { tools } = await server.client.listTools();
-
-      const listTopics = tools.find((t) => t.name === ToolName.LIST_TOPICS);
-      expect(listTopics).toBeDefined();
-    });
-
-    it("should return the topics from the configured Kafka cluster", async () => {
-      const result = await server.client.callTool({
-        name: ToolName.LIST_TOPICS,
-        arguments: {},
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      // handler response is always prefixed with "Kafka topics:" whether the
-      // cluster is empty or not, so this proves the tool ran end-to-end
-      expect(textContent(result)).toMatch(/^Kafka topics:/);
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should expose list-topics in tools/list", async () => {
+        const { tools } = await server.client.listTools();
+
+        const listTopics = tools.find((t) => t.name === ToolName.LIST_TOPICS);
+        expect(listTopics).toBeDefined();
+      });
+
+      it("should return the topics from the configured Kafka cluster", async () => {
+        const result = await server.client.callTool({
+          name: ToolName.LIST_TOPICS,
+          arguments: {},
+        });
+
+        // handler response is always prefixed with "Kafka topics:" whether the
+        // cluster is empty or not, so this proves the tool ran end-to-end
+        expect(textContent(result)).toMatch(/^Kafka topics:/);
+      });
     });
-  });
-});
+  },
+);

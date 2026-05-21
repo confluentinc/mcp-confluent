@@ -18,49 +18,55 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new AlterTopicConfigHandler();
 const runtime = integrationRuntime();
 
-describe("alter-topic-config", { tags: [Tag.KAFKA] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires kafka.rest_endpoint + kafka.auth config", () => {});
-    return;
-  }
+describe(
+  "alter-topic-config",
+  { tags: [Tag.KAFKA, Tag.REQUIRES_KAFKA_CONFIG] },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires kafka.rest_endpoint + kafka.auth config", () => {});
+      return;
+    }
 
-  const clusterId = getTestClusterId();
-  // installs beforeAll/afterAll at this describe scope (shared admin client, topic cleanup)
-  const { admin, createdTopics } = withSharedAdminClient();
+    const clusterId = getTestClusterId();
+    // installs beforeAll/afterAll at this describe scope (shared admin client, topic cleanup)
+    const { admin, createdTopics } = withSharedAdminClient();
 
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
-
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should alter retention.ms on the test topic via the REST proxy", async () => {
-      const topic = uniqueName(`alter-${transport}`);
-      createdTopics.push(topic);
-      await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
-
-      const result = await server.client.callTool({
-        name: ToolName.ALTER_TOPIC_CONFIG,
-        arguments: {
-          clusterId,
-          topicName: topic,
-          topicConfigs: [
-            {
-              name: "retention.ms",
-              value: "3600000",
-              operation: "SET",
-            },
-          ],
-          validateOnly: false,
-        },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      expect(textContent(result)).toMatch(/Successfully altered topic config/);
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should alter retention.ms on the test topic via the REST proxy", async () => {
+        const topic = uniqueName(`alter-${transport}`);
+        createdTopics.push(topic);
+        await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
+
+        const result = await server.client.callTool({
+          name: ToolName.ALTER_TOPIC_CONFIG,
+          arguments: {
+            clusterId,
+            topicName: topic,
+            topicConfigs: [
+              {
+                name: "retention.ms",
+                value: "3600000",
+                operation: "SET",
+              },
+            ],
+            validateOnly: false,
+          },
+        });
+
+        expect(textContent(result)).toMatch(
+          /Successfully altered topic config/,
+        );
+      });
     });
-  });
-});
+  },
+);

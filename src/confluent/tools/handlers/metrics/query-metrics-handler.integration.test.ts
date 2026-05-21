@@ -13,46 +13,50 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new QueryMetricsHandler();
 const runtime = integrationRuntime();
 
-describe("query-metrics-handler", { tags: [Tag.METRICS] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires telemetry.auth config", () => {});
-    return;
-  }
+describe(
+  "query-metrics-handler",
+  { tags: [Tag.METRICS, Tag.REQUIRES_TELEMETRY_CONFIG] },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires telemetry.auth config", () => {});
+      return;
+    }
 
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
-
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should expose query-metrics in tools/list", async () => {
-      const { tools } = await server.client.listTools();
-
-      expect(
-        tools.find((t) => t.name === ToolName.QUERY_METRICS),
-      ).toBeDefined();
-    });
-
-    it("should query a kafka.server metric for the configured cluster", async () => {
-      // `filter` is omitted: for io.confluent.kafka.server/* metrics the handler auto-injects
-      // resource.kafka.id (from kafka.cluster_id in integration.yaml)
-      const result = await server.client.callTool({
-        name: ToolName.QUERY_METRICS,
-        arguments: {
-          metric: "io.confluent.kafka.server/received_bytes",
-          granularity: "PT5M",
-        },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      // idle cluster may show "No data returned for metric"
-      expect(textContent(result)).toMatch(
-        /^(Metrics Query Results|No data returned for metric)/,
-      );
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should expose query-metrics in tools/list", async () => {
+        const { tools } = await server.client.listTools();
+
+        expect(
+          tools.find((t) => t.name === ToolName.QUERY_METRICS),
+        ).toBeDefined();
+      });
+
+      it("should query a kafka.server metric for the configured cluster", async () => {
+        // `filter` is omitted: for io.confluent.kafka.server/* metrics the handler auto-injects
+        // resource.kafka.id (from kafka.cluster_id in integration.yaml)
+        const result = await server.client.callTool({
+          name: ToolName.QUERY_METRICS,
+          arguments: {
+            metric: "io.confluent.kafka.server/received_bytes",
+            granularity: "PT5M",
+          },
+        });
+
+        // idle cluster may show "No data returned for metric"
+        expect(textContent(result)).toMatch(
+          /^(Metrics Query Results|No data returned for metric)/,
+        );
+      });
     });
-  });
-});
+  },
+);

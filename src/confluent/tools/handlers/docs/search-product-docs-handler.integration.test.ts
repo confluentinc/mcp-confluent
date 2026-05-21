@@ -13,40 +13,44 @@ interface SearchPayload {
   warnings: string[];
 }
 
-describe("search-product-docs-handler", { tags: [Tag.DOCS] }, () => {
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+describe(
+  "search-product-docs-handler",
+  { tags: [Tag.DOCS, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
+  () => {
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
-
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should expose search-product-docs in tools/list", async () => {
-      const { tools } = await server.client.listTools();
-      expect(
-        tools.find((t) => t.name === ToolName.SEARCH_PRODUCT_DOCS),
-      ).toBeDefined();
-    });
-
-    // Non-empty results prove ≥1 backend responded and merge/dedupe ran.
-    it("should return hits from at least one backend for a common query", async () => {
-      const result = await server.client.callTool({
-        name: ToolName.SEARCH_PRODUCT_DOCS,
-        arguments: { query: "kafka topic configuration", limit: 5 },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      expect(result.isError, textContent(result)).not.toBe(true);
-      const payload = JSON.parse(textContent(result)) as SearchPayload;
-      expect(payload.results.length).toBeGreaterThan(0);
-      for (const hit of payload.results) {
-        expect(hit.url).toMatch(
-          /^https:\/\/(docs|developer|support)\.confluent\.io\//,
-        );
-      }
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should expose search-product-docs in tools/list", async () => {
+        const { tools } = await server.client.listTools();
+        expect(
+          tools.find((t) => t.name === ToolName.SEARCH_PRODUCT_DOCS),
+        ).toBeDefined();
+      });
+
+      // Non-empty results prove ≥1 backend responded and merge/dedupe ran.
+      it("should return hits from at least one backend for a common query", async () => {
+        const result = await server.client.callTool({
+          name: ToolName.SEARCH_PRODUCT_DOCS,
+          arguments: { query: "kafka topic configuration", limit: 5 },
+        });
+
+        expect(result.isError, textContent(result)).not.toBe(true);
+        const payload = JSON.parse(textContent(result)) as SearchPayload;
+        expect(payload.results.length).toBeGreaterThan(0);
+        for (const hit of payload.results) {
+          expect(hit.url).toMatch(
+            /^https:\/\/(docs|developer|support)\.confluent\.io\//,
+          );
+        }
+      });
     });
-  });
-});
+  },
+);

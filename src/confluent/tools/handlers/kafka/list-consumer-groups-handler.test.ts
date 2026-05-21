@@ -120,7 +120,7 @@ describe("list-consumer-groups-handler.ts", () => {
   describe("handle()", () => {
     const handler = new ListConsumerGroupsHandler();
 
-    it("should return an empty structured payload and 'Found 0 consumer group(s).' when listGroups returns nothing", async () => {
+    it("should return an empty structured payload and 'Found 0 consumer groups.' when listGroups returns nothing", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
@@ -132,7 +132,7 @@ describe("list-consumer-groups-handler.ts", () => {
 
       expect(result.isError).toBe(false);
       expect(result.structuredContent).toEqual({ groups: [], errors: [] });
-      expect(textOf(result)).toBe("Found 0 consumer group(s).");
+      expect(textOf(result)).toBe("Found 0 consumer groups.");
     });
 
     it("should map numeric librdkafka state/type enums to TitleCase strings on the response", async () => {
@@ -167,8 +167,7 @@ describe("list-consumer-groups-handler.ts", () => {
 
       const result = await handler.handle(kafkaRuntime(clientManager), {});
 
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({
+      const expectedPayload = {
         groups: [
           {
             groupId: "live",
@@ -193,8 +192,13 @@ describe("list-consumer-groups-handler.ts", () => {
           },
         ],
         errors: [],
-      });
-      expect(textOf(result)).toBe("Found 3 consumer group(s).");
+      };
+      expect(result.isError).toBe(false);
+      expect(result.structuredContent).toEqual(expectedPayload);
+      expect(textOf(result)).toBe(
+        `Found 3 consumer groups:\n${JSON.stringify(expectedPayload, null, 2)}`,
+      );
+      expect(textOf(result)).toContain('"groupId": "live"');
     });
 
     it("should forward matchStates to listGroups as the corresponding numeric enum values", async () => {
@@ -259,7 +263,9 @@ describe("list-consumer-groups-handler.ts", () => {
         matchStates: ["Stable"],
       });
 
-      expect(textOf(result)).toBe("Found 2 consumer group(s) (filtered).");
+      expect(textOf(result)).toMatch(
+        /^Found 2 consumer groups \(filtered\):\n/,
+      );
     });
 
     it("should surface per-broker partial failures verbatim alongside the returned groups (not collapsed to a tool-level error)", async () => {

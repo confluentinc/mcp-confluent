@@ -1,4 +1,5 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { FetchOffsetsPartition } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import type {
   GroupDescription,
   LibrdKafkaError,
@@ -37,20 +38,25 @@ function fakeNotFoundError(
 }
 
 /** Per-partition row in `admin.fetchOffsets`'s response, with sensible
- *  defaults so tests only set the fields they care about. */
+ *  defaults so tests only set the fields they care about. `error` is
+ *  typed as `LibrdKafkaError | null | undefined` deliberately: the
+ *  upstream `.d.ts` declares it `LibrdKafkaError | undefined`, but at
+ *  runtime kafkajs-compat populates `error: null` for successful
+ *  partitions. The factory exposes that runtime shape so tests can pin
+ *  both the explicit-null path and the real-error path. */
 function fakeFetchedPartition(overrides: {
   partition: number;
   offset?: string;
   metadata?: string | null;
   leaderEpoch?: number | null;
-  error?: LibrdKafkaError;
-}) {
+  error?: LibrdKafkaError | null;
+}): FetchOffsetsPartition {
   return {
     offset: "100",
     metadata: null,
     leaderEpoch: null,
     ...overrides,
-  };
+  } as FetchOffsetsPartition;
 }
 
 /** Per-partition row in `admin.fetchTopicOffsets`'s response. The native
@@ -382,6 +388,49 @@ describe("get-consumer-group-lag-handler.ts", () => {
       // excluded — without that exclusion we'd have synthesized a
       // misleading 999-message lag against the -1 sentinel.
       expect(payload.totalLag).toBe(50);
+    });
+
+    it("should treat a partition whose error field is explicitly null (kafkajs-compat's no-error sentinel) as a successful partition and compute lag normally", async () => {
+      // The kafkajs-compat layer populates `error: null` on the
+      // FetchOffsetsPartition shape for successful partitions, even
+      // though the upstream `.d.ts` declares the field as
+      // `LibrdKafkaError | undefined`. A `!== undefined` check would
+      // see `null` as "error present" and crash dereferencing
+      // `null.code`. The handler uses `!= null` (loose) so both
+      // `undefined` and `null` go through the no-error path.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([
+        {
+          topic: "orders",
+          partitions: [
+            fakeFetchedPartition({
+              partition: 0,
+              offset: "80",
+              error: null,
+            }),
+          ],
+        },
+      ]);
+      admin.fetchTopicOffsets.mockResolvedValue([
+        fakeWatermark({ partition: 0, low: "0", high: "100" }),
+      ]);
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "g1",
+      });
+
+      expect(result.isError, textOf(result)).not.toBe(true);
+      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      expect(payload.topics[0]!.partitions[0]).toEqual({
+        partition: 0,
+        committedOffset: "80",
+        highWatermark: "100",
+        lag: 20,
+        metadata: null,
+        leaderEpoch: null,
+      });
+      expect(payload.totalLag).toBe(20);
     });
 
     it("should surface a per-partition broker error as {committedOffset: null, lag: null, error: {code, message}} and exclude that partition from totalLag", async () => {
@@ -834,6 +883,34 @@ describe("get-consumer-group-lag-handler.ts", () => {
       // watermark cost — only `orders` (the committed topic) is fetched.
       expect(admin.fetchTopicOffsets).toHaveBeenCalledOnce();
       expect(admin.fetchTopicOffsets).toHaveBeenCalledWith("orders");
+    });
+
+    it("should normalize the bare-array runtime shape of fetchTopicMetadata's response (the upstream .d.ts declares `{topics: [...]}` but the kafkajs-compat runtime resolves with the bare array)", async () => {
+      // Long-standing upstream type/runtime mismatch tracked at
+      // confluentinc/confluent-kafka-javascript#367. A non-defensive
+      // `metadata.topics.map(...)` crashes against the bare-array
+      // runtime shape with "Cannot read properties of undefined" — the
+      // exact failure mode the live integration test surfaced.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeRealGroup("g1")],
+      });
+      // Bare array, NOT wrapped in {topics: [...]} — matches the actual
+      // runtime shape that the .d.ts misrepresents.
+      admin.fetchTopicMetadata.mockResolvedValue([
+        { name: "shipments", partitions: [] },
+      ] as unknown as Awaited<ReturnType<typeof admin.fetchTopicMetadata>>);
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "g1",
+        topics: ["shipments"],
+      });
+
+      expect(result.isError, textOf(result)).not.toBe(true);
+      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      expect(payload.topics).toEqual([{ topic: "shipments", partitions: [] }]);
     });
 
     it("should batch fetchTopicMetadata into a single call when verifying multiple never-committed filter topics", async () => {

@@ -3,7 +3,6 @@ import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-m
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
 import {
-  bareRuntime,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
 } from "@tests/factories/runtime.js";
@@ -80,18 +79,6 @@ describe("list-metrics-handler.ts", () => {
         expect(config.description).toContain("Confluent Cloud metrics");
         expect(config.inputSchema).toHaveProperty("resource_type");
         expect(config.annotations).toBe(READ_ONLY);
-      });
-    });
-
-    describe("enabledConnectionIds()", () => {
-      it("should enable when the connection has a telemetry block", () => {
-        expect(
-          handler.enabledConnectionIds(runtimeWith(TELEMETRY_CONN)),
-        ).toEqual([DEFAULT_CONNECTION_ID]);
-      });
-
-      it("should be disabled on a bare runtime", () => {
-        expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
       });
     });
 

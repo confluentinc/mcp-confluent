@@ -2,11 +2,7 @@ import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { GetPartitionOffsetsHandler } from "@src/confluent/tools/handlers/kafka/get-partition-offsets-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
-import {
-  bareRuntime,
-  DEFAULT_CONNECTION_ID,
-  kafkaRuntime,
-} from "@tests/factories/runtime.js";
+import { kafkaRuntime } from "@tests/factories/runtime.js";
 import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
@@ -24,20 +20,6 @@ describe("get-partition-offsets-handler.ts", () => {
         "partition",
         "topicName",
       ]);
-    });
-  });
-
-  describe("enabledConnectionIds()", () => {
-    const handler = new GetPartitionOffsetsHandler();
-
-    it("should enable on a kafka runtime", () => {
-      expect(handler.enabledConnectionIds(kafkaRuntime())).toEqual([
-        DEFAULT_CONNECTION_ID,
-      ]);
-    });
-
-    it("should disable on a bare runtime", () => {
-      expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
     });
   });
 

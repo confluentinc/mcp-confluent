@@ -133,11 +133,17 @@ test-integration:
 			set -- "$$@" "src/confluent/tools/handlers/$$TAG_SUFFIX"; \
 		fi; \
 	fi; \
-	npm run build && \
+	if [ ! -f dist/index.js ]; then npm run build; fi && \
 	INTEGRATION_TEST_TRANSPORT="$$TRANSPORT_VAL" npx vitest run \
 		--project integration \
 		--outputFile.junit=TEST-integration.xml \
 		"$$@"
+# ^ `npm run build` is skipped when `dist/index.js` already exists. CI's
+# integration prologue builds before invoking `make test-integration`, so
+# this avoids the double build per matrix cell. Local devs running cold
+# (no `dist/`) still get an automatic build; for staleness control,
+# `rm -rf dist && make test-integration ...` or running `npm run dev` in a
+# watch terminal alongside.
 
 # publish JUnit results to semaphore: each test lane writes a distinct file via package.json's
 # --outputFile.junit overrides, so per-test-type publishing stays separated in the Semaphore UI

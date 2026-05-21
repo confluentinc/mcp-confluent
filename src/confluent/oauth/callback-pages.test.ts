@@ -35,6 +35,10 @@ describe("oauth/callback-pages.ts", () => {
       // Copy button and target box are wired by id
       expect(html).toContain('id="install-cmd"');
       expect(html).toContain('id="install-cmd-copy"');
+      // Docs link so users can learn more about agent skills.
+      expect(html).toContain(
+        "https://docs.confluent.io/cloud/current/ai/ai-tools/agent-skills.html",
+      );
       // The server's path constants land verbatim in the rendered HTML so the
       // template and server can't drift.
       expect(html).toContain(paths.copiedPath);

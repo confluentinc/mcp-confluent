@@ -40,9 +40,13 @@ export const SKILLS_HINT_STREAM_PATH = "/skills-hint-stream";
 /**
  * Safety cap on how long the callback server can stay bound after a successful
  * auth. The stream-disconnect path is the normal closer; this is just the
- * "user left the tab open and walked away" backstop.
+ * "user left the tab open and walked away" backstop. Kept tight (60s) because
+ * a lingering listener will collide with the next PKCE attempt — if a token
+ * refresh fails non-transiently inside this window and triggers a fresh login,
+ * the second attempt errors with `port_in_use` when in fact it's this same
+ * session's leftover listener still holding the port.
  */
-export const SUCCESS_PAGE_MAX_LIFETIME_MS = 10 * 60_000;
+export const SUCCESS_PAGE_MAX_LIFETIME_MS = 60_000;
 
 /** Reasons a PKCE login can fail. Carried on {@link PkceLoginError}. */
 export type PkceLoginFailureReason =

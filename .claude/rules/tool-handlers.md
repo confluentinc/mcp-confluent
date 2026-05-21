@@ -28,6 +28,7 @@ Every tool handler follows this pattern:
    - Otherwise extend `BaseToolHandler` from `@src/confluent/tools/base-tools.js` directly. If a domain has more than one tool with the same predicate, introduce a domain subclass first and extend that.
 2. **Implement these members:**
    - `getToolConfig()` → returns `{ name: ToolName, description: string, inputSchema: zodSchema.shape, annotations: ToolAnnotations }`. Use one of the shared annotation constants exported from `base-tools.ts`: `READ_ONLY`, `CREATE_UPDATE`, or `DESTRUCTIVE` (don't construct ad-hoc instances).
+     Test-side: assert by identity (`expect(config.annotations).toBe(READ_ONLY)`); see `.claude/rules/unit-tests.md` Handler Tests.
    - `handle(runtime, toolArguments, sessionId?)` → returns `Promise<CallToolResult>`.
    - `readonly predicate` (skip if you inherited it from a domain subclass) → a `ConnectionPredicate` from `connection-predicates.ts` that gates tool enablement. Declared as a one-liner property, never as a method:
      ```typescript

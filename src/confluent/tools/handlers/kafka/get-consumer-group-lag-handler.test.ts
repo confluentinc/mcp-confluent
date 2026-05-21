@@ -653,12 +653,12 @@ describe("get-consumer-group-lag-handler.ts", () => {
     });
 
     it("should propagate a non-not-found per-group GroupDescription.error from the probe with every librdkafka field preserved", async () => {
-      // Caught by Copilot on PR #508: the per-group-error path in
-      // `groupExists` previously wrapped `desc.error` with
-      // `throw new Error(desc.error.message)`, dropping `code` / `errno`
-      // / `origin` on the way out. This test pins the throw against
-      // shape regression — it would have failed against the buggy code
-      // because the message-only wrapper has no `code`.
+      // The per-group-error path in `groupExists` throws `desc.error`
+      // verbatim, preserving `code` / `errno` / `origin` so downstream
+      // logging and handling can see the real librdkafka failure
+      // details. A naive `throw new Error(desc.error.message)` would
+      // surface only the message string, and this test pins the throw
+      // shape so that regression can't slip back in.
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockResolvedValue([]);
@@ -685,10 +685,10 @@ describe("get-consumer-group-lag-handler.ts", () => {
     });
 
     it("should accumulate totalLag in BigInt so a cross-partition sum that exceeds Number.MAX_SAFE_INTEGER saturates rather than silently losing precision", async () => {
-      // Caught by Copilot on PR #508: `totalLag += row.lag` previously
-      // accumulated as a JS Number, so summing K partitions whose
-      // individual lags fit could push the running total past 2^53 - 1
-      // and silently lose precision. The fix accumulates in BigInt and
+      // Per-partition `lag` values are individually narrowed to JS
+      // Number, but a JS-Number running total `totalLag += row.lag`
+      // would silently lose precision once K partitions accumulate past
+      // 2^53 - 1. The accumulator stays in BigInt across partitions and
       // narrows once at the end via the same `narrowMessageCount`
       // saturation guard the per-partition path uses.
       //
@@ -697,9 +697,8 @@ describe("get-consumer-group-lag-handler.ts", () => {
       // `MAX_SAFE_INTEGER` (in-range). Two such partitions sum to
       // 2 * MAX_SAFE_INTEGER as a BigInt — well past the safe boundary,
       // so the cross-partition narrow saturates and the test pins
-      // `totalLag === MAX_SAFE_INTEGER`. The buggy code would have
-      // accumulated to 2 * MAX_SAFE_INTEGER as a JS Number and failed
-      // this assertion.
+      // `totalLag === MAX_SAFE_INTEGER`. A JS-Number accumulator would
+      // produce 2 * MAX_SAFE_INTEGER and fail this assertion.
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       const clientManager = getMockedClientManager();
@@ -772,6 +771,39 @@ describe("get-consumer-group-lag-handler.ts", () => {
       expect(shipments).toEqual({ topic: "shipments", partitions: [] });
       // The orders topic still has its lag computed.
       expect(payload.totalLag).toBe(20);
+    });
+
+    it("should surface a friendly 'Topic <name> not found' error when the group has committed offsets for a topic that has since been deleted from the cluster", async () => {
+      // Kafka retains a group's committed offsets independently of the
+      // topic until `offsets.retention.minutes` expires, so the broker
+      // can return a non-empty fetchOffsets result for a topic the
+      // watermark fetch then can't resolve. Without the catch around
+      // `watermarkCache(topic)` inside the committed-offsets loop, the
+      // raw librdkafka error would leak through; with it, the deleted
+      // topic gets the same friendly mapping as a filtered-but-unknown
+      // topic.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([
+        {
+          topic: "deleted-since-commit",
+          partitions: [fakeFetchedPartition({ partition: 0, offset: "10" })],
+        },
+      ]);
+      admin.fetchTopicOffsets.mockRejectedValue(
+        new KafkaJS.KafkaJSError("Broker: Unknown topic or partition", {
+          code: KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART,
+        }),
+      );
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "g1",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe(
+        'Topic "deleted-since-commit" not found on this cluster.',
+      );
     });
 
     it("should surface a friendly 'Topic <name> not found' error when a filtered topic does not exist on the cluster", async () => {

@@ -175,15 +175,24 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
       }
 
       // 2. For each topic+partition the group has committed to, fetch the
-      // partition's high watermark and compute lag = high - committed.
+      // partition's high watermark and compute lag = high - committed. A
+      // topic the group has committed offsets for but that's since been
+      // deleted from the cluster short-circuits with the same friendly
+      // "Topic not found" error the filter-topics path uses below.
 
       const watermarkCache = createWatermarkCache(admin);
-      const { topics: responseTopics, totalLagBigInt } =
-        await buildLagFromCommittedOffsets(
-          parsed.groupId,
-          committedByTopic,
-          watermarkCache,
+      const lagResult = await buildLagFromCommittedOffsets(
+        parsed.groupId,
+        committedByTopic,
+        watermarkCache,
+      );
+      if (lagResult.kind === "topicNotFound") {
+        return this.createResponse(
+          `Topic "${lagResult.missingTopic}" not found on this cluster.`,
+          true,
         );
+      }
+      const { topics: responseTopics, totalLagBigInt } = lagResult;
 
       // 3. If the caller passed `topics`, verify that any never-committed
       // filter topics exist on the cluster (so we can return
@@ -337,10 +346,29 @@ function isUnknownTopicError(err: unknown): boolean {
 }
 
 /**
+ * Tagged-union outcome of {@link buildLagFromCommittedOffsets}.
+ * `kind: "resolved"` carries the per-(topic, partition) lag rows and the
+ * BigInt running total; `kind: "topicNotFound"` marks the case where a
+ * topic the group still has committed offsets for has since been deleted
+ * from the cluster — Kafka retains group offsets independently of the
+ * topic until offsets.retention.minutes expires, so the broker can hand
+ * back commits for a topic the watermark fetch then can't resolve.
+ */
+type BuildLagResult =
+  | {
+      kind: "resolved";
+      topics: ConsumerGroupLagTopic[];
+      totalLagBigInt: bigint;
+    }
+  | { kind: "topicNotFound"; missingTopic: string };
+
+/**
  * Iterate the group's committed offsets and produce per-(topic, partition)
  * lag rows paired with a BigInt running total. The accumulator stays in
  * BigInt so a sum that exceeds the safe-integer boundary stays precise;
- * narrow once at the end via {@link narrowMessageCount}.
+ * narrow once at the end via {@link narrowMessageCount}. A
+ * deleted-but-still-committed-to topic short-circuits with its name in
+ * the `topicNotFound` arm — see {@link BuildLagResult}.
  */
 async function buildLagFromCommittedOffsets(
   groupId: string,
@@ -349,15 +377,20 @@ async function buildLagFromCommittedOffsets(
     partitions: FetchOffsetsPartition[];
   }>,
   watermarkCache: WatermarkCache,
-): Promise<{
-  topics: ConsumerGroupLagTopic[];
-  totalLagBigInt: bigint;
-}> {
+): Promise<BuildLagResult> {
   const topics: ConsumerGroupLagTopic[] = [];
   let totalLagBigInt = 0n;
 
   for (const { topic, partitions: committedPartitions } of committedByTopic) {
-    const watermarks = await watermarkCache(topic);
+    let watermarks: PartitionWatermark[];
+    try {
+      watermarks = await watermarkCache(topic);
+    } catch (err) {
+      if (isUnknownTopicError(err)) {
+        return { kind: "topicNotFound", missingTopic: topic };
+      }
+      throw err;
+    }
     const watermarkByPartition = new Map<number, PartitionWatermark>(
       watermarks.map((w) => [w.partition, w]),
     );
@@ -386,7 +419,7 @@ async function buildLagFromCommittedOffsets(
     topics.push({ topic, partitions: rows });
   }
 
-  return { topics, totalLagBigInt };
+  return { kind: "resolved", topics, totalLagBigInt };
 }
 
 /**

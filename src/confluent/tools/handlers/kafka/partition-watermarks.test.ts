@@ -21,9 +21,9 @@ describe("partition-watermarks.ts", () => {
     it("should pass small negative BigInt diffs through unchanged", () => {
       // The lag tool surfaces a rebalance-race condition (committed >
       // high watermark) as a small negative lag rather than clamping to
-      // zero — clamping would hide a real, if rare, state. The asymmetric
-      // saturation guard intentionally does not interfere with negative
-      // diffs of realistic magnitude.
+      // zero — clamping would hide a real, if rare, state. Negative
+      // diffs of realistic magnitude land well inside the symmetric
+      // safe-integer range.
       expect(narrowMessageCount(-3n, {})).toBe(-3);
       expect(narrowMessageCount(-100n, {})).toBe(-100);
     });
@@ -73,11 +73,12 @@ describe("partition-watermarks.ts", () => {
     });
 
     it("should saturate to Number.MIN_SAFE_INTEGER and emit a Wacky log when the diff is below the safe-integer boundary", () => {
-      // Caught by Copilot on PR #508: the guard was asymmetric (positive
-      // overflow only) and a diff below -(2^53 - 1) would silently lose
-      // precision via `Number(diff)`. The symmetric arm covers far-ahead
-      // committed offsets (single partition) and cross-partition sums of
-      // many negative lags (rebalance-race aggregation).
+      // Symmetric counterpart to the MAX_SAFE_INTEGER saturation test.
+      // A diff below -(2^53 - 1) would silently lose precision through
+      // `Number(diff)` without the lower-bound guard. Real-world
+      // sources: a single partition where the group committed far ahead
+      // of the watermark, or a cross-partition sum of many
+      // rebalance-race negative lags.
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       expect(

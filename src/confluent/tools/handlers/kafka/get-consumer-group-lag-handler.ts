@@ -176,9 +176,6 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
 
       // 2. For each topic+partition the group has committed to, fetch the
       // partition's high watermark and compute lag = high - committed.
-      // The nested loop + accumulator lives in
-      // `buildLagFromCommittedOffsets` to keep this handler under
-      // SonarCloud's cognitive-complexity threshold.
 
       const watermarkCache = createWatermarkCache(admin);
       const { topics: responseTopics, totalLagBigInt } =
@@ -238,12 +235,15 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
 }
 
 /**
- * Build one {@link ConsumerGroupLagPartition} row from a committed offset and
- * a paired watermark. Splits the never-committed sentinel (`offset === "-1"`)
- * from the real arithmetic path so the latter remains a clean BigInt
- * subtraction. Also returns the raw BigInt diff (or `null` for the
- * never-committed case) so the caller can accumulate `totalLag` in BigInt
- * and narrow once at the end — see [PR #508 Copilot comment 1].
+ * Build one {@link ConsumerGroupLagPartition} row from a committed offset
+ * and a paired watermark. Splits the never-committed sentinel
+ * (`offset === "-1"`) from the real arithmetic path so the latter remains
+ * a clean BigInt subtraction. Returns the raw BigInt diff (or `null` for
+ * the never-committed case) alongside the row so the caller can
+ * accumulate `totalLag` in BigInt across partitions and narrow once at
+ * the end via {@link narrowMessageCount} — individual per-partition lags
+ * each fit in `Number`, but their sum can still overflow the
+ * safe-integer boundary.
  */
 function buildLagRow(
   groupId: string,
@@ -337,17 +337,10 @@ function isUnknownTopicError(err: unknown): boolean {
 }
 
 /**
- * Step 2 of {@link GetConsumerGroupLagHandler.handle}: iterate the
- * group's committed offsets and produce per-(topic, partition) lag rows
- * paired with a BigInt total. Extracted from the handler so the
- * orchestrating `handle()` stays flat enough to satisfy SonarCloud's
- * cognitive-complexity threshold — the nested loop + the per-partition
- * `watermark === undefined` Wacky branch + the per-partition lag
- * accumulator all live here rather than inflating the handler body.
- *
- * `totalLagBigInt` accumulates as a BigInt so a sum that exceeds
- * `Number.MAX_SAFE_INTEGER` stays precise; the handler narrows once at
- * the end via {@link narrowMessageCount}.
+ * Iterate the group's committed offsets and produce per-(topic, partition)
+ * lag rows paired with a BigInt running total. The accumulator stays in
+ * BigInt so a sum that exceeds the safe-integer boundary stays precise;
+ * narrow once at the end via {@link narrowMessageCount}.
  */
 async function buildLagFromCommittedOffsets(
   groupId: string,
@@ -408,19 +401,12 @@ type ResolveNeverCommittedTopicsResult =
   | { kind: "topicNotFound"; missingTopic: string };
 
 /**
- * Step 3 of {@link GetConsumerGroupLagHandler.handle}: iterate any
- * topics in the caller's filter that didn't appear in the
- * `fetchOffsets` response (group has never committed to them) and
- * verify each exists on the cluster via the watermark cache. A
- * successful fetch produces `{topic, partitions: []}` row; an
- * unknown-topic rejection short-circuits with the offending topic name
- * so the handler can map it to the friendly "Topic not found" response.
- * Non-unknown-topic errors propagate via throw, matching the symmetry
- * the handler's other admin-call sites already follow.
- *
- * Extracted from the handler for the same SonarCloud
- * cognitive-complexity reason as
- * {@link buildLagFromCommittedOffsets}.
+ * Verify each filter topic that didn't appear in the `fetchOffsets`
+ * response (group never committed to them) exists on the cluster, via
+ * the watermark cache. Topics that exist but the group hasn't committed
+ * to surface as `{topic, partitions: []}` in the `resolved` arm; topics
+ * that don't exist short-circuit the iteration with their name in the
+ * `topicNotFound` arm. Non-unknown-topic errors propagate via throw.
  */
 async function resolveNeverCommittedFilterTopics(
   filterTopics: readonly string[],

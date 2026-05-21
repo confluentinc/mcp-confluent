@@ -8,6 +8,7 @@ import { getMockedAdmin } from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
 
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 
 describe("partition-watermarks.ts", () => {
   describe("narrowMessageCount()", () => {
@@ -53,6 +54,35 @@ describe("partition-watermarks.ts", () => {
       expect(
         narrowMessageCount(MAX_SAFE_BIGINT + 1n, { groupId: "overflow" }),
       ).toBe(Number.MAX_SAFE_INTEGER);
+
+      expect(warnSpy).toHaveBeenCalledOnce();
+    });
+
+    it("should narrow exactly Number.MIN_SAFE_INTEGER without triggering the Wacky branch", () => {
+      // Symmetric boundary case to the MAX_SAFE_INTEGER test above: the
+      // saturation check is strict `< minSafe`, so a diff landing exactly
+      // on `-(2^53 - 1)` returns `Number(diff)` through the happy path
+      // and the `warn` spy stays silent.
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      expect(narrowMessageCount(MIN_SAFE_BIGINT, { topic: "edge" })).toBe(
+        Number.MIN_SAFE_INTEGER,
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should saturate to Number.MIN_SAFE_INTEGER and emit a Wacky log when the diff is below the safe-integer boundary", () => {
+      // Caught by Copilot on PR #508: the guard was asymmetric (positive
+      // overflow only) and a diff below -(2^53 - 1) would silently lose
+      // precision via `Number(diff)`. The symmetric arm covers far-ahead
+      // committed offsets (single partition) and cross-partition sums of
+      // many negative lags (rebalance-race aggregation).
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      expect(
+        narrowMessageCount(MIN_SAFE_BIGINT - 1n, { groupId: "underflow" }),
+      ).toBe(Number.MIN_SAFE_INTEGER);
 
       expect(warnSpy).toHaveBeenCalledOnce();
     });

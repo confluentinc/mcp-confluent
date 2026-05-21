@@ -17,15 +17,16 @@ export interface PartitionWatermark {
 
 /**
  * Narrow a {@link BigInt} difference to a JS `Number`, saturating at
- * {@link Number.MAX_SAFE_INTEGER} when the result would lose precision.
- * The narrow path is the only one expected to fire in practice (even a
- * million-msg/sec partition with infinite retention takes ~285 years to
- * exceed 2^53 - 1); the saturation arm is a defensive sentinel — hence
- * the `Wacky --` log signaling "this branch firing means something
- * genuinely surprising happened". The asymmetric guard (only positive
- * overflow) is deliberate: callers compute `high - low` or `high -
- * committed`, where any negative value reflects a small, transient race
- * (rebalance window) whose magnitude can't approach `-MAX_SAFE_INTEGER`.
+ * {@link Number.MAX_SAFE_INTEGER} or {@link Number.MIN_SAFE_INTEGER}
+ * when the result would lose precision. The narrow path is the only one
+ * expected to fire in practice (even a million-msg/sec partition with
+ * infinite retention takes ~285 years to exceed 2^53 - 1); the
+ * saturation arms are defensive sentinels — hence the `Wacky --` log
+ * signaling "this branch firing means something genuinely surprising
+ * happened". Symmetric guards on both ends of the safe range so a `diff`
+ * produced by an unexpected caller pattern (e.g. a far-ahead committed
+ * offset, or a cross-partition sum of many negative lags) can't silently
+ * lose precision.
  *
  * `context` is forwarded verbatim into the log payload so each caller
  * can name the dimensions it knows about (`{topicName, partition}` for
@@ -37,12 +38,20 @@ export function narrowMessageCount(
   context: Record<string, unknown>,
 ): number {
   const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+  const minSafe = BigInt(Number.MIN_SAFE_INTEGER);
   if (diff > maxSafe) {
     logger.warn(
       context,
       "Wacky -- messageCount BigInt subtraction exceeds Number.MAX_SAFE_INTEGER; saturating to MAX_SAFE_INTEGER",
     );
     return Number.MAX_SAFE_INTEGER;
+  }
+  if (diff < minSafe) {
+    logger.warn(
+      context,
+      "Wacky -- messageCount BigInt subtraction below Number.MIN_SAFE_INTEGER; saturating to MIN_SAFE_INTEGER",
+    );
+    return Number.MIN_SAFE_INTEGER;
   }
   return Number(diff);
 }

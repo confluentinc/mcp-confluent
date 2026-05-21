@@ -64,8 +64,10 @@ export const getConsumerGroupLagArgs = z.object({
  * safe-integer boundary; `lag` is a `Number` because the BigInt subtraction
  * is done server-side and asking an LLM caller to subtract two int64-typed
  * strings is the wrong ergonomic trade. `null` for both `committedOffset`
- * and `lag` marks a partition the group has never committed to — distinct
- * from a zero-lag partition the group is caught up on.
+ * and `lag` marks a partition where the lag is unknown — either the group
+ * has never committed (distinct from a zero-lag partition the group is
+ * caught up on) or the broker reported a per-partition error on the
+ * OffsetFetch response (see {@link error}).
  */
 export type ConsumerGroupLagPartition = {
   partition: number;
@@ -74,6 +76,16 @@ export type ConsumerGroupLagPartition = {
   lag: number | null;
   metadata: string | null;
   leaderEpoch: number | null;
+  /**
+   * Set when the broker reported a per-partition error on the
+   * OffsetFetch response (e.g., leader unavailable, partition-level
+   * authorization failure). `committedOffset` and `lag` are `null` in
+   * this case — the broker's `offset` value is not meaningful when an
+   * error is attached — and the partition is excluded from `totalLag`.
+   * Surfacing the `code` and `message` lets the caller act on the
+   * specific failure rather than guessing why the lag is unknown.
+   */
+  error?: { code: number; message: string };
 };
 
 /** Per-topic group of {@link ConsumerGroupLagPartition} rows. */
@@ -260,6 +272,27 @@ function buildLagRow(
   committed: FetchOffsetsPartition,
   watermark: PartitionWatermark,
 ): { row: ConsumerGroupLagPartition; lagBigInt: bigint | null } {
+  // Broker-reported per-partition error: the offset value isn't
+  // meaningful (could be a sentinel, stale, or garbage), so surface the
+  // error code and message verbatim and treat the lag as unknown.
+  // Excluded from the cross-partition `totalLag` sum.
+  if (committed.error !== undefined) {
+    return {
+      row: {
+        partition: committed.partition,
+        committedOffset: null,
+        highWatermark: watermark.high,
+        lag: null,
+        metadata: committed.metadata,
+        leaderEpoch: committed.leaderEpoch,
+        error: {
+          code: committed.error.code,
+          message: committed.error.message,
+        },
+      },
+      lagBigInt: null,
+    };
+  }
   if (committed.offset === "-1") {
     return {
       row: {
@@ -338,10 +371,13 @@ async function groupExists(
  * message; same posture get-partition-offsets takes.
  */
 function isUnknownTopicError(err: unknown): boolean {
-  if (!(err instanceof KafkaJS.KafkaJSError)) return false;
+  if (typeof err !== "object" || err === null || !("code" in err)) {
+    return false;
+  }
+  const code = (err as { code: unknown }).code;
   return (
-    err.code === KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART ||
-    err.code === KafkaJS.ErrorCodes.ERR__UNKNOWN_TOPIC
+    code === KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART ||
+    code === KafkaJS.ErrorCodes.ERR__UNKNOWN_TOPIC
   );
 }
 
@@ -454,23 +490,66 @@ async function resolveNeverCommittedFilterTopics(
   seenTopics: ReadonlySet<string>,
   admin: KafkaJS.Admin,
 ): Promise<ResolveNeverCommittedTopicsResult> {
-  const topics: ConsumerGroupLagTopic[] = [];
-  for (const filterTopic of filterTopics) {
-    if (seenTopics.has(filterTopic)) continue;
-    let metadata: Awaited<ReturnType<typeof admin.fetchTopicMetadata>>;
-    try {
-      metadata = await admin.fetchTopicMetadata({ topics: [filterTopic] });
-    } catch (err) {
-      if (isUnknownTopicError(err)) {
-        return { kind: "topicNotFound", missingTopic: filterTopic };
-      }
+  const missing = filterTopics.filter((t) => !seenTopics.has(t));
+  if (missing.length === 0) {
+    return { kind: "resolved", topics: [] };
+  }
+
+  let metadata: Awaited<ReturnType<typeof admin.fetchTopicMetadata>>;
+  try {
+    metadata = await admin.fetchTopicMetadata({ topics: [...missing] });
+  } catch (err) {
+    if (!isUnknownTopicError(err)) throw err;
+    // The batched call rejected with an unknown-topic code but doesn't
+    // tell us which topic was missing. Probe per-topic to identify the
+    // first missing one in user-supplied order so the caller-facing
+    // error names a specific topic.
+    const firstMissing = await findFirstMissingTopic(admin, missing);
+    if (firstMissing === null) {
+      // Wacky: batch rejected but every individual probe found its
+      // topic. Could happen if the cluster changed between calls;
+      // rethrow the original rather than fabricate a not-found response.
       throw err;
     }
-    const found = metadata.topics.some((t) => t.name === filterTopic);
-    if (!found) {
-      return { kind: "topicNotFound", missingTopic: filterTopic };
-    }
-    topics.push({ topic: filterTopic, partitions: [] });
+    return { kind: "topicNotFound", missingTopic: firstMissing };
   }
-  return { kind: "resolved", topics };
+
+  // Defensive against the silently-omits-missing-topic surface shape:
+  // locate the first requested topic that didn't come back, in
+  // user-supplied order.
+  const returnedNames = new Set(metadata.topics.map((t) => t.name));
+  const firstMissing = missing.find((t) => !returnedNames.has(t));
+  if (firstMissing !== undefined) {
+    return { kind: "topicNotFound", missingTopic: firstMissing };
+  }
+
+  return {
+    kind: "resolved",
+    topics: missing.map((topic) => ({ topic, partitions: [] })),
+  };
+}
+
+/**
+ * Identify the first missing topic from `candidates` in candidate order
+ * by probing each individually via `fetchTopicMetadata`. Returns `null`
+ * if every probe found its topic. Used as a fallback after a batched
+ * `fetchTopicMetadata` rejects with an unknown-topic code but doesn't
+ * tell us which one triggered the failure.
+ */
+async function findFirstMissingTopic(
+  admin: KafkaJS.Admin,
+  candidates: readonly string[],
+): Promise<string | null> {
+  for (const topic of candidates) {
+    try {
+      const metadata = await admin.fetchTopicMetadata({ topics: [topic] });
+      if (!metadata.topics.some((t) => t.name === topic)) {
+        return topic;
+      }
+    } catch (err) {
+      if (isUnknownTopicError(err)) return topic;
+      throw err;
+    }
+  }
+  return null;
 }

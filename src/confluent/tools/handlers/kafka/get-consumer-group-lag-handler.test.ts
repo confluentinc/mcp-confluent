@@ -384,6 +384,62 @@ describe("get-consumer-group-lag-handler.ts", () => {
       expect(payload.totalLag).toBe(50);
     });
 
+    it("should surface a per-partition broker error as {committedOffset: null, lag: null, error: {code, message}} and exclude that partition from totalLag", async () => {
+      // `FetchOffsetsPartition.error` is set when the broker reports a
+      // per-partition failure on the OffsetFetch response (leader
+      // unavailable, partition-level authorization failure, etc.). The
+      // partition's `offset` value is meaningless in that case, so
+      // computing lag from it would either throw on a non-numeric
+      // sentinel or surface a wildly wrong number. The handler routes
+      // these partitions into the same null/null shape as the
+      // never-committed sentinel, with an `error` field carrying the
+      // librdkafka `code` and `message` so the caller can act on the
+      // specific failure.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([
+        {
+          topic: "orders",
+          partitions: [
+            fakeFetchedPartition({ partition: 0, offset: "50" }),
+            fakeFetchedPartition({
+              partition: 1,
+              offset: "0",
+              error: fakeLibrdKafkaError({
+                code: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
+                message: "Broker: Group authorization failed",
+              }),
+            }),
+          ],
+        },
+      ]);
+      admin.fetchTopicOffsets.mockResolvedValue([
+        fakeWatermark({ partition: 0, high: "100" }),
+        fakeWatermark({ partition: 1, high: "200" }),
+      ]);
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "g1",
+      });
+
+      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      const partitions = payload.topics[0]!.partitions;
+      expect(partitions[1]).toEqual({
+        partition: 1,
+        committedOffset: null,
+        highWatermark: "200",
+        lag: null,
+        metadata: null,
+        leaderEpoch: null,
+        error: {
+          code: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
+          message: "Broker: Group authorization failed",
+        },
+      });
+      // Only partition 0's lag (50) counts; partition 1 is excluded.
+      expect(payload.totalLag).toBe(50);
+    });
+
     it("should surface a negative lag when committed > high (rebalance race) and include it in totalLag without crashing", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
@@ -778,6 +834,77 @@ describe("get-consumer-group-lag-handler.ts", () => {
       // watermark cost — only `orders` (the committed topic) is fetched.
       expect(admin.fetchTopicOffsets).toHaveBeenCalledOnce();
       expect(admin.fetchTopicOffsets).toHaveBeenCalledWith("orders");
+    });
+
+    it("should batch fetchTopicMetadata into a single call when verifying multiple never-committed filter topics", async () => {
+      // Perf invariant: K never-committed filter topics produce ONE
+      // metadata round trip, not K. A regression that fanned the
+      // existence check back out into a per-topic loop would fail this
+      // call-count assertion.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeRealGroup("g1")],
+      });
+      admin.fetchTopicMetadata.mockResolvedValue({
+        topics: [
+          { name: "alpha", partitions: [] },
+          { name: "bravo", partitions: [] },
+          { name: "charlie", partitions: [] },
+        ],
+      });
+
+      await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "g1",
+        topics: ["alpha", "bravo", "charlie"],
+      });
+
+      expect(admin.fetchTopicMetadata).toHaveBeenCalledOnce();
+      expect(admin.fetchTopicMetadata).toHaveBeenCalledWith({
+        topics: ["alpha", "bravo", "charlie"],
+      });
+    });
+
+    it("should fall back to per-topic probes to identify the first missing topic when a batched fetchTopicMetadata rejects with an unknown-topic code", async () => {
+      // Defensive against the kafkajs-compat surface where a batched
+      // metadata call rejects on the first missing topic without
+      // identifying it. The handler probes per-topic in user-supplied
+      // order so the caller-facing "Topic not found" message names a
+      // specific topic — the one the caller is likely confused about,
+      // not whichever the broker happened to evaluate first.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeRealGroup("g1")],
+      });
+      admin.fetchTopicMetadata.mockImplementation(async (options) => {
+        const requested = options?.topics ?? [];
+        // Batched call (more than one topic) rejects with unknown-topic
+        // — the kafkajs-compat behavior under test.
+        if (requested.length > 1) {
+          throw new KafkaJS.KafkaJSError("Broker: Unknown topic or partition", {
+            code: KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART,
+          });
+        }
+        // Per-topic probes: "alpha" exists, "bravo" doesn't.
+        const [topic] = requested;
+        if (topic === "alpha") {
+          return { topics: [{ name: "alpha", partitions: [] }] };
+        }
+        throw new KafkaJS.KafkaJSError("Broker: Unknown topic or partition", {
+          code: KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART,
+        });
+      });
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "g1",
+        topics: ["alpha", "bravo"],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe('Topic "bravo" not found on this cluster.');
     });
 
     it("should surface a friendly 'Topic <name> not found' error when the group has committed offsets for a topic that has since been deleted from the cluster", async () => {

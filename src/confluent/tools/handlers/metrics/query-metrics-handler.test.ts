@@ -1,9 +1,12 @@
+import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import {
   buildEffectiveFilter,
   buildRequestBody,
   QueryMetricsHandler,
   resolveInterval,
 } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { textOf } from "@tests/call-tool-result.js";
 import {
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
@@ -39,6 +42,16 @@ type FilterCase = HandleCaseWithConn & {
 describe("query-metrics-handler.ts", () => {
   describe("QueryMetricsHandler", () => {
     const handler = new QueryMetricsHandler();
+
+    describe("getToolConfig()", () => {
+      it("should describe the query-metrics tool as read-only", () => {
+        const config = handler.getToolConfig();
+        expect(config.name).toBe(ToolName.QUERY_METRICS);
+        expect(config.description).toContain("Confluent Cloud metrics");
+        expect(config.inputSchema).toHaveProperty("metric");
+        expect(config.annotations).toBe(READ_ONLY);
+      });
+    });
 
     describe("resolveInterval()", () => {
       beforeEach(() => {
@@ -126,18 +139,18 @@ describe("query-metrics-handler.ts", () => {
         });
       });
 
-      it("should wrap multiple filter entries in an AND object", () => {
+      it("should wrap multiple filter entries in an AND object preserving insertion order", () => {
         const body = buildRequestBody(
           ...BASE_ARGS,
           { "resource.kafka.id": "lkc-abc", "metric.topic": "my-topic" },
           undefined,
         );
-        expect(body.filter).toMatchObject({
+        expect(body.filter).toEqual({
           op: "AND",
-          filters: expect.arrayContaining([
+          filters: [
             { field: "resource.kafka.id", op: "EQ", value: "lkc-abc" },
             { field: "metric.topic", op: "EQ", value: "my-topic" },
-          ]),
+          ],
         });
       });
 
@@ -148,7 +161,11 @@ describe("query-metrics-handler.ts", () => {
 
       it("should set GROUPED format when group_by is provided", () => {
         const body = buildRequestBody(...BASE_ARGS, {}, ["metric.topic"]);
-        expect(body).toMatchObject({
+        expect(body).toEqual({
+          aggregations: [{ metric: KAFKA_SERVER_METRIC, agg: "SUM" }],
+          granularity: "PT1M",
+          intervals: ["2024-01-01T00:00:00Z/2024-01-02T00:00:00Z"],
+          limit: 100,
           group_by: ["metric.topic"],
           format: "GROUPED",
         });
@@ -263,11 +280,175 @@ describe("query-metrics-handler.ts", () => {
             ? expect.objectContaining({ filter: expectedFilter })
             : expect.not.objectContaining({ filter: expect.anything() });
           expect(telemetryRest.POST).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.objectContaining({ body: expectedBody }),
+            "/v2/metrics/{dataset}/query",
+            expect.objectContaining({
+              params: { path: { dataset: "cloud" } },
+              body: expectedBody,
+            }),
           );
         },
       );
+    });
+
+    describe("handle() response shaping", () => {
+      it("should return a flagged error when the telemetry API returns errors with detail", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTelemetryRestClient()
+          .POST.mockResolvedValue({
+            data: {
+              errors: [{ detail: "bad metric" }, { detail: "wrong dataset" }],
+            },
+          });
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { metric: KAFKA_SERVER_METRIC },
+          outcome: {
+            resolves:
+              "Metrics query returned errors: bad metric; wrong dataset",
+            isError: true,
+          },
+          clientManager,
+        });
+      });
+
+      it("should return a flagged error when the telemetry client throws", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTelemetryRestClient()
+          .POST.mockRejectedValue(new Error("network down"));
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { metric: KAFKA_SERVER_METRIC },
+          outcome: {
+            resolves: "Failed to query metrics: network down",
+            isError: true,
+          },
+          clientManager,
+        });
+      });
+
+      it("should stringify non-Error thrown values in the failure message", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTelemetryRestClient()
+          .POST.mockRejectedValue("boom");
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { metric: KAFKA_SERVER_METRIC },
+          outcome: {
+            resolves: "Failed to query metrics: boom",
+            isError: true,
+          },
+          clientManager,
+        });
+      });
+
+      it("should format flat results with integer locale separators and surface _meta with result_count", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTelemetryRestClient()
+          .POST.mockResolvedValue({
+            data: {
+              data: [
+                { timestamp: "2024-06-01T12:00:00Z", value: 1234567 },
+                { timestamp: "2024-06-01T12:01:00Z", value: 0.12345 },
+                { timestamp: "2024-06-01T12:02:00Z" },
+              ],
+            },
+          });
+
+        const result = await handler.handle(
+          runtimeWith(
+            TELEMETRY_WITH_KAFKA_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          {
+            metric: KAFKA_SERVER_METRIC,
+            interval: "2024-06-01T11:00:00Z/2024-06-01T12:00:00Z",
+          },
+        );
+
+        const text = textOf(result);
+        expect(result.isError).toBe(false);
+        expect(text).toContain("Metrics Query Results");
+        expect(text).toContain(`Metric: ${KAFKA_SERVER_METRIC}`);
+        expect(text).toContain(
+          'Filter: {"resource.kafka.id":"lkc-from-config"}',
+        );
+        expect(text).toContain("Data Points: 3");
+        expect(text).toContain((1234567).toLocaleString());
+        expect(text).toContain("0.1235");
+        expect(text).toContain("2024-06-01T12:02:00.000Z: N/A");
+        expect(result._meta).toEqual({
+          metric: KAFKA_SERVER_METRIC,
+          dataset: "cloud",
+          aggregation: "SUM",
+          granularity: "PT1M",
+          interval: "2024-06-01T11:00:00Z/2024-06-01T12:00:00Z",
+          result_count: 3,
+        });
+      });
+
+      it("should format grouped results with labels, group_by header, and an empty-points marker", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTelemetryRestClient()
+          .POST.mockResolvedValue({
+            data: {
+              data: [
+                {
+                  "metric.topic": "orders",
+                  points: [
+                    { timestamp: "2024-06-01T12:00:00Z", value: 42 },
+                    { timestamp: "2024-06-01T12:01:00Z" },
+                  ],
+                },
+                {
+                  "metric.topic": "shipments",
+                  points: [],
+                },
+              ],
+            },
+          });
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {
+            metric: KAFKA_SERVER_METRIC,
+            interval: "2024-06-01T11:00:00Z/2024-06-01T12:00:00Z",
+            group_by: ["metric.topic"],
+          },
+        );
+
+        const text = textOf(result);
+        expect(text).toContain("Group by: metric.topic");
+        expect(text).toContain("Groups: 2");
+        expect(text).toContain("Group: metric.topic=orders");
+        expect(text).toContain("42");
+        expect(text).toContain("2024-06-01T12:01:00.000Z: N/A");
+        expect(text).toContain("Group: metric.topic=shipments");
+        expect(text).toContain("(no data points)");
+      });
     });
   });
 });

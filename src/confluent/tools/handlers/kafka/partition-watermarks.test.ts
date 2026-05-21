@@ -1,17 +1,100 @@
 import {
   createWatermarkCache,
   fetchPartitionWatermarks,
+  narrowMessageCount,
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
+import { logger } from "@src/logger.js";
 import { getMockedAdmin } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 
 describe("partition-watermarks.ts", () => {
+  describe("narrowMessageCount()", () => {
+    it("should pass small non-negative BigInt diffs through as a Number", () => {
+      expect(narrowMessageCount(0n, {})).toBe(0);
+      expect(narrowMessageCount(1n, {})).toBe(1);
+      expect(narrowMessageCount(1_000_000n, {})).toBe(1_000_000);
+    });
+
+    it("should pass small negative BigInt diffs through unchanged", () => {
+      // The lag tool surfaces a rebalance-race condition (committed >
+      // high watermark) as a small negative lag rather than clamping to
+      // zero — clamping would hide a real, if rare, state. Negative
+      // diffs of realistic magnitude land well inside the symmetric
+      // safe-integer range.
+      expect(narrowMessageCount(-3n, {})).toBe(-3);
+      expect(narrowMessageCount(-100n, {})).toBe(-100);
+    });
+
+    it("should narrow exactly Number.MAX_SAFE_INTEGER without triggering the Wacky branch", () => {
+      // The saturation check is strict `> maxSafe`, not `>= maxSafe`, so a
+      // diff that lands exactly on the boundary returns Number(diff)
+      // through the happy path. Asserting `warn` was never called is what
+      // distinguishes this branch from the saturate branch — the return
+      // value is identical at the boundary.
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      expect(narrowMessageCount(MAX_SAFE_BIGINT, { topic: "edge" })).toBe(
+        Number.MAX_SAFE_INTEGER,
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should saturate to Number.MAX_SAFE_INTEGER and emit a Wacky log when the diff exceeds the safe-integer boundary", () => {
+      // The saturation arm is a defensive sentinel; spy on `logger.warn`
+      // only to silence the noise and to distinguish this branch from the
+      // boundary case in the previous test. Log content is not asserted
+      // (per CLAUDE.md: don't pin logging side effects), only that the
+      // branch was taken.
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      expect(
+        narrowMessageCount(MAX_SAFE_BIGINT + 1n, { groupId: "overflow" }),
+      ).toBe(Number.MAX_SAFE_INTEGER);
+
+      expect(warnSpy).toHaveBeenCalledOnce();
+    });
+
+    it("should narrow exactly Number.MIN_SAFE_INTEGER without triggering the Wacky branch", () => {
+      // Symmetric boundary case to the MAX_SAFE_INTEGER test above: the
+      // saturation check is strict `< minSafe`, so a diff landing exactly
+      // on `-(2^53 - 1)` returns `Number(diff)` through the happy path
+      // and the `warn` spy stays silent.
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      expect(narrowMessageCount(MIN_SAFE_BIGINT, { topic: "edge" })).toBe(
+        Number.MIN_SAFE_INTEGER,
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it("should saturate to Number.MIN_SAFE_INTEGER and emit a Wacky log when the diff is below the safe-integer boundary", () => {
+      // Symmetric counterpart to the MAX_SAFE_INTEGER saturation test.
+      // A diff below -(2^53 - 1) would silently lose precision through
+      // `Number(diff)` without the lower-bound guard. Real-world
+      // sources: a single partition where the group committed far ahead
+      // of the watermark, or a cross-partition sum of many
+      // rebalance-race negative lags.
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      expect(
+        narrowMessageCount(MIN_SAFE_BIGINT - 1n, { groupId: "underflow" }),
+      ).toBe(Number.MIN_SAFE_INTEGER);
+
+      expect(warnSpy).toHaveBeenCalledOnce();
+    });
+  });
+
   describe("fetchPartitionWatermarks()", () => {
     it("should narrow admin.fetchTopicOffsets's response to {partition, low, high}, dropping the unused committed `offset` field", async () => {
       // The committed `offset` field on the upstream response isn't the
       // same as `high` (it's the next-to-be-committed group offset, not
       // the partition end-of-log) and neither this module's callers nor
-      // #480's `get-partition-offsets` handler read it. Narrowing here
+      // `get-partition-offsets` handler read it. Narrowing here
       // keeps the seam small and prevents accidental dependence on a
       // field whose semantics differ from its name.
       const admin = getMockedAdmin();

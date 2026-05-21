@@ -1,4 +1,5 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { logger } from "@src/logger.js";
 
 /**
  * Per-partition low/high watermark pair, normalized to the fields the
@@ -15,10 +16,51 @@ export interface PartitionWatermark {
 }
 
 /**
+ * Narrow a {@link BigInt} difference to a JS `Number`, saturating at
+ * {@link Number.MAX_SAFE_INTEGER} or {@link Number.MIN_SAFE_INTEGER}
+ * when the result would lose precision. The narrow path is the only one
+ * expected to fire in practice (even a million-msg/sec partition with
+ * infinite retention takes ~285 years to exceed 2^53 - 1); the
+ * saturation arms are defensive sentinels — hence the `Wacky --` log
+ * signaling "this branch firing means something genuinely surprising
+ * happened". Symmetric guards on both ends of the safe range so a `diff`
+ * produced by an unexpected caller pattern (e.g. a far-ahead committed
+ * offset, or a cross-partition sum of many negative lags) can't silently
+ * lose precision.
+ *
+ * `context` is forwarded verbatim into the log payload so each caller
+ * can name the dimensions it knows about (`{topicName, partition}` for
+ * the standalone watermark tool, `{groupId, topic, partition}` for the
+ * consumer-group lag tool) without this helper hard-coding either.
+ */
+export function narrowMessageCount(
+  diff: bigint,
+  context: Record<string, unknown>,
+): number {
+  const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+  const minSafe = BigInt(Number.MIN_SAFE_INTEGER);
+  if (diff > maxSafe) {
+    logger.warn(
+      context,
+      "Wacky -- messageCount BigInt subtraction exceeds Number.MAX_SAFE_INTEGER; saturating to MAX_SAFE_INTEGER",
+    );
+    return Number.MAX_SAFE_INTEGER;
+  }
+  if (diff < minSafe) {
+    logger.warn(
+      context,
+      "Wacky -- messageCount BigInt subtraction below Number.MIN_SAFE_INTEGER; saturating to MIN_SAFE_INTEGER",
+    );
+    return Number.MIN_SAFE_INTEGER;
+  }
+  return Number(diff);
+}
+
+/**
  * Thin wrapper around `admin.fetchTopicOffsets(topic)` that normalizes
  * the response to {@link PartitionWatermark}. Shared seam between the
  * consume handler's per-call watermark cache (see
- * {@link createWatermarkCache}) and #480's standalone
+ * {@link createWatermarkCache}) and standalone
  * `get-partition-offsets` tool — single source of truth for the
  * response shape both surfaces see.
  */

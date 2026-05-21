@@ -14,6 +14,7 @@ import {
 import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
   fetchPartitionWatermarks,
+  narrowMessageCount,
   type PartitionWatermark,
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -69,33 +70,6 @@ export type GetPartitionOffsetsResponse = {
   partitions: PartitionOffsetInfo[];
 };
 
-/**
- * Narrow {@link BigInt} subtraction to a JS `Number`, saturating at
- * {@link Number.MAX_SAFE_INTEGER} when the result would lose precision.
- * The narrow path is the only one expected to fire in practice (even a
- * million-msg/sec partition with infinite retention takes ~285 years to
- * exceed 2^53 - 1); the saturation arm is a defensive sentinel — hence the
- * `Wacky --` log signaling "this branch firing means something genuinely
- * surprising happened".
- */
-function narrowMessageCount(
-  diff: bigint,
-  topicName: string,
-  partition: number,
-  low: string,
-  high: string,
-): number {
-  const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
-  if (diff > maxSafe) {
-    logger.warn(
-      { topicName, partition, low, high },
-      "Wacky -- messageCount BigInt subtraction exceeds Number.MAX_SAFE_INTEGER; saturating to MAX_SAFE_INTEGER",
-    );
-    return Number.MAX_SAFE_INTEGER;
-  }
-  return Number(diff);
-}
-
 function mapToPartitionOffsetInfo(
   topicName: string,
   watermark: PartitionWatermark,
@@ -107,13 +81,12 @@ function mapToPartitionOffsetInfo(
     partition: watermark.partition,
     lowWatermark: watermark.low,
     highWatermark: watermark.high,
-    messageCount: narrowMessageCount(
-      diff,
+    messageCount: narrowMessageCount(diff, {
       topicName,
-      watermark.partition,
-      watermark.low,
-      watermark.high,
-    ),
+      partition: watermark.partition,
+      low: watermark.low,
+      high: watermark.high,
+    }),
   };
 }
 
@@ -123,7 +96,7 @@ function mapToPartitionOffsetInfo(
  * broker's `Admin.fetchTopicOffsets` admin call — the metadata primitive
  * that `consume-messages` already relies on internally for `start:
  * "earliest" / "latest" / {timestamp} / {tail}` resolution but doesn't
- * surface in its response. Closes #480.
+ * surface in its response.
  */
 export class GetPartitionOffsetsHandler extends BaseToolHandler {
   async handle(

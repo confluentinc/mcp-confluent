@@ -1,7 +1,7 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import { CallToolResult } from "@src/confluent/schema.js";
 import { GetPartitionOffsetsHandler } from "@src/confluent/tools/handlers/kafka/get-partition-offsets-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { textOf } from "@tests/call-tool-result.js";
 import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
@@ -9,10 +9,6 @@ import {
 } from "@tests/factories/runtime.js";
 import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
-
-function textOf(result: CallToolResult): string {
-  return result.content.map((c) => ("text" in c ? c.text : "")).join("");
-}
 
 describe("get-partition-offsets-handler.ts", () => {
   describe("getToolConfig()", () => {

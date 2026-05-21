@@ -60,7 +60,7 @@ export function narrowMessageCount(
  * Thin wrapper around `admin.fetchTopicOffsets(topic)` that normalizes
  * the response to {@link PartitionWatermark}. Shared seam between the
  * consume handler's per-call watermark cache (see
- * {@link createWatermarkCache}) and #480's standalone
+ * {@link createWatermarkCache}) and standalone
  * `get-partition-offsets` tool — single source of truth for the
  * response shape both surfaces see.
  */

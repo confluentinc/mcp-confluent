@@ -30,7 +30,7 @@ export function isGroupIdNotFoundError(err: unknown): boolean {
  * successful-shaped {@link GroupDescription} with no `.error` field, state
  * `Dead`, no members, and empty `protocol` / `partitionAssignor` strings.
  * Confluent Cloud's brokers were observed taking this path
- * (integration-test discovery, May 2026) rather than the documented
+ * rather than the documented
  * `ERR_GROUP_ID_NOT_FOUND` paths.
  *
  * The empty `protocol` and `partitionAssignor` are the load-bearing

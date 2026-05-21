@@ -113,7 +113,7 @@ export type GetConsumerGroupLagResponse = {
  * negative during a consumer-group rebalance (committed offset captured
  * at a different isolation level than the watermark snapshot); the value
  * is surfaced as-is rather than clamped, since clamping would hide a real
- * if rare state. Closes #491.
+ * if rare state.
  */
 export class GetConsumerGroupLagHandler extends BaseToolHandler {
   readonly category = ToolCategory.Kafka;

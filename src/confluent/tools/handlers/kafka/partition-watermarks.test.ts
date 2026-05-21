@@ -94,7 +94,7 @@ describe("partition-watermarks.ts", () => {
       // The committed `offset` field on the upstream response isn't the
       // same as `high` (it's the next-to-be-committed group offset, not
       // the partition end-of-log) and neither this module's callers nor
-      // #480's `get-partition-offsets` handler read it. Narrowing here
+      // `get-partition-offsets` handler read it. Narrowing here
       // keeps the seam small and prevents accidental dependence on a
       // field whose semantics differ from its name.
       const admin = getMockedAdmin();

@@ -37,7 +37,7 @@ describe("get-consumer-group-lag-handler", { tags: [Tag.KAFKA] }, () => {
   let admin: KafkaJS.Admin;
   let producer: KafkaJS.Producer;
   const topic = uniqueName("lag");
-  // Second topic stays exist-but-untouched so test #4 below can prove the
+  // Second topic stays exist-but-untouched so below can prove the
   // "filter includes a topic the group has never committed to" path returns
   // `partitions: []` rather than silently dropping the topic.
   const untouchedTopic = uniqueName("lag-untouched");

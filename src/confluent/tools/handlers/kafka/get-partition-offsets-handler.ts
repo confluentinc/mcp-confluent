@@ -96,7 +96,7 @@ function mapToPartitionOffsetInfo(
  * broker's `Admin.fetchTopicOffsets` admin call — the metadata primitive
  * that `consume-messages` already relies on internally for `start:
  * "earliest" / "latest" / {timestamp} / {tail}` resolution but doesn't
- * surface in its response. Closes #480.
+ * surface in its response.
  */
 export class GetPartitionOffsetsHandler extends BaseToolHandler {
   async handle(

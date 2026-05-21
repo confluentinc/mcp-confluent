@@ -19,6 +19,11 @@ import {
   stateName,
   typeName,
 } from "@src/confluent/tools/handlers/kafka/consumer-group-enums.js";
+import {
+  isGroupIdNotFoundError,
+  isUnknownGroupTombstone,
+  notFoundGroupMessage,
+} from "@src/confluent/tools/handlers/kafka/consumer-group-not-found.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -130,7 +135,10 @@ export class DescribeConsumerGroupHandler extends BaseToolHandler {
         raw = await admin.describeGroups([parsed.groupId]);
       } catch (err) {
         if (isGroupIdNotFoundError(err)) {
-          return this.createResponse(notFoundMessage(parsed.groupId), true);
+          return this.createResponse(
+            notFoundGroupMessage(parsed.groupId),
+            true,
+          );
         }
         throw err;
       }
@@ -142,20 +150,23 @@ export class DescribeConsumerGroupHandler extends BaseToolHandler {
       // broker returned nothing addressable to the requested id, so treat it
       // as not-found rather than crash on `groupDesc.groupId` below.
       if (groupDesc === undefined) {
-        return this.createResponse(notFoundMessage(parsed.groupId), true);
+        return this.createResponse(notFoundGroupMessage(parsed.groupId), true);
       }
 
       if (groupDesc.error !== undefined) {
         if (
           groupDesc.error.code === KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND
         ) {
-          return this.createResponse(notFoundMessage(parsed.groupId), true);
+          return this.createResponse(
+            notFoundGroupMessage(parsed.groupId),
+            true,
+          );
         }
         return this.createResponse(groupDesc.error.message, true);
       }
 
       if (isUnknownGroupTombstone(groupDesc)) {
-        return this.createResponse(notFoundMessage(parsed.groupId), true);
+        return this.createResponse(notFoundGroupMessage(parsed.groupId), true);
       }
 
       const payload: DescribeConsumerGroupResponse = {
@@ -179,51 +190,6 @@ export class DescribeConsumerGroupHandler extends BaseToolHandler {
       await disposeIfOAuth(runtime, connId, admin);
     }
   }
-}
-
-function notFoundMessage(groupId: string): string {
-  return `Consumer group "${groupId}" not found on this cluster.`;
-}
-
-/**
- * Narrow an unknown rejection to a librdkafka `ERR_GROUP_ID_NOT_FOUND` error.
- * The kafkajs-flavored `describeGroups` surfaces unknown groups either as a
- * top-level rejection (this path) or as a per-group `GroupDescription.error`
- * (handled separately); the handler normalizes both into the same caller-
- * friendly tool-level error.
- */
-function isGroupIdNotFoundError(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: unknown }).code ===
-      KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND
-  );
-}
-
-/**
- * Third path the broker uses to report an unknown group: a successful-shaped
- * {@link GroupDescription} with no `.error` field, state `Dead`, no members,
- * and empty `protocol` / `partitionAssignor` strings. Confluent Cloud's
- * brokers were observed taking this path (integration-test discovery, May
- * 2026) rather than the documented `ERR_GROUP_ID_NOT_FOUND` paths.
- *
- * The empty `protocol` and `partitionAssignor` are the load-bearing signal:
- * a group that previously lived and has since died would still carry its
- * last-used protocol name. Both fields being empty means the broker never
- * had a record of this group to begin with. Long-tombstoned real groups
- * could in principle match the same fingerprint once the broker drops the
- * retained protocol metadata; accepted as an exotic-edge false-positive in
- * exchange for the friendly UX the spec asked for.
- */
-function isUnknownGroupTombstone(groupDesc: GroupDescription): boolean {
-  return (
-    groupDesc.state === KafkaJS.ConsumerGroupStates.DEAD &&
-    groupDesc.members.length === 0 &&
-    groupDesc.protocol === "" &&
-    groupDesc.partitionAssignor === ""
-  );
 }
 
 function buildCoordinator(

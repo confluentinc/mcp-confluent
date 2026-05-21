@@ -106,9 +106,13 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
           name: ToolName.CONSUME_MESSAGES,
           arguments: {
             topics: [{ name: multiTopic, partition: 0, start: "earliest" }],
-            // Allow headroom; we'll assert exactly one record landed
-            // via the negative-presence checks rather than by count.
-            maxMessages: 10,
+            // Match the expected message count exactly: one record on
+            // partition 0, none on the other partitions (the pause step
+            // suppresses p1/p2). `maxMessages: 1` lets the call exit on
+            // the first kept message instead of waiting out the
+            // `timeoutMs` floor — the negative-presence assertions on
+            // p1/p2 still catch a broken pause regardless.
+            maxMessages: 1,
             timeoutMs: 15_000,
             valueFormat: { disableSchemaRegistry: true },
           },

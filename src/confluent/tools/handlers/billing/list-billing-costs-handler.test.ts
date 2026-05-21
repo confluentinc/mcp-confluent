@@ -1,5 +1,5 @@
-import { CallToolResult } from "@src/confluent/schema.js";
 import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
+import { textOf } from "@tests/call-tool-result.js";
 import {
   CCLOUD_CONN,
   DEFAULT_CONNECTION_ID,
@@ -10,10 +10,6 @@ import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
 const VALID_ARGS = { startDate: "2026-01-01", endDate: "2026-01-31" };
-
-function responseText(result: CallToolResult): string {
-  return result.content.map((c) => (c.type === "text" ? c.text : "")).join("");
-}
 
 describe("list-billing-costs-handler.ts", () => {
   describe("ListBillingCostsHandler", () => {
@@ -70,7 +66,7 @@ describe("list-billing-costs-handler.ts", () => {
           VALID_ARGS,
         );
 
-        const text = responseText(result);
+        const text = textOf(result);
         expect(result.isError).toBe(false);
         expect(text).toContain("Total Amount: $160.00");
         expect(text).toContain("Original Amount: $175.00");
@@ -113,7 +109,7 @@ describe("list-billing-costs-handler.ts", () => {
           VALID_ARGS,
         );
 
-        const text = responseText(result);
+        const text = textOf(result);
         expect(result.isError).toBe(false);
         expect(text).toContain("Total Line Items: 0");
         expect(text).not.toContain("Product Breakdown");
@@ -146,7 +142,7 @@ describe("list-billing-costs-handler.ts", () => {
           VALID_ARGS,
         );
 
-        const text = responseText(result);
+        const text = textOf(result);
         expect(result.isError).toBe(false);
         expect(text).toContain("Pagination:");
         expect(text).toContain("Total Items: 42");
@@ -176,7 +172,7 @@ describe("list-billing-costs-handler.ts", () => {
           VALID_ARGS,
         );
 
-        const text = responseText(result);
+        const text = textOf(result);
         expect(result.isError).toBe(false);
         expect(text).not.toContain("Pagination:");
         expect(result._meta).toMatchObject({
@@ -198,8 +194,8 @@ describe("list-billing-costs-handler.ts", () => {
         );
 
         expect(result.isError).toBe(true);
-        expect(responseText(result)).toContain("Failed to fetch billing costs");
-        expect(responseText(result)).toContain("forbidden");
+        expect(textOf(result)).toContain("Failed to fetch billing costs");
+        expect(textOf(result)).toContain("forbidden");
         expect(result._meta).toEqual({ error: apiError });
       });
 
@@ -215,7 +211,7 @@ describe("list-billing-costs-handler.ts", () => {
         );
 
         expect(result.isError).toBe(true);
-        expect(responseText(result)).toContain("Invalid billing costs data");
+        expect(textOf(result)).toContain("Invalid billing costs data");
         expect(result._meta).toBeDefined();
         expect((result._meta as { error: unknown }).error).toBeInstanceOf(
           ZodError,
@@ -234,7 +230,7 @@ describe("list-billing-costs-handler.ts", () => {
         );
 
         expect(result.isError).toBe(true);
-        expect(responseText(result)).toContain("network down");
+        expect(textOf(result)).toContain("network down");
         expect(result._meta).toEqual({ error: "network down" });
       });
 

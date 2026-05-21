@@ -152,18 +152,18 @@ describe("query-metrics-handler.ts", () => {
         });
       });
 
-      it("should wrap multiple filter entries in an AND object", () => {
+      it("should wrap multiple filter entries in an AND object preserving insertion order", () => {
         const body = buildRequestBody(
           ...BASE_ARGS,
           { "resource.kafka.id": "lkc-abc", "metric.topic": "my-topic" },
           undefined,
         );
-        expect(body.filter).toMatchObject({
+        expect(body.filter).toEqual({
           op: "AND",
-          filters: expect.arrayContaining([
+          filters: [
             { field: "resource.kafka.id", op: "EQ", value: "lkc-abc" },
             { field: "metric.topic", op: "EQ", value: "my-topic" },
-          ]),
+          ],
         });
       });
 
@@ -174,7 +174,11 @@ describe("query-metrics-handler.ts", () => {
 
       it("should set GROUPED format when group_by is provided", () => {
         const body = buildRequestBody(...BASE_ARGS, {}, ["metric.topic"]);
-        expect(body).toMatchObject({
+        expect(body).toEqual({
+          aggregations: [{ metric: KAFKA_SERVER_METRIC, agg: "SUM" }],
+          granularity: "PT1M",
+          intervals: ["2024-01-01T00:00:00Z/2024-01-02T00:00:00Z"],
+          limit: 100,
           group_by: ["metric.topic"],
           format: "GROUPED",
         });
@@ -289,8 +293,11 @@ describe("query-metrics-handler.ts", () => {
             ? expect.objectContaining({ filter: expectedFilter })
             : expect.not.objectContaining({ filter: expect.anything() });
           expect(telemetryRest.POST).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.objectContaining({ body: expectedBody }),
+            "/v2/metrics/{dataset}/query",
+            expect.objectContaining({
+              params: { path: { dataset: "cloud" } },
+              body: expectedBody,
+            }),
           );
         },
       );

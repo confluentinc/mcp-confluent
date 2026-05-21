@@ -83,11 +83,19 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
     });
 
     it("should restrict consumption to one partition when `partition` is set on the topic entry", async () => {
-      // Seed a 3-partition topic with one distinct value per partition,
-      // then ask for partition 0 only. Asserts: partition 0's value
-      // appears AND the other two do not — proving the pause step
-      // suppressed the non-keep partitions end-to-end against
-      // librdkafka, not just against mocks.
+      // Seed a 3-partition topic with three records on the keep
+      // partition and one record each on the suppressed partitions,
+      // then ask for partition 0 only. `maxMessages: 3` lets the call
+      // exit as soon as the three p0 records land instead of waiting
+      // out the `timeoutMs` floor, but it also forces the handler to
+      // stay alive long enough that a leaked p1/p2 record from a
+      // broken pause has a high probability of landing in the
+      // response (librdkafka round-robins across partitions, so 3
+      // consecutive p0 deliveries before any p1/p2 is unlikely).
+      // Asserts: every p0 record appears AND neither suppressed
+      // partition's record does — proving the pause step suppressed
+      // the non-keep partitions end-to-end against librdkafka, not
+      // just against mocks.
       const multiTopic = uniqueName("consume-part");
       await admin.createTopics({
         topics: [{ topic: multiTopic, numPartitions: 3 }],
@@ -96,7 +104,9 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
         await producer.send({
           topic: multiTopic,
           messages: [
-            { partition: 0, value: "p0-msg" },
+            { partition: 0, value: "p0-msg-a" },
+            { partition: 0, value: "p0-msg-b" },
+            { partition: 0, value: "p0-msg-c" },
             { partition: 1, value: "p1-msg" },
             { partition: 2, value: "p2-msg" },
           ],
@@ -106,20 +116,16 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
           name: ToolName.CONSUME_MESSAGES,
           arguments: {
             topics: [{ name: multiTopic, partition: 0, start: "earliest" }],
-            // Match the expected message count exactly: one record on
-            // partition 0, none on the other partitions (the pause step
-            // suppresses p1/p2). `maxMessages: 1` lets the call exit on
-            // the first kept message instead of waiting out the
-            // `timeoutMs` floor — the negative-presence assertions on
-            // p1/p2 still catch a broken pause regardless.
-            maxMessages: 1,
+            maxMessages: 3,
             timeoutMs: 15_000,
             valueFormat: { disableSchemaRegistry: true },
           },
         });
 
         const text = textContent(result);
-        expect(text).toContain("p0-msg");
+        expect(text).toContain("p0-msg-a");
+        expect(text).toContain("p0-msg-b");
+        expect(text).toContain("p0-msg-c");
         expect(text).not.toContain("p1-msg");
         expect(text).not.toContain("p2-msg");
       } finally {

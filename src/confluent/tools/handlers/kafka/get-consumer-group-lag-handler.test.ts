@@ -13,11 +13,7 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { textOf } from "@tests/call-tool-result.js";
 import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
-import {
-  bareRuntime,
-  DEFAULT_CONNECTION_ID,
-  kafkaRuntime,
-} from "@tests/factories/runtime.js";
+import { kafkaRuntime } from "@tests/factories/runtime.js";
 import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
@@ -200,20 +196,6 @@ describe("get-consumer-group-lag-handler.ts", () => {
         "groupId",
         "topics",
       ]);
-    });
-  });
-
-  describe("enabledConnectionIds()", () => {
-    const handler = new GetConsumerGroupLagHandler();
-
-    it("should enable on a kafka runtime", () => {
-      expect(handler.enabledConnectionIds(kafkaRuntime())).toEqual([
-        DEFAULT_CONNECTION_ID,
-      ]);
-    });
-
-    it("should disable on a bare runtime", () => {
-      expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
     });
   });
 

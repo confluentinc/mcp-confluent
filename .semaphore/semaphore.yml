@@ -53,11 +53,12 @@ blocks:
   # 'master', so without the override `change_in()` evaluates as
   # "everything changed" on feature branches and every block would fire.
   #
-  # Every block (including smoke) fans the `CONNECTION_TYPE` matrix axis
-  # across `direct` and `oauth`, so each PR exercises both connection
-  # shapes for the touched handler dir. Tool groups without OAuth describes
-  # skip the OAuth tests gracefully via the harness's per-describe
-  # `activeConnectionTypes` filter.
+  # Each block runs ONE job that exercises both `direct` and `oauth`
+  # connection types sequentially via the harness's `activeConnectionTypes`
+  # default (`INTEGRATION_TEST_CONNECTION_TYPE` left unset = both modes
+  # active). Splitting into a CONNECTION_TYPE matrix axis would double the
+  # agent count without adding unique test coverage; tool groups without
+  # OAuth describes skip the OAuth pass gracefully inside the job.
 
   - name: "Integration Tests: catalog"
     dependencies: ["Build & Test"]
@@ -85,10 +86,7 @@ blocks:
         - name: "@catalog"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@catalog
-          matrix: &connection-type-matrix
-            - env_var: CONNECTION_TYPE
-              values: ["direct", "oauth"]
+            - make test-integration TAGS=@catalog
 
   - name: "Integration Tests: billing"
     dependencies: ["Build & Test"]
@@ -101,8 +99,7 @@ blocks:
         - name: "@billing"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@billing
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@billing
 
   - name: "Integration Tests: clusters"
     dependencies: ["Build & Test"]
@@ -115,8 +112,7 @@ blocks:
         - name: "@clusters"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@clusters
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@clusters
 
   - name: "Integration Tests: connect"
     dependencies: ["Build & Test"]
@@ -129,8 +125,7 @@ blocks:
         - name: "@connect"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@connect
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@connect
 
   - name: "Integration Tests: docs"
     dependencies: ["Build & Test"]
@@ -143,8 +138,7 @@ blocks:
         - name: "@docs"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@docs
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@docs
 
   - name: "Integration Tests: environments"
     dependencies: ["Build & Test"]
@@ -157,8 +151,7 @@ blocks:
         - name: "@environments"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@environments
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@environments
 
   - name: "Integration Tests: flink"
     dependencies: ["Build & Test"]
@@ -171,8 +164,7 @@ blocks:
         - name: "@flink"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@flink
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@flink
 
   - name: "Integration Tests: kafka"
     dependencies: ["Build & Test"]
@@ -185,8 +177,7 @@ blocks:
         - name: "@kafka"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@kafka
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@kafka
 
   - name: "Integration Tests: metrics"
     dependencies: ["Build & Test"]
@@ -199,8 +190,7 @@ blocks:
         - name: "@metrics"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@metrics
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@metrics
 
   - name: "Integration Tests: organizations"
     dependencies: ["Build & Test"]
@@ -213,8 +203,7 @@ blocks:
         - name: "@organizations"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@organizations
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@organizations
 
   - name: "Integration Tests: schema"
     dependencies: ["Build & Test"]
@@ -227,8 +216,7 @@ blocks:
         - name: "@schema"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@schema
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@schema
 
   - name: "Integration Tests: tableflow"
     dependencies: ["Build & Test"]
@@ -241,8 +229,7 @@ blocks:
         - name: "@tableflow"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@tableflow
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@tableflow
 
   # Smoke block: fires on any non-test src/ change, so transport-layer
   # regressions (auth middleware, multi-client wiring, OAuth flow) trigger
@@ -260,8 +247,7 @@ blocks:
         - name: "@smoke"
           commands:
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration TAGS=@smoke
-          matrix: *connection-type-matrix
+            - make test-integration TAGS=@smoke
 
 after_pipeline:
   task:
@@ -274,9 +260,9 @@ promotions:
   - name: Docker Image Scan
     pipeline_file: docker-image-scan.yml
 
-  # Manual operator escape hatch: pick an arbitrary cut of service configs
-  # and connection types from the Semaphore UI. integration.yml is the
-  # service-config-organized pipeline used here and by the scheduled
+  # Manual operator escape hatch: pick a cut of service configs (and
+  # optionally one connection type) from the Semaphore UI. integration.yml
+  # is the service-config-organized pipeline used here and by the scheduled
   # daily run in service.yml; per-PR work lives in the change_in()-gated
   # blocks above, not promotions.
   - name: "Integration Tests: full (manual)"
@@ -287,7 +273,7 @@ promotions:
           description: "Pipe-separated service-config tags. One matrix block per service config."
           default_value: "@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
           required: true
-        - name: CONNECTION_TYPES
-          description: "Pipe-separated connection types (direct, oauth). Each one becomes a matrix axis alongside the tool group."
-          default_value: "direct|oauth"
-          required: true
+        - name: CONNECTION_TYPE
+          description: "Optional single connection type (direct or oauth). Empty = both modes run sequentially in each job."
+          default_value: ""
+          required: false

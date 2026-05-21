@@ -59,10 +59,6 @@ semaphore:
           required: true
           default_value: "@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
           description: 'Pipe-separated service-config tags. One matrix block per service config.'
-        - name: CONNECTION_TYPES
-          required: true
-          default_value: "direct|oauth"
-          description: 'Pipe-separated connection types (direct, oauth). Each becomes a matrix axis alongside the tool group within each service-config block.'
     - name: scheduled-npm-audit
       branch: main
       pipeline_file: .semaphore/npm-audit.yml

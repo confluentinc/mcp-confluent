@@ -1,6 +1,7 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type {
   GroupDescription,
+  LibrdKafkaError,
   MemberDescription,
   Node,
 } from "@confluentinc/kafka-javascript/types/rdkafka.js";
@@ -42,9 +43,17 @@ function fakeMember(overrides: Partial<MemberDescription>): MemberDescription {
   };
 }
 
-/** Build a {@link GroupDescription} fixture with all fields populated. */
+/** Build a {@link GroupDescription} fixture with all fields populated.
+ *  `error` accepts `null` in addition to the upstream type's
+ *  `LibrdKafkaError | undefined` shape — kafkajs-compat populates the
+ *  field as `null` at runtime when no error occurred, even though the
+ *  `.d.ts` declares it absent. The factory exposes that runtime shape so
+ *  tests can pin both the explicit-null happy path and the real-error
+ *  path. */
 function fakeGroupDescription(
-  overrides: Partial<GroupDescription>,
+  overrides: Omit<Partial<GroupDescription>, "error"> & {
+    error?: LibrdKafkaError | null;
+  },
 ): GroupDescription {
   return {
     groupId: "g",
@@ -57,7 +66,7 @@ function fakeGroupDescription(
     type: KafkaJS.ConsumerGroupTypes.CONSUMER,
     coordinator: fakeCoordinator(),
     ...overrides,
-  };
+  } as GroupDescription;
 }
 
 /** Curried convenience: most error paths in this file exercise the
@@ -313,6 +322,37 @@ describe("describe-consumer-group-handler.ts", () => {
       expect(textOf(result)).toBe(
         'Consumer group "no-such-group" not found on this cluster.',
       );
+    });
+
+    it("should treat a GroupDescription whose error field is explicitly null (kafkajs-compat's no-error sentinel) as a successful describe and not crash on the null dereference", async () => {
+      // kafkajs-compat populates `error: null` on the GroupDescription
+      // shape when no per-group error occurred, even though the upstream
+      // `.d.ts` declares the field as `LibrdKafkaError | undefined`. A
+      // `!== undefined` check would see `null` as "error present" and
+      // crash dereferencing `null.code`. The handler uses `!= null`
+      // (loose) so both `undefined` and `null` go through the no-error
+      // path.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.describeGroups.mockResolvedValue({
+        groups: [
+          fakeGroupDescription({
+            groupId: "alive-group",
+            state: KafkaJS.ConsumerGroupStates.STABLE,
+            error: null,
+          }),
+        ],
+      });
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "alive-group",
+      });
+
+      expect(result.isError, textOf(result)).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        groupId: "alive-group",
+        state: "Stable",
+      });
     });
 
     it("should translate the CCloud unknown-group tombstone shape (state=Dead, no members, empty protocol/partitionAssignor, no .error) into the same friendly not-found error", async () => {

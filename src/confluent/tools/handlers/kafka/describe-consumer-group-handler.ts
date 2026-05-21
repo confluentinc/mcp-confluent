@@ -153,7 +153,11 @@ export class DescribeConsumerGroupHandler extends BaseToolHandler {
         return this.createResponse(notFoundGroupMessage(parsed.groupId), true);
       }
 
-      if (groupDesc.error !== undefined) {
+      // `!= null` (loose equality) covers both `undefined` (the
+      // TypeScript-declared shape) and `null` (what kafkajs-compat
+      // actually populates when no error occurred — the upstream type
+      // lies about the runtime).
+      if (groupDesc.error != null) {
         if (
           groupDesc.error.code === KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND
         ) {

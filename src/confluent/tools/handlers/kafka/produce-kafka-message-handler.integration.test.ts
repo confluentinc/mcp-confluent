@@ -16,53 +16,57 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new ProduceKafkaMessageHandler();
 const runtime = integrationRuntime();
 
-describe("produce-kafka-message-handler", { tags: [Tag.KAFKA] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires kafka.bootstrap_servers config", () => {});
-    return;
-  }
+describe(
+  "produce-kafka-message-handler",
+  { tags: [Tag.KAFKA, Tag.REQUIRES_KAFKA_CONFIG] },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires kafka.bootstrap_servers config", () => {});
+      return;
+    }
 
-  // single shared topic for all transports (cheaper than creating one per transport)
-  let admin: KafkaJS.Admin;
-  const topic = uniqueName("produce");
-
-  beforeAll(async () => {
-    admin = await connectTestAdmin();
-    await admin.createTopics({ topics: [{ topic, numPartitions: 1 }] });
-  });
-
-  afterAll(async () => {
-    await admin.deleteTopics({ topics: [topic] }).catch(() => {
-      // teardown-only; a cleanup failure shouldn't fail an already-asserted test
-    });
-    await admin.disconnect();
-  });
-
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    // single shared topic for all transports (cheaper than creating one per transport)
+    let admin: KafkaJS.Admin;
+    const topic = uniqueName("produce");
 
     beforeAll(async () => {
-      server = await startServer({ transport });
+      admin = await connectTestAdmin();
+      await admin.createTopics({ topics: [{ topic, numPartitions: 1 }] });
     });
 
     afterAll(async () => {
-      await server?.stop();
+      await admin.deleteTopics({ topics: [topic] }).catch(() => {
+        // teardown-only; a cleanup failure shouldn't fail an already-asserted test
+      });
+      await admin.disconnect();
     });
 
-    it("should produce a raw-string message and return a partition+offset delivery report", async () => {
-      const result = await server.client.callTool({
-        name: ToolName.PRODUCE_MESSAGE,
-        arguments: {
-          topicName: topic,
-          value: { message: `hello from ${transport}` },
-        },
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
+
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      // handler formats each delivery report as:
-      //   "Message produced successfully to [Topic: ..., Partition: ..., Offset: ...]"
-      const text = textContent(result);
-      expect(text).toMatch(/Message produced successfully to \[Topic: /);
-      expect(text).toContain(topic);
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should produce a raw-string message and return a partition+offset delivery report", async () => {
+        const result = await server.client.callTool({
+          name: ToolName.PRODUCE_MESSAGE,
+          arguments: {
+            topicName: topic,
+            value: { message: `hello from ${transport}` },
+          },
+        });
+
+        // handler formats each delivery report as:
+        //   "Message produced successfully to [Topic: ..., Partition: ..., Offset: ...]"
+        const text = textContent(result);
+        expect(text).toMatch(/Message produced successfully to \[Topic: /);
+        expect(text).toContain(topic);
+      });
     });
-  });
-});
+  },
+);

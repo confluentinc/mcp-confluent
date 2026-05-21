@@ -18,45 +18,49 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new GetTopicConfigHandler();
 const runtime = integrationRuntime();
 
-describe("get-topic-config", { tags: [Tag.KAFKA] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires kafka.rest_endpoint + kafka.auth config", () => {});
-    return;
-  }
+describe(
+  "get-topic-config",
+  { tags: [Tag.KAFKA, Tag.REQUIRES_KAFKA_CONFIG] },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires kafka.rest_endpoint + kafka.auth config", () => {});
+      return;
+    }
 
-  const clusterId = getTestClusterId();
-  // installs beforeAll/afterAll at this describe scope (shared admin client, topic cleanup)
-  const { admin, createdTopics } = withSharedAdminClient();
+    const clusterId = getTestClusterId();
+    // installs beforeAll/afterAll at this describe scope (shared admin client, topic cleanup)
+    const { admin, createdTopics } = withSharedAdminClient();
 
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
-
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should return the topic configuration for an existing topic", async () => {
-      const topic = uniqueName(`get-config-${transport}`);
-      createdTopics.push(topic);
-      await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
-
-      const result = await server.client.callTool({
-        name: ToolName.GET_TOPIC_CONFIG,
-        arguments: {
-          clusterId,
-          topicName: topic,
-        },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      // handler embeds a JSON blob with both topicDetails and topicConfig
-      const text = textContent(result);
-      expect(text).toContain(`Topic configuration for '${topic}'`);
-      expect(text).toContain("topicDetails");
-      expect(text).toContain("topicConfig");
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should return the topic configuration for an existing topic", async () => {
+        const topic = uniqueName(`get-config-${transport}`);
+        createdTopics.push(topic);
+        await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
+
+        const result = await server.client.callTool({
+          name: ToolName.GET_TOPIC_CONFIG,
+          arguments: {
+            clusterId,
+            topicName: topic,
+          },
+        });
+
+        // handler embeds a JSON blob with both topicDetails and topicConfig
+        const text = textContent(result);
+        expect(text).toContain(`Topic configuration for '${topic}'`);
+        expect(text).toContain("topicDetails");
+        expect(text).toContain("topicConfig");
+      });
     });
-  });
-});
+  },
+);

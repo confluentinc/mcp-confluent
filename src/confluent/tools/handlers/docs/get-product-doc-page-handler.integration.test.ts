@@ -32,39 +32,43 @@ const cases = [
   },
 ] as const;
 
-describe("get-product-doc-page-handler", { tags: [Tag.DOCS] }, () => {
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+describe(
+  "get-product-doc-page-handler",
+  { tags: [Tag.DOCS, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
+  () => {
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
+      beforeAll(async () => {
+        server = await startServer({ transport });
+      });
+
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should expose get-product-doc-page in tools/list", async () => {
+        const { tools } = await server.client.listTools();
+        expect(
+          tools.find((t) => t.name === ToolName.GET_PRODUCT_DOC_PAGE),
+        ).toBeDefined();
+      });
+
+      it.each(cases)(
+        "should fetch and render markdown from $label",
+        async ({ url, expectMarkdown }) => {
+          const result = await server.client.callTool({
+            name: ToolName.GET_PRODUCT_DOC_PAGE,
+            arguments: { url },
+          });
+
+          const text = textContent(result);
+          expect(text).toContain(`# Source: ${url}`);
+          // Above the bare `# Source` header — proves we got a body.
+          expect(text.length).toBeGreaterThan(500);
+          expect(text).toMatch(expectMarkdown);
+        },
+      );
     });
-
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should expose get-product-doc-page in tools/list", async () => {
-      const { tools } = await server.client.listTools();
-      expect(
-        tools.find((t) => t.name === ToolName.GET_PRODUCT_DOC_PAGE),
-      ).toBeDefined();
-    });
-
-    it.each(cases)(
-      "should fetch and render markdown from $label",
-      async ({ url, expectMarkdown }) => {
-        const result = await server.client.callTool({
-          name: ToolName.GET_PRODUCT_DOC_PAGE,
-          arguments: { url },
-        });
-
-        const text = textContent(result);
-        expect(text).toContain(`# Source: ${url}`);
-        // Above the bare `# Source` header — proves we got a body.
-        expect(text.length).toBeGreaterThan(500);
-        expect(text).toMatch(expectMarkdown);
-      },
-    );
-  });
-});
+  },
+);

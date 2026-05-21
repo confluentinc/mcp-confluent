@@ -15,51 +15,55 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new DeleteTopicsHandler();
 const runtime = integrationRuntime();
 
-describe("delete-topics-handler", { tags: [Tag.KAFKA] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires kafka.bootstrap_servers config", () => {});
-    return;
-  }
+describe(
+  "delete-topics-handler",
+  { tags: [Tag.KAFKA, Tag.REQUIRES_KAFKA_CONFIG] },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires kafka.bootstrap_servers config", () => {});
+      return;
+    }
 
-  // installs beforeAll/afterAll at this describe scope (shared admin client, topic cleanup)
-  const { admin, createdTopics } = withSharedAdminClient();
+    // installs beforeAll/afterAll at this describe scope (shared admin client, topic cleanup)
+    const { admin, createdTopics } = withSharedAdminClient();
 
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
-
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should delete the requested Kafka topic", async () => {
-      const topic = uniqueName(`delete-${transport}`);
-      createdTopics.push(topic);
-      await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
-      // wait for the newly-created topic to be visible before deleting it
-      await expect
-        .poll(() => admin().listTopics(), {
-          timeout: 15_000,
-          interval: 500,
-        })
-        .toContain(topic);
-
-      const result = await server.client.callTool({
-        name: ToolName.DELETE_TOPICS,
-        arguments: { topicNames: [topic] },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      expect(result.isError, textContent(result)).not.toBe(true);
+      afterAll(async () => {
+        await server?.stop();
+      });
 
-      await expect
-        .poll(() => admin().listTopics(), {
-          timeout: 15_000,
-          interval: 500,
-        })
-        .not.toContain(topic);
+      it("should delete the requested Kafka topic", async () => {
+        const topic = uniqueName(`delete-${transport}`);
+        createdTopics.push(topic);
+        await admin().createTopics({ topics: [{ topic, numPartitions: 1 }] });
+        // wait for the newly-created topic to be visible before deleting it
+        await expect
+          .poll(() => admin().listTopics(), {
+            timeout: 15_000,
+            interval: 500,
+          })
+          .toContain(topic);
+
+        const result = await server.client.callTool({
+          name: ToolName.DELETE_TOPICS,
+          arguments: { topicNames: [topic] },
+        });
+
+        expect(result.isError, textContent(result)).not.toBe(true);
+
+        await expect
+          .poll(() => admin().listTopics(), {
+            timeout: 15_000,
+            interval: 500,
+          })
+          .not.toContain(topic);
+      });
     });
-  });
-});
+  },
+);

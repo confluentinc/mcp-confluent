@@ -6,6 +6,7 @@ export enum ToolName {
   CONSUME_MESSAGES = "consume-messages",
   GET_PARTITION_OFFSETS = "get-partition-offsets",
   LIST_CONSUMER_GROUPS = "list-consumer-groups",
+  DESCRIBE_CONSUMER_GROUP = "describe-consumer-group",
   LIST_FLINK_STATEMENTS = "list-flink-statements",
   CREATE_FLINK_STATEMENT = "create-flink-statement",
   READ_FLINK_STATEMENT = "read-flink-statement",

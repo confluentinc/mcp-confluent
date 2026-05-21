@@ -50,6 +50,7 @@ global_job_config:
 # Semaphore jobs would 3x the agent count for the same coverage.
 blocks:
   - name: "Integration Tests: @requires-kafka-config"
+    dependencies: []
     skip:
       when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-kafka-config'"
     task:
@@ -73,6 +74,7 @@ blocks:
               values: '%{{parameters.CONNECTION_TYPES | splitList "|"}}'
 
   - name: "Integration Tests: @requires-schema-registry-config"
+    dependencies: []
     skip:
       when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-schema-registry-config'"
     task:
@@ -89,6 +91,7 @@ blocks:
             - *connection-type-matrix-entry
 
   - name: "Integration Tests: @requires-confluent-cloud-config"
+    dependencies: []
     skip:
       when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-confluent-cloud-config'"
     task:
@@ -116,6 +119,7 @@ blocks:
             - *connection-type-matrix-entry
 
   - name: "Integration Tests: @requires-flink-config"
+    dependencies: []
     skip:
       when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-flink-config'"
     task:
@@ -132,6 +136,7 @@ blocks:
             - *connection-type-matrix-entry
 
   - name: "Integration Tests: @requires-tableflow-config"
+    dependencies: []
     skip:
       when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-tableflow-config'"
     task:
@@ -148,6 +153,7 @@ blocks:
             - *connection-type-matrix-entry
 
   - name: "Integration Tests: @requires-telemetry-config"
+    dependencies: []
     skip:
       when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-telemetry-config'"
     task:

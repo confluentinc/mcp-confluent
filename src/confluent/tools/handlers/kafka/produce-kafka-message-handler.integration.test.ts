@@ -1,13 +1,17 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
   CONNECTION_TYPE_DIRECT_FILTERED_REASON,
   CONNECTION_TYPE_OAUTH_FILTERED_REASON,
   ConnectionType,
 } from "@tests/harness/connection-types.js";
-import { connectTestAdmin } from "@tests/harness/kafka-admin.js";
+import {
+  connectTestAdmin,
+  getTestClusterId,
+} from "@tests/harness/kafka-admin.js";
 import {
   callToolWithOAuthFlow,
   DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
@@ -117,6 +121,11 @@ describe("produce-kafka-message-handler", { tags: [Tag.KAFKA] }, () => {
         return;
       }
 
+      // OAuth connections carry no `kafka` block, so the handler resolves the broker from
+      // `cluster_id` + `environment_id` at call time; under OAuth the handler errors when omitted
+      const clusterId = getTestClusterId();
+      const environmentId = getTestEnvironmentId();
+
       // seed via the api-key-authed admin client; the PRODUCE_MESSAGE call goes via OAuth
       let admin: KafkaJS.Admin;
       const topic = uniqueName("produce-oauth");
@@ -151,6 +160,8 @@ describe("produce-kafka-message-handler", { tags: [Tag.KAFKA] }, () => {
             arguments: {
               topicName: topic,
               value: { message: `hello from oauth ${transport}` },
+              cluster_id: clusterId,
+              environment_id: environmentId,
             },
           });
 

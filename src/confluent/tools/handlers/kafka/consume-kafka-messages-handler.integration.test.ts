@@ -1,6 +1,7 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { ConsumeKafkaMessagesHandler } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
   CONNECTION_TYPE_DIRECT_FILTERED_REASON,
@@ -10,6 +11,7 @@ import {
 import {
   connectTestAdmin,
   connectTestProducer,
+  getTestClusterId,
 } from "@tests/harness/kafka-admin.js";
 import {
   callToolWithOAuthFlow,
@@ -381,6 +383,11 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
         return;
       }
 
+      // OAuth connections carry no `kafka` block, so the handler resolves the broker from
+      // `cluster_id` + `environment_id` at call time; under OAuth the handler errors when omitted
+      const clusterId = getTestClusterId();
+      const environmentId = getTestEnvironmentId();
+
       // seed via the api-key-authed admin + producer; the CONSUME_MESSAGES call goes via OAuth
       let admin: KafkaJS.Admin;
       let producer: KafkaJS.Producer;
@@ -429,6 +436,8 @@ describe("consume-kafka-messages-handler", { tags: [Tag.KAFKA] }, () => {
               maxMessages: seededValues.length,
               timeoutMs: 15_000,
               valueFormat: { disableSchemaRegistry: true },
+              cluster_id: clusterId,
+              environment_id: environmentId,
             },
           });
 

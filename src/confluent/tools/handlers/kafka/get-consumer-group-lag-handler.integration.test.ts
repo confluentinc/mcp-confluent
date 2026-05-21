@@ -15,6 +15,7 @@ import {
   connectTestAdmin,
   connectTestConsumer,
   connectTestProducer,
+  getTestClusterId,
 } from "@tests/harness/kafka-admin.js";
 import {
   callToolWithOAuthFlow,
@@ -264,7 +265,8 @@ describe("get-consumer-group-lag-handler", { tags: [Tag.KAFKA] }, () => {
       }
 
       // OAuth handlers don't carry a `kafka` block, so the broker is resolved at call time from
-      // `environment_id`; under OAuth the handler errors when this arg is omitted
+      // `cluster_id` + `environment_id`; under OAuth the handler errors when omitted
+      const clusterId = getTestClusterId();
       const environmentId = getTestEnvironmentId();
 
       // seed via the api-key-authed admin + producer + consumer; the GET_CONSUMER_GROUP_LAG call
@@ -330,7 +332,11 @@ describe("get-consumer-group-lag-handler", { tags: [Tag.KAFKA] }, () => {
         it("should return the deterministic lag for the seeded group on the seeded topic", async () => {
           const result = await callToolWithOAuthFlow(server, credentials, {
             name: ToolName.GET_CONSUMER_GROUP_LAG,
-            arguments: { groupId, environment_id: environmentId },
+            arguments: {
+              groupId,
+              cluster_id: clusterId,
+              environment_id: environmentId,
+            },
           });
 
           expect(result.isError, textContent(result)).not.toBe(true);

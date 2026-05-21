@@ -4,6 +4,7 @@ import {
   type GetPartitionOffsetsResponse,
 } from "@src/confluent/tools/handlers/kafka/get-partition-offsets-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
   CONNECTION_TYPE_DIRECT_FILTERED_REASON,
@@ -13,6 +14,7 @@ import {
 import {
   connectTestAdmin,
   connectTestProducer,
+  getTestClusterId,
 } from "@tests/harness/kafka-admin.js";
 import {
   callToolWithOAuthFlow,
@@ -198,6 +200,11 @@ describe("get-partition-offsets-handler", { tags: [Tag.KAFKA] }, () => {
         return;
       }
 
+      // OAuth connections carry no `kafka` block, so the handler resolves the broker from
+      // `cluster_id` + `environment_id` at call time; under OAuth the handler errors when omitted
+      const clusterId = getTestClusterId();
+      const environmentId = getTestEnvironmentId();
+
       // seed via the api-key-authed admin + producer; the GET_PARTITION_OFFSETS call goes via OAuth
       let admin: KafkaJS.Admin;
       let producer: KafkaJS.Producer;
@@ -242,7 +249,11 @@ describe("get-partition-offsets-handler", { tags: [Tag.KAFKA] }, () => {
         it("should return every partition with messageCount totaling the seeded writes", async () => {
           const result = await callToolWithOAuthFlow(server, credentials, {
             name: ToolName.GET_PARTITION_OFFSETS,
-            arguments: { topicName: topic },
+            arguments: {
+              topicName: topic,
+              cluster_id: clusterId,
+              environment_id: environmentId,
+            },
           });
 
           expect(result.isError, textContent(result)).not.toBe(true);

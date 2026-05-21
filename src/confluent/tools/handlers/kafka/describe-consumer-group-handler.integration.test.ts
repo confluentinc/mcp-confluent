@@ -7,7 +7,10 @@ import {
   CONNECTION_TYPE_OAUTH_FILTERED_REASON,
   ConnectionType,
 } from "@tests/harness/connection-types.js";
-import { withSharedAdminClient } from "@tests/harness/kafka-admin.js";
+import {
+  getTestClusterId,
+  withSharedAdminClient,
+} from "@tests/harness/kafka-admin.js";
 import {
   callToolWithOAuthFlow,
   DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
@@ -150,7 +153,8 @@ describe("describe-consumer-group-handler", { tags: [Tag.KAFKA] }, () => {
       }
 
       // OAuth handlers don't carry a `kafka` block, so the broker is resolved at call time from
-      // `environment_id`; under OAuth the handler errors when this arg is omitted
+      // `cluster_id` + `environment_id`; under OAuth the handler errors when omitted
+      const clusterId = getTestClusterId();
       const environmentId = getTestEnvironmentId();
 
       // discover via the api-key-authed admin client; DESCRIBE_CONSUMER_GROUP goes via OAuth
@@ -186,6 +190,7 @@ describe("describe-consumer-group-handler", { tags: [Tag.KAFKA] }, () => {
             name: ToolName.DESCRIBE_CONSUMER_GROUP,
             arguments: {
               groupId: discoveredGroupId,
+              cluster_id: clusterId,
               environment_id: environmentId,
             },
           });

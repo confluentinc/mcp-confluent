@@ -1,12 +1,16 @@
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
   CONNECTION_TYPE_DIRECT_FILTERED_REASON,
   CONNECTION_TYPE_OAUTH_FILTERED_REASON,
   ConnectionType,
 } from "@tests/harness/connection-types.js";
-import { withSharedAdminClient } from "@tests/harness/kafka-admin.js";
+import {
+  getTestClusterId,
+  withSharedAdminClient,
+} from "@tests/harness/kafka-admin.js";
 import {
   callToolWithOAuthFlow,
   DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
@@ -114,6 +118,11 @@ describe("delete-topics-handler", { tags: [Tag.KAFKA] }, () => {
         return;
       }
 
+      // OAuth connections carry no `kafka` block, so the handler resolves the broker from
+      // `cluster_id` + `environment_id` at call time; under OAuth the handler errors when omitted
+      const clusterId = getTestClusterId();
+      const environmentId = getTestEnvironmentId();
+
       // seed + verify via the api-key-authed admin client; only the DELETE_TOPICS call goes via OAuth
       const { admin, createdTopics } = withSharedAdminClient();
 
@@ -142,7 +151,11 @@ describe("delete-topics-handler", { tags: [Tag.KAFKA] }, () => {
 
           const result = await callToolWithOAuthFlow(server, credentials, {
             name: ToolName.DELETE_TOPICS,
-            arguments: { topicNames: [topic] },
+            arguments: {
+              topicNames: [topic],
+              cluster_id: clusterId,
+              environment_id: environmentId,
+            },
           });
 
           expect(result.isError, textContent(result)).not.toBe(true);

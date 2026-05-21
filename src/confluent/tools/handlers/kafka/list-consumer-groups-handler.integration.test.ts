@@ -1,13 +1,16 @@
 import { ListConsumerGroupsHandler } from "@src/confluent/tools/handlers/kafka/list-consumer-groups-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
   CONNECTION_TYPE_DIRECT_FILTERED_REASON,
   CONNECTION_TYPE_OAUTH_FILTERED_REASON,
   ConnectionType,
 } from "@tests/harness/connection-types.js";
+import { getTestClusterId } from "@tests/harness/kafka-admin.js";
 import {
   callToolWithOAuthFlow,
+  DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
   getOAuthCredentialsFromEnv,
   OAUTH_FIXTURE_NOT_LOADED_REASON,
   OAUTH_USER_CREDS_MISSING_REASON,
@@ -93,6 +96,18 @@ describe("list-consumer-groups-handler", { tags: [Tag.KAFKA] }, () => {
         it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
         return;
       }
+      // `getTestClusterId()`/`getTestEnvironmentId()` read from the direct YAML; gate the OAuth
+      // describe on the same predicate the direct describe uses so an OAuth-only CI lane without
+      // direct creds skips cleanly instead of crashing on missing fixture
+      const directRuntime = integrationRuntime({ oauth: false });
+      if (handler.enabledConnectionIds(directRuntime).length === 0) {
+        it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+        return;
+      }
+      // OAuth connections carry no `kafka` block, so the handler resolves the broker from
+      // `cluster_id` + `environment_id` at call time; under OAuth the handler errors when omitted
+      const clusterId = getTestClusterId();
+      const environmentId = getTestEnvironmentId();
 
       describe.each(activeTransports)("via %s transport", (transport) => {
         let server: StartedServer;
@@ -117,7 +132,10 @@ describe("list-consumer-groups-handler", { tags: [Tag.KAFKA] }, () => {
         it("should return the consumer groups from the configured Kafka cluster", async () => {
           const result = await callToolWithOAuthFlow(server, credentials, {
             name: ToolName.LIST_CONSUMER_GROUPS,
-            arguments: {},
+            arguments: {
+              cluster_id: clusterId,
+              environment_id: environmentId,
+            },
           });
 
           expect(textContent(result)).toMatch(/^Found \d+ consumer group/);

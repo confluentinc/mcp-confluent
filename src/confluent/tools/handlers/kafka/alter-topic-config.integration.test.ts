@@ -1,5 +1,6 @@
 import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alter-topic-config.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
   CONNECTION_TYPE_DIRECT_FILTERED_REASON,
@@ -117,7 +118,11 @@ describe("alter-topic-config", { tags: [Tag.KAFKA] }, () => {
         return;
       }
 
+      // REST-tool handler resolves the cluster URL from `clusterId` + `environmentId` at call
+      // time under OAuth (no `kafka.rest_endpoint` in OAuth connections); the handler errors
+      // when either is omitted
       const clusterId = getTestClusterId();
+      const environmentId = getTestEnvironmentId();
       // seed via the api-key-authed admin client; ALTER_TOPIC_CONFIG goes via OAuth
       const { admin, createdTopics } = withSharedAdminClient();
 
@@ -142,6 +147,7 @@ describe("alter-topic-config", { tags: [Tag.KAFKA] }, () => {
             name: ToolName.ALTER_TOPIC_CONFIG,
             arguments: {
               clusterId,
+              environmentId,
               topicName: topic,
               topicConfigs: [
                 {

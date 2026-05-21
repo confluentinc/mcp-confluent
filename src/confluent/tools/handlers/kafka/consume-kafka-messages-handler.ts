@@ -1,8 +1,5 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import type {
-  ITopicMetadata,
-  KafkaMessage,
-} from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import type { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
@@ -26,6 +23,7 @@ import {
   createWatermarkCache,
   type WatermarkCache,
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
+import { normalizeFetchTopicMetadataResponse } from "@src/confluent/tools/handlers/kafka/topic-metadata.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -415,23 +413,17 @@ function guardScopedStartRequiresPartition(
 /**
  * Fetch partition counts for the supplied topics via
  * `admin.fetchTopicMetadata`. Throws if any requested topic returned no
- * metadata (typically: the topic doesn't exist on this cluster).
- *
- * Defensive shape normalization: the `@confluentinc/kafka-javascript`
- * `.d.ts` declares this call as `Promise<{ topics: Array<ITopicMetadata> }>`
- * but the runtime implementation returns the bare `Array<ITopicMetadata>`
- * — long-standing mismatch tracked at
- * confluentinc/confluent-kafka-javascript#367. Handle either shape so a
- * future library fix doesn't require code change here.
+ * metadata (typically: the topic doesn't exist on this cluster). The
+ * upstream type/runtime mismatch on the response shape is handled by
+ * {@link normalizeFetchTopicMetadataResponse}.
  */
 async function fetchPartitionCounts(
   admin: KafkaJS.Admin,
   topicNames: string[],
 ): Promise<Map<string, number>> {
-  const metadataRaw = await admin.fetchTopicMetadata({ topics: topicNames });
-  const topicMetadata: ITopicMetadata[] = Array.isArray(metadataRaw)
-    ? (metadataRaw as unknown as ITopicMetadata[])
-    : metadataRaw.topics;
+  const topicMetadata = normalizeFetchTopicMetadataResponse(
+    await admin.fetchTopicMetadata({ topics: topicNames }),
+  );
   const counts = new Map<string, number>();
   for (const t of topicMetadata) {
     counts.set(t.name, t.partitions.length);

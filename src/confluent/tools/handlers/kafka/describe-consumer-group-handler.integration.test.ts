@@ -1,3 +1,4 @@
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { DescribeConsumerGroupHandler } from "@src/confluent/tools/handlers/kafka/describe-consumer-group-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
@@ -8,6 +9,8 @@ import {
   ConnectionType,
 } from "@tests/harness/connection-types.js";
 import {
+  connectTestAdmin,
+  connectTestConsumer,
   getTestClusterId,
   withSharedAdminClient,
 } from "@tests/harness/kafka-admin.js";
@@ -27,6 +30,7 @@ import {
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
 import { activeTransports } from "@tests/harness/transports.js";
+import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -157,13 +161,41 @@ describe("describe-consumer-group-handler", { tags: [Tag.KAFKA] }, () => {
       const clusterId = getTestClusterId();
       const environmentId = getTestEnvironmentId();
 
-      // discover via the api-key-authed admin client; DESCRIBE_CONSUMER_GROUP goes via OAuth
-      const { admin } = withSharedAdminClient();
-      let discoveredGroupId: string | undefined;
+      // Seed a dedicated group rather than discovering an existing one: other test files
+      // (`get-consumer-group-lag`) run in parallel processes (vitest `pool: "forks"`) and create
+      // + delete `int-lag-group-*` groups concurrently, so a discovered group can vanish
+      // between `listGroups()` and the OAuth-flow tool call. An ephemeral group we own is
+      // race-free.
+      let admin: KafkaJS.Admin;
+      const topic = uniqueName("describe-oauth");
+      const groupId = uniqueName("describe-oauth-group");
 
       beforeAll(async () => {
-        const { groups } = await admin().listGroups();
-        discoveredGroupId = groups[0]?.groupId;
+        admin = await connectTestAdmin();
+        await admin.createTopics({ topics: [{ topic, numPartitions: 1 }] });
+        // `commitOffsets` with an explicit topic-partition-offset writes to __consumer_offsets
+        // via the group coordinator regardless of whether the consumer ever polled — enough to
+        // make the group visible to describe-consumer-group.
+        const consumer = await connectTestConsumer(groupId);
+        try {
+          await consumer.commitOffsets([{ topic, partition: 0, offset: "0" }]);
+        } finally {
+          await consumer.disconnect().catch(() => {
+            // disconnect race during fixture teardown isn't actionable
+          });
+        }
+      });
+
+      afterAll(async () => {
+        await admin.deleteGroups([groupId]).catch(() => {
+          // teardown-only; a cleanup failure shouldn't fail an already-asserted test
+        });
+        await admin.deleteTopics({ topics: [topic] }).catch(() => {
+          // teardown-only; a cleanup failure shouldn't fail an already-asserted test
+        });
+        await admin.disconnect().catch(() => {
+          // disconnect race during teardown isn't actionable
+        });
       });
 
       describe.each(activeTransports)("via %s transport", (transport) => {
@@ -178,25 +210,18 @@ describe("describe-consumer-group-handler", { tags: [Tag.KAFKA] }, () => {
         });
 
         // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-        it("should describe an existing consumer group end-to-end", async (ctx) => {
-          if (discoveredGroupId === undefined) {
-            ctx.skip(
-              "no consumer groups present on the test cluster to describe",
-            );
-            return;
-          }
-
+        it("should describe the seeded consumer group end-to-end", async () => {
           const result = await callToolWithOAuthFlow(server, credentials, {
             name: ToolName.DESCRIBE_CONSUMER_GROUP,
             arguments: {
-              groupId: discoveredGroupId,
+              groupId,
               cluster_id: clusterId,
               environment_id: environmentId,
             },
           });
 
           const text = textContent(result);
-          const expectedPrefix = `Consumer group "${discoveredGroupId}" is `;
+          const expectedPrefix = `Consumer group "${groupId}" is `;
           expect(text.startsWith(expectedPrefix), text).toBe(true);
         });
       });

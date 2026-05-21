@@ -1,7 +1,6 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type {
   GroupDescription,
-  LibrdKafkaError,
   MemberDescription,
   Node,
 } from "@confluentinc/kafka-javascript/types/rdkafka.js";
@@ -11,6 +10,7 @@ import {
 } from "@src/confluent/tools/handlers/kafka/describe-consumer-group-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
+import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
 import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
@@ -60,17 +60,19 @@ function fakeGroupDescription(
   };
 }
 
-/** Build a {@link LibrdKafkaError} fixture with the required fields populated.
- *  The default code matches `ERR_GROUP_ID_NOT_FOUND` so the not-found tests
- *  read tersely; override `code` for other error scenarios. */
-function fakeError(overrides: Partial<LibrdKafkaError> = {}): LibrdKafkaError {
-  return {
+/** Curried convenience: most error paths in this file exercise the
+ *  not-found mapping, so the local wrapper pins
+ *  `ERR_GROUP_ID_NOT_FOUND` as the default code and a matching default
+ *  message. Tests for other error scenarios override `code` (and usually
+ *  `message`) explicitly. */
+function fakeNotFoundError(
+  overrides: Partial<Parameters<typeof fakeLibrdKafkaError>[0]> = {},
+) {
+  return fakeLibrdKafkaError({
     message: "Broker: Group id not found",
     code: KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND,
-    errno: KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND,
-    origin: "kafka",
     ...overrides,
-  };
+  });
 }
 
 describe("describe-consumer-group-handler.ts", () => {
@@ -279,7 +281,7 @@ describe("describe-consumer-group-handler.ts", () => {
     it("should translate a describeGroups rejection with ERR_GROUP_ID_NOT_FOUND into a caller-friendly tool-level error keyed on the requested name", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
-      admin.describeGroups.mockRejectedValue(fakeError());
+      admin.describeGroups.mockRejectedValue(fakeNotFoundError());
 
       const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "no-such-group",
@@ -298,7 +300,7 @@ describe("describe-consumer-group-handler.ts", () => {
         groups: [
           fakeGroupDescription({
             groupId: "no-such-group",
-            error: fakeError(),
+            error: fakeNotFoundError(),
           }),
         ],
       });
@@ -383,7 +385,7 @@ describe("describe-consumer-group-handler.ts", () => {
         groups: [
           fakeGroupDescription({
             groupId: "g",
-            error: fakeError({
+            error: fakeLibrdKafkaError({
               code: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
               message: "Broker: Group authorization failed",
             }),

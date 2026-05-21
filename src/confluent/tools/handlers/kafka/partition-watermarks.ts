@@ -1,4 +1,5 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { logger } from "@src/logger.js";
 
 /**
  * Per-partition low/high watermark pair, normalized to the fields the
@@ -12,6 +13,38 @@ export interface PartitionWatermark {
   partition: number;
   low: string;
   high: string;
+}
+
+/**
+ * Narrow a {@link BigInt} difference to a JS `Number`, saturating at
+ * {@link Number.MAX_SAFE_INTEGER} when the result would lose precision.
+ * The narrow path is the only one expected to fire in practice (even a
+ * million-msg/sec partition with infinite retention takes ~285 years to
+ * exceed 2^53 - 1); the saturation arm is a defensive sentinel — hence
+ * the `Wacky --` log signaling "this branch firing means something
+ * genuinely surprising happened". The asymmetric guard (only positive
+ * overflow) is deliberate: callers compute `high - low` or `high -
+ * committed`, where any negative value reflects a small, transient race
+ * (rebalance window) whose magnitude can't approach `-MAX_SAFE_INTEGER`.
+ *
+ * `context` is forwarded verbatim into the log payload so each caller
+ * can name the dimensions it knows about (`{topicName, partition}` for
+ * the standalone watermark tool, `{groupId, topic, partition}` for the
+ * consumer-group lag tool) without this helper hard-coding either.
+ */
+export function narrowMessageCount(
+  diff: bigint,
+  context: Record<string, unknown>,
+): number {
+  const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+  if (diff > maxSafe) {
+    logger.warn(
+      context,
+      "Wacky -- messageCount BigInt subtraction exceeds Number.MAX_SAFE_INTEGER; saturating to MAX_SAFE_INTEGER",
+    );
+    return Number.MAX_SAFE_INTEGER;
+  }
+  return Number(diff);
 }
 
 /**

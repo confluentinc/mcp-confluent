@@ -26,6 +26,32 @@ export async function connectTestProducer(): Promise<KafkaJS.Producer> {
 }
 
 /**
+ * Connects a Kafka consumer bound to the given group ID, for test-side
+ * seeding of committed offsets on behalf of that group (e.g.
+ * `get-consumer-group-lag` needs a group with a known committed offset to
+ * produce a deterministic lag value). The native admin surface in this
+ * version of `@confluentinc/kafka-javascript` does not expose a
+ * `setOffsets` / `alterConsumerGroupOffsets` verb, so an actual consumer
+ * instance is the path. Callers can `commitOffsets([{topic, partition,
+ * offset}])` directly without subscribing or running a poll loop — the
+ * write goes to the group coordinator regardless of assignment state — and
+ * must `consumer.disconnect()` when done.
+ */
+export async function connectTestConsumer(
+  groupId: string,
+): Promise<KafkaJS.Consumer> {
+  // `ConsumerConstructorConfig` is rdkafka-style (top-level `group.id`)
+  // with the kafkajs-style camelCased shape nested under `kafkaJS`. Use the
+  // nested form so the parameter spelling matches the rest of the
+  // kafkajs-flavored test code.
+  const consumer = newKafkaClient("mcp-confluent-it-consumer").consumer({
+    kafkaJS: { groupId },
+  });
+  await consumer.connect();
+  return consumer;
+}
+
+/**
  * Returns the `kafka.cluster_id` value from the integration test fixture, for
  * tests that need to address a specific Kafka cluster (e.g., REST proxy
  * calls). Throws if the field is missing: the credential gate uses

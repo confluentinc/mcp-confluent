@@ -1,3 +1,4 @@
+import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
 import { textOf } from "@tests/call-tool-result.js";
 import {
@@ -22,7 +23,7 @@ describe("list-billing-costs-handler.ts", () => {
         expect(config.description).toContain("billing cost data");
         expect(config.inputSchema).toHaveProperty("startDate");
         expect(config.inputSchema).toHaveProperty("endDate");
-        expect(config.annotations?.readOnlyHint).toBe(true);
+        expect(config.annotations).toBe(READ_ONLY);
       });
     });
 
@@ -82,19 +83,23 @@ describe("list-billing-costs-handler.ts", () => {
         expect(breakdownSection).toContain("FLINK: $100.00");
         expect(breakdownSection).toContain("KAFKA: $60.00");
 
-        expect(result._meta).toMatchObject({
-          summary: {
-            total_amount: 160,
-            original_amount: 175,
-            discount_amount: 15,
-            line_item_count: 3,
-            date_range: { start: "2026-01-01", end: "2026-01-31" },
-          },
-          product_breakdown: { KAFKA: 60, FLINK: 100 },
-          total: undefined,
-          pagination: undefined,
+        const meta = result._meta as {
+          costs: unknown[];
+          summary: unknown;
+          product_breakdown: Record<string, number>;
+          total: unknown;
+          pagination: unknown;
+        };
+        expect(meta.summary).toEqual({
+          total_amount: 160,
+          original_amount: 175,
+          discount_amount: 15,
+          line_item_count: 3,
+          date_range: { start: "2026-01-01", end: "2026-01-31" },
         });
-        const meta = result._meta as { costs: unknown[] };
+        expect(meta.product_breakdown).toEqual({ KAFKA: 60, FLINK: 100 });
+        expect(meta.total).toBeUndefined();
+        expect(meta.pagination).toBeUndefined();
         expect(meta.costs).toHaveLength(3);
       });
 
@@ -113,11 +118,17 @@ describe("list-billing-costs-handler.ts", () => {
         expect(result.isError).toBe(false);
         expect(text).toContain("Total Line Items: 0");
         expect(text).not.toContain("Product Breakdown");
-        expect(result._meta).toMatchObject({
-          summary: { line_item_count: 0, total_amount: 0 },
-          product_breakdown: {},
-          pagination: undefined,
-        });
+        const meta = result._meta as {
+          summary: { line_item_count: number; total_amount: number };
+          product_breakdown: Record<string, number>;
+          total: unknown;
+          pagination: unknown;
+        };
+        expect(meta.summary.line_item_count).toBe(0);
+        expect(meta.summary.total_amount).toBe(0);
+        expect(meta.product_breakdown).toEqual({});
+        expect(meta.total).toBeUndefined();
+        expect(meta.pagination).toBeUndefined();
       });
 
       it("should render a pagination section and populate _meta.pagination when metadata is present", async () => {
@@ -150,14 +161,16 @@ describe("list-billing-costs-handler.ts", () => {
         expect(text).toContain("Last Page: https://api/page?last");
         expect(text).toContain("Previous Page: https://api/page?prev");
         expect(text).toContain("Next Page: https://api/page?next");
-        expect(result._meta).toMatchObject({
-          total: 42,
-          pagination: {
-            first: "https://api/page?first",
-            last: "https://api/page?last",
-            prev: "https://api/page?prev",
-            next: "https://api/page?next",
-          },
+        const meta = result._meta as {
+          total: number;
+          pagination: Record<string, string>;
+        };
+        expect(meta.total).toBe(42);
+        expect(meta.pagination).toEqual({
+          first: "https://api/page?first",
+          last: "https://api/page?last",
+          prev: "https://api/page?prev",
+          next: "https://api/page?next",
         });
       });
 
@@ -175,10 +188,9 @@ describe("list-billing-costs-handler.ts", () => {
         const text = textOf(result);
         expect(result.isError).toBe(false);
         expect(text).not.toContain("Pagination:");
-        expect(result._meta).toMatchObject({
-          pagination: undefined,
-          total: undefined,
-        });
+        const meta = result._meta as { total: unknown; pagination: unknown };
+        expect(meta.total).toBeUndefined();
+        expect(meta.pagination).toBeUndefined();
       });
 
       it("should return an error response when the API responds with { error }", async () => {
@@ -199,24 +211,39 @@ describe("list-billing-costs-handler.ts", () => {
         expect(result._meta).toEqual({ error: apiError });
       });
 
-      it("should return a validation-error response when the response fails schema parsing", async () => {
-        const clientManager = getMockedClientManager();
-        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
-          data: { api_version: "v1", kind: "NotACostList", data: [] },
-        });
+      it.each([
+        {
+          label: "the top-level kind literal is wrong",
+          response: { api_version: "v1", kind: "NotACostList", data: [] },
+        },
+        {
+          label: "a line item is missing required fields",
+          response: {
+            api_version: "v1",
+            kind: "CostList",
+            data: [{ product: "KAFKA" }],
+          },
+        },
+      ])(
+        "should return a validation-error response when $label",
+        async ({ response }) => {
+          const clientManager = getMockedClientManager();
+          clientManager
+            .getConfluentCloudRestClient()
+            .GET.mockResolvedValue({ data: response });
 
-        const result = await handler.handle(
-          runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
-          VALID_ARGS,
-        );
+          const result = await handler.handle(
+            runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
+            VALID_ARGS,
+          );
 
-        expect(result.isError).toBe(true);
-        expect(textOf(result)).toContain("Invalid billing costs data");
-        expect(result._meta).toBeDefined();
-        expect((result._meta as { error: unknown }).error).toBeInstanceOf(
-          ZodError,
-        );
-      });
+          expect(result.isError).toBe(true);
+          expect(textOf(result)).toContain("Invalid billing costs data");
+          expect((result._meta as { error: unknown }).error).toBeInstanceOf(
+            ZodError,
+          );
+        },
+      );
 
       it("should return an error response when the client throws", async () => {
         const clientManager = getMockedClientManager();
@@ -234,19 +261,47 @@ describe("list-billing-costs-handler.ts", () => {
         expect(result._meta).toEqual({ error: "network down" });
       });
 
-      it("should throw a ZodError when startDate is not in YYYY-MM-DD format", async () => {
-        const clientManager = getMockedClientManager();
-        const restClient = clientManager.getConfluentCloudRestClient();
+      it.each([
+        {
+          label: "startDate is not in YYYY-MM-DD format",
+          args: { startDate: "01-01-2026", endDate: "2026-01-31" },
+        },
+        {
+          label: "endDate is not in YYYY-MM-DD format",
+          args: { startDate: "2026-01-01", endDate: "31-01-2026" },
+        },
+        {
+          label: "startDate is missing",
+          args: { endDate: "2026-01-31" },
+        },
+        {
+          label: "endDate is missing",
+          args: { startDate: "2026-01-01" },
+        },
+        {
+          label: "pageSize exceeds the 1000 max",
+          args: {
+            startDate: "2026-01-01",
+            endDate: "2026-01-31",
+            pageSize: 1001,
+          },
+        },
+      ])(
+        "should throw a ZodError and not call the API when $label",
+        async ({ args }) => {
+          const clientManager = getMockedClientManager();
+          const restClient = clientManager.getConfluentCloudRestClient();
 
-        await expect(
-          handler.handle(
-            runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
-            { startDate: "01-01-2026", endDate: "2026-01-31" },
-          ),
-        ).rejects.toBeInstanceOf(ZodError);
+          await expect(
+            handler.handle(
+              runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
+              args,
+            ),
+          ).rejects.toBeInstanceOf(ZodError);
 
-        expect(restClient.GET).not.toHaveBeenCalled();
-      });
+          expect(restClient.GET).not.toHaveBeenCalled();
+        },
+      );
 
       it("should forward start/end/page params to the /billing/v1/costs path", async () => {
         const clientManager = getMockedClientManager();

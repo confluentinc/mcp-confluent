@@ -1,3 +1,4 @@
+import { CallToolResult } from "@src/confluent/schema.js";
 import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
 import {
   CCLOUD_CONN,
@@ -10,8 +11,8 @@ import { ZodError } from "zod";
 
 const VALID_ARGS = { startDate: "2026-01-01", endDate: "2026-01-31" };
 
-function responseText(result: { content: Array<{ text?: string }> }): string {
-  return result.content.map((c) => c.text ?? "").join("");
+function responseText(result: CallToolResult): string {
+  return result.content.map((c) => (c.type === "text" ? c.text : "")).join("");
 }
 
 describe("list-billing-costs-handler.ts", () => {
@@ -67,7 +68,6 @@ describe("list-billing-costs-handler.ts", () => {
         const result = await handler.handle(
           runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
           VALID_ARGS,
-          undefined,
         );
 
         const text = responseText(result);
@@ -111,7 +111,6 @@ describe("list-billing-costs-handler.ts", () => {
         const result = await handler.handle(
           runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
           VALID_ARGS,
-          undefined,
         );
 
         const text = responseText(result);
@@ -145,7 +144,6 @@ describe("list-billing-costs-handler.ts", () => {
         const result = await handler.handle(
           runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
           VALID_ARGS,
-          undefined,
         );
 
         const text = responseText(result);
@@ -176,7 +174,6 @@ describe("list-billing-costs-handler.ts", () => {
         const result = await handler.handle(
           runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
           VALID_ARGS,
-          undefined,
         );
 
         const text = responseText(result);
@@ -198,7 +195,6 @@ describe("list-billing-costs-handler.ts", () => {
         const result = await handler.handle(
           runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
           VALID_ARGS,
-          undefined,
         );
 
         expect(result.isError).toBe(true);
@@ -216,7 +212,6 @@ describe("list-billing-costs-handler.ts", () => {
         const result = await handler.handle(
           runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
           VALID_ARGS,
-          undefined,
         );
 
         expect(result.isError).toBe(true);
@@ -236,7 +231,6 @@ describe("list-billing-costs-handler.ts", () => {
         const result = await handler.handle(
           runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
           VALID_ARGS,
-          undefined,
         );
 
         expect(result.isError).toBe(true);
@@ -252,7 +246,6 @@ describe("list-billing-costs-handler.ts", () => {
           handler.handle(
             runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
             { startDate: "01-01-2026", endDate: "2026-01-31" },
-            undefined,
           ),
         ).rejects.toBeInstanceOf(ZodError);
 
@@ -274,7 +267,6 @@ describe("list-billing-costs-handler.ts", () => {
             pageSize: 100,
             pageToken: "tok",
           },
-          undefined,
         );
 
         expect(restClient.GET).toHaveBeenCalledWith("/billing/v1/costs", {

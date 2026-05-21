@@ -200,10 +200,7 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
         watermarkCache,
       );
       if (lagResult.kind === "topicNotFound") {
-        return this.createResponse(
-          `Topic "${lagResult.missingTopic}" not found on this cluster.`,
-          true,
-        );
+        return this.createResponse(lagResult.message, true);
       }
       const { topics: responseTopics, totalLagBigInt } = lagResult;
 
@@ -220,10 +217,7 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
           admin,
         );
         if (filterResult.kind === "topicNotFound") {
-          return this.createResponse(
-            `Topic "${filterResult.missingTopic}" not found on this cluster.`,
-            true,
-          );
+          return this.createResponse(filterResult.message, true);
         }
         responseTopics.push(...filterResult.topics);
       }
@@ -390,13 +384,15 @@ function isUnknownTopicError(err: unknown): boolean {
 }
 
 /**
- * Tagged-union outcome of {@link buildLagFromCommittedOffsets}.
- * `kind: "resolved"` carries the per-(topic, partition) lag rows and the
- * BigInt running total; `kind: "topicNotFound"` marks the case where a
- * topic the group still has committed offsets for has since been deleted
- * from the cluster — Kafka retains group offsets independently of the
- * topic until offsets.retention.minutes expires, so the broker can hand
- * back commits for a topic the watermark fetch then can't resolve.
+ * Tagged-union outcome of {@link buildLagFromCommittedOffsets}. Shares
+ * the `{kind: "topicNotFound", message: string}` arm shape with
+ * {@link ResolveNeverCommittedTopicsResult} so the handler thunks both
+ * through the same `createResponse(message, true)` call. The
+ * `topicNotFound` arm fires when a topic the group still has committed
+ * offsets for has since been deleted from the cluster — Kafka retains
+ * group offsets independently of the topic until
+ * offsets.retention.minutes expires, so the broker can hand back commits
+ * for a topic the watermark fetch then can't resolve.
  */
 type BuildLagResult =
   | {
@@ -404,7 +400,7 @@ type BuildLagResult =
       topics: ConsumerGroupLagTopic[];
       totalLagBigInt: bigint;
     }
-  | { kind: "topicNotFound"; missingTopic: string };
+  | { kind: "topicNotFound"; message: string };
 
 /**
  * Iterate the group's committed offsets and produce per-(topic, partition)
@@ -431,7 +427,10 @@ async function buildLagFromCommittedOffsets(
       watermarks = await watermarkCache(topic);
     } catch (err) {
       if (isUnknownTopicError(err)) {
-        return { kind: "topicNotFound", missingTopic: topic };
+        return {
+          kind: "topicNotFound",
+          message: notFoundTopicMessage(topic),
+        };
       }
       throw err;
     }
@@ -469,12 +468,15 @@ async function buildLagFromCommittedOffsets(
 /**
  * Tagged-union outcome of {@link resolveNeverCommittedFilterTopics}.
  * `kind: "resolved"` means every filter topic exists on the cluster;
- * `kind: "topicNotFound"` means the existence check found `missingTopic`
- * absent from the cluster's metadata.
+ * `kind: "topicNotFound"` means at least one filter topic is absent from
+ * the cluster's metadata — the helper formats the user-facing message
+ * directly (specific-topic when we have specificity, list-style when
+ * the broker only tells us "one of these is wrong" without saying
+ * which).
  */
 type ResolveNeverCommittedTopicsResult =
   | { kind: "resolved"; topics: ConsumerGroupLagTopic[] }
-  | { kind: "topicNotFound"; missingTopic: string };
+  | { kind: "topicNotFound"; message: string };
 
 /**
  * Verify each filter topic that didn't appear in the `fetchOffsets`
@@ -484,14 +486,15 @@ type ResolveNeverCommittedTopicsResult =
  * partition and discard the watermark data we don't need on this path.
  * Topics that exist but the group hasn't committed to surface as
  * `{topic, partitions: []}` in the `resolved` arm; topics that don't
- * exist short-circuit the iteration with their name in the
+ * exist short-circuit with a pre-formatted user-facing message in the
  * `topicNotFound` arm. Non-unknown-topic errors propagate via throw.
  *
  * Defensive against both unknown-topic surface shapes: librdkafka may
- * reject the call with `ERR_UNKNOWN_TOPIC_OR_PART` / `ERR__UNKNOWN_TOPIC`
- * for a missing topic, or it may resolve cleanly with the unknown topic
- * absent from the returned `topics` array. Both map to the same
- * `topicNotFound` arm.
+ * reject the batched call with `ERR_UNKNOWN_TOPIC_OR_PART` /
+ * `ERR__UNKNOWN_TOPIC` (which doesn't identify which candidate
+ * triggered it — we surface the full list in the message) or resolve
+ * cleanly with the unknown topic absent from the returned `topics`
+ * array (which does give us specificity).
  */
 async function resolveNeverCommittedFilterTopics(
   filterTopics: readonly string[],
@@ -509,17 +512,15 @@ async function resolveNeverCommittedFilterTopics(
   } catch (err) {
     if (!isUnknownTopicError(err)) throw err;
     // The batched call rejected with an unknown-topic code but doesn't
-    // tell us which topic was missing. Probe per-topic to identify the
-    // first missing one in user-supplied order so the caller-facing
-    // error names a specific topic.
-    const firstMissing = await findFirstMissingTopic(admin, missing);
-    if (firstMissing === null) {
-      // Wacky: batch rejected but every individual probe found its
-      // topic. Could happen if the cluster changed between calls;
-      // rethrow the original rather than fabricate a not-found response.
-      throw err;
-    }
-    return { kind: "topicNotFound", missingTopic: firstMissing };
+    // tell us which candidate triggered the failure. With K=1 there's
+    // only one possibility so we can still name it; with K>1 surface
+    // the full list so the caller can spot the typo without us paying
+    // K extra round-trips to identify the specific one.
+    const message =
+      missing.length === 1
+        ? notFoundTopicMessage(missing[0]!)
+        : `Topic not found in [${missing.join(", ")}] on this cluster.`;
+    return { kind: "topicNotFound", message };
   }
 
   // Defensive against the silently-omits-missing-topic surface shape:
@@ -530,7 +531,10 @@ async function resolveNeverCommittedFilterTopics(
   );
   const firstMissing = missing.find((t) => !returnedNames.has(t));
   if (firstMissing !== undefined) {
-    return { kind: "topicNotFound", missingTopic: firstMissing };
+    return {
+      kind: "topicNotFound",
+      message: notFoundTopicMessage(firstMissing),
+    };
   }
 
   return {
@@ -540,27 +544,10 @@ async function resolveNeverCommittedFilterTopics(
 }
 
 /**
- * Identify the first missing topic from `candidates` in candidate order
- * by probing each individually via `fetchTopicMetadata`. Returns `null`
- * if every probe found its topic. Used as a fallback after a batched
- * `fetchTopicMetadata` rejects with an unknown-topic code but doesn't
- * tell us which one triggered the failure.
+ * Canonical user-facing "topic not found" message format. Centralizes
+ * the phrasing so the step-2 (deleted-since-commit topic) and step-3
+ * (filter topic missing from metadata) paths can't drift apart.
  */
-async function findFirstMissingTopic(
-  admin: KafkaJS.Admin,
-  candidates: readonly string[],
-): Promise<string | null> {
-  for (const topic of candidates) {
-    try {
-      const raw = await admin.fetchTopicMetadata({ topics: [topic] });
-      const metadata = normalizeFetchTopicMetadataResponse(raw);
-      if (!metadata.some((t) => t.name === topic)) {
-        return topic;
-      }
-    } catch (err) {
-      if (isUnknownTopicError(err)) return topic;
-      throw err;
-    }
-  }
-  return null;
+function notFoundTopicMessage(topic: string): string {
+  return `Topic "${topic}" not found on this cluster.`;
 }

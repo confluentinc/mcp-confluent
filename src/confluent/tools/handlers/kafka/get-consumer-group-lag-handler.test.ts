@@ -943,37 +943,24 @@ describe("get-consumer-group-lag-handler.ts", () => {
       });
     });
 
-    it("should fall back to per-topic probes to identify the first missing topic when a batched fetchTopicMetadata rejects with an unknown-topic code", async () => {
-      // Defensive against the kafkajs-compat surface where a batched
-      // metadata call rejects on the first missing topic without
-      // identifying it. The handler probes per-topic in user-supplied
-      // order so the caller-facing "Topic not found" message names a
-      // specific topic — the one the caller is likely confused about,
-      // not whichever the broker happened to evaluate first.
+    it("should surface a list-style not-found error citing every filter candidate when a batched fetchTopicMetadata rejects without identifying the missing topic", async () => {
+      // The kafkajs-compat surface rejects a batched metadata call on
+      // the first missing topic without telling us which one triggered
+      // the failure. Rather than pay K extra per-topic round-trips to
+      // identify it, the handler surfaces the full candidate list — the
+      // caller already knows the topics they typed and can spot the
+      // typo themselves.
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockResolvedValue([]);
       admin.describeGroups.mockResolvedValue({
         groups: [fakeRealGroup("g1")],
       });
-      admin.fetchTopicMetadata.mockImplementation(async (options) => {
-        const requested = options?.topics ?? [];
-        // Batched call (more than one topic) rejects with unknown-topic
-        // — the kafkajs-compat behavior under test.
-        if (requested.length > 1) {
-          throw new KafkaJS.KafkaJSError("Broker: Unknown topic or partition", {
-            code: KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART,
-          });
-        }
-        // Per-topic probes: "alpha" exists, "bravo" doesn't.
-        const [topic] = requested;
-        if (topic === "alpha") {
-          return { topics: [{ name: "alpha", partitions: [] }] };
-        }
-        throw new KafkaJS.KafkaJSError("Broker: Unknown topic or partition", {
+      admin.fetchTopicMetadata.mockRejectedValue(
+        new KafkaJS.KafkaJSError("Broker: Unknown topic or partition", {
           code: KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART,
-        });
-      });
+        }),
+      );
 
       const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g1",
@@ -981,7 +968,13 @@ describe("get-consumer-group-lag-handler.ts", () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe('Topic "bravo" not found on this cluster.');
+      expect(textOf(result)).toBe(
+        "Topic not found in [alpha, bravo] on this cluster.",
+      );
+      // The simplification deletes the per-topic-probe fallback path:
+      // fetchTopicMetadata is called exactly once (the batch), not K+1
+      // times.
+      expect(admin.fetchTopicMetadata).toHaveBeenCalledOnce();
     });
 
     it("should surface a friendly 'Topic <name> not found' error when the group has committed offsets for a topic that has since been deleted from the cluster", async () => {

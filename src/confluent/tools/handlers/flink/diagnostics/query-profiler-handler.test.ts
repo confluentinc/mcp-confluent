@@ -1,3 +1,4 @@
+import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
@@ -8,14 +9,40 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  wireFlinkTelemetry,
 } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 const STATEMENT_NAME = "my-statement";
+
+const TASK_GRAPH = {
+  tasks: [
+    {
+      task_id: "task-1",
+      task_name: "Source: orders",
+      input_tasks: [],
+      included_operators: [
+        { num: 0, operator_id: "op-1", operator_name: "Source" },
+      ],
+    },
+  ],
+};
 
 describe("query-profiler-handler.ts", () => {
   describe("QueryProfilerHandler", () => {
     const handler = new QueryProfilerHandler();
+
+    describe("getToolConfig()", () => {
+      it("should describe the get-flink-statement-profile tool as read-only", () => {
+        const config = handler.getToolConfig();
+        expect(config.name).toBe("get-flink-statement-profile");
+        expect(config.description).toContain("Query Profiler");
+        expect(config.inputSchema).toHaveProperty("statementName");
+        expect(config.inputSchema).toHaveProperty("intervalMinutes");
+        expect(config.inputSchema).toHaveProperty("includeAnalysis");
+        expect(config.annotations).toBe(READ_ONLY);
+      });
+    });
 
     describe("handle()", () => {
       const cases: FlinkGetCase[] = [
@@ -54,8 +81,6 @@ describe("query-profiler-handler.ts", () => {
         }) => {
           const clientManager = getMockedClientManager();
           if (flinkGetData !== undefined) {
-            // handler GETs the statement graph from Flink REST and POSTs telemetry
-            // queries afterwards; both clients need a usable response
             clientManager
               .getConfluentCloudFlinkRestClient()
               .GET.mockResolvedValue({ data: flinkGetData });
@@ -76,6 +101,169 @@ describe("query-profiler-handler.ts", () => {
           });
         },
       );
+
+      it("should return an error response when the task-graph GET errors", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudFlinkRestClient()
+          .GET.mockResolvedValueOnce({ error: { code: 500 } });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: "Failed to get task graph", isError: true },
+          clientManager,
+        });
+      });
+
+      it("should return an error response when Graph field is missing", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudFlinkRestClient()
+          .GET.mockResolvedValue({ data: {} });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: "Task graph not available", isError: true },
+          clientManager,
+        });
+      });
+
+      it("should return an error response when Graph JSON is malformed", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudFlinkRestClient()
+          .GET.mockResolvedValue({ data: { Graph: "{not json" } });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: "Failed to parse task graph", isError: true },
+          clientManager,
+        });
+      });
+
+      it("should detect high backpressure per-task when backpressurePercent exceeds 50%", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: JSON.stringify(TASK_GRAPH) },
+        });
+        // task/backpressure_time at 600 ms/s → 60% → medium severity
+        wireFlinkTelemetry(cm, {
+          "task/backpressure_time": [{ value: 600, taskId: "task-1" }],
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: "high_backpressure" },
+          clientManager: cm,
+        });
+      });
+
+      it("should escalate severity when backpressurePercent exceeds 80%", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: JSON.stringify(TASK_GRAPH) },
+        });
+        // 900 ms/s → 90% → "high"
+        wireFlinkTelemetry(cm, {
+          "task/backpressure_time": [{ value: 900, taskId: "task-1" }],
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: '"severity": "high"' },
+          clientManager: cm,
+        });
+      });
+
+      it("should detect high consumer lag from summary pendingRecords", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: JSON.stringify(TASK_GRAPH) },
+        });
+        // pending_records is a summary (statement-level) metric; the helper
+        // POSTs it without a group_by task id.
+        wireFlinkTelemetry(cm, {
+          pending_records: [{ value: 2_000_000 }],
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: "high_consumer_lag" },
+          clientManager: cm,
+        });
+      });
+
+      it("should detect late_data when summary numLateRecordsIn > 0", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: JSON.stringify(TASK_GRAPH) },
+        });
+        wireFlinkTelemetry(cm, {
+          num_late_records_in: [{ value: 50_000 }],
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: "late_data" },
+          clientManager: cm,
+        });
+      });
+
+      it("should detect large_state when stateBytes exceeds 10 GB", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: JSON.stringify(TASK_GRAPH) },
+        });
+        // 11 GB in bytes
+        wireFlinkTelemetry(cm, {
+          state_size_bytes: [{ value: 11 * 1024 * 1024 * 1024 }],
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: "large_state" },
+          clientManager: cm,
+        });
+      });
+
+      it("should skip analysis section when includeAnalysis is false", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: JSON.stringify(TASK_GRAPH) },
+        });
+        cm.getConfluentCloudTelemetryRestClient().POST.mockResolvedValue({
+          data: { data: [] },
+        });
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          { statementName: STATEMENT_NAME, includeAnalysis: false },
+        );
+        const text = result.content
+          .map((c) => ("text" in c ? c.text : ""))
+          .join("");
+        expect(text).not.toContain("detectedIssues");
+        expect(text).not.toContain("issueCount");
+      });
     });
   });
 });

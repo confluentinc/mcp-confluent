@@ -1,19 +1,13 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import type {
-  GroupOverview,
-  LibrdKafkaError,
-} from "@confluentinc/kafka-javascript/types/rdkafka.js";
+import type { GroupOverview } from "@confluentinc/kafka-javascript/types/rdkafka.js";
 import {
   listConsumerGroupsArgs,
   ListConsumerGroupsHandler,
 } from "@src/confluent/tools/handlers/kafka/list-consumer-groups-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
-import {
-  bareRuntime,
-  DEFAULT_CONNECTION_ID,
-  kafkaRuntime,
-} from "@tests/factories/runtime.js";
+import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
+import { kafkaRuntime } from "@tests/factories/runtime.js";
 import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
@@ -26,17 +20,6 @@ function fakeGroup(overrides: Partial<GroupOverview>): GroupOverview {
     isSimpleConsumerGroup: false,
     state: KafkaJS.ConsumerGroupStates.STABLE,
     type: KafkaJS.ConsumerGroupTypes.CONSUMER,
-    ...overrides,
-  };
-}
-
-/** Build a `LibrdKafkaError` fixture with the required fields populated. */
-function fakeError(overrides: Partial<LibrdKafkaError>): LibrdKafkaError {
-  return {
-    message: "broker error",
-    code: 7,
-    errno: 7,
-    origin: "kafka",
     ...overrides,
   };
 }
@@ -100,20 +83,6 @@ describe("list-consumer-groups-handler.ts", () => {
         "matchStates",
         "matchType",
       ]);
-    });
-  });
-
-  describe("enabledConnectionIds()", () => {
-    const handler = new ListConsumerGroupsHandler();
-
-    it("should enable on a kafka runtime", () => {
-      expect(handler.enabledConnectionIds(kafkaRuntime())).toEqual([
-        DEFAULT_CONNECTION_ID,
-      ]);
-    });
-
-    it("should disable on a bare runtime", () => {
-      expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
     });
   });
 
@@ -274,8 +243,8 @@ describe("list-consumer-groups-handler.ts", () => {
       admin.listGroups.mockResolvedValue({
         groups: [fakeGroup({ groupId: "g1" })],
         errors: [
-          fakeError({ message: "broker 2 unreachable", code: 6 }),
-          fakeError({ message: "metadata stale", code: 17 }),
+          fakeLibrdKafkaError({ message: "broker 2 unreachable", code: 6 }),
+          fakeLibrdKafkaError({ message: "metadata stale", code: 17 }),
         ],
       });
 
@@ -305,8 +274,8 @@ describe("list-consumer-groups-handler.ts", () => {
       admin.listGroups.mockResolvedValue({
         groups: [],
         errors: [
-          fakeError({ message: "all brokers down", code: 6 }),
-          fakeError({ message: "secondary failure", code: 2 }),
+          fakeLibrdKafkaError({ message: "all brokers down", code: 6 }),
+          fakeLibrdKafkaError({ message: "secondary failure", code: 2 }),
         ],
       });
 

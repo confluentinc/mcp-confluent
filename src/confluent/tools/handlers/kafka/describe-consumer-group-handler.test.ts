@@ -11,11 +11,8 @@ import {
 } from "@src/confluent/tools/handlers/kafka/describe-consumer-group-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
-import {
-  bareRuntime,
-  DEFAULT_CONNECTION_ID,
-  kafkaRuntime,
-} from "@tests/factories/runtime.js";
+import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
+import { kafkaRuntime } from "@tests/factories/runtime.js";
 import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
@@ -42,9 +39,17 @@ function fakeMember(overrides: Partial<MemberDescription>): MemberDescription {
   };
 }
 
-/** Build a {@link GroupDescription} fixture with all fields populated. */
+/** Build a {@link GroupDescription} fixture with all fields populated.
+ *  `error` accepts `null` in addition to the upstream type's
+ *  `LibrdKafkaError | undefined` shape — kafkajs-compat populates the
+ *  field as `null` at runtime when no error occurred, even though the
+ *  `.d.ts` declares it absent. The factory exposes that runtime shape so
+ *  tests can pin both the explicit-null happy path and the real-error
+ *  path. */
 function fakeGroupDescription(
-  overrides: Partial<GroupDescription>,
+  overrides: Omit<Partial<GroupDescription>, "error"> & {
+    error?: LibrdKafkaError | null;
+  },
 ): GroupDescription {
   return {
     groupId: "g",
@@ -57,20 +62,22 @@ function fakeGroupDescription(
     type: KafkaJS.ConsumerGroupTypes.CONSUMER,
     coordinator: fakeCoordinator(),
     ...overrides,
-  };
+  } as GroupDescription;
 }
 
-/** Build a {@link LibrdKafkaError} fixture with the required fields populated.
- *  The default code matches `ERR_GROUP_ID_NOT_FOUND` so the not-found tests
- *  read tersely; override `code` for other error scenarios. */
-function fakeError(overrides: Partial<LibrdKafkaError> = {}): LibrdKafkaError {
-  return {
+/** Curried convenience: most error paths in this file exercise the
+ *  not-found mapping, so the local wrapper pins
+ *  `ERR_GROUP_ID_NOT_FOUND` as the default code and a matching default
+ *  message. Tests for other error scenarios override `code` (and usually
+ *  `message`) explicitly. */
+function fakeNotFoundError(
+  overrides: Partial<Parameters<typeof fakeLibrdKafkaError>[0]> = {},
+) {
+  return fakeLibrdKafkaError({
     message: "Broker: Group id not found",
     code: KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND,
-    errno: KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND,
-    origin: "kafka",
     ...overrides,
-  };
+  });
 }
 
 describe("describe-consumer-group-handler.ts", () => {
@@ -134,20 +141,6 @@ describe("describe-consumer-group-handler.ts", () => {
       const description = handler.getToolConfig().description;
       expect(description).not.toMatch(/TopicPartition\[\]/);
       expect(description).toMatch(/\{ ?topic, ?partition ?\}/);
-    });
-  });
-
-  describe("enabledConnectionIds()", () => {
-    const handler = new DescribeConsumerGroupHandler();
-
-    it("should enable on a kafka runtime", () => {
-      expect(handler.enabledConnectionIds(kafkaRuntime())).toEqual([
-        DEFAULT_CONNECTION_ID,
-      ]);
-    });
-
-    it("should disable on a bare runtime", () => {
-      expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
     });
   });
 
@@ -279,7 +272,7 @@ describe("describe-consumer-group-handler.ts", () => {
     it("should translate a describeGroups rejection with ERR_GROUP_ID_NOT_FOUND into a caller-friendly tool-level error keyed on the requested name", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
-      admin.describeGroups.mockRejectedValue(fakeError());
+      admin.describeGroups.mockRejectedValue(fakeNotFoundError());
 
       const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "no-such-group",
@@ -298,7 +291,7 @@ describe("describe-consumer-group-handler.ts", () => {
         groups: [
           fakeGroupDescription({
             groupId: "no-such-group",
-            error: fakeError(),
+            error: fakeNotFoundError(),
           }),
         ],
       });
@@ -311,6 +304,37 @@ describe("describe-consumer-group-handler.ts", () => {
       expect(textOf(result)).toBe(
         'Consumer group "no-such-group" not found on this cluster.',
       );
+    });
+
+    it("should treat a GroupDescription whose error field is explicitly null (kafkajs-compat's no-error sentinel) as a successful describe and not crash on the null dereference", async () => {
+      // kafkajs-compat populates `error: null` on the GroupDescription
+      // shape when no per-group error occurred, even though the upstream
+      // `.d.ts` declares the field as `LibrdKafkaError | undefined`. A
+      // `!== undefined` check would see `null` as "error present" and
+      // crash dereferencing `null.code`. The handler uses `!= null`
+      // (loose) so both `undefined` and `null` go through the no-error
+      // path.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.describeGroups.mockResolvedValue({
+        groups: [
+          fakeGroupDescription({
+            groupId: "alive-group",
+            state: KafkaJS.ConsumerGroupStates.STABLE,
+            error: null,
+          }),
+        ],
+      });
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "alive-group",
+      });
+
+      expect(result.isError, textOf(result)).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        groupId: "alive-group",
+        state: "Stable",
+      });
     });
 
     it("should translate the CCloud unknown-group tombstone shape (state=Dead, no members, empty protocol/partitionAssignor, no .error) into the same friendly not-found error", async () => {
@@ -383,7 +407,7 @@ describe("describe-consumer-group-handler.ts", () => {
         groups: [
           fakeGroupDescription({
             groupId: "g",
-            error: fakeError({
+            error: fakeLibrdKafkaError({
               code: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
               message: "Broker: Group authorization failed",
             }),

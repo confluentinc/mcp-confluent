@@ -9,7 +9,7 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
-  type MockedClientManager,
+  wireFlinkTelemetry,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
@@ -27,40 +27,6 @@ const TASK_GRAPH = {
     },
   ],
 };
-
-/** Configure telemetry POST responses keyed by substring of the requested
- *  metric name. Default response is `{ data: { data: [] } }`. */
-function wireTelemetryByMetric(
-  cm: MockedClientManager,
-  byMetric: Record<string, { value: number; taskId?: string }>,
-): void {
-  cm.getConfluentCloudTelemetryRestClient().POST.mockImplementation(
-    (
-      _path: unknown,
-      opts: unknown,
-    ): Promise<{ data?: unknown; error?: unknown }> => {
-      const o = opts as {
-        body?: { aggregations?: Array<{ metric?: string }> };
-      };
-      const metric = o.body?.aggregations?.[0]?.metric ?? "";
-      for (const [substr, point] of Object.entries(byMetric)) {
-        if (metric.includes(substr)) {
-          return Promise.resolve({
-            data: {
-              data: [
-                {
-                  "metric.flink_task.id": point.taskId,
-                  points: [{ value: point.value, timestamp: "t" }],
-                },
-              ],
-            },
-          });
-        }
-      }
-      return Promise.resolve({ data: { data: [] } });
-    },
-  );
-}
 
 describe("query-profiler-handler.ts", () => {
   describe("QueryProfilerHandler", () => {
@@ -196,8 +162,8 @@ describe("query-profiler-handler.ts", () => {
           data: { Graph: JSON.stringify(TASK_GRAPH) },
         });
         // task/backpressure_time at 600 ms/s → 60% → medium severity
-        wireTelemetryByMetric(cm, {
-          "task/backpressure_time": { value: 600, taskId: "task-1" },
+        wireFlinkTelemetry(cm, {
+          "task/backpressure_time": [{ value: 600, taskId: "task-1" }],
         });
         await assertHandleCase({
           handler,
@@ -214,8 +180,8 @@ describe("query-profiler-handler.ts", () => {
           data: { Graph: JSON.stringify(TASK_GRAPH) },
         });
         // 900 ms/s → 90% → "high"
-        wireTelemetryByMetric(cm, {
-          "task/backpressure_time": { value: 900, taskId: "task-1" },
+        wireFlinkTelemetry(cm, {
+          "task/backpressure_time": [{ value: 900, taskId: "task-1" }],
         });
         await assertHandleCase({
           handler,
@@ -233,8 +199,8 @@ describe("query-profiler-handler.ts", () => {
         });
         // pending_records is a summary (statement-level) metric; the helper
         // POSTs it without a group_by task id.
-        wireTelemetryByMetric(cm, {
-          pending_records: { value: 2_000_000 },
+        wireFlinkTelemetry(cm, {
+          pending_records: [{ value: 2_000_000 }],
         });
         await assertHandleCase({
           handler,
@@ -250,8 +216,8 @@ describe("query-profiler-handler.ts", () => {
         cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
           data: { Graph: JSON.stringify(TASK_GRAPH) },
         });
-        wireTelemetryByMetric(cm, {
-          num_late_records_in: { value: 50_000 },
+        wireFlinkTelemetry(cm, {
+          num_late_records_in: [{ value: 50_000 }],
         });
         await assertHandleCase({
           handler,
@@ -268,8 +234,8 @@ describe("query-profiler-handler.ts", () => {
           data: { Graph: JSON.stringify(TASK_GRAPH) },
         });
         // 11 GB in bytes
-        wireTelemetryByMetric(cm, {
-          state_size_bytes: { value: 11 * 1024 * 1024 * 1024 },
+        wireFlinkTelemetry(cm, {
+          state_size_bytes: [{ value: 11 * 1024 * 1024 * 1024 }],
         });
         await assertHandleCase({
           handler,

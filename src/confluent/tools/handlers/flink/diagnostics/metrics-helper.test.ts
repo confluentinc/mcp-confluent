@@ -4,47 +4,11 @@ import {
   type FlinkStatementMetrics,
 } from "@src/confluent/tools/handlers/flink/diagnostics/metrics-helper.js";
 import {
+  LONG_MIN_SENTINEL,
   getMockedClientManager,
-  type MockedClientManager,
+  wireFlinkTelemetry,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
-
-/** Configure the telemetry POST mock to respond per metric substring.
- *  Each match returns one data point per (taskId | splitName) entry, or a
- *  single point when neither is supplied (statement-level summary). */
-function wireTelemetry(
-  cm: MockedClientManager,
-  byMetric: Record<
-    string,
-    Array<{ value: number; taskId?: string; splitName?: string }>
-  >,
-): void {
-  cm.getConfluentCloudTelemetryRestClient().POST.mockImplementation(
-    (
-      _path: unknown,
-      opts: unknown,
-    ): Promise<{ data?: unknown; error?: unknown }> => {
-      const o = opts as {
-        body?: { aggregations?: Array<{ metric?: string }> };
-      };
-      const metric = o.body?.aggregations?.[0]?.metric ?? "";
-      for (const [substr, points] of Object.entries(byMetric)) {
-        if (metric.includes(substr)) {
-          return Promise.resolve({
-            data: {
-              data: points.map((p) => ({
-                "metric.flink_task.id": p.taskId,
-                "metric.flink_split": p.splitName,
-                points: [{ value: p.value, timestamp: "t" }],
-              })),
-            },
-          });
-        }
-      }
-      return Promise.resolve({ data: { data: [] } });
-    },
-  );
-}
 
 describe("metrics-helper.ts", () => {
   describe("analyzeMetrics()", () => {
@@ -184,7 +148,7 @@ describe("metrics-helper.ts", () => {
 
     it("should populate counter and gauge metrics from telemetry responses and compute watermarkLagMs", async () => {
       const cm = getMockedClientManager();
-      wireTelemetry(cm, {
+      wireFlinkTelemetry(cm, {
         // num_records_in (counter, SUM across tasks)
         num_records_in: [
           { value: 100, taskId: "t1" },
@@ -223,10 +187,8 @@ describe("metrics-helper.ts", () => {
 
     it("should ignore Long.MIN_VALUE watermark sentinels", async () => {
       const cm = getMockedClientManager();
-      wireTelemetry(cm, {
-        current_input_watermark: [
-          { value: -9_223_372_036_854_776_000, taskId: "t1" },
-        ],
+      wireFlinkTelemetry(cm, {
+        current_input_watermark: [{ value: LONG_MIN_SENTINEL, taskId: "t1" }],
       });
       const result = await getStatementMetrics(cm, {
         statementName: "stmt",
@@ -414,12 +376,7 @@ describe("metrics-helper.ts", () => {
                 data: [
                   {
                     "metric.flink_split": "orders-0",
-                    points: [
-                      {
-                        value: -9_223_372_036_854_776_000,
-                        timestamp: "t",
-                      },
-                    ],
+                    points: [{ value: LONG_MIN_SENTINEL, timestamp: "t" }],
                   },
                 ],
               },

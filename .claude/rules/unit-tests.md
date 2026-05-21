@@ -233,8 +233,6 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   as default for success cases). Pass `"DISCOVER"` as the `outcome` sentinel to run the
   handler and get a copy-paste suggestion for the correct expectation; replace before
   committing.
-  `assertHandleCase` is geared toward outcome-shaped throws/resolves; when a handler test asserts _formatted text content_ and `_meta` aggregation (rather than just resolve/throw outcome), a bespoke per-test shape is acceptable.
-  Reach for `assertHandleCase` first and only fall back when the outcome model doesn't fit the assertions.
 
 - **Schema-validation tests: prefer `it.each` or scope the name.**
   When a Zod schema rejects multiple field shapes (e.g. malformed dates, page-size bounds, missing required keys), either cover each rejection case with `it.each` _or_ scope the single test's name to what it actually checks (`"should reject malformed startDate"` rather than `"should surface ZodError"`).

@@ -240,11 +240,14 @@ describe("get-consumer-group-lag-handler.ts", () => {
         groups: [fakeRealGroup("g1")],
       });
       // The filter is forwarded so the broker can server-side-restrict; the
-      // handler still resolves never-committed topics in the filter from the
-      // watermark cache afterwards.
-      admin.fetchTopicOffsets.mockResolvedValue([
-        fakeWatermark({ partition: 0 }),
-      ]);
+      // handler still verifies the never-committed filter topics exist on
+      // the cluster via fetchTopicMetadata.
+      admin.fetchTopicMetadata.mockImplementation(async (options) => ({
+        topics: (options?.topics ?? []).map((name) => ({
+          name,
+          partitions: [],
+        })),
+      }));
 
       await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g1",
@@ -738,7 +741,7 @@ describe("get-consumer-group-lag-handler.ts", () => {
       expect(warnSpy).toHaveBeenCalledOnce();
     });
 
-    it("should include a never-committed topic (in the filter but not in fetchOffsets output) as {topic, partitions: []} when its watermark fetch succeeds", async () => {
+    it("should include a never-committed topic (in the filter but not in fetchOffsets output) as {topic, partitions: []} when its existence is confirmed via fetchTopicMetadata", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       // Group has committed to `orders` only; caller asks about
@@ -751,14 +754,14 @@ describe("get-consumer-group-lag-handler.ts", () => {
           partitions: [fakeFetchedPartition({ partition: 0, offset: "10" })],
         },
       ]);
-      admin.fetchTopicOffsets.mockImplementation(async (topic: string) => {
-        if (topic === "orders") {
-          return [fakeWatermark({ partition: 0, high: "30" })];
-        }
-        if (topic === "shipments") {
-          return [fakeWatermark({ partition: 0, high: "999" })];
-        }
-        throw new Error(`unexpected topic ${topic}`);
+      admin.fetchTopicOffsets.mockResolvedValue([
+        fakeWatermark({ partition: 0, high: "30" }),
+      ]);
+      // shipments is verified via metadata, not via the watermark fetch
+      // — its watermarks are never needed since the group has no commits
+      // on it.
+      admin.fetchTopicMetadata.mockResolvedValue({
+        topics: [{ name: "shipments", partitions: [] }],
       });
 
       const result = await handler.handle(kafkaRuntime(clientManager), {
@@ -771,6 +774,10 @@ describe("get-consumer-group-lag-handler.ts", () => {
       expect(shipments).toEqual({ topic: "shipments", partitions: [] });
       // The orders topic still has its lag computed.
       expect(payload.totalLag).toBe(20);
+      // The never-committed-topic path does NOT pay the per-partition
+      // watermark cost — only `orders` (the committed topic) is fetched.
+      expect(admin.fetchTopicOffsets).toHaveBeenCalledOnce();
+      expect(admin.fetchTopicOffsets).toHaveBeenCalledWith("orders");
     });
 
     it("should surface a friendly 'Topic <name> not found' error when the group has committed offsets for a topic that has since been deleted from the cluster", async () => {
@@ -806,7 +813,7 @@ describe("get-consumer-group-lag-handler.ts", () => {
       );
     });
 
-    it("should surface a friendly 'Topic <name> not found' error when a filtered topic does not exist on the cluster", async () => {
+    it("should surface a friendly 'Topic <name> not found' error when a filtered topic does not exist on the cluster (metadata fetch rejects)", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockResolvedValue([]);
@@ -815,14 +822,14 @@ describe("get-consumer-group-lag-handler.ts", () => {
       admin.describeGroups.mockResolvedValue({
         groups: [fakeRealGroup("g1")],
       });
-      // Watermark fetch rejects with the librdkafka unknown-topic code
-      // for the filtered topic — same posture get-partition-offsets
+      // fetchTopicMetadata rejects with the broker-issued unknown-topic
+      // code for the filtered topic — same posture get-partition-offsets
       // takes for its own "topic not found" mapping.
-      const unknownTopicErr = new KafkaJS.KafkaJSError(
-        "Broker: Unknown topic or partition",
-        { code: KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART },
+      admin.fetchTopicMetadata.mockRejectedValue(
+        new KafkaJS.KafkaJSError("Broker: Unknown topic or partition", {
+          code: KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART,
+        }),
       );
-      admin.fetchTopicOffsets.mockRejectedValue(unknownTopicErr);
 
       const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g1",
@@ -835,7 +842,7 @@ describe("get-consumer-group-lag-handler.ts", () => {
       );
     });
 
-    it("should surface the same 'Topic <name> not found' error when the watermark fetch rejects with the local-side ERR__UNKNOWN_TOPIC code", async () => {
+    it("should surface the same 'Topic <name> not found' error when fetchTopicMetadata rejects with the local-side ERR__UNKNOWN_TOPIC code", async () => {
       // ERR_UNKNOWN_TOPIC_OR_PART is broker-issued (single underscore);
       // ERR__UNKNOWN_TOPIC is client-local (double underscore — fires
       // when librdkafka's own metadata cache rejects the topic before
@@ -847,10 +854,11 @@ describe("get-consumer-group-lag-handler.ts", () => {
       admin.describeGroups.mockResolvedValue({
         groups: [fakeRealGroup("g1")],
       });
-      const unknownTopicErr = new KafkaJS.KafkaJSError("Local: Unknown topic", {
-        code: KafkaJS.ErrorCodes.ERR__UNKNOWN_TOPIC,
-      });
-      admin.fetchTopicOffsets.mockRejectedValue(unknownTopicErr);
+      admin.fetchTopicMetadata.mockRejectedValue(
+        new KafkaJS.KafkaJSError("Local: Unknown topic", {
+          code: KafkaJS.ErrorCodes.ERR__UNKNOWN_TOPIC,
+        }),
+      );
 
       const result = await handler.handle(kafkaRuntime(clientManager), {
         groupId: "g1",
@@ -860,6 +868,31 @@ describe("get-consumer-group-lag-handler.ts", () => {
       expect(result.isError).toBe(true);
       expect(textOf(result)).toBe(
         'Topic "mystery-topic" not found on this cluster.',
+      );
+    });
+
+    it("should surface the same 'Topic <name> not found' error when fetchTopicMetadata resolves cleanly with the requested topic absent from the response", async () => {
+      // Defensive against kafkajs-compat implementations that silently
+      // omit unknown topics from the returned `topics` array rather than
+      // rejecting. The helper inspects the response and routes that
+      // shape through the same `topicNotFound` arm as the rejection
+      // path above.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeRealGroup("g1")],
+      });
+      admin.fetchTopicMetadata.mockResolvedValue({ topics: [] });
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "g1",
+        topics: ["silently-omitted-topic"],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toBe(
+        'Topic "silently-omitted-topic" not found on this cluster.',
       );
     });
 

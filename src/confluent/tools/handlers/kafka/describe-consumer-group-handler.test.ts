@@ -5,12 +5,12 @@ import type {
   MemberDescription,
   Node,
 } from "@confluentinc/kafka-javascript/types/rdkafka.js";
-import { CallToolResult } from "@src/confluent/schema.js";
 import {
   describeConsumerGroupArgs,
   DescribeConsumerGroupHandler,
 } from "@src/confluent/tools/handlers/kafka/describe-consumer-group-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { textOf } from "@tests/call-tool-result.js";
 import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
@@ -19,10 +19,6 @@ import {
 import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-
-function textOf(result: CallToolResult): string {
-  return result.content.map((c) => ("text" in c ? c.text : "")).join("");
-}
 
 /** Build a {@link Node} coordinator fixture; pass `rack: undefined` explicitly
  *  to assert the field is omitted from the payload. */

@@ -3,12 +3,12 @@ import type {
   GroupOverview,
   LibrdKafkaError,
 } from "@confluentinc/kafka-javascript/types/rdkafka.js";
-import { CallToolResult } from "@src/confluent/schema.js";
 import {
   listConsumerGroupsArgs,
   ListConsumerGroupsHandler,
 } from "@src/confluent/tools/handlers/kafka/list-consumer-groups-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { textOf } from "@tests/call-tool-result.js";
 import {
   bareRuntime,
   DEFAULT_CONNECTION_ID,
@@ -17,10 +17,6 @@ import {
 import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-
-function textOf(result: CallToolResult): string {
-  return result.content.map((c) => ("text" in c ? c.text : "")).join("");
-}
 
 /** Build a `GroupOverview` fixture with all fields populated. */
 function fakeGroup(overrides: Partial<GroupOverview>): GroupOverview {

@@ -102,11 +102,10 @@ export class DescribeConsumerGroupHandler extends BaseToolHandler {
     return {
       name: ToolName.DESCRIBE_CONSUMER_GROUP,
       description:
-        "Describe a single consumer group on a Kafka cluster — wraps the " +
-        "broker's describeGroups admin call for one group ID. Returns the " +
-        "group's state, type, protocol, partition assignor, coordinator, " +
-        "and per-member assignment as a flat array of {topic, partition} " +
-        "pairs (the raw librdkafka memberAssignment Buffer is dropped).",
+        "Describe a single consumer group on a Kafka cluster. " +
+        "Returns the group's state, type, protocol, partition assignor, " +
+        "coordinator, and per-member assignment as a flat array " +
+        "of {topic, partition} pairs.",
       inputSchema: describeConsumerGroupArgs.shape,
       annotations: READ_ONLY,
     };

@@ -13,7 +13,7 @@ const TEMPLATES_DIR_URL = new URL(
   import.meta.url,
 );
 
-let cachedSuccessPage: string | undefined;
+let cachedSuccessTemplate: string | undefined;
 let cachedFailureTemplate: string | undefined;
 
 function readTemplate(fileName: string): string {
@@ -37,9 +37,21 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-export function renderSuccessPage(): string {
-  cachedSuccessPage ??= inlinePartials(readTemplate(SUCCESS_TEMPLATE_FILE));
-  return cachedSuccessPage;
+/**
+ * Render the OAuth success page. The `copiedPath` and `streamPath` placeholders
+ * in the template are replaced with the same constants the server registers
+ * its handlers under, so the page and server can't drift on path naming.
+ */
+export function renderSuccessPage(opts: {
+  copiedPath: string;
+  streamPath: string;
+}): string {
+  cachedSuccessTemplate ??= inlinePartials(readTemplate(SUCCESS_TEMPLATE_FILE));
+  // Replacer-function form so `$&`, `$$`, etc. in path values are taken literally
+  // rather than processed as String.prototype.replace substitution patterns.
+  return cachedSuccessTemplate
+    .replaceAll("{{copiedPath}}", () => opts.copiedPath)
+    .replaceAll("{{streamPath}}", () => opts.streamPath);
 }
 
 export function renderErrorPage(message: string): string {
@@ -49,6 +61,6 @@ export function renderErrorPage(message: string): string {
 
 /** Test-only: reset the module-level template cache. */
 export function _resetCallbackPageCacheForTests(): void {
-  cachedSuccessPage = undefined;
+  cachedSuccessTemplate = undefined;
   cachedFailureTemplate = undefined;
 }

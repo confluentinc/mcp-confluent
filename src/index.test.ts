@@ -275,6 +275,8 @@ describe("index.ts", () => {
         ToolName.CONSUME_MESSAGES,
         ToolName.GET_PARTITION_OFFSETS,
         ToolName.LIST_CONSUMER_GROUPS,
+        ToolName.DESCRIBE_CONSUMER_GROUP,
+        ToolName.GET_CONSUMER_GROUP_LAG,
         ToolName.LIST_ENVIRONMENTS,
         ToolName.READ_ENVIRONMENT,
         ToolName.LIST_ORGANIZATIONS,

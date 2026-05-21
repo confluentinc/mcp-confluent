@@ -22,6 +22,7 @@ import {
   createWatermarkCache,
   narrowMessageCount,
   type PartitionWatermark,
+  type WatermarkCache,
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
@@ -175,73 +176,49 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
 
       // 2. For each topic+partition the group has committed to, fetch the
       // partition's high watermark and compute lag = high - committed.
+      // The nested loop + accumulator lives in
+      // `buildLagFromCommittedOffsets` to keep this handler under
+      // SonarCloud's cognitive-complexity threshold.
 
       const watermarkCache = createWatermarkCache(admin);
-      const responseTopics: ConsumerGroupLagTopic[] = [];
-      let totalLag = 0;
-
-      for (const {
-        topic,
-        partitions: committedPartitions,
-      } of committedByTopic) {
-        const watermarks = await watermarkCache(topic);
-        const watermarkByPartition = new Map<number, PartitionWatermark>(
-          watermarks.map((w) => [w.partition, w]),
+      const { topics: responseTopics, totalLagBigInt } =
+        await buildLagFromCommittedOffsets(
+          parsed.groupId,
+          committedByTopic,
+          watermarkCache,
         );
 
-        const rows: ConsumerGroupLagPartition[] = [];
-        for (const committed of committedPartitions) {
-          const watermark = watermarkByPartition.get(committed.partition);
-          if (watermark === undefined) {
-            logger.warn(
-              {
-                groupId: parsed.groupId,
-                topic,
-                partition: committed.partition,
-              },
-              "Wacky -- committed offset reported for a partition with no matching watermark; skipping",
-            );
-            continue;
-          }
-          const row = buildLagRow(parsed.groupId, topic, committed, watermark);
-          rows.push(row);
-          if (row.lag !== null) {
-            totalLag += row.lag;
-          }
-        }
-        responseTopics.push({ topic, partitions: rows });
-      }
-
-      // 3. If the caller passed `topics`, they may have included topics the group
-      // has never committed to. Those topics won't appear in the fetchOffsets
-      // response above, so fetch their watermarks here to confirm their existence
-      // and include them in the response with empty partition arrays (the
-      // spec's way of saying "this topic exists but the group has no commits on
-      // it", distinct from omitting the topic entirely which means "the group
-      // has no commits on this topic, and also we didn't verify whether the
-      // topic exists or not").
+      // 3. If the caller passed `topics`, verify that any never-committed
+      // filter topics exist on the cluster (so we can return
+      // `{topic, partitions: []}` for each) and surface a friendly
+      // "Topic not found" error for any that don't.
 
       if (parsed.topics) {
         const seenTopics = new Set(committedByTopic.map(({ topic }) => topic));
-        for (const filterTopic of parsed.topics) {
-          if (seenTopics.has(filterTopic)) continue;
-          try {
-            await watermarkCache(filterTopic);
-          } catch (err) {
-            if (isUnknownTopicError(err)) {
-              return this.createResponse(
-                `Topic "${filterTopic}" not found on this cluster.`,
-                true,
-              );
-            }
-            throw err;
-          }
-          responseTopics.push({ topic: filterTopic, partitions: [] });
+        const filterResult = await resolveNeverCommittedFilterTopics(
+          parsed.topics,
+          seenTopics,
+          watermarkCache,
+        );
+        if (filterResult.kind === "topicNotFound") {
+          return this.createResponse(
+            `Topic "${filterResult.missingTopic}" not found on this cluster.`,
+            true,
+          );
         }
+        responseTopics.push(...filterResult.topics);
       }
 
-      // 4. Return the structured response with per-partition lag rows and a
-      // total lag sum across the group.
+      // 4. Narrow the BigInt accumulator to a JS Number for the wire
+      // payload, saturating at Number.MAX_SAFE_INTEGER (and emitting a
+      // Wacky log) if the cross-partition sum exceeds the safe-integer
+      // boundary even though each individual partition fit.
+
+      const totalLag = narrowMessageCount(totalLagBigInt, {
+        groupId: parsed.groupId,
+        scope: "totalLag",
+        topicCount: responseTopics.length,
+      });
 
       const payload: GetConsumerGroupLagResponse = {
         groupId: parsed.groupId,
@@ -264,22 +241,27 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
  * Build one {@link ConsumerGroupLagPartition} row from a committed offset and
  * a paired watermark. Splits the never-committed sentinel (`offset === "-1"`)
  * from the real arithmetic path so the latter remains a clean BigInt
- * subtraction.
+ * subtraction. Also returns the raw BigInt diff (or `null` for the
+ * never-committed case) so the caller can accumulate `totalLag` in BigInt
+ * and narrow once at the end — see [PR #508 Copilot comment 1].
  */
 function buildLagRow(
   groupId: string,
   topic: string,
   committed: FetchOffsetsPartition,
   watermark: PartitionWatermark,
-): ConsumerGroupLagPartition {
+): { row: ConsumerGroupLagPartition; lagBigInt: bigint | null } {
   if (committed.offset === "-1") {
     return {
-      partition: committed.partition,
-      committedOffset: null,
-      highWatermark: watermark.high,
-      lag: null,
-      metadata: committed.metadata,
-      leaderEpoch: committed.leaderEpoch,
+      row: {
+        partition: committed.partition,
+        committedOffset: null,
+        highWatermark: watermark.high,
+        lag: null,
+        metadata: committed.metadata,
+        leaderEpoch: committed.leaderEpoch,
+      },
+      lagBigInt: null,
     };
   }
   const diff = BigInt(watermark.high) - BigInt(committed.offset);
@@ -291,12 +273,15 @@ function buildLagRow(
     high: watermark.high,
   });
   return {
-    partition: committed.partition,
-    committedOffset: committed.offset,
-    highWatermark: watermark.high,
-    lag,
-    metadata: committed.metadata,
-    leaderEpoch: committed.leaderEpoch,
+    row: {
+      partition: committed.partition,
+      committedOffset: committed.offset,
+      highWatermark: watermark.high,
+      lag,
+      metadata: committed.metadata,
+      leaderEpoch: committed.leaderEpoch,
+    },
+    lagBigInt: diff,
   };
 }
 
@@ -326,7 +311,11 @@ async function groupExists(
     if (desc.error.code === KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND) {
       return false;
     }
-    throw new Error(desc.error.message);
+    // Throw the raw librdkafka error so downstream handlers and logs can
+    // inspect `code` / `errno` / `origin` rather than just a message
+    // string. Symmetric with how the top-level rejection arm above
+    // rethrows `err` unchanged.
+    throw desc.error;
   }
   return !isUnknownGroupTombstone(desc);
 }
@@ -345,4 +334,111 @@ function isUnknownTopicError(err: unknown): boolean {
     err.code === KafkaJS.ErrorCodes.ERR_UNKNOWN_TOPIC_OR_PART ||
     err.code === KafkaJS.ErrorCodes.ERR__UNKNOWN_TOPIC
   );
+}
+
+/**
+ * Step 2 of {@link GetConsumerGroupLagHandler.handle}: iterate the
+ * group's committed offsets and produce per-(topic, partition) lag rows
+ * paired with a BigInt total. Extracted from the handler so the
+ * orchestrating `handle()` stays flat enough to satisfy SonarCloud's
+ * cognitive-complexity threshold — the nested loop + the per-partition
+ * `watermark === undefined` Wacky branch + the per-partition lag
+ * accumulator all live here rather than inflating the handler body.
+ *
+ * `totalLagBigInt` accumulates as a BigInt so a sum that exceeds
+ * `Number.MAX_SAFE_INTEGER` stays precise; the handler narrows once at
+ * the end via {@link narrowMessageCount}.
+ */
+async function buildLagFromCommittedOffsets(
+  groupId: string,
+  committedByTopic: ReadonlyArray<{
+    topic: string;
+    partitions: FetchOffsetsPartition[];
+  }>,
+  watermarkCache: WatermarkCache,
+): Promise<{
+  topics: ConsumerGroupLagTopic[];
+  totalLagBigInt: bigint;
+}> {
+  const topics: ConsumerGroupLagTopic[] = [];
+  let totalLagBigInt = 0n;
+
+  for (const { topic, partitions: committedPartitions } of committedByTopic) {
+    const watermarks = await watermarkCache(topic);
+    const watermarkByPartition = new Map<number, PartitionWatermark>(
+      watermarks.map((w) => [w.partition, w]),
+    );
+
+    const rows: ConsumerGroupLagPartition[] = [];
+    for (const committed of committedPartitions) {
+      const watermark = watermarkByPartition.get(committed.partition);
+      if (watermark === undefined) {
+        logger.warn(
+          { groupId, topic, partition: committed.partition },
+          "Wacky -- committed offset reported for a partition with no matching watermark; skipping",
+        );
+        continue;
+      }
+      const { row, lagBigInt } = buildLagRow(
+        groupId,
+        topic,
+        committed,
+        watermark,
+      );
+      rows.push(row);
+      if (lagBigInt !== null) {
+        totalLagBigInt += lagBigInt;
+      }
+    }
+    topics.push({ topic, partitions: rows });
+  }
+
+  return { topics, totalLagBigInt };
+}
+
+/**
+ * Tagged-union outcome of {@link resolveNeverCommittedFilterTopics}.
+ * `kind: "resolved"` means every filter topic exists on the cluster;
+ * `kind: "topicNotFound"` means the watermark fetch rejected with an
+ * unknown-topic code for `missingTopic` and the handler should surface
+ * the friendly tool-level error keyed on that name.
+ */
+type ResolveNeverCommittedTopicsResult =
+  | { kind: "resolved"; topics: ConsumerGroupLagTopic[] }
+  | { kind: "topicNotFound"; missingTopic: string };
+
+/**
+ * Step 3 of {@link GetConsumerGroupLagHandler.handle}: iterate any
+ * topics in the caller's filter that didn't appear in the
+ * `fetchOffsets` response (group has never committed to them) and
+ * verify each exists on the cluster via the watermark cache. A
+ * successful fetch produces `{topic, partitions: []}` row; an
+ * unknown-topic rejection short-circuits with the offending topic name
+ * so the handler can map it to the friendly "Topic not found" response.
+ * Non-unknown-topic errors propagate via throw, matching the symmetry
+ * the handler's other admin-call sites already follow.
+ *
+ * Extracted from the handler for the same SonarCloud
+ * cognitive-complexity reason as
+ * {@link buildLagFromCommittedOffsets}.
+ */
+async function resolveNeverCommittedFilterTopics(
+  filterTopics: readonly string[],
+  seenTopics: ReadonlySet<string>,
+  watermarkCache: WatermarkCache,
+): Promise<ResolveNeverCommittedTopicsResult> {
+  const topics: ConsumerGroupLagTopic[] = [];
+  for (const filterTopic of filterTopics) {
+    if (seenTopics.has(filterTopic)) continue;
+    try {
+      await watermarkCache(filterTopic);
+    } catch (err) {
+      if (isUnknownTopicError(err)) {
+        return { kind: "topicNotFound", missingTopic: filterTopic };
+      }
+      throw err;
+    }
+    topics.push({ topic: filterTopic, partitions: [] });
+  }
+  return { kind: "resolved", topics };
 }

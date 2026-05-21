@@ -9,6 +9,7 @@ import {
   GetConsumerGroupLagResponse,
 } from "@src/confluent/tools/handlers/kafka/get-consumer-group-lag-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { logger } from "@src/logger.js";
 import { textOf } from "@tests/call-tool-result.js";
 import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
 import {
@@ -17,7 +18,7 @@ import {
   kafkaRuntime,
 } from "@tests/factories/runtime.js";
 import { getMockedClientManager } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
 /** Curried convenience: most error paths in this file exercise the
@@ -649,6 +650,93 @@ describe("get-consumer-group-lag-handler.ts", () => {
       ).rejects.toMatchObject({
         code: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
       });
+    });
+
+    it("should propagate a non-not-found per-group GroupDescription.error from the probe with every librdkafka field preserved", async () => {
+      // Caught by Copilot on PR #508: the per-group-error path in
+      // `groupExists` previously wrapped `desc.error` with
+      // `throw new Error(desc.error.message)`, dropping `code` / `errno`
+      // / `origin` on the way out. This test pins the throw against
+      // shape regression — it would have failed against the buggy code
+      // because the message-only wrapper has no `code`.
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([]);
+      admin.describeGroups.mockResolvedValue({
+        groups: [
+          {
+            ...fakeRealGroup("g1"),
+            error: fakeLibrdKafkaError({
+              code: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
+              message: "Broker: Group authorization failed",
+            }),
+          },
+        ],
+      });
+
+      await expect(
+        handler.handle(kafkaRuntime(clientManager), { groupId: "g1" }),
+      ).rejects.toMatchObject({
+        code: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
+        errno: KafkaJS.ErrorCodes.ERR_GROUP_AUTHORIZATION_FAILED,
+        origin: "kafka",
+        message: "Broker: Group authorization failed",
+      });
+    });
+
+    it("should accumulate totalLag in BigInt so a cross-partition sum that exceeds Number.MAX_SAFE_INTEGER saturates rather than silently losing precision", async () => {
+      // Caught by Copilot on PR #508: `totalLag += row.lag` previously
+      // accumulated as a JS Number, so summing K partitions whose
+      // individual lags fit could push the running total past 2^53 - 1
+      // and silently lose precision. The fix accumulates in BigInt and
+      // narrows once at the end via the same `narrowMessageCount`
+      // saturation guard the per-partition path uses.
+      //
+      // Each partition's `committedOffset: "0"`, `highWatermark:
+      // String(MAX_SAFE_INTEGER)` gives a per-partition lag of exactly
+      // `MAX_SAFE_INTEGER` (in-range). Two such partitions sum to
+      // 2 * MAX_SAFE_INTEGER as a BigInt — well past the safe boundary,
+      // so the cross-partition narrow saturates and the test pins
+      // `totalLag === MAX_SAFE_INTEGER`. The buggy code would have
+      // accumulated to 2 * MAX_SAFE_INTEGER as a JS Number and failed
+      // this assertion.
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      const maxSafe = String(Number.MAX_SAFE_INTEGER);
+      admin.fetchOffsets.mockResolvedValue([
+        {
+          topic: "huge",
+          partitions: [
+            fakeFetchedPartition({ partition: 0, offset: "0" }),
+            fakeFetchedPartition({ partition: 1, offset: "0" }),
+          ],
+        },
+      ]);
+      admin.fetchTopicOffsets.mockResolvedValue([
+        fakeWatermark({ partition: 0, low: "0", high: maxSafe }),
+        fakeWatermark({ partition: 1, low: "0", high: maxSafe }),
+      ]);
+
+      const result = await handler.handle(kafkaRuntime(clientManager), {
+        groupId: "g1",
+      });
+
+      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      // Per-partition lag stays precise (each is in-range).
+      expect(payload.topics[0]!.partitions[0]!.lag).toBe(
+        Number.MAX_SAFE_INTEGER,
+      );
+      expect(payload.topics[0]!.partitions[1]!.lag).toBe(
+        Number.MAX_SAFE_INTEGER,
+      );
+      // Cross-partition totalLag saturates because the BigInt sum
+      // (2 * MAX_SAFE_INTEGER) exceeds the safe boundary.
+      expect(payload.totalLag).toBe(Number.MAX_SAFE_INTEGER);
+      // The Wacky log fires exactly once — for the totalLag narrowing,
+      // not for the per-partition narrowings (each in-range).
+      expect(warnSpy).toHaveBeenCalledOnce();
     });
 
     it("should include a never-committed topic (in the filter but not in fetchOffsets output) as {topic, partitions: []} when its watermark fetch succeeds", async () => {

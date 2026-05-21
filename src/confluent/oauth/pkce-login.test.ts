@@ -7,14 +7,21 @@ import {
   PKCE_LOGIN_TIMEOUT_MS,
   PkceLoginError,
   runPkceLogin,
+  SKILLS_HINT_COPIED_PATH,
+  SKILLS_HINT_STREAM_PATH,
+  SUCCESS_PAGE_MAX_LIFETIME_MS,
 } from "@src/confluent/oauth/pkce-login.js";
+import { TelemetryEvent } from "@src/confluent/telemetry.js";
 import {
   mockFetch,
   mockHttpServer,
   mockOpen,
+  mockTelemetryService,
+  resetTelemetryService,
   type MockedFetch,
   type MockedHttpServer,
   type MockedOpen,
+  type MockedTelemetryService,
 } from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -64,6 +71,7 @@ describe("oauth/pkce-login.ts", () => {
 
   describe("runPkceLogin", () => {
     it("should bind the callback server, open the browser, exchange the code, and return tokens", async () => {
+      vi.useFakeTimers();
       stubFullChain(fetchSpy);
 
       const loginPromise = runPkceLogin(auth0Config);
@@ -94,6 +102,12 @@ describe("oauth/pkce-login.ts", () => {
       expect(result.controlPlaneToken).toBe("cp-token");
       expect(result.dataPlaneToken).toBe("dp-token");
       expect(result.refreshToken).toBe("refresh-token");
+
+      // After successful auth the listener stays bound to wait for the
+      // success page's EventSource; without any stream connecting it sits
+      // open until the safety timer fires.
+      expect(httpMock.closed()).toBe(false);
+      await vi.advanceTimersByTimeAsync(SUCCESS_PAGE_MAX_LIFETIME_MS);
       expect(httpMock.closed()).toBe(true);
     });
 
@@ -252,6 +266,112 @@ describe("oauth/pkce-login.ts", () => {
       expect(openSpy).not.toHaveBeenCalled();
       // `closed()` is false because we never bound (so there was nothing to close).
       expect(httpMock.closed()).toBe(false);
+    });
+  });
+
+  describe("install hint beacon + stream", () => {
+    let trackSpy: MockedTelemetryService;
+
+    beforeEach(() => {
+      trackSpy = mockTelemetryService();
+    });
+
+    afterEach(() => {
+      resetTelemetryService();
+    });
+
+    async function driveSuccessfulCallback(): Promise<void> {
+      stubFullChain(fetchSpy);
+      const loginPromise = runPkceLogin(auth0Config);
+      await httpMock.listening;
+      await flushMicrotasks(3);
+      const openedUrl = openSpy.mock.calls[0]![0];
+      const state = new URL(openedUrl).searchParams.get("state")!;
+      await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+      );
+      await loginPromise;
+    }
+
+    it("should respond 200 with event-stream headers on the stream path", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      const stream = httpMock.openStream(SKILLS_HINT_STREAM_PATH);
+      expect(stream.statusCode).toBe(200);
+      expect(stream.headers["Content-Type"]).toBe("text/event-stream");
+    });
+
+    it("should close the listener when the success-page stream disconnects", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      const stream = httpMock.openStream(SKILLS_HINT_STREAM_PATH);
+      // While the stream is connected the listener stays bound.
+      expect(httpMock.closed()).toBe(false);
+
+      stream.disconnect();
+      expect(httpMock.closed()).toBe(true);
+    });
+
+    it("should close the listener via the safety timer if no stream ever connects", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      expect(httpMock.closed()).toBe(false);
+      await vi.advanceTimersByTimeAsync(SUCCESS_PAGE_MAX_LIFETIME_MS);
+      expect(httpMock.closed()).toBe(true);
+    });
+
+    it("should track AGENT_SKILLS_HINT_COPIED on POST to the beacon path", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH, {
+        method: "POST",
+      });
+      expect(response.statusCode).toBe(204);
+      expect(trackSpy).toHaveBeenCalledWith(
+        TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
+        {},
+      );
+    });
+
+    it("should reject non-POST methods on the beacon path with 405", async () => {
+      vi.useFakeTimers();
+      await driveSuccessfulCallback();
+
+      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH, {
+        method: "GET",
+      });
+      expect(response.statusCode).toBe(405);
+      expect(trackSpy).not.toHaveBeenCalled();
+    });
+
+    it("should 404 beacons that arrive before the success page is served", async () => {
+      vi.useFakeTimers();
+      const loginPromise = runPkceLogin(auth0Config);
+      await httpMock.listening;
+      await flushMicrotasks(3);
+
+      const response = await httpMock.fireRequest(SKILLS_HINT_COPIED_PATH, {
+        method: "POST",
+      });
+      // The beacon path is gated on the success page having been served.
+      // Anything earlier is a stray localhost request, not a Copy click —
+      // attributing it to the user would be wrong.
+      expect(response.statusCode).toBe(404);
+      expect(trackSpy).not.toHaveBeenCalled();
+
+      // Drive the real callback so the outer login resolves and afterEach is clean.
+      stubFullChain(fetchSpy);
+      const openedUrl = openSpy.mock.calls[0]![0];
+      const state = new URL(openedUrl).searchParams.get("state")!;
+      await httpMock.fireRequest(
+        `${OAUTH_CALLBACK_PATH}?code=auth-code&state=${state}`,
+      );
+      await loginPromise;
+      await vi.advanceTimersByTimeAsync(SUCCESS_PAGE_MAX_LIFETIME_MS);
     });
   });
 });

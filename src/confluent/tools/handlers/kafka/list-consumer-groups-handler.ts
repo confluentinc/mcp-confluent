@@ -136,9 +136,14 @@ export class ListConsumerGroupsHandler extends BaseToolHandler {
         errors: rawErrors.map((e) => ({ message: e.message, code: e.code })),
       };
 
-      const summary = filtered
-        ? `Found ${payload.groups.length} consumer group(s) (filtered).`
-        : `Found ${payload.groups.length} consumer group(s).`;
+      const count = payload.groups.length;
+      const noun = count === 1 ? "group" : "groups";
+      const suffix = filtered ? " (filtered)" : "";
+      const summary =
+        count === 0
+          ? `Found 0 consumer ${noun}${suffix}.`
+          : `Found ${count} consumer ${noun}${suffix}:\n` +
+            JSON.stringify(payload, null, 2);
 
       return this.createStructuredResponse(summary, payload);
     } finally {

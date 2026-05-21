@@ -10,6 +10,10 @@ import type { ITopicMetadata } from "@confluentinc/kafka-javascript/types/kafkaj
  * tracked at confluentinc/confluent-kafka-javascript#367. Handle either
  * shape so a future library fix doesn't require code change at the call
  * sites.
+ *
+ * TODO(#514): delete this normalizer (and its call sites' workarounds)
+ * once the upstream issue is fixed and we pick up the library version
+ * whose runtime aligns with the declared type.
  */
 export function normalizeFetchTopicMetadataResponse(
   raw: Awaited<ReturnType<KafkaJS.Admin["fetchTopicMetadata"]>>,

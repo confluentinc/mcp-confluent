@@ -1,6 +1,5 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { FetchOffsetsPartition } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import type { GroupDescription } from "@confluentinc/kafka-javascript/types/rdkafka.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -14,8 +13,8 @@ import {
 } from "@src/confluent/tools/cluster-arg-resolvers.js";
 import { kafkaBootstrapOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import {
+  describeGroupOutcome,
   isGroupIdNotFoundError,
-  isUnknownGroupTombstone,
   notFoundGroupMessage,
 } from "@src/confluent/tools/handlers/kafka/consumer-group-not-found.js";
 import {
@@ -178,12 +177,18 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
       // before continuing — only on the empty path, so happy-path calls pay
       // nothing.
       if (committedByTopic.length === 0) {
-        const exists = await groupExists(admin, parsed.groupId);
-        if (!exists) {
+        const outcome = await describeGroupOutcome(admin, parsed.groupId);
+        if (outcome.kind === "notFound") {
           return this.createResponse(
             notFoundGroupMessage(parsed.groupId),
             true,
           );
+        }
+        if (outcome.kind === "error") {
+          // Propagate the raw librdkafka error so downstream handlers
+          // and logs can inspect `code` / `errno` / `origin` rather
+          // than just a message string.
+          throw outcome.error;
         }
       }
 
@@ -323,45 +328,6 @@ function buildLagRow(
     },
     lagBigInt: diff,
   };
-}
-
-/**
- * Best-effort group-existence probe used to disambiguate the
- * `fetchOffsets`-resolves-empty path. Returns `true` if the group is known
- * to exist on the cluster, `false` if the broker reported it as unknown
- * via any of the three shapes the project handles (top-level rejection,
- * per-group `GroupDescription.error` with the same code, or the
- * dead-tombstone — see {@link isUnknownGroupTombstone} for why the
- * tombstone path matters on Confluent Cloud). Propagates any other error.
- */
-async function groupExists(
-  admin: KafkaJS.Admin,
-  groupId: string,
-): Promise<boolean> {
-  let result: { groups: GroupDescription[] };
-  try {
-    result = await admin.describeGroups([groupId]);
-  } catch (err) {
-    if (isGroupIdNotFoundError(err)) return false;
-    throw err;
-  }
-  const desc = result.groups[0];
-  if (desc === undefined) return false;
-  // `!= null` (loose equality) covers both `undefined` (the
-  // TypeScript-declared shape) and `null` (what kafkajs-compat
-  // actually populates when no error occurred — the upstream type
-  // lies about the runtime).
-  if (desc.error != null) {
-    if (desc.error.code === KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND) {
-      return false;
-    }
-    // Throw the raw librdkafka error so downstream handlers and logs can
-    // inspect `code` / `errno` / `origin` rather than just a message
-    // string. Symmetric with how the top-level rejection arm above
-    // rethrows `err` unchanged.
-    throw desc.error;
-  }
-  return !isUnknownGroupTombstone(desc);
 }
 
 /**

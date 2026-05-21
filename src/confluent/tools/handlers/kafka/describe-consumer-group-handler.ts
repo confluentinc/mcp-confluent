@@ -20,8 +20,7 @@ import {
   typeName,
 } from "@src/confluent/tools/handlers/kafka/consumer-group-enums.js";
 import {
-  isGroupIdNotFoundError,
-  isUnknownGroupTombstone,
+  describeGroupOutcome,
   notFoundGroupMessage,
 } from "@src/confluent/tools/handlers/kafka/consumer-group-not-found.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -130,48 +129,14 @@ export class DescribeConsumerGroupHandler extends BaseToolHandler {
     const admin = await clientManager.getKafkaAdminClient(clusterId, envId);
 
     try {
-      let raw: { groups: GroupDescription[] };
-      try {
-        raw = await admin.describeGroups([parsed.groupId]);
-      } catch (err) {
-        if (isGroupIdNotFoundError(err)) {
-          return this.createResponse(
-            notFoundGroupMessage(parsed.groupId),
-            true,
-          );
-        }
-        throw err;
-      }
-
-      const groupDesc = raw.groups[0];
-      // Wacky -- `describeGroups([oneId])` reliably returns one entry per
-      // requested id (the per-group error embedded in `GroupDescription.error`
-      // is the path for not-found). An empty groups array here means the
-      // broker returned nothing addressable to the requested id, so treat it
-      // as not-found rather than crash on `groupDesc.groupId` below.
-      if (groupDesc === undefined) {
+      const outcome = await describeGroupOutcome(admin, parsed.groupId);
+      if (outcome.kind === "notFound") {
         return this.createResponse(notFoundGroupMessage(parsed.groupId), true);
       }
-
-      // `!= null` (loose equality) covers both `undefined` (the
-      // TypeScript-declared shape) and `null` (what kafkajs-compat
-      // actually populates when no error occurred — the upstream type
-      // lies about the runtime).
-      if (groupDesc.error != null) {
-        if (
-          groupDesc.error.code === KafkaJS.ErrorCodes.ERR_GROUP_ID_NOT_FOUND
-        ) {
-          return this.createResponse(
-            notFoundGroupMessage(parsed.groupId),
-            true,
-          );
-        }
-        return this.createResponse(groupDesc.error.message, true);
+      if (outcome.kind === "error") {
+        return this.createResponse(outcome.error.message, true);
       }
-
-      if (isUnknownGroupTombstone(groupDesc)) {
-        return this.createResponse(notFoundGroupMessage(parsed.groupId), true);
-      }
+      const groupDesc = outcome.group;
 
       const payload: DescribeConsumerGroupResponse = {
         groupId: groupDesc.groupId,

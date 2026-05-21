@@ -135,6 +135,7 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
     const admin = await clientManager.getKafkaAdminClient(clusterId, envId);
 
     try {
+      // 1. Fetch the group's committed offsets.
       let committedByTopic: Array<{
         topic: string;
         partitions: FetchOffsetsPartition[];
@@ -172,6 +173,9 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
         }
       }
 
+      // 2. For each topic+partition the group has committed to, fetch the
+      // partition's high watermark and compute lag = high - committed.
+
       const watermarkCache = createWatermarkCache(admin);
       const responseTopics: ConsumerGroupLagTopic[] = [];
       let totalLag = 0;
@@ -208,6 +212,15 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
         responseTopics.push({ topic, partitions: rows });
       }
 
+      // 3. If the caller passed `topics`, they may have included topics the group
+      // has never committed to. Those topics won't appear in the fetchOffsets
+      // response above, so fetch their watermarks here to confirm their existence
+      // and include them in the response with empty partition arrays (the
+      // spec's way of saying "this topic exists but the group has no commits on
+      // it", distinct from omitting the topic entirely which means "the group
+      // has no commits on this topic, and also we didn't verify whether the
+      // topic exists or not").
+
       if (parsed.topics) {
         const seenTopics = new Set(committedByTopic.map(({ topic }) => topic));
         for (const filterTopic of parsed.topics) {
@@ -226,6 +239,9 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
           responseTopics.push({ topic: filterTopic, partitions: [] });
         }
       }
+
+      // 4. Return the structured response with per-partition lag rows and a
+      // total lag sum across the group.
 
       const payload: GetConsumerGroupLagResponse = {
         groupId: parsed.groupId,

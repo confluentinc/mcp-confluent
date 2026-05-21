@@ -15,48 +15,52 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new CreateTopicTagsHandler();
 const runtime = integrationRuntime();
 
-describe("create-topic-tags-handler", { tags: [Tag.CATALOG] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires schema_registry.endpoint + schema_registry.auth (api_key) config", () => {});
-    return;
-  }
+describe(
+  "create-topic-tags-handler",
+  { tags: [Tag.CATALOG, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires schema_registry.endpoint + schema_registry.auth (api_key) config", () => {});
+      return;
+    }
 
-  // installs beforeAll/afterAll at this describe scope (shared SR REST client, tag cleanup)
-  const { createdTags } = withSharedCatalogTagsClient();
+    // installs beforeAll/afterAll at this describe scope (shared SR REST client, tag cleanup)
+    const { createdTags } = withSharedCatalogTagsClient();
 
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
-
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should expose create-topic-tags in tools/list", async () => {
-      const { tools } = await server.client.listTools();
-
-      expect(
-        tools.find((t) => t.name === ToolName.CREATE_TOPIC_TAGS),
-      ).toBeDefined();
-    });
-
-    it("should create a tag and return it in the response", async () => {
-      // fresh tag per transport so each iteration has a clean POST target
-      const tagName = uniqueName(`create-${transport}`);
-      createdTags.push(tagName);
-
-      const result = await server.client.callTool({
-        name: ToolName.CREATE_TOPIC_TAGS,
-        arguments: {
-          tags: [{ tagName, description: "integration test create" }],
-        },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      expect(textContent(result)).toMatch(/^Successfully created tag:/);
-      expect(textContent(result)).toContain(tagName);
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should expose create-topic-tags in tools/list", async () => {
+        const { tools } = await server.client.listTools();
+
+        expect(
+          tools.find((t) => t.name === ToolName.CREATE_TOPIC_TAGS),
+        ).toBeDefined();
+      });
+
+      it("should create a tag and return it in the response", async () => {
+        // fresh tag per transport so each iteration has a clean POST target
+        const tagName = uniqueName(`create-${transport}`);
+        createdTags.push(tagName);
+
+        const result = await server.client.callTool({
+          name: ToolName.CREATE_TOPIC_TAGS,
+          arguments: {
+            tags: [{ tagName, description: "integration test create" }],
+          },
+        });
+
+        expect(textContent(result)).toMatch(/^Successfully created tag:/);
+        expect(textContent(result)).toContain(tagName);
+      });
     });
-  });
-});
+  },
+);

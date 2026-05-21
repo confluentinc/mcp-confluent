@@ -18,39 +18,43 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new DeleteConnectorHandler();
 const runtime = integrationRuntime();
 
-describe("delete-connector-handler", { tags: [Tag.CONNECT] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires confluent_cloud.auth config", () => {});
-    return;
-  }
+describe(
+  "delete-connector-handler",
+  { tags: [Tag.CONNECT, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires confluent_cloud.auth config", () => {});
+      return;
+    }
 
-  // installs afterAll at this describe scope (idempotent connector cleanup sweep)
-  const { createdConnectors } = withSharedConnectorCleanup();
+    // installs afterAll at this describe scope (idempotent connector cleanup sweep)
+    const { createdConnectors } = withSharedConnectorCleanup();
 
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
-
-    afterAll(async () => {
-      await server?.stop();
-    });
-
-    it("should delete the provisioned connector via the tool", async () => {
-      const connectorName = uniqueName(`connect-delete-${transport}`);
-      createdConnectors.push(connectorName);
-      await provisionTestDatagenConnector(connectorName);
-
-      const result = await server.client.callTool({
-        name: ToolName.DELETE_CONNECTOR,
-        arguments: { connectorName },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      expect(textContent(result)).toBe(
-        `Successfully deleted connector ${connectorName}`,
-      );
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should delete the provisioned connector via the tool", async () => {
+        const connectorName = uniqueName(`connect-delete-${transport}`);
+        createdConnectors.push(connectorName);
+        await provisionTestDatagenConnector(connectorName);
+
+        const result = await server.client.callTool({
+          name: ToolName.DELETE_CONNECTOR,
+          arguments: { connectorName },
+        });
+
+        expect(textContent(result)).toBe(
+          `Successfully deleted connector ${connectorName}`,
+        );
+      });
     });
-  });
-});
+  },
+);

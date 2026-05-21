@@ -18,55 +18,65 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new ReadFlinkStatementHandler();
 const runtime = integrationRuntime();
 
-describe("read-flink-statement-handler", { tags: [Tag.FLINK] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires flink config", () => {});
-    return;
-  }
+describe(
+  "read-flink-statement-handler",
+  {
+    tags: [
+      Tag.FLINK,
+      Tag.REQUIRES_FLINK_CONFIG,
+      Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG,
+    ],
+  },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires flink config", () => {});
+      return;
+    }
 
-  // installs afterAll at this describe scope (cleans up the seeded statement)
-  const { createdStatements } = withSharedFlinkStatementCleanup();
-  const statementName = uniqueName("read-stmt");
-
-  beforeAll(async () => {
-    await provisionTestFlinkStatement(statementName);
-    createdStatements.push(statementName);
-  });
-
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    // installs afterAll at this describe scope (cleans up the seeded statement)
+    const { createdStatements } = withSharedFlinkStatementCleanup();
+    const statementName = uniqueName("read-stmt");
 
     beforeAll(async () => {
-      server = await startServer({ transport });
+      await provisionTestFlinkStatement(statementName);
+      createdStatements.push(statementName);
     });
 
-    afterAll(async () => {
-      await server?.stop();
-    });
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    it("should expose read-flink-statement in tools/list", async () => {
-      const { tools } = await server.client.listTools();
+      beforeAll(async () => {
+        server = await startServer({ transport });
+      });
 
-      expect(
-        tools.find((t) => t.name === ToolName.READ_FLINK_STATEMENT),
-      ).toBeDefined();
-    });
+      afterAll(async () => {
+        await server?.stop();
+      });
 
-    it("should read the seeded statement and return a results header", async () => {
-      // CCloud briefly returns 409 "Results not ready" between statement creation time and the time
-      // results are available
-      await expect
-        .poll(
-          async () => {
-            const result = await server.client.callTool({
-              name: ToolName.READ_FLINK_STATEMENT,
-              arguments: { statementName, timeoutInMilliseconds: 5000 },
-            });
-            return textContent(result);
-          },
-          { timeout: 30_000, interval: 2_000 },
-        )
-        .toMatch(/^Flink SQL Statement Results:/);
+      it("should expose read-flink-statement in tools/list", async () => {
+        const { tools } = await server.client.listTools();
+
+        expect(
+          tools.find((t) => t.name === ToolName.READ_FLINK_STATEMENT),
+        ).toBeDefined();
+      });
+
+      it("should read the seeded statement and return a results header", async () => {
+        // CCloud briefly returns 409 "Results not ready" between statement creation time and the time
+        // results are available
+        await expect
+          .poll(
+            async () => {
+              const result = await server.client.callTool({
+                name: ToolName.READ_FLINK_STATEMENT,
+                arguments: { statementName, timeoutInMilliseconds: 5000 },
+              });
+              return textContent(result);
+            },
+            { timeout: 30_000, interval: 2_000 },
+          )
+          .toMatch(/^Flink SQL Statement Results:/);
+      });
     });
-  });
-});
+  },
+);

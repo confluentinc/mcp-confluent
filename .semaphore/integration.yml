@@ -43,6 +43,13 @@ global_job_config:
 # Each block's TOOL_GROUP matrix values are hard-coded from which tool-group
 # tests carry the matching `Tag.REQUIRES_<X>_CONFIG` tag in tests/tags.ts.
 #
+# Connection type (direct vs OAuth) is NOT a matrix axis: each cell runs
+# both modes sequentially via the harness's `activeConnectionTypes`
+# default. The manual full promotion's optional `CONNECTION_TYPE` parameter
+# (forwarded as `INTEGRATION_TEST_CONNECTION_TYPE` at task scope) lets
+# operators limit a run to one mode; scheduled and the default manual run
+# leave it empty so both modes exercise.
+#
 # Transport (stdio / http / sse) is intentionally NOT a matrix axis:
 # `tests/harness/transports.ts` reads `INTEGRATION_TEST_TRANSPORT` and
 # returns all three when unset, so each matrix cell exercises every
@@ -57,21 +64,20 @@ blocks:
       env_vars:
         - name: SERVICE_CONFIG
           value: "@requires-kafka-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
       epilogue: &service-config-epilogue
         always:
           commands:
-            - make store-integration-test-results SERVICE_CONFIG="$SERVICE_CONFIG" TAGS="$TOOL_GROUP" CONNECTION_TYPE="$CONNECTION_TYPE"
+            - make store-integration-test-results SERVICE_CONFIG="$SERVICE_CONFIG" TAGS="$TOOL_GROUP"
       jobs:
         - name: "Integration tests"
           commands: &service-config-job-commands
             - npm run test:harness
-            - INTEGRATION_TEST_CONNECTION_TYPE="$CONNECTION_TYPE" make test-integration SERVICE_CONFIG="$SERVICE_CONFIG" TAGS="$TOOL_GROUP"
+            - make test-integration SERVICE_CONFIG="$SERVICE_CONFIG" TAGS="$TOOL_GROUP"
           matrix:
             - env_var: TOOL_GROUP
               values: ["@kafka", "@catalog"]
-            - &connection-type-matrix-entry
-              env_var: CONNECTION_TYPE
-              values: '%{{parameters.CONNECTION_TYPES | splitList "|"}}'
 
   - name: "Integration Tests: @requires-schema-registry-config"
     dependencies: []
@@ -81,6 +87,8 @@ blocks:
       env_vars:
         - name: SERVICE_CONFIG
           value: "@requires-schema-registry-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
       epilogue: *service-config-epilogue
       jobs:
         - name: "Integration tests"
@@ -88,7 +96,6 @@ blocks:
           matrix:
             - env_var: TOOL_GROUP
               values: ["@schema", "@catalog"]
-            - *connection-type-matrix-entry
 
   - name: "Integration Tests: @requires-confluent-cloud-config"
     dependencies: []
@@ -98,6 +105,8 @@ blocks:
       env_vars:
         - name: SERVICE_CONFIG
           value: "@requires-confluent-cloud-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
       epilogue: *service-config-epilogue
       jobs:
         - name: "Integration tests"
@@ -116,7 +125,6 @@ blocks:
                   "@organizations",
                   "@tableflow",
                 ]
-            - *connection-type-matrix-entry
 
   - name: "Integration Tests: @requires-flink-config"
     dependencies: []
@@ -126,6 +134,8 @@ blocks:
       env_vars:
         - name: SERVICE_CONFIG
           value: "@requires-flink-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
       epilogue: *service-config-epilogue
       jobs:
         - name: "Integration tests"
@@ -133,7 +143,6 @@ blocks:
           matrix:
             - env_var: TOOL_GROUP
               values: ["@flink"]
-            - *connection-type-matrix-entry
 
   - name: "Integration Tests: @requires-tableflow-config"
     dependencies: []
@@ -143,6 +152,8 @@ blocks:
       env_vars:
         - name: SERVICE_CONFIG
           value: "@requires-tableflow-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
       epilogue: *service-config-epilogue
       jobs:
         - name: "Integration tests"
@@ -150,7 +161,6 @@ blocks:
           matrix:
             - env_var: TOOL_GROUP
               values: ["@tableflow"]
-            - *connection-type-matrix-entry
 
   - name: "Integration Tests: @requires-telemetry-config"
     dependencies: []
@@ -160,6 +170,8 @@ blocks:
       env_vars:
         - name: SERVICE_CONFIG
           value: "@requires-telemetry-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
       epilogue: *service-config-epilogue
       jobs:
         - name: "Integration tests"
@@ -167,7 +179,6 @@ blocks:
           matrix:
             - env_var: TOOL_GROUP
               values: ["@metrics"]
-            - *connection-type-matrix-entry
 
 after_pipeline:
   task:

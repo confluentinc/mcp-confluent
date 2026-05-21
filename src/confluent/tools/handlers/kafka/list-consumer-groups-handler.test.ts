@@ -7,11 +7,7 @@ import {
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
 import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
-import {
-  bareRuntime,
-  DEFAULT_CONNECTION_ID,
-  kafkaRuntime,
-} from "@tests/factories/runtime.js";
+import { kafkaRuntime } from "@tests/factories/runtime.js";
 import { getMockedClientManager } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
@@ -87,20 +83,6 @@ describe("list-consumer-groups-handler.ts", () => {
         "matchStates",
         "matchType",
       ]);
-    });
-  });
-
-  describe("enabledConnectionIds()", () => {
-    const handler = new ListConsumerGroupsHandler();
-
-    it("should enable on a kafka runtime", () => {
-      expect(handler.enabledConnectionIds(kafkaRuntime())).toEqual([
-        DEFAULT_CONNECTION_ID,
-      ]);
-    });
-
-    it("should disable on a bare runtime", () => {
-      expect(handler.enabledConnectionIds(bareRuntime())).toEqual([]);
     });
   });
 

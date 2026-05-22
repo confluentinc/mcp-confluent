@@ -55,18 +55,18 @@ semaphore:
       scheduled: true
       at: "0 5 * * *" # Every day at 05:00 UTC
       parameters:
-        - name: TOOL_GROUPS
+        - name: SERVICE_CONFIGS
           required: true
-          default_value: "@smoke|@kafka|@schema|@environments|@clusters|@connect|@metrics|@flink|@tableflow|@billing|@docs|@catalog"
-          description: 'Pipe-separated tool-group tags to test.'
-        - name: TRANSPORTS
-          required: true
-          default_value: "stdio|http|sse"
-          description: 'Pipe-separated MCP transport(s) to test.'
+          default_value: "@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
+          description: 'Pipe-separated service-config tags. One matrix block per service config.'
         - name: CONNECTION_TYPE
-          required: true
-          default_value: "direct"
-          description: 'Connection type to test (direct or oauth).'
+          required: false
+          default_value: ""
+          options:
+            - "direct"
+            - "oauth"
+            - ""
+          description: 'Optional single connection type (direct or oauth). Empty (default) runs both modes sequentially in each job.'
     - name: scheduled-npm-audit
       branch: main
       pipeline_file: .semaphore/npm-audit.yml

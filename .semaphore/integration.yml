@@ -182,6 +182,31 @@ blocks:
             - env_var: TOOL_GROUP
               values: ["@metrics"]
 
+  # Smoke block: cross-cutting transport-layer regression coverage (auth
+  # middleware, multi-client wiring, OAuth flow) that doesn't belong to any
+  # service-config matrix cell because `@smoke` isn't in any TOOL_GROUP
+  # values array. Gated on `@smoke` appearing in `SERVICE_CONFIGS` rather
+  # than carrying its own parameter so the operator surface stays at two
+  # params (SERVICE_CONFIGS + CONNECTION_TYPE). The scheduled task and the
+  # manual full promotion both include `@smoke` in their defaults.
+  - name: "Integration Tests: @smoke"
+    dependencies: []
+    skip:
+      when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@smoke'"
+    task:
+      env_vars:
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
+      epilogue:
+        always:
+          commands:
+            - make store-integration-test-results TAGS="@smoke"
+      jobs:
+        - name: "Integration tests"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS="@smoke"
+
 after_pipeline:
   task:
     jobs:

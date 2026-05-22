@@ -269,8 +269,8 @@ promotions:
     parameters:
       env_vars:
         - name: SERVICE_CONFIGS
-          description: "Pipe-separated service-config tags. One matrix block per service config."
-          default_value: "@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
+          description: "Pipe-separated tags. One block per service-config tag, plus @smoke to include the cross-cutting transport-layer smoke tests."
+          default_value: "@smoke|@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
           required: true
         - name: CONNECTION_TYPE
           description: "Connection type to exercise. 'all' (default) runs both direct and oauth sequentially in each job; 'direct' or 'oauth' limits the run to that single mode."

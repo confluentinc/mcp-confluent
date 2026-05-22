@@ -57,8 +57,8 @@ semaphore:
       parameters:
         - name: SERVICE_CONFIGS
           required: true
-          default_value: "@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
-          description: 'Pipe-separated service-config tags. One matrix block per service config.'
+          default_value: "@smoke|@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
+          description: 'Pipe-separated tags. One block per service-config tag, plus @smoke to include the cross-cutting transport-layer smoke tests.'
         - name: CONNECTION_TYPE
           required: true
           default_value: "all"

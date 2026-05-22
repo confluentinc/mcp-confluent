@@ -534,20 +534,21 @@ The smoke block fires on any change under `src/` (excluding `*.test.ts`) so tran
 
 ### Scheduled / manual full (`.semaphore/integration.yml`)
 
-One block per service config (6 of them: kafka, schema-registry, confluent-cloud, flink, tableflow, telemetry).
-Each block declares a hard-coded `TOOL_GROUP` matrix of the tool groups whose handlers consume that service config; a tool group with handlers across multiple service configs appears in each matching block (e.g. `@catalog` runs under both `@requires-kafka-config` and `@requires-confluent-cloud-config`).
-The scheduled task in `service.yml` and the manual `Integration Tests: full (manual)` promotion in `semaphore.yml` both pass two parameters to this pipeline: `SERVICE_CONFIGS` (pipe-separated, controls which blocks run via each block's `skip.when` clause) and `CONNECTION_TYPE` (one of `all` / `direct` / `oauth`, forwarded as `INTEGRATION_TEST_CONNECTION_TYPE` to both the harness's `activeConnectionTypes` filter and the Makefile's tag-filter composer).
+One block per service config (6 of them: kafka, schema-registry, confluent-cloud, flink, tableflow, telemetry) plus a cross-cutting `@smoke` block that runs the transport-layer regression tests (auth middleware, multi-client wiring, OAuth round-trip).
+Each service-config block declares a hard-coded `TOOL_GROUP` matrix of the tool groups whose handlers consume that service config; a tool group with handlers across multiple service configs appears in each matching block (e.g. `@catalog` runs under both `@requires-kafka-config` and `@requires-confluent-cloud-config`).
+The smoke block has no matrix axis and no service-config filter; it just runs `make test-integration TAGS=@smoke`.
+The scheduled task in `service.yml` and the manual `Integration Tests: full (manual)` promotion in `semaphore.yml` both pass two parameters to this pipeline: `SERVICE_CONFIGS` (pipe-separated, controls which blocks run via each block's `skip.when` clause; accepts the six service-config tags plus `@smoke` as a sentinel for the cross-cutting block) and `CONNECTION_TYPE` (one of `all` / `direct` / `oauth`, forwarded as `INTEGRATION_TEST_CONNECTION_TYPE` to both the harness's `activeConnectionTypes` filter and the Makefile's tag-filter composer).
 
 ### Tuning CI speed without code changes
 
-| Want to ...                                        | Edit                                                                 | Effect                                             |
-| -------------------------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------- |
-| Drop a service config from the scheduled run       | `SERVICE_CONFIGS` default in `service.yml`                           | Skips one whole block in the scheduled pipeline    |
-| Limit a manual run to one connection mode          | Pick `direct` or `oauth` for `CONNECTION_TYPE` in the Semaphore UI   | Halves runtime per cell                            |
-| Stop a tool group from running on PRs              | Delete the corresponding block in `.semaphore/semaphore.yml`         | One fewer block; rest stays `change_in()`-gated    |
-| Re-balance which scheduled block runs a tool group | `TOOL_GROUP` matrix `values` array in `.semaphore/integration.yml`   | Moves the cell to a different service-config block |
-| Tighten the smoke-block trigger                    | The `exclude` glob in the smoke block's `change_in()` clause         | Reduces smoke-block fire rate                      |
-| Change how the daily run is scheduled              | The `at:` cron in `service.yml`'s `scheduled-integration-tests` task | Shifts daily run time                              |
+| Want to ...                                                   | Edit                                                                                       | Effect                                             |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| Drop a block (service config or smoke) from the scheduled run | `SERVICE_CONFIGS` default in `service.yml`                                                 | Skips one whole block in the scheduled pipeline    |
+| Limit a manual run to one connection mode                     | Pick `direct` or `oauth` for `CONNECTION_TYPE` in the Semaphore UI                         | Halves runtime per cell                            |
+| Stop a tool group from running on PRs                         | Delete the corresponding block in `.semaphore/semaphore.yml`                               | One fewer block; rest stays `change_in()`-gated    |
+| Re-balance which scheduled block runs a tool group            | `TOOL_GROUP` matrix `values` array in `.semaphore/integration.yml`                         | Moves the cell to a different service-config block |
+| Tighten the per-PR smoke-block trigger                        | The `exclude` glob in the smoke block's `change_in()` clause in `.semaphore/semaphore.yml` | Reduces smoke-block fire rate on PRs               |
+| Change how the daily run is scheduled                         | The `at:` cron in `service.yml`'s `scheduled-integration-tests` task                       | Shifts daily run time                              |
 
 Anything beyond this (adding a new tag axis, renaming a tag, adding a new service-config block to `MCPServerConfiguration`) is a tag-system structural change and requires touching `tests/tags.ts`, the integration test files, and the harness alongside the YAML.
 

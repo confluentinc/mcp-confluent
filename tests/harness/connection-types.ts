@@ -10,21 +10,22 @@ export enum ConnectionType {
 }
 
 /**
- * Resolves active connection types based on whether `INTEGRATION_TEST_CONNECTION_TYPE` is set.
- * If unset, both 'direct' and 'oauth' connection types will be used.
- * If set, must be a case-insensitive value of either 'direct' or 'oauth'.
+ * Resolves active connection types from `INTEGRATION_TEST_CONNECTION_TYPE`. Unset or `"all"`
+ * (case-insensitive) means both modes; `"direct"` or `"oauth"` (case-insensitive) limits to one.
+ * `"all"` is the explicit sentinel because Semaphore Tasks UI dropdowns serialize an empty-string
+ * option as the literal 2-char string `""`, which would slip past a plain emptiness check.
  * @throws on unknown values.
  */
 function resolveActiveConnectionTypes(): ConnectionType[] {
   const known = Object.values(ConnectionType);
   const raw = process.env.INTEGRATION_TEST_CONNECTION_TYPE;
-  if (!raw) {
+  if (!raw || raw.toLowerCase() === "all") {
     return known;
   }
   const filter = raw.toLowerCase() as ConnectionType;
   if (!known.includes(filter)) {
     throw new Error(
-      `INTEGRATION_TEST_CONNECTION_TYPE must be one of ${known.join("|")}; got: ${raw}`,
+      `INTEGRATION_TEST_CONNECTION_TYPE must be one of all|${known.join("|")}; got: ${raw}`,
     );
   }
   return [filter];

@@ -153,9 +153,27 @@ export async function callToolWithOAuthFlow(
   credentials: { email: string; password: string },
   toolCall: CallToolArgs,
 ): Promise<CallToolResponse> {
+  // TEMPORARY INSTRUMENTATION: tag each step with a timestamp so we can correlate test-side
+  // ordering with server-side "tool handler invoked" + "Starting OAuth login" log lines.
+  // Diagnosing the ~30s gap between expected listener attach and observed URL emission.
+  const tEntry = Date.now();
+  process.stderr.write(
+    `[OAUTH-TIMING] callToolWithOAuthFlow entry t=${tEntry} toolName=${toolCall.name}\n`,
+  );
   const flowPromise = driveOAuthFlow(server, credentials);
+  const tFlow = Date.now();
+  process.stderr.write(
+    `[OAUTH-TIMING] driveOAuthFlow returned promise t=${tFlow} (Δ=${tFlow - tEntry}ms)\n`,
+  );
   const callPromise = server.client.callTool(toolCall);
+  const tCall = Date.now();
+  process.stderr.write(
+    `[OAUTH-TIMING] callTool returned promise t=${tCall} (Δ=${tCall - tFlow}ms)\n`,
+  );
   const [, result] = await Promise.all([flowPromise, callPromise]);
+  process.stderr.write(
+    `[OAUTH-TIMING] callToolWithOAuthFlow resolved t=${Date.now()} (totalΔ=${Date.now() - tEntry}ms)\n`,
+  );
   return result;
 }
 
@@ -181,12 +199,16 @@ function waitForAuthUrl(
   return new Promise((resolve, reject) => {
     let settled = false;
     let buffer = "";
+    let firstDataT: number | undefined;
+    let dataChunks = 0;
     const cleanup = () => {
       settled = true;
       stderr.off("data", onData);
       clearTimeout(timer);
     };
     const onData = (chunk: Buffer | string) => {
+      dataChunks += 1;
+      firstDataT ??= Date.now();
       buffer += typeof chunk === "string" ? chunk : chunk.toString("utf-8");
       let newlineIndex = buffer.indexOf("\n");
       while (newlineIndex !== -1) {
@@ -204,13 +226,24 @@ function waitForAuthUrl(
     const timer = setTimeout(() => {
       if (settled) return;
       cleanup();
+      // TEMPORARY INSTRUMENTATION: include listener-attach time, timeout-fire time, and a count
+      // of data chunks received in the window. If `dataChunks=0` we know stderr was completely
+      // silent for the listener's lifetime; if `firstDataT` is set but no URL matched, we know
+      // data flowed but nothing matched the AUTH_URL_LOG_MSG line.
       reject(
         new Error(
           `did not see ${AUTH_URL_LOG_MSG} on server stderr within ${timeoutMs}ms.\n` +
+            `Listener attached: ${listenerAttachT}\n` +
+            `Timeout fired:    ${Date.now()}\n` +
+            `Data chunks seen: ${dataChunks} (first at ${firstDataT ?? "never"})\n` +
             `Captured stderr:\n${server.stderrSnapshot?.() ?? "(stderrSnapshot unavailable - non-OAuth spawn?)"}`,
         ),
       );
     }, timeoutMs);
+    const listenerAttachT = Date.now();
+    process.stderr.write(
+      `[OAUTH-TIMING] waitForAuthUrl listener attached t=${listenerAttachT}\n`,
+    );
     stderr.on("data", onData);
     // race against child exit so a server that dies during OAuth init fails fast with the exit
     // code instead of waiting out the full timeout

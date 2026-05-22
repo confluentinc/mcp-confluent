@@ -54,6 +54,7 @@ export type PkceLoginFailureReason =
   | "user_aborted"
   | "port_in_use"
   | "auth0_unreachable"
+  | "callback_server_error"
   | "configuration";
 
 /** Structured error so callers can react to the cause of a failed PKCE login. */
@@ -266,10 +267,17 @@ export async function runPkceLogin(
     server.listen(OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_HOST, () => {
       bound = true;
       server.off("error", onBindError);
-      // Replace the bind-time rejector with a log-only listener so a stray
-      // post-bind socket error doesn't escape as an uncaught 'error' event.
+      // Post-bind socket errors must reject the in-flight flow, not just warn: if the listener
+      // dies mid-callback (EMFILE, broken TLS upgrade, etc.) the user would otherwise hang on
+      // `codePromise` until `PKCE_LOGIN_TIMEOUT_MS` (minutes) instead of failing fast.
       server.on("error", (err) => {
         logger.warn({ err }, "PKCE callback server post-bind error");
+        rejectFlow(
+          new PkceLoginError(
+            "callback_server_error",
+            `PKCE callback listener errored after bind: ${err.message}`,
+          ),
+        );
       });
       resolve();
     });

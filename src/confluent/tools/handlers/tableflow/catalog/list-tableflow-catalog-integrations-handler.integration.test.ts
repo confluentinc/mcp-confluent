@@ -15,7 +15,13 @@ const runtime = integrationRuntime();
 
 describe(
   "list-tableflow-catalog-integrations-handler",
-  { tags: [Tag.TABLEFLOW] },
+  {
+    tags: [
+      Tag.TABLEFLOW,
+      Tag.REQUIRES_TABLEFLOW_CONFIG,
+      Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG,
+    ],
+  },
   () => {
     if (handler.enabledConnectionIds(runtime).length === 0) {
       it.skip("requires tableflow.auth config", () => {});

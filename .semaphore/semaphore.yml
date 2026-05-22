@@ -234,8 +234,7 @@ blocks:
   # Smoke block: fires on any non-test src/ change, so transport-layer
   # regressions (auth middleware, multi-client wiring, OAuth flow) trigger
   # regardless of which handler dir the PR touched. The `exclude` glob
-  # covers both `*.test.ts` and `*.integration.test.ts` (the latter ends
-  # in `.test.ts`).
+  # covers both unit and integration test files.
   - name: "Integration Tests: smoke"
     dependencies: ["Build & Test"]
     run:

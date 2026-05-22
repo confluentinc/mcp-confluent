@@ -45,10 +45,12 @@ global_job_config:
 #
 # Connection type (direct vs OAuth) is NOT a matrix axis: each cell runs
 # both modes sequentially via the harness's `activeConnectionTypes`
-# default. The manual full promotion's optional `CONNECTION_TYPE` parameter
-# (forwarded as `INTEGRATION_TEST_CONNECTION_TYPE` at task scope) lets
-# operators limit a run to one mode; scheduled and the default manual run
-# leave it empty so both modes exercise.
+# default. The triggering task or promotion supplies `CONNECTION_TYPE`
+# (forwarded as `INTEGRATION_TEST_CONNECTION_TYPE` at task scope): the
+# scheduled task defaults to empty (which the harness treats as "both"),
+# the manual full promotion defaults to "all" (an explicit sentinel for
+# "both"). Operators can override either to `direct` or `oauth` to limit
+# a run to a single mode.
 #
 # Transport (stdio / http / sse) is intentionally NOT a matrix axis:
 # `tests/harness/transports.ts` reads `INTEGRATION_TEST_TRANSPORT` and

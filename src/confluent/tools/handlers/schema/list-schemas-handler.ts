@@ -53,6 +53,7 @@ export class ListSchemasHandler extends BaseToolHandler {
       },
       "ListSchemasHandler.handle called with arguments",
     );
+    // TEST CHANGE TO TRIGGER CI
 
     const registry: SchemaRegistryClient =
       await clientManager.getSchemaRegistrySdkClient(environment_id);

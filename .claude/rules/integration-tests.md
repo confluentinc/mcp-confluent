@@ -490,10 +490,16 @@ This means new direct-only tests don't need to remember to tag themselves; "not 
 
 ### OAuth-required optional arguments
 
-Some `.optional()` tool args become **required at call time under OAuth** because OAuth connections carry no service blocks for the handler to fall back on (e.g. `environment_id` on `list-schemas`/`delete-schema` — direct gets it from the `schema_registry` block, OAuth must be told).
-Omit it and the handler errors with `<arg> is required under OAuth ...`.
-Pass `getTestEnvironmentId()` (from `@tests/harness/confluent-cloud.js`) — or the equivalent YAML-pinned helper — in the OAuth describe's `callToolWithOAuthFlow` arguments; leave the direct describe alone.
-Spot these in advance by scanning the handler's Zod schema for `.optional()` args whose `.describe()` mentions OAuth or environment.
+Some `.optional()` tool args become **required at call time under OAuth** because OAuth connections carry no service blocks for the handler to fall back on.
+Omit them and the handler errors with `<arg> is required under OAuth ...`.
+Pass YAML-pinned helpers in the OAuth describe's `callToolWithOAuthFlow` arguments; leave the direct describe alone.
+Known cases:
+
+- **Schema Registry tools** (`list-schemas`, `delete-schema`): `environment_id` from `getTestEnvironmentId()` — direct gets it from the `schema_registry` block.
+- **Native-Kafka tools** (every `kafkaBootstrapOrOAuth` handler — `list-topics`, `create-topics`, `delete-topics`, `produce-kafka-message`, `consume-kafka-messages`, `list-consumer-groups`, `get-partition-offsets`, `describe-consumer-group`, `get-consumer-group-lag`): **both** `cluster_id` (from `getTestClusterId()`) **and** `environment_id` (from `getTestEnvironmentId()`) — direct gets them from the `kafka` block.
+- **Kafka REST-proxy tools** (`kafkaRestWithAuthOrOAuth` — `get-topic-config`, `alter-topic-config`): `clusterId` + `environmentId` in **camelCase** (handler-side convention), built from the same two helpers. Direct already passes `clusterId`; OAuth additionally requires `environmentId`.
+
+Spot these in advance by scanning the handler's Zod schema for `.optional()` args whose `.describe()` text mentions OAuth, environment, or cluster, and by reading the resolver the handler calls at entry (`resolveKafkaClusterArgs`, `resolveKafkaRestArgs`, `resolveEnvArg`) — the resolver's OAuth branch documents exactly which args are required.
 
 ### Direct-fixture gate for OAuth describes that seed
 

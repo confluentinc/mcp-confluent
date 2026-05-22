@@ -49,18 +49,9 @@ export interface StartedServer {
    * Read by {@linkcode driveOAuthFlow} to extract the Auth0 authorization URL.
    */
   stderr?: Readable;
-  /**
-   * OAuth-only: returns a rolling string of everything the child has written to stderr since
-   * spawn, capped at {@linkcode STDERR_SNAPSHOT_MAX_BYTES} with a `(truncated front)` marker.
-   * Included in {@link driveOAuthFlow} timeout/exit error messages so a failed run shows what
-   * the server actually logged instead of a generic 30s timeout.
-   */
+  /** OAuth-only: rolling stderr capture (capped at {@linkcode STDERR_SNAPSHOT_MAX_BYTES}), dumped in {@link driveOAuthFlow} timeout/exit messages. */
   stderrSnapshot?: () => string;
-  /**
-   * OAuth-only: resolves when the spawned child exits. {@link driveOAuthFlow} races this against
-   * its auth-URL wait so a server that dies during OAuth init fails fast with the exit code +
-   * captured stderr instead of timing out.
-   */
+  /** OAuth-only: resolves when the spawned child exits. {@link driveOAuthFlow} races it against the auth-URL wait so a dying server fails fast. */
   childExit?: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
   /** Sends SIGTERM to the child, awaits exit, and closes the MCP client. */
   stop: () => Promise<void>;
@@ -70,17 +61,23 @@ export interface StartedServer {
 const STDERR_SNAPSHOT_MAX_BYTES = 65_536;
 
 /**
- * Attaches a data listener that accumulates stderr into a capped rolling string, and returns a
- * getter for it. Doubles as the drain that keeps the child from blocking on a full pipe buffer,
- * so this is the only stderr `data` listener needed on OAuth spawns.
+ * Attaches a data listener that accumulates stderr into a capped rolling string and returns a
+ * getter. Doubles as the pipe drain for OAuth spawns. Truncation runs at 1.5× cap so the O(cap)
+ * string copy amortizes across ~32KB of writes instead of firing per chunk past the cap.
  */
 function createStderrCapture(stderr: Readable): () => string {
+  const truncateAt = Math.floor(STDERR_SNAPSHOT_MAX_BYTES * 1.5);
   let buf = "";
   stderr.on("data", (chunk: Buffer | string) => {
     buf += typeof chunk === "string" ? chunk : chunk.toString("utf-8");
-    if (buf.length > STDERR_SNAPSHOT_MAX_BYTES) {
+    if (buf.length > truncateAt) {
       buf = "...(truncated front)...\n" + buf.slice(-STDERR_SNAPSHOT_MAX_BYTES);
     }
+  });
+  // Surface stream errors in the snapshot rather than letting them bubble as unhandled `error`
+  // events that would crash the test worker mid-run.
+  stderr.on("error", (err) => {
+    buf += `\n[stderr stream error: ${err.message}]\n`;
   });
   return () => buf;
 }
@@ -94,11 +91,7 @@ function captureChildExit(
   });
 }
 
-/**
- * Returns the `stderrSnapshot` + `childExit` pair on OAuth spawns, or an empty object otherwise.
- * Spread into the {@link StartedServer} literal so non-OAuth spawns stay byte-identical to the
- * pre-instrumentation shape.
- */
+/** Returns the OAuth diagnostics pair when applicable; non-OAuth callers spread an empty object. */
 function oauthDiagnostics(
   options: StartServerOptions,
   child: ChildProcess | undefined,

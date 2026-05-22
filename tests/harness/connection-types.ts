@@ -12,8 +12,8 @@ export enum ConnectionType {
 /**
  * Resolves active connection types from `INTEGRATION_TEST_CONNECTION_TYPE`. Unset or `"all"`
  * (case-insensitive) means both modes; `"direct"` or `"oauth"` (case-insensitive) limits to one.
- * `"all"` is the sentinel because Semaphore Tasks UI dropdowns serialize an empty-string option
- * as the literal 2-char string `""`, which trips the `!raw` check below; a real word avoids that.
+ * `"all"` is the explicit sentinel because Semaphore Tasks UI dropdowns serialize an empty-string
+ * option as the literal 2-char string `""`, which would slip past a plain emptiness check.
  * @throws on unknown values.
  */
 function resolveActiveConnectionTypes(): ConnectionType[] {

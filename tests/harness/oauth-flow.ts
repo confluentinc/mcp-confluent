@@ -100,23 +100,6 @@ export async function driveOAuthFlow(
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
-    // TEMPORARY INSTRUMENTATION: capture browser-side network events. Hypothesis: the OAuth
-    // callback never reaches the server even when waitForURL succeeds, which would happen if
-    // chromium's connection to 127.0.0.1:26640 is failing and the URL bar shows the target URL
-    // anyway (because Chrome's error page reuses the requested URL).
-    page.on("requestfailed", (req) => {
-      process.stderr.write(
-        `[OAUTH-NETWORK] requestfailed url=${req.url()} method=${req.method()} reason=${req.failure()?.errorText}\n`,
-      );
-    });
-    page.on("response", (resp) => {
-      const url = resp.url();
-      if (url.includes("127.0.0.1") || url.includes("login.confluent.io")) {
-        process.stderr.write(
-          `[OAUTH-NETWORK] response url=${url} status=${resp.status()}\n`,
-        );
-      }
-    });
     await page.goto(authUrl);
     // Auth0's email-then-password flow: one form per page, both submitted via [type=submit]
     await page
@@ -150,20 +133,6 @@ export async function driveOAuthFlow(
         waitUntil: "domcontentloaded",
         timeout: CALLBACK_REDIRECT_TIMEOUT_MS,
       });
-      // TEMPORARY INSTRUMENTATION: dump page state immediately after waitForURL resolves. If
-      // chromium reached a connection-refused error page, the URL bar still matches /127.0.0.1/
-      // but the title/body reveal the failure. Comparing this against the server-side "OAuth
-      // callback server received request" log tells us whether the GET reached the server.
-      const postUrl = page.url();
-      const postTitle = await page.title().catch(() => "(title read failed)");
-      const postBody = await page
-        .locator("body")
-        .innerText({ timeout: 1_000 })
-        .then((t: string) => t.slice(0, 200).replace(/\s+/g, " "))
-        .catch(() => "(body read failed)");
-      process.stderr.write(
-        `[OAUTH-NETWORK] post-waitForURL url=${postUrl} title="${postTitle}" body="${postBody}"\n`,
-      );
     } catch (error) {
       // capture where Auth0 actually landed so the next CI failure surfaces an anomaly screen,
       // captcha, password-rotation prompt, etc. instead of a generic playwright timeout
@@ -188,27 +157,9 @@ export async function callToolWithOAuthFlow(
   credentials: { email: string; password: string },
   toolCall: CallToolArgs,
 ): Promise<CallToolResponse> {
-  // TEMPORARY INSTRUMENTATION: tag each step with a timestamp so we can correlate test-side
-  // ordering with server-side "tool handler invoked" + "Starting OAuth login" log lines.
-  // Diagnosing the ~30s gap between expected listener attach and observed URL emission.
-  const tEntry = Date.now();
-  process.stderr.write(
-    `[OAUTH-TIMING] callToolWithOAuthFlow entry t=${tEntry} toolName=${toolCall.name}\n`,
-  );
   const flowPromise = driveOAuthFlow(server, credentials);
-  const tFlow = Date.now();
-  process.stderr.write(
-    `[OAUTH-TIMING] driveOAuthFlow returned promise t=${tFlow} (Δ=${tFlow - tEntry}ms)\n`,
-  );
   const callPromise = server.client.callTool(toolCall);
-  const tCall = Date.now();
-  process.stderr.write(
-    `[OAUTH-TIMING] callTool returned promise t=${tCall} (Δ=${tCall - tFlow}ms)\n`,
-  );
   const [, result] = await Promise.all([flowPromise, callPromise]);
-  process.stderr.write(
-    `[OAUTH-TIMING] callToolWithOAuthFlow resolved t=${Date.now()} (totalΔ=${Date.now() - tEntry}ms)\n`,
-  );
   return result;
 }
 
@@ -234,16 +185,12 @@ function waitForAuthUrl(
   return new Promise((resolve, reject) => {
     let settled = false;
     let buffer = "";
-    let firstDataT: number | undefined;
-    let dataChunks = 0;
     const cleanup = () => {
       settled = true;
       stderr.off("data", onData);
       clearTimeout(timer);
     };
     const onData = (chunk: Buffer | string) => {
-      dataChunks += 1;
-      firstDataT ??= Date.now();
       buffer += typeof chunk === "string" ? chunk : chunk.toString("utf-8");
       let newlineIndex = buffer.indexOf("\n");
       while (newlineIndex !== -1) {
@@ -261,37 +208,28 @@ function waitForAuthUrl(
     const timer = setTimeout(() => {
       if (settled) return;
       cleanup();
-      // TEMPORARY INSTRUMENTATION: include listener-attach time, timeout-fire time, and a count
-      // of data chunks received in the window. If `dataChunks=0` we know stderr was completely
-      // silent for the listener's lifetime; if `firstDataT` is set but no URL matched, we know
-      // data flowed but nothing matched the AUTH_URL_LOG_MSG line.
       reject(
         new Error(
           `did not see ${AUTH_URL_LOG_MSG} on server stderr within ${timeoutMs}ms.\n` +
-            `Listener attached: ${listenerAttachT}\n` +
-            `Timeout fired:    ${Date.now()}\n` +
-            `Data chunks seen: ${dataChunks} (first at ${firstDataT ?? "never"})\n` +
             `Captured stderr:\n${server.stderrSnapshot?.() ?? "(stderrSnapshot unavailable - non-OAuth spawn?)"}`,
         ),
       );
     }, timeoutMs);
-    const listenerAttachT = Date.now();
-    process.stderr.write(
-      `[OAUTH-TIMING] waitForAuthUrl listener attached t=${listenerAttachT}\n`,
-    );
     stderr.on("data", onData);
     // race against child exit so a server that dies during OAuth init fails fast with the exit
     // code instead of waiting out the full timeout
-    server.childExit?.then(({ code, signal }) => {
-      if (settled) return;
-      cleanup();
-      reject(
-        new Error(
-          `server exited (code=${code}, signal=${signal ?? "null"}) before emitting ${AUTH_URL_LOG_MSG}.\n` +
-            `Captured stderr:\n${server.stderrSnapshot?.() ?? "(no snapshot)"}`,
-        ),
-      );
-    });
+    server.childExit
+      ?.then(({ code, signal }) => {
+        if (settled) return;
+        cleanup();
+        reject(
+          new Error(
+            `server exited (code=${code}, signal=${signal ?? "null"}) before emitting ${AUTH_URL_LOG_MSG}.\n` +
+              `Captured stderr:\n${server.stderrSnapshot?.() ?? "(stderrSnapshot unavailable - non-OAuth spawn?)"}`,
+          ),
+        );
+      })
+      .catch(() => {});
   });
 }
 
@@ -331,7 +269,9 @@ async function augmentCallbackTimeout(
     .innerText({ timeout: 1_000 })
     .then((text: string) => text.slice(0, PAGE_BODY_EXCERPT_BYTES))
     .catch(() => "(could not read page body)");
-  const stderr = server.stderrSnapshot?.() ?? "(no snapshot)";
+  const stderr =
+    server.stderrSnapshot?.() ??
+    "(stderrSnapshot unavailable - non-OAuth spawn?)";
   return new Error(
     `OAuth callback redirect timed out after ${CALLBACK_REDIRECT_TIMEOUT_MS}ms. Auth0 stayed on:\n` +
       `  url:   ${url}\n` +

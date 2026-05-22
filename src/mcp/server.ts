@@ -2,7 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 /** Properties recorded for each tool invocation. */
@@ -57,14 +56,6 @@ export function createMcpServer({
       },
       async (args, context) => {
         const startTime = Date.now();
-        // TEMPORARY INSTRUMENTATION: log every handler invocation with tool name + timestamp.
-        // Diagnosing the CI OAuth tests where the auth URL is emitted server-side ~30s before
-        // `driveOAuthFlow`'s listener attaches. If a handler fires twice (or fires from an
-        // unexpected path like the SDK's tools/list response), this surfaces it.
-        logger.info(
-          { toolName: name, t: startTime, sessionId: context?.sessionId },
-          "tool handler invoked",
-        );
         // per-instance lookup so concurrent HTTP sessions don't clobber each other's telemetry
         const clientInfo = srv.server.getClientVersion();
         const baseProps = {

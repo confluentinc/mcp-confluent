@@ -54,6 +54,7 @@ export type PkceLoginFailureReason =
   | "user_aborted"
   | "port_in_use"
   | "auth0_unreachable"
+  | "callback_server_error"
   | "configuration";
 
 /** Structured error so callers can react to the cause of a failed PKCE login. */
@@ -151,19 +152,6 @@ export async function runPkceLogin(
   };
 
   const server = nodeHttp.createServer((req, res) => {
-    // TEMPORARY INSTRUMENTATION: log every request that reaches the callback server, BEFORE any
-    // path/state validation. Diagnosing the CI failure where playwright's redirect-to-127.0.0.1
-    // appears to succeed but the server never receives the GET. Optional chaining on `socket`
-    // because the unit-test stub's synthetic IncomingMessage doesn't carry one.
-    logger.info(
-      {
-        url: req.url,
-        method: req.method,
-        remoteAddress: req.socket?.remoteAddress,
-        remotePort: req.socket?.remotePort,
-      },
-      "OAuth callback server received request",
-    );
     const reqUrl = req.url ?? "";
     const parsed = new URL(reqUrl, "http://127.0.0.1");
     if (parsed.pathname === SKILLS_HINT_COPIED_PATH) {
@@ -279,17 +267,17 @@ export async function runPkceLogin(
     server.listen(OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_HOST, () => {
       bound = true;
       server.off("error", onBindError);
-      // TEMPORARY INSTRUMENTATION: confirm bind succeeded on the expected host:port. Pair with
-      // "OAuth callback server received request" log to diagnose CI runs where the redirect
-      // appears to succeed (waitForURL match) but the server never receives the GET.
-      logger.info(
-        { host: OAUTH_CALLBACK_HOST, port: OAUTH_CALLBACK_PORT },
-        "OAuth callback server listening",
-      );
-      // Replace the bind-time rejector with a log-only listener so a stray
-      // post-bind socket error doesn't escape as an uncaught 'error' event.
+      // Post-bind socket errors must reject the in-flight flow, not just warn: if the listener
+      // dies mid-callback (EMFILE, broken TLS upgrade, etc.) the user would otherwise hang on
+      // `codePromise` until `PKCE_LOGIN_TIMEOUT_MS` (minutes) instead of failing fast.
       server.on("error", (err) => {
         logger.warn({ err }, "PKCE callback server post-bind error");
+        rejectFlow(
+          new PkceLoginError(
+            "callback_server_error",
+            `PKCE callback listener errored after bind: ${err.message}`,
+          ),
+        );
       });
       resolve();
     });

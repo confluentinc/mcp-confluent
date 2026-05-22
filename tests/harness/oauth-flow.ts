@@ -11,7 +11,7 @@ import {
   startServer,
   type StartedServer,
 } from "@tests/harness/start-server.js";
-import { chromium } from "playwright-core";
+import { chromium, type Page } from "playwright-core";
 
 /** Skip reason when the OAuth fixture failed to load (creds missing from .env.integration). */
 export const OAUTH_FIXTURE_NOT_LOADED_REASON =
@@ -91,10 +91,7 @@ export async function driveOAuthFlow(
       "driveOAuthFlow requires startServer({ oauth: true }) so child stderr is piped",
     );
   }
-  // attach the stderr listener synchronously so a fast log line emitted before our first await
-  // isn't lost
-  const authUrlPromise = waitForAuthUrl(server.stderr);
-  const authUrl = await authUrlPromise;
+  const authUrl = await waitForAuthUrl(server);
 
   const browser = await chromium.launch({
     // set INTEGRATION_TEST_PLAYWRIGHT_HEADLESS=false to watch the CCloud OAuth flow in a browser for debugging
@@ -124,10 +121,16 @@ export async function driveOAuthFlow(
     if (consentVisible) {
       await consentButton.first().click();
     }
-    await page.waitForURL(/127\.0\.0\.1/, {
-      waitUntil: "networkidle",
-      timeout: CALLBACK_REDIRECT_TIMEOUT_MS,
-    });
+    try {
+      await page.waitForURL(/127\.0\.0\.1/, {
+        waitUntil: "networkidle",
+        timeout: CALLBACK_REDIRECT_TIMEOUT_MS,
+      });
+    } catch (error) {
+      // capture where Auth0 actually landed so the next CI failure surfaces an anomaly screen,
+      // captcha, password-rotation prompt, etc. instead of a generic playwright timeout
+      throw await augmentCallbackTimeout(server, page, error);
+    }
   } finally {
     await browser.close();
   }
@@ -153,15 +156,30 @@ export async function callToolWithOAuthFlow(
   return result;
 }
 
-/** Reads pino JSON log lines from stderr, resolves with the `authUrl` field once the
- * `Opening Auth0 authorization URL` line appears. Detaches the listener on resolve/reject. */
+/**
+ * Resolves with the `authUrl` field of the first pino line matching `Opening Auth0 authorization
+ * URL`. Races three sources so a stuck OAuth flow surfaces a useful error instead of a generic
+ * 30s timeout: (1) the URL appears on stderr, (2) the child exits before emitting it, (3) the
+ * timeout elapses. The exit and timeout paths both dump {@link StartedServer.stderrSnapshot}
+ * so the failure message names what the server actually said.
+ */
 function waitForAuthUrl(
-  stderr: NodeJS.ReadableStream,
+  server: StartedServer,
   timeoutMs = WAIT_FOR_AUTH_URL_TIMEOUT_MS,
 ): Promise<string> {
+  const stderr = server.stderr;
+  if (!stderr) {
+    return Promise.reject(
+      new Error(
+        "waitForAuthUrl requires startServer({ oauth: true }) so child stderr is piped",
+      ),
+    );
+  }
   return new Promise((resolve, reject) => {
+    let settled = false;
     let buffer = "";
     const cleanup = () => {
+      settled = true;
       stderr.off("data", onData);
       clearTimeout(timer);
     };
@@ -181,14 +199,28 @@ function waitForAuthUrl(
       }
     };
     const timer = setTimeout(() => {
+      if (settled) return;
       cleanup();
       reject(
         new Error(
-          `did not see ${AUTH_URL_LOG_MSG} on server stderr within ${timeoutMs}ms`,
+          `did not see ${AUTH_URL_LOG_MSG} on server stderr within ${timeoutMs}ms.\n` +
+            `Captured stderr:\n${server.stderrSnapshot?.() ?? "(stderrSnapshot unavailable - non-OAuth spawn?)"}`,
         ),
       );
     }, timeoutMs);
     stderr.on("data", onData);
+    // race against child exit so a server that dies during OAuth init fails fast with the exit
+    // code instead of waiting out the full timeout
+    server.childExit?.then(({ code, signal }) => {
+      if (settled) return;
+      cleanup();
+      reject(
+        new Error(
+          `server exited (code=${code}, signal=${signal ?? "null"}) before emitting ${AUTH_URL_LOG_MSG}.\n` +
+            `Captured stderr:\n${server.stderrSnapshot?.() ?? "(no snapshot)"}`,
+        ),
+      );
+    });
   });
 }
 
@@ -203,4 +235,38 @@ function extractAuthUrl(line: string): string | undefined {
   const record = parsed as Record<string, unknown>;
   if (record.msg !== AUTH_URL_LOG_MSG) return undefined;
   return typeof record.authUrl === "string" ? record.authUrl : undefined;
+}
+
+/** Body-excerpt cap when dumping the page after a callback-redirect timeout. */
+const PAGE_BODY_EXCERPT_BYTES = 800;
+
+/**
+ * Enriches a `page.waitForURL` timeout with the URL/title/body excerpt of wherever Auth0 actually
+ * landed, plus the server's stderr snapshot. Wraps the original error as `cause` so the stack is
+ * preserved. Each capture step is best-effort: if the page is in an unusual state we skip the
+ * field rather than masking the original timeout with a secondary failure.
+ */
+async function augmentCallbackTimeout(
+  server: StartedServer,
+  page: Page,
+  cause: unknown,
+): Promise<Error> {
+  const url = await Promise.resolve(page.url()).catch(
+    () => "(could not read page url)",
+  );
+  const title = await page.title().catch(() => "(could not read page title)");
+  const bodyText = await page
+    .locator("body")
+    .innerText({ timeout: 1_000 })
+    .then((text: string) => text.slice(0, PAGE_BODY_EXCERPT_BYTES))
+    .catch(() => "(could not read page body)");
+  const stderr = server.stderrSnapshot?.() ?? "(no snapshot)";
+  return new Error(
+    `OAuth callback redirect timed out after ${CALLBACK_REDIRECT_TIMEOUT_MS}ms. Auth0 stayed on:\n` +
+      `  url:   ${url}\n` +
+      `  title: ${title}\n` +
+      `  body:  ${bodyText.replace(/\n/g, " ")}\n` +
+      `Captured stderr:\n${stderr}`,
+    { cause },
+  );
 }

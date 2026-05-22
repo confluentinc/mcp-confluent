@@ -60,8 +60,8 @@ semaphore:
           default_value: "@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
           description: 'Pipe-separated service-config tags. One matrix block per service config.'
         - name: CONNECTION_TYPE
-          required: false
-          default_value: ""
+          required: true
+          default_value: "all"
           options:
             - "all"
             - "direct"

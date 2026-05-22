@@ -280,4 +280,4 @@ promotions:
             - "all"
             - "direct"
             - "oauth"
-          required: false
+          required: true

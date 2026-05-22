@@ -139,10 +139,14 @@ export async function driveOAuthFlow(
       await consentButton.first().click();
     }
     try {
-      await page.waitForURL(/127\.0\.0\.1/, {
-        // `load` stalls on the success page's external favicon under restricted CI egress, and
-        // `networkidle` never fires because the page holds an open EventSource (and is discouraged
-        // in playwright docs; see https://playwright.dev/docs/api/class-page#page-wait-for-url)
+      // Hostname predicate (not the literal regex /127\.0\.0\.1/) because Auth0's login URL
+      // carries the OAuth `redirect_uri` as a query parameter, and dots in 127.0.0.1 stay
+      // unencoded after URL-encoding (dots are valid URL characters). The substring regex
+      // matches immediately on Auth0's URL before the browser ever leaves it.
+      // `load` stalls on the success page's external favicon under restricted CI egress, and
+      // `networkidle` never fires because the page holds an open EventSource (and is discouraged
+      // in playwright docs; see https://playwright.dev/docs/api/class-page#page-wait-for-url)
+      await page.waitForURL((url) => url.hostname === "127.0.0.1", {
         waitUntil: "domcontentloaded",
         timeout: CALLBACK_REDIRECT_TIMEOUT_MS,
       });

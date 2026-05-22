@@ -21,40 +21,44 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const runtime = integrationRuntime({ oauth: true });
 
-describe("CCloud OAuth flow", { tags: [Tag.SMOKE, Tag.OAUTH] }, () => {
-  if (Object.keys(runtime.config.connections).length === 0) {
-    it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
-    return;
-  }
-  // playwright drives the prod Auth0 sign-in form with these creds; populated by
-  // `make setup-test-env` from vault path confluent-cloud-user.
-  const credentials = getOAuthCredentialsFromEnv();
-  if (!credentials) {
-    it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
-    return;
-  }
+describe(
+  "CCloud OAuth flow",
+  { tags: [Tag.SMOKE, Tag.OAUTH, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
+  () => {
+    if (Object.keys(runtime.config.connections).length === 0) {
+      it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+      return;
+    }
+    // playwright drives the prod Auth0 sign-in form with these creds; populated by
+    // `make setup-test-env` from vault path confluent-cloud-user.
+    const credentials = getOAuthCredentialsFromEnv();
+    if (!credentials) {
+      it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
+      return;
+    }
 
-  let server: StartedServer;
+    let server: StartedServer;
 
-  beforeAll(async () => {
-    server = await startOAuthServer({ transport: TransportType.STDIO });
-  }, 180_000);
+    beforeAll(async () => {
+      server = await startOAuthServer({ transport: TransportType.STDIO });
+    }, 180_000);
 
-  afterAll(async () => {
-    await stopOAuthServer(server);
-  });
+    afterAll(async () => {
+      await stopOAuthServer(server);
+    });
 
-  it(
-    "should complete the CCloud OAuth flow via playwright and invoke an OAuth-eligible tool",
-    // covers the Auth0 sign-in round-trip (form fill + consent + redirect) plus the cloud REST call
-    { timeout: 120_000 },
-    async () => {
-      const result = await callToolWithOAuthFlow(server, credentials, {
-        name: ToolName.LIST_ORGANIZATIONS,
-        arguments: {},
-      });
+    it(
+      "should complete the CCloud OAuth flow via playwright and invoke an OAuth-eligible tool",
+      // covers the Auth0 sign-in round-trip (form fill + consent + redirect) plus the cloud REST call
+      { timeout: 120_000 },
+      async () => {
+        const result = await callToolWithOAuthFlow(server, credentials, {
+          name: ToolName.LIST_ORGANIZATIONS,
+          arguments: {},
+        });
 
-      expect(textContent(result)).toMatch(/^Retrieved \d+ organizations?:/);
-    },
-  );
-});
+        expect(textContent(result)).toMatch(/^Retrieved \d+ organizations?:/);
+      },
+    );
+  },
+);

@@ -97,6 +97,7 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
   }
 
   getToolConfig(): ToolConfig {
+    // TEST CHANGE TO TRIGGER CI
     return {
       name: ToolName.EXPLAIN_DISABLED_TOOLS,
       description:

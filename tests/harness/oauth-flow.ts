@@ -100,6 +100,23 @@ export async function driveOAuthFlow(
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
+    // TEMPORARY INSTRUMENTATION: capture browser-side network events. Hypothesis: the OAuth
+    // callback never reaches the server even when waitForURL succeeds, which would happen if
+    // chromium's connection to 127.0.0.1:26640 is failing and the URL bar shows the target URL
+    // anyway (because Chrome's error page reuses the requested URL).
+    page.on("requestfailed", (req) => {
+      process.stderr.write(
+        `[OAUTH-NETWORK] requestfailed url=${req.url()} method=${req.method()} reason=${req.failure()?.errorText}\n`,
+      );
+    });
+    page.on("response", (resp) => {
+      const url = resp.url();
+      if (url.includes("127.0.0.1") || url.includes("login.confluent.io")) {
+        process.stderr.write(
+          `[OAUTH-NETWORK] response url=${url} status=${resp.status()}\n`,
+        );
+      }
+    });
     await page.goto(authUrl);
     // Auth0's email-then-password flow: one form per page, both submitted via [type=submit]
     await page
@@ -129,6 +146,20 @@ export async function driveOAuthFlow(
         waitUntil: "domcontentloaded",
         timeout: CALLBACK_REDIRECT_TIMEOUT_MS,
       });
+      // TEMPORARY INSTRUMENTATION: dump page state immediately after waitForURL resolves. If
+      // chromium reached a connection-refused error page, the URL bar still matches /127.0.0.1/
+      // but the title/body reveal the failure. Comparing this against the server-side "OAuth
+      // callback server received request" log tells us whether the GET reached the server.
+      const postUrl = page.url();
+      const postTitle = await page.title().catch(() => "(title read failed)");
+      const postBody = await page
+        .locator("body")
+        .innerText({ timeout: 1_000 })
+        .then((t: string) => t.slice(0, 200).replace(/\s+/g, " "))
+        .catch(() => "(body read failed)");
+      process.stderr.write(
+        `[OAUTH-NETWORK] post-waitForURL url=${postUrl} title="${postTitle}" body="${postBody}"\n`,
+      );
     } catch (error) {
       // capture where Auth0 actually landed so the next CI failure surfaces an anomaly screen,
       // captcha, password-rotation prompt, etc. instead of a generic playwright timeout

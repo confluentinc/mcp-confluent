@@ -274,6 +274,10 @@ promotions:
           default_value: "@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
           required: true
         - name: CONNECTION_TYPE
-          description: "Optional single connection type (direct or oauth). Empty = both modes run sequentially in each job."
-          default_value: ""
+          description: "Connection type to exercise. 'all' (default) runs both direct and oauth sequentially in each job; 'direct' or 'oauth' limits the run to that single mode."
+          default_value: "all"
+          options:
+            - "all"
+            - "direct"
+            - "oauth"
           required: false

@@ -63,10 +63,10 @@ semaphore:
           required: false
           default_value: ""
           options:
+            - "all"
             - "direct"
             - "oauth"
-            - ""
-          description: 'Optional single connection type (direct or oauth). Empty (default) runs both modes sequentially in each job.'
+          description: 'Connection type to exercise. all (default) runs both direct and oauth sequentially in each job; direct or oauth limits the run to that single mode.'
     - name: scheduled-npm-audit
       branch: main
       pipeline_file: .semaphore/npm-audit.yml

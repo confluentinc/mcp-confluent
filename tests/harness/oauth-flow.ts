@@ -123,7 +123,9 @@ export async function driveOAuthFlow(
     }
     try {
       await page.waitForURL(/127\.0\.0\.1/, {
-        waitUntil: "networkidle",
+        // don't use 'networkidle' here since it may cause timeouts and is discouraged in the docs:
+        // see https://playwright.dev/docs/api/class-page#page-wait-for-url
+        waitUntil: "load",
         timeout: CALLBACK_REDIRECT_TIMEOUT_MS,
       });
     } catch (error) {

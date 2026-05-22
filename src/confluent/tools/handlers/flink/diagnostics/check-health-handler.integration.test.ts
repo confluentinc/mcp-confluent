@@ -18,49 +18,59 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new CheckHealthHandler();
 const runtime = integrationRuntime();
 
-describe("check-health-handler", { tags: [Tag.FLINK] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires flink config", () => {});
-    return;
-  }
+describe(
+  "check-health-handler",
+  {
+    tags: [
+      Tag.FLINK,
+      Tag.REQUIRES_FLINK_CONFIG,
+      Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG,
+    ],
+  },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires flink config", () => {});
+      return;
+    }
 
-  // installs afterAll at this describe scope (cleans up the seeded statement)
-  const { createdStatements } = withSharedFlinkStatementCleanup();
-  const statementName = uniqueName("health-stmt");
-
-  beforeAll(async () => {
-    await provisionTestFlinkStatement(statementName);
-    createdStatements.push(statementName);
-  });
-
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    // installs afterAll at this describe scope (cleans up the seeded statement)
+    const { createdStatements } = withSharedFlinkStatementCleanup();
+    const statementName = uniqueName("health-stmt");
 
     beforeAll(async () => {
-      server = await startServer({ transport });
+      await provisionTestFlinkStatement(statementName);
+      createdStatements.push(statementName);
     });
 
-    afterAll(async () => {
-      await server?.stop();
-    });
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    it("should expose check-flink-statement-health in tools/list", async () => {
-      const { tools } = await server.client.listTools();
-
-      expect(
-        tools.find((t) => t.name === ToolName.CHECK_FLINK_STATEMENT_HEALTH),
-      ).toBeDefined();
-    });
-
-    it("should return a health report for the seeded statement", async () => {
-      const result = await server.client.callTool({
-        name: ToolName.CHECK_FLINK_STATEMENT_HEALTH,
-        arguments: { statementName },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      expect(textContent(result)).toMatch(
-        new RegExp(`^Health check for '${statementName}':`),
-      );
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should expose check-flink-statement-health in tools/list", async () => {
+        const { tools } = await server.client.listTools();
+
+        expect(
+          tools.find((t) => t.name === ToolName.CHECK_FLINK_STATEMENT_HEALTH),
+        ).toBeDefined();
+      });
+
+      it("should return a health report for the seeded statement", async () => {
+        const result = await server.client.callTool({
+          name: ToolName.CHECK_FLINK_STATEMENT_HEALTH,
+          arguments: { statementName },
+        });
+
+        expect(textContent(result)).toMatch(
+          new RegExp(`^Health check for '${statementName}':`),
+        );
+      });
     });
-  });
-});
+  },
+);

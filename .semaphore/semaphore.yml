@@ -45,6 +45,210 @@ blocks:
             - sem-version java 17
             - emit-sonarqube-data --run_only_sonar_scan --enable_sonarqube_enterprise
 
+  # Per-tool-group integration blocks. Each gates on `change_in()` over its
+  # handler directory via `run.when`, so a PR only fires the integration
+  # blocks whose handler dirs it touched. `default_branch: 'main'` must
+  # repeat literally on every `change_in()` call: YAML anchors don't reach
+  # inside the quoted conditions-DSL string, and the DSL's default is
+  # 'master', so without the override `change_in()` evaluates as
+  # "everything changed" on feature branches and every block would fire.
+  #
+  # Each block runs ONE job that exercises both `direct` and `oauth`
+  # connection types sequentially via the harness's `activeConnectionTypes`
+  # default (`INTEGRATION_TEST_CONNECTION_TYPE` left unset = both modes
+  # active). Splitting into a CONNECTION_TYPE matrix axis would double the
+  # agent count without adding unique test coverage; tool groups without
+  # OAuth describes skip the OAuth pass gracefully inside the job.
+
+  - name: "Integration Tests: catalog"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/catalog/', { default_branch: 'main' })"
+    task:
+      prologue: &integration-prologue
+        commands:
+          - npm ci --prefer-offline --include=dev
+          # chromium is needed for any @oauth-tagged tests as well as the OAuth smoke test
+          - |
+            PLAYWRIGHT_VERSION=$(node -p "require('playwright-core/package.json').version")
+            cache restore "playwright-chromium-${PLAYWRIGHT_VERSION}"
+            npx playwright-core install chromium && \
+              cache store "playwright-chromium-${PLAYWRIGHT_VERSION}" ~/.cache/ms-playwright
+          - . vault-setup --version v3 --role mcp-confluent
+          - make setup-test-env
+          - npm run build
+      epilogue: &integration-epilogue
+        always:
+          commands:
+            - make remove-test-env
+            - test-results publish TEST-integration.xml --name "Integration (${SEMAPHORE_JOB_NAME})" --force || true
+      jobs:
+        - name: "@catalog"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@catalog
+
+  - name: "Integration Tests: billing"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/billing/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@billing"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@billing
+
+  - name: "Integration Tests: clusters"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/clusters/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@clusters"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@clusters
+
+  - name: "Integration Tests: connect"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/connect/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@connect"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@connect
+
+  - name: "Integration Tests: docs"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/docs/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@docs"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@docs
+
+  - name: "Integration Tests: environments"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/environments/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@environments"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@environments
+
+  - name: "Integration Tests: flink"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/flink/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@flink"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@flink
+
+  - name: "Integration Tests: kafka"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/kafka/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@kafka"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@kafka
+
+  - name: "Integration Tests: metrics"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/metrics/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@metrics"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@metrics
+
+  - name: "Integration Tests: organizations"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/organizations/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@organizations"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@organizations
+
+  - name: "Integration Tests: schema"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/schema/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@schema"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@schema
+
+  - name: "Integration Tests: tableflow"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/confluent/tools/handlers/tableflow/', { default_branch: 'main' })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@tableflow"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@tableflow
+
+  # Smoke block: fires on any non-test src/ change, so transport-layer
+  # regressions (auth middleware, multi-client wiring, OAuth flow) trigger
+  # regardless of which handler dir the PR touched. The `exclude` glob
+  # covers both `*.test.ts` and `*.integration.test.ts` (the latter ends
+  # in `.test.ts`).
+  - name: "Integration Tests: smoke"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in('/src/', { default_branch: 'main', exclude: ['/src/**/*.test.ts'] })"
+    task:
+      prologue: *integration-prologue
+      epilogue: *integration-epilogue
+      jobs:
+        - name: "@smoke"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@smoke
+
 after_pipeline:
   task:
     jobs:
@@ -55,19 +259,21 @@ after_pipeline:
 promotions:
   - name: Docker Image Scan
     pipeline_file: docker-image-scan.yml
-  - name: "Integration Tests"
+
+  # Manual operator escape hatch: pick a cut of service configs (and
+  # optionally one connection type) from the Semaphore UI. integration.yml
+  # is the service-config-organized pipeline used here and by the scheduled
+  # daily run in service.yml; per-PR work lives in the change_in()-gated
+  # blocks above, not promotions.
+  - name: "Integration Tests: full (manual)"
     pipeline_file: integration.yml
     parameters:
       env_vars:
-        - name: TOOL_GROUPS
-          description: "Pipe-separated vitest tags to run (e.g. @kafka|@schema)"
-          default_value: "@smoke|@kafka|@schema|@environments|@clusters|@connect|@metrics|@flink|@tableflow|@billing|@docs|@catalog"
-          required: true
-        - name: TRANSPORTS
-          description: "Pipe-separated MCP transports (stdio|http|sse)"
-          default_value: "stdio|http|sse"
+        - name: SERVICE_CONFIGS
+          description: "Pipe-separated service-config tags. One matrix block per service config."
+          default_value: "@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
           required: true
         - name: CONNECTION_TYPE
-          description: "Connection type to test (direct or oauth)"
-          default_value: "direct"
-          required: true
+          description: "Optional single connection type (direct or oauth). Empty = both modes run sequentially in each job."
+          default_value: ""
+          required: false

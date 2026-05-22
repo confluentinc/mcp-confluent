@@ -75,8 +75,8 @@ remove-test-env:
 # include glob. @smoke and empty TAGS fall through to a filter on just the
 # service config, since neither is directory-aligned.
 #
-# When INTEGRATION_TEST_CONNECTION_TYPE is set in the environment (CI sets
-# it per matrix cell via the CONNECTION_TYPE axis), we also append a
+# When INTEGRATION_TEST_CONNECTION_TYPE is set (manual full-promotion
+# CONNECTION_TYPE parameter forwards into this env var), we append a
 # `@oauth` / `!@oauth` clause to the tag filter:
 #  - `direct` lane excludes oauth describes (`!@oauth`), so single-mode
 #    direct-only tests don't re-run alongside dual-mode oauth describes.
@@ -157,7 +157,7 @@ store-unit-test-results:
 
 store-integration-test-results:
 	@if [ -f TEST-integration.xml ]; then \
-		test-results publish TEST-integration.xml --name "Integration ($(SERVICE_CONFIG) / $(TAGS) / $(CONNECTION_TYPE))" --force; \
+		test-results publish TEST-integration.xml --name "Integration ($(SERVICE_CONFIG) / $(TAGS) / $${INTEGRATION_TEST_CONNECTION_TYPE:-all})" --force; \
 	else \
 		echo "no TEST-integration.xml to publish"; \
 	fi

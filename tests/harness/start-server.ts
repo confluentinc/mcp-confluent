@@ -49,8 +49,65 @@ export interface StartedServer {
    * Read by {@linkcode driveOAuthFlow} to extract the Auth0 authorization URL.
    */
   stderr?: Readable;
+  /**
+   * OAuth-only: returns a rolling string of everything the child has written to stderr since
+   * spawn, capped at {@linkcode STDERR_SNAPSHOT_MAX_BYTES} with a `(truncated front)` marker.
+   * Included in {@link driveOAuthFlow} timeout/exit error messages so a failed run shows what
+   * the server actually logged instead of a generic 30s timeout.
+   */
+  stderrSnapshot?: () => string;
+  /**
+   * OAuth-only: resolves when the spawned child exits. {@link driveOAuthFlow} races this against
+   * its auth-URL wait so a server that dies during OAuth init fails fast with the exit code +
+   * captured stderr instead of timing out.
+   */
+  childExit?: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
   /** Sends SIGTERM to the child, awaits exit, and closes the MCP client. */
   stop: () => Promise<void>;
+}
+
+/** Cap for {@link createStderrCapture}: large enough to hold ~hundreds of pino JSON lines. */
+const STDERR_SNAPSHOT_MAX_BYTES = 65_536;
+
+/**
+ * Attaches a data listener that accumulates stderr into a capped rolling string, and returns a
+ * getter for it. Doubles as the drain that keeps the child from blocking on a full pipe buffer,
+ * so this is the only stderr `data` listener needed on OAuth spawns.
+ */
+function createStderrCapture(stderr: Readable): () => string {
+  let buf = "";
+  stderr.on("data", (chunk: Buffer | string) => {
+    buf += typeof chunk === "string" ? chunk : chunk.toString("utf-8");
+    if (buf.length > STDERR_SNAPSHOT_MAX_BYTES) {
+      buf = "...(truncated front)...\n" + buf.slice(-STDERR_SNAPSHOT_MAX_BYTES);
+    }
+  });
+  return () => buf;
+}
+
+/** Resolves with the child's exit `code` and `signal` once it exits. Never rejects. */
+function captureChildExit(
+  child: ChildProcess,
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  return new Promise((resolve) => {
+    child.once("exit", (code, signal) => resolve({ code, signal }));
+  });
+}
+
+/**
+ * Returns the `stderrSnapshot` + `childExit` pair on OAuth spawns, or an empty object otherwise.
+ * Spread into the {@link StartedServer} literal so non-OAuth spawns stay byte-identical to the
+ * pre-instrumentation shape.
+ */
+function oauthDiagnostics(
+  options: StartServerOptions,
+  child: ChildProcess | undefined,
+): Pick<StartedServer, "stderrSnapshot" | "childExit"> {
+  if (!options.oauth || !child?.stderr) return {};
+  return {
+    stderrSnapshot: createStderrCapture(child.stderr),
+    childExit: captureChildExit(child),
+  };
 }
 
 // resolve from the worktree root (vitest runs with cwd at the project root)
@@ -104,6 +161,7 @@ async function startHttp(options: StartServerOptions): Promise<StartedServer> {
     client,
     baseUrl,
     stderr: options.oauth ? (child.stderr ?? undefined) : undefined,
+    ...oauthDiagnostics(options, child),
     stop: makeHttpStop(client, child),
   };
 }
@@ -134,6 +192,7 @@ async function startSse(options: StartServerOptions): Promise<StartedServer> {
     client,
     baseUrl,
     stderr: options.oauth ? (child.stderr ?? undefined) : undefined,
+    ...oauthDiagnostics(options, child),
     stop: makeHttpStop(client, child),
   };
 }
@@ -179,11 +238,10 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
   // as of v1.x).
   const child = (transport as unknown as { _process?: ChildProcess })._process;
 
-  if (options.oauth) {
-    // keep the piped stderr draining after driveOAuthFlow's scraper detaches; otherwise the
-    // child stalls once the OS pipe buffer fills
-    child?.stderr?.on("data", () => {});
-  }
+  // OAuth spawns need a stderr drain so the child doesn't block on a full pipe buffer.
+  // `createStderrCapture` (inside `oauthDiagnostics`) already attaches a `data` listener, which
+  // doubles as that drain, so no separate keep-alive listener is needed here.
+  const diagnostics = oauthDiagnostics(options, child);
 
   // No SIGTERM here: client.close() routes through transport.close() which
   // already kills the SDK-owned child; we just await its exit afterward.
@@ -198,6 +256,7 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
   return {
     client,
     stderr: options.oauth ? (child?.stderr ?? undefined) : undefined,
+    ...diagnostics,
     stop,
   };
 }

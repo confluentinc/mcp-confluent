@@ -36,65 +36,176 @@ global_job_config:
       commands:
         - make remove-test-env
 
+# Service-config-organized blocks. This pipeline is the scheduled-daily and
+# manual full-run shape; per-PR work lives in semaphore.yml's
+# change_in()-gated blocks, not here.
+#
+# Each block's TOOL_GROUP matrix values are hard-coded from which tool-group
+# tests carry the matching `Tag.REQUIRES_<X>_CONFIG` tag in tests/tags.ts.
+#
+# Connection type (direct vs OAuth) is NOT a matrix axis: each cell runs
+# both modes sequentially via the harness's `activeConnectionTypes`
+# default. The triggering task or promotion supplies `CONNECTION_TYPE`
+# (forwarded as `INTEGRATION_TEST_CONNECTION_TYPE` at task scope): the
+# scheduled task defaults to empty (which the harness treats as "both"),
+# the manual full promotion defaults to "all" (an explicit sentinel for
+# "both"). Operators can override either to `direct` or `oauth` to limit
+# a run to a single mode.
+#
+# Transport (stdio / http / sse) is intentionally NOT a matrix axis:
+# `tests/harness/transports.ts` reads `INTEGRATION_TEST_TRANSPORT` and
+# returns all three when unset, so each matrix cell exercises every
+# transport sequentially within the same job. Splitting transports across
+# Semaphore jobs would 3x the agent count for the same coverage.
 blocks:
-  - name: "Integration Tests: stdio"
+  - name: "Integration Tests: @requires-kafka-config"
     dependencies: []
-    # skip this block when the triggering parameters don't include stdio
     skip:
-      when: "'${{parameters.TRANSPORTS}}' !~ 'stdio'"
+      when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-kafka-config'"
     task:
       env_vars:
-        - name: TRANSPORT
-          value: stdio
-        # Default `direct` keeps CI on the existing direct matrix; ops can
-        # override at promotion time. OAuth coverage in CI lands with #380's
-        # matrix restructure.
+        - name: SERVICE_CONFIG
+          value: "@requires-kafka-config"
         - name: INTEGRATION_TEST_CONNECTION_TYPE
           value: "${{parameters.CONNECTION_TYPE}}"
-      # task-level epilogue so $TOOL_GROUP / $TRANSPORT from the matrix axis
-      # are unambiguously in scope when result-publishing runs.
-      epilogue: &transport-epilogue
+      epilogue: &service-config-epilogue
         always:
           commands:
-            - make store-integration-test-results TAG="$TOOL_GROUP" TRANSPORT="$TRANSPORT"
-      jobs: &transport-jobs
-        # Semaphore auto-appends the matrix axis (e.g. " - TOOL_GROUP=@kafka")
-        # to the rendered job name, so we don't need to manually include here.
+            - make store-integration-test-results SERVICE_CONFIG="$SERVICE_CONFIG" TAGS="$TOOL_GROUP"
+      jobs:
+        - name: "Integration tests"
+          commands: &service-config-job-commands
+            - npm run test:harness
+            - make test-integration SERVICE_CONFIG="$SERVICE_CONFIG" TAGS="$TOOL_GROUP"
+          matrix:
+            - env_var: TOOL_GROUP
+              values: ["@kafka", "@catalog"]
+
+  - name: "Integration Tests: @requires-schema-registry-config"
+    dependencies: []
+    skip:
+      when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-schema-registry-config'"
+    task:
+      env_vars:
+        - name: SERVICE_CONFIG
+          value: "@requires-schema-registry-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
+      epilogue: *service-config-epilogue
+      jobs:
+        - name: "Integration tests"
+          commands: *service-config-job-commands
+          matrix:
+            - env_var: TOOL_GROUP
+              values: ["@schema", "@catalog"]
+
+  - name: "Integration Tests: @requires-confluent-cloud-config"
+    dependencies: []
+    skip:
+      when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-confluent-cloud-config'"
+    task:
+      env_vars:
+        - name: SERVICE_CONFIG
+          value: "@requires-confluent-cloud-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
+      epilogue: *service-config-epilogue
+      jobs:
+        - name: "Integration tests"
+          commands: *service-config-job-commands
+          matrix:
+            - env_var: TOOL_GROUP
+              values:
+                [
+                  "@billing",
+                  "@catalog",
+                  "@clusters",
+                  "@connect",
+                  "@docs",
+                  "@environments",
+                  "@flink",
+                  "@organizations",
+                  "@tableflow",
+                ]
+
+  - name: "Integration Tests: @requires-flink-config"
+    dependencies: []
+    skip:
+      when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-flink-config'"
+    task:
+      env_vars:
+        - name: SERVICE_CONFIG
+          value: "@requires-flink-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
+      epilogue: *service-config-epilogue
+      jobs:
+        - name: "Integration tests"
+          commands: *service-config-job-commands
+          matrix:
+            - env_var: TOOL_GROUP
+              values: ["@flink"]
+
+  - name: "Integration Tests: @requires-tableflow-config"
+    dependencies: []
+    skip:
+      when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-tableflow-config'"
+    task:
+      env_vars:
+        - name: SERVICE_CONFIG
+          value: "@requires-tableflow-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
+      epilogue: *service-config-epilogue
+      jobs:
+        - name: "Integration tests"
+          commands: *service-config-job-commands
+          matrix:
+            - env_var: TOOL_GROUP
+              values: ["@tableflow"]
+
+  - name: "Integration Tests: @requires-telemetry-config"
+    dependencies: []
+    skip:
+      when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@requires-telemetry-config'"
+    task:
+      env_vars:
+        - name: SERVICE_CONFIG
+          value: "@requires-telemetry-config"
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
+      epilogue: *service-config-epilogue
+      jobs:
+        - name: "Integration tests"
+          commands: *service-config-job-commands
+          matrix:
+            - env_var: TOOL_GROUP
+              values: ["@metrics"]
+
+  # Smoke block: cross-cutting transport-layer regression coverage (auth
+  # middleware, multi-client wiring, OAuth flow) that doesn't belong to any
+  # service-config matrix cell because `@smoke` isn't in any TOOL_GROUP
+  # values array. Gated on `@smoke` appearing in `SERVICE_CONFIGS` rather
+  # than carrying its own parameter so the operator surface stays at two
+  # params (SERVICE_CONFIGS + CONNECTION_TYPE). The scheduled task and the
+  # manual full promotion both include `@smoke` in their defaults.
+  - name: "Integration Tests: @smoke"
+    dependencies: []
+    skip:
+      when: "'${{parameters.SERVICE_CONFIGS}}' !~ '@smoke'"
+    task:
+      env_vars:
+        - name: INTEGRATION_TEST_CONNECTION_TYPE
+          value: "${{parameters.CONNECTION_TYPE}}"
+      epilogue:
+        always:
+          commands:
+            - make store-integration-test-results TAGS="@smoke"
+      jobs:
         - name: "Integration tests"
           commands:
             - npm run test:harness
-            - make test-integration TAG="$TOOL_GROUP" TRANSPORT="$TRANSPORT"
-          # matrix axis: pipe-split TOOL_GROUPS from pipeline parameters. one
-          # job per tool-group tag within this transport's block.
-          matrix:
-            - env_var: TOOL_GROUP
-              values: '%{{parameters.TOOL_GROUPS | splitList "|"}}'
-
-  - name: "Integration Tests: http"
-    dependencies: []
-    skip:
-      when: "'${{parameters.TRANSPORTS}}' !~ 'http'"
-    task:
-      env_vars:
-        - name: TRANSPORT
-          value: http
-        - name: INTEGRATION_TEST_CONNECTION_TYPE
-          value: "${{parameters.CONNECTION_TYPE}}"
-      epilogue: *transport-epilogue
-      jobs: *transport-jobs
-
-  - name: "Integration Tests: sse"
-    dependencies: []
-    skip:
-      when: "'${{parameters.TRANSPORTS}}' !~ 'sse'"
-    task:
-      env_vars:
-        - name: TRANSPORT
-          value: sse
-        - name: INTEGRATION_TEST_CONNECTION_TYPE
-          value: "${{parameters.CONNECTION_TYPE}}"
-      epilogue: *transport-epilogue
-      jobs: *transport-jobs
+            - make test-integration TAGS="@smoke"
 
 after_pipeline:
   task:

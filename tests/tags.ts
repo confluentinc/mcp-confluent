@@ -1,10 +1,21 @@
 /**
- * Tags for filtering integration tests. Tool-group tags map 1:1 to
- * directories under `src/confluent/tools/handlers/`; `SMOKE` and `OAUTH`
- * are cross-cutting tags. `SMOKE` marks transport-layer tests (e.g. the
- * auth middleware) that don't belong to any tool group. `OAUTH` marks
- * tests that can run against an OAuth connection via the harness's
- * `oauth: true` opt-in.
+ * Tags for filtering integration tests.
+ *
+ * Two axes:
+ *
+ * - **Tool-group axis** ({@link Tag.KAFKA}, {@link Tag.FLINK}, ...) - matches
+ *   handler directories under `src/confluent/tools/handlers/`. Used to scope
+ *   per-PR auto-promotions to the handler dir the PR touched.
+ * - **Service-config axis** ({@link Tag.REQUIRES_KAFKA_CONFIG}, ...) - matches
+ *   the per-service blocks on `MCPServerConfiguration` (`kafka`, `flink`,
+ *   etc.). Drives `integration.yml`'s matrix axis: each job provisions one
+ *   service config's worth of setup and runs every test tagged with that
+ *   service config.
+ *
+ * Cross-cutting tags: {@link Tag.SMOKE} marks transport-layer tests that
+ * don't belong to any tool group; {@link Tag.OAUTH} marks tests that exercise
+ * the OAuth flow.
+ *
  * {@see https://vitest.dev/guide/test-tags}
  */
 export enum Tag {
@@ -13,7 +24,7 @@ export enum Tag {
   // Tests that work with an OAuth connection
   OAUTH = "@oauth",
 
-  // Tool group specific tags, matching handler directories
+  // Tool-group axis: matches handler directories
   BILLING = "@billing",
   CATALOG = "@catalog",
   CLUSTERS = "@clusters",
@@ -27,4 +38,14 @@ export enum Tag {
   SCHEMA = "@schema",
   SEARCH = "@search",
   TABLEFLOW = "@tableflow",
+
+  // Service-config axis: drives integration.yml's matrix axis. Each value
+  // matches a service block on MCPServerConfiguration (see
+  // src/config/models.ts).
+  REQUIRES_KAFKA_CONFIG = "@requires-kafka-config",
+  REQUIRES_SCHEMA_REGISTRY_CONFIG = "@requires-schema-registry-config",
+  REQUIRES_CONFLUENT_CLOUD_CONFIG = "@requires-confluent-cloud-config",
+  REQUIRES_FLINK_CONFIG = "@requires-flink-config",
+  REQUIRES_TABLEFLOW_CONFIG = "@requires-tableflow-config",
+  REQUIRES_TELEMETRY_CONFIG = "@requires-telemetry-config",
 }

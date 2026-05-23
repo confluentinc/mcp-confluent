@@ -20,10 +20,11 @@ don't conflict.
   sits next to `list-topics-handler.ts` in `src/confluent/tools/handlers/kafka/`.
 - Do NOT put integration test files under `tests/` (only shared harness,
   stubs, factories, and fixtures live there).
-- Tag the outermost `describe` with the tool group via the `Tag` enum from
-  `@tests/tags.js` (e.g. `{ tags: [Tag.KAFKA] }`). `tests/tags.ts` is the
-  single source of truth; `vitest.config.ts` derives its `test.tags` list
-  from the same enum, so adding a new tool group means editing one file.
+- Tag the outermost `describe` with **two** axes via the `Tag` enum from `@tests/tags.js`: the tool-group tag (e.g. `Tag.KAFKA`) and at least one service-config tag (e.g. `Tag.REQUIRES_KAFKA_CONFIG`).
+  Tool-group tags map 1:1 to handler directories under `src/confluent/tools/handlers/` and drive per-PR `change_in()` gating in `.semaphore/semaphore.yml`.
+  Service-config tags map 1:1 to service blocks on `MCPServerConfiguration` (`kafka`, `flink`, `schema_registry`, `confluent_cloud`, `tableflow`, `telemetry`) and drive the matrix axes in `.semaphore/integration.yml`.
+  A test that needs more than one service block to be provisioned declares all of them and will run in every matching block of the scheduled / manual pipeline.
+  `tests/tags.ts` is the single source of truth; `vitest.config.ts` derives its `test.tags` list from the same enum, so adding a new tag means editing one file.
 
 ## Running Tests Locally
 
@@ -413,8 +414,11 @@ sets it per-block (see CI Matrix below).
 `activeConnectionTypes` (from `@tests/harness/connection-types.js`) mirrors `activeTransports` along a second axis: dual-mode tests use it to gate the connection shapes (direct vs OAuth) they support.
 It honors the `INTEGRATION_TEST_CONNECTION_TYPE` env var:
 
-- **unset** → both connection types active (default for local runs / full coverage)
+- **unset** or **`all`** → both connection types active (default for local runs / full coverage)
 - **`direct`** or **`oauth`** → only that connection type active
+
+`all` is an explicit sentinel because the Semaphore Tasks UI serializes an empty-string dropdown option as the literal 2-char string `""`, which would slip past a plain emptiness check.
+The Makefile mirrors this on the tag-filter side: unset or `all` appends no clause, `oauth` appends `&& @oauth` (only OAuth describes collect), `direct` appends `&& !@oauth` so the direct-only lane doesn't double-execute direct-only tests through OAuth describes.
 
 Single-mode tests (the vast majority; everything that needs only direct api-key auth) don't need to touch this; they default to direct via the `integrationRuntime()` / `startServer({ transport })` calls.
 
@@ -519,11 +523,34 @@ OAuth describes that don't seed (e.g. `list-organizations`, `list-billing-costs`
 
 ## CI Matrix
 
-`.semaphore/integration.yml` has one block per MCP transport (stdio, http,
-and sse), each skippable via the `TRANSPORTS` pipeline parameter. Within a
-block, jobs parallelize across tool groups (the `TOOL_GROUP` matrix axis).
-The matrix axis picks up new tags automatically - no block or anchor
-changes needed.
+The CI surface has two shapes; they share the harness and the Makefile but differ in what each block represents.
+
+### Per-PR (`.semaphore/semaphore.yml`)
+
+One block per tool group (12 of them) plus a smoke block, each gated by `run.when: change_in('/src/confluent/tools/handlers/<dir>/', { default_branch: 'main' })`.
+Only the blocks whose handler dirs the PR touched actually run; everything else stays gray.
+Within a block, a single job exercises both connection types sequentially via the harness's `activeConnectionTypes` default; transport (stdio/http/sse) and connection type (direct/oauth) are deliberately NOT Semaphore axes, since splitting them would multiply agent count without unique coverage.
+The smoke block fires on any change under `src/` (excluding `*.test.ts`) so transport-layer regressions (auth middleware, multi-client wiring, OAuth flow) trigger regardless of which handler dir the PR touched.
+
+### Scheduled / manual full (`.semaphore/integration.yml`)
+
+One block per service config (6 of them: kafka, schema-registry, confluent-cloud, flink, tableflow, telemetry) plus a cross-cutting `@smoke` block that runs the transport-layer regression tests (auth middleware, multi-client wiring, OAuth round-trip).
+Each service-config block declares a hard-coded `TOOL_GROUP` matrix of the tool groups whose handlers consume that service config; a tool group with handlers across multiple service configs appears in each matching block (e.g. `@catalog` runs under both `@requires-kafka-config` and `@requires-confluent-cloud-config`).
+The smoke block has no matrix axis and no service-config filter; it just runs `make test-integration TAGS=@smoke`.
+The scheduled task in `service.yml` and the manual `Integration Tests: full (manual)` promotion in `semaphore.yml` both pass two parameters to this pipeline: `SERVICE_CONFIGS` (pipe-separated, controls which blocks run via each block's `skip.when` clause; accepts the six service-config tags plus `@smoke` as a sentinel for the cross-cutting block) and `CONNECTION_TYPE` (one of `all` / `direct` / `oauth`, forwarded as `INTEGRATION_TEST_CONNECTION_TYPE` to both the harness's `activeConnectionTypes` filter and the Makefile's tag-filter composer).
+
+### Tuning CI speed without code changes
+
+| Want to ...                                                   | Edit                                                                                       | Effect                                             |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| Drop a block (service config or smoke) from the scheduled run | `SERVICE_CONFIGS` default in `service.yml`                                                 | Skips one whole block in the scheduled pipeline    |
+| Limit a manual run to one connection mode                     | Pick `direct` or `oauth` for `CONNECTION_TYPE` in the Semaphore UI                         | Halves runtime per cell                            |
+| Stop a tool group from running on PRs                         | Delete the corresponding block in `.semaphore/semaphore.yml`                               | One fewer block; rest stays `change_in()`-gated    |
+| Re-balance which scheduled block runs a tool group            | `TOOL_GROUP` matrix `values` array in `.semaphore/integration.yml`                         | Moves the cell to a different service-config block |
+| Tighten the per-PR smoke-block trigger                        | The `exclude` glob in the smoke block's `change_in()` clause in `.semaphore/semaphore.yml` | Reduces smoke-block fire rate on PRs               |
+| Change how the daily run is scheduled                         | The `at:` cron in `service.yml`'s `scheduled-integration-tests` task                       | Shifts daily run time                              |
+
+Anything beyond this (adding a new tag axis, renaming a tag, adding a new service-config block to `MCPServerConfiguration`) is a tag-system structural change and requires touching `tests/tags.ts`, the integration test files, and the harness alongside the YAML.
 
 ## Adding a New Tool Group
 
@@ -555,9 +582,10 @@ Schema Registry, Flink, Tableflow):
    `src/confluent/tools/connection-predicates.ts` for the skip gate (or
    add a new predicate there if none fit).
 
-6. **CI default** (optional): bump the `TOOL_GROUPS` default in
-   `service.yml`'s `scheduled-integration-tests` task to include the new
-   tag, or override per-run via the Semaphore UI.
+6. **CI wiring**:
+   - Add a new tool-group block to `.semaphore/semaphore.yml` (copy an existing block, swap the name, the `change_in()` handler dir, and the `TAGS=` value in the job command).
+   - Add the new tool-group tag to the `TOOL_GROUP` matrix `values` array in every `.semaphore/integration.yml` service-config block whose service config the new handler consumes.
+   - Service-config blocks in `integration.yml` and the `SERVICE_CONFIGS` default in `service.yml`'s `scheduled-integration-tests` task only need to change if the new handler also requires a new service config (i.e. a new `REQUIRES_*_CONFIG` tag).
 
 ## What NOT to Do
 

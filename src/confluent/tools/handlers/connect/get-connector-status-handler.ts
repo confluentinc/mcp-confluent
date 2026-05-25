@@ -1,30 +1,12 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
+import {
+  ConnectToolHandler,
+  connectorByNameArguments,
+} from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
-import { z } from "zod";
-
-const getConnectorStatusArguments = z.object({
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe(
-      "The unique identifier for the environment this resource belongs to.",
-    ),
-  clusterId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the Kafka cluster."),
-  connectorName: z
-    .string()
-    .trim()
-    .nonempty()
-    .describe("The unique name of the connector."),
-});
 
 export class GetConnectorStatusHandler extends ConnectToolHandler {
   async handle(
@@ -33,7 +15,7 @@ export class GetConnectorStatusHandler extends ConnectToolHandler {
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName } =
-      getConnectorStatusArguments.parse(toolArguments);
+      connectorByNameArguments.parse(toolArguments);
 
     const conn = runtime.config.getSoleDirectConnection();
     const { environment_id, kafka_cluster_id } =
@@ -77,7 +59,7 @@ export class GetConnectorStatusHandler extends ConnectToolHandler {
       name: ToolName.GET_CONNECTOR_STATUS,
       description:
         "Get the current state of a connector and its tasks (RUNNING, FAILED, PAUSED, UNASSIGNED) including failure traces if any.",
-      inputSchema: getConnectorStatusArguments.shape,
+      inputSchema: connectorByNameArguments.shape,
       annotations: READ_ONLY,
     };
   }

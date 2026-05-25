@@ -1,30 +1,12 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
+import {
+  ConnectToolHandler,
+  connectorByNameArguments,
+} from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
-import { z } from "zod";
-
-const getConnectorConfigArguments = z.object({
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe(
-      "The unique identifier for the environment this resource belongs to.",
-    ),
-  clusterId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the Kafka cluster."),
-  connectorName: z
-    .string()
-    .trim()
-    .nonempty()
-    .describe("The unique name of the connector."),
-});
 
 export class GetConnectorConfigHandler extends ConnectToolHandler {
   async handle(
@@ -33,7 +15,7 @@ export class GetConnectorConfigHandler extends ConnectToolHandler {
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName } =
-      getConnectorConfigArguments.parse(toolArguments);
+      connectorByNameArguments.parse(toolArguments);
 
     const conn = runtime.config.getSoleDirectConnection();
     const { environment_id, kafka_cluster_id } =
@@ -69,7 +51,7 @@ export class GetConnectorConfigHandler extends ConnectToolHandler {
       name: ToolName.GET_CONNECTOR_CONFIG,
       description:
         "Retrieve the full configuration map for a connector. Returns the flat config object the connector was created/updated with.",
-      inputSchema: getConnectorConfigArguments.shape,
+      inputSchema: connectorByNameArguments.shape,
       annotations: READ_ONLY,
     };
   }

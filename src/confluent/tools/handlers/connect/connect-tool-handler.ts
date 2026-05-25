@@ -4,6 +4,33 @@ import {
   ToolCategory,
 } from "@src/confluent/tools/base-tools.js";
 import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { z } from "zod";
+
+/**
+ * Shared Zod input schema for tools that operate on a single connector by name.
+ * `environmentId` and `clusterId` are optional and fall back to the
+ * connection's `kafka.env_id` / `kafka.cluster_id` via
+ * `resolveConnectEnvAndClusterId`. `connectorName` is required.
+ */
+export const connectorByNameArguments = z.object({
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "The unique identifier for the environment this resource belongs to.",
+    ),
+  clusterId: z
+    .string()
+    .trim()
+    .optional()
+    .describe("The unique identifier for the Kafka cluster."),
+  connectorName: z
+    .string()
+    .trim()
+    .nonempty()
+    .describe("The unique name of the connector."),
+});
 
 /**
  * Intermediate base class for all Connect tool handlers.

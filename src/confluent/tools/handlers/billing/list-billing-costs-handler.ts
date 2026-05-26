@@ -37,24 +37,57 @@ const listBillingCostsObject = z.object({
     .describe("Token for the next page of results"),
 });
 
-const listBillingCostsArguments = listBillingCostsObject.refine(
-  ({ startDate, endDate }) => {
-    const diffDays = (Date.parse(endDate) - Date.parse(startDate)) / MS_PER_DAY;
-    return diffDays <= BILLING_RANGE_MAX_DAYS;
-  },
-  {
-    error: (iss) => {
-      const { startDate, endDate } = iss.input as {
-        startDate: string;
-        endDate: string;
-      };
+const listBillingCostsArguments = listBillingCostsObject
+  .refine(
+    ({ startDate, endDate }) =>
+      Number.isFinite(Date.parse(startDate)) &&
+      Number.isFinite(Date.parse(endDate)),
+    {
+      error: (iss) => {
+        const { startDate, endDate } = iss.input as {
+          startDate: string;
+          endDate: string;
+        };
+        const invalid = !Number.isFinite(Date.parse(startDate))
+          ? `startDate=${startDate}`
+          : `endDate=${endDate}`;
+        return `Date must be a valid calendar date (got ${invalid}).`;
+      },
+      path: ["endDate"],
+    },
+  )
+  .refine(
+    ({ startDate, endDate }) => Date.parse(endDate) >= Date.parse(startDate),
+    {
+      error: (iss) => {
+        const { startDate, endDate } = iss.input as {
+          startDate: string;
+          endDate: string;
+        };
+        return `endDate (${endDate}) must be on or after startDate (${startDate}).`;
+      },
+      path: ["endDate"],
+    },
+  )
+  .refine(
+    ({ startDate, endDate }) => {
       const diffDays =
         (Date.parse(endDate) - Date.parse(startDate)) / MS_PER_DAY;
-      return `Date range must be 31 days or fewer (got ${diffDays} days). The CCloud billing API caps queries at 31 days.`;
+      return diffDays <= BILLING_RANGE_MAX_DAYS;
     },
-    path: ["endDate"],
-  },
-);
+    {
+      error: (iss) => {
+        const { startDate, endDate } = iss.input as {
+          startDate: string;
+          endDate: string;
+        };
+        const diffDays =
+          (Date.parse(endDate) - Date.parse(startDate)) / MS_PER_DAY;
+        return `Date range must be ${BILLING_RANGE_MAX_DAYS} days or fewer (got ${diffDays} days). The CCloud billing API caps queries at ${BILLING_RANGE_MAX_DAYS} days.`;
+      },
+      path: ["endDate"],
+    },
+  );
 
 /**
  * Schema for validating billing cost line items

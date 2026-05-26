@@ -294,6 +294,18 @@ describe("list-billing-costs-handler.ts", () => {
           label: "range is a full year, well over the 31-day cap",
           args: { startDate: "2026-01-01", endDate: "2027-01-01" },
         },
+        {
+          label: "endDate is before startDate",
+          args: { startDate: "2026-02-01", endDate: "2026-01-01" },
+        },
+        {
+          label: "startDate matches the format but is not a real calendar date",
+          args: { startDate: "2026-02-30", endDate: "2026-02-28" },
+        },
+        {
+          label: "endDate matches the format but is not a real calendar date",
+          args: { startDate: "2026-01-01", endDate: "2026-13-01" },
+        },
       ])(
         "should throw a ZodError and not call the API when $label",
         async ({ args }) => {

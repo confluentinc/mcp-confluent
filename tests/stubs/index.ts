@@ -11,6 +11,12 @@ export {
   type MockedRestClient,
 } from "./clients.js";
 export {
+  LONG_MIN_SENTINEL,
+  wireFlinkPair,
+  wireFlinkTelemetry,
+  type FlinkTelemetryPoint,
+} from "./flink-telemetry.js";
+export {
   assertHandleCase,
   classifyThrown,
   type HandleCase,

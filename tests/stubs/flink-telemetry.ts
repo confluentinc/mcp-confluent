@@ -1,7 +1,7 @@
 import type { MockedClientManager } from "./clients.js";
 
 export type FlinkTelemetryPoint = {
-  value: number;
+  value?: number;
   taskId?: string;
   splitName?: string;
 };
@@ -49,4 +49,17 @@ export function wireFlinkTelemetry(
       return Promise.resolve({ data: { data: [] } });
     },
   );
+}
+
+/** Wire the two Flink REST GETs that diagnostics handlers issue back-to-back:
+ *  the statement fetch followed by the exceptions list. Pass `exceptions` to
+ *  populate the second response's `data.data` array; defaults to empty. */
+export function wireFlinkPair(
+  cm: MockedClientManager,
+  statement: unknown,
+  exceptions: Array<Record<string, unknown>> = [],
+): void {
+  cm.getConfluentCloudFlinkRestClient()
+    .GET.mockResolvedValueOnce({ data: statement })
+    .mockResolvedValueOnce({ data: { data: exceptions } });
 }

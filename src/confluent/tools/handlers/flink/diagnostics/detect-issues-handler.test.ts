@@ -10,23 +10,13 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  wireFlinkPair,
+  wireFlinkTelemetry,
   type MockedClientManager,
 } from "@tests/stubs/index.js";
 import { beforeEach, describe, expect, it } from "vitest";
 
 const STATEMENT_NAME = "my-statement";
-
-/** Wire two Flink GETs (statement, exceptions) for handle() invocations
- *  whose tests don't enable metrics. */
-function wireFlinkPair(
-  cm: MockedClientManager,
-  statement: unknown,
-  exceptions: Array<Record<string, unknown>> = [],
-): void {
-  cm.getConfluentCloudFlinkRestClient()
-    .GET.mockResolvedValueOnce({ data: statement })
-    .mockResolvedValueOnce({ data: { data: exceptions } });
-}
 
 describe("detect-issues-handler.ts", () => {
   describe("DetectIssuesHandler", () => {
@@ -364,39 +354,10 @@ describe("detect-issues-handler.ts", () => {
 
       it("should fold metrics-helper issues into the issue list when metrics analysis finds problems", async () => {
         const clientManager = getMockedClientManager();
-        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-        flinkRest.GET.mockResolvedValueOnce({
-          data: { status: { phase: "RUNNING" } },
-        }).mockResolvedValueOnce({ data: { data: [] } });
-
-        // Telemetry: first POST is pending_records (high backpressure metric)
-        // — the helper queries 13 metrics sequentially. To trigger an issue
-        // from analyzeMetrics, return a high pending_records value on the
-        // appropriate iteration. Simpler: return the same response for every
-        // call where the metric name in the body matches what we want to
-        // trigger. We use a per-call implementation that inspects the
-        // requested metric name.
-        const telemetryRest =
-          clientManager.getConfluentCloudTelemetryRestClient();
-        telemetryRest.POST.mockImplementation(
-          (
-            _path: unknown,
-            opts: unknown,
-          ): Promise<{ data?: unknown; error?: unknown }> => {
-            const o = opts as {
-              body?: { aggregations?: Array<{ metric?: string }> };
-            };
-            const metric = o.body?.aggregations?.[0]?.metric ?? "";
-            if (metric.includes("pending_records")) {
-              return Promise.resolve({
-                data: {
-                  data: [{ points: [{ value: 2_000_000, timestamp: "t" }] }],
-                },
-              });
-            }
-            return Promise.resolve({ data: { data: [] } });
-          },
-        );
+        wireFlinkPair(clientManager, { status: { phase: "RUNNING" } });
+        wireFlinkTelemetry(clientManager, {
+          pending_records: [{ value: 2_000_000 }],
+        });
 
         await assertHandleCase({
           handler,

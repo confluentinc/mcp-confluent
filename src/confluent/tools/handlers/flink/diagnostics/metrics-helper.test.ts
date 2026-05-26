@@ -233,35 +233,11 @@ describe("metrics-helper.ts", () => {
 
     it("should query and return per-task breakdown when includeTaskBreakdown is true", async () => {
       const cm = getMockedClientManager();
-      // Statement-level queries return empty; task-breakdown queries return
-      // a point per task.
-      const telemetry = cm.getConfluentCloudTelemetryRestClient();
-      telemetry.POST.mockImplementation(
-        (
-          _path: unknown,
-          opts: unknown,
-        ): Promise<{ data?: unknown; error?: unknown }> => {
-          const o = opts as {
-            body?: { aggregations?: Array<{ metric?: string }> };
-          };
-          const metric = o.body?.aggregations?.[0]?.metric ?? "";
-          // The breakdown query loop uses metrics with "task/" prefix paths
-          // like io.confluent.flink/task/num_records_in. Match them here.
-          if (metric.startsWith("io.confluent.flink/task/")) {
-            return Promise.resolve({
-              data: {
-                data: [
-                  {
-                    "metric.flink_task.id": "task-a",
-                    points: [{ value: 7, timestamp: "t" }],
-                  },
-                ],
-              },
-            });
-          }
-          return Promise.resolve({ data: { data: [] } });
-        },
-      );
+      // Statement-level queries return empty for non-task/ metric names;
+      // task-breakdown queries (io.confluent.flink/task/*) get one point per task.
+      wireFlinkTelemetry(cm, {
+        "task/": [{ value: 7, taskId: "task-a" }],
+      });
 
       const result = await getStatementMetrics(cm, {
         statementName: "stmt",
@@ -283,31 +259,12 @@ describe("metrics-helper.ts", () => {
 
     it("should skip task entries when taskId or value is missing", async () => {
       const cm = getMockedClientManager();
-      const telemetry = cm.getConfluentCloudTelemetryRestClient();
-      telemetry.POST.mockImplementation(
-        (
-          _path: unknown,
-          opts: unknown,
-        ): Promise<{ data?: unknown; error?: unknown }> => {
-          const o = opts as {
-            body?: { aggregations?: Array<{ metric?: string }> };
-          };
-          const metric = o.body?.aggregations?.[0]?.metric ?? "";
-          if (metric.startsWith("io.confluent.flink/task/")) {
-            return Promise.resolve({
-              data: {
-                data: [
-                  // missing taskId
-                  { points: [{ value: 1, timestamp: "t" }] },
-                  // missing value
-                  { "metric.flink_task.id": "task-x", points: [{}] },
-                ],
-              },
-            });
-          }
-          return Promise.resolve({ data: { data: [] } });
-        },
-      );
+      wireFlinkTelemetry(cm, {
+        "task/": [
+          { value: 1 }, // taskId omitted
+          { taskId: "task-x" }, // value omitted
+        ],
+      });
       const result = await getStatementMetrics(cm, {
         statementName: "stmt",
         computePoolId: "pool",
@@ -319,31 +276,9 @@ describe("metrics-helper.ts", () => {
 
     it("should query and return per-split breakdown when includeSplitBreakdown is true", async () => {
       const cm = getMockedClientManager();
-      const telemetry = cm.getConfluentCloudTelemetryRestClient();
-      telemetry.POST.mockImplementation(
-        (
-          _path: unknown,
-          opts: unknown,
-        ): Promise<{ data?: unknown; error?: unknown }> => {
-          const o = opts as {
-            body?: { aggregations?: Array<{ metric?: string }> };
-          };
-          const metric = o.body?.aggregations?.[0]?.metric ?? "";
-          if (metric.startsWith("io.confluent.flink/split/")) {
-            return Promise.resolve({
-              data: {
-                data: [
-                  {
-                    "metric.flink_split": "orders-0",
-                    points: [{ value: 12_345, timestamp: "t" }],
-                  },
-                ],
-              },
-            });
-          }
-          return Promise.resolve({ data: { data: [] } });
-        },
-      );
+      wireFlinkTelemetry(cm, {
+        "split/": [{ value: 12_345, splitName: "orders-0" }],
+      });
       const result = await getStatementMetrics(cm, {
         statementName: "stmt",
         computePoolId: "pool",

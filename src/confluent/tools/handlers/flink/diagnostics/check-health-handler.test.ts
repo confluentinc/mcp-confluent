@@ -10,6 +10,7 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  wireFlinkPair,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
@@ -99,10 +100,10 @@ describe("check-health-handler.ts", () => {
         "should map phase $phase to expected status",
         async ({ phase, expected }) => {
           const clientManager = getMockedClientManager();
-          const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-          flinkRest.GET.mockResolvedValueOnce({
-            data: { status: { phase }, spec: { statement: "SELECT 1" } },
-          }).mockResolvedValueOnce({ data: { data: [] } });
+          wireFlinkPair(clientManager, {
+            status: { phase },
+            spec: { statement: "SELECT 1" },
+          });
           await assertHandleCase({
             handler,
             runtime: runtimeWith(
@@ -119,12 +120,10 @@ describe("check-health-handler.ts", () => {
 
       it("should report warning when running statement has exceptions", async () => {
         const clientManager = getMockedClientManager();
-        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-        flinkRest.GET.mockResolvedValueOnce({
-          data: { status: { phase: "RUNNING" } },
-        }).mockResolvedValueOnce({
-          data: { data: [{ message: "kaboom" }, { message: "earlier" }] },
-        });
+        wireFlinkPair(clientManager, { status: { phase: "RUNNING" } }, [
+          { message: "kaboom" },
+          { message: "earlier" },
+        ]);
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -140,10 +139,9 @@ describe("check-health-handler.ts", () => {
 
       it("should include status.detail in FAILED message when present", async () => {
         const clientManager = getMockedClientManager();
-        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-        flinkRest.GET.mockResolvedValueOnce({
-          data: { status: { phase: "FAILED", detail: "ran out of memory" } },
-        }).mockResolvedValueOnce({ data: { data: [] } });
+        wireFlinkPair(clientManager, {
+          status: { phase: "FAILED", detail: "ran out of memory" },
+        });
         await assertHandleCase({
           handler,
           runtime: runtimeWith(
@@ -159,12 +157,9 @@ describe("check-health-handler.ts", () => {
 
       it("should fall back to latest exception message when FAILING and no detail", async () => {
         const clientManager = getMockedClientManager();
-        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-        flinkRest.GET.mockResolvedValueOnce({
-          data: { status: { phase: "FAILING" } },
-        }).mockResolvedValueOnce({
-          data: { data: [{ message: "downstream timeout" }] },
-        });
+        wireFlinkPair(clientManager, { status: { phase: "FAILING" } }, [
+          { message: "downstream timeout" },
+        ]);
         await assertHandleCase({
           handler,
           runtime: runtimeWith(

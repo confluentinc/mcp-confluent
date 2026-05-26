@@ -12,6 +12,7 @@ export {
 } from "./clients.js";
 export {
   LONG_MIN_SENTINEL,
+  wireFlinkPair,
   wireFlinkTelemetry,
   type FlinkTelemetryPoint,
 } from "./flink-telemetry.js";

@@ -286,6 +286,14 @@ describe("list-billing-costs-handler.ts", () => {
             pageSize: 1001,
           },
         },
+        {
+          label: "range exceeds the 31-day cap by one day",
+          args: { startDate: "2026-01-01", endDate: "2026-02-02" },
+        },
+        {
+          label: "range is a full year, well over the 31-day cap",
+          args: { startDate: "2026-01-01", endDate: "2027-01-01" },
+        },
       ])(
         "should throw a ZodError and not call the API when $label",
         async ({ args }) => {
@@ -302,6 +310,33 @@ describe("list-billing-costs-handler.ts", () => {
           expect(restClient.GET).not.toHaveBeenCalled();
         },
       );
+
+      it("should name the 31-day cap and the actual span in the ZodError message", async () => {
+        const clientManager = getMockedClientManager();
+
+        await expect(
+          handler.handle(
+            runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
+            { startDate: "2026-01-01", endDate: "2026-03-01" },
+          ),
+        ).rejects.toThrowError(/got 59 days.*31 days/);
+      });
+
+      it("should accept the inclusive 31-day boundary and call the API", async () => {
+        const clientManager = getMockedClientManager();
+        const restClient = clientManager.getConfluentCloudRestClient();
+        restClient.GET.mockResolvedValue({
+          data: { api_version: "v1", kind: "CostList", data: [] },
+        });
+
+        const result = await handler.handle(
+          runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { startDate: "2026-01-01", endDate: "2026-02-01" },
+        );
+
+        expect(result.isError).toBe(false);
+        expect(restClient.GET).toHaveBeenCalledOnce();
+      });
 
       it("should forward start/end/page params to the /billing/v1/costs path", async () => {
         const clientManager = getMockedClientManager();

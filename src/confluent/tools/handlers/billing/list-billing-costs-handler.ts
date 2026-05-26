@@ -43,14 +43,14 @@ const listBillingCostsArguments = listBillingCostsObject
       Number.isFinite(Date.parse(startDate)) &&
       Number.isFinite(Date.parse(endDate)),
     {
-      error: (iss) => {
-        const { startDate, endDate } = iss.input as {
+      error: (issue) => {
+        const { startDate, endDate } = issue.input as {
           startDate: string;
           endDate: string;
         };
-        const invalid = !Number.isFinite(Date.parse(startDate))
-          ? `startDate=${startDate}`
-          : `endDate=${endDate}`;
+        const invalid = Number.isFinite(Date.parse(startDate))
+          ? `endDate=${endDate}`
+          : `startDate=${startDate}`;
         return `Date must be a valid calendar date (got ${invalid}).`;
       },
       path: ["endDate"],
@@ -59,8 +59,8 @@ const listBillingCostsArguments = listBillingCostsObject
   .refine(
     ({ startDate, endDate }) => Date.parse(endDate) >= Date.parse(startDate),
     {
-      error: (iss) => {
-        const { startDate, endDate } = iss.input as {
+      error: (issue) => {
+        const { startDate, endDate } = issue.input as {
           startDate: string;
           endDate: string;
         };
@@ -76,8 +76,8 @@ const listBillingCostsArguments = listBillingCostsObject
       return diffDays <= BILLING_RANGE_MAX_DAYS;
     },
     {
-      error: (iss) => {
-        const { startDate, endDate } = iss.input as {
+      error: (issue) => {
+        const { startDate, endDate } = issue.input as {
           startDate: string;
           endDate: string;
         };

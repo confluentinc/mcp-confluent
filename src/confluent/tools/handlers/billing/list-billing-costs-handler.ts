@@ -15,7 +15,7 @@ import { z } from "zod";
 const BILLING_RANGE_MAX_DAYS = 31;
 const MS_PER_DAY = 86_400_000;
 
-const listBillingCostsShape = z.object({
+const listBillingCostsObject = z.object({
   startDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
@@ -37,7 +37,7 @@ const listBillingCostsShape = z.object({
     .describe("Token for the next page of results"),
 });
 
-const listBillingCostsArguments = listBillingCostsShape.refine(
+const listBillingCostsArguments = listBillingCostsObject.refine(
   ({ startDate, endDate }) => {
     const diffDays = (Date.parse(endDate) - Date.parse(startDate)) / MS_PER_DAY;
     return diffDays <= BILLING_RANGE_MAX_DAYS;
@@ -229,7 +229,7 @@ Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : "
       name: ToolName.LIST_BILLING_COSTS,
       description:
         "Retrieve billing cost data for a Confluent Cloud organization within a specified date range with pagination support",
-      inputSchema: listBillingCostsShape.shape,
+      inputSchema: listBillingCostsObject.shape,
       annotations: READ_ONLY,
     };
   }

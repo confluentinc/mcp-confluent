@@ -20,10 +20,33 @@ import {
   type TokenChainResult,
 } from "@src/confluent/oauth/token-chain.js";
 import type { Auth0Config } from "@src/confluent/oauth/types.js";
+import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { logger } from "@src/logger.js";
 
 /** Maximum time to wait for the user to complete the browser PKCE flow. */
 export const PKCE_LOGIN_TIMEOUT_MS = 120_000;
+
+/** Path the success page POSTs to when the user copies the install hint. */
+export const SKILLS_HINT_COPIED_PATH = "/skills-hint-copied";
+
+/**
+ * Path the success page opens an EventSource to. The open connection is what
+ * keeps the callback server alive past the OAuth redirect: as long as the page
+ * is in a tab, the stream is connected and beacons land on a live listener.
+ * When the tab closes, the stream disconnects and the server tears down.
+ */
+export const SKILLS_HINT_STREAM_PATH = "/skills-hint-stream";
+
+/**
+ * Safety cap on how long the callback server can stay bound after a successful
+ * auth. The stream-disconnect path is the normal closer; this is just the
+ * "user left the tab open and walked away" backstop. Kept tight (60s) because
+ * a lingering listener will collide with the next PKCE attempt — if a token
+ * refresh fails non-transiently inside this window and triggers a fresh login,
+ * the second attempt errors with `port_in_use` when in fact it's this same
+ * session's leftover listener still holding the port.
+ */
+export const SUCCESS_PAGE_MAX_LIFETIME_MS = 60_000;
 
 /** Reasons a PKCE login can fail. Carried on {@link PkceLoginError}. */
 export type PkceLoginFailureReason =
@@ -31,6 +54,7 @@ export type PkceLoginFailureReason =
   | "user_aborted"
   | "port_in_use"
   | "auth0_unreachable"
+  | "callback_server_error"
   | "configuration";
 
 /** Structured error so callers can react to the cause of a failed PKCE login. */
@@ -106,9 +130,79 @@ export async function runPkceLogin(
     rejectFlow = reject;
   });
 
+  // Tracks whether the success page was served. After success, the server's
+  // lifetime is driven by the success page's EventSource: it stays bound while
+  // the tab is open and closes when the stream disconnects (or when the safety
+  // timer fires).
+  let successServed = false;
+  let serverClosed = false;
+  let lifetimeTimer: ReturnType<typeof setTimeout> | undefined;
+  const streamClients = new Set<ServerResponse>();
+
+  const closeServerOnce = (): void => {
+    if (serverClosed || !bound) return;
+    serverClosed = true;
+    if (lifetimeTimer) {
+      clearTimeout(lifetimeTimer);
+      lifetimeTimer = undefined;
+    }
+    for (const client of streamClients) client.end();
+    streamClients.clear();
+    server.close();
+  };
+
   const server = nodeHttp.createServer((req, res) => {
     const reqUrl = req.url ?? "";
     const parsed = new URL(reqUrl, "http://127.0.0.1");
+    if (parsed.pathname === SKILLS_HINT_COPIED_PATH) {
+      // Only reachable once we've served the success page. Anything earlier
+      // would be a stray request on localhost, not a copy of the install hint.
+      if (!successServed) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      if (req.method !== "POST") {
+        res.writeHead(405, { Allow: "POST" });
+        res.end();
+        return;
+      }
+      try {
+        TelemetryService.getInstance().track(
+          TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
+          {},
+        );
+      } catch (err) {
+        logger.warn({ err }, "Failed to track agent-skills hint copied event");
+      }
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (parsed.pathname === SKILLS_HINT_STREAM_PATH) {
+      // Same gate as the beacon: the stream only makes sense once the success
+      // page has been served. Pre-auth requests get a 404.
+      if (!successServed) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      // Flush headers so the browser considers the EventSource "open".
+      res.write(": connected\n\n");
+      streamClients.add(res);
+      req.on("close", () => {
+        streamClients.delete(res);
+        // When the last tab closes and auth already succeeded, the listener
+        // has no further reason to exist.
+        if (successServed && streamClients.size === 0) closeServerOnce();
+      });
+      return;
+    }
     if (parsed.pathname !== OAUTH_CALLBACK_PATH) {
       sendHtml(res, 404, renderErrorPage("Not found"));
       return;
@@ -138,7 +232,15 @@ export async function runPkceLogin(
       sendHtml(res, 400, renderErrorPage("Missing authorization code"));
       return;
     }
-    sendHtml(res, 200, renderSuccessPage());
+    sendHtml(
+      res,
+      200,
+      renderSuccessPage({
+        copiedPath: SKILLS_HINT_COPIED_PATH,
+        streamPath: SKILLS_HINT_STREAM_PATH,
+      }),
+    );
+    successServed = true;
     resolveCode(code);
   });
 
@@ -165,10 +267,17 @@ export async function runPkceLogin(
     server.listen(OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_HOST, () => {
       bound = true;
       server.off("error", onBindError);
-      // Replace the bind-time rejector with a log-only listener so a stray
-      // post-bind socket error doesn't escape as an uncaught 'error' event.
+      // Post-bind socket errors must reject the in-flight flow, not just warn: if the listener
+      // dies mid-callback (EMFILE, broken TLS upgrade, etc.) the user would otherwise hang on
+      // `codePromise` until `PKCE_LOGIN_TIMEOUT_MS` (minutes) instead of failing fast.
       server.on("error", (err) => {
         logger.warn({ err }, "PKCE callback server post-bind error");
+        rejectFlow(
+          new PkceLoginError(
+            "callback_server_error",
+            `PKCE callback listener errored after bind: ${err.message}`,
+          ),
+        );
       });
       resolve();
     });
@@ -221,7 +330,22 @@ export async function runPkceLogin(
       signal.removeEventListener("abort", abortListener);
     }
     clearTimeout(timer);
-    if (bound) server.close();
+    if (bound) {
+      if (successServed) {
+        // The success page's EventSource keeps the listener alive while the
+        // browser tab is open; stream-disconnect calls closeServerOnce. The
+        // timer + unref'd server are the "tab left open" backstop so this
+        // listener can never keep the process alive on its own.
+        server.unref?.();
+        lifetimeTimer = setTimeout(
+          closeServerOnce,
+          SUCCESS_PAGE_MAX_LIFETIME_MS,
+        );
+        lifetimeTimer.unref?.();
+      } else {
+        closeServerOnce();
+      }
+    }
   }
 
   logger.info("PKCE auth code received; exchanging for token chain");

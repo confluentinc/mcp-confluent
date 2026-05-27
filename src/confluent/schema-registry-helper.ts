@@ -55,20 +55,13 @@ export type MessageOptions = {
 
 /**
  * Result of checking if a schema is needed for a message.
- * Can indicate:
- * - A schema is needed and provides the latest schema details
- * - No schema exists and needs to be provided
- * - No schema action is needed
+ * Returned only when the caller did not supply a schema and no schema is
+ * registered for the subject yet — that's the one case the caller must
+ * resolve before serialization can proceed. Otherwise null: either the
+ * caller supplied a schema (register-and-use path) or one is already
+ * registered (use-latest path).
  */
-export type SchemaCheckResult =
-  | {
-      type: "schema-needed";
-      latestSchema: string;
-      subject: string;
-      schemaType: string;
-    }
-  | { type: "no-schema"; subject: string }
-  | null;
+export type SchemaCheckResult = { type: "no-schema"; subject: string } | null;
 
 /**
  * Creates and returns the appropriate serializer instance based on schema type.
@@ -163,14 +156,7 @@ export async function checkSchemaNeeded(
     const latest = registry
       ? await getLatestSchemaIfExists(registry, subject)
       : null;
-    if (latest) {
-      return {
-        type: "schema-needed",
-        latestSchema: latest.schema,
-        subject,
-        schemaType: latest.schemaType,
-      };
-    } else {
+    if (!latest) {
       return { type: "no-schema", subject };
     }
   }

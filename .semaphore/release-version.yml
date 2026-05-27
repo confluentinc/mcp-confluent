@@ -148,3 +148,33 @@ blocks:
                 exit 1
               fi
             - gh release upload "$RELEASE_NAME" "$TGZ_FILE" --clobber
+
+  - name: "Publish to npm"
+    dependencies: ["Upload to GitHub Release"]
+    task:
+      jobs:
+        - name: "Publish to npm"
+          commands:
+            - |
+              if [ "$PUBLISH_TO_NPM" != "true" ]; then
+                echo "Skipping npm publish (PUBLISH_TO_NPM=$PUBLISH_TO_NPM)"
+                exit 0
+              fi
+            - artifact pull workflow release-assets/
+            - TGZ_FILE=$(find release-assets/ -name "*.tgz" | head -1)
+            - |
+              if [ -z "$TGZ_FILE" ]; then
+                echo "Error: no .tgz file found in release-assets/"
+                exit 1
+              fi
+            # Authenticate to npm registry
+            - . vault-get-secret --vault-role=mcp-confluent --secret-key=NPM_TOKEN --export-as=NPM_TOKEN mcpconfluent/npm
+            - npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
+            # Get TOTP code and publish (keep these adjacent to stay within the 30s TOTP window)
+            - OTP=$(vault-get-totp confluent-npm --vault-role mcp-confluent)
+            - |
+              if [ "$IS_PRERELEASE" = "true" ]; then
+                npm publish "$TGZ_FILE" --otp="$OTP" --tag next
+              else
+                npm publish "$TGZ_FILE" --otp="$OTP"
+              fi

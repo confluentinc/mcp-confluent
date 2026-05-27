@@ -171,7 +171,7 @@ blocks:
             - . vault-get-secret --vault-role=mcp-confluent --secret-key=NPM_TOKEN --export-as=NPM_TOKEN mcpconfluent/npm
             - npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
             # Get TOTP code and publish (keep these adjacent to stay within the 30s TOTP window)
-            - OTP=$(vault-get-totp confluent-npm --vault-role mcp-confluent)
+            - OTP=$(vault-get-totp npm-publishing --vault-role mcp-confluent)
             - |
               if [ "$IS_PRERELEASE" = "true" ]; then
                 npm publish "$TGZ_FILE" --otp="$OTP" --tag next

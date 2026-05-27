@@ -12,7 +12,10 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
-const listBillingCostsArguments = z.object({
+const BILLING_RANGE_MAX_DAYS = 31;
+const MS_PER_DAY = 86_400_000;
+
+const listBillingCostsObject = z.object({
   startDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
@@ -33,6 +36,58 @@ const listBillingCostsArguments = z.object({
     .optional()
     .describe("Token for the next page of results"),
 });
+
+const listBillingCostsArguments = listBillingCostsObject
+  .refine(
+    ({ startDate, endDate }) =>
+      Number.isFinite(Date.parse(startDate)) &&
+      Number.isFinite(Date.parse(endDate)),
+    {
+      error: (issue) => {
+        const { startDate, endDate } = issue.input as {
+          startDate: string;
+          endDate: string;
+        };
+        const invalid = Number.isFinite(Date.parse(startDate))
+          ? `endDate=${endDate}`
+          : `startDate=${startDate}`;
+        return `Date must be a valid calendar date (got ${invalid}).`;
+      },
+      path: ["endDate"],
+    },
+  )
+  .refine(
+    ({ startDate, endDate }) => Date.parse(endDate) >= Date.parse(startDate),
+    {
+      error: (issue) => {
+        const { startDate, endDate } = issue.input as {
+          startDate: string;
+          endDate: string;
+        };
+        return `endDate (${endDate}) must be on or after startDate (${startDate}).`;
+      },
+      path: ["endDate"],
+    },
+  )
+  .refine(
+    ({ startDate, endDate }) => {
+      const diffDays =
+        (Date.parse(endDate) - Date.parse(startDate)) / MS_PER_DAY;
+      return diffDays <= BILLING_RANGE_MAX_DAYS;
+    },
+    {
+      error: (issue) => {
+        const { startDate, endDate } = issue.input as {
+          startDate: string;
+          endDate: string;
+        };
+        const diffDays =
+          (Date.parse(endDate) - Date.parse(startDate)) / MS_PER_DAY;
+        return `Date range must be ${BILLING_RANGE_MAX_DAYS} days or fewer (got ${diffDays} days). The CCloud billing API caps queries at ${BILLING_RANGE_MAX_DAYS} days.`;
+      },
+      path: ["endDate"],
+    },
+  );
 
 /**
  * Schema for validating billing cost line items
@@ -207,7 +262,7 @@ Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : "
       name: ToolName.LIST_BILLING_COSTS,
       description:
         "Retrieve billing cost data for a Confluent Cloud organization within a specified date range with pagination support",
-      inputSchema: listBillingCostsArguments.shape,
+      inputSchema: listBillingCostsObject.shape,
       annotations: READ_ONLY,
     };
   }

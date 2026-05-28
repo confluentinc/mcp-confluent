@@ -55,11 +55,11 @@ export type MessageOptions = {
 
 /**
  * Result of checking if a schema is needed for a message.
- * Returned only when the caller did not supply a schema and no schema is
- * registered for the subject yet — that's the one case the caller must
- * resolve before serialization can proceed. Otherwise null: either the
- * caller supplied a schema (register-and-use path) or one is already
- * registered (use-latest path).
+ * Returned only when schema registry is in use, the caller did not supply a
+ * schema, and no schema is registered for the subject yet — that's the one
+ * case the caller must resolve before serialization can proceed. Otherwise
+ * null: schema registry is disabled, or the caller supplied a schema
+ * (register-and-use path), or one is already registered (use-latest path).
  */
 export type SchemaCheckResult = { type: "no-schema"; subject: string } | null;
 

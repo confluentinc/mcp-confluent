@@ -85,7 +85,7 @@ type ProduceKafkaMessageArguments = z.infer<
 /**
  * Handler for producing messages to a Kafka topic, with support for Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value.
  *
- * - If schema registry is enabled, the handler checks if a schema is already registered for the topic's key/value subject.
+ * - If schema registry is enabled, `schemaType` is required and the handler checks if a schema is already registered for the topic's key/value subject.
  *   - If a schema is provided, it is registered before serialization.
  *   - If no schema is provided and one is already registered, the serializer uses the latest registered version.
  *   - If no schema is provided and none is registered, it returns an error.

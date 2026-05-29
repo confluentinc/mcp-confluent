@@ -30,14 +30,18 @@ describe("get-connector-status-handler.ts", () => {
       const cases: ConnectHandleCase[] = [
         {
           label:
-            "surface lccId at the top level when the API returns an `id` block under expand=id",
+            "surface lccId at the top level when the expansion map entry includes an `id` block",
           connectionConfig: CONNECT_CONN,
           args: { connectorName: "my-connector" },
           mockResponse: {
             data: {
-              name: "my-connector",
-              connector: { state: "RUNNING" },
-              id: { id: "lcc-abc123", id_type: "ID" },
+              "my-connector": {
+                status: {
+                  name: "my-connector",
+                  connector: { state: "RUNNING" },
+                },
+                id: { id: "lcc-abc123", id_type: "ID" },
+              },
             },
           },
           outcome: { resolves: '"lccId":"lcc-abc123"' },
@@ -45,12 +49,18 @@ describe("get-connector-status-handler.ts", () => {
           expectedClusterId: "lkc-from-config",
         },
         {
-          label:
-            "omit lccId when the API response lacks the expand=id `id` block",
+          label: "omit lccId when the expansion map entry has no `id` block",
           connectionConfig: CONNECT_CONN,
           args: { connectorName: "my-connector" },
           mockResponse: {
-            data: { name: "my-connector", connector: { state: "RUNNING" } },
+            data: {
+              "my-connector": {
+                status: {
+                  name: "my-connector",
+                  connector: { state: "RUNNING" },
+                },
+              },
+            },
           },
           outcome: { resolves: "Connector Status for my-connector" },
           expectedEnvId: "env-from-config",
@@ -65,10 +75,24 @@ describe("get-connector-status-handler.ts", () => {
             environmentId: "env-from-arg",
             clusterId: "lkc-from-arg",
           },
-          mockResponse: { data: { name: "my-connector" } },
+          mockResponse: {
+            data: {
+              "my-connector": { status: { name: "my-connector" } },
+            },
+          },
           outcome: { resolves: "Connector Status for my-connector" },
           expectedEnvId: "env-from-arg",
           expectedClusterId: "lkc-from-arg",
+        },
+        {
+          label:
+            "return a not-found error when the expansion map omits the requested connector",
+          connectionConfig: CONNECT_CONN,
+          args: { connectorName: "my-connector" },
+          mockResponse: { data: {} },
+          outcome: { resolves: "Connector my-connector not found" },
+          expectedEnvId: "env-from-config",
+          expectedClusterId: "lkc-from-config",
         },
         {
           label: "throw ZodError when connectorName is missing",
@@ -124,15 +148,13 @@ describe("get-connector-status-handler.ts", () => {
           if (typeof outcome === "object" && "resolves" in outcome) {
             expect(cloudRest.GET).toHaveBeenCalledOnce();
             expect(cloudRest.GET).toHaveBeenCalledWith(
-              expect.stringContaining("/status"),
+              expect.stringContaining("?expand=info,status,id"),
               expect.objectContaining({
                 params: expect.objectContaining({
                   path: expect.objectContaining({
                     environment_id: expectedEnvId,
                     kafka_cluster_id: expectedClusterId,
-                    connector_name: "my-connector",
                   }),
-                  query: { expand: "id" },
                 }),
               }),
             );

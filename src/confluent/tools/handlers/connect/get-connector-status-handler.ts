@@ -21,19 +21,21 @@ export class GetConnectorStatusHandler extends ConnectToolHandler {
     const { environment_id, kafka_cluster_id } =
       this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
 
+    // CCloud only surfaces the lcc-id via the list endpoint's `expand=id`;
+    // the per-connector `/status` endpoint silently ignores `expand`. Use
+    // the expansion list and pluck the named entry so a single round-trip
+    // yields both status and lccId.
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudRestClient(),
     );
     const { data: response, error } = await pathBasedClient[
-      "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}/status"
+      "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors?expand=info,status,id"
     ].GET({
       params: {
         path: {
-          connector_name: connectorName,
           environment_id,
           kafka_cluster_id,
         },
-        query: { expand: "id" },
       },
     });
     if (error) {
@@ -42,13 +44,15 @@ export class GetConnectorStatusHandler extends ConnectToolHandler {
         true,
       );
     }
-    // The OpenAPI schema doesn't declare the `id` field, but `?expand=id`
-    // augments the response with `{ id: { id: "lcc-...", id_type: "ID" } }`.
-    const expanded = response as
-      | (typeof response & { id?: { id?: string; id_type?: string } })
-      | undefined;
-    const lccId = expanded?.id?.id;
-    const projection = lccId ? { ...expanded, lccId } : expanded;
+    const entry = response?.[connectorName];
+    if (!entry?.status) {
+      return this.createResponse(
+        `Connector ${connectorName} not found in cluster ${kafka_cluster_id}`,
+        true,
+      );
+    }
+    const lccId = entry.id?.id;
+    const projection = lccId ? { ...entry.status, lccId } : entry.status;
     return this.createResponse(
       `Connector Status for ${connectorName}: ${JSON.stringify(projection)}`,
     );

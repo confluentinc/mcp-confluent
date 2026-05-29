@@ -72,7 +72,7 @@ Categories marked with ¹ also work with [OAuth authentication](#oauth-authentic
 | **Flink SQL**                                | `create-flink-statement`, `list-flink-statements`, `read-flink-statement`, `delete-flink-statements`, `get-flink-statement-exceptions`                                                                        | Create and manage Flink SQL statements                                                     |
 | **Flink Catalog**                            | `list-flink-catalogs`, `list-flink-databases`, `list-flink-tables`, `describe-flink-table`, `get-flink-table-info`                                                                                            | Explore Flink catalogs, databases, and table schemas                                       |
 | **Flink Diagnostics**                        | `check-flink-statement-health`, `detect-flink-statement-issues`, `get-flink-statement-profile`                                                                                                                | Health checks, issue detection, and query profiling                                        |
-| **Connectors**                               | `list-connectors`, `read-connector`, `create-connector`, `delete-connector`                                                                                                                                   | Manage Kafka Connect connectors                                                            |
+| **Connectors**                               | `list-connectors`, `get-connector-config`, `get-connector-offsets`, `get-connector-status`, `get-connector-tasks`, `create-connector`, `delete-connector`                                                     | Inspect and manage Kafka Connect connectors                                                |
 | **Schema Registry** ¹                        | `list-schemas`, `delete-schema`                                                                                                                                                                               | List, inspect, and delete data schemas                                                     |
 | **Catalog & Tags**                           | `search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`                                                                | Organize and search topics using tags                                                      |
 | **Organizations, Environments & Clusters** ¹ | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`                                                                                                                                | Discover Confluent Cloud resources                                                         |
@@ -311,6 +311,10 @@ delete-tag: Delete a tag definition from Confluent Cloud.
 delete-topics: Delete the topic with the given names.
 check-flink-statement-health: Perform an aggregate health check for a Flink SQL statement.
 describe-consumer-group: Describe a single consumer group on a Kafka cluster — wraps the broker's describeGroups admin call for one group ID. Returns state, type, protocol, coordinator, and per-member assignment.
+get-connector-config: Retrieve the configuration for a connector.
+get-connector-offsets: Retrieve current offsets for a connector's tasks. Useful for detecting lag, stalled tasks, or assisting recovery.
+get-connector-status: Get the current state of a connector and its tasks (RUNNING, FAILED, PAUSED, UNASSIGNED) including failure traces if any.
+get-connector-tasks: List the tasks of a connector along with their configurations.
 get-consumer-group-lag: Compute live offset lag for a single Kafka consumer group. Returns per-(topic, partition) {committedOffset, highWatermark, lag} rows and a total lag count across the group.
 describe-flink-table: Get full schema details for a Flink table via INFORMATION_SCHEMA.COLUMNS.
 detect-flink-statement-issues: Detect issues for a Flink SQL statement by analyzing status, exceptions, and metrics.
@@ -330,7 +334,6 @@ list-schemas: List all schemas in the Schema Registry.
 list-tags: Retrieve all tags with definitions from Confluent Cloud Schema Registry.
 list-topics: List all topics in the Kafka cluster.
 produce-message: Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both ke...
-read-connector: Get information about the connector.
 read-environment: Get details of a specific environment by ID
 read-flink-statement: Make a request to read a statement and its results
 remove-tag-from-entity: Remove tag from an entity in Confluent Cloud.

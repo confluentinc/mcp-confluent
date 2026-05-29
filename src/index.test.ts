@@ -309,7 +309,10 @@ describe("index.ts", () => {
         ToolName.GET_FLINK_STATEMENT_PROFILE,
         // Connect (hasKafkaRestWithAuth / hasKafkaAuth — needs the kafka block)
         ToolName.LIST_CONNECTORS,
-        ToolName.READ_CONNECTOR,
+        ToolName.GET_CONNECTOR_CONFIG,
+        ToolName.GET_CONNECTOR_OFFSETS,
+        ToolName.GET_CONNECTOR_STATUS,
+        ToolName.GET_CONNECTOR_TASKS,
         ToolName.CREATE_CONNECTOR,
         ToolName.DELETE_CONNECTOR,
         // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)

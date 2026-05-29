@@ -51,7 +51,7 @@ semaphore:
           options:
             - "true"
             - "false"
-          default_value: "true"
+          default_value: "false"
           description: 'Whether to publish the package to the npm registry after creating the GitHub release.'
         - name: PREVIOUS_RELEASE_TAG
           required: false

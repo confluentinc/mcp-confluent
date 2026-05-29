@@ -1,12 +1,17 @@
 import { SerdeType } from "@confluentinc/schemaregistry";
 import { checkSchemaNeeded } from "@src/confluent/schema-registry-helper.js";
 import { getMockedSchemaRegistry } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 describe("schema-registry-helper.ts", () => {
   describe("checkSchemaNeeded()", () => {
+    let registry: ReturnType<typeof getMockedSchemaRegistry>;
+
+    beforeEach(() => {
+      registry = getMockedSchemaRegistry();
+    });
+
     it("should return null when useSchemaRegistry is false", async () => {
-      const registry = getMockedSchemaRegistry();
       const result = await checkSchemaNeeded(
         "orders",
         { message: "raw", useSchemaRegistry: false },
@@ -18,7 +23,6 @@ describe("schema-registry-helper.ts", () => {
     });
 
     it("should return null when the caller supplied a schema", async () => {
-      const registry = getMockedSchemaRegistry();
       const result = await checkSchemaNeeded(
         "orders",
         {
@@ -38,7 +42,6 @@ describe("schema-registry-helper.ts", () => {
       // Regression test for issue #159: subsequent produce calls without
       // re-specifying the schema must proceed (the serializer falls back to
       // useLatestVersion), not error with "A schema already exists".
-      const registry = getMockedSchemaRegistry();
       registry.getLatestSchemaMetadata.mockResolvedValue({
         id: 7,
         version: 1,
@@ -58,48 +61,42 @@ describe("schema-registry-helper.ts", () => {
       );
     });
 
-    it("should return no-schema when nothing is registered and the caller didn't supply one", async () => {
-      const registry = getMockedSchemaRegistry();
-      registry.getLatestSchemaMetadata.mockRejectedValue({ status: 404 });
-      const result = await checkSchemaNeeded(
-        "orders",
-        { message: { x: 1 }, useSchemaRegistry: true, schemaType: "AVRO" },
-        SerdeType.VALUE,
-        registry,
-      );
-      expect(result).toEqual({ type: "no-schema", subject: "orders-value" });
-    });
-
-    it("should derive a key-suffixed subject for SerdeType.KEY", async () => {
-      const registry = getMockedSchemaRegistry();
-      registry.getLatestSchemaMetadata.mockRejectedValue({ status: 404 });
-      const result = await checkSchemaNeeded(
-        "orders",
-        { message: { x: 1 }, useSchemaRegistry: true, schemaType: "AVRO" },
-        SerdeType.KEY,
-        registry,
-      );
-      expect(result).toEqual({ type: "no-schema", subject: "orders-key" });
-    });
-
-    it("should honor an explicit subject override", async () => {
-      const registry = getMockedSchemaRegistry();
-      registry.getLatestSchemaMetadata.mockRejectedValue({ status: 404 });
-      const result = await checkSchemaNeeded(
-        "orders",
-        {
-          message: { x: 1 },
-          useSchemaRegistry: true,
-          schemaType: "AVRO",
-          subject: "custom-subject",
-        },
-        SerdeType.VALUE,
-        registry,
-      );
-      expect(result).toEqual({
-        type: "no-schema",
+    it.each([
+      {
+        name: "derives a -value subject for SerdeType.VALUE",
+        serdeType: SerdeType.VALUE,
+        subject: undefined,
+        expected: "orders-value",
+      },
+      {
+        name: "derives a -key subject for SerdeType.KEY",
+        serdeType: SerdeType.KEY,
+        subject: undefined,
+        expected: "orders-key",
+      },
+      {
+        name: "honors an explicit subject override",
+        serdeType: SerdeType.VALUE,
         subject: "custom-subject",
-      });
-    });
+        expected: "custom-subject",
+      },
+    ])(
+      "should return no-schema when nothing is registered and it $name",
+      async ({ serdeType, subject, expected }) => {
+        registry.getLatestSchemaMetadata.mockRejectedValue({ status: 404 });
+        const result = await checkSchemaNeeded(
+          "orders",
+          {
+            message: { x: 1 },
+            useSchemaRegistry: true,
+            schemaType: "AVRO",
+            subject,
+          },
+          serdeType,
+          registry,
+        );
+        expect(result).toEqual({ type: "no-schema", subject: expected });
+      },
+    );
   });
 });

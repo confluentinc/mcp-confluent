@@ -196,7 +196,10 @@ describe("tool-registry.ts", () => {
         [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
         // Connect
         [ToolName.LIST_CONNECTORS]: hasConfluentCloud,
-        [ToolName.READ_CONNECTOR]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_CONFIG]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_OFFSETS]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_STATUS]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloud,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
         [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
         // Catalog + search (CCloud catalog support)
@@ -420,7 +423,10 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_CONNECTORS]: {
         outcome: { throws: "Environment ID is required" },
       },
-      [ToolName.READ_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_CONFIG]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_OFFSETS]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_STATUS]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_TASKS]: { outcome: { throws: "ZodError" } },
       [ToolName.CREATE_CONNECTOR]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_CONNECTOR]: { outcome: { throws: "ZodError" } },
       // Catalog

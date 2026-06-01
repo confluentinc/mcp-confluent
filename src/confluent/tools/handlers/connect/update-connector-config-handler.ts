@@ -1,26 +1,15 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
+import {
+  ConnectToolHandler,
+  connectorByNameArguments,
+} from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
-const updateConnectorConfigArguments = z.object({
-  environmentId: z
-    .string()
-    .optional()
-    .describe(
-      "The unique identifier for the environment this resource belongs to.",
-    ),
-  clusterId: z
-    .string()
-    .optional()
-    .describe("The unique identifier for the Kafka cluster."),
-  connectorName: z
-    .string()
-    .nonempty()
-    .describe("The name of the connector to update."),
+const updateConnectorConfigArguments = connectorByNameArguments.extend({
   connectorConfig: z
     .record(z.string(), z.string())
     .describe(
@@ -45,15 +34,21 @@ export class UpdateConnectorConfigHandler extends ConnectToolHandler {
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudRestClient(),
     );
-    // The PUT /config endpoint accepts the flat configuration map directly,
-    // not the {name, config} envelope used by POST /connectors. The generated
-    // OpenAPI body type tags `connector.class`, `name`, `kafka.api.key`, and
-    // `kafka.api.secret` as required, but in practice an update may legitimately
-    // omit any of those — the API only validates the merged config server-side.
-    // We forward the caller-provided map verbatim and cast to satisfy the type.
-    const { data: response, error } = await pathBasedClient[
-      "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}/config"
-    ].PUT({
+    const updateConfigEndpoint =
+      pathBasedClient[
+        "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}/config"
+      ];
+    // PUT /config uses replacement semantics: omitted keys are removed, and the
+    // server rejects a body missing any field the connector class requires. The
+    // generated body type marks `connector.class` / `name` / `kafka.api.key` /
+    // `kafka.api.secret` as statically required, but we accept the caller's flat
+    // `Record<string, string>` and let CCloud return the validation error if a
+    // required key is missing. The cast is scoped to the body field only so path
+    // params stay fully type-checked.
+    type UpdateConfigBody = NonNullable<
+      Parameters<typeof updateConfigEndpoint.PUT>[0]
+    >["body"];
+    const { data: response, error } = await updateConfigEndpoint.PUT({
       params: {
         path: {
           environment_id,
@@ -61,8 +56,7 @@ export class UpdateConnectorConfigHandler extends ConnectToolHandler {
           connector_name: connectorName,
         },
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      body: connectorConfig as any,
+      body: connectorConfig as unknown as UpdateConfigBody,
     });
     if (error) {
       return this.createResponse(
@@ -79,7 +73,7 @@ export class UpdateConnectorConfigHandler extends ConnectToolHandler {
     return {
       name: ToolName.UPDATE_CONNECTOR_CONFIG,
       description:
-        "Update the configuration of an existing connector. The connector is reconfigured (and tasks restarted) with the new config. Returns the updated connector info.",
+        "Update the configuration of an existing connector. Full-replace: omitted keys are removed and the connector is reconfigured (tasks restarted) with the supplied config. Returns the updated connector info.",
       inputSchema: updateConnectorConfigArguments.shape,
       annotations: CREATE_UPDATE,
     };

@@ -1,27 +1,12 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
+import {
+  ConnectToolHandler,
+  connectorByNameArguments,
+} from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
-import { z } from "zod";
-
-const resumeConnectorArguments = z.object({
-  environmentId: z
-    .string()
-    .optional()
-    .describe(
-      "The unique identifier for the environment this resource belongs to.",
-    ),
-  clusterId: z
-    .string()
-    .optional()
-    .describe("The unique identifier for the Kafka cluster."),
-  connectorName: z
-    .string()
-    .nonempty()
-    .describe("The name of the connector to resume."),
-});
 
 export class ResumeConnectorHandler extends ConnectToolHandler {
   async handle(
@@ -30,7 +15,7 @@ export class ResumeConnectorHandler extends ConnectToolHandler {
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName } =
-      resumeConnectorArguments.parse(toolArguments);
+      connectorByNameArguments.parse(toolArguments);
 
     const conn = runtime.config.getSoleDirectConnection();
     const { environment_id, kafka_cluster_id } =
@@ -65,7 +50,7 @@ export class ResumeConnectorHandler extends ConnectToolHandler {
     return {
       name: ToolName.RESUME_CONNECTOR,
       description: "Resume a paused connector and its tasks. Idempotent.",
-      inputSchema: resumeConnectorArguments.shape,
+      inputSchema: connectorByNameArguments.shape,
       annotations: CREATE_UPDATE,
     };
   }

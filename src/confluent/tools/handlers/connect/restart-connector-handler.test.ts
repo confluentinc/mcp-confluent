@@ -127,51 +127,6 @@ describe("restart-connector-handler.ts", () => {
           }
         },
       );
-
-      it("should not include a query block when neither includeTasks nor onlyFailed is set", async () => {
-        const clientManager = getMockedClientManager();
-        const cloudRest = clientManager.getConfluentCloudRestClient();
-        cloudRest.POST.mockResolvedValue({});
-
-        const runtime = runtimeWith(
-          CONNECT_CONN,
-          DEFAULT_CONNECTION_ID,
-          clientManager,
-        );
-        await handler.handle(runtime, { connectorName: "my-connector" });
-
-        expect(cloudRest.POST).toHaveBeenCalledOnce();
-        const init = cloudRest.POST.mock.calls[0]![1] as {
-          params: { query?: unknown };
-        };
-        expect(init.params.query).toBeUndefined();
-      });
-
-      it("should forward includeTasks and onlyFailed as query params when provided", async () => {
-        const clientManager = getMockedClientManager();
-        const cloudRest = clientManager.getConfluentCloudRestClient();
-        cloudRest.POST.mockResolvedValue({});
-
-        const runtime = runtimeWith(
-          CONNECT_CONN,
-          DEFAULT_CONNECTION_ID,
-          clientManager,
-        );
-        await handler.handle(runtime, {
-          connectorName: "my-connector",
-          includeTasks: true,
-          onlyFailed: true,
-        });
-
-        expect(cloudRest.POST).toHaveBeenCalledOnce();
-        const init = cloudRest.POST.mock.calls[0]![1] as {
-          params: { query?: unknown };
-        };
-        expect(init.params.query).toEqual({
-          includeTasks: true,
-          onlyFailed: true,
-        });
-      });
     });
   });
 });

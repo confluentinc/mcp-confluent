@@ -90,6 +90,49 @@ export async function deleteTestConnector(name: string): Promise<void> {
 }
 
 /**
+ * Polls the connector's status endpoint until it leaves PROVISIONING so
+ * lifecycle ops like restart (which the API 400s on a PROVISIONING
+ * connector) don't race the provisioning POST. Throws if the connector
+ * doesn't settle within the timeout. Must run in a `beforeAll` (not an
+ * `it`) so the test rule against setTimeout-as-test-primitive is upheld
+ * by keeping the wait in the harness layer.
+ */
+export async function waitForConnectorRunnable(
+  name: string,
+  { timeoutMs = 60_000, intervalMs = 2_000 }: TimingOptions = {},
+): Promise<void> {
+  const { envId, clusterId } = getConnectScope();
+  const client = newTestCloudClient();
+  const deadline = Date.now() + timeoutMs;
+  let lastState: string | undefined;
+  while (Date.now() < deadline) {
+    const { data } = await client.GET(
+      "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}/status",
+      {
+        params: {
+          path: {
+            environment_id: envId,
+            kafka_cluster_id: clusterId,
+            connector_name: name,
+          },
+        },
+      },
+    );
+    lastState = data?.connector?.state;
+    if (lastState && lastState !== "PROVISIONING") return;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error(
+    `connector ${name} did not leave PROVISIONING within ${timeoutMs}ms (last state: ${lastState ?? "unknown"})`,
+  );
+}
+
+interface TimingOptions {
+  timeoutMs?: number;
+  intervalMs?: number;
+}
+
+/**
  * Registers an `afterAll` at the calling describe scope to delete any
  * tracked connectors. Tests push names onto `createdConnectors` as they
  * create them; the sweep is best-effort so a teardown failure can't fail

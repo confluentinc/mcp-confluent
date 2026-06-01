@@ -315,6 +315,10 @@ describe("index.ts", () => {
         ToolName.GET_CONNECTOR_TASKS,
         ToolName.CREATE_CONNECTOR,
         ToolName.DELETE_CONNECTOR,
+        ToolName.PAUSE_CONNECTOR,
+        ToolName.RESUME_CONNECTOR,
+        ToolName.RESTART_CONNECTOR,
+        ToolName.UPDATE_CONNECTOR_CONFIG,
         // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)
         ToolName.SEARCH_TOPICS_BY_TAG,
         ToolName.SEARCH_TOPICS_BY_NAME,

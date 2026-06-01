@@ -74,11 +74,21 @@ export function bareRuntime(): ServerRuntime {
   return runtimeWith();
 }
 
-/** Runtime with a kafka block. */
-export function kafkaRuntime(): ServerRuntime {
-  return runtimeWith({
-    kafka: { bootstrap_servers: "broker:9092" },
-  });
+/**
+ * Runtime with a kafka block. When `clientManager` is supplied, threads it
+ * through so that handler-call tests can configure mocked client behaviour
+ * on the exact instance the handler will see; omit it (the
+ * `enabledConnectionIds`-style predicate-only callsites) and a fresh
+ * default-constructed mock is used.
+ */
+export function kafkaRuntime(
+  clientManager?: Mocked<DirectClientManager>,
+): ServerRuntime {
+  return runtimeWith(
+    { kafka: { bootstrap_servers: "broker:9092" } },
+    DEFAULT_CONNECTION_ID,
+    clientManager,
+  );
 }
 
 /** Shared Confluent Cloud control-plane connection config fixture for handle() tests. */

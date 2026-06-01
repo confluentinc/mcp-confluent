@@ -7,6 +7,8 @@ which is hosted by [Confluent Inc.](https://github.com/confluentinc)
 on GitHub. This document lists rules, guidelines, and help getting started,
 so if you feel something is missing feel free to send a pull request.
 
+_Internal Confluent Contributors: Please inform `#mcp-confluent` before proposing new development to avoid conflicts with work already in progress._
+
 ## What should I know before I get started?
 
 ### Contributor Agreement
@@ -235,6 +237,38 @@ npm run test:integration -- --tags-filter=@kafka
 Each tool group needs a specific credential subset; `.env.integration.example` annotates which var feeds which tests. Tests whose credentials aren't populated skip themselves with a clear reason — you don't have to fill in every var to run a subset.
 
 Minimum for `@kafka` tests: `KAFKA_API_KEY`, `KAFKA_API_SECRET`. Non-secret config (bootstrap servers, REST endpoint, cluster id) lives in `test-fixtures/yaml_configs/integration.yaml` and doesn't need to be set in the env file.
+
+##### OAuth integration tests (one-time setup)
+
+`@oauth`-tagged tests drive the CCloud OAuth flow (Auth0 sign-in) through a real headless browser via [`playwright-core`](https://playwright.dev/docs/library).
+The project depends on `playwright-core` (API only, no browser auto-download) rather than `@playwright/test` to keep regular `npm install` lightweight for contributors who never run OAuth tests.
+Before running OAuth integration tests locally for the first time, install Chromium via the locally-installed `playwright-core` CLI:
+
+```bash
+npx playwright-core install chromium
+```
+
+Using `playwright-core`'s own CLI keeps the chromium install version-aligned with the `playwright-core` devDep, with no fresh registry fetch.
+This is a one-time step per machine; the binary is cached at `~/Library/Caches/ms-playwright/` (macOS) or `~/.cache/ms-playwright/` (Linux) and is shared across playwright versions.
+CI runs this automatically in the integration pipeline's prologue, so the CI matrix doesn't need any additional setup.
+
+In addition to a Confluent Cloud API key/secret, `@oauth` tests need a real Confluent Cloud user account (username/password) for the playwright-driven Auth0 sign-in.
+With Vault-backed setup (Option A above), these come from `confluent-cloud-user`.
+With BYO setup (Option B), set `CONFLUENT_CLOUD_USERNAME` and `CONFLUENT_CLOUD_PASSWORD` in `.env.integration`.
+
+To filter to OAuth-capable tests only:
+
+```bash
+npm run test:integration -- --tags-filter=@oauth
+```
+
+To debug the playwright flow visually (browser window opens, you watch the sign-in happen), set `INTEGRATION_TEST_PLAYWRIGHT_HEADLESS=false` for that run:
+
+```bash
+INTEGRATION_TEST_PLAYWRIGHT_HEADLESS=false npm run test:integration -- --tags-filter=@oauth
+```
+
+This toggle is scoped to playwright's launch options only; it doesn't touch `INTEGRATION_TEST` (the general "we are in integration tests" flag), so unrelated test-mode behavior (like skipping the system-browser `open()` in `node-deps.ts`) stays intact.
 
 ##### Timing expectations
 

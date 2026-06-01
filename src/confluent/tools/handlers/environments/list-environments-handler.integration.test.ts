@@ -1,5 +1,19 @@
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import {
+  activeConnectionTypes,
+  CONNECTION_TYPE_DIRECT_FILTERED_REASON,
+  CONNECTION_TYPE_OAUTH_FILTERED_REASON,
+  ConnectionType,
+} from "@tests/harness/connection-types.js";
+import {
+  callToolWithOAuthFlow,
+  getOAuthCredentialsFromEnv,
+  OAUTH_FIXTURE_NOT_LOADED_REASON,
+  OAUTH_USER_CREDS_MISSING_REASON,
+  startOAuthServer,
+  stopOAuthServer,
+} from "@tests/harness/oauth-flow.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
 import {
   startServer,
@@ -11,42 +25,106 @@ import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new ListEnvironmentsHandler();
-const runtime = integrationRuntime();
 
-describe("list-environments-handler", { tags: [Tag.ENVIRONMENTS] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires confluent_cloud.auth config", () => {});
-    return;
-  }
+describe(
+  "list-environments-handler",
+  { tags: [Tag.ENVIRONMENTS, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
+  () => {
+    // the handler's `hasConfluentCloudOrOAuth` predicate accepts either an API-key-authed
+    // `confluent_cloud` block or an OAuth connection; sibling describes exercise each path
 
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    describe(`with a ${ConnectionType.DIRECT} connection`, () => {
+      if (!activeConnectionTypes.includes(ConnectionType.DIRECT)) {
+        it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
+        return;
+      }
+      const directRuntime = integrationRuntime({ oauth: false });
+      if (handler.enabledConnectionIds(directRuntime).length === 0) {
+        it.skip("requires confluent_cloud.auth in test-fixtures/yaml_configs/integration.yaml", () => {});
+        return;
+      }
 
-    beforeAll(async () => {
-      server = await startServer({ transport });
-    });
+      describe.each(activeTransports)("via %s transport", (transport) => {
+        let server: StartedServer;
 
-    afterAll(async () => {
-      await server?.stop();
-    });
+        beforeAll(async () => {
+          server = await startServer({ transport });
+        });
 
-    it("should expose list-environments in tools/list", async () => {
-      const { tools } = await server.client.listTools();
-      expect(
-        tools.find((t) => t.name === ToolName.LIST_ENVIRONMENTS),
-      ).toBeDefined();
-    });
+        afterAll(async () => {
+          await server?.stop();
+        });
 
-    it("should return at least one environment from CCloud", async () => {
-      const result = await server.client.callTool({
-        name: ToolName.LIST_ENVIRONMENTS,
-        arguments: {},
+        it("should expose list-environments in tools/list", async () => {
+          const { tools } = await server.client.listTools();
+          expect(
+            tools.find((t) => t.name === ToolName.LIST_ENVIRONMENTS),
+          ).toBeDefined();
+        });
+
+        it("should return at least one environment from CCloud", async () => {
+          const result = await server.client.callTool({
+            name: ToolName.LIST_ENVIRONMENTS,
+            arguments: {},
+          });
+          // handler's success line starts with "Successfully retrieved N environments:"
+          expect(textContent(result)).toMatch(
+            /^Successfully retrieved \d+ environments:/,
+          );
+        });
       });
-
-      // handler's success line starts with "Successfully retrieved N environments:"
-      expect(textContent(result)).toMatch(
-        /^Successfully retrieved \d+ environments:/,
-      );
     });
-  });
-});
+
+    describe(
+      `with a ${ConnectionType.OAUTH} connection`,
+      { tags: [Tag.OAUTH] },
+      () => {
+        if (!activeConnectionTypes.includes(ConnectionType.OAUTH)) {
+          it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
+          return;
+        }
+        const oauthRuntime = integrationRuntime({ oauth: true });
+        if (handler.enabledConnectionIds(oauthRuntime).length === 0) {
+          it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+          return;
+        }
+        const credentials = getOAuthCredentialsFromEnv();
+        if (!credentials) {
+          it.skip(OAUTH_USER_CREDS_MISSING_REASON, () => {});
+          return;
+        }
+
+        describe.each(activeTransports)("via %s transport", (transport) => {
+          let server: StartedServer;
+
+          beforeAll(async () => {
+            server = await startOAuthServer({ transport });
+          }, 180_000);
+
+          afterAll(async () => {
+            await stopOAuthServer(server);
+          });
+
+          it("should expose list-environments in tools/list", async () => {
+            const { tools } = await server.client.listTools();
+            expect(
+              tools.find((t) => t.name === ToolName.LIST_ENVIRONMENTS),
+            ).toBeDefined();
+          });
+
+          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+          it("should return at least one environment from CCloud", async () => {
+            const result = await callToolWithOAuthFlow(server, credentials, {
+              name: ToolName.LIST_ENVIRONMENTS,
+              arguments: {},
+            });
+            // handler's success line starts with "Successfully retrieved N environments:"
+            expect(textContent(result)).toMatch(
+              /^Successfully retrieved \d+ environments:/,
+            );
+          });
+        });
+      },
+    );
+  },
+);

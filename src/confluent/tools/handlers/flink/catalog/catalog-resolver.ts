@@ -75,6 +75,22 @@ export interface SchemaMapping {
 }
 
 /**
+ * Result of a resolver lookup. `statementName` is the name minted by the
+ * underlying {@linkcode executeFlinkSql} call, surfaced so the calling
+ * handler can emit it via `_meta.flinkStatementsCreated` for test-side
+ * cleanup.
+ */
+export interface CatalogMappingResult {
+  mappings: CatalogMapping[];
+  statementName?: string;
+}
+
+export interface SchemaMappingResult {
+  mappings: SchemaMapping[];
+  statementName?: string;
+}
+
+/**
  * Looks up catalog mappings from INFORMATION_SCHEMA.CATALOGS.
  * Returns a 1:1 mapping between environment IDs (CATALOG_ID) and friendly names (CATALOG_NAME).
  */
@@ -86,7 +102,7 @@ export async function getCatalogMapping(
     environmentId: string;
     computePoolId: string;
   },
-): Promise<CatalogMapping[]> {
+): Promise<CatalogMappingResult> {
   const sql = `SELECT \`CATALOG_ID\`, \`CATALOG_NAME\` FROM \`${catalogName}\`.\`INFORMATION_SCHEMA\`.\`CATALOGS\``;
 
   const result = await executeFlinkSql(clientManager, sql, {
@@ -96,7 +112,7 @@ export async function getCatalogMapping(
   });
 
   if (!result.success || !result.data) {
-    return [];
+    return { mappings: [], statementName: result.statementName };
   }
 
   const mappings: CatalogMapping[] = [];
@@ -108,7 +124,7 @@ export async function getCatalogMapping(
       mappings.push({ catalogId, catalogName: catalogNameValue });
     }
   }
-  return mappings;
+  return { mappings, statementName: result.statementName };
 }
 
 /**
@@ -146,7 +162,7 @@ export async function getSchemaMapping(
     environmentId: string;
     computePoolId: string;
   },
-): Promise<SchemaMapping[]> {
+): Promise<SchemaMappingResult> {
   const sql = `SELECT \`SCHEMA_ID\`, \`SCHEMA_NAME\` FROM \`${catalogName}\`.\`INFORMATION_SCHEMA\`.\`SCHEMATA\` WHERE \`SCHEMA_NAME\` <> 'INFORMATION_SCHEMA'`;
 
   const result = await executeFlinkSql(clientManager, sql, {
@@ -156,7 +172,7 @@ export async function getSchemaMapping(
   });
 
   if (!result.success || !result.data) {
-    return [];
+    return { mappings: [], statementName: result.statementName };
   }
 
   const mappings: SchemaMapping[] = [];
@@ -168,7 +184,7 @@ export async function getSchemaMapping(
       mappings.push({ schemaId, schemaName });
     }
   }
-  return mappings;
+  return { mappings, statementName: result.statementName };
 }
 
 /**

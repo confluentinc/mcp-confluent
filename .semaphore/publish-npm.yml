@@ -26,6 +26,13 @@ blocks:
                 echo "Aborting: set CONFIRM_PUBLISH=yes to publish $RELEASE_NAME to npm (got '$CONFIRM_PUBLISH')."
                 exit 1
               fi
+            # This task publishes to the default 'latest' tag, so refuse prereleases
+            - |
+              IS_PRERELEASE=$(gh release view "$RELEASE_NAME" --json isPrerelease -q .isPrerelease)
+              if [ "$IS_PRERELEASE" != "false" ]; then
+                echo "Aborting: $RELEASE_NAME is a prerelease (isPrerelease=$IS_PRERELEASE); this task only publishes stable releases to the 'latest' tag."
+                exit 1
+              fi
             - echo "Confirmed: publishing $RELEASE_NAME to npm."
 
   - name: "Publish to npm"

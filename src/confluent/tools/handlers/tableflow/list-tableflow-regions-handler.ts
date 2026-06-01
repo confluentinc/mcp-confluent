@@ -23,10 +23,9 @@ const listTableFlowRegionsArguments = z.object({
     ),
   pageToken: z
     .string()
-    .max(255)
     .optional()
     .describe(
-      "Opaque pagination token from a previous response (max 255 characters). Omit on first request.",
+      "Opaque pagination token from a previous response. Omit on first request.",
     ),
 });
 

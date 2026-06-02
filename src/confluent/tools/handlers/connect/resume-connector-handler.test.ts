@@ -113,7 +113,7 @@ describe("resume-connector-handler.ts", () => {
           if (typeof outcome === "object" && "resolves" in outcome) {
             expect(cloudRest.PUT).toHaveBeenCalledOnce();
             expect(cloudRest.PUT).toHaveBeenCalledWith(
-              expect.any(String),
+              expect.stringContaining("/resume"),
               expect.objectContaining({
                 params: expect.objectContaining({
                   path: expect.objectContaining({

@@ -113,7 +113,7 @@ describe("pause-connector-handler.ts", () => {
           if (typeof outcome === "object" && "resolves" in outcome) {
             expect(cloudRest.PUT).toHaveBeenCalledOnce();
             expect(cloudRest.PUT).toHaveBeenCalledWith(
-              expect.any(String),
+              expect.stringContaining("/pause"),
               expect.objectContaining({
                 params: expect.objectContaining({
                   path: expect.objectContaining({

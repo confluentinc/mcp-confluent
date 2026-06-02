@@ -113,7 +113,7 @@ describe("restart-connector-handler.ts", () => {
           if (typeof outcome === "object" && "resolves" in outcome) {
             expect(cloudRest.POST).toHaveBeenCalledOnce();
             expect(cloudRest.POST).toHaveBeenCalledWith(
-              expect.any(String),
+              expect.stringContaining("/restart"),
               expect.objectContaining({
                 params: expect.objectContaining({
                   path: expect.objectContaining({

@@ -3,6 +3,7 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   provisionTestDatagenConnector,
   waitForConnectorRunnable,
+  waitForConnectorRunning,
   withSharedConnectorCleanup,
 } from "@tests/harness/connect.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
@@ -88,6 +89,13 @@ describe(
       });
 
       it("should restart the connector", async () => {
+        // Resume returns 202 the moment CCloud accepts the request; the state
+        // transition itself is asynchronous, so the connector may still be
+        // PAUSED when this test fires. Restart is rejected with HTTP 400 on
+        // a non-RUNNING connector, so wait for the resume to actually land
+        // before issuing the restart.
+        await waitForConnectorRunning(connectorName);
+
         const result = await server.client.callTool({
           name: ToolName.RESTART_CONNECTOR,
           arguments: { connectorName },

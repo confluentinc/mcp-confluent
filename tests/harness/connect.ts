@@ -89,6 +89,74 @@ export async function deleteTestConnector(name: string): Promise<void> {
   }
 }
 
+interface TimingOptions {
+  timeoutMs?: number;
+  intervalMs?: number;
+}
+
+/**
+ * Polls the connector's status endpoint until `matches(state)` returns true.
+ * Throws if the predicate is not satisfied within the timeout. CCloud's
+ * lifecycle ops are asynchronous — pause/resume return 202 the moment the
+ * request is accepted, not when the state actually transitions — so tests
+ * that chain ops (e.g. resume → restart) must wait for the intermediate
+ * state to land before issuing the next call. Kept in the harness layer
+ * (not a test `it`) so the "no setTimeout-for-waiting in tests" rule
+ * stays intact.
+ */
+export async function waitForConnectorState(
+  name: string,
+  matches: (state: string | undefined) => boolean,
+  description: string,
+  { timeoutMs = 60_000, intervalMs = 2_000 }: TimingOptions = {},
+): Promise<void> {
+  const { envId, clusterId } = getConnectScope();
+  const client = newTestCloudClient();
+  const deadline = Date.now() + timeoutMs;
+  let lastState: string | undefined;
+  while (Date.now() < deadline) {
+    const { data } = await client.GET(
+      "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors/{connector_name}/status",
+      {
+        params: {
+          path: {
+            environment_id: envId,
+            kafka_cluster_id: clusterId,
+            connector_name: name,
+          },
+        },
+      },
+    );
+    lastState = data?.connector?.state;
+    if (matches(lastState)) return;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error(
+    `connector ${name} did not reach ${description} within ${timeoutMs}ms (last state: ${lastState ?? "unknown"})`,
+  );
+}
+
+/** Wait for the connector to leave PROVISIONING, i.e. become operable. */
+export function waitForConnectorRunnable(
+  name: string,
+  opts?: TimingOptions,
+): Promise<void> {
+  return waitForConnectorState(
+    name,
+    (s) => s !== undefined && s !== "PROVISIONING",
+    "a non-PROVISIONING state",
+    opts,
+  );
+}
+
+/** Wait for the connector to reach RUNNING (e.g. after resume, before restart). */
+export function waitForConnectorRunning(
+  name: string,
+  opts?: TimingOptions,
+): Promise<void> {
+  return waitForConnectorState(name, (s) => s === "RUNNING", "RUNNING", opts);
+}
+
 /**
  * Registers an `afterAll` at the calling describe scope to delete any
  * tracked connectors. Tests push names onto `createdConnectors` as they

@@ -13,6 +13,10 @@ import { GetConnectorOffsetsHandler } from "@src/confluent/tools/handlers/connec
 import { GetConnectorStatusHandler } from "@src/confluent/tools/handlers/connect/get-connector-status-handler.js";
 import { GetConnectorTasksHandler } from "@src/confluent/tools/handlers/connect/get-connector-tasks-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
+import { PauseConnectorHandler } from "@src/confluent/tools/handlers/connect/pause-connector-handler.js";
+import { RestartConnectorHandler } from "@src/confluent/tools/handlers/connect/restart-connector-handler.js";
+import { ResumeConnectorHandler } from "@src/confluent/tools/handlers/connect/resume-connector-handler.js";
+import { UpdateConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/update-connector-config-handler.js";
 import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
 import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
@@ -93,6 +97,10 @@ export class ToolHandlerRegistry {
     [ToolName.GET_CONNECTOR_OFFSETS, new GetConnectorOffsetsHandler()],
     [ToolName.GET_CONNECTOR_STATUS, new GetConnectorStatusHandler()],
     [ToolName.GET_CONNECTOR_TASKS, new GetConnectorTasksHandler()],
+    [ToolName.UPDATE_CONNECTOR_CONFIG, new UpdateConnectorConfigHandler()],
+    [ToolName.PAUSE_CONNECTOR, new PauseConnectorHandler()],
+    [ToolName.RESUME_CONNECTOR, new ResumeConnectorHandler()],
+    [ToolName.RESTART_CONNECTOR, new RestartConnectorHandler()],
     [ToolName.SEARCH_TOPICS_BY_TAG, new SearchTopicsByTagHandler()],
     [ToolName.CREATE_TOPIC_TAGS, new CreateTopicTagsHandler()],
     [ToolName.DELETE_TAG, new DeleteTagHandler()],

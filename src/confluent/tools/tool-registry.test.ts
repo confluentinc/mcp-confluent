@@ -112,6 +112,9 @@ describe("tool-registry.ts", () => {
           "add",
           "update",
           "alter",
+          "pause",
+          "resume",
+          "restart",
         ]);
         const destructivePrefixes = new Set(["delete", "remove"]);
 
@@ -202,6 +205,10 @@ describe("tool-registry.ts", () => {
         [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloud,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
         [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
+        [ToolName.PAUSE_CONNECTOR]: hasConfluentCloud,
+        [ToolName.RESUME_CONNECTOR]: hasConfluentCloud,
+        [ToolName.RESTART_CONNECTOR]: hasConfluentCloud,
+        [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloud,
         // Catalog + search (CCloud catalog support)
         [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
         [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
@@ -429,6 +436,10 @@ describe("tool-registry.ts", () => {
       [ToolName.GET_CONNECTOR_TASKS]: { outcome: { throws: "ZodError" } },
       [ToolName.CREATE_CONNECTOR]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.PAUSE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.RESUME_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.RESTART_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.UPDATE_CONNECTOR_CONFIG]: { outcome: { throws: "ZodError" } },
       // Catalog
       [ToolName.CREATE_TOPIC_TAGS]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_TAG]: { outcome: { throws: "ZodError" } },

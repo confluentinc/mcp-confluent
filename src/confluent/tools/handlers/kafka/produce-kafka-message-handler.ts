@@ -85,10 +85,10 @@ type ProduceKafkaMessageArguments = z.infer<
 /**
  * Handler for producing messages to a Kafka topic, with support for Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value.
  *
- * - If schema registry is enabled, the handler checks if a schema is already registered for the topic's key/value subject.
- *   - If a schema exists and none is provided, it returns the latest schema to the client for retry.
- *   - If no schema exists and none is provided, it returns an error.
+ * - If schema registry is enabled, `schemaType` is required and the handler checks if a schema is already registered for the topic's key/value subject.
  *   - If a schema is provided, it is registered before serialization.
+ *   - If no schema is provided and one is already registered, the serializer uses the latest registered version.
+ *   - If no schema is provided and none is registered, it returns an error.
  * - Serialization is performed using the appropriate serializer for the schema type.
  * - Produces the message to the specified Kafka topic, handling both key and value serialization as needed.
  */
@@ -100,23 +100,10 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
    */
   handleSchemaCheckResult(result: SchemaCheckResult): CallToolResult | null {
     if (!result) return null;
-
-    if (result.type === "schema-needed") {
-      return this.createResponse(
-        `A schema already exists for subject '${result.subject}'. Please retry with the following schema:\n${result.latestSchema}, schemaType: ${result.schemaType}`,
-        true,
-        {
-          latestSchema: result.latestSchema,
-          subject: result.subject,
-          schemaType: result.schemaType,
-        },
-      );
-    } else {
-      return this.createResponse(
-        `No schema registered for subject '${result.subject}', and no schema provided to register.`,
-        true,
-      );
-    }
+    return this.createResponse(
+      `No schema registered for subject '${result.subject}', and no schema provided to register.`,
+      true,
+    );
   }
 
   /**

@@ -1,7 +1,22 @@
-import { SerdeType } from "@confluentinc/schemaregistry";
-import { checkSchemaNeeded } from "@src/confluent/schema-registry-helper.js";
+import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import {
+  buildProtobufMessage,
+  checkSchemaNeeded,
+  deserializeMessage,
+  serializeMessage,
+} from "@src/confluent/schema-registry-helper.js";
 import { getMockedSchemaRegistry } from "@tests/stubs/index.js";
 import { beforeEach, describe, expect, it } from "vitest";
+
+const PROTO_USER = `syntax = "proto3";
+package com.example;
+
+message User {
+  string user_id = 1;
+  string name = 2;
+  string email = 3;
+  int32 age = 4;
+}`;
 
 describe("schema-registry-helper.ts", () => {
   describe("checkSchemaNeeded()", () => {
@@ -98,5 +113,154 @@ describe("schema-registry-helper.ts", () => {
         expect(result).toEqual({ type: "no-schema", subject: expected });
       },
     );
+  });
+
+  describe("buildProtobufMessage()", () => {
+    it("builds a typed message (with $typeName) from snake_case payload keys", () => {
+      const { message } = buildProtobufMessage(PROTO_USER, "com.example.User", {
+        user_id: "USR-001",
+        name: "Alice",
+        age: 30,
+      });
+      const fields = message as Record<string, unknown>;
+      expect(fields.$typeName).toBe("com.example.User");
+      expect(fields.userId).toBe("USR-001");
+      expect(fields.name).toBe("Alice");
+      expect(fields.age).toBe(30);
+    });
+
+    it("requires payload keys to match the proto field names (snake_case)", () => {
+      // protobufjs preserves the declared field names (keepCase), so the JSON
+      // payload must use the proto field name `user_id`, not camelCase `userId`.
+      expect(() =>
+        buildProtobufMessage(PROTO_USER, "com.example.User", {
+          userId: "USR-002",
+        }),
+      ).toThrow(/unknown/);
+    });
+
+    it("throws listing available message types when messageName is unknown", () => {
+      expect(() =>
+        buildProtobufMessage(PROTO_USER, "com.example.Missing", {}),
+      ).toThrow(/Available message types: com\.example\.User/);
+    });
+
+    it("throws a parse error for malformed .proto text", () => {
+      expect(() =>
+        buildProtobufMessage("this is not protobuf", "com.example.User", {}),
+      ).toThrow(/Failed to parse Protobuf schema/);
+    });
+  });
+
+  describe("serializeMessage() with PROTOBUF", () => {
+    // A real mock:// Schema Registry client serializes/deserializes entirely
+    // in-memory (no network), so the round-trip proves the produced bytes are
+    // valid Protobuf tagged with the right schema id.
+    const newRegistry = (): SchemaRegistryClient =>
+      SchemaRegistryClient.newClient({
+        baseURLs: ["mock://"],
+      }) as SchemaRegistryClient;
+
+    it("registers the schema and serializes a payload that round-trips", async () => {
+      const registry = newRegistry();
+      const topic = "proto-roundtrip";
+      const bytes = await serializeMessage(
+        topic,
+        {
+          message: {
+            user_id: "USR-001",
+            name: "Alice",
+            email: "alice@example.com",
+            age: 30,
+          },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          schema: PROTO_USER,
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+      expect(Buffer.isBuffer(bytes)).toBe(true);
+
+      const decoded = await deserializeMessage(
+        topic,
+        bytes as Buffer,
+        "PROTOBUF",
+        registry,
+        SerdeType.VALUE,
+      );
+      expect(decoded).toEqual({
+        $typeName: "com.example.User",
+        userId: "USR-001",
+        name: "Alice",
+        email: "alice@example.com",
+        age: 30,
+      });
+    });
+
+    it("uses the latest registered schema when no schema is supplied", async () => {
+      const registry = newRegistry();
+      const topic = "proto-latest";
+      // First produce WITH the schema so the serializer registers it in the
+      // serialized (base64 FileDescriptorProto) format the SDK expects, mimicking
+      // a prior produce. A subsequent produce then exercises the use-latest path.
+      await serializeMessage(
+        topic,
+        {
+          message: { user_id: "USR-000", name: "Seed" },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          schema: PROTO_USER,
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      const bytes = await serializeMessage(
+        topic,
+        {
+          message: { user_id: "USR-009", name: "Bob" },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      const decoded = await deserializeMessage(
+        topic,
+        bytes as Buffer,
+        "PROTOBUF",
+        registry,
+        SerdeType.VALUE,
+      );
+      expect(decoded).toEqual({
+        $typeName: "com.example.User",
+        userId: "USR-009",
+        name: "Bob",
+        email: "",
+        age: 0,
+      });
+    });
+
+    it("throws when messageName is missing for PROTOBUF", async () => {
+      const registry = newRegistry();
+      await expect(
+        serializeMessage(
+          "proto-missing",
+          {
+            message: { user_id: "USR-001" },
+            useSchemaRegistry: true,
+            schemaType: "PROTOBUF",
+            schema: PROTO_USER,
+          },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(/messageName is required/);
+    });
   });
 });

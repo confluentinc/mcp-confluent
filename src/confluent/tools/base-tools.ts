@@ -3,12 +3,13 @@ import type { ConnectionConfig } from "@src/config/models.js";
 import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
+  alwaysEnabled,
   ConnectionPredicate,
   PredicateResult,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { ZodRawShape } from "zod";
+import { z, ZodRawShape } from "zod";
 
 /**
  * Standard MCP tool annotations.
@@ -50,13 +51,23 @@ export enum ToolCategory {
 }
 
 export interface ToolHandler {
+  /** Handle a tool invocation. */
   handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
     sessionId?: string,
   ): Promise<CallToolResult> | CallToolResult;
 
-  getToolConfig(): ToolConfig;
+  /**
+   * Produce the actual config registered with MCP for this tool, potentially
+   * injecting a required `connectionId` parameter when the tool can target more
+   * than one connection. See the method body for the rules.
+   *
+   * This method is called when setting up the MCP server, and we ourselves make
+   * the downcall to the handler-authored `getToolConfig()`.
+   * {@linkcode BaseToolHandler.getRegisteredToolConfig} for the rules.
+   */
+  getRegisteredToolConfig(runtime: ServerRuntime): ToolConfig;
 
   /**
    * The connection predicate that gates this tool's enablement. Lifted onto
@@ -109,7 +120,50 @@ export abstract class BaseToolHandler implements ToolHandler {
     sessionId?: string,
   ): Promise<CallToolResult> | CallToolResult;
 
-  abstract getToolConfig(): ToolConfig;
+  protected abstract getToolConfig(): ToolConfig;
+
+  /**
+   * Produce the actual config registered with MCP for this tool, potentially
+   * injecting a required `connectionId` parameter when the tool can target more
+   * than one connection. See the method body for the rules.
+   *
+   * This method is called when setting up the MCP server, and we ourselves make
+   * the downcall to the handler-authored `getToolConfig()`.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
+   */
+  getRegisteredToolConfig(runtime: ServerRuntime): ToolConfig {
+    const config = this.getToolConfig();
+    const ids = this.enabledConnectionIds(runtime);
+
+    // If the tool is always enabled or only works with a single connection,
+    // no need to inject a connectionId parameter — there is no ambiguity as
+    // to which connection the tool should route to, so return the tool's
+    // authored config verbatim.
+
+    // (We might find that in multi-connection configurations, we might
+    //  want to surface the `connectionId` parameter regardless but then
+    //  lock it to a single value with `z.enum([theSoleEnabledId])`. Will
+    //  have to get farther along epic #532 before we can make that
+    //  determination, though. We have enough information in serverRuntime
+    //  to be able to migrate, though, so is not a blocker at this time.)
+    if (this.predicate === alwaysEnabled || ids.length <= 1) return config;
+
+    // Otherwise, inject a required connectionId parameter into the Zod
+    // inputSchema with an enum of the enabled connection IDs.
+    return {
+      ...config,
+      inputSchema: {
+        ...config.inputSchema,
+        connectionId: z
+          .enum(ids as [string, ...string[]])
+          .describe(
+            `Which configured connection to target. One of: ${ids.join(", ")}. ` +
+              `Discover via list-connections.`,
+          ),
+      },
+    };
+  }
 
   /**
    * The connection predicate that gates this tool. The single customization

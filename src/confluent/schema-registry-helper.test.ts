@@ -3,6 +3,11 @@ import {
   buildProtobufMessage,
   checkSchemaNeeded,
   deserializeMessage,
+  getDeserializer,
+  getLatestSchemaIfExists,
+  getLatestSchemaOfTypeOrThrow,
+  getSerializer,
+  protobufRegistryFromSerialized,
   serializeMessage,
 } from "@src/confluent/schema-registry-helper.js";
 import { getMockedSchemaRegistry } from "@tests/stubs/index.js";
@@ -334,6 +339,182 @@ describe("schema-registry-helper.ts", () => {
       ).rejects.toThrow(
         /is registered as AVRO, but the requested schemaType is JSON/,
       );
+    });
+  });
+
+  describe("getSerializer()", () => {
+    it.each(["AVRO", "JSON", "PROTOBUF"] as const)(
+      "should return a serializer for %s",
+      (schemaType) => {
+        const registry = getMockedSchemaRegistry();
+        expect(
+          getSerializer(schemaType, registry, SerdeType.VALUE),
+        ).toBeDefined();
+      },
+    );
+
+    it("should throw for an unknown schema type", () => {
+      const registry = getMockedSchemaRegistry();
+      expect(() =>
+        getSerializer("XML" as unknown as "AVRO", registry, SerdeType.VALUE),
+      ).toThrow(/Unknown schemaType: XML/);
+    });
+
+    it("should throw when the schema type is undefined", () => {
+      const registry = getMockedSchemaRegistry();
+      expect(() => getSerializer(undefined, registry, SerdeType.VALUE)).toThrow(
+        /Unknown schemaType/,
+      );
+    });
+  });
+
+  describe("getDeserializer()", () => {
+    it.each(["AVRO", "JSON", "PROTOBUF"] as const)(
+      "should return a deserializer for %s",
+      (schemaType) => {
+        const registry = getMockedSchemaRegistry();
+        expect(
+          getDeserializer(schemaType, registry, SerdeType.VALUE),
+        ).toBeDefined();
+      },
+    );
+
+    it("should throw for an unknown schema type", () => {
+      const registry = getMockedSchemaRegistry();
+      expect(() =>
+        getDeserializer("XML" as unknown as "AVRO", registry, SerdeType.VALUE),
+      ).toThrow(/Unknown schemaType: XML/);
+    });
+  });
+
+  describe("getLatestSchemaIfExists()", () => {
+    it("should return null when the subject is not found (404)", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.getLatestSchemaMetadata.mockRejectedValue({ status: 404 });
+      expect(await getLatestSchemaIfExists(registry, "missing")).toBeNull();
+    });
+
+    it("should rethrow non-404 errors", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.getLatestSchemaMetadata.mockRejectedValue({ status: 500 });
+      await expect(getLatestSchemaIfExists(registry, "boom")).rejects.toEqual({
+        status: 500,
+      });
+    });
+
+    it("should default the schema type to AVRO when none is reported", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.getLatestSchemaMetadata.mockResolvedValue({
+        id: 1,
+        version: 1,
+        subject: "orders-value",
+        schema: '{"type":"record","name":"X","fields":[]}',
+      });
+      expect(await getLatestSchemaIfExists(registry, "orders-value")).toEqual({
+        schema: '{"type":"record","name":"X","fields":[]}',
+        schemaType: "AVRO",
+      });
+    });
+  });
+
+  describe("getLatestSchemaOfTypeOrThrow()", () => {
+    it("should throw when no schema is registered for the subject", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.getLatestSchemaMetadata.mockRejectedValue({ status: 404 });
+      await expect(
+        getLatestSchemaOfTypeOrThrow(registry, "orders-value", "AVRO"),
+      ).rejects.toThrow(/No AVRO schema registered for subject 'orders-value'/);
+    });
+  });
+
+  describe("protobufRegistryFromSerialized()", () => {
+    it("should throw an actionable error when the stored schema cannot be decoded", () => {
+      expect(() =>
+        protobufRegistryFromSerialized("not-valid-base64$$"),
+      ).toThrow(/Failed to decode registered Protobuf schema/);
+    });
+  });
+
+  describe("serializeMessage() guards", () => {
+    it("should stringify a non-string payload when schema registry is disabled", async () => {
+      const registry = getMockedSchemaRegistry();
+      const result = await serializeMessage(
+        "orders",
+        { message: { x: 1 }, useSchemaRegistry: false },
+        SerdeType.VALUE,
+        registry,
+      );
+      expect(result).toBe('{"x":1}');
+    });
+
+    it("should throw when schemaType is missing and useSchemaRegistry is true", async () => {
+      const registry = getMockedSchemaRegistry();
+      await expect(
+        serializeMessage(
+          "orders",
+          { message: { x: 1 }, useSchemaRegistry: true },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(
+        /schemaType is required when useSchemaRegistry is true/,
+      );
+    });
+
+    it("should throw when the registry client is missing", async () => {
+      await expect(
+        serializeMessage(
+          "orders",
+          { message: { x: 1 }, useSchemaRegistry: true, schemaType: "AVRO" },
+          SerdeType.VALUE,
+          undefined,
+        ),
+      ).rejects.toThrow(/Schema Registry client is required/);
+    });
+
+    it("should throw when the message is not an object", async () => {
+      const registry = getMockedSchemaRegistry();
+      await expect(
+        serializeMessage(
+          "orders",
+          { message: "raw", useSchemaRegistry: true, schemaType: "AVRO" },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(/message must be an object matching the schema/);
+    });
+
+    it("should wrap a registration failure with an actionable message", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.register.mockRejectedValue(new Error("conflict"));
+      await expect(
+        serializeMessage(
+          "orders",
+          {
+            message: { x: 1 },
+            useSchemaRegistry: true,
+            schemaType: "AVRO",
+            schema: '{"type":"record","name":"X","fields":[]}',
+          },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(/Failed to register schema for subject 'orders-value'/);
+    });
+  });
+
+  describe("deserializeMessage() failure", () => {
+    it("should wrap deserialization errors", async () => {
+      const registry = getMockedSchemaRegistry();
+      await expect(
+        deserializeMessage(
+          "orders",
+          Buffer.from([0, 1, 2, 3]),
+          "AVRO",
+          registry,
+          SerdeType.VALUE,
+        ),
+      ).rejects.toThrow(/Failed to deserialize message/);
     });
   });
 });

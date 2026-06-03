@@ -225,6 +225,41 @@ export async function getLatestSchemaIfExists(
 }
 
 /**
+ * Fetches the latest registered schema for a subject and asserts it matches the
+ * requested schema type. Without this guard a use-latest produce against a
+ * subject registered with a different format fails deep inside the serializer
+ * with an opaque parse/decode error (e.g. an AvroSerializer trying to parse a
+ * JSON schema string, or the Protobuf path base64-decoding an Avro schema);
+ * surfacing the mismatch here gives the caller an actionable message instead.
+ *
+ * @param registry - The schema registry client instance
+ * @param subject - The resolved Schema Registry subject
+ * @param expected - The schema type the caller asked to produce with
+ * @returns The latest schema string and (matching) schema type
+ * @throws Error if no schema is registered for the subject, or the registered
+ *   schema type differs from `expected`
+ */
+export async function getLatestSchemaOfTypeOrThrow(
+  registry: SchemaRegistryClient,
+  subject: string,
+  expected: SchemaType,
+): Promise<{ schema: string; schemaType: SchemaType }> {
+  const latest = await getLatestSchemaIfExists(registry, subject);
+  if (!latest) {
+    throw new Error(
+      `No ${expected} schema registered for subject '${subject}', and none provided.`,
+    );
+  }
+  if (latest.schemaType !== expected) {
+    throw new Error(
+      `Subject '${subject}' is registered as ${latest.schemaType}, but the requested schemaType is ${expected}. ` +
+        `Use the matching schemaType, or produce to a different subject.`,
+    );
+  }
+  return latest;
+}
+
+/**
  * Builds a `@bufbuild/protobuf` descriptor registry from raw `.proto` schema text.
  *
  * The `@confluentinc/schemaregistry` ProtobufSerializer encodes locally against
@@ -257,7 +292,9 @@ export function protobufRegistryFromProto(protoText: string): MutableRegistry {
       createFileRegistry(fromBinary(FileDescriptorSetSchema, bytes)),
     );
   } catch (err) {
-    throw new Error(`Failed to parse Protobuf schema: ${err}`);
+    throw new Error(
+      `Failed to parse Protobuf schema: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
@@ -284,7 +321,9 @@ export function protobufRegistryFromSerialized(
       createFileRegistry(fileDescriptorProto, () => undefined),
     );
   } catch (err) {
-    throw new Error(`Failed to decode registered Protobuf schema: ${err}`);
+    throw new Error(
+      `Failed to decode registered Protobuf schema: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
@@ -428,9 +467,14 @@ export async function serializeMessage(
       );
     } catch (err) {
       throw new Error(
-        `Failed to register schema for subject '${subject}': ${err}`,
+        `Failed to register schema for subject '${subject}': ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  } else {
+    // Use-latest path: confirm the registered schema is the requested type so a
+    // mismatch fails with an actionable message here rather than as an opaque
+    // parse error inside the serializer's lazy useLatestVersion fetch.
+    await getLatestSchemaOfTypeOrThrow(registry, subject, options.schemaType);
   }
 
   let serializer: Serializer;
@@ -499,12 +543,11 @@ async function serializeProtobufMessage(
     };
   } else {
     // Use-latest path: rebuild the descriptor from the stored serialized schema.
-    const latest = await getLatestSchemaIfExists(registry, subject);
-    if (!latest) {
-      throw new Error(
-        `No Protobuf schema registered for subject '${subject}', and none provided.`,
-      );
-    }
+    const latest = await getLatestSchemaOfTypeOrThrow(
+      registry,
+      subject,
+      "PROTOBUF",
+    );
     protobufRegistry = protobufRegistryFromSerialized(latest.schema);
     serializerConfig = { useLatestVersion: true };
   }
@@ -523,7 +566,7 @@ async function serializeProtobufMessage(
     return await serializer.serialize(topicName, message);
   } catch (err) {
     throw new Error(
-      `Failed to serialize message for subject '${subject}': ${err}`,
+      `Failed to serialize message for subject '${subject}': ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }

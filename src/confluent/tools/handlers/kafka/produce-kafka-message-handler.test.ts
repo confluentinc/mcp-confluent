@@ -93,6 +93,30 @@ describe("produce-kafka-message-handler.ts", () => {
         });
       });
 
+      it("should throw a ZodError when a PROTOBUF value omits messageName", async () => {
+        // The valueOptions superRefine requires messageName for PROTOBUF
+        // produces that use schema registry; without it the schema rejects
+        // before the handler touches the client.
+        const clientManager = getMockedClientManager();
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: {
+              message: { user_id: "USR-001" },
+              useSchemaRegistry: true,
+              schemaType: "PROTOBUF",
+            },
+          },
+          outcome: { throws: "ZodError" },
+        });
+      });
+
       it("should call getSchemaRegistrySdkClient with the resolved envId when value.useSchemaRegistry is true", async () => {
         // Pin the SR-under-OAuth wiring at the handler-test layer. Under
         // direct-mode runtime, `resolveKafkaClusterArgs` returns

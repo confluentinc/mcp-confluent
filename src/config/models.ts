@@ -89,6 +89,7 @@ export interface SchemaRegistryDirectConfig {
 export interface ConfluentCloudDirectConfig {
   readonly endpoint: string;
   readonly auth: AuthConfig;
+  readonly organization_id?: string;
 }
 
 /**
@@ -298,6 +299,11 @@ const directConnectionSchema = z
           )
           .optional(),
         auth: authConfigSchema,
+        organization_id: z
+          .string()
+          .trim()
+          .min(1, "confluent_cloud.organization_id cannot be empty")
+          .optional(),
       })
       .strict()
       .optional(),

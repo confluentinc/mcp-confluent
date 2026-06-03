@@ -294,8 +294,10 @@ export function protobufRegistryFromSerialized(
  *
  * @param registry - Descriptor registry containing the target message type
  * @param messageName - Fully-qualified message type name (e.g. `com.example.User`)
- * @param payload - The payload to encode; keys may be snake_case (proto field
- *   names) or camelCase (JSON names)
+ * @param payload - The payload to encode. Keys must match the proto field names
+ *   exactly (e.g. `user_id`, not `userId`): the schema is parsed with protobufjs
+ *   `keepCase: true`, so each field's JSON name equals its declared proto name
+ *   and `fromJson` rejects camelCase keys as unknown fields.
  * @returns The typed protobuf message
  * @throws Error if `messageName` does not match a message in the registry (the
  *   error lists the available names)
@@ -332,7 +334,8 @@ export function protobufMessageFrom(
  *
  * @param protoText - The `.proto` schema definition (proto3)
  * @param messageName - Fully-qualified message type name (e.g. `com.example.User`)
- * @param payload - The payload to encode (snake_case or camelCase keys)
+ * @param payload - The payload to encode. Keys must match the proto field names
+ *   exactly (e.g. `user_id`, not `userId`) — see {@link protobufMessageFrom}.
  * @returns The typed protobuf message and the registry describing it
  * @throws Error if the `.proto` text cannot be parsed, or if `messageName` does
  *   not match a message in the schema

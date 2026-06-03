@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or usage help
+    url: https://github.com/confluentinc/mcp-confluent/blob/main/README.md
+    about: Check the README and the docs/ guides for setup, configuration, and client integration before opening an issue.
+  - name: Configuration help
+    url: https://github.com/confluentinc/mcp-confluent/blob/main/CONFIGURATION.md
+    about: See CONFIGURATION.md for the YAML/env configuration reference.
+  - name: Contributing guide
+    url: https://github.com/confluentinc/mcp-confluent/blob/main/CONTRIBUTING.md
+    about: Want to contribute a fix or feature? Start here.
+  - name: Confluent Cloud support
+    url: https://support.confluent.io/
+    about: For issues with your Confluent Cloud account, billing, or services (not this server), contact Confluent support.

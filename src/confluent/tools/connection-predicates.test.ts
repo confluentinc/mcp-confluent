@@ -79,6 +79,20 @@ const CCLOUD_SR_CONN = directConn({
     endpoint: "https://psrc-abc.us-east-1.aws.confluent.cloud",
     auth: { type: "api_key", key: "k", secret: "s" },
   },
+  confluent_cloud: {
+    endpoint: "https://api.confluent.cloud",
+    auth: { type: "api_key", key: "k", secret: "s" },
+  },
+});
+
+// Self-managed Confluent Platform deployment with HTTP Basic Auth in front of
+// its Schema Registry. The auth shape collides with CCloud's api_key shape, but
+// the absence of a confluent_cloud block distinguishes the two.
+const CP_AUTH_SR_CONN = directConn({
+  schema_registry: {
+    endpoint: "https://cp-sr.internal:8081",
+    auth: { type: "api_key", key: "k", secret: "s" },
+  },
 });
 
 const DIRECT_CCLOUD_KAFKA_AUTH_CONN = directConn({
@@ -298,8 +312,14 @@ describe("connection-predicates.ts", () => {
   });
 
   describe("hasCCloudCatalogSupport()", () => {
-    it("should return enabled when schema_registry has api_key auth", () => {
+    it("should return enabled when schema_registry has api_key auth and confluent_cloud is present", () => {
       expect(hasCCloudCatalogSupport(CCLOUD_SR_CONN)).toEqual(ENABLED);
+    });
+
+    it("should report MissingConfluentCloudBlock when schema_registry has api_key auth but confluent_cloud is absent (Confluent Platform with auth-protected SR)", () => {
+      expect(hasCCloudCatalogSupport(CP_AUTH_SR_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingConfluentCloudBlock),
+      );
     });
 
     it("should report MissingSchemaRegistryApiKeyAuth when schema_registry has no auth", () => {

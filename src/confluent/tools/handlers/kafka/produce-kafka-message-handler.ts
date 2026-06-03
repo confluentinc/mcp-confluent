@@ -64,11 +64,18 @@ const messageOptions = z.object({
 // PROTOBUF serialization needs a fully-qualified message type to encode the
 // payload as; AVRO/JSON do not. Surface the requirement in the schema so the
 // contract is visible to callers rather than only failing at serialize time.
+// Only enforce when schema registry is actually in use: with useSchemaRegistry
+// false, schemaType is ignored and the payload is sent raw, so messageName is
+// irrelevant and requiring it would reject otherwise-valid raw produces.
 const requireMessageNameForProtobuf = (
   opts: z.infer<typeof messageOptions>,
   ctx: z.RefinementCtx,
 ): void => {
-  if (opts.schemaType === "PROTOBUF" && !opts.messageName) {
+  if (
+    opts.useSchemaRegistry &&
+    opts.schemaType === "PROTOBUF" &&
+    !opts.messageName
+  ) {
     ctx.addIssue({
       code: "custom",
       message:

@@ -246,6 +246,42 @@ describe("schema-registry-helper.ts", () => {
       });
     });
 
+    it("throws an actionable error when the registered schema is not PROTOBUF (use-latest path)", async () => {
+      const registry = newRegistry();
+      const topic = "proto-mismatch";
+      // Seed the subject with an AVRO schema, then attempt a PROTOBUF produce
+      // without supplying a schema (use-latest). The mismatch must surface as a
+      // clear error rather than a confusing base64 decode failure.
+      await serializeMessage(
+        topic,
+        {
+          message: { x: 1 },
+          useSchemaRegistry: true,
+          schemaType: "AVRO",
+          schema:
+            '{"type":"record","name":"X","fields":[{"name":"x","type":"int"}]}',
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      await expect(
+        serializeMessage(
+          topic,
+          {
+            message: { user_id: "USR-001" },
+            useSchemaRegistry: true,
+            schemaType: "PROTOBUF",
+            messageName: "com.example.User",
+          },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(
+        /is registered as AVRO, but the requested schemaType is PROTOBUF/,
+      );
+    });
+
     it("throws when messageName is missing for PROTOBUF", async () => {
       const registry = newRegistry();
       await expect(
@@ -261,6 +297,43 @@ describe("schema-registry-helper.ts", () => {
           registry,
         ),
       ).rejects.toThrow(/messageName is required/);
+    });
+  });
+
+  describe("serializeMessage() use-latest schema-type validation", () => {
+    const newRegistry = (): SchemaRegistryClient =>
+      SchemaRegistryClient.newClient({
+        baseURLs: ["mock://"],
+      }) as SchemaRegistryClient;
+
+    it("throws when the requested schemaType differs from the registered one (AVRO subject, JSON request)", async () => {
+      const registry = newRegistry();
+      const topic = "type-mismatch";
+      // Register an AVRO schema, then attempt a use-latest produce asking for
+      // JSON. Without the upfront check this fails as an opaque serializer error.
+      await serializeMessage(
+        topic,
+        {
+          message: { x: 1 },
+          useSchemaRegistry: true,
+          schemaType: "AVRO",
+          schema:
+            '{"type":"record","name":"X","fields":[{"name":"x","type":"int"}]}',
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      await expect(
+        serializeMessage(
+          topic,
+          { message: { x: 1 }, useSchemaRegistry: true, schemaType: "JSON" },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(
+        /is registered as AVRO, but the requested schemaType is JSON/,
+      );
     });
   });
 });

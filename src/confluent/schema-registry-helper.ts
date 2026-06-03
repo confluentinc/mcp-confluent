@@ -99,10 +99,12 @@ export type SchemaCheckResult = { type: "no-schema"; subject: string } | null;
  * @returns The appropriate Serializer instance
  * @throws Error if the schema type is unknown or unsupported
  *
- * Note: PROTOBUF is handled directly in {@link serializeMessage} (it needs a
- * descriptor registry and auto-register/use-latest semantics rather than the
- * schema-id config used here), so callers should not rely on the PROTOBUF
- * branch below for producing real payloads.
+ * PROTOBUF never flows through here: {@link serializeMessage} short-circuits to
+ * {@link serializeProtobufMessage} (which needs a descriptor registry and
+ * auto-register/use-latest semantics rather than the schema-id config used
+ * here) before reaching this factory. The PROTOBUF entry below therefore throws
+ * explicitly — if that short-circuit is ever removed, this surfaces the
+ * assumption loudly instead of silently producing undeserializable bytes.
  */
 export function getSerializer(
   schemaType: SchemaType | undefined,
@@ -118,8 +120,11 @@ export function getSerializer(
   const serializers = {
     AVRO: () => new AvroSerializer(registry, serdeType, serializerConfig),
     JSON: () => new JsonSerializer(registry, serdeType, serializerConfig),
-    PROTOBUF: () =>
-      new ProtobufSerializer(registry, serdeType, serializerConfig),
+    PROTOBUF: (): Serializer => {
+      throw new Error(
+        "PROTOBUF serialization goes through serializeProtobufMessage, not getSerializer",
+      );
+    },
   };
 
   if (!schemaType || !(schemaType in serializers)) {

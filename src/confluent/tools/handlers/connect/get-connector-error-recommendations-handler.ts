@@ -1,30 +1,12 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
+import {
+  ConnectToolHandler,
+  connectorByNameArguments,
+} from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
-import { z } from "zod";
-
-const getConnectorErrorRecommendationsArguments = z.object({
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe(
-      "The unique identifier for the environment this resource belongs to.",
-    ),
-  clusterId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the Kafka cluster."),
-  connectorName: z
-    .string()
-    .trim()
-    .nonempty()
-    .describe("The unique name of the connector."),
-});
 
 interface RecommendationsProjection {
   connectorName: string;
@@ -40,7 +22,7 @@ export class GetConnectorErrorRecommendationsHandler extends ConnectToolHandler 
   ): Promise<CallToolResult> {
     const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName } =
-      getConnectorErrorRecommendationsArguments.parse(toolArguments);
+      connectorByNameArguments.parse(toolArguments);
 
     const conn = runtime.config.getSoleDirectConnection();
     const { environment_id, kafka_cluster_id } =
@@ -129,7 +111,7 @@ export class GetConnectorErrorRecommendationsHandler extends ConnectToolHandler 
       name: ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
       description:
         "Get suggested remediation steps for a connector that has failed or is in an error state. Recommendations are generated server-side from the connector's recent failure traces and configuration. Returns a one-liner when no recommendations are available.",
-      inputSchema: getConnectorErrorRecommendationsArguments.shape,
+      inputSchema: connectorByNameArguments.shape,
       annotations: READ_ONLY,
     };
   }

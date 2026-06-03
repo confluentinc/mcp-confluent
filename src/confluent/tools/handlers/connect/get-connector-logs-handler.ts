@@ -3,7 +3,10 @@ import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { nodeFetch } from "@src/confluent/node-deps.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
+import {
+  ConnectToolHandler,
+  connectorByNameArguments,
+} from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -14,21 +17,7 @@ const PLATFORM_BASE = "https://confluent.cloud";
 const TRACE_LINE_LIMIT = 10;
 const TRACE_CHAR_LIMIT = 800;
 
-const getConnectorLogsArguments = z.object({
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe(
-      "The unique identifier for the environment this resource belongs to. Falls back to the connection's kafka.env_id.",
-    ),
-  clusterId: z
-    .string()
-    .trim()
-    .optional()
-    .describe(
-      "The unique identifier for the Kafka cluster. Falls back to the connection's kafka.cluster_id.",
-    ),
+const getConnectorLogsArguments = connectorByNameArguments.extend({
   organizationId: z
     .string()
     .trim()
@@ -36,11 +25,6 @@ const getConnectorLogsArguments = z.object({
     .describe(
       "The Confluent Cloud organization ID. Falls back to the connection's confluent_cloud.organization_id, then auto-resolves via GET /org/v2/organizations.",
     ),
-  connectorName: z
-    .string()
-    .trim()
-    .nonempty()
-    .describe("The unique name of the connector."),
   connectorId: z
     .string()
     .trim()

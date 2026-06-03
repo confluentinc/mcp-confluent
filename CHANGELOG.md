@@ -20,6 +20,7 @@ All notable changes to this MCP server will be documented in this file.
 - **Connector inspection tools: four new READ_ONLY views.** `get-connector-config` (flat config map), `get-connector-offsets` (per-task offsets), `get-connector-status` (state + per-task health), and `get-connector-tasks` (per-task configs).
   Three of these expose data the prior `read-connector` tool didn't return at all — offsets, runtime status, and per-task configs — and the model can fetch just the view it needs without paying for fields irrelevant to the question.
   `get-connector-status` also surfaces the connector's resource ID (`lcc-...`) as a top-level `lccId` by requesting `?expand=id`, so downstream "by connectorId" tools (metrics, logs) don't need a separate lookup.
+- **Connector lifecycle tools: four new CREATE_UPDATE actions.** `pause-connector` (`PUT /connectors/{name}/pause` — idempotent), `resume-connector` (`PUT /connectors/{name}/resume` — idempotent), `restart-connector` (`POST /connectors/{name}/restart` — asynchronous; CCloud's managed Connect does not expose the upstream Apache Kafka `includeTasks` / `onlyFailed` query flags, so the tool restarts the connector and its tasks as a single unit), and `update-connector-config` (`PUT /connectors/{name}/config` — **full-replace semantics: omitted keys are removed**, and the supplied map must include every key the connector class requires or CCloud will reject it).
 
 #### New Internals
 

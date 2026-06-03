@@ -343,7 +343,7 @@ describe("schema-registry-helper.ts", () => {
   });
 
   describe("getSerializer()", () => {
-    it.each(["AVRO", "JSON", "PROTOBUF"] as const)(
+    it.each(["AVRO", "JSON"] as const)(
       "should return a serializer for %s",
       (schemaType) => {
         const registry = getMockedSchemaRegistry();
@@ -352,6 +352,13 @@ describe("schema-registry-helper.ts", () => {
         ).toBeDefined();
       },
     );
+
+    it("should throw for PROTOBUF (handled by serializeProtobufMessage)", () => {
+      const registry = getMockedSchemaRegistry();
+      expect(() =>
+        getSerializer("PROTOBUF", registry, SerdeType.VALUE),
+      ).toThrow(/goes through serializeProtobufMessage/);
+    });
 
     it("should throw for an unknown schema type", () => {
       const registry = getMockedSchemaRegistry();

@@ -110,39 +110,31 @@ Ready-to-use variants live in [`sample_configs/`](sample_configs/).
 
 ## Using with Confluent Platform
 
-`mcp-confluent` runs against a self-managed Confluent Platform (CP) cluster the same way it runs against any local Kafka + Schema Registry: by configuring a connection that has only the service blocks the deployment actually exposes. There is no separate "CP mode" — a connection without a `confluent_cloud` block automatically gates out every Cloud-only tool (Flink, Tableflow, Billing, Metrics, Stream Catalog tags, Managed Connect, Organizations / Environments / Clusters).
-
-The available tool surface on CP matches [Available Tools for Confluent Local](#available-tools-for-confluent-local): the seven Kafka + Schema Registry tools plus `search-product-docs`. The differences from a `localhost:9092` setup are auth and TLS.
+`mcp-confluent` runs against a self-managed Confluent Platform (CP) cluster the same way it runs against any local Kafka + Schema Registry deployment: point a `direct` connection at your brokers and Schema Registry.
+A CP connection exposes the same tools as any other local deployment — see [Available Tools for local deployments](#available-tools-for-local-deployments).
+The Confluent Cloud tools (Flink, Tableflow, Billing, Metrics, and the rest) require a Confluent Cloud account and stay disabled on CP.
+The only differences from a `localhost:9092` setup are authentication and TLS.
 
 ### Sample YAML config
 
-[`sample_configs/confluent-platform.yaml`](sample_configs/confluent-platform.yaml) is a copy-pasteable starter. It assumes PLAIN over SASL_SSL for Kafka (the default when `kafka.auth` is present) and HTTP Basic Auth for Schema Registry. Customize the broker/SR URLs and inject the credentials via `${KAFKA_API_KEY}` / `${KAFKA_API_SECRET}` / `${SCHEMA_REGISTRY_API_KEY}` / `${SCHEMA_REGISTRY_API_SECRET}` env vars.
+[`sample_configs/confluent-platform.yaml`](sample_configs/confluent-platform.yaml) is a copy-pasteable starter.
+It assumes PLAIN over SASL_SSL for Kafka and HTTP Basic Auth for Schema Registry.
+Customize the broker and Schema Registry URLs, and inject credentials via the `${KAFKA_API_KEY}` / `${KAFKA_API_SECRET}` / `${SCHEMA_REGISTRY_API_KEY}` / `${SCHEMA_REGISTRY_API_SECRET}` environment variables.
+If your cluster uses SCRAM or another SASL mechanism, override `security.protocol` and `sasl.mechanisms` through the `kafka.extra_properties` map in that file.
 
 ### TLS trust (internal CAs)
 
-CP clusters frequently sit behind an internal CA. If you see TLS handshake failures against the broker or Schema Registry, point Node at your CA bundle when starting the server:
+CP clusters frequently sit behind an internal CA.
+If you see TLS handshake failures against the broker or Schema Registry, point Node at your CA bundle when starting the server:
 
 ```bash
 NODE_EXTRA_CA_CERTS=/path/to/internal-ca.pem npm run start -- --config path/to/config.yaml
 ```
 
-### Validating your setup
-
-Start the server briefly with your CP config. Each tool emits exactly one log line at startup — either `Tool <name> enabled` (registered) or `Tool <name> disabled; no connections satisfy its requirements` (auto-disabled because no connection's service blocks match the tool's requirements):
-
-```bash
-KAFKA_API_KEY=... KAFKA_API_SECRET=... \
-SCHEMA_REGISTRY_API_KEY=... SCHEMA_REGISTRY_API_SECRET=... \
-npm run start -- --config sample_configs/confluent-platform.yaml
-```
-
-Confirm the seven CP-compatible tools (`list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `list-schemas`, `delete-schema`) plus `search-product-docs` show as enabled, and every Cloud-only tool shows as disabled. Stop the server with Ctrl+C once you've confirmed.
-
-> **Note:** `--list-tools` is a pre-config diagnostic that prints every registered tool regardless of which connections are configured. It is not a way to verify CP-specific gating; use the startup-log approach above.
-
 ### End-to-end smoke test
 
-A docker-compose stack ([`docker-compose.cp-test.yml`](docker-compose.cp-test.yml)) brings up a local CP Kafka (KRaft, SASL_PLAINTEXT/PLAIN) plus an unauthenticated Schema Registry. The matching integration tests are tagged `@cp` and live next to their handlers as `*.cp.integration.test.ts`:
+A docker-compose stack ([`docker-compose.cp-test.yml`](docker-compose.cp-test.yml)) brings up a local CP Kafka (KRaft, SASL_PLAINTEXT/PLAIN) plus an unauthenticated Schema Registry.
+The matching integration tests are tagged `@cp` and live next to their handlers as `*.cp.integration.test.ts`:
 
 ```bash
 docker compose -f docker-compose.cp-test.yml up -d
@@ -152,7 +144,7 @@ CP_KAFKA_USERNAME=mcp CP_KAFKA_PASSWORD=mcp-secret \
 docker compose -f docker-compose.cp-test.yml down -v
 ```
 
-The tests skip cleanly when those env vars are unset, so `npm run test:unit` and a default `npm run test:integration` against your real CCloud account are unaffected if you don't have the docker stack running.
+The tests skip cleanly when those env vars are unset, so `npm run test:unit` and a default `npm run test:integration` against your real Confluent Cloud account are unaffected if you don't have the docker stack running.
 
 ## Getting Started
 

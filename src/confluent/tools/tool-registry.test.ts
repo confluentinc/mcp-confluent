@@ -112,6 +112,9 @@ describe("tool-registry.ts", () => {
           "add",
           "update",
           "alter",
+          "pause",
+          "resume",
+          "restart",
         ]);
         const destructivePrefixes = new Set(["delete", "remove"]);
 
@@ -174,6 +177,10 @@ describe("tool-registry.ts", () => {
         [ToolName.DELETE_TOPICS]: kafkaBootstrapOrOAuth,
         [ToolName.PRODUCE_MESSAGE]: kafkaBootstrapOrOAuth,
         [ToolName.CONSUME_MESSAGES]: kafkaBootstrapOrOAuth,
+        [ToolName.GET_PARTITION_OFFSETS]: kafkaBootstrapOrOAuth,
+        [ToolName.LIST_CONSUMER_GROUPS]: kafkaBootstrapOrOAuth,
+        [ToolName.DESCRIBE_CONSUMER_GROUP]: kafkaBootstrapOrOAuth,
+        [ToolName.GET_CONSUMER_GROUP_LAG]: kafkaBootstrapOrOAuth,
         [ToolName.ALTER_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         [ToolName.GET_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         // Flink
@@ -192,9 +199,16 @@ describe("tool-registry.ts", () => {
         [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
         // Connect
         [ToolName.LIST_CONNECTORS]: hasConfluentCloud,
-        [ToolName.READ_CONNECTOR]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_CONFIG]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_OFFSETS]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_STATUS]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloud,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
         [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
+        [ToolName.PAUSE_CONNECTOR]: hasConfluentCloud,
+        [ToolName.RESUME_CONNECTOR]: hasConfluentCloud,
+        [ToolName.RESTART_CONNECTOR]: hasConfluentCloud,
+        [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloud,
         // Catalog + search (CCloud catalog support)
         [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
         [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
@@ -348,10 +362,22 @@ describe("tool-registry.ts", () => {
           (await cm.getAdminClient()).listTopics.mockResolvedValue([]);
         },
       },
+      [ToolName.LIST_CONSUMER_GROUPS]: {
+        outcome: { resolves: "Found 0 consumer group" },
+        setup: async (cm) => {
+          (await cm.getAdminClient()).listGroups.mockResolvedValue({
+            groups: [],
+            errors: [],
+          });
+        },
+      },
+      [ToolName.DESCRIBE_CONSUMER_GROUP]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONSUMER_GROUP_LAG]: { outcome: { throws: "ZodError" } },
       [ToolName.CREATE_TOPICS]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_TOPICS]: { outcome: { throws: "ZodError" } },
       [ToolName.PRODUCE_MESSAGE]: { outcome: { throws: "ZodError" } },
       [ToolName.CONSUME_MESSAGES]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_PARTITION_OFFSETS]: { outcome: { throws: "ZodError" } },
       [ToolName.ALTER_TOPIC_CONFIG]: { outcome: { throws: "ZodError" } },
       [ToolName.GET_TOPIC_CONFIG]: { outcome: { throws: "ZodError" } },
       // Schema Registry
@@ -404,9 +430,16 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_CONNECTORS]: {
         outcome: { throws: "Environment ID is required" },
       },
-      [ToolName.READ_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_CONFIG]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_OFFSETS]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_STATUS]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_TASKS]: { outcome: { throws: "ZodError" } },
       [ToolName.CREATE_CONNECTOR]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.PAUSE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.RESUME_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.RESTART_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.UPDATE_CONNECTOR_CONFIG]: { outcome: { throws: "ZodError" } },
       // Catalog
       [ToolName.CREATE_TOPIC_TAGS]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_TAG]: { outcome: { throws: "ZodError" } },

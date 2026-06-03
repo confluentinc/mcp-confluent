@@ -49,20 +49,38 @@ semaphore:
         - name: PREVIOUS_RELEASE_TAG
           required: false
           description: 'The previous release tag for generating release notes. If not provided, will use the latest (non-prerelease) GitHub Release.'
+    - name: publish-npm
+      branch: main
+      pipeline_file: .semaphore/publish-npm.yml
+      parameters:
+        - name: RELEASE_NAME
+          required: true
+          description: 'The name of the existing GitHub Release (and tag) whose .tgz asset will be downloaded and published to npm (e.g., v1.2.0).'
+        - name: CONFIRM_PUBLISH
+          required: true
+          options:
+            - "no"
+            - "yes"
+          default_value: "no"
+          description: 'Safety guard against accidental publishing. Must be set to "yes" to actually publish to npm.'
     - name: scheduled-integration-tests
       branch: main
       pipeline_file: .semaphore/integration.yml
       scheduled: true
       at: "0 5 * * *" # Every day at 05:00 UTC
       parameters:
-        - name: TOOL_GROUPS
+        - name: SERVICE_CONFIGS
           required: true
-          default_value: "@smoke|@kafka|@schema|@environments|@clusters|@connect|@metrics|@flink|@tableflow|@billing|@docs|@catalog"
-          description: 'Pipe-separated tool-group tags to test.'
-        - name: TRANSPORTS
+          default_value: "@smoke|@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
+          description: 'Pipe-separated tags. One block per service-config tag, plus @smoke to include the cross-cutting transport-layer smoke tests.'
+        - name: CONNECTION_TYPE
           required: true
-          default_value: "stdio|http|sse"
-          description: 'Pipe-separated MCP transport(s) to test.'
+          default_value: "all"
+          options:
+            - "all"
+            - "direct"
+            - "oauth"
+          description: 'Connection type to exercise. all (default) runs both direct and oauth sequentially in each job; direct or oauth limits the run to that single mode.'
     - name: scheduled-npm-audit
       branch: main
       pipeline_file: .semaphore/npm-audit.yml

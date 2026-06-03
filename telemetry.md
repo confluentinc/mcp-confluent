@@ -2,7 +2,7 @@
 
 _Last updated: May 2026_
 
-The Confluent MCP Server collects anonymous usage data to help us understand how the server is used and improve the user experience.
+The Confluent MCP Server collects usage data to help us understand how the server is used and improve the user experience.
 
 ## How to Control Telemetry
 
@@ -12,16 +12,24 @@ Telemetry can be disabled by setting the `DO_NOT_TRACK` environment variable to 
 DO_NOT_TRACK=true
 ```
 
+Or, in a YAML config, set `server.do_not_track: true`. The `DO_NOT_TRACK` env
+var always wins over the YAML field — it's the floor, so opting out in the
+environment cannot be overridden by a stray `false` in a config file.
+
 When telemetry is disabled, no events are sent.
 
 ## What Events Are Tracked
 
-The server tracks tool call completions and failures, server startup, and Confluent Cloud authentication outcomes.
+The server tracks tool call completions and failures, server startup, Confluent Cloud authentication outcomes, and clicks on the "Copy" button next to the agent-skills install command on the OAuth success page.
 
 ### Captured Information
 
 - Tool name, execution duration, and success/error status
-- Confluent Cloud authentication outcome (success or failure reason). Successful logins also include `ccloudUserId` (the user's Confluent Cloud `resource_id`) and `ccloudDomain` (the domain portion of the user's email).
+- Confluent Cloud authentication outcome (success or failure reason).
+  Successful logins also include `ccloudUserId` (the user's Confluent Cloud `resource_id`) and `ccloudDomain` (the domain portion of the user's email).
+- Clicks on the "Copy" button for the agent-skills install command on the OAuth success page.
+  The event itself carries no payload.
+  Because this click can only happen after a successful login, it is attributable to the same `ccloudUserId` recorded by the preceding authentication event, alongside the shared context information below.
 
 ### Context Information (Sent with All Events)
 

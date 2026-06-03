@@ -1,15 +1,20 @@
 # Makefile for mcp-confluent integration test lifecycle.
 #
-# Used by .semaphore/integration.yml to pull secrets from Vault, run a
-# single-tag / single-transport matrix cell, and publish results to
-# Semaphore. Also works locally: `make setup-test-env` once, then
-# `make test-integration TAG=@kafka`.
+# Used by .semaphore/semaphore.yml's per-PR tool-group blocks and
+# .semaphore/integration.yml's per-service-config blocks to pull secrets
+# from Vault, run a single matrix cell, and publish results to Semaphore.
+# Also works locally: `make setup-test-env` once, then
+# `make test-integration SERVICE_CONFIG=@requires-kafka-config TAGS=@kafka`.
 
 VAULT_SECRET_BASE ?= stag/kv/semaphore/mcpconfluent/testing
 ENV_FILE ?= .env.integration
-# TAG and TRANSPORT default to empty; when unset, `test-integration` runs the full integration
-# suite without filtering. Semaphore tasks (service.yml) can set defaults.
-TAG ?=
+# SERVICE_CONFIG filters tests by service-config tag (e.g. @requires-kafka-config) -
+# drives integration.yml's matrix axis. TAGS layers an AND-filter on top
+# (typically a tool-group tag like @kafka, or @smoke). Both default to empty;
+# unset, `test-integration` runs the full integration suite. TRANSPORT filters
+# which MCP transport each file's describe.each exercises.
+SERVICE_CONFIG ?=
+TAGS ?=
 TRANSPORT ?=
 
 # Vault paths -> fields. Each entry is `<path-suffix>:<comma-separated-fields>`,
@@ -61,30 +66,84 @@ setup-test-env:
 remove-test-env:
 	@rm -f $(ENV_FILE)
 
-# Run the integration tests. TAG filters tests by tool-group tag; TRANSPORT
-# filters which MCP transport (stdio or http) each file's describe.each
-# exercises, via the INTEGRATION_TEST_TRANSPORT env var read by
-# tests/harness/transports.ts.
+# Run the integration tests. SERVICE_CONFIG and TAGS compose into a single
+# vitest tag expression: an empty value drops that clause. When TAGS names a
+# non-smoke tool-group tag whose value matches a `handlers/<dir>/`, we also
+# pass that directory as a positional scope filter so vitest only collects
+# files under it; without the scope, --tags-filter is a runtime-skip filter
+# that still loads (and prints as skipped) every file in the project's
+# include glob. @smoke and empty TAGS fall through to a filter on just the
+# service config, since neither is directory-aligned.
 #
-# Both filters are conditionally applied: an empty or literal-env-var-name
-# value falls through to "run everything" instead of forcing a filter. The
-# `!= "TOOL_GROUP"` / `!= "TRANSPORT"` guards catch a CI misconfiguration where
-# Semaphore's matrix env-var name leaks through uninterpolated; without them,
-# vitest would silently match 0 tests (TAG) or activeTransports would throw
-# (TRANSPORT). Same idea as vscode's Makefile check on TEST_SUITE.
+# When INTEGRATION_TEST_CONNECTION_TYPE is set (manual full-promotion
+# CONNECTION_TYPE parameter forwards into this env var), we append a
+# `@oauth` / `!@oauth` clause to the tag filter:
+#  - `direct` lane excludes oauth describes (`!@oauth`), so single-mode
+#    direct-only tests don't re-run alongside dual-mode oauth describes.
+#  - `oauth` lane only collects oauth describes (`@oauth`), so the cell
+#    skips every direct-only test and only exercises the PKCE-flow paths.
+# Unset (local dev) skips the clause entirely; vitest collects everything.
+#
+# The `!= "SERVICE_CONFIG"` / `!= "TOOL_GROUP"` / `!= "TRANSPORT"` guards
+# catch a Semaphore misconfiguration where a matrix env-var name leaks
+# through uninterpolated (e.g. `make test-integration TAGS=TOOL_GROUP` if
+# `$TOOL_GROUP` failed to expand in integration.yml's job command); without
+# them, vitest would silently match 0 tests.
+#
+# `set --` builds argv one word at a time so values containing `&&` (e.g.
+# `--tags-filter=@requires-kafka-config && @kafka`) stay quoted as a single
+# argument; an unquoted variable would let the shell interpret `&&` as a
+# control operator and split the npm command. Vitest is invoked directly
+# via `npx vitest run` rather than `npm run test:integration --` for the
+# same reason: npm concatenates trailing `--` args into the script string
+# verbatim, so `&&` inside a filter value would split that script too.
 test-integration:
-	@echo "running integration tests: tag=$(TAG) transport=$(TRANSPORT)"
-	@if [ -n "$(TAG)" ] && [ "$(TAG)" != "TOOL_GROUP" ]; then \
-		TAG_ARG="--tags-filter=$(TAG)"; \
-	else \
-		TAG_ARG=""; \
+	@echo "running integration tests: service_config=$(SERVICE_CONFIG) tags=$(TAGS) transport=$(TRANSPORT) connection_type=$$INTEGRATION_TEST_CONNECTION_TYPE"
+	@set --; \
+	SERVICE_CONFIG_VAL=""; [ -n "$(SERVICE_CONFIG)" ] && [ "$(SERVICE_CONFIG)" != "SERVICE_CONFIG" ] && SERVICE_CONFIG_VAL="$(SERVICE_CONFIG)"; \
+	TAGS_VAL=""; [ -n "$(TAGS)" ] && [ "$(TAGS)" != "TOOL_GROUP" ] && TAGS_VAL="$(TAGS)"; \
+	TRANSPORT_VAL=""; [ -n "$(TRANSPORT)" ] && [ "$(TRANSPORT)" != "TRANSPORT" ] && TRANSPORT_VAL="$(TRANSPORT)"; \
+	CONNECTION_FILTER=""; \
+	case "$$INTEGRATION_TEST_CONNECTION_TYPE" in \
+		direct) CONNECTION_FILTER="!@oauth";; \
+		oauth) CONNECTION_FILTER="@oauth";; \
+	esac; \
+	FILTER_PARTS=""; \
+	if [ -n "$$SERVICE_CONFIG_VAL" ]; then FILTER_PARTS="$$SERVICE_CONFIG_VAL"; fi; \
+	if [ -n "$$TAGS_VAL" ]; then \
+		if [ -n "$$FILTER_PARTS" ]; then \
+			FILTER_PARTS="$$FILTER_PARTS && $$TAGS_VAL"; \
+		else \
+			FILTER_PARTS="$$TAGS_VAL"; \
+		fi; \
 	fi; \
-	if [ -n "$(TRANSPORT)" ] && [ "$(TRANSPORT)" != "TRANSPORT" ]; then \
-		TRANSPORT_ENV="$(TRANSPORT)"; \
-	else \
-		TRANSPORT_ENV=""; \
+	if [ -n "$$CONNECTION_FILTER" ]; then \
+		if [ -n "$$FILTER_PARTS" ]; then \
+			FILTER_PARTS="$$FILTER_PARTS && $$CONNECTION_FILTER"; \
+		else \
+			FILTER_PARTS="$$CONNECTION_FILTER"; \
+		fi; \
 	fi; \
-	INTEGRATION_TEST_TRANSPORT="$$TRANSPORT_ENV" npm run test:integration -- $$TAG_ARG
+	if [ -n "$$FILTER_PARTS" ]; then \
+		set -- "$$@" "--tags-filter=$$FILTER_PARTS"; \
+	fi; \
+	if [ -n "$$TAGS_VAL" ] && [ "$$TAGS_VAL" != "@smoke" ]; then \
+		TAG_SUFFIX=$$(echo "$$TAGS_VAL" | sed 's/^@//'); \
+		if [ -d "src/confluent/tools/handlers/$$TAG_SUFFIX" ]; then \
+			set -- "$$@" "src/confluent/tools/handlers/$$TAG_SUFFIX"; \
+		fi; \
+	fi; \
+	if [ ! -f dist/index.js ]; then npm run build; fi && \
+	INTEGRATION_TEST_TRANSPORT="$$TRANSPORT_VAL" npx vitest run \
+		--project integration \
+		--outputFile.junit=TEST-integration.xml \
+		"$$@"
+# ^ `npm run build` is skipped when `dist/index.js` already exists. CI's
+# integration prologue builds before invoking `make test-integration`, so
+# this avoids the double build per matrix cell. Local devs running cold
+# (no `dist/`) still get an automatic build; for staleness control,
+# `rm -rf dist && make test-integration ...` or running `npm run dev` in a
+# watch terminal alongside.
 
 # publish JUnit results to semaphore: each test lane writes a distinct file via package.json's
 # --outputFile.junit overrides, so per-test-type publishing stays separated in the Semaphore UI
@@ -98,7 +157,7 @@ store-unit-test-results:
 
 store-integration-test-results:
 	@if [ -f TEST-integration.xml ]; then \
-		test-results publish TEST-integration.xml --name "Integration ($(TAG) / $(TRANSPORT))" --force; \
+		test-results publish TEST-integration.xml --name "Integration ($(SERVICE_CONFIG) / $(TAGS) / $${INTEGRATION_TEST_CONNECTION_TYPE:-all})" --force; \
 	else \
 		echo "no TEST-integration.xml to publish"; \
 	fi

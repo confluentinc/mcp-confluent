@@ -9,6 +9,20 @@ export interface FlinkSqlResult {
   phase?: string;
 }
 
+/**
+ * `_meta` payload emitted by catalog handlers so integration tests can sweep
+ * statements the handler created internally. {@linkcode executeFlinkSql}
+ * does not auto-delete (a streaming caller would break under that semantic).
+ *
+ * Declared as `type` rather than `interface` so the shape is assignable to
+ * {@link BaseToolHandler.createResponse}'s `_meta: Record<string, unknown>`
+ * parameter; interfaces are excluded from that target by declaration-merging
+ * rules (microsoft/TypeScript#15300).
+ */
+export type FlinkStatementMeta = {
+  flinkStatementsCreated: string[];
+};
+
 export interface FlinkSqlOptions {
   organizationId: string;
   environmentId: string;

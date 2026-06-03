@@ -8,23 +8,15 @@
       "runtimeVersion": "22",
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/dist/index.js",
-      "args": [
-        "--config",
-        "config.yaml"
-      ],
+      "args": ["--config", "config.yaml"],
       "env": {
         "LOG_PRETTY": "true"
       },
-      "outFiles": [
-        "${workspaceFolder}/dist/**/*.js"
-      ],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "sourceMaps": true,
       "console": "integratedTerminal",
       "preLaunchTask": "build",
-      "skipFiles": [
-        "<node_internals>/**",
-        "**/node_modules/**"
-      ]
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
     }
   ]
 }

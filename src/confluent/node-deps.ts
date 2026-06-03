@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { Analytics } from "@segment/analytics-node";
 import { TELEMETRY_WRITE_KEY } from "@src/build-config.js";
 import * as dotenv from "dotenv";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   appendFileSync,
   existsSync,
@@ -36,12 +36,17 @@ export const nodeFetch = { fetch: globalThis.fetch };
 // `randomBytes`. The codebase only uses the sync form.
 export const nodeCrypto = {
   randomBytes: (size: number): Buffer => randomBytes(size),
+  randomUUID: (): string => randomUUID(),
 };
 export const nodeHttp = { createServer: httpCreateServer };
 // `open` is loaded lazily so non-OAuth runs don't pay the import cost (it
 // pulls in is-wsl, default-browser, etc.).
 export const nodeOpen = {
   open: async (target: string): Promise<void> => {
+    // skip during integration test runs: playwright drives auth headlessly, so a system-browser
+    // open is redundant and would race on the OAuth callback port.
+    // eslint-disable-next-line no-restricted-syntax -- localized test seam, not a config read
+    if (process.env.INTEGRATION_TEST === "1") return;
     const { default: open } = await import("open");
     await open(target);
   },

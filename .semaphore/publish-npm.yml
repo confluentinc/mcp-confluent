@@ -1,0 +1,57 @@
+version: v1.0
+name: publish-npm
+agent:
+  machine:
+    type: s1-prod-ubuntu24-04-amd64-1
+
+execution_time_limit:
+  hours: 1
+
+global_job_config:
+  prologue:
+    commands:
+      - sem-version node 22
+      - checkout
+      - . vault-setup --version v3 --role mcp-confluent
+
+blocks:
+  - name: "Confirm Publish"
+    dependencies: []
+    task:
+      jobs:
+        - name: "Confirm Publish"
+          commands:
+            - |
+              if [ "$CONFIRM_PUBLISH" != "yes" ]; then
+                echo "Aborting: set CONFIRM_PUBLISH=yes to publish $RELEASE_NAME to npm (got '$CONFIRM_PUBLISH')."
+                exit 1
+              fi
+            # This task publishes to the default 'latest' tag, so refuse prereleases
+            - |
+              IS_PRERELEASE=$(gh release view "$RELEASE_NAME" --json isPrerelease -q .isPrerelease)
+              if [ "$IS_PRERELEASE" != "false" ]; then
+                echo "Aborting: $RELEASE_NAME is a prerelease (isPrerelease=$IS_PRERELEASE); this task only publishes stable releases to the 'latest' tag."
+                exit 1
+              fi
+            - echo "Confirmed: publishing $RELEASE_NAME to npm."
+
+  - name: "Publish to npm"
+    dependencies: ["Confirm Publish"]
+    task:
+      jobs:
+        - name: "Publish to npm"
+          commands:
+            # Download the .tgz asset from the existing GitHub Release
+            - gh release download "$RELEASE_NAME" --pattern "*.tgz" --dir release-assets/
+            - TGZ_FILE=$(find release-assets/ -name "*.tgz" | head -1)
+            - |
+              if [ -z "$TGZ_FILE" ]; then
+                echo "Error: no .tgz asset found on GitHub Release $RELEASE_NAME"
+                exit 1
+              fi
+            # Authenticate to npm registry
+            - . vault-get-secret --vault-role=mcp-confluent --secret-key=NPM_TOKEN --export-as=NPM_TOKEN mcpconfluent/npm
+            - npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
+            # Get TOTP code and publish (keep these adjacent to stay within the 30s TOTP window)
+            - OTP=$(vault-get-totp npm-publishing --vault-role mcp-confluent)
+            - npm publish "$TGZ_FILE" --otp="$OTP"

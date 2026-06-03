@@ -9,9 +9,9 @@ import { describe, expect, it } from "vitest";
  * A CP deployment is modeled in this codebase as a connection with kafka
  * (bootstrap + auth) plus schema_registry (endpoint + auth) and NO
  * confluent_cloud / flink / tableflow / telemetry blocks. With that shape,
- * every Cloud-only tool's predicate must fail and exactly the seven Kafka +
- * Schema Registry tools (plus the cloud-agnostic search-product-docs) must be
- * enabled.
+ * every Cloud-only tool's predicate must fail and only the native Kafka +
+ * Schema Registry tools (plus the always-available, cloud-agnostic tools)
+ * must be enabled.
  *
  * This test enumerates every registered handler and proves the categorical
  * invariant in a single place. Per-handler tests already cover the predicates
@@ -46,6 +46,11 @@ describe("Confluent Platform tool gating", () => {
     // Native Kafka producer/consumer
     ToolName.PRODUCE_MESSAGE,
     ToolName.CONSUME_MESSAGES,
+    // Native Kafka consumer-group / partition admin
+    ToolName.LIST_CONSUMER_GROUPS,
+    ToolName.DESCRIBE_CONSUMER_GROUP,
+    ToolName.GET_CONSUMER_GROUP_LAG,
+    ToolName.GET_PARTITION_OFFSETS,
     // Schema Registry
     ToolName.LIST_SCHEMAS,
     ToolName.DELETE_SCHEMA,

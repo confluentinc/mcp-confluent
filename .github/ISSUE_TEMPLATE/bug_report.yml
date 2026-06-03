@@ -1,0 +1,139 @@
+name: "Report a bug"
+description: Report a bug with the Confluent MCP server.
+type: Bug
+labels:
+  - "bug"
+  - "needs triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug with the Confluent MCP server!
+
+        Before opening a new issue, please [search existing issues](https://github.com/confluentinc/mcp-confluent/issues) and 👍 upvote a matching one instead — this helps us prioritize and resolve it faster.
+
+        For setup and configuration help, see the [README](https://github.com/confluentinc/mcp-confluent/blob/main/README.md) and [CONFIGURATION.md](https://github.com/confluentinc/mcp-confluent/blob/main/CONFIGURATION.md).
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/confluentinc/mcp-confluent/blob/main/CODE_OF_CONDUCT.md).
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
+  - type: input
+    id: server_version
+    attributes:
+      label: MCP server version
+      description: What version of the Confluent MCP server are you running? (e.g. the `version` from `package.json`, an npm release, or a git commit SHA)
+      placeholder: "ex. 1.2.3 or git SHA"
+    validations:
+      required: true
+  - type: input
+    id: node_version
+    attributes:
+      label: Node.js version
+      description: Output of `node --version`. Node ≥22 is required.
+      placeholder: "ex. v22.14.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: On what operating system are you seeing the problem?
+      multiple: true
+      options:
+        - macOS (Intel/x64)
+        - macOS (Apple/arm64)
+        - Linux (x64)
+        - Linux (arm64)
+        - Windows (x64)
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Which transport are you using?
+      multiple: true
+      options:
+        - stdio
+        - HTTP (Streamable HTTP)
+        - SSE
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: config_method
+    attributes:
+      label: How is the server configured?
+      options:
+        - YAML config file (-c <path>)
+        - Environment variables / CLI flags
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: mcp_client
+    attributes:
+      label: MCP client
+      description: Which MCP client/host are you connecting with, and its version?
+      placeholder: "ex. Claude Desktop, Claude Code, Cursor, VS Code, Gemini CLI, Goose, Windsurf, MCP Inspector"
+    validations:
+      required: false
+  - type: dropdown
+    id: areas
+    attributes:
+      label: Which area(s) are affected? (Select all that apply)
+      multiple: true
+      options:
+        - "Not sure"
+        - "Startup / configuration"
+        - "Authentication"
+        - "Kafka (topics / produce / consume)"
+        - "Flink"
+        - "Schema Registry"
+        - "Connectors / Connect"
+        - "Tableflow"
+        - "Billing"
+        - "Catalog"
+        - "Metrics"
+        - "Search / product docs"
+        - "Environments / Clusters / Organizations"
+        - "Transport (stdio / HTTP / SSE)"
+        - "Tool enablement / discovery"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: To Reproduce
+      description: A step-by-step description of how to reproduce the issue. Include the tool you invoked and any arguments. Redact API keys, secrets, and other sensitive data.
+      placeholder: |
+        1. Configure the server with ...
+        2. Invoke the `list-topics` tool with ...
+        3. The following error is returned ...
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Current vs. Expected behavior
+      description: A clear and concise description of what the bug is, and what you expected to happen.
+      placeholder: "I expected A to happen, but I observed B instead."
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: |
+        Copy and paste any relevant server log output. This will be automatically formatted into code, so no need for backticks. **Please redact API keys, tokens, and other secrets before pasting.**
+      render: shell
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any extra information that might help us investigate. Does the issue happen every time or intermittently? Anything unusual about your Confluent Cloud setup?
+    validations:
+      required: false

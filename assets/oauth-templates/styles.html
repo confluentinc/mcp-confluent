@@ -1,49 +1,110 @@
 <style>
-    /* Axon theme design tokens partial */
+  /* Axon theme design tokens partial */
+  :root {
+    --background: #f5f4f4;
+    --text-primary: #131316;
+    --link-primary: #4933d7;
+    --link-primary-hover: #30228b;
+    --support-failure: #c43b42;
+    --logo: #040531;
+  }
+  @media (prefers-color-scheme: dark) {
     :root {
-        --background: #F5F4F4;
-        --text-primary: #131316;
-        --link-primary: #4933D7;
-        --link-primary-hover: #30228B;
-        --support-failure: #C43B42;
-        --logo: #040531;
+      --background: #131316;
+      --text-primary: #f5f4f4;
+      --link-primary: #bdb3ff;
+      --link-primary-hover: #b4a8ff;
+      --support-failure: #f07a80;
+      --logo: #ffffff;
     }
-    @media (prefers-color-scheme: dark) {
-        :root {
-            --background: #131316;
-            --text-primary: #F5F4F4;
-            --link-primary: #BDB3FF;
-            --link-primary-hover: #B4A8FF;
-            --support-failure: #F07A80;
-            --logo: #FFFFFF;
-        }
-    }
+  }
 
-    /* Page styling */
-    a, a:active { color: var(--link-primary); }
-    a:hover { color: var(--link-primary-hover); }
+  /* Page styling */
+  a,
+  a:active {
+    color: var(--link-primary);
+  }
+  a:hover {
+    color: var(--link-primary-hover);
+  }
 
-    body {
-        margin: 0;
-        overflow: hidden;
-        background-color: var(--background);
-        color: var(--text-primary);
-    }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--background);
+    color: var(--text-primary);
+  }
 
-    /* Logo styling */
-    div.logo {
-        width: 320px;
-    }
-    .logo .st0{ fill: none; }
-    .logo .st1{ fill: var(--logo); }
+  /* Logo styling */
+  div.logo {
+    width: 320px;
+  }
+  .logo .st0 {
+    fill: none;
+  }
+  .logo .st1 {
+    fill: var(--logo);
+  }
 
-    /* Content styling */
-    div.banner {
-        margin: 80px 32px;
-        font-family: 'MarkPro-NarrowBook', 'Arial', sans-serif;
-        text-align: center;
-    }
+  /* Content styling */
+  div.banner {
+    margin: 80px 32px;
+    font-family: "MarkPro-NarrowBook", "Arial", sans-serif;
+    text-align: center;
+  }
 
-    /* Util styling */
-    .failure { color: var(--support-failure); }
+  /* Install hint styling */
+  div.install-hint {
+    max-width: 560px;
+    margin: 0 auto 80px;
+    padding: 0 32px;
+    font-family: "MarkPro-NarrowBook", "Arial", sans-serif;
+    text-align: center;
+  }
+  div.install-hint h2 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+  }
+  .install-hint__cmd-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin-top: 16px;
+    border: 1px solid color-mix(in srgb, var(--text-primary) 20%, transparent);
+    border-radius: 6px;
+    padding: 4px;
+    background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  }
+  code.install-hint__cmd {
+    flex: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.95rem;
+    text-align: left;
+    padding: 8px 12px;
+    white-space: nowrap;
+    overflow-x: auto;
+    user-select: all;
+  }
+  button.install-hint__copy {
+    font-family: inherit;
+    font-size: 0.9rem;
+    padding: 0 16px;
+    border: none;
+    border-radius: 4px;
+    background: var(--link-primary);
+    color: #ffffff;
+    cursor: pointer;
+  }
+  button.install-hint__copy:hover {
+    background: var(--link-primary-hover);
+  }
+  p.install-hint__docs {
+    margin-top: 12px;
+    font-size: 0.9rem;
+  }
+
+  /* Util styling */
+  .failure {
+    color: var(--support-failure);
+  }
 </style>

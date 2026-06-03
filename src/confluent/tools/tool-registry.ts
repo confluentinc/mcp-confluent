@@ -1,4 +1,4 @@
-import { ToolConfig, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ListBillingCostsHandler } from "@src/confluent/tools/handlers/billing/list-billing-costs-handler.js";
 import { AddTagToTopicHandler } from "@src/confluent/tools/handlers/catalog/add-tags-to-topic.js";
 import { CreateTopicTagsHandler } from "@src/confluent/tools/handlers/catalog/create-topic-tags.js";
@@ -8,8 +8,15 @@ import { RemoveTagFromEntityHandler } from "@src/confluent/tools/handlers/catalo
 import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list-clusters-handler.js";
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
+import { GetConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/get-connector-config-handler.js";
+import { GetConnectorOffsetsHandler } from "@src/confluent/tools/handlers/connect/get-connector-offsets-handler.js";
+import { GetConnectorStatusHandler } from "@src/confluent/tools/handlers/connect/get-connector-status-handler.js";
+import { GetConnectorTasksHandler } from "@src/confluent/tools/handlers/connect/get-connector-tasks-handler.js";
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
-import { ReadConnectorHandler } from "@src/confluent/tools/handlers/connect/read-connectors-handler.js";
+import { PauseConnectorHandler } from "@src/confluent/tools/handlers/connect/pause-connector-handler.js";
+import { RestartConnectorHandler } from "@src/confluent/tools/handlers/connect/restart-connector-handler.js";
+import { ResumeConnectorHandler } from "@src/confluent/tools/handlers/connect/resume-connector-handler.js";
+import { UpdateConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/update-connector-config-handler.js";
 import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
 import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
@@ -32,7 +39,11 @@ import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alt
 import { ConsumeKafkaMessagesHandler } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
 import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-topics-handler.js";
 import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-topics-handler.js";
+import { DescribeConsumerGroupHandler } from "@src/confluent/tools/handlers/kafka/describe-consumer-group-handler.js";
+import { GetConsumerGroupLagHandler } from "@src/confluent/tools/handlers/kafka/get-consumer-group-lag-handler.js";
+import { GetPartitionOffsetsHandler } from "@src/confluent/tools/handlers/kafka/get-partition-offsets-handler.js";
 import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
+import { ListConsumerGroupsHandler } from "@src/confluent/tools/handlers/kafka/list-consumer-groups-handler.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
@@ -81,8 +92,15 @@ export class ToolHandlerRegistry {
     [ToolName.DETECT_FLINK_STATEMENT_ISSUES, new DetectIssuesHandler()],
     [ToolName.GET_FLINK_STATEMENT_PROFILE, new QueryProfilerHandler()],
     [ToolName.LIST_CONNECTORS, new ListConnectorsHandler()],
-    [ToolName.READ_CONNECTOR, new ReadConnectorHandler()],
     [ToolName.CREATE_CONNECTOR, new CreateConnectorHandler()],
+    [ToolName.GET_CONNECTOR_CONFIG, new GetConnectorConfigHandler()],
+    [ToolName.GET_CONNECTOR_OFFSETS, new GetConnectorOffsetsHandler()],
+    [ToolName.GET_CONNECTOR_STATUS, new GetConnectorStatusHandler()],
+    [ToolName.GET_CONNECTOR_TASKS, new GetConnectorTasksHandler()],
+    [ToolName.UPDATE_CONNECTOR_CONFIG, new UpdateConnectorConfigHandler()],
+    [ToolName.PAUSE_CONNECTOR, new PauseConnectorHandler()],
+    [ToolName.RESUME_CONNECTOR, new ResumeConnectorHandler()],
+    [ToolName.RESTART_CONNECTOR, new RestartConnectorHandler()],
     [ToolName.SEARCH_TOPICS_BY_TAG, new SearchTopicsByTagHandler()],
     [ToolName.CREATE_TOPIC_TAGS, new CreateTopicTagsHandler()],
     [ToolName.DELETE_TAG, new DeleteTagHandler()],
@@ -98,6 +116,10 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],
     [ToolName.DELETE_SCHEMA, new DeleteSchemaHandler()],
     [ToolName.CONSUME_MESSAGES, new ConsumeKafkaMessagesHandler()],
+    [ToolName.GET_PARTITION_OFFSETS, new GetPartitionOffsetsHandler()],
+    [ToolName.LIST_CONSUMER_GROUPS, new ListConsumerGroupsHandler()],
+    [ToolName.DESCRIBE_CONSUMER_GROUP, new DescribeConsumerGroupHandler()],
+    [ToolName.GET_CONSUMER_GROUP_LAG, new GetConsumerGroupLagHandler()],
     [ToolName.GET_TOPIC_CONFIG, new GetTopicConfigHandler()],
     [ToolName.CREATE_TABLEFLOW_TOPIC, new CreateTableFlowTopicHandler()],
     [ToolName.LIST_TABLEFLOW_REGIONS, new ListTableFlowRegionsHandler()],
@@ -139,10 +161,6 @@ export class ToolHandlerRegistry {
 
   static getToolHandler(toolName: ToolName): ToolHandler {
     return this.handlers.get(toolName)!;
-  }
-
-  static getToolConfig(toolName: ToolName): ToolConfig {
-    return this.getToolHandler(toolName).getToolConfig();
   }
 
   /**

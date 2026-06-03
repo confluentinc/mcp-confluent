@@ -7,6 +7,8 @@ which is hosted by [Confluent Inc.](https://github.com/confluentinc)
 on GitHub. This document lists rules, guidelines, and help getting started,
 so if you feel something is missing feel free to send a pull request.
 
+_Internal Confluent Contributors: Please inform `#mcp-confluent` before proposing new development to avoid conflicts with work already in progress._
+
 ## What should I know before I get started?
 
 ### Contributor Agreement
@@ -120,9 +122,9 @@ Before you begin, ensure you have the following installed on your system:
 
 Docker Desktop (or Docker Engine and Docker Compose): <https://www.docker.com/products/docker-desktop>
 
-##### Environment Variables
+##### Local credentials and config
 
-The MCP server requires several environment variables to connect to Confluent Cloud and other relevant services. These should be provided in the `.env` file in the root directory of this project. Or you can add them directly in the `docker-compose.yml`
+The container needs a `config.yaml` (or, on the legacy path, a `.env`) describing which Confluent Cloud resources to talk to. Keep secrets in a `.env` and reference them from `config.yaml` via `${VAR}` interpolation — see [CONFIGURATION.md](CONFIGURATION.md). Mount or bind in whichever file(s) you use; `docker-compose.yml` also accepts inline `environment:` entries for ad-hoc overrides.
 
 #### Building and Running with Docker
 
@@ -177,7 +179,7 @@ Here's how to build your Docker image and run it in different modes.
 
    The --build flag ensures that Docker Compose rebuilds the image before starting the container. You can omit this flag on subsequent runs if you haven't changed the Dockerfile or source code.
 
-   The server will be accessible on <http://localhost:8080> (or the port specified in HTTP_PORT in your .env file).
+   The server will be accessible on <http://localhost:8080> (or the port specified by `server.http.port` in `config.yaml`, or `HTTP_PORT` if you're on the legacy env-var path).
 
 3. **Stopping the Server**
    To stop the running MCP server and remove the containers, press Ctrl+C in the terminal where docker compose up is running.
@@ -235,6 +237,38 @@ npm run test:integration -- --tags-filter=@kafka
 Each tool group needs a specific credential subset; `.env.integration.example` annotates which var feeds which tests. Tests whose credentials aren't populated skip themselves with a clear reason — you don't have to fill in every var to run a subset.
 
 Minimum for `@kafka` tests: `KAFKA_API_KEY`, `KAFKA_API_SECRET`. Non-secret config (bootstrap servers, REST endpoint, cluster id) lives in `test-fixtures/yaml_configs/integration.yaml` and doesn't need to be set in the env file.
+
+##### OAuth integration tests (one-time setup)
+
+`@oauth`-tagged tests drive the CCloud OAuth flow (Auth0 sign-in) through a real headless browser via [`playwright-core`](https://playwright.dev/docs/library).
+The project depends on `playwright-core` (API only, no browser auto-download) rather than `@playwright/test` to keep regular `npm install` lightweight for contributors who never run OAuth tests.
+Before running OAuth integration tests locally for the first time, install Chromium via the locally-installed `playwright-core` CLI:
+
+```bash
+npx playwright-core install chromium
+```
+
+Using `playwright-core`'s own CLI keeps the chromium install version-aligned with the `playwright-core` devDep, with no fresh registry fetch.
+This is a one-time step per machine; the binary is cached at `~/Library/Caches/ms-playwright/` (macOS) or `~/.cache/ms-playwright/` (Linux) and is shared across playwright versions.
+CI runs this automatically in the integration pipeline's prologue, so the CI matrix doesn't need any additional setup.
+
+In addition to a Confluent Cloud API key/secret, `@oauth` tests need a real Confluent Cloud user account (username/password) for the playwright-driven Auth0 sign-in.
+With Vault-backed setup (Option A above), these come from `confluent-cloud-user`.
+With BYO setup (Option B), set `CONFLUENT_CLOUD_USERNAME` and `CONFLUENT_CLOUD_PASSWORD` in `.env.integration`.
+
+To filter to OAuth-capable tests only:
+
+```bash
+npm run test:integration -- --tags-filter=@oauth
+```
+
+To debug the playwright flow visually (browser window opens, you watch the sign-in happen), set `INTEGRATION_TEST_PLAYWRIGHT_HEADLESS=false` for that run:
+
+```bash
+INTEGRATION_TEST_PLAYWRIGHT_HEADLESS=false npm run test:integration -- --tags-filter=@oauth
+```
+
+This toggle is scoped to playwright's launch options only; it doesn't touch `INTEGRATION_TEST` (the general "we are in integration tests" flag), so unrelated test-mode behavior (like skipping the system-browser `open()` in `node-deps.ts`) stays intact.
 
 ##### Timing expectations
 
@@ -315,7 +349,7 @@ tail -f server.log
 
 The repository includes checked-in configs for debugging the MCP server and connecting MCP clients (Claude Code, GitHub Copilot) to a local dev instance.
 
-**Prerequisites:** `npm install`, a `.env` file populated from `.env.example`.
+**Prerequisites:** `npm install`, plus a `config.yaml` (preferred — see [CONFIGURATION.md](CONFIGURATION.md)) or a legacy `.env` populated from `.env.example`.
 
 #### Starting the Dev Server
 
@@ -337,16 +371,18 @@ After pressing F5, your MCP client should automatically discover the `confluent-
 
 ### Adding a New Tool
 
-Tools are auto-enabled at startup based on which environment variables are present: each handler declares its requirements via `getRequiredEnvVars()`, and the server only exposes handlers whose requirements are satisfied. There is no manual enabled-tools list to maintain.
+Tools are auto-enabled at startup based on which service blocks are present in each connection's resolved `ConnectionConfig` (whether from YAML or the legacy env-var synthesizer). Each handler declares its requirement via a `predicate` property pointing at a named export from `src/confluent/tools/connection-predicates.ts`, and `BaseToolHandler` derives `enabledConnectionIds()` and `connectionVerdicts()` from it. There is no manual enabled-tools list to maintain.
 
 1. Add a new entry to the `ToolName` enum in `src/confluent/tools/tool-name.ts`.
-2. Create a handler class under `src/confluent/tools/handlers/<domain>/` (pick the existing domain directory that matches the Confluent service the tool wraps, or add a new one). The class must extend `BaseToolHandler`.
+2. Create a handler class under `src/confluent/tools/handlers/<domain>/` (pick the existing domain directory that matches the Confluent service the tool wraps, or add a new one). Extend the domain base class if one exists (e.g., `FlinkToolHandler`, `TableflowToolHandler`); otherwise extend `BaseToolHandler` directly.
 3. On your handler, implement:
-   - `getToolConfig()` — returns the tool name, description, Zod input schema, and annotations (`READ_ONLY`, `CREATE_UPDATE`, `DESTRUCTIVE`). For tools with no parameters, pass `inputSchema: {}`, not an omitted field.
+   - `getToolConfig()` — returns the tool name, description, Zod input schema, and annotations (`READ_ONLY`, `CREATE_UPDATE`, `DESTRUCTIVE`). For tools with no parameters, pass `inputSchema: {}`, not an omitted field. Every input field needs a `.describe()` call.
    - `handle()` — the runtime implementation.
-   - `getRequiredEnvVars()` — the env vars that must be set for the server to expose this tool.
+   - `predicate` — a `readonly predicate = <namedExport>` referencing one of the named predicates in `connection-predicates.ts`. If no existing predicate fits, add one there first (with a test in `connection-predicates.test.ts` and a row in `EXPECTED_PREDICATES` inside `tool-registry.test.ts`), then reference it from the handler. **Do not** compose predicates inline at the handler use site — combinators like `allOf` and `widenForOAuth` are for defining new named exports, not handler-side glue.
 4. Register the handler in the `ToolHandlerRegistry.handlers` map in `src/confluent/tools/tool-registry.ts`.
 5. If the tool calls a Confluent Cloud REST endpoint whose path or response shape isn't already in `openapi.json`, add it and regenerate the typed client — see [Generating Types](#generating-types) below.
+
+Project-specific conventions for handler structure, input-schema rules, and the predicate-selection checklist live in `.claude/rules/tool-handlers.md`.
 
 ### Generating Types
 

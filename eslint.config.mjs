@@ -15,6 +15,7 @@ export default [
       "src/confluent/openapi-schema.d.ts",
       "coverage/**",
       ".worktrees/**",
+      ".claude/**",
     ],
   },
   { files: ["scripts/**"], languageOptions: { globals: globals.node } },

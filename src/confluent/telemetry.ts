@@ -17,6 +17,12 @@ export enum TelemetryEvent {
    * Refresh-token rotations are not tracked here.
    */
   CCLOUD_AUTHENTICATION = "CCloud Authentication",
+  /**
+   * Emitted when the user clicks "Copy" on the agent-skills install hint shown
+   * on the OAuth success page. Fired by a same-origin beacon from the callback
+   * page to the local callback server.
+   */
+  AGENT_SKILLS_HINT_COPIED = "Agent Skills Hint Copied",
 }
 
 /**

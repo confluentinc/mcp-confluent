@@ -5,7 +5,10 @@ import {
 } from "@src/config/models.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
-import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
+import {
+  ToolCategory,
+  type ToolConfig,
+} from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import {
@@ -28,8 +31,8 @@ import {
   describe,
   expect,
   it,
-  type MockInstance,
   vi,
+  type MockInstance,
 } from "vitest";
 
 /**
@@ -65,63 +68,95 @@ describe("index.ts", () => {
   });
 
   describe("outputToolList()", () => {
+    /** Concatenate every console.log invocation into a single string so
+     *  tests can search the whole output without indexing into specific
+     *  rows — the grouped layout makes per-call indexing fragile. */
+    function allOutput(spy: MockInstance<typeof console.log>): string {
+      return spy.mock.calls.map((args) => args.join(" ")).join("\n");
+    }
+
+    /** Install a single mock handler that {@linkcode outputToolList} will
+     *  pick up via `ToolHandlerRegistry.getToolHandler`. The default
+     *  StubHandler already declares `category = ToolCategory.Kafka`, so
+     *  callers only need to override the description. */
+    function withStubbedConfig(description: string): void {
+      const handler = new StubHandler();
+      vi.spyOn(handler, "getToolConfig").mockReturnValue({
+        name: ToolName.LIST_TOPICS,
+        description,
+        inputSchema: {},
+        annotations: {},
+      } as ToolConfig);
+      vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(handler);
+    }
+
     it("should not call console.log when the tool list is empty", () => {
       outputToolList([]);
       expect(consoleLog).not.toHaveBeenCalled();
     });
 
-    it("should call console.log once for a single tool", () => {
+    it("should print a category section header plus one tool row for a single tool", () => {
       outputToolList([ToolName.LIST_TOPICS]);
-      expect(consoleLog).toHaveBeenCalledOnce();
+      // 1 header + 1 row, no trailing blank (last section).
+      expect(consoleLog).toHaveBeenCalledTimes(2);
     });
 
-    it("should call console.log once per tool for multiple tools", () => {
+    it("should print one header plus N rows when N tools share a single category", () => {
       outputToolList([
         ToolName.LIST_TOPICS,
         ToolName.CREATE_TOPICS,
         ToolName.DELETE_TOPICS,
       ]);
-      expect(consoleLog).toHaveBeenCalledTimes(3);
+      // All three are kafka: 1 header + 3 rows, no inter-section blank.
+      expect(consoleLog).toHaveBeenCalledTimes(4);
     });
 
-    it("should include the tool name in the output line", () => {
+    it("should emit a blank-line separator between adjacent category sections but not after the last", () => {
+      outputToolList([ToolName.LIST_TOPICS, ToolName.LIST_FLINK_STATEMENTS]);
+      // 2 headers + 2 rows + 1 separator (between the two sections) = 5.
+      expect(consoleLog).toHaveBeenCalledTimes(5);
+      // The separator lives between the two sections; its argument is "".
+      const blankCalls = consoleLog.mock.calls.filter((args) => args[0] === "");
+      expect(blankCalls).toHaveLength(1);
+    });
+
+    it("should include the tool's category header in the output", () => {
       outputToolList([ToolName.LIST_TOPICS]);
-      const output = consoleLog.mock.calls[0]![0] as string;
-      expect(output).toContain(ToolName.LIST_TOPICS);
+      expect(allOutput(consoleLog)).toContain(ToolCategory.Kafka);
+    });
+
+    it("should include the tool name on its row", () => {
+      outputToolList([ToolName.LIST_TOPICS]);
+      expect(allOutput(consoleLog)).toContain(ToolName.LIST_TOPICS);
     });
 
     it("should include the full description when it is within 120 characters", () => {
       const shortDesc = "A short description.";
-      vi.spyOn(ToolHandlerRegistry, "getToolConfig").mockReturnValue({
-        name: ToolName.LIST_TOPICS,
-        description: shortDesc,
-        inputSchema: {},
-        annotations: {},
-      } as ToolConfig);
+      withStubbedConfig(shortDesc);
 
       outputToolList([ToolName.LIST_TOPICS]);
 
-      const output = consoleLog.mock.calls[0]![0] as string;
+      const output = allOutput(consoleLog);
       expect(output).toContain(shortDesc);
       expect(output).not.toContain("...");
     });
 
     it("should truncate descriptions longer than 120 characters with ellipsis", () => {
       const longDesc = "x".repeat(150);
-      vi.spyOn(ToolHandlerRegistry, "getToolConfig").mockReturnValue({
-        name: ToolName.LIST_TOPICS,
-        description: longDesc,
-        inputSchema: {},
-        annotations: {},
-      } as ToolConfig);
+      withStubbedConfig(longDesc);
 
       outputToolList([ToolName.LIST_TOPICS]);
 
-      const output = consoleLog.mock.calls[0]![0] as string;
-      expect(output).toContain("...");
+      // Find the tool row by the colon-separator pattern; the header line
+      // lacks a trailing description.
+      const toolRow = consoleLog.mock.calls
+        .map((args) => args[0] as string)
+        .find((line) => line.includes(`${ToolName.LIST_TOPICS}\x1b[0m: `));
+      expect(toolRow).toBeDefined();
+      expect(toolRow).toContain("...");
       // ANSI codes only wrap the tool name before the ": " separator, so
       // splitting there isolates the description without needing regex stripping.
-      const descPart = output.split(": ").slice(1).join(": ");
+      const descPart = toolRow!.split(": ").slice(1).join(": ");
       expect(descPart.length).toBe(120);
     });
   });
@@ -238,6 +273,10 @@ describe("index.ts", () => {
         ToolName.DELETE_TOPICS,
         ToolName.PRODUCE_MESSAGE,
         ToolName.CONSUME_MESSAGES,
+        ToolName.GET_PARTITION_OFFSETS,
+        ToolName.LIST_CONSUMER_GROUPS,
+        ToolName.DESCRIBE_CONSUMER_GROUP,
+        ToolName.GET_CONSUMER_GROUP_LAG,
         ToolName.LIST_ENVIRONMENTS,
         ToolName.READ_ENVIRONMENT,
         ToolName.LIST_ORGANIZATIONS,
@@ -270,12 +309,19 @@ describe("index.ts", () => {
         ToolName.GET_FLINK_STATEMENT_PROFILE,
         // Connect (hasKafkaRestWithAuth / hasKafkaAuth — needs the kafka block)
         ToolName.LIST_CONNECTORS,
-        ToolName.READ_CONNECTOR,
+        ToolName.GET_CONNECTOR_CONFIG,
+        ToolName.GET_CONNECTOR_OFFSETS,
+        ToolName.GET_CONNECTOR_STATUS,
+        ToolName.GET_CONNECTOR_TASKS,
         ToolName.CREATE_CONNECTOR,
         ToolName.DELETE_CONNECTOR,
         ToolName.GET_CONNECTOR_ERROR_SUMMARY,
         ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
         ToolName.GET_CONNECTOR_LOGS,
+        ToolName.PAUSE_CONNECTOR,
+        ToolName.RESUME_CONNECTOR,
+        ToolName.RESTART_CONNECTOR,
+        ToolName.UPDATE_CONNECTOR_CONFIG,
         // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)
         ToolName.SEARCH_TOPICS_BY_TAG,
         ToolName.SEARCH_TOPICS_BY_NAME,

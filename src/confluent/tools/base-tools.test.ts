@@ -164,5 +164,15 @@ describe("base-tools.ts", () => {
         expect(result._meta).toBeUndefined();
       });
     });
+
+    describe("createStructuredResponse()", () => {
+      it("should carry both a text summary and the structuredContent payload", () => {
+        const payload = { groups: [], errors: [] };
+        const result = handler.createStructuredResponse("summary", payload);
+        expect(result.content).toEqual([{ type: "text", text: "summary" }]);
+        expect(result.structuredContent).toBe(payload);
+        expect(result.isError).toBe(false);
+      });
+    });
   });
 });

@@ -16,7 +16,7 @@ import {
 import { buildConfigTelemetry } from "@src/confluent/config-telemetry.js";
 import { buildConfig, fs, path } from "@src/confluent/node-deps.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
-import { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { groupDisabledToolsByReason } from "@src/confluent/tools/tool-availability.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
@@ -203,13 +203,42 @@ function ensureGitignoreEntry(filePath: string): string {
 
 export function outputToolList(filteredToolNames: ToolName[]): void {
   const MAX_DESC_LENGTH = 120;
-  filteredToolNames.forEach((toolName) => {
-    const config = ToolHandlerRegistry.getToolConfig(toolName);
+
+  // Bucket by ToolCategory. Today's callers pass `filteredToolNames` in
+  // registry-declaration order, which already roughly groups same-category
+  // tools, but we re-bucket explicitly here so the rendered layout doesn't
+  // depend on that incidental ordering.
+  const byCategory = new Map<
+    ToolCategory,
+    Array<{ name: ToolName; desc: string }>
+  >();
+  for (const toolName of filteredToolNames) {
+    const handler = ToolHandlerRegistry.getToolHandler(toolName);
+    const config = handler.getToolConfig();
     let desc = config.description.replaceAll(/\s+/g, " ").trim();
     if (desc.length > MAX_DESC_LENGTH) {
       desc = desc.slice(0, MAX_DESC_LENGTH - 3) + "...";
     }
-    console.log(`\x1b[32m${config.name}\x1b[0m: ${desc}`);
+    let bucket = byCategory.get(handler.category);
+    bucket ??= [];
+    byCategory.set(handler.category, bucket);
+    bucket.push({ name: toolName, desc });
+  }
+
+  // Categories rendered lex-sorted (kebab-case enum values sort cleanly);
+  // within each category, tools preserve the order they appeared in
+  // `filteredToolNames` (today: registry-declaration order, as supplied
+  // by the caller).
+  const sortedCategories = Array.from(byCategory.keys()).sort((a, b) =>
+    a.localeCompare(b),
+  );
+  sortedCategories.forEach((category, idx) => {
+    console.log(`\x1b[1;36m${category}:\x1b[0m`);
+    for (const { name, desc } of byCategory.get(category)!) {
+      console.log(`  \x1b[32m${name}\x1b[0m: ${desc}`);
+    }
+    // Blank line between sections, but not after the last category.
+    if (idx < sortedCategories.length - 1) console.log("");
   });
 }
 

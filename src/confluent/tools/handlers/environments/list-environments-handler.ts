@@ -2,6 +2,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   READ_ONLY,
+  ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
@@ -30,7 +31,7 @@ export const environmentSchema = z.object({
     updated_at: z.string(),
     deleted_at: z.string().optional(),
     resource_name: z.string(),
-    self: z.string().url(),
+    self: z.url(),
   }),
   display_name: z.string(),
   stream_governance_config: z
@@ -45,10 +46,10 @@ export const environmentListSchema = z.object({
   kind: z.literal("EnvironmentList"),
   metadata: z
     .object({
-      first: z.string().url().optional(),
-      last: z.string().url().optional(),
-      prev: z.string().url().optional(),
-      next: z.string().url().optional(),
+      first: z.url().optional(),
+      last: z.url().optional(),
+      prev: z.url().optional(),
+      next: z.url().optional(),
       total_size: z.number().optional(),
     })
     .optional(),
@@ -170,5 +171,6 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
       annotations: READ_ONLY,
     };
   }
+  readonly category = ToolCategory.ConfluentCloud;
   readonly predicate = hasConfluentCloudOrOAuth;
 }

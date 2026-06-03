@@ -18,53 +18,63 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new DetectIssuesHandler();
 const runtime = integrationRuntime();
 
-describe("detect-issues-handler", { tags: [Tag.FLINK] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires flink config", () => {});
-    return;
-  }
+describe(
+  "detect-issues-handler",
+  {
+    tags: [
+      Tag.FLINK,
+      Tag.REQUIRES_FLINK_CONFIG,
+      Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG,
+    ],
+  },
+  () => {
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires flink config", () => {});
+      return;
+    }
 
-  // installs afterAll at this describe scope (cleans up the seeded statement)
-  const { createdStatements } = withSharedFlinkStatementCleanup();
-  const statementName = uniqueName("issues-stmt");
-
-  beforeAll(async () => {
-    await provisionTestFlinkStatement(statementName);
-    createdStatements.push(statementName);
-  });
-
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    // installs afterAll at this describe scope (cleans up the seeded statement)
+    const { createdStatements } = withSharedFlinkStatementCleanup();
+    const statementName = uniqueName("issues-stmt");
 
     beforeAll(async () => {
-      server = await startServer({ transport });
+      await provisionTestFlinkStatement(statementName);
+      createdStatements.push(statementName);
     });
 
-    afterAll(async () => {
-      await server?.stop();
-    });
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    it("should expose detect-flink-statement-issues in tools/list", async () => {
-      const { tools } = await server.client.listTools();
-
-      expect(
-        tools.find((t) => t.name === ToolName.DETECT_FLINK_STATEMENT_ISSUES),
-      ).toBeDefined();
-    });
-
-    it("should return an issue report for the seeded statement", async () => {
-      // includeMetrics: false skips the Telemetry roundtrip
-      const result = await server.client.callTool({
-        name: ToolName.DETECT_FLINK_STATEMENT_ISSUES,
-        arguments: { statementName, includeMetrics: false },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      // SELECT 1 typically reports no issues; accept either response prefix.
-      expect(textContent(result)).toMatch(
-        new RegExp(
-          `(No issues detected|Detected \\d+ issue).*'${statementName}'`,
-        ),
-      );
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should expose detect-flink-statement-issues in tools/list", async () => {
+        const { tools } = await server.client.listTools();
+
+        expect(
+          tools.find((t) => t.name === ToolName.DETECT_FLINK_STATEMENT_ISSUES),
+        ).toBeDefined();
+      });
+
+      it("should return an issue report for the seeded statement", async () => {
+        // includeMetrics: false skips the Telemetry roundtrip
+        const result = await server.client.callTool({
+          name: ToolName.DETECT_FLINK_STATEMENT_ISSUES,
+          arguments: { statementName, includeMetrics: false },
+        });
+
+        // SELECT 1 typically reports no issues; accept either response prefix.
+        expect(textContent(result)).toMatch(
+          new RegExp(
+            `(No issues detected|Detected \\d+ issue).*'${statementName}'`,
+          ),
+        );
+      });
     });
-  });
-});
+  },
+);

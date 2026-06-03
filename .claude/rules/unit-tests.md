@@ -62,6 +62,16 @@ compute — timestamps, generated UUIDs, opaque tokens minted by the unit under 
 fields whose value the test deliberately doesn't pin (e.g. a free-port-allocated URL).
 "I don't want to spell out the full object" is not non-determinism.
 
+#### `toMatchObject` is not literal
+
+`toMatchObject` is the loose-matcher trap inside an otherwise literal-looking assertion: it matches a subset, accepts extra keys, and does not pin key order.
+When the test is asserting the _full_ shape, use `toEqual` instead; when explicitly checking absence, use `not.toHaveProperty("…")` rather than `toMatchObject({ key: undefined })`.
+`toMatchObject({ key: undefined })` works in vitest but reads ambiguously to the next reader — is the key absent, or present-with-undefined? — and obscures intent in diffs.
+
+If ordering is part of the contract being tested, assert it explicitly with `Object.keys(obj)` against an expected array.
+`toMatchObject` and `toEqual` on a plain object do not pin insertion order.
+If ordering is only asserted in a rendered text section, the structured `_meta` assertion can stay loose — but scope the test name to say so, so a future reader doesn't widen the contract by accident.
+
 **Cautionary tale.** Issue #129 (`ListTableFlowRegions sends cloud=undefined`) was a path
 key built via template literal — the colocated test used `expect.any(String)` for that
 path and `expect.objectContaining({ params: { path: { cloud: "AWS" } } })` for the
@@ -209,10 +219,21 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 ## Handler Tests
 
 - Test `getToolConfig()` (name, description, input schema, annotations).
-- Test `enabledConnectionIds(runtime)` against representative `ServerRuntime` fixtures: a runtime
-  whose connection has the relevant service block (expect the connection id) and a bare runtime
-  without that block (expect `[]`). Helper factories live in `tests/factories/runtime.ts`
-  (`flinkRuntime()`, `tableflowRuntime()`, `bareRuntime()`, etc.).
+  Assert annotations by identity against the shared constant: `expect(config.annotations).toBe(READ_ONLY)` — not field-by-field (`config.annotations?.readOnlyHint === true`).
+  Identity catches drift if the constant changes (e.g. a new annotation field is added) where the field probe would silently still pass.
+- **Do not test `enabledConnectionIds()` (or `connectionVerdicts()`) on individual handlers.**
+  Both methods are `@final` on `BaseToolHandler` — handlers don't override them, they only declare a `predicate` property.
+  Coverage is already centralized in three places, and a per-handler test would just re-test the base method against a re-tested predicate:
+  - `src/confluent/tools/base-tools.test.ts` exercises `BaseToolHandler.enabledConnectionIds()` / `connectionVerdicts()` once against representative runtimes — this is the only place that behavior gets asserted.
+  - `src/confluent/tools/connection-predicates.test.ts` exhaustively tests every predicate (direct-enabled, each conjunct's failure mode, OAuth verdict) against `ConnectionConfig` fixtures.
+  - `src/confluent/tools/tool-registry.test.ts` pins each handler's `predicate` property to the expected named export via the `EXPECTED_PREDICATES` record (exhaustive over `ToolName` — `tsc --noEmit` fails on a missing row).
+
+  Together these three give you: the right predicate is wired into the handler (registry test), the predicate behaves correctly (predicates test), and `BaseToolHandler` turns a predicate verdict into the right `enabledConnectionIds` / `connectionVerdicts` output (base-tools test).
+  Per-handler `enabledConnectionIds()` tests duplicate this triangle without adding signal.
+
+  When adding a new tool, the registration checklist in `.claude/rules/tool-handlers.md` covers the enablement-side test work: add a `EXPECTED_PREDICATES` row (mandatory — exhaustiveness is compile-time enforced), and only if you also introduced a new predicate, add a per-predicate block in `connection-predicates.test.ts`.
+  Do not add an enablement test in the handler's own `*.test.ts` file.
+
 - Test `handle()` for typical and edge-case inputs using `getMockedClientManager` +
   `assertHandleCase` from `@tests/stubs/index.js`. The standard three cases per
   config-backed parameter: (1) throws when arg absent and not in config, (2) resolves
@@ -221,6 +242,11 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   as default for success cases). Pass `"DISCOVER"` as the `outcome` sentinel to run the
   handler and get a copy-paste suggestion for the correct expectation; replace before
   committing.
+
+- **Schema-validation tests: prefer `it.each` or scope the name.**
+  When a Zod schema rejects multiple field shapes (e.g. malformed dates, page-size bounds, missing required keys), either cover each rejection case with `it.each` _or_ scope the single test's name to what it actually checks (`"should reject malformed startDate"` rather than `"should surface ZodError"`).
+  A single-case test under a broad name hides coverage gaps from later readers.
+  For per-handler `_meta.error instanceof ZodError` tests, one well-chosen failing fixture is sufficient (typical pick: the discriminator/`kind` literal, since it fails fastest); if the schema also validates line-item shape (`data[*]`), add one more case for that — it's a different validation path.
 
   `getMockedClientManager()` returns a `MockedClientManager` (a
   `Mocked<DirectClientManager>` whose client-getters are narrowed to return
@@ -352,7 +378,8 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 - `createTestServer(clientManager, toolNames?)` from `@tests/server.js` boots a real `McpServer`
   with all tools (or a passed subset) wired to a stubbed `ClientManager` over `InMemoryTransport`.
   Use it for protocol-level integration tests.
-- For `enabledConnectionIds()` tests, build a `ServerRuntime` via the named factories in
+- For `handle()` tests that need a `ServerRuntime`, use the named factories in
   `@tests/factories/runtime.js`: `bareRuntime()`, `kafkaRuntime()`, `flinkRuntime()`,
   `tableflowRuntime()`, `schemaRegistryRuntime()`, `confluentCloudRuntime()`,
-  `telemetryRuntime()`, etc. For uncommon shapes, use `runtimeWith(connectionConfig?, connectionId?)` (both args optional; `connectionId` defaults to `"default"`).
+  `telemetryRuntime()`, etc. For uncommon shapes, use `runtimeWith(connectionConfig?, connectionId?, clientManager?)` (all args optional; `connectionId` defaults to `"default"`).
+  These same factories are used by `base-tools.test.ts` and `connection-predicates.test.ts` for the centralized enablement coverage — handler `*.test.ts` files should not re-derive that coverage (see the Handler Tests section above).

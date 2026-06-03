@@ -100,9 +100,9 @@ describe("produce-kafka-message-handler.ts", () => {
         // assertion is on the call shape, not the outcome — the handler
         // is allowed to short-circuit on the schema-missing path.
         const clientManager = getMockedClientManager();
-        // Make subject lookup miss → checkSchemaNeeded returns "no-schema-
-        // needed" → handler returns an isError response without invoking
-        // the producer or serializer. Cheap controlled exit.
+        // Make subject lookup miss → checkSchemaNeeded returns "no-schema"
+        // → handler returns an isError response without invoking the
+        // producer or serializer. Cheap controlled exit.
         clientManager
           .getSchemaRegistryClient()
           .getLatestSchemaMetadata.mockRejectedValue({ status: 404 });

@@ -19,54 +19,64 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const handler = new QueryProfilerHandler();
 const runtime = integrationRuntime();
 
-describe("query-profiler-handler", { tags: [Tag.FLINK] }, () => {
-  // composes hasFlink + hasTelemetry, stricter than the rest of the flink suite
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires flink + telemetry config", () => {});
-    return;
-  }
+describe(
+  "query-profiler-handler",
+  {
+    tags: [
+      Tag.FLINK,
+      Tag.REQUIRES_FLINK_CONFIG,
+      Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG,
+    ],
+  },
+  () => {
+    // composes hasFlink + hasTelemetry, stricter than the rest of the flink suite
+    if (handler.enabledConnectionIds(runtime).length === 0) {
+      it.skip("requires flink + telemetry config", () => {});
+      return;
+    }
 
-  // installs afterAll at this describe scope (cleans up the seeded statement)
-  const { createdStatements } = withSharedFlinkStatementCleanup();
-  const statementName = uniqueName("profile-stmt");
-
-  beforeAll(async () => {
-    await provisionTestFlinkStatement(statementName);
-    createdStatements.push(statementName);
-    // profiler needs the task graph, which materializes once the statement leaves PENDING.
-    // SELECT 1 is bounded and can blow through RUNNING into COMPLETED between polls, so accept
-    // both - either state means the task graph exists.
-    await waitForFlinkStatementPhase(statementName, ["RUNNING", "COMPLETED"]);
-  });
-
-  describe.each(activeTransports)("via %s transport", (transport) => {
-    let server: StartedServer;
+    // installs afterAll at this describe scope (cleans up the seeded statement)
+    const { createdStatements } = withSharedFlinkStatementCleanup();
+    const statementName = uniqueName("profile-stmt");
 
     beforeAll(async () => {
-      server = await startServer({ transport });
+      await provisionTestFlinkStatement(statementName);
+      createdStatements.push(statementName);
+      // profiler needs the task graph, which materializes once the statement leaves PENDING.
+      // SELECT 1 is bounded and can blow through RUNNING into COMPLETED between polls, so accept
+      // both - either state means the task graph exists.
+      await waitForFlinkStatementPhase(statementName, ["RUNNING", "COMPLETED"]);
     });
 
-    afterAll(async () => {
-      await server?.stop();
-    });
+    describe.each(activeTransports)("via %s transport", (transport) => {
+      let server: StartedServer;
 
-    it("should expose get-flink-statement-profile in tools/list", async () => {
-      const { tools } = await server.client.listTools();
-
-      expect(
-        tools.find((t) => t.name === ToolName.GET_FLINK_STATEMENT_PROFILE),
-      ).toBeDefined();
-    });
-
-    it("should return a profiler report for the seeded statement", async () => {
-      const result = await server.client.callTool({
-        name: ToolName.GET_FLINK_STATEMENT_PROFILE,
-        arguments: { statementName, includeAnalysis: false },
+      beforeAll(async () => {
+        server = await startServer({ transport });
       });
 
-      expect(textContent(result)).toMatch(
-        new RegExp(`^Query Profiler for '${statementName}':`),
-      );
+      afterAll(async () => {
+        await server?.stop();
+      });
+
+      it("should expose get-flink-statement-profile in tools/list", async () => {
+        const { tools } = await server.client.listTools();
+
+        expect(
+          tools.find((t) => t.name === ToolName.GET_FLINK_STATEMENT_PROFILE),
+        ).toBeDefined();
+      });
+
+      it("should return a profiler report for the seeded statement", async () => {
+        const result = await server.client.callTool({
+          name: ToolName.GET_FLINK_STATEMENT_PROFILE,
+          arguments: { statementName, includeAnalysis: false },
+        });
+
+        expect(textContent(result)).toMatch(
+          new RegExp(`^Query Profiler for '${statementName}':`),
+        );
+      });
     });
-  });
-});
+  },
+);

@@ -2,6 +2,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
   DESTRUCTIVE,
+  ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
@@ -63,5 +64,6 @@ export class DeleteTopicsHandler extends BaseToolHandler {
     };
   }
 
+  readonly category = ToolCategory.Kafka;
   readonly predicate = kafkaBootstrapOrOAuth;
 }

@@ -28,6 +28,27 @@ export const DESTRUCTIVE: ToolAnnotations = {
   readOnlyHint: false,
 } as const;
 
+/**
+ * Operator-facing taxonomy of tool kinds.
+ *
+ * Answers "what kind of tool is this?" — orthogonal to the
+ * {@linkcode ConnectionPredicate}-based "is this tool enabled?" question that
+ * lives next door. Predicates gate advertisement; categories classify intent.
+ */
+export enum ToolCategory {
+  Billing = "billing",
+  Catalog = "catalog",
+  ConfluentCloud = "confluent-cloud",
+  Connect = "connect",
+  Docs = "docs",
+  Flink = "flink",
+  Kafka = "kafka",
+  McpServerDiagnostics = "mcp-server-diagnostics",
+  Metrics = "metrics",
+  SchemaRegistry = "schema-registry",
+  Tableflow = "tableflow",
+}
+
 export interface ToolHandler {
   handle(
     runtime: ServerRuntime,
@@ -45,6 +66,13 @@ export interface ToolHandler {
    * {@linkcode BaseToolHandler.predicate} for the rules around setting it.
    */
   readonly predicate: ConnectionPredicate;
+
+  /**
+   * The {@linkcode ToolCategory} this tool belongs to — operator-facing
+   * taxonomy, orthogonal to {@linkcode predicate}. See
+   * {@linkcode BaseToolHandler.category} for the rules around setting it.
+   */
+  readonly category: ToolCategory;
 
   /**
    * IDs of connections that satisfy this tool's service requirements. A
@@ -114,6 +142,14 @@ export abstract class BaseToolHandler implements ToolHandler {
    * `runtime.config.connections` for you.
    */
   abstract readonly predicate: ConnectionPredicate;
+
+  /**
+   * The {@linkcode ToolCategory} this tool belongs to — operator-facing
+   * taxonomy answering "what kind of tool is this?" Orthogonal to
+   * {@linkcode predicate} (which gates advertisement); category classifies
+   * intent for grouping in diagnostic surfaces and AI-client UX.
+   */
+  abstract readonly category: ToolCategory;
 
   /**
    * IDs of connections that satisfy this tool's {@linkcode predicate}. A
@@ -213,5 +249,24 @@ export abstract class BaseToolHandler implements ToolHandler {
       _meta: _meta,
     };
     return response;
+  }
+
+  /**
+   * Variant of {@link createResponse} that surfaces the response's
+   * machine-readable payload via MCP's `structuredContent` channel (per the
+   * [2025-11-25 spec](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)).
+   * The `message` carries the human-readable summary on `content`; the
+   * `structuredContent` field carries the typed JSON payload callers (or
+   * `outputSchema` validators) can consume directly.
+   */
+  createStructuredResponse(
+    message: string,
+    structuredContent: Record<string, unknown>,
+  ): CallToolResult {
+    return {
+      content: [{ type: "text", text: message }],
+      structuredContent,
+      isError: false,
+    };
   }
 }

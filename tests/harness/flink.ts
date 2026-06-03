@@ -1,6 +1,8 @@
 import type { paths } from "@src/confluent/openapi-schema.js";
+import type { FlinkStatementMeta } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { createRetryOn429Middleware } from "@tests/harness/retry-on-429.js";
 import { integrationRuntime } from "@tests/harness/runtime.js";
+import type { CallToolResponse } from "@tests/harness/tool-results.js";
 import { setTimeout as sleep } from "node:timers/promises";
 import createClient, { type Client } from "openapi-fetch";
 import { afterAll } from "vitest";
@@ -199,6 +201,21 @@ export function withSharedFlinkStatementCleanup(): {
     );
   });
   return { createdStatements };
+}
+
+/**
+ * Reads `_meta.flinkStatementsCreated` from a tool-call result and pushes names onto
+ * {@linkcode createdStatements} for sweep by {@linkcode withSharedFlinkStatementCleanup}'s `afterAll`.
+ */
+export function trackStatementsFromMeta(
+  result: CallToolResponse,
+  createdStatements: string[],
+): void {
+  const names = (result._meta as Partial<FlinkStatementMeta> | undefined)
+    ?.flinkStatementsCreated;
+  if (Array.isArray(names) && names.length > 0) {
+    createdStatements.push(...names.filter((n) => typeof n === "string"));
+  }
 }
 
 /**

@@ -11,6 +11,7 @@ import { spawnConfigPath } from "@tests/harness/runtime.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { resolve } from "node:path";
+import type { Readable } from "node:stream";
 
 export interface StartServerOptions {
   transport: TransportType;
@@ -27,6 +28,11 @@ export interface StartServerOptions {
    * tests omit this and run with auth disabled. Ignored for stdio.
    */
   auth?: { apiKey: string };
+  /**
+   * Spawn against the OAuth YAML fixture instead of the default direct one. Pipes child stderr
+   * so {@linkcode driveOAuthFlow} can read the Auth0 authorization URL from it.
+   */
+  oauth?: boolean;
 }
 
 export interface StartedServer {
@@ -38,8 +44,63 @@ export interface StartedServer {
    * deliberately-bad headers).
    */
   baseUrl?: string;
+  /**
+   * Child's stderr stream when {@linkcode StartServerOptions.oauth} is set, otherwise undefined.
+   * Read by {@linkcode driveOAuthFlow} to extract the Auth0 authorization URL.
+   */
+  stderr?: Readable;
+  /** OAuth-only: rolling stderr capture (capped at {@linkcode STDERR_SNAPSHOT_MAX_BYTES}), dumped in {@link driveOAuthFlow} timeout/exit messages. */
+  stderrSnapshot?: () => string;
+  /** OAuth-only: resolves when the spawned child exits. {@link driveOAuthFlow} races it against the auth-URL wait so a dying server fails fast. */
+  childExit?: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
   /** Sends SIGTERM to the child, awaits exit, and closes the MCP client. */
   stop: () => Promise<void>;
+}
+
+/** Cap for {@link createStderrCapture}: large enough to hold ~hundreds of pino JSON lines. */
+const STDERR_SNAPSHOT_MAX_BYTES = 65_536;
+
+/**
+ * Attaches a data listener that accumulates stderr into a capped rolling string and returns a
+ * getter. Doubles as the pipe drain for OAuth spawns. Truncation runs at 1.5× cap so the O(cap)
+ * string copy amortizes across ~32KB of writes instead of firing per chunk past the cap.
+ */
+function createStderrCapture(stderr: Readable): () => string {
+  const truncateAt = Math.floor(STDERR_SNAPSHOT_MAX_BYTES * 1.5);
+  let buf = "";
+  stderr.on("data", (chunk: Buffer | string) => {
+    buf += typeof chunk === "string" ? chunk : chunk.toString("utf-8");
+    if (buf.length > truncateAt) {
+      buf = "...(truncated front)...\n" + buf.slice(-STDERR_SNAPSHOT_MAX_BYTES);
+    }
+  });
+  // Surface stream errors in the snapshot rather than letting them bubble as unhandled `error`
+  // events that would crash the test worker mid-run.
+  stderr.on("error", (err) => {
+    buf += `\n[stderr stream error: ${err.message}]\n`;
+  });
+  return () => buf;
+}
+
+/** Resolves with the child's exit `code` and `signal` once it exits. Never rejects. */
+function captureChildExit(
+  child: ChildProcess,
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  return new Promise((resolve) => {
+    child.once("exit", (code, signal) => resolve({ code, signal }));
+  });
+}
+
+/** Returns the OAuth diagnostics pair when applicable; non-OAuth callers spread an empty object. */
+function oauthDiagnostics(
+  options: StartServerOptions,
+  child: ChildProcess | undefined,
+): Pick<StartedServer, "stderrSnapshot" | "childExit"> {
+  if (!options.oauth || !child?.stderr) return {};
+  return {
+    stderrSnapshot: createStderrCapture(child.stderr),
+    childExit: captureChildExit(child),
+  };
 }
 
 // resolve from the worktree root (vitest runs with cwd at the project root)
@@ -89,7 +150,13 @@ async function startHttp(options: StartServerOptions): Promise<StartedServer> {
   const client = newClient();
   await client.connect(transport);
 
-  return { client, baseUrl, stop: makeHttpStop(client, child) };
+  return {
+    client,
+    baseUrl,
+    stderr: options.oauth ? (child.stderr ?? undefined) : undefined,
+    ...oauthDiagnostics(options, child),
+    stop: makeHttpStop(client, child),
+  };
 }
 
 /**
@@ -114,7 +181,13 @@ async function startSse(options: StartServerOptions): Promise<StartedServer> {
   const client = newClient();
   await client.connect(transport);
 
-  return { client, baseUrl, stop: makeHttpStop(client, child) };
+  return {
+    client,
+    baseUrl,
+    stderr: options.oauth ? (child.stderr ?? undefined) : undefined,
+    ...oauthDiagnostics(options, child),
+    stop: makeHttpStop(client, child),
+  };
 }
 
 /** Header object the auth middleware checks (see {@linkcode CFLT_MCP_API_KEY_HEADER}). */
@@ -135,10 +208,15 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
       "--no-deprecation",
       SERVER_ENTRY,
       "--config",
-      spawnConfigPath({ transport: options.transport }),
+      spawnConfigPath({
+        transport: options.transport,
+        oauth: options.oauth,
+      }),
     ],
     env: buildEnv(options.env),
-    stderr: "inherit",
+    // pipe stderr only for OAuth spawns so `driveOAuthFlow` can read the auth URL; default
+    // `inherit` keeps normal test output flowing to the parent terminal
+    stderr: options.oauth ? "pipe" : "inherit",
   });
   const client = newClient();
   await client.connect(transport);
@@ -153,6 +231,11 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
   // as of v1.x).
   const child = (transport as unknown as { _process?: ChildProcess })._process;
 
+  // OAuth spawns need a stderr drain so the child doesn't block on a full pipe buffer.
+  // `createStderrCapture` (inside `oauthDiagnostics`) already attaches a `data` listener, which
+  // doubles as that drain, so no separate keep-alive listener is needed here.
+  const diagnostics = oauthDiagnostics(options, child);
+
   // No SIGTERM here: client.close() routes through transport.close() which
   // already kills the SDK-owned child; we just await its exit afterward.
   const stop = async () => {
@@ -163,7 +246,12 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
     }
   };
 
-  return { client, stop };
+  return {
+    client,
+    stderr: options.oauth ? (child?.stderr ?? undefined) : undefined,
+    ...diagnostics,
+    stop,
+  };
 }
 
 /**
@@ -264,6 +352,7 @@ async function spawnHttpChild(
         httpPort: port,
         authDisabled: !options.auth,
         apiKey: options.auth?.apiKey,
+        oauth: options.oauth,
       }),
     ],
     {

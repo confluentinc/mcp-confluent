@@ -30,7 +30,6 @@ const listFlinkStatementsArguments = z.object({
     ),
   pageToken: z
     .string()
-    .max(255)
     .optional()
     .describe("An opaque pagination token for collection requests."),
   labelSelector: z

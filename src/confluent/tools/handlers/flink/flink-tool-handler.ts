@@ -2,11 +2,15 @@ import {
   FlinkDirectConfig,
   MCPServerConfiguration,
 } from "@src/config/models.js";
-import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
+import {
+  BaseToolHandler,
+  ToolCategory,
+} from "@src/confluent/tools/base-tools.js";
 import { hasFlink } from "@src/confluent/tools/connection-predicates.js";
 
 /** Intermediate base class for Flink tool handlers */
 export abstract class FlinkToolHandler extends BaseToolHandler {
+  readonly category = ToolCategory.Flink;
   readonly predicate = hasFlink;
 
   /**

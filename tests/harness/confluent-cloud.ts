@@ -22,24 +22,24 @@ export function newTestCloudClient(): Client<paths> {
 }
 
 /**
- * Fetches the first environment id from CCloud. Throws on empty since every
- * org always has at least one (the API rejects deletion of the last).
+ * Returns the `kafka.env_id` value from the integration test fixture, for tests that need to
+ * address a specific CCloud environment (e.g. as a `READ_ENVIRONMENT` / `LIST_CLUSTERS`
+ * argument). Synchronous and YAML-pinned by design: the org-wide `CONFLUENT_CLOUD_API_KEY`
+ * sees every env the account has access to, and `GET /org/v2/environments` returns whichever
+ * the API happens to list first - which won't necessarily be the one the rest of the harness
+ * (kafka cluster, SR endpoint, flink pool) is pinned to. See issue #500 for the context.
+ * Throws if `env_id` is missing: the credential gate is at the `confluent_cloud` / `kafka`
+ * block level, so without this check the handler would receive `undefined` and produce a
+ * confusing downstream error.
  */
-export async function getFirstTestEnvironmentId(): Promise<string> {
-  const client = newTestCloudClient();
-  const { data, error } = await client.GET("/org/v2/environments", {});
-  if (error) {
+export function getTestEnvironmentId(): string {
+  const conn = integrationRuntime().config.getSoleDirectConnection();
+  if (!conn.kafka?.env_id) {
     throw new Error(
-      `failed to list environments from ccloud: ${JSON.stringify(error)}`,
+      "test-side env id requires kafka.env_id in test-fixtures/yaml_configs/integration.yaml",
     );
   }
-  const first = data?.data?.[0];
-  if (!first?.id) {
-    throw new Error(
-      "ccloud account has no environments - account is misconfigured for integration tests",
-    );
-  }
-  return first.id;
+  return conn.kafka.env_id;
 }
 
 /**

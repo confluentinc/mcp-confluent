@@ -182,11 +182,19 @@ export function hasTableflow(conn: ConnectionConfig): PredicateResult {
 }
 
 /**
- * Field-level — verdict that holds when the `schema_registry` block is
- * present and its `auth` field is `api_key`-typed. That combination is the
- * reliable signal that the SR is CCloud-hosted and therefore exposes the
- * `/catalog/v1/` endpoints. A vanilla CP SR has no auth, so it disables
- * even when the `schema_registry` block itself is present.
+ * Field-level — verdict that holds when the connection points at a Confluent
+ * Cloud-hosted Schema Registry that exposes the `/catalog/v1/` Stream Catalog
+ * endpoints. Requires three signals together:
+ *   - a `schema_registry` block, AND
+ *   - `auth.type === "api_key"` on that block, AND
+ *   - a `confluent_cloud` block (Cloud control-plane creds).
+ *
+ * The `confluent_cloud` block is required because `auth.type === "api_key"` is
+ * ambiguous on its own: a self-managed Confluent Platform deployment with HTTP
+ * Basic Auth in front of its SR also models as `auth.type === "api_key"` in
+ * the YAML schema, even though that SR does not serve `/catalog/v1/`. Without
+ * the `confluent_cloud` requirement, this predicate would over-enable Stream
+ * Catalog tools on CP deployments and they would 404 at runtime.
  */
 export function hasCCloudCatalogSupport(
   conn: ConnectionConfig,
@@ -198,6 +206,9 @@ export function hasCCloudCatalogSupport(
   }
   if (conn.schema_registry.auth?.type !== "api_key") {
     return disabled(ToolDisabledReason.MissingSchemaRegistryApiKeyAuth);
+  }
+  if (conn.confluent_cloud === undefined) {
+    return disabled(ToolDisabledReason.MissingConfluentCloudBlock);
   }
   return ENABLED;
 }

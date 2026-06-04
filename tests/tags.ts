@@ -48,4 +48,7 @@ export enum Tag {
   REQUIRES_FLINK_CONFIG = "@requires-flink-config",
   REQUIRES_TABLEFLOW_CONFIG = "@requires-tableflow-config",
   REQUIRES_TELEMETRY_CONFIG = "@requires-telemetry-config",
+
+  // Self-managed Confluent Platform (local CP stack via docker-compose.cp-test.yml)
+  CP = "@cp",
 }

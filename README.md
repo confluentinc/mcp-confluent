@@ -32,6 +32,7 @@ See [Getting Started](#getting-started) for full setup instructions and [Configu
   - [Always Available](#always-available-tools)
   - [Confluent Cloud](#available-tools-for-confluent-cloud)
   - [Local deployments](#available-tools-for-local-deployments)
+- [Using with Confluent Platform](#using-with-confluent-platform)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
 - [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud)
@@ -106,6 +107,44 @@ Ready-to-use variants live in [`sample_configs/`](sample_configs/).
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `list-consumer-groups`, `describe-consumer-group`, `get-consumer-group-lag` | Manage topics, produce/consume messages, inspect consumer groups |
 | **Schema Registry** | `list-schemas`, `delete-schema`                                                                                                                                     | List, inspect, and delete data schemas                           |
+
+## Using with Confluent Platform
+
+`mcp-confluent` runs against a self-managed Confluent Platform (CP) cluster the same way it runs against any local Kafka + Schema Registry deployment: point a `direct` connection at your brokers and Schema Registry.
+A CP connection exposes the same tools as any other local deployment — see [Available Tools for local deployments](#available-tools-for-local-deployments).
+The Confluent Cloud tools (Flink, Tableflow, Billing, Metrics, and the rest) require a Confluent Cloud account and stay disabled on CP.
+The only differences from a `localhost:9092` setup are authentication and TLS.
+
+### Sample YAML config
+
+[`sample_configs/confluent-platform.yaml`](sample_configs/confluent-platform.yaml) is a copy-pasteable starter.
+It assumes PLAIN over SASL_SSL for Kafka and HTTP Basic Auth for Schema Registry.
+Customize the broker and Schema Registry URLs, and inject credentials via the `${KAFKA_API_KEY}` / `${KAFKA_API_SECRET}` / `${SCHEMA_REGISTRY_API_KEY}` / `${SCHEMA_REGISTRY_API_SECRET}` environment variables.
+If your cluster uses SCRAM or another SASL mechanism, override `security.protocol` and `sasl.mechanisms` through the `kafka.extra_properties` map in that file.
+
+### TLS trust (internal CAs)
+
+CP clusters frequently sit behind an internal CA.
+If you see TLS handshake failures against the broker or Schema Registry, point Node at your CA bundle when starting the server:
+
+```bash
+NODE_EXTRA_CA_CERTS=/path/to/internal-ca.pem npm run start -- --config path/to/config.yaml
+```
+
+### End-to-end smoke test
+
+A docker-compose stack ([`docker-compose.cp-test.yml`](docker-compose.cp-test.yml)) brings up a local CP Kafka (KRaft, SASL_PLAINTEXT/PLAIN) plus an unauthenticated Schema Registry.
+The matching integration tests are tagged `@cp` and live next to their handlers as `*.cp.integration.test.ts`:
+
+```bash
+docker compose -f docker-compose.cp-test.yml up -d
+# Wait ~30s for Kafka + SR to become ready, then:
+CP_KAFKA_USERNAME=mcp CP_KAFKA_PASSWORD=mcp-secret \
+  npm run test:integration -- --tags-filter=@cp
+docker compose -f docker-compose.cp-test.yml down -v
+```
+
+The tests skip cleanly when those env vars are unset, so `npm run test:unit` and a default `npm run test:integration` against your real Confluent Cloud account are unaffected if you don't have the docker stack running.
 
 ## Getting Started
 

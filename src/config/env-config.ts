@@ -308,6 +308,7 @@ function buildSchemaRegistryBlock(
  *
  * confluent_cloud:
  *   endpoint: "${CONFLUENT_CLOUD_REST_ENDPOINT}"
+ *   organization_id: "${CONFLUENT_CLOUD_ORG_ID}"
  *   auth:
  *     type: api_key
  *     key: "${CONFLUENT_CLOUD_API_KEY}"
@@ -320,6 +321,9 @@ function buildConfluentCloudBlock(env: Environment) {
     confluent_cloud: {
       ...(env.CONFLUENT_CLOUD_REST_ENDPOINT && {
         endpoint: env.CONFLUENT_CLOUD_REST_ENDPOINT,
+      }),
+      ...(env.CONFLUENT_CLOUD_ORG_ID && {
+        organization_id: env.CONFLUENT_CLOUD_ORG_ID,
       }),
       ...apiKeyAuth(
         env.CONFLUENT_CLOUD_API_KEY,

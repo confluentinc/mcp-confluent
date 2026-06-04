@@ -12,7 +12,6 @@ interface RecommendationsProjection {
   connectorName: string;
   recommendations: string[];
   eventId?: string;
-  engineError?: unknown;
 }
 
 export class GetConnectorErrorRecommendationsHandler extends ConnectToolHandler {

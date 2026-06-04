@@ -205,6 +205,9 @@ describe("tool-registry.ts", () => {
         [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloud,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
         [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]: hasConfluentCloud,
+        [ToolName.GET_CONNECTOR_LOGS]: hasConfluentCloud,
         [ToolName.PAUSE_CONNECTOR]: hasConfluentCloud,
         [ToolName.RESUME_CONNECTOR]: hasConfluentCloud,
         [ToolName.RESTART_CONNECTOR]: hasConfluentCloud,
@@ -436,6 +439,13 @@ describe("tool-registry.ts", () => {
       [ToolName.GET_CONNECTOR_TASKS]: { outcome: { throws: "ZodError" } },
       [ToolName.CREATE_CONNECTOR]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_CONNECTOR]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]: {
+        outcome: { throws: "ZodError" },
+      },
+      [ToolName.GET_CONNECTOR_LOGS]: { outcome: { throws: "ZodError" } },
       [ToolName.PAUSE_CONNECTOR]: { outcome: { throws: "ZodError" } },
       [ToolName.RESUME_CONNECTOR]: { outcome: { throws: "ZodError" } },
       [ToolName.RESTART_CONNECTOR]: { outcome: { throws: "ZodError" } },

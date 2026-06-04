@@ -25,6 +25,54 @@ function getConnectScope(): ConnectScope {
 }
 
 /**
+ * Provisions a managed PostgresSource pointed at a non-resolvable hostname.
+ * CCloud accepts the config at POST (schema validation only — no eager DNS
+ * check), then the source task fails at startup when it tries to open the
+ * JDBC connection. The connector transitions to FAILED with the diagnostic
+ * extras (`validation_errors`, `errors_from_trace`, failed-task traces)
+ * that the error-summary / error-recommendations tools project.
+ *
+ * Test-side helper for the connector-error-diagnostics integration test;
+ * the healthy-path connector lives in {@link provisionTestDatagenConnector}.
+ */
+export async function provisionFailedTestPostgresConnector(
+  name: string,
+): Promise<void> {
+  const { envId, clusterId, kafkaApiKey, kafkaApiSecret } = getConnectScope();
+  const client = newTestCloudClient();
+  const { error } = await client.POST(
+    "/connect/v1/environments/{environment_id}/clusters/{kafka_cluster_id}/connectors",
+    {
+      params: { path: { environment_id: envId, kafka_cluster_id: clusterId } },
+      body: {
+        name,
+        config: {
+          name,
+          "connector.class": "PostgresSource",
+          "kafka.api.key": kafkaApiKey,
+          "kafka.api.secret": kafkaApiSecret,
+          "connection.host": "nonexistent.invalid.example.com",
+          "connection.port": "5432",
+          "connection.user": "test-user",
+          "connection.password": "test-password",
+          "db.name": "test-db",
+          "topic.prefix": name,
+          "table.whitelist": "public.test_table",
+          mode: "bulk",
+          "tasks.max": "1",
+          "output.data.format": "JSON",
+        },
+      },
+    },
+  );
+  if (error) {
+    throw new Error(
+      `failed to provision test failed-connector ${name}: ${JSON.stringify(error)}`,
+    );
+  }
+}
+
+/**
  * Provisions a managed Datagen Source connector targeting a topic named
  * after the connector itself (CCloud auto-creates the topic). The POST
  * returns immediately with status PROVISIONING; tests don't need to wait
@@ -155,6 +203,23 @@ export function waitForConnectorRunning(
   opts?: TimingOptions,
 ): Promise<void> {
   return waitForConnectorState(name, (s) => s === "RUNNING", "RUNNING", opts);
+}
+
+/**
+ * Wait for the connector to reach FAILED (e.g. after provisioning with a
+ * deliberately broken config). Default timeout is 3 minutes because
+ * runtime failures can lag behind PROVISIONING by 30–90s while the task
+ * scheduler attempts and reattempts the connection.
+ */
+export function waitForConnectorFailed(
+  name: string,
+  opts?: TimingOptions,
+): Promise<void> {
+  return waitForConnectorState(name, (s) => s === "FAILED", "FAILED", {
+    timeoutMs: 180_000,
+    intervalMs: 3_000,
+    ...opts,
+  });
 }
 
 /**

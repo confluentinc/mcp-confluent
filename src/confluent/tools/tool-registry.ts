@@ -9,6 +9,9 @@ import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
 import { GetConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/get-connector-config-handler.js";
+import { GetConnectorErrorRecommendationsHandler } from "@src/confluent/tools/handlers/connect/get-connector-error-recommendations-handler.js";
+import { GetConnectorErrorSummaryHandler } from "@src/confluent/tools/handlers/connect/get-connector-error-summary-handler.js";
+import { GetConnectorLogsHandler } from "@src/confluent/tools/handlers/connect/get-connector-logs-handler.js";
 import { GetConnectorOffsetsHandler } from "@src/confluent/tools/handlers/connect/get-connector-offsets-handler.js";
 import { GetConnectorStatusHandler } from "@src/confluent/tools/handlers/connect/get-connector-status-handler.js";
 import { GetConnectorTasksHandler } from "@src/confluent/tools/handlers/connect/get-connector-tasks-handler.js";
@@ -97,6 +100,15 @@ export class ToolHandlerRegistry {
     [ToolName.GET_CONNECTOR_OFFSETS, new GetConnectorOffsetsHandler()],
     [ToolName.GET_CONNECTOR_STATUS, new GetConnectorStatusHandler()],
     [ToolName.GET_CONNECTOR_TASKS, new GetConnectorTasksHandler()],
+    [
+      ToolName.GET_CONNECTOR_ERROR_SUMMARY,
+      new GetConnectorErrorSummaryHandler(),
+    ],
+    [
+      ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
+      new GetConnectorErrorRecommendationsHandler(),
+    ],
+    [ToolName.GET_CONNECTOR_LOGS, new GetConnectorLogsHandler()],
     [ToolName.UPDATE_CONNECTOR_CONFIG, new UpdateConnectorConfigHandler()],
     [ToolName.PAUSE_CONNECTOR, new PauseConnectorHandler()],
     [ToolName.RESUME_CONNECTOR, new ResumeConnectorHandler()],

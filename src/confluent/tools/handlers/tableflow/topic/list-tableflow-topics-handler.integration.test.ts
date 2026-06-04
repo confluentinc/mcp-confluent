@@ -1,6 +1,6 @@
 import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tableflow/topic/list-tableflow-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -11,7 +11,6 @@ import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new ListTableFlowTopicsHandler();
-const runtime = integrationRuntime();
 
 describe(
   "list-tableflow-topics-handler",
@@ -23,8 +22,9 @@ describe(
     ],
   },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires tableflow.auth config", () => {});
+    const verdict = handler.predicate(integrationConnection());
+    if (!verdict.enabled) {
+      it.skip(verdict.reason, () => {});
       return;
     }
 

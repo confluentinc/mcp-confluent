@@ -1,6 +1,6 @@
 import { ListConnectorsHandler } from "@src/confluent/tools/handlers/connect/list-connectors-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -11,14 +11,14 @@ import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new ListConnectorsHandler();
-const runtime = integrationRuntime();
 
 describe(
   "list-connectors-handler",
   { tags: [Tag.CONNECT, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires confluent_cloud.auth config", () => {});
+    const verdict = handler.predicate(integrationConnection());
+    if (!verdict.enabled) {
+      it.skip(verdict.reason, () => {});
       return;
     }
 

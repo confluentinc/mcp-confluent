@@ -1,6 +1,6 @@
 import { DeleteTagHandler } from "@src/confluent/tools/handlers/catalog/delete-tag.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
 import { withSharedCatalogTagsClient } from "@tests/harness/schema-registry.js";
 import {
   startServer,
@@ -14,14 +14,14 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new DeleteTagHandler();
-const runtime = integrationRuntime();
 
 describe(
   "delete-tag-handler",
   { tags: [Tag.CATALOG, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires schema_registry.endpoint + schema_registry.auth (api_key) config", () => {});
+    const verdict = handler.predicate(integrationConnection());
+    if (!verdict.enabled) {
+      it.skip(verdict.reason, () => {});
       return;
     }
 

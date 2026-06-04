@@ -9,7 +9,10 @@ import {
   getTestClusterId,
   withSharedAdminClient,
 } from "@tests/harness/kafka-admin.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import {
+  integrationConnection,
+  integrationRuntime,
+} from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -33,8 +36,9 @@ describe(
     ],
   },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires flink config", () => {});
+    const verdict = handler.predicate(integrationConnection());
+    if (!verdict.enabled) {
+      it.skip(verdict.reason, () => {});
       return;
     }
 

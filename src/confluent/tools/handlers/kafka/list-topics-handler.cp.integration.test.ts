@@ -1,6 +1,6 @@
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { cpIntegrationRuntime } from "@tests/harness/cp-runtime.js";
+import { cpIntegrationConnection } from "@tests/harness/cp-runtime.js";
 import {
   startCpServer,
   type StartedServer,
@@ -11,10 +11,9 @@ import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new ListTopicsHandler();
-const runtime = cpIntegrationRuntime();
 
 describe("list-topics-handler (Confluent Platform)", { tags: [Tag.CP] }, () => {
-  if (handler.enabledConnectionIds(runtime).length === 0) {
+  if (!handler.predicate(cpIntegrationConnection()).enabled) {
     it.skip("requires kafka.bootstrap_servers config (start docker-compose.cp-test.yml and set CP_KAFKA_USERNAME + CP_KAFKA_PASSWORD)", () => {});
     return;
   }

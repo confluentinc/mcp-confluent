@@ -5,7 +5,10 @@ import {
   getTestClusterId,
   withSharedAdminClient,
 } from "@tests/harness/kafka-admin.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import {
+  integrationConnection,
+  integrationRuntime,
+} from "@tests/harness/runtime.js";
 import {
   TEST_AVRO_SCHEMA,
   withSharedCatalogTagsClient,
@@ -36,8 +39,9 @@ describe(
     ],
   },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires schema_registry.endpoint + schema_registry.auth (api_key) config", () => {});
+    const verdict = handler.predicate(integrationConnection());
+    if (!verdict.enabled) {
+      it.skip(verdict.reason, () => {});
       return;
     }
     // test-side deps beyond the handler predicate (kafka admin + SR cluster id discovery); gating

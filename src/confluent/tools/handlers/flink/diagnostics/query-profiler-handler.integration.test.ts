@@ -5,7 +5,7 @@ import {
   waitForFlinkStatementPhase,
   withSharedFlinkStatementCleanup,
 } from "@tests/harness/flink.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -17,7 +17,6 @@ import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new QueryProfilerHandler();
-const runtime = integrationRuntime();
 
 describe(
   "query-profiler-handler",
@@ -30,8 +29,9 @@ describe(
   },
   () => {
     // composes hasFlink + hasTelemetry, stricter than the rest of the flink suite
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires flink + telemetry config", () => {});
+    const verdict = handler.predicate(integrationConnection());
+    if (!verdict.enabled) {
+      it.skip(verdict.reason, () => {});
       return;
     }
 

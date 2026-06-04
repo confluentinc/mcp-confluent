@@ -6,7 +6,10 @@ import {
   waitForConnectorRunning,
   withSharedConnectorCleanup,
 } from "@tests/harness/connect.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import {
+  integrationConnection,
+  integrationRuntime,
+} from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -26,8 +29,9 @@ describe(
   "connector-lifecycle",
   { tags: [Tag.CONNECT, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires confluent_cloud.auth config", () => {});
+    const verdict = handler.predicate(integrationConnection());
+    if (!verdict.enabled) {
+      it.skip(verdict.reason, () => {});
       return;
     }
 

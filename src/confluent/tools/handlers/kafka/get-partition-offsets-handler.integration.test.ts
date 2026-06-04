@@ -25,7 +25,7 @@ import {
   startOAuthServer,
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -57,9 +57,9 @@ describe(
         it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
         return;
       }
-      const directRuntime = integrationRuntime({ oauth: false });
-      if (handler.enabledConnectionIds(directRuntime).length === 0) {
-        it.skip("requires kafka.bootstrap_servers in test-fixtures/yaml_configs/integration.yaml", () => {});
+      const verdict = handler.predicate(integrationConnection());
+      if (!verdict.enabled) {
+        it.skip(verdict.reason, () => {});
         return;
       }
 
@@ -188,8 +188,9 @@ describe(
           it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
           return;
         }
-        const oauthRuntime = integrationRuntime({ oauth: true });
-        if (handler.enabledConnectionIds(oauthRuntime).length === 0) {
+        if (
+          !handler.predicate(integrationConnection({ oauth: true })).enabled
+        ) {
           it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
           return;
         }
@@ -201,8 +202,7 @@ describe(
         // `connectTestAdmin()`/`connectTestProducer()` build api-key kafka clients from the direct
         // fixture; gate the OAuth describe on the same predicate the direct describe uses so an
         // OAuth-only CI lane without direct creds skips cleanly instead of crashing in beforeAll
-        const directRuntime = integrationRuntime({ oauth: false });
-        if (handler.enabledConnectionIds(directRuntime).length === 0) {
+        if (!handler.predicate(integrationConnection()).enabled) {
           it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
           return;
         }

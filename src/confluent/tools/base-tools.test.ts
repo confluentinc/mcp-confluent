@@ -366,6 +366,27 @@ describe("base-tools.ts", () => {
         },
       );
 
+      it.each([
+        ["a number", 123, "number"],
+        ["null", null, "object"],
+        ["an object", { id: "a" }, "object"],
+      ])(
+        "should throw rather than auto-route when connectionId is present but %s, even with a sole viable connection",
+        (_label, requested, typeofName) => {
+          // Sole viable connection: absent the guard, a non-string would fall
+          // through to the omitted-path and silently auto-route to "a".
+          const runtime = runtimeWithConnections({ a: KAFKA, b: {} });
+
+          expect(() =>
+            resolveConnectionOf(kafkaHandler())(runtime, {
+              connectionId: requested,
+            }),
+          ).toThrow(
+            `Wacky -- connectionId present but not a string (got ${typeofName}); the injected schema should have rejected this`,
+          );
+        },
+      );
+
       it("should resolve a sole OAuth connection without narrowing its type", () => {
         const { conn } = resolveConnectionOf(new StubHandler())(
           ccloudOAuthRuntime(),

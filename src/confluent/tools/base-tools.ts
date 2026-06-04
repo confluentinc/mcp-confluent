@@ -291,9 +291,10 @@ export abstract class BaseToolHandler implements ToolHandler {
   /**
    * Resolves which connection a tool call targets: the explicit `connectionId`
    * argument when present, else the sole connection enabled for this tool.
-   * Throws a listing error when the id is unknown/not-enabled, or when omitted
-   * while two or more connections are candidates (the augmented schema makes the
-   * latter unreachable in normal MCP flow — this is the defensive backstop).
+   * Throws a listing error when the id is unknown/not-enabled, when it is
+   * present but not a string, or when omitted while two or more connections are
+   * candidates (the augmented schema makes all three unreachable in normal MCP
+   * flow — these are defensive backstops against internal call sites).
    *
    * Reads `connectionId` off the **raw** `toolArguments` rather than off the
    * handler's locally-parsed object: the framework already validated it against
@@ -312,8 +313,9 @@ export abstract class BaseToolHandler implements ToolHandler {
     // What connection ids this tool possibly supports.
     const enabledIds = this.enabledConnectionIds(runtime);
 
-    // The requested connection id, if the caller provided one. If provided, will be a string and must
-    // be one of the enabled ids per the Zod schema injected by `getRegisteredToolConfig()`.
+    // The requested connection id, if the caller provided one. Per the Zod schema injected by
+    // `getRegisteredToolConfig()` it should be a string that is one of the enabled ids; both
+    // expectations are enforced below rather than assumed.
     const requestedId = toolArguments?.connectionId;
 
     if (typeof requestedId === "string") {
@@ -325,6 +327,18 @@ export abstract class BaseToolHandler implements ToolHandler {
       // Explicit requested ID must be valid based on the injected schema enum already having validated it, so can
       // at this point trust fully.
       determinedId = requestedId;
+    } else if (requestedId !== undefined) {
+      // Unreachable in normal operation: Zod has already validated `args`
+      // against the registered schema before `handle()` runs, and that schema
+      // either declares `connectionId` as a string enum (multi-connection
+      // tools — a non-string fails parsing) or omits it entirely (single-
+      // connection tools — an unknown key is stripped). Either way a non-string
+      // can't survive to reach this branch. It exists purely as a symmetric
+      // peer to the two backstops below, so a malformed value can never quietly
+      // masquerade as an omission and auto-route.
+      throw new Error(
+        `Wacky -- connectionId present but not a string (got ${typeof requestedId}); the injected schema should have rejected this`,
+      );
     } else if (enabledIds.length === 1) {
       // No requested ID, but only one enabled connection — unambiguous, so route there.
       determinedId = enabledIds[0]!;

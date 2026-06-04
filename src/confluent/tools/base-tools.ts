@@ -134,12 +134,16 @@ export abstract class BaseToolHandler implements ToolHandler {
    */
   getRegisteredToolConfig(runtime: ServerRuntime): ToolConfig {
     const config = this.getToolConfig();
+
+    // alwaysEnabled is an identity-checked sentinel, so bail before the
+    // per-connection scan below: connection-agnostic tools (docs, diagnostics)
+    // never route to a connection and so never need a connectionId parameter.
+    if (this.predicate === alwaysEnabled) return config;
+
     const ids = this.enabledConnectionIds(runtime);
 
-    // If the tool is always enabled or only works with a single connection,
-    // no need to inject a connectionId parameter — there is no ambiguity as
-    // to which connection the tool should route to, so return the tool's
-    // authored config verbatim.
+    // A tool viable on a single connection has no ambiguity as to which
+    // connection it routes to, so return the tool's authored config verbatim.
 
     // (We might find that in multi-connection configurations, we might
     //  want to surface the `connectionId` parameter regardless but then
@@ -147,7 +151,7 @@ export abstract class BaseToolHandler implements ToolHandler {
     //  have to get farther along epic #532 before we can make that
     //  determination, though. We have enough information in serverRuntime
     //  to be able to migrate, though, so is not a blocker at this time.)
-    if (this.predicate === alwaysEnabled || ids.length <= 1) return config;
+    if (ids.length <= 1) return config;
 
     // Otherwise, inject a required connectionId parameter into the Zod
     // inputSchema with an enum of the enabled connection IDs.
@@ -158,8 +162,7 @@ export abstract class BaseToolHandler implements ToolHandler {
         connectionId: z
           .enum(ids as [string, ...string[]])
           .describe(
-            `Which configured connection to target. One of: ${ids.join(", ")}. ` +
-              `Discover via list-connections.`,
+            `Which configured connection to target. One of: ${ids.join(", ")}. `,
           ),
       },
     };

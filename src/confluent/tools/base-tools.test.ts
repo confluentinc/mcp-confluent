@@ -14,7 +14,7 @@ import {
   runtimeWithConnections,
 } from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 describe("base-tools.ts", () => {
@@ -130,6 +130,23 @@ describe("base-tools.ts", () => {
           expect(reg.description).toBe("stub");
           expect(reg.annotations).toBe(READ_ONLY);
         });
+
+        it("should short-circuit on the alwaysEnabled identity check without scanning connections", () => {
+          // alwaysEnabled is identity-checked, so an always-enabled tool must
+          // not pay the per-connection enabledConnectionIds() scan even on a
+          // multi-connection runtime.
+          const handler = new StubHandler({
+            inputSchema: { query: z.string() },
+          });
+          const scan = vi.spyOn(handler, "enabledConnectionIds");
+
+          const reg = handler.getRegisteredToolConfig(
+            runtimeWithConnections({ a: {}, b: {} }),
+          );
+
+          expect(scan).not.toHaveBeenCalled();
+          expect(reg.inputSchema).not.toHaveProperty("connectionId");
+        });
       });
 
       describe("injects a required connectionId enum for a connection-gated tool with multiple viable connections", () => {
@@ -185,13 +202,12 @@ describe("base-tools.ts", () => {
           expect(connectionId.isOptional()).toBe(false);
         });
 
-        it("should describe connectionId with the viable ids and a pointer to list-connections", () => {
+        it("should describe connectionId with the viable ids", () => {
           const connectionId = injectedConnectionId(
             runtimeWithConnections({ a: KAFKA, b: KAFKA }),
           );
 
           expect(connectionId.description).toContain("a, b");
-          expect(connectionId.description).toContain("list-connections");
         });
 
         it("should preserve the handler's pre-existing input fields alongside connectionId", () => {

@@ -1,4 +1,9 @@
-import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
+import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
+import {
+  hasKafka,
+  ToolDisabledReason,
+} from "@src/confluent/tools/connection-predicates.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   bareRuntime,
   CCLOUD_CONN,
@@ -6,9 +11,11 @@ import {
   DEFAULT_CONNECTION_ID,
   kafkaRuntime,
   runtimeWith,
+  runtimeWithConnections,
 } from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 describe("base-tools.ts", () => {
   describe("BaseToolHandler", () => {
@@ -51,6 +58,195 @@ describe("base-tools.ts", () => {
             ],
           ]),
         );
+      });
+    });
+
+    describe("getRegisteredToolConfig()", () => {
+      const KAFKA = { kafka: { bootstrap_servers: "b:9092" } };
+
+      describe("returns the authored config verbatim (no connectionId injected)", () => {
+        it.each([
+          [
+            "connection-neutral tool, no connections",
+            () => ({
+              handler: new StubHandler({ inputSchema: { query: z.string() } }),
+              runtime: runtimeWithConnections({}),
+            }),
+          ],
+          [
+            "connection-neutral tool, single connection",
+            () => ({
+              handler: new StubHandler({ inputSchema: { query: z.string() } }),
+              runtime: runtimeWith(),
+            }),
+          ],
+          [
+            "connection-neutral tool, two connections (alwaysEnabled short-circuit)",
+            () => ({
+              handler: new StubHandler({ inputSchema: { query: z.string() } }),
+              runtime: runtimeWithConnections({ a: {}, b: {} }),
+            }),
+          ],
+          [
+            "connection-centric tool, two connections but none viable",
+            () => ({
+              handler: new StubHandler({
+                predicate: hasKafka,
+                inputSchema: { topicName: z.string() },
+              }),
+              runtime: runtimeWithConnections({ a: {}, b: {} }),
+            }),
+          ],
+          [
+            "connection-centric tool, single viable connection",
+            () => ({
+              handler: new StubHandler({
+                predicate: hasKafka,
+                inputSchema: { topicName: z.string() },
+              }),
+              runtime: runtimeWithConnections({ a: KAFKA }),
+            }),
+          ],
+          [
+            "connection-centric tool, multiple connections but only one viable",
+            () => ({
+              handler: new StubHandler({
+                predicate: hasKafka,
+                inputSchema: { topicName: z.string() },
+              }),
+              runtime: runtimeWithConnections({ a: KAFKA, b: {} }),
+            }),
+          ],
+        ])("should not inject connectionId for %s", (_label, build) => {
+          const { handler, runtime } = build();
+          const reg = handler.getRegisteredToolConfig(runtime);
+
+          expect(reg.inputSchema).not.toHaveProperty("connectionId");
+          // authored field(s) and metadata pass through unchanged
+          expect(Object.keys(reg.inputSchema)).toEqual(
+            Object.keys(handler["getToolConfig"]().inputSchema),
+          );
+          expect(reg.name).toBe(ToolName.LIST_TOPICS);
+          expect(reg.description).toBe("stub");
+          expect(reg.annotations).toBe(READ_ONLY);
+        });
+
+        it("should short-circuit on the alwaysEnabled identity check without scanning connections", () => {
+          // alwaysEnabled is identity-checked, so an always-enabled tool must
+          // not pay the per-connection enabledConnectionIds() scan even on a
+          // multi-connection runtime.
+          const handler = new StubHandler({
+            inputSchema: { query: z.string() },
+          });
+          const scan = vi.spyOn(handler, "enabledConnectionIds");
+
+          const reg = handler.getRegisteredToolConfig(
+            runtimeWithConnections({ a: {}, b: {} }),
+          );
+
+          expect(scan).not.toHaveBeenCalled();
+          expect(reg.inputSchema).not.toHaveProperty("connectionId");
+        });
+      });
+
+      describe("injects a required connectionId enum for a connection-gated tool with multiple viable connections", () => {
+        function multiViableHandler(): StubHandler {
+          return new StubHandler({
+            predicate: hasKafka,
+            inputSchema: { topicName: z.string() },
+          });
+        }
+
+        /** Registers the multi-viable handler against `runtime` and returns the
+         * injected connectionId field, narrowed to ZodEnum (throwing if absent
+         * or not an enum) so callers can read ZodType members like
+         * `isOptional()` / `description`. */
+        function injectedConnectionId(
+          runtime: Parameters<StubHandler["getRegisteredToolConfig"]>[0],
+        ): z.ZodEnum {
+          const connectionId =
+            multiViableHandler().getRegisteredToolConfig(runtime).inputSchema
+              .connectionId;
+          if (!(connectionId instanceof z.ZodEnum)) {
+            throw new Error("connectionId should be a ZodEnum");
+          }
+          return connectionId;
+        }
+
+        it("should inject an enum of exactly the viable connection ids (excluding non-viable ones), in connection insertion order", () => {
+          // Keys deliberately reverse-alphabetical with a non-viable one wedged
+          // between, so the assertion distinguishes connection insertion order
+          // (the contract) from an accidental sort, and proves the non-viable
+          // connection is dropped.
+          const reg = multiViableHandler().getRegisteredToolConfig(
+            runtimeWithConnections({
+              "conn-z": KAFKA,
+              "conn-m": {},
+              "conn-a": KAFKA,
+            }),
+          );
+
+          const connectionId = reg.inputSchema.connectionId;
+          expect(connectionId).toBeInstanceOf(z.ZodEnum);
+          if (!(connectionId instanceof z.ZodEnum)) {
+            throw new Error("connectionId should be a ZodEnum");
+          }
+          expect(connectionId.options).toEqual(["conn-z", "conn-a"]);
+        });
+
+        it("should mark connectionId as required (not optional)", () => {
+          const connectionId = injectedConnectionId(
+            runtimeWithConnections({ a: KAFKA, b: KAFKA }),
+          );
+
+          expect(connectionId.isOptional()).toBe(false);
+        });
+
+        it("should describe connectionId with the viable ids", () => {
+          const connectionId = injectedConnectionId(
+            runtimeWithConnections({ a: KAFKA, b: KAFKA }),
+          );
+
+          expect(connectionId.description).toContain("a, b");
+        });
+
+        it("should preserve the handler's pre-existing input fields alongside connectionId", () => {
+          const reg = multiViableHandler().getRegisteredToolConfig(
+            runtimeWithConnections({ a: KAFKA, b: KAFKA }),
+          );
+
+          expect(Object.keys(reg.inputSchema)).toEqual([
+            "topicName",
+            "connectionId",
+          ]);
+        });
+
+        it("should not mutate the handler's authored input schema", () => {
+          // The handler hands back the same inputSchema object on every
+          // getToolConfig() call, so augmenting via mutation (rather than the
+          // spread) would leak connectionId back into the authored shape.
+          const authoredInputSchema = { topicName: z.string() };
+          const handler = new StubHandler({
+            predicate: hasKafka,
+            inputSchema: authoredInputSchema,
+          });
+
+          handler.getRegisteredToolConfig(
+            runtimeWithConnections({ a: KAFKA, b: KAFKA }),
+          );
+
+          expect(Object.keys(authoredInputSchema)).toEqual(["topicName"]);
+        });
+
+        it("should leave name, description, and annotations unchanged", () => {
+          const reg = multiViableHandler().getRegisteredToolConfig(
+            runtimeWithConnections({ a: KAFKA, b: KAFKA }),
+          );
+
+          expect(reg.name).toBe(ToolName.LIST_TOPICS);
+          expect(reg.description).toBe("stub");
+          expect(reg.annotations).toBe(READ_ONLY);
+        });
       });
     });
 

@@ -44,7 +44,7 @@ export function createMcpServer({
   });
 
   toolHandlers.forEach((handler, name) => {
-    const config = handler.getToolConfig();
+    const config = handler.getRegisteredToolConfig(runtime);
 
     srv.registerTool(
       name,

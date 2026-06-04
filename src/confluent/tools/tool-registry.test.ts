@@ -54,7 +54,7 @@ describe("tool-registry.ts", () => {
       it("should return valid ToolConfig for every registered tool", () => {
         for (const name of ALL_TOOL_NAMES) {
           const handler = ToolHandlerRegistry.getToolHandler(name);
-          const config = handler.getToolConfig();
+          const config = handler.getRegisteredToolConfig(runtimeWith());
 
           expect(config.name).toBe(name);
           expect(config.description.length).toBeGreaterThan(10);
@@ -65,7 +65,7 @@ describe("tool-registry.ts", () => {
       it("should have a valid annotation (READ_ONLY, CREATE_UPDATE, or DESTRUCTIVE) for every tool", () => {
         for (const name of ALL_TOOL_NAMES) {
           const handler = ToolHandlerRegistry.getToolHandler(name);
-          const config = handler.getToolConfig();
+          const config = handler.getRegisteredToolConfig(runtimeWith());
 
           expect(config.annotations).toBeDefined();
 
@@ -132,7 +132,7 @@ describe("tool-registry.ts", () => {
 
         for (const name of ALL_TOOL_NAMES) {
           const handler = ToolHandlerRegistry.getToolHandler(name);
-          const config = handler.getToolConfig();
+          const config = handler.getRegisteredToolConfig(runtimeWith());
 
           const prefix = name.split("-")[0]!;
 

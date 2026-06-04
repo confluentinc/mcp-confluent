@@ -296,7 +296,7 @@ describe("index.ts", () => {
         // Flink (hasFlink — needs the flink service block)
         ToolName.LIST_FLINK_STATEMENTS,
         ToolName.CREATE_FLINK_STATEMENT,
-        ToolName.READ_FLINK_STATEMENT,
+        ToolName.GET_FLINK_STATEMENT_RESULTS,
         ToolName.DELETE_FLINK_STATEMENTS,
         ToolName.GET_FLINK_STATEMENT_EXCEPTIONS,
         ToolName.LIST_FLINK_CATALOGS,

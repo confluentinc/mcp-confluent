@@ -33,6 +33,7 @@ All notable changes to this MCP server will be documented in this file.
 
 ### Changed
 
+- **`read-flink-statement` tool renamed to `get-flink-statement-results`.** The old name read as a peer to `read-connector` / `read-environment` (fetch the resource), but the tool actually returns a statement's _result rows_, not the statement definition. The new name matches the `get-…` verb the rest of the surface uses for result/data reads. Inputs, output shape, and behavior are unchanged; update any client config that pins the tool by name.
 - **`consume-messages` tool: breaking shape changes alongside the new controls above.**
   - **Top-level `offsetReset` field removed.** Position control is consolidated into the per-topic `start` tagged union (see Added); the consumer-level `auto.offset.reset` is derived from the call. The consolidation enables mixed-direction calls the prior consumer-wide `offsetReset` couldn't express ("topic A from earliest, topic B from latest" in one call now works). The starting-position default stays at `"earliest"` (no behavior change for bare-name calls); pass `start: "latest"` on the topic entries that should read only newly-produced messages.
   - **`value` / `key` deserialization options renamed to `valueFormat` / `keyFormat`.** The old names read as data peers to `topics` (especially `value`, which looks like "the value to produce"); the new names describe what the fields do — the format/encoding of the bytes. Both are also now omit-by-default, so the simple consume call no longer needs `value: {}` filler.

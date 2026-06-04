@@ -1,0 +1,72 @@
+name: "Request a feature"
+description: Suggest a new tool, capability, or improvement for the Confluent MCP server.
+type: Feature
+labels:
+  - "enhancement"
+  - "needs triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement to the Confluent MCP server!
+
+        Before opening a new request, please [search existing issues](https://github.com/confluentinc/mcp-confluent/issues) and 👍 upvote a matching one instead — this helps us gauge demand and prioritize.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/confluentinc/mcp-confluent/blob/main/CODE_OF_CONDUCT.md).
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: A clear and concise description of the problem or limitation. What are you trying to do that you can't do today?
+      placeholder: "I'm always frustrated when ..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Describe the solution you'd like
+      description: What new tool, capability, or behavior would solve this? If you're proposing a new tool, describe the Confluent resource/API it would wrap.
+    validations:
+      required: true
+  - type: dropdown
+    id: areas
+    attributes:
+      label: Which area(s) does this relate to? (Select all that apply)
+      multiple: true
+      options:
+        - "Not sure / general"
+        - "Kafka"
+        - "Flink"
+        - "Schema Registry"
+        - "Connectors / Connect"
+        - "Tableflow"
+        - "Billing"
+        - "Catalog"
+        - "Metrics"
+        - "Search / product docs"
+        - "Environments / Clusters / Organizations"
+        - "Configuration"
+        - "Transports (stdio / HTTP / SSE)"
+        - "Developer experience"
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or workarounds you've considered.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add any other context, links to Confluent Cloud APIs/docs, or screenshots about the request here.
+    validations:
+      required: false

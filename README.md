@@ -298,67 +298,95 @@ npx -y @confluentinc/mcp-confluent --list-tools
 <summary>Show output</summary>
 
 ```text
-add-tags-to-topic: Assign existing tags to Kafka topics in Confluent Cloud.
-alter-topic-config: Alter topic configuration in Confluent Cloud.
-consume-messages: Consumes messages from one or more Kafka topics. Supports automatic deserialization of Schema Registry encoded messag...
-create-connector: Create a new connector. Returns the new connector information if successful.
-create-flink-statement: Make a request to create a statement.
-create-topic-tags: Create new tag definitions in Confluent Cloud.
-create-topics: Create one or more Kafka topics.
-delete-connector: Delete an existing connector. Returns success message if deletion was successful.
-delete-flink-statements: Make a request to delete a statement.
-delete-tag: Delete a tag definition from Confluent Cloud.
-delete-topics: Delete the topic with the given names.
-check-flink-statement-health: Perform an aggregate health check for a Flink SQL statement.
-describe-consumer-group: Describe a single consumer group on a Kafka cluster — wraps the broker's describeGroups admin call for one group ID. Returns state, type, protocol, coordinator, and per-member assignment.
-get-connector-config: Retrieve the configuration for a connector.
-get-connector-error-recommendations: Get suggested remediation steps for a connector that has failed or is in an error state. Returns a one-liner when no recommendations are available.
-get-connector-error-summary: Summarize a connector's current errors. Projects Confluent Cloud's /status diagnostics into a compact, agent-friendly form. Returns a one-liner when the connector is healthy.
-get-connector-logs: Retrieve recent log entries for a Confluent Cloud connector from the Cloud logging API. Defaults to the last hour of ERROR-level entries. Paginated via nextPageToken.
-get-connector-offsets: Retrieve current offsets for a connector's tasks. Useful for detecting lag, stalled tasks, or assisting recovery.
-get-connector-status: Get the current state of a connector and its tasks (RUNNING, FAILED, PAUSED, UNASSIGNED) including failure traces if any.
-get-connector-tasks: List the tasks of a connector along with their configurations.
-get-consumer-group-lag: Compute live offset lag for a single Kafka consumer group. Returns per-(topic, partition) {committedOffset, highWatermark, lag} rows and a total lag count across the group.
-describe-flink-table: Get full schema details for a Flink table via INFORMATION_SCHEMA.COLUMNS.
-detect-flink-statement-issues: Detect issues for a Flink SQL statement by analyzing status, exceptions, and metrics.
-get-flink-statement-profile: Get Query Profiler data with task graph, metrics, and automated issue detection.
-get-flink-table-info: Get table metadata via INFORMATION_SCHEMA.TABLES.
-list-flink-catalogs: List all catalogs in the Flink environment.
-list-flink-databases: List all databases (schemas) in a Flink catalog via INFORMATION_SCHEMA.SCHEMATA.
-list-flink-tables: List all tables in a Flink database.
-get-flink-statement-exceptions: Retrieve the 10 most recent exceptions for a Flink SQL statement.
-get-topic-config: Retrieve configuration details for a specific Kafka topic.
-list-clusters: Get all clusters in the Confluent Cloud environment
-list-connectors: Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.
-list-consumer-groups: List consumer groups on a Kafka cluster — wraps the broker's listGroups admin call. Optional filters narrow the resul...
-list-environments: Get all environments in Confluent Cloud with pagination support
-list-flink-statements: Retrieve a sorted, filtered, paginated list of all statements.
-list-schemas: List all schemas in the Schema Registry.
-list-tags: Retrieve all tags with definitions from Confluent Cloud Schema Registry.
-list-topics: List all topics in the Kafka cluster.
-pause-connector: Pause a running connector and its tasks. Idempotent.
-produce-message: Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both ke...
-read-environment: Get details of a specific environment by ID
-read-flink-statement: Make a request to read a statement and its results
-remove-tag-from-entity: Remove tag from an entity in Confluent Cloud.
-restart-connector: Restart a connector and its tasks. Asynchronous; the connector will not transition state synchronously.
-resume-connector: Resume a paused connector and its tasks. Idempotent.
-search-topics-by-name: List all topics in the Kafka cluster matching the specified name.
-search-topics-by-tag: List all topics in the Kafka cluster with the specified tag.
-create-tableflow-topic: Make a request to create a tableflow topic.
-list-tableflow-regions: Retrieve a sorted, filtered, paginated list of all tableflow regions.
-list-tableflow-topics: Retrieve a sorted, filtered, paginated list of all tableflow topics.
-read-tableflow-topic: Make a request to read a tableflow topic.
-update-tableflow-topic: Make a request to update a tableflow topic.
-delete-tableflow-topic: Make a request to delete a tableflow topic.
-create-tableflow-catalog-integration: Make a request to create a catalog integration.
-list-tableflow-catalog-integrations: Retrieve a sorted, filtered, paginated list of all catalog integrations.
-read-tableflow-catalog-integration: Make a request to read a catalog integration.
-update-connector-config: Update the configuration of an existing connector. Full-replace: omitted keys are removed and the connector is...
-update-tableflow-catalog-integration: Make a request to update a catalog integration.
-delete-tableflow-catalog-integration: Make a request to delete a tableflow catalog integration.
-list-organizations: List Confluent Cloud organizations the current credentials can see. Paginated; if the response includes a nextPageToken, pass it back as pageToken to fetch additional pages.
-explain-disabled-tools: Call when the user asks why a tool is missing or unavailable (e.g., "why can't I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools grouped by the config gap each one is waiting on, so you can tell the user the exact YAML block or field to add. Prefer this over guessing about credentials, network, or auth.
+billing:
+  list-billing-costs: Retrieve billing cost data for a Confluent Cloud organization within a specified date range with pagination support
+
+catalog:
+  add-tags-to-topic: Assign existing tags to Kafka topics in Confluent Cloud.
+  create-topic-tags: Create new tag definitions in Confluent Cloud.
+  delete-tag: Delete a tag definition from Confluent Cloud.
+  list-tags: Retrieve all tags with definitions from Confluent Cloud Schema Registry.
+  remove-tag-from-entity: Remove tag from an entity in Confluent Cloud.
+  search-topics-by-name: List all topics in the Kafka cluster matching the specified name.
+  search-topics-by-tag: List all topics in the Kafka cluster with the specified tag.
+
+confluent-cloud:
+  list-clusters: Get all clusters in the Confluent Cloud environment
+  list-environments: Get all environments in Confluent Cloud with pagination support
+  list-organizations: List Confluent Cloud organizations the current credentials can see. Paginated; if the response includes a nextPageTok...
+  read-environment: Get details of a specific environment by ID
+
+connect:
+  create-connector: Create a new connector. Returns the new connector information if successful.
+  delete-connector: Delete an existing connector. Returns success message if deletion was successful.
+  get-connector-config: Retrieve the full configuration map for a connector. Returns the flat config object the connector was created/updated...
+  get-connector-error-recommendations: Get suggested remediation steps for a connector that has failed or is in an error state. Returns a one-liner when no recommendations are available.
+  get-connector-error-summary: Summarize a connector's current errors. Projects Confluent Cloud's /status diagnostics into a compact, agent-friendly form. Returns a one-liner when the connector is healthy.
+  get-connector-logs: Retrieve recent log entries for a Confluent Cloud connector from the Cloud logging API. Defaults to the last hour of ERROR-level entries. Paginated via nextPageToken.
+  get-connector-offsets: Retrieve current offsets for a connector's tasks. Useful for detecting lag, stalled tasks, or assisting recovery.
+  get-connector-status: Get the current state of a connector and its tasks (RUNNING, FAILED, PAUSED, UNASSIGNED) including failure traces if ...
+  get-connector-tasks: List the tasks of a connector along with their configurations.
+  list-connectors: Retrieve a list of "names" of the active connectors. You can then make a read request for a specific connector by name.
+  pause-connector: Pause a running connector and its tasks. Idempotent.
+  restart-connector: Restart a connector and its tasks. Asynchronous; the connector will not transition state synchronously.
+  resume-connector: Resume a paused connector and its tasks. Idempotent.
+  update-connector-config: Update the configuration of an existing connector. Full-replace: omitted keys are removed and the connector is reconf...
+
+docs:
+  get-product-doc-page: Fetch the full markdown content of a Confluent product documentation page. Accepts URLs under https://docs.confluent....
+  search-product-docs: Search Confluent product documentation (docs.confluent.io, developer.confluent.io, support.confluent.io) by keyword.
+
+flink:
+  check-flink-statement-health: Perform an aggregate health check for a Flink SQL statement. Returns status (healthy/warning/critical), current phase...
+  create-flink-statement: Make a request to create a statement.
+  delete-flink-statements: Make a request to delete a statement.
+  describe-flink-table: Get full schema details for a Flink table via INFORMATION_SCHEMA.COLUMNS. Returns column names, data types (including...
+  detect-flink-statement-issues: Detect issues for a Flink SQL statement by analyzing status, exceptions, and performance metrics. Identifies problems...
+  get-flink-statement-exceptions: Retrieve the 10 most recent exceptions for a Flink SQL statement. Useful for diagnosing failed or failing statements.
+  get-flink-statement-profile: Get Query Profiler data for a Flink SQL statement. Returns the task graph with human-readable task/operator names, pe...
+  get-flink-table-info: Get table metadata via INFORMATION_SCHEMA.TABLES. Returns watermark configuration, distribution info, and table type.
+  list-flink-catalogs: List all catalogs available in the Flink environment via INFORMATION_SCHEMA.CATALOGS.
+  list-flink-databases: List all databases (schemas) in a Flink catalog via INFORMATION_SCHEMA.SCHEMATA. Returns catalog and database names.
+  list-flink-statements: Retrieve a sorted, filtered, paginated list of all statements.
+  list-flink-tables: List all tables in a Flink database via INFORMATION_SCHEMA.TABLES. Returns table names and types.
+  read-flink-statement: Make a request to read a statement and its results
+
+kafka:
+  alter-topic-config: Alter topic configuration in Confluent Cloud.
+  consume-messages: Consume messages from Kafka topics. Optionally restrict to a partition, start from an offset, timestamp, earliest, la...
+  create-topics: Create one or more Kafka topics with an optional partition count.
+  delete-topics: Delete the topic with the given names.
+  describe-consumer-group: Describe a single consumer group on a Kafka cluster. Returns the group's state, type, protocol, partition assignor, c...
+  get-consumer-group-lag: Compute live offset lag for a single Kafka consumer group. Returns per-(topic, partition) {committedOffset, highWater...
+  get-partition-offsets: Return per-partition low/high watermarks and message counts for a Kafka topic. Use this to size a backfill, measure l...
+  get-topic-config: Retrieve configuration details for a specific Kafka topic.
+  list-consumer-groups: List consumer groups on a Kafka cluster — wraps the broker's listGroups admin call. Optional filters narrow the resul...
+  list-topics: List all topics in the Kafka cluster.
+  produce-message: Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both ke...
+
+mcp-server-diagnostics:
+  explain-disabled-tools: Call when the user asks why a tool is missing or unavailable (e.g., "why can't I list Kafka topics?", "where are the ...
+
+metrics:
+  list-available-metrics: List available Confluent Cloud metrics and their filter fields from the Telemetry API. Use this tool BEFORE query-met...
+  query-metrics: Query Confluent Cloud metrics from the Telemetry API. IMPORTANT: Use the list-available-metrics tool first to discove...
+
+schema-registry:
+  delete-schema: Delete a schema subject or a specific version from the Schema Registry. If version is omitted, all versions of the su...
+  list-schemas: List all schemas in the Schema Registry.
+
+tableflow:
+  create-tableflow-catalog-integration: Make a request to create a catalog integration.
+  create-tableflow-topic: Make a request to create a tableflow topic.
+  delete-tableflow-catalog-integration: Make a request to delete a tableflow catalog integration.
+  delete-tableflow-topic: Make a request to delete a tableflow topic.
+  list-tableflow-catalog-integrations: Retrieve a sorted, filtered, paginated list of all catalog integrations.
+  list-tableflow-regions: Retrieve a sorted, filtered, paginated list of all tableflow regions.
+  list-tableflow-topics: Retrieve a sorted, filtered, paginated list of all tableflow topics.
+  read-tableflow-catalog-integration: Make a request to read a catalog integration.
+  read-tableflow-topic: Make a request to read a tableflow topic.
+  update-tableflow-catalog-integration: Make a request to update a catalog integration.
+  update-tableflow-topic: Make a request to update a tableflow topic.
 ```
 
 </details>

@@ -30,7 +30,17 @@ VAULT_PATH_FIELDS := \
 	tableflow:TABLEFLOW_API_KEY,TABLEFLOW_API_SECRET \
 	telemetry:TELEMETRY_API_KEY,TELEMETRY_API_SECRET
 
-.PHONY: setup-test-env remove-test-env test-integration store-unit-test-results store-integration-test-results
+# Confluent Platform stack coordinates. Unlike the Vault-backed CCloud creds
+# above, these are non-secret: they're fixed by docker-compose.cp-test.yml's
+# JAAS config (user_mcp="mcp-secret"), so they live as literals here and just
+# get seeded into $(ENV_FILE) for the integration.cp.yaml fixture to
+# interpolate. Override CP_SR_READY_URL if your stack exposes SR elsewhere.
+CP_COMPOSE_FILE ?= docker-compose.cp-test.yml
+CP_KAFKA_USERNAME ?= mcp
+CP_KAFKA_PASSWORD ?= mcp-secret
+CP_SR_READY_URL ?= http://localhost:8081/subjects
+
+.PHONY: setup-test-env remove-test-env setup-cp-env remove-cp-env test-integration store-unit-test-results store-integration-test-results
 
 # Pull integration secrets into $(ENV_FILE). Fails fast if `vault` isn't on
 # PATH or the user isn't authed. Empty Vault reads (missing field, no
@@ -64,6 +74,41 @@ setup-test-env:
 	done
 
 remove-test-env:
+	@rm -f $(ENV_FILE)
+
+# Self-contained Confluent Platform setup: brings up the local CP stack
+# (docker-compose.cp-test.yml — Kafka on SASL_PLAINTEXT/PLAIN at :9092,
+# unauthenticated SR at :8081) and seeds $(ENV_FILE) with the two non-secret
+# Kafka creds the integration.cp.yaml fixture interpolates. No Vault, no Cloud
+# account — the @cp lane needs neither. The Schema Registry HTTP endpoint is
+# the readiness signal: SR depends_on Kafka and won't answer until the broker
+# is reachable, so one poll gates on both. Mirrors setup-test-env's
+# rm/touch/chmod-600 handling of $(ENV_FILE).
+setup-cp-env:
+	@command -v docker >/dev/null 2>&1 || { \
+		echo "ERROR: 'docker' not found on PATH. Install Docker to run the @cp integration lane."; \
+		exit 1; \
+	}
+	@echo "starting Confluent Platform stack ($(CP_COMPOSE_FILE))"
+	@docker compose -f $(CP_COMPOSE_FILE) up -d
+	@echo "waiting for Schema Registry at $(CP_SR_READY_URL) (also gates on Kafka readiness)"
+	@deadline=$$(( $$(date +%s) + 120 )); \
+	until curl -sf -o /dev/null $(CP_SR_READY_URL); do \
+		if [ $$(date +%s) -ge $$deadline ]; then \
+			echo "ERROR: CP stack not ready within 120s"; \
+			docker compose -f $(CP_COMPOSE_FILE) logs --tail=50; \
+			exit 1; \
+		fi; \
+		sleep 2; \
+	done
+	@echo "CP stack ready; writing CP creds to $(ENV_FILE)"
+	@rm -f $(ENV_FILE)
+	@touch $(ENV_FILE) && chmod 600 $(ENV_FILE)
+	@echo "CP_KAFKA_USERNAME=$(CP_KAFKA_USERNAME)" >> $(ENV_FILE)
+	@echo "CP_KAFKA_PASSWORD=$(CP_KAFKA_PASSWORD)" >> $(ENV_FILE)
+
+remove-cp-env:
+	@docker compose -f $(CP_COMPOSE_FILE) down -v >/dev/null 2>&1 || true
 	@rm -f $(ENV_FILE)
 
 # Run the integration tests. SERVICE_CONFIG and TAGS compose into a single

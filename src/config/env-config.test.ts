@@ -312,6 +312,29 @@ describe("config/env-config.ts", () => {
         });
       });
 
+      it("should populate organization_id when CONFLUENT_CLOUD_ORG_ID is set alongside credentials", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({
+            CONFLUENT_CLOUD_API_KEY: "cckey",
+            CONFLUENT_CLOUD_API_SECRET: "ccsecret",
+            CONFLUENT_CLOUD_ORG_ID: "org-abc123",
+          }),
+        );
+        const conn = config.getSoleDirectConnection();
+        expect(conn.confluent_cloud?.organization_id).toBe("org-abc123");
+      });
+
+      it("should omit organization_id when CONFLUENT_CLOUD_ORG_ID is unset", () => {
+        const config = buildConfigFromEnvAndCli(
+          envWith({
+            CONFLUENT_CLOUD_API_KEY: "cckey",
+            CONFLUENT_CLOUD_API_SECRET: "ccsecret",
+          }),
+        );
+        const conn = config.getSoleDirectConnection();
+        expect(conn.confluent_cloud?.organization_id).toBeUndefined();
+      });
+
       it("should be valid as a standalone block (no kafka or schema_registry)", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({

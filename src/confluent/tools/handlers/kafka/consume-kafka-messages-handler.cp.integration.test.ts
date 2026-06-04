@@ -71,14 +71,14 @@ describe(
         const result = await server.client.callTool({
           name: ToolName.CONSUME_MESSAGES,
           arguments: {
-            topicNames: [topic],
+            topics: [{ name: topic }],
             maxMessages: seededValues.length,
             timeoutMs: 15_000,
-            value: { useSchemaRegistry: false },
+            valueFormat: { disableSchemaRegistry: true },
           },
         });
 
-        expect(result.isError).not.toBe(true);
+        expect(result.isError, textContent(result)).not.toBe(true);
 
         const text = textContent(result);
         expect(text).toMatch(/^Consumed \d+ messages/);

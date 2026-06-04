@@ -43,6 +43,10 @@ All notable changes to this MCP server will be documented in this file.
 
 - **`read-connector` tool.** Returned `{name, config, tasks: [id-refs], type}` from `GET /connect/v1/.../connectors/{name}`. Its content is now covered by the more granular tools listed under Added: the config map by `get-connector-config`, the per-task identifiers (and the connector type, derivable from `connector.class`) by `get-connector-tasks`. Callers that previously read the whole blob to pick one field can now ask for just that field.
 
+### Fixed
+
+- **`produce-message` PROTOBUF serialization (issue #127).** Producing to a topic with a Protobuf schema previously failed with `message type name is empty` because a plain JS payload carries neither the `$typeName` nor the descriptor the `@confluentinc/schemaregistry` `ProtobufSerializer` requires. PROTOBUF now takes a dedicated serialization path: the `.proto` text (provide path) or the stored serialized schema (use-latest path) is turned into a `@bufbuild/protobuf` descriptor registry, and the payload is converted into a typed message before serialization. A new `messageName` argument (the fully-qualified message type, e.g. `com.example.User`) is **required** for PROTOBUF produce so the payload can be encoded against the right type; it is ignored for AVRO/JSON. Payload keys must match the proto field names exactly (e.g. `user_id`, not `userId`).
+
 ## 1.3.0
 
 ### Added

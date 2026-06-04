@@ -343,35 +343,34 @@ describe("schema-registry-helper.ts", () => {
   });
 
   describe("getSerializer()", () => {
-    it.each(["AVRO", "JSON"] as const)(
+    it.each(["AVRO", "JSON", "PROTOBUF"] as const)(
       "should return a serializer for %s",
       (schemaType) => {
         const registry = getMockedSchemaRegistry();
         expect(
-          getSerializer(schemaType, registry, SerdeType.VALUE),
+          getSerializer(schemaType, registry, SerdeType.VALUE, {
+            useLatestVersion: true,
+          }),
         ).toBeDefined();
       },
     );
 
-    it("should throw for PROTOBUF (handled by serializeProtobufMessage)", () => {
-      const registry = getMockedSchemaRegistry();
-      expect(() =>
-        getSerializer("PROTOBUF", registry, SerdeType.VALUE),
-      ).toThrow(/goes through serializeProtobufMessage/);
-    });
-
     it("should throw for an unknown schema type", () => {
       const registry = getMockedSchemaRegistry();
       expect(() =>
-        getSerializer("XML" as unknown as "AVRO", registry, SerdeType.VALUE),
+        getSerializer("XML" as unknown as "AVRO", registry, SerdeType.VALUE, {
+          useLatestVersion: true,
+        }),
       ).toThrow(/Unknown schemaType: XML/);
     });
 
     it("should throw when the schema type is undefined", () => {
       const registry = getMockedSchemaRegistry();
-      expect(() => getSerializer(undefined, registry, SerdeType.VALUE)).toThrow(
-        /Unknown schemaType/,
-      );
+      expect(() =>
+        getSerializer(undefined, registry, SerdeType.VALUE, {
+          useLatestVersion: true,
+        }),
+      ).toThrow(/Unknown schemaType/);
     });
   });
 

@@ -24,6 +24,7 @@ import {
   JsonSerializer,
   ProtobufDeserializer,
   ProtobufSerializer,
+  ProtobufSerializerConfig,
   SchemaRegistryClient,
   SerdeType,
   Serializer,
@@ -90,41 +91,35 @@ export type SchemaCheckResult = { type: "no-schema"; subject: string } | null;
 
 /**
  * Creates and returns the appropriate serializer instance based on schema type.
- * The serializer is configured to use either a specific schema ID or the latest version.
+ *
+ * This is a pure factory: it maps a {@link SchemaType} to its serializer
+ * constructor and forwards the caller-built {@link SerializerConfig}. The
+ * format-specific *decisions* — schema-id vs. use-latest for AVRO/JSON,
+ * auto-register vs. use-latest plus the descriptor registry for PROTOBUF — live
+ * with the callers ({@link serializeMessage}, {@link serializeProtobufMessage}),
+ * which is why the config arrives ready-made. For PROTOBUF the descriptor
+ * registry rides inside the config as its optional `registry` field
+ * (`ProtobufSerializerConfig = SerializerConfig & { registry?: MutableRegistry }`).
  *
  * @param schemaType - The type of schema (AVRO, JSON, PROTOBUF)
  * @param registry - The schema registry client instance
  * @param serdeType - Whether this is for key or value serialization
- * @param schemaId - Optional schema ID to use for serialization
+ * @param serializerConfig - The serializer configuration to forward (use-latest,
+ *   use-schema-id, auto-register, and/or the PROTOBUF descriptor registry)
  * @returns The appropriate Serializer instance
  * @throws Error if the schema type is unknown or unsupported
- *
- * PROTOBUF never flows through here: {@link serializeMessage} short-circuits to
- * {@link serializeProtobufMessage} (which needs a descriptor registry and
- * auto-register/use-latest semantics rather than the schema-id config used
- * here) before reaching this factory. The PROTOBUF entry below therefore throws
- * explicitly — if that short-circuit is ever removed, this surfaces the
- * assumption loudly instead of silently producing undeserializable bytes.
  */
 export function getSerializer(
   schemaType: SchemaType | undefined,
   registry: SchemaRegistryClient,
   serdeType: SerdeType,
-  schemaId?: number,
+  serializerConfig: SerializerConfig,
 ): Serializer {
-  const serializerConfig: SerializerConfig =
-    typeof schemaId === "number"
-      ? { useSchemaId: schemaId }
-      : { useLatestVersion: true };
-
   const serializers = {
     AVRO: () => new AvroSerializer(registry, serdeType, serializerConfig),
     JSON: () => new JsonSerializer(registry, serdeType, serializerConfig),
-    PROTOBUF: (): Serializer => {
-      throw new Error(
-        "PROTOBUF serialization goes through serializeProtobufMessage, not getSerializer",
-      );
-    },
+    PROTOBUF: () =>
+      new ProtobufSerializer(registry, serdeType, serializerConfig),
   };
 
   if (!schemaType || !(schemaType in serializers)) {
@@ -482,13 +477,18 @@ export async function serializeMessage(
     await getLatestSchemaOfTypeOrThrow(registry, subject, options.schemaType);
   }
 
+  const serializerConfig: SerializerConfig =
+    typeof schemaId === "number"
+      ? { useSchemaId: schemaId }
+      : { useLatestVersion: true };
+
   let serializer: Serializer;
   try {
     serializer = getSerializer(
       options.schemaType,
       registry,
       serdeType,
-      schemaId,
+      serializerConfig,
     );
   } catch (err) {
     throw new Error(`Failed to get serializer: ${err}`);
@@ -563,10 +563,19 @@ async function serializeProtobufMessage(
     options.message as object,
   );
 
-  const serializer = new ProtobufSerializer(registry, serdeType, {
+  // The descriptor registry rides inside the config: ProtobufSerializer reads
+  // its optional `registry` field to encode locally. getSerializer forwards the
+  // whole config, so PROTOBUF flows through the same factory as AVRO/JSON.
+  const protobufConfig: ProtobufSerializerConfig = {
     ...serializerConfig,
     registry: protobufRegistry,
-  });
+  };
+  const serializer = getSerializer(
+    "PROTOBUF",
+    registry,
+    serdeType,
+    protobufConfig,
+  );
   try {
     return await serializer.serialize(topicName, message);
   } catch (err) {

@@ -1,4 +1,4 @@
-import { ReadFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/read-flink-statement-handler.js";
+import { GetFlinkStatementResultsHandler } from "@src/confluent/tools/handlers/flink/get-flink-statement-results-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -18,9 +18,9 @@ const EXPLICIT_IDS = {
 
 const STATEMENT_NAME = "my-statement";
 
-describe("read-flink-statement-handler.ts", () => {
-  describe("ReadFlinkStatementHandler", () => {
-    const handler = new ReadFlinkStatementHandler();
+describe("get-flink-statement-results-handler.ts", () => {
+  describe("GetFlinkStatementResultsHandler", () => {
+    const handler = new GetFlinkStatementResultsHandler();
 
     describe("handle()", () => {
       const cases: FlinkGetCase[] = [

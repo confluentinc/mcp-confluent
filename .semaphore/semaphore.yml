@@ -248,6 +248,35 @@ blocks:
             - npm run test:harness
             - make test-integration TAGS=@smoke
 
+  # Self-contained Confluent Platform block. Unlike every other integration
+  # block, the @cp lane runs against a local docker-compose CP stack
+  # (docker-compose.cp-test.yml) rather than live Confluent Cloud — so it gets
+  # its own prologue: no `vault-setup`, no `make setup-test-env`, no Playwright
+  # (CP has no @oauth describes). `make setup-cp-env` brings the stack up and
+  # seeds the two non-secret Kafka creds that integration.cp.yaml interpolates;
+  # `make remove-cp-env` tears it down. Gates on the CP fixtures/harness plus
+  # the Kafka/schema handler dirs whose tools the @cp suite exercises.
+  - name: "Integration Tests: cp"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in(['/docker-compose.cp-test.yml', '/test-fixtures/yaml_configs/integration.cp.yaml', '/tests/harness/cp-runtime.ts', '/tests/harness/cp-start-server.ts', '/src/confluent/tools/handlers/kafka/', '/src/confluent/tools/handlers/schema/'], { default_branch: 'main' })"
+    task:
+      prologue:
+        commands:
+          - npm ci --prefer-offline --include=dev
+          - npm run build
+          - make setup-cp-env
+      epilogue:
+        always:
+          commands:
+            - make remove-cp-env
+            - test-results publish TEST-integration.xml --name "Integration (${SEMAPHORE_JOB_NAME})" --force || true
+      jobs:
+        - name: "@cp"
+          commands:
+            - npm run test:harness
+            - make test-integration TAGS=@cp
+
 after_pipeline:
   task:
     jobs:

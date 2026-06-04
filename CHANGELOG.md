@@ -8,7 +8,7 @@ All notable changes to this MCP server will be documented in this file.
 
 #### New Tools / Tool Features
 
-- **`consume-messages` per-topic `partition` and `start` controls.** Each `topics[]` entry now accepts an optional `partition` (consume a single partition) and a `start` position: `"earliest"`, `"latest"`, `{offset: "N"}`, `{timestamp: ...}` (ISO 8601 or ms-since-epoch), or `{tail: N}` (the N most recent existing messages, returned without waiting for new traffic). Examples:
+- **`consume-messages` per-topic `partition` and `start` controls.** Each `topics[]` entry now accepts an optional `partition` (consume a single partition) and an optional `start` position (default `"earliest"`): `"earliest"`, `"latest"`, `{offset: "N"}` (requires `partition`), `{timestamp: ...}` (ISO 8601 or ms-since-epoch), or `{tail: N}` (the N most recent existing messages, returned without waiting for new traffic; requires `partition`). Examples:
   - `{name: "orders", partition: 0, start: {offset: "42"}}` — read partition 0 starting at offset 42.
   - `{name: "orders", start: {timestamp: "2026-05-14T17:00:00Z"}}` — every partition seeks to the broker-resolved offset for that timestamp.
   - `{name: "orders", partition: 0, start: {tail: 50}}` — the last 50 messages already on partition 0, returned without blocking for new writes.
@@ -19,7 +19,7 @@ All notable changes to this MCP server will be documented in this file.
 - **`get-consumer-group-lag` tool.** Read-only per-partition offset lag for a single consumer group (committed offset vs. high watermark).
 - **Connector inspection tools (4, read-only):** `get-connector-config`, `get-connector-offsets`, `get-connector-status` (also surfaces the connector's `lcc-...` resource ID as `lccId`), and `get-connector-tasks`.
 - **Connector lifecycle tools (4):** `pause-connector`, `resume-connector`, `restart-connector`, and `update-connector-config` (full-replace semantics — omitted keys are removed).
-- **Connector error-diagnostics tools (3, read-only)** for troubleshooting FAILED connectors: `get-connector-error-summary`, `get-connector-error-recommendations`, and `get-connector-logs`.
+- **Connector error-diagnostics tools (3, read-only):** `get-connector-error-summary`, `get-connector-error-recommendations`, and `get-connector-logs` — for troubleshooting FAILED connectors.
 
 #### New Internals
 
@@ -32,7 +32,7 @@ All notable changes to this MCP server will be documented in this file.
   - `topicNames: string[]` replaced by `topics[]`, an array of per-topic option objects. Minimal call: `{topics: [{name: "orders"}]}`.
   - Top-level `offsetReset` removed; starting position is now per-topic via `start` (default remains `"earliest"`).
   - `value` / `key` deserialization options renamed to `valueFormat` / `keyFormat`, both omit-by-default.
-  - Schema Registry decoding now defaults on; opt out per side with `disableSchemaRegistry: true` on `valueFormat` / `keyFormat`.
+  - Schema Registry decoding is now enabled by default; opt out per side with `disableSchemaRegistry: true` on `valueFormat` / `keyFormat`.
 
 ### Removed
 

@@ -212,9 +212,17 @@ export function outputToolList(filteredToolNames: ToolName[]): void {
     ToolCategory,
     Array<{ name: ToolName; desc: string }>
   >();
+  // --list-tools runs before any config is loaded, so there is no real runtime.
+  // A zero-connection runtime makes getRegisteredToolConfig() return each tool's
+  // authored config verbatim (no connectionId augmentation), which is exactly
+  // the connection-independent catalog view this listing wants.
+  const runtime = new ServerRuntime(
+    new MCPServerConfiguration({ connections: {} }),
+    {},
+  );
   for (const toolName of filteredToolNames) {
     const handler = ToolHandlerRegistry.getToolHandler(toolName);
-    const config = handler.getToolConfig();
+    const config = handler.getRegisteredToolConfig(runtime);
     let desc = config.description.replaceAll(/\s+/g, " ").trim();
     if (desc.length > MAX_DESC_LENGTH) {
       desc = desc.slice(0, MAX_DESC_LENGTH - 3) + "...";

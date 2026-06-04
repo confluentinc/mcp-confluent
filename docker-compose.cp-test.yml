@@ -1,9 +1,9 @@
 # Local Confluent Platform stack for integration testing mcp-confluent.
 #
-# Usage:
+# Usage (or just `make setup-cp-env` / `make remove-cp-env`):
 #   docker compose -f docker-compose.cp-test.yml up -d
-#   # Wait ~30s for Kafka + SR to become ready
-#   RUN_CP_INTEGRATION=1 npm run test -- src/cp-integration.test.ts
+#   # Wait for Kafka + SR to become ready (SR's /subjects answering = both up)
+#   npm run test:integration -- --tags-filter=@cp
 #   docker compose -f docker-compose.cp-test.yml down -v
 #
 # Notes:
@@ -24,15 +24,33 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: "broker,controller"
-      KAFKA_LISTENERS: "SASL_PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
-      KAFKA_ADVERTISED_LISTENERS: "SASL_PLAINTEXT://localhost:9092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "SASL_PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT"
+      # Two SASL_PLAINTEXT listeners: EXTERNAL is advertised as localhost:9092
+      # for host-based test clients; INTERNAL is advertised as kafka:29092 for
+      # in-network clients (schema-registry). A single localhost-advertised
+      # listener would be unreachable from the SR container.
+      #
+      # Listener NAMES are INTERNAL/EXTERNAL rather than SASL_PLAINTEXT on
+      # purpose: the cp-kafka image maps env vars to properties by replacing
+      # `_` with `.`, so a listener literally named SASL_PLAINTEXT would make
+      # KAFKA_LISTENER_NAME_SASL_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG resolve to
+      # the wrong property (listener.name.sasl.plaintext...) and the broker
+      # would start with no JAAS. Underscore-free names sidestep that, and
+      # because the advertised string no longer contains "SASL_" the image
+      # skips its `dub ensure KAFKA_OPTS` gate, keeping this env-var-only.
+      KAFKA_LISTENERS: "INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka:29092,EXTERNAL://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-      KAFKA_INTER_BROKER_LISTENER_NAME: "SASL_PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
       KAFKA_SASL_ENABLED_MECHANISMS: "PLAIN"
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "PLAIN"
-      KAFKA_LISTENER_NAME_SASL_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG: >-
+      KAFKA_LISTENER_NAME_INTERNAL_PLAIN_SASL_JAAS_CONFIG: >-
+        org.apache.kafka.common.security.plain.PlainLoginModule required
+        username="admin" password="admin-secret"
+        user_admin="admin-secret"
+        user_mcp="mcp-secret";
+      KAFKA_LISTENER_NAME_EXTERNAL_PLAIN_SASL_JAAS_CONFIG: >-
         org.apache.kafka.common.security.plain.PlainLoginModule required
         username="admin" password="admin-secret"
         user_admin="admin-secret"
@@ -55,7 +73,7 @@ services:
     environment:
       SCHEMA_REGISTRY_HOST_NAME: "schema-registry"
       SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "SASL_PLAINTEXT://kafka:9092"
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "SASL_PLAINTEXT://kafka:29092"
       SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: "SASL_PLAINTEXT"
       SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: "PLAIN"
       SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: >-

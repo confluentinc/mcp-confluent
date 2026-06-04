@@ -2,11 +2,17 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { hasKafka } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
 import { createMcpServer, type ToolCallProps } from "@src/mcp/server.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { ccloudOAuthRuntime, runtimeWith } from "@tests/factories/runtime.js";
+import {
+  ccloudOAuthRuntime,
+  runtimeWith,
+  runtimeWithConnections,
+} from "@tests/factories/runtime.js";
 import { createTestServer, TestServerContext } from "@tests/server.js";
 import { createMockInstance, StubHandler } from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -89,6 +95,29 @@ async function startServerWith(
 }
 
 describe("MCP server tool-call gate", () => {
+  let activeShutdown: (() => Promise<void>) | undefined;
+
+  afterEach(async () => {
+    await activeShutdown?.();
+    activeShutdown = undefined;
+  });
+
+  // Boots a single-tool server and registers its teardown with the afterEach
+  // above, so individual tests don't carry their own try/finally shutdown.
+  async function startWith(
+    handler: ToolHandler,
+    runtime: ServerRuntime,
+    track?: (props: ToolCallProps) => void,
+  ): Promise<Client> {
+    const { client, shutdown } = await startServerWith(
+      new Map([[ToolName.LIST_TOPICS, handler]]),
+      runtime,
+      track,
+    );
+    activeShutdown = shutdown;
+    return client;
+  }
+
   // StubHandler({ enabled: false }) yields a predicate that's not
   // `alwaysEnabled` (it returns a disabled-result), which is the condition
   // the gate uses to decide to launch the OAuth login. The "tool disabled"
@@ -99,16 +128,10 @@ describe("MCP server tool-call gate", () => {
     holder.ensureLoggedIn.mockResolvedValue(undefined);
     const handler = new StubHandler({ enabled: false });
 
-    const { client, shutdown } = await startServerWith(
-      new Map([[ToolName.LIST_TOPICS, handler]]),
-      ccloudOAuthRuntime(holder),
-    );
-    try {
-      await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
-      expect(holder.ensureLoggedIn).toHaveBeenCalledOnce();
-    } finally {
-      await shutdown();
-    }
+    const client = await startWith(handler, ccloudOAuthRuntime(holder));
+    await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
+
+    expect(holder.ensureLoggedIn).toHaveBeenCalledOnce();
   });
 
   it("should NOT call ensureLoggedIn() when handler.predicate is alwaysEnabled (e.g., docs lookups)", async () => {
@@ -119,32 +142,20 @@ describe("MCP server tool-call gate", () => {
     holder.ensureLoggedIn.mockResolvedValue(undefined);
     const handler = new StubHandler({ enabled: true });
 
-    const { client, shutdown } = await startServerWith(
-      new Map([[ToolName.LIST_TOPICS, handler]]),
-      ccloudOAuthRuntime(holder),
-    );
-    try {
-      await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
-      expect(holder.ensureLoggedIn).not.toHaveBeenCalled();
-    } finally {
-      await shutdown();
-    }
+    const client = await startWith(handler, ccloudOAuthRuntime(holder));
+    await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
+
+    expect(holder.ensureLoggedIn).not.toHaveBeenCalled();
   });
 
   it("should be a no-op when runtime.oauthHolder is undefined (api_key path)", async () => {
     const handler = new StubHandler({ enabled: false });
     const handleSpy = vi.spyOn(handler, "handle");
 
-    const { client, shutdown } = await startServerWith(
-      new Map([[ToolName.LIST_TOPICS, handler]]),
-      runtimeWith(), // No oauthHolder.
-    );
-    try {
-      await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
-      expect(handleSpy).toHaveBeenCalledOnce();
-    } finally {
-      await shutdown();
-    }
+    const client = await startWith(handler, runtimeWith()); // No oauthHolder.
+    await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
+
+    expect(handleSpy).toHaveBeenCalledOnce();
   });
 
   it('should propagate ensureLoggedIn() rejection as a tool-call error and track status:"error"', async () => {
@@ -154,31 +165,114 @@ describe("MCP server tool-call gate", () => {
     );
     const handler = new StubHandler({ enabled: false });
     const handleSpy = vi.spyOn(handler, "handle");
-
     const trackSpy = vi.fn();
-    const { client, shutdown } = await startServerWith(
-      new Map([[ToolName.LIST_TOPICS, handler]]),
+
+    const client = await startWith(
+      handler,
       ccloudOAuthRuntime(holder),
       trackSpy,
     );
-    try {
+    const result = await client.callTool({
+      name: ToolName.LIST_TOPICS,
+      arguments: {},
+    });
+
+    // MCP SDK converts thrown errors into an error result with isError=true.
+    expect(result.isError).toBe(true);
+    // Handler must NOT have run — gate failure is terminal for this call.
+    expect(handleSpy).not.toHaveBeenCalled();
+    // Telemetry hook records the failure.
+    expect(trackSpy).toHaveBeenCalledOnce();
+    expect(trackSpy.mock.calls[0]![0]).toMatchObject({
+      toolName: ToolName.LIST_TOPICS,
+      status: "error",
+    });
+  });
+});
+
+describe("createMcpServer registered schema", () => {
+  // A connection-gated tool viable on both connections, so
+  // getRegisteredToolConfig() injects a required connectionId enum.
+  const twoKafka = () =>
+    runtimeWithConnections({
+      "conn-a": { kafka: { bootstrap_servers: "a:9092" } },
+      "conn-b": { kafka: { bootstrap_servers: "b:9092" } },
+    });
+
+  let activeShutdown: (() => Promise<void>) | undefined;
+
+  afterEach(async () => {
+    await activeShutdown?.();
+    activeShutdown = undefined;
+  });
+
+  // Boots a one-tool server and registers its teardown with the afterEach above,
+  // so individual tests don't carry their own try/finally shutdown.
+  async function startWith(
+    handler: ToolHandler,
+    runtime: ServerRuntime,
+  ): Promise<Client> {
+    const { client, shutdown } = await startServerWith(
+      new Map([[ToolName.LIST_TOPICS, handler]]),
+      runtime,
+    );
+    activeShutdown = shutdown;
+    return client;
+  }
+
+  // Proves the registration path advertises getRegisteredToolConfig() — not the
+  // raw authored getToolConfig() — by exercising the one case where they differ:
+  // a connection-gated tool viable on more than one connection gains a routing
+  // connectionId enum.
+  it("should advertise a required connectionId enum for a connection-gated tool viable on multiple connections", async () => {
+    const client = await startWith(
+      ToolHandlerRegistry.getToolHandler(ToolName.LIST_TOPICS),
+      twoKafka(),
+    );
+
+    const { tools } = await client.listTools();
+    const listTopics = tools.find((t) => t.name === ToolName.LIST_TOPICS);
+    const properties = listTopics?.inputSchema?.properties as
+      | Record<string, { enum?: string[] }>
+      | undefined;
+
+    expect(properties?.connectionId?.enum).toEqual(["conn-a", "conn-b"]);
+    expect(listTopics?.inputSchema?.required).toContain("connectionId");
+  });
+
+  // The injected enum is required and value-constrained, so the SDK rejects a
+  // missing/unknown connectionId before the handler runs — the guarantee the
+  // consume side (#534) leans on.
+  it.each([
+    ["a missing", {}],
+    ["an unknown", { connectionId: "conn-x" }],
+  ])(
+    "should reject %s connectionId before handle() runs",
+    async (_label, args) => {
+      const handler = new StubHandler({ predicate: hasKafka });
+      const handleSpy = vi.spyOn(handler, "handle");
+      const client = await startWith(handler, twoKafka());
+
       const result = await client.callTool({
         name: ToolName.LIST_TOPICS,
-        arguments: {},
+        arguments: args,
       });
 
-      // MCP SDK converts thrown errors into an error result with isError=true.
       expect(result.isError).toBe(true);
-      // Handler must NOT have run — gate failure is terminal for this call.
       expect(handleSpy).not.toHaveBeenCalled();
-      // Telemetry hook records the failure.
-      expect(trackSpy).toHaveBeenCalledOnce();
-      expect(trackSpy.mock.calls[0]![0]).toMatchObject({
-        toolName: ToolName.LIST_TOPICS,
-        status: "error",
-      });
-    } finally {
-      await shutdown();
-    }
+    },
+  );
+
+  it("should run handle() when connectionId names a viable connection", async () => {
+    const handler = new StubHandler({ predicate: hasKafka });
+    const handleSpy = vi.spyOn(handler, "handle");
+    const client = await startWith(handler, twoKafka());
+
+    await client.callTool({
+      name: ToolName.LIST_TOPICS,
+      arguments: { connectionId: "conn-a" },
+    });
+
+    expect(handleSpy).toHaveBeenCalledOnce();
   });
 });

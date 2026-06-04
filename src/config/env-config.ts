@@ -45,6 +45,7 @@ const ENV_VAR_TO_ZPATH = {
   CONFLUENT_CLOUD_REST_ENDPOINT: `${CONN}.confluent_cloud.endpoint`,
   CONFLUENT_CLOUD_API_KEY: `${CONN}.confluent_cloud.auth.key`,
   CONFLUENT_CLOUD_API_SECRET: `${CONN}.confluent_cloud.auth.secret`,
+  CONFLUENT_CLOUD_ORG_ID: `${CONN}.confluent_cloud.organization_id`,
   // Tableflow parameters
   TABLEFLOW_API_KEY: `${CONN}.tableflow.auth.key`,
   TABLEFLOW_API_SECRET: `${CONN}.tableflow.auth.secret`,
@@ -307,6 +308,7 @@ function buildSchemaRegistryBlock(
  *
  * confluent_cloud:
  *   endpoint: "${CONFLUENT_CLOUD_REST_ENDPOINT}"
+ *   organization_id: "${CONFLUENT_CLOUD_ORG_ID}"
  *   auth:
  *     type: api_key
  *     key: "${CONFLUENT_CLOUD_API_KEY}"
@@ -319,6 +321,9 @@ function buildConfluentCloudBlock(env: Environment) {
     confluent_cloud: {
       ...(env.CONFLUENT_CLOUD_REST_ENDPOINT && {
         endpoint: env.CONFLUENT_CLOUD_REST_ENDPOINT,
+      }),
+      ...(env.CONFLUENT_CLOUD_ORG_ID && {
+        organization_id: env.CONFLUENT_CLOUD_ORG_ID,
       }),
       ...apiKeyAuth(
         env.CONFLUENT_CLOUD_API_KEY,

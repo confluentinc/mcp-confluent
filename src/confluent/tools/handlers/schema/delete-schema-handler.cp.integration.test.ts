@@ -1,17 +1,17 @@
 import { DeleteSchemaHandler } from "@src/confluent/tools/handlers/schema/delete-schema-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { cpIntegrationRuntime } from "@tests/harness/cp-runtime.js";
+import { cpIntegrationConnection } from "@tests/harness/cp-runtime.js";
 import {
   startCpServer,
   type StartedServer,
 } from "@tests/harness/cp-start-server.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import { textContent } from "@tests/harness/tool-results.js";
 import { activeTransports } from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new DeleteSchemaHandler();
-const runtime = cpIntegrationRuntime();
 
 /** Schema Registry base URL for the local CP stack. */
 const SR_BASE = "http://localhost:8081";
@@ -52,8 +52,13 @@ describe(
   "delete-schema-handler (Confluent Platform)",
   { tags: [Tag.CP] },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires schema_registry config (start docker-compose.cp-test.yml and set CP_KAFKA_USERNAME + CP_KAFKA_PASSWORD)", () => {});
+    if (
+      skipIfNotEnabled(
+        handler,
+        cpIntegrationConnection(),
+        "requires schema_registry config (start docker-compose.cp-test.yml and set CP_KAFKA_USERNAME + CP_KAFKA_PASSWORD)",
+      )
+    ) {
       return;
     }
 

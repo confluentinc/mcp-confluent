@@ -21,6 +21,7 @@ import { RestartConnectorHandler } from "@src/confluent/tools/handlers/connect/r
 import { ResumeConnectorHandler } from "@src/confluent/tools/handlers/connect/resume-connector-handler.js";
 import { UpdateConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/update-connector-config-handler.js";
 import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
+import { ListConnectionsHandler } from "@src/confluent/tools/handlers/diagnostics/list-connections-handler.js";
 import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
@@ -168,6 +169,10 @@ export class ToolHandlerRegistry {
     [
       ToolName.EXPLAIN_DISABLED_TOOLS,
       new ExplainDisabledToolsHandler(() => ToolHandlerRegistry.allHandlers()),
+    ],
+    [
+      ToolName.LIST_CONNECTIONS,
+      new ListConnectionsHandler(() => ToolHandlerRegistry.allHandlers()),
     ],
   ]);
 

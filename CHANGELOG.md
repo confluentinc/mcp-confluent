@@ -4,6 +4,12 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+#### New Tools / Tool Features
+
+- **`list-connections` tool.** Read-only, always-enabled discovery tool mapping each configured connection id to the connection-routable tools enabled on it.
+
 ## 1.4.0
 
 ### Added

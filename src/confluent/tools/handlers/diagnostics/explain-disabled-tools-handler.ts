@@ -1,10 +1,8 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
-  BaseToolHandler,
   READ_ONLY,
   ToolCategory,
   ToolConfig,
-  ToolHandler,
 } from "@src/confluent/tools/base-tools.js";
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
 import {
@@ -13,6 +11,7 @@ import {
   disabledToolGroupKey,
   type ToolGatingReport,
 } from "@src/confluent/tools/tool-availability.js";
+import { ToolMetadataHandler } from "@src/confluent/tools/tool-metadata-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -41,7 +40,7 @@ const explainDisabledToolsArguments = z.object({
  * registry block, …). Tools enabled on the active connection are
  * intentionally absent — `tools/list` already advertises them.
  *
- * v2 plan (when multi-connection support lands — issue #151's follow-ups):
+ * v2 plan (#559, when multi-connection support lands under epic #532):
  * regrow output around connections. The text body becomes one block per
  * connection (header + per-connection gaps) plus a `Cross-connection
  * deltas` section that surfaces tools enabled on some connections but not
@@ -64,23 +63,10 @@ const explainDisabledToolsArguments = z.object({
  * Always enabled (predicate is `alwaysEnabled`) so an operator can call it
  * to diagnose a config that left every other tool disabled.
  *
- * The handlers iterable is supplied at construction time via a thunk so
- * this module does not need to import `ToolHandlerRegistry`. Importing the
- * registry from a registered handler would create an ESM cycle, leaving
- * the registry's static initializer running before this class's binding
- * is set. The thunk is invoked at request time, after every module is
- * fully loaded, sidestepping the cycle entirely.
+ * The tool catalog is supplied through the thunk that {@link
+ * ToolMetadataHandler} owns, for the ESM-cycle reason documented there.
  */
-export class ExplainDisabledToolsHandler extends BaseToolHandler {
-  private readonly listHandlers: () => Iterable<
-    readonly [ToolName, ToolHandler]
-  >;
-
-  constructor(listHandlers: () => Iterable<readonly [ToolName, ToolHandler]>) {
-    super();
-    this.listHandlers = listHandlers;
-  }
-
+export class ExplainDisabledToolsHandler extends ToolMetadataHandler {
   handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -89,7 +75,7 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
       toolArguments ?? {},
     );
     const report = buildToolGatingReport(
-      this.listHandlers(),
+      this.getToolNamesAndHandlers(),
       runtime,
       group_by,
     );
@@ -138,9 +124,9 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
  *
  * Two-space indent on the bucket header, four-space indent on the bullets.
  *
- * v2 (multi-connection): grow a connection header per per-connection
- * section and an optional `Cross-connection deltas` section. See the
- * handler's class JSDoc for the migration sketch.
+ * v2 (#559, multi-connection): grow a per-connection section (header +
+ * per-connection gaps) plus an optional `Cross-connection deltas` section.
+ * See the handler's class JSDoc for the migration sketch.
  */
 function renderReport(report: ToolGatingReport): string {
   const total = report.enabledCount + report.disabledCount;

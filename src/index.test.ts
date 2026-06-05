@@ -20,6 +20,7 @@ import {
   resolveTelemetryWriteKey,
 } from "@src/index.js";
 import { logger } from "@src/logger.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import { ccloudOAuthRuntime, runtimeWith } from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import {
@@ -162,14 +163,20 @@ describe("index.ts", () => {
   });
 
   describe("getToolHandlersToRegister()", () => {
+    /** A single-(empty)-connection runtime whose operator allow-list is exactly
+     * `allowed` — the candidate set Pass 1 will consider. Pass no args for an
+     * empty allow-list (nothing invokable). */
+    function runtimeAllowing(...allowed: ToolName[]): ServerRuntime {
+      return runtimeWith({}, undefined, undefined, new Set(allowed));
+    }
+
     it("should include a tool when enabledConnectionIds returns connection IDs", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
         new StubHandler(),
       );
 
       const result = getToolHandlersToRegister(
-        [ToolName.LIST_TOPICS],
-        runtimeWith(),
+        runtimeAllowing(ToolName.LIST_TOPICS),
       );
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
@@ -181,18 +188,15 @@ describe("index.ts", () => {
       );
 
       expect(() =>
-        getToolHandlersToRegister([ToolName.LIST_TOPICS], runtimeWith()),
+        getToolHandlersToRegister(runtimeAllowing(ToolName.LIST_TOPICS)),
       ).toThrow("No tools enabled");
     });
 
-    it("should exclude a tool absent from filteredToolNames", () => {
+    it("should exclude a tool absent from the runtime's allowed set", () => {
       const getToolHandler = vi.spyOn(ToolHandlerRegistry, "getToolHandler");
 
-      expect(() =>
-        getToolHandlersToRegister(
-          [], // LIST_TOPICS not in the allowed set
-          runtimeWith(),
-        ),
+      expect(
+        () => getToolHandlersToRegister(runtimeAllowing()), // empty allow-list
       ).toThrow("No tools enabled");
 
       expect(getToolHandler).not.toHaveBeenCalled();
@@ -206,7 +210,7 @@ describe("index.ts", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(handler);
 
       expect(() =>
-        getToolHandlersToRegister([ToolName.LIST_TOPICS], runtimeWith()),
+        getToolHandlersToRegister(runtimeAllowing(ToolName.LIST_TOPICS)),
       ).toThrow(
         "Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
       );
@@ -224,8 +228,7 @@ describe("index.ts", () => {
       );
 
       const result = getToolHandlersToRegister(
-        [ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS],
-        runtimeWith(),
+        runtimeAllowing(ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS),
       );
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
@@ -245,8 +248,11 @@ describe("index.ts", () => {
       );
 
       getToolHandlersToRegister(
-        [ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS, ToolName.DELETE_TOPICS],
-        runtimeWith(),
+        runtimeAllowing(
+          ToolName.LIST_TOPICS,
+          ToolName.CREATE_TOPICS,
+          ToolName.DELETE_TOPICS,
+        ),
       );
 
       const warningMessages = warnSpy.mock.calls
@@ -287,6 +293,7 @@ describe("index.ts", () => {
         ToolName.GET_TOPIC_CONFIG,
         ToolName.LIST_CLUSTERS,
         ToolName.EXPLAIN_DISABLED_TOOLS,
+        ToolName.LIST_CONNECTIONS,
         // Schema Registry (hasSchemaRegistryOrOAuth)
         ToolName.LIST_SCHEMAS,
         ToolName.DELETE_SCHEMA,
@@ -361,10 +368,7 @@ describe("index.ts", () => {
       });
 
       it("should enable exactly EXPECTED_OAUTH_ENABLED under an OAuth connection", () => {
-        const registered = getToolHandlersToRegister(
-          Object.values(ToolName),
-          ccloudOAuthRuntime(),
-        );
+        const registered = getToolHandlersToRegister(ccloudOAuthRuntime());
 
         expect([...registered.keys()].sort()).toEqual(
           [...EXPECTED_OAUTH_ENABLED].sort(),

@@ -7,7 +7,10 @@
  */
 
 import { loadConfigFromYaml } from "@src/config/index.js";
-import { MCPServerConfiguration } from "@src/config/models.js";
+import {
+  type ConnectionConfig,
+  MCPServerConfiguration,
+} from "@src/config/models.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -36,6 +39,22 @@ export function cpIntegrationRuntime(): ServerRuntime {
       new MCPServerConfiguration({ connections: {} }),
       {},
     );
+  }
+}
+
+/**
+ * The sole {@link ConnectionConfig} the spawned CP server would see, loaded
+ * from the CP fixture. The CP-fixture peer of {@linkcode integrationConnection}
+ * in runtime.ts: a single connection is the right-sized input for a
+ * {@linkcode ConnectionPredicate} gate, with no ServerRuntime to build. Returns
+ * an empty `direct` connection on load failure so block-based predicates yield
+ * a clean disabled verdict.
+ */
+export function cpIntegrationConnection(): ConnectionConfig {
+  try {
+    return loadConfigFromYaml(CP_FIXTURE_PATH, process.env).getSoleConnection();
+  } catch {
+    return { type: "direct" };
   }
 }
 

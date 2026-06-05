@@ -14,7 +14,8 @@ import {
   startOAuthServer,
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -48,9 +49,7 @@ describe(
         it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
         return;
       }
-      const directRuntime = integrationRuntime({ oauth: false });
-      if (handler.enabledConnectionIds(directRuntime).length === 0) {
-        it.skip("requires confluent_cloud.auth in test-fixtures/yaml_configs/integration.yaml", () => {});
+      if (skipIfNotEnabled(handler, integrationConnection())) {
         return;
       }
 
@@ -96,9 +95,13 @@ describe(
           it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
           return;
         }
-        const oauthRuntime = integrationRuntime({ oauth: true });
-        if (handler.enabledConnectionIds(oauthRuntime).length === 0) {
-          it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+        if (
+          skipIfNotEnabled(
+            handler,
+            integrationConnection({ oauth: true }),
+            OAUTH_FIXTURE_NOT_LOADED_REASON,
+          )
+        ) {
           return;
         }
         const credentials = getOAuthCredentialsFromEnv();

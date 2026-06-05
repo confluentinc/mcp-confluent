@@ -31,6 +31,22 @@ import { ServerRuntime } from "@src/server-runtime.js";
  * runtime's operator allow/block-list (`runtime.isToolAllowed`) whose predicate
  * is also satisfied (typically by at least one configured connection).
  **/
+/**
+ * Resolve the operator's tool allow/block-list into the set `ServerRuntime`
+ * gates on — or `undefined` when neither list was configured, preserving the
+ * "no filter configured" sentinel rather than materializing an all-tools set
+ * that would mean the same thing while muddying the runtime's contract.
+ */
+export function resolveAllowedToolNames(
+  allowTools: string[],
+  blockTools: string[],
+): ReadonlySet<ToolName> | undefined {
+  if (allowTools.length === 0 && blockTools.length === 0) {
+    return undefined;
+  }
+  return new Set(getFilteredToolNames(allowTools, blockTools));
+}
+
 export function getToolHandlersToRegister(
   runtime: ServerRuntime,
 ): Map<ToolName, ToolHandler> {
@@ -319,7 +335,7 @@ async function main() {
       process.exit(earlyExit.exitCode);
     }
 
-    const filteredToolNames = getFilteredToolNames(
+    const allowedToolNames = resolveAllowedToolNames(
       cliOptions.allowTools ?? [],
       cliOptions.blockTools ?? [],
     );
@@ -365,10 +381,7 @@ async function main() {
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
 
-    const runtime = ServerRuntime.fromConfig(
-      mcpConfig,
-      new Set(filteredToolNames),
-    );
+    const runtime = ServerRuntime.fromConfig(mcpConfig, allowedToolNames);
 
     const serverVersion = getPackageVersion();
 

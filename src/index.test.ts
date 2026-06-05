@@ -17,6 +17,7 @@ import {
   outputApiKey,
   outputInitConfig,
   outputToolList,
+  resolveAllowedToolNames,
   resolveTelemetryWriteKey,
 } from "@src/index.js";
 import { logger } from "@src/logger.js";
@@ -374,6 +375,27 @@ describe("index.ts", () => {
           [...EXPECTED_OAUTH_ENABLED].sort(),
         );
       });
+    });
+  });
+
+  describe("resolveAllowedToolNames()", () => {
+    it("should return undefined when neither an allow nor a block list is configured", () => {
+      // The `undefined` sentinel keeps ServerRuntime in its "no filter" state
+      // rather than carrying an all-tools set that means the same thing.
+      expect(resolveAllowedToolNames([], [])).toBeUndefined();
+    });
+
+    it("should restrict to exactly the allow list when one is provided", () => {
+      const allowed = resolveAllowedToolNames([ToolName.LIST_TOPICS], []);
+      expect(allowed).toBeInstanceOf(Set);
+      expect(allowed?.has(ToolName.LIST_TOPICS)).toBe(true);
+      expect(allowed?.has(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+
+    it("should return a set excluding the block list when only a block list is provided", () => {
+      const allowed = resolveAllowedToolNames([], [ToolName.LIST_TOPICS]);
+      expect(allowed?.has(ToolName.LIST_TOPICS)).toBe(false);
+      expect(allowed?.has(ToolName.CREATE_TOPICS)).toBe(true);
     });
   });
 

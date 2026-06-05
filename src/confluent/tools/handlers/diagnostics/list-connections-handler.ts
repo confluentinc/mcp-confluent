@@ -23,7 +23,7 @@ const listConnectionsArguments = z.object({});
  * connection-agnostic tools from the per-connection lists: a tool whose predicate is `alwaysEnabled`
  * applies to every connection, so listing it under each connection would misrepresent it as
  * connection-routable. This tool answers "which connections are available and which tools
- * are directly useable on each."
+ * are directly usable on each."
  *
  * The tool catalog is supplied through the thunk that {@link
  * ToolMetadataHandler} owns, for the ESM-cycle reason documented there.
@@ -35,24 +35,31 @@ export class ListConnectionsHandler extends ToolMetadataHandler {
   ): CallToolResult {
     listConnectionsArguments.parse(toolArguments ?? {});
 
-    const handlers = this.getToolNamesAndHandlers();
     const connections: Record<string, { enabledTools: ToolName[] }> = {};
     for (const connId of Object.keys(runtime.config.connections)) {
-      const enabledTools = handlers
-        .filter(
-          ([name, handler]) =>
-            runtime.isToolAllowed(name) &&
-            // Skip connection-agnostic tools (predicate === alwaysEnabled):
-            // they take no connectionId and apply to every connection, so
-            // listing them per connection would misrepresent them as
-            // connection-routable. This map answers "which tools route to
-            // this connection id?" — the always-on set is orthogonal.
-            handler.predicate !== alwaysEnabled &&
-            handler.enabledConnectionIds(runtime).includes(connId),
-        )
-        .map(([name]) => name)
-        .sort();
-      connections[connId] = { enabledTools };
+      connections[connId] = { enabledTools: [] };
+    }
+
+    // Single pass over the catalog: compute each tool's enabled connection ids
+    // once and distribute it into those buckets. Asking
+    // enabledConnectionIds() once per connection instead would be
+    // O(tools × connections²), since it rescans every connection each call.
+    for (const [name, handler] of this.getToolNamesAndHandlers()) {
+      // Skip tools the operator filtered out, and connection-agnostic tools
+      // (predicate === alwaysEnabled): they take no connectionId and apply to
+      // every connection, so listing them per connection would misrepresent
+      // them as connection-routable. This map answers "which tools route to
+      // this connection id?" — the always-on set is orthogonal.
+      if (!runtime.isToolAllowed(name) || handler.predicate === alwaysEnabled) {
+        continue;
+      }
+      for (const connId of handler.enabledConnectionIds(runtime)) {
+        connections[connId]?.enabledTools.push(name);
+      }
+    }
+
+    for (const bucket of Object.values(connections)) {
+      bucket.enabledTools.sort();
     }
 
     return this.createStructuredResponse(renderSummary(connections), {

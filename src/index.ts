@@ -27,11 +27,6 @@ import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
- * Determine the subset of ToolHandlers to register: those left enabled by the
- * runtime's operator allow/block-list (`runtime.isToolAllowed`) whose predicate
- * is also satisfied (typically by at least one configured connection).
- **/
-/**
  * Resolve the operator's tool allow/block-list into the set `ServerRuntime`
  * gates on — or `undefined` when neither list was configured, preserving the
  * "no filter configured" sentinel rather than materializing an all-tools set
@@ -47,6 +42,11 @@ export function resolveAllowedToolNames(
   return new Set(getFilteredToolNames(allowTools, blockTools));
 }
 
+/**
+ * Determine the subset of ToolHandlers to register: those left enabled by the
+ * runtime's operator allow/block-list (`runtime.isToolAllowed`) whose predicate
+ * is also satisfied (typically by at least one configured connection).
+ **/
 export function getToolHandlersToRegister(
   runtime: ServerRuntime,
 ): Map<ToolName, ToolHandler> {

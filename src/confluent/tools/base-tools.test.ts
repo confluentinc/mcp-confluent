@@ -210,19 +210,23 @@ describe("base-tools.ts", () => {
           expect(connectionId.description).toContain("a, b");
         });
 
+        const CONNECTION_ID_BASE =
+          "Which configured connection to target. One of: a, b.";
         const LIST_CONNECTIONS_POINTER =
           "Discover connections and learn what tools are supported by each connection by invoking 'list-connections'.";
 
-        it("should append the list-connections pointer to the connectionId description when list-connections is allowed", () => {
+        it("should append the list-connections pointer single-spaced when list-connections is allowed", () => {
           // No allow-list configured ⇒ every tool, including list-connections, is allowed.
           const connectionId = injectedConnectionId(
             runtimeWithConnections({ a: KAFKA, b: KAFKA }),
           );
 
-          expect(connectionId.description).toContain(LIST_CONNECTIONS_POINTER);
+          expect(connectionId.description).toBe(
+            `${CONNECTION_ID_BASE} ${LIST_CONNECTIONS_POINTER}`,
+          );
         });
 
-        it("should omit the list-connections pointer when list-connections is blocked by the operator filter", () => {
+        it("should omit the pointer with no dangling trailing space when list-connections is blocked", () => {
           // Allow-list excludes list-connections; the gated tool itself stays allowed.
           const connectionId = injectedConnectionId(
             runtimeWithConnections(
@@ -232,11 +236,7 @@ describe("base-tools.ts", () => {
             ),
           );
 
-          expect(connectionId.description).not.toContain(
-            LIST_CONNECTIONS_POINTER,
-          );
-          // …but the viable-ids portion is still present.
-          expect(connectionId.description).toContain("a, b");
+          expect(connectionId.description).toBe(CONNECTION_ID_BASE);
         });
 
         it("should preserve the handler's pre-existing input fields alongside connectionId", () => {

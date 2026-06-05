@@ -7,7 +7,8 @@ import {
   waitForConnectorRunning,
   withSharedConnectorCleanup,
 } from "@tests/harness/connect.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -22,14 +23,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // predicate via ConnectToolHandler, so any one is representative for the
 // predicate gate.
 const handler = new GetConnectorErrorSummaryHandler();
-const runtime = integrationRuntime();
 
 describe(
   "connector-error-diagnostics",
   { tags: [Tag.CONNECT, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires confluent_cloud.auth config", () => {});
+    if (skipIfNotEnabled(handler, integrationConnection())) {
       return;
     }
 

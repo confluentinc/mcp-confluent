@@ -5,12 +5,16 @@ import {
   getTestClusterId,
   withSharedAdminClient,
 } from "@tests/harness/kafka-admin.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import {
+  integrationConnection,
+  integrationRuntime,
+} from "@tests/harness/runtime.js";
 import {
   TEST_AVRO_SCHEMA,
   withSharedCatalogTagsClient,
   withSharedSrClient,
 } from "@tests/harness/schema-registry.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -36,8 +40,7 @@ describe(
     ],
   },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires schema_registry.endpoint + schema_registry.auth (api_key) config", () => {});
+    if (skipIfNotEnabled(handler, integrationConnection())) {
       return;
     }
     // test-side deps beyond the handler predicate (kafka admin + SR cluster id discovery); gating

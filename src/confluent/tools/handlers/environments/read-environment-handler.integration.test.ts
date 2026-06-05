@@ -16,7 +16,8 @@ import {
   startOAuthServer,
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -40,9 +41,7 @@ describe(
         it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
         return;
       }
-      const directRuntime = integrationRuntime({ oauth: false });
-      if (handler.enabledConnectionIds(directRuntime).length === 0) {
-        it.skip("requires confluent_cloud.auth in test-fixtures/yaml_configs/integration.yaml", () => {});
+      if (skipIfNotEnabled(handler, integrationConnection())) {
         return;
       }
       const environmentId = getTestEnvironmentId();
@@ -84,9 +83,13 @@ describe(
           it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
           return;
         }
-        const oauthRuntime = integrationRuntime({ oauth: true });
-        if (handler.enabledConnectionIds(oauthRuntime).length === 0) {
-          it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+        if (
+          skipIfNotEnabled(
+            handler,
+            integrationConnection({ oauth: true }),
+            OAUTH_FIXTURE_NOT_LOADED_REASON,
+          )
+        ) {
           return;
         }
         const credentials = getOAuthCredentialsFromEnv();
@@ -97,9 +100,13 @@ describe(
         // `getTestEnvironmentId()` reads `kafka.env_id` out of the direct YAML; gate the OAuth
         // describe on the same predicate the direct describe uses so an OAuth-only CI lane without
         // direct creds skips cleanly instead of crashing on missing fixture
-        const directRuntime = integrationRuntime({ oauth: false });
-        if (handler.enabledConnectionIds(directRuntime).length === 0) {
-          it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+        if (
+          skipIfNotEnabled(
+            handler,
+            integrationConnection(),
+            DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
+          )
+        ) {
           return;
         }
         // env id is read from the direct YAML; the OAuth-mode handler itself talks to CCloud via OAuth

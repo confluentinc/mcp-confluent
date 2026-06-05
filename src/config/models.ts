@@ -237,6 +237,26 @@ export class MCPServerConfiguration {
     return conn;
   }
 
+  /**
+   * Returns the {@link ConnectionConfig} registered under `connectionId`,
+   * throwing if no such connection is defined. The by-id accessor for the
+   * multi-connection world: callers route to a known connection (a tool's
+   * `connectionId` enum is built from the defined ids, so an unknown id is a
+   * programming error, not user input). Prefer this over reaching into
+   * `connections[id]` directly.
+   */
+  getConnectionConfig(connectionId: string): ConnectionConfig {
+    const conn = this.connections[connectionId];
+    if (conn === undefined) {
+      throw new Error(
+        `Unknown connection id "${connectionId}"; defined connections: ${
+          this.getConnectionNames().join(", ") || "none"
+        }`,
+      );
+    }
+    return conn;
+  }
+
   getConnectionNames(): string[] {
     return Object.keys(this.connections).sort((a, b) => a.localeCompare(b));
   }

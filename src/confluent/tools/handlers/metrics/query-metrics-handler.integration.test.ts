@@ -1,6 +1,7 @@
 import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -16,9 +17,7 @@ describe(
   "query-metrics-handler",
   { tags: [Tag.METRICS, Tag.REQUIRES_TELEMETRY_CONFIG] },
   () => {
-    const verdict = handler.predicate(integrationConnection());
-    if (!verdict.enabled) {
-      it.skip(verdict.reason, () => {});
+    if (skipIfNotEnabled(handler, integrationConnection())) {
       return;
     }
 

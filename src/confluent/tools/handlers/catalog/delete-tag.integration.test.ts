@@ -2,6 +2,7 @@ import { DeleteTagHandler } from "@src/confluent/tools/handlers/catalog/delete-t
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
 import { withSharedCatalogTagsClient } from "@tests/harness/schema-registry.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -19,9 +20,7 @@ describe(
   "delete-tag-handler",
   { tags: [Tag.CATALOG, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
   () => {
-    const verdict = handler.predicate(integrationConnection());
-    if (!verdict.enabled) {
-      it.skip(verdict.reason, () => {});
+    if (skipIfNotEnabled(handler, integrationConnection())) {
       return;
     }
 

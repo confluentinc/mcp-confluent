@@ -15,6 +15,7 @@ import {
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -48,9 +49,7 @@ describe(
         it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
         return;
       }
-      const verdict = handler.predicate(integrationConnection());
-      if (!verdict.enabled) {
-        it.skip(verdict.reason, () => {});
+      if (skipIfNotEnabled(handler, integrationConnection())) {
         return;
       }
 
@@ -97,9 +96,12 @@ describe(
           return;
         }
         if (
-          !handler.predicate(integrationConnection({ oauth: true })).enabled
+          skipIfNotEnabled(
+            handler,
+            integrationConnection({ oauth: true }),
+            OAUTH_FIXTURE_NOT_LOADED_REASON,
+          )
         ) {
-          it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
           return;
         }
         const credentials = getOAuthCredentialsFromEnv();

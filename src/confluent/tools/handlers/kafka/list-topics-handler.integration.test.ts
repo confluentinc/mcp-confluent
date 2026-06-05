@@ -18,6 +18,7 @@ import {
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -41,9 +42,7 @@ describe(
         it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
         return;
       }
-      const verdict = handler.predicate(integrationConnection());
-      if (!verdict.enabled) {
-        it.skip(verdict.reason, () => {});
+      if (skipIfNotEnabled(handler, integrationConnection())) {
         return;
       }
 
@@ -87,9 +86,12 @@ describe(
           return;
         }
         if (
-          !handler.predicate(integrationConnection({ oauth: true })).enabled
+          skipIfNotEnabled(
+            handler,
+            integrationConnection({ oauth: true }),
+            OAUTH_FIXTURE_NOT_LOADED_REASON,
+          )
         ) {
-          it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
           return;
         }
         const credentials = getOAuthCredentialsFromEnv();
@@ -100,8 +102,13 @@ describe(
         // `getTestClusterId()`/`getTestEnvironmentId()` read from the direct YAML; gate the OAuth
         // describe on the same predicate the direct describe uses so an OAuth-only CI lane without
         // direct creds skips cleanly instead of crashing on missing fixture
-        if (!handler.predicate(integrationConnection()).enabled) {
-          it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+        if (
+          skipIfNotEnabled(
+            handler,
+            integrationConnection(),
+            DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
+          )
+        ) {
           return;
         }
         // OAuth connections carry no `kafka` block, so the handler resolves the broker from

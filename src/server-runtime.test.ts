@@ -7,6 +7,7 @@ import {
 } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
@@ -181,7 +182,49 @@ describe("ServerRuntime", () => {
     });
   });
 
+  describe("isToolAllowed()", () => {
+    it("should return true for any tool when no allow/block list was configured", () => {
+      const runtime = new ServerRuntime(config, {});
+      expect(runtime.isToolAllowed(ToolName.LIST_TOPICS)).toBe(true);
+      expect(runtime.isToolAllowed(ToolName.CREATE_TOPICS)).toBe(true);
+    });
+
+    it("should return true for a tool present in the configured allow set", () => {
+      const runtime = new ServerRuntime(
+        config,
+        {},
+        undefined,
+        new Set([ToolName.LIST_TOPICS]),
+      );
+      expect(runtime.isToolAllowed(ToolName.LIST_TOPICS)).toBe(true);
+    });
+
+    it("should return false for a tool absent from the configured allow set", () => {
+      const runtime = new ServerRuntime(
+        config,
+        {},
+        undefined,
+        new Set([ToolName.LIST_TOPICS]),
+      );
+      expect(runtime.isToolAllowed(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+  });
+
   describe("fromConfig()", () => {
+    it("should thread allowedToolNames through so isToolAllowed gates accordingly", () => {
+      const runtime = ServerRuntime.fromConfig(
+        config,
+        new Set([ToolName.LIST_TOPICS]),
+      );
+      expect(runtime.isToolAllowed(ToolName.LIST_TOPICS)).toBe(true);
+      expect(runtime.isToolAllowed(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+
+    it("should leave every tool allowed when called without an allow set", () => {
+      const runtime = ServerRuntime.fromConfig(config);
+      expect(runtime.isToolAllowed(ToolName.CREATE_TOPICS)).toBe(true);
+    });
+
     it("should create a DirectClientManager for each connection", () => {
       const twoConnConfig = new MCPServerConfiguration({
         connections: {

@@ -56,10 +56,10 @@ npx -y @confluentinc/mcp-confluent --list-tools
 
 These tools need no service blocks or authentication — they're enabled even on a bare config, regardless of which deployment the rest of your config targets.
 
-| Category          | Tools                                         | Description                                               |
-| ----------------- | --------------------------------------------- | --------------------------------------------------------- |
-| **Documentation** | `search-product-docs`, `get-product-doc-page` | Search Confluent product docs and fetch full page content |
-| **Diagnostics**   | `explain-disabled-tools`                      | Explain why specific tools are absent from `tools/list`   |
+| Category          | Tools                                         | Description                                                                                 |
+| ----------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Documentation** | `search-product-docs`, `get-product-doc-page` | Search Confluent product docs and fetch full page content                                   |
+| **Diagnostics**   | `explain-disabled-tools`, `list-connections`  | Explain why tools are absent, and list configured connections and the tools enabled on each |
 
 ### Available Tools for Confluent Cloud
 
@@ -405,6 +405,7 @@ kafka:
 
 mcp-server-diagnostics:
   explain-disabled-tools: Call when the user asks why a tool is missing or unavailable (e.g., "why can't I list Kafka topics?", "where are the ...
+  list-connections: List every configured connection and the connection-routable tools you can invoke against each. The connection id (th...
 
 metrics:
   list-available-metrics: List available Confluent Cloud metrics and their filter fields from the Telemetry API. Use this tool BEFORE query-met...

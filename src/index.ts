@@ -27,22 +27,23 @@ import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
- * Determine the subset of ToolHandlers to register based on the filtered tool names
- * and which connections satisfy each tool's service requirements.
+ * Determine the subset of ToolHandlers to register: those left enabled by the
+ * runtime's operator allow/block-list (`runtime.isToolAllowed`) whose predicate
+ * is also satisfied (typically by at least one configured connection).
  **/
 export function getToolHandlersToRegister(
-  filteredToolNames: ToolName[],
   runtime: ServerRuntime,
 ): Map<ToolName, ToolHandler> {
-  const toolHandlers = new Map<ToolName, ToolHandler>();
+  const toolHandlersToRegister = new Map<ToolName, ToolHandler>();
   const knownIds = new Set(Object.keys(runtime.config.connections));
 
   // Pass 1: drop tools excluded by the allow/block list (logged per-tool —
   // the reason is config-driven, not predicate-driven, so it doesn't fold
-  // into the grouped warning emitted later).
+  // into the grouped warning emitted later). The filter lives on the runtime
+  // so registration and the list-connections tool read one source of truth.
   const candidates: Array<readonly [ToolName, ToolHandler]> = [];
   for (const toolName of Object.values(ToolName)) {
-    if (!filteredToolNames.includes(toolName)) {
+    if (!runtime.isToolAllowed(toolName)) {
       logger.warn(`Tool ${toolName} disabled due to allow/block list rules`);
       continue;
     }
@@ -59,7 +60,7 @@ export function getToolHandlersToRegister(
       );
     }
     if (enabledIds.length > 0) {
-      toolHandlers.set(toolName, handler);
+      toolHandlersToRegister.set(toolName, handler);
       logger.info(`Tool ${toolName} enabled`);
     }
   }
@@ -75,13 +76,13 @@ export function getToolHandlersToRegister(
   }
 
   // Raise an error if no tools are enabled, as the server would be non-functional without any tools.
-  if (toolHandlers.size === 0) {
+  if (toolHandlersToRegister.size === 0) {
     throw new Error(
       "No tools enabled. Please check your configuration and environment variables.",
     );
   }
 
-  return toolHandlers;
+  return toolHandlersToRegister;
 }
 
 /**
@@ -364,13 +365,16 @@ async function main() {
       `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
     );
 
-    const runtime = ServerRuntime.fromConfig(mcpConfig);
+    const runtime = ServerRuntime.fromConfig(
+      mcpConfig,
+      new Set(filteredToolNames),
+    );
 
     const serverVersion = getPackageVersion();
 
     telemetry.setCommonProperties({ serverVersion });
 
-    const toolHandlers = getToolHandlersToRegister(filteredToolNames, runtime);
+    const toolHandlers = getToolHandlersToRegister(runtime);
 
     logger.info(
       { enabledTools: [...toolHandlers.keys()] },

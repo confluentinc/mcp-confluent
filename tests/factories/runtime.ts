@@ -6,6 +6,7 @@ import { MCPServerConfiguration } from "@src/config/models.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import type { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
+import type { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance, type HandleCase } from "@tests/stubs/index.js";
 import { fileURLToPath } from "node:url";
@@ -34,6 +35,7 @@ const CCLOUD_OAUTH_FIXTURE = fileURLToPath(
 export function runtimeWithConnections(
   connections: Record<string, Omit<DirectConnectionConfig, "type">>,
   clientManagers?: Partial<Record<string, Mocked<DirectClientManager>>>,
+  allowedToolNames?: ReadonlySet<ToolName>,
 ): ServerRuntime {
   const directConnections: Record<string, DirectConnectionConfig> = {};
   const resolvedClientManagers: Record<
@@ -48,6 +50,8 @@ export function runtimeWithConnections(
   return new ServerRuntime(
     new MCPServerConfiguration({ connections: directConnections }),
     resolvedClientManagers,
+    undefined,
+    allowedToolNames,
   );
 }
 
@@ -62,10 +66,12 @@ export function runtimeWith(
   clientManager: Mocked<DirectClientManager> = createMockInstance(
     DirectClientManager,
   ),
+  allowedToolNames?: ReadonlySet<ToolName>,
 ): ServerRuntime {
   return runtimeWithConnections(
     { [connectionId]: connectionConfig },
     { [connectionId]: clientManager },
+    allowedToolNames,
   );
 }
 

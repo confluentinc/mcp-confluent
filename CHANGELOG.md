@@ -20,6 +20,7 @@ All notable changes to this MCP server will be documented in this file.
 - **Connector inspection tools (4, read-only):** `get-connector-config`, `get-connector-offsets`, `get-connector-status` (also surfaces the connector's `lcc-...` resource ID as `lccId`), and `get-connector-tasks`.
 - **Connector lifecycle tools (4):** `pause-connector`, `resume-connector`, `restart-connector`, and `update-connector-config` (full-replace semantics — omitted keys are removed).
 - **Connector error-diagnostics tools (3, read-only):** `get-connector-error-summary`, `get-connector-error-recommendations`, and `get-connector-logs` — for troubleshooting FAILED connectors.
+- **`list-connections` tool.** Read-only, always-enabled discovery tool mapping each configured connection id to the tools invokable against it.
 
 #### New Internals
 

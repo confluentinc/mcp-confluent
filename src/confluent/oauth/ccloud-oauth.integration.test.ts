@@ -8,7 +8,7 @@ import {
   startOAuthServer,
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnectionLoaded } from "@tests/harness/runtime.js";
 import { type StartedServer } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
 import { Tag } from "@tests/tags.js";
@@ -19,13 +19,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // bearer auth. stdio only (the flow is transport-agnostic); serializes on OAUTH_CALLBACK_PORT
 // via the port lock.
 
-const runtime = integrationRuntime({ oauth: true });
-
 describe(
   "CCloud OAuth flow",
   { tags: [Tag.SMOKE, Tag.OAUTH, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
   () => {
-    if (Object.keys(runtime.config.connections).length === 0) {
+    if (!integrationConnectionLoaded({ oauth: true })) {
       it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
       return;
     }

@@ -1,7 +1,8 @@
 import { CreateFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/create-flink-statement-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { withSharedFlinkStatementCleanup } from "@tests/harness/flink.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -13,7 +14,6 @@ import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new CreateFlinkStatementHandler();
-const runtime = integrationRuntime();
 
 describe(
   "create-flink-statement-handler",
@@ -25,8 +25,7 @@ describe(
     ],
   },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires flink config", () => {});
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
 

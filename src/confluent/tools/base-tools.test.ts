@@ -269,6 +269,197 @@ describe("base-tools.ts", () => {
       });
     });
 
+    describe("resolveConnection()", () => {
+      const KAFKA = { kafka: { bootstrap_servers: "b:9092" } };
+
+      /** Binds the protected resolveConnection off a (possibly predicate-gated)
+       * handler so each case can target a handler with the right viability. */
+      function resolveConnectionOf(handler: StubHandler) {
+        return handler["resolveConnection"].bind(
+          handler,
+        ) as (typeof handler)["resolveConnection"];
+      }
+
+      const kafkaHandler = () => new StubHandler({ predicate: hasKafka });
+
+      it("should route to the explicitly requested connection (not merely the first viable one)", () => {
+        const runtime = runtimeWithConnections({
+          "conn-a": KAFKA,
+          "conn-b": KAFKA,
+        });
+
+        const { connId, conn, clientManager } = resolveConnectionOf(
+          kafkaHandler(),
+        )(runtime, { connectionId: "conn-b" });
+
+        expect(connId).toBe("conn-b");
+        expect(conn).toBe(runtime.config.connections["conn-b"]);
+        expect(clientManager).toBe(runtime.clientManagers["conn-b"]);
+      });
+
+      it.each([
+        [
+          "an id absent from the configuration entirely",
+          () => kafkaHandler(),
+          () => runtimeWithConnections({ a: KAFKA, b: KAFKA }),
+          "ghost",
+          'Wacky -- connection "ghost" is not an enabled connection for this tool; enabled: a, b',
+        ],
+        [
+          "a configured id that this tool's predicate does not enable",
+          () => kafkaHandler(),
+          () => runtimeWithConnections({ a: KAFKA, b: {} }),
+          "b",
+          'Wacky -- connection "b" is not an enabled connection for this tool; enabled: a',
+        ],
+      ])(
+        "should throw a listing error for %s",
+        (_label, handler, buildRuntime, requested, message) => {
+          expect(() =>
+            resolveConnectionOf(handler())(buildRuntime(), {
+              connectionId: requested,
+            }),
+          ).toThrow(message);
+        },
+      );
+
+      it("should auto-route to the sole viable connection when connectionId is omitted", () => {
+        const runtime = runtimeWithConnections({ a: KAFKA, b: {} });
+
+        const { connId, conn, clientManager } = resolveConnectionOf(
+          kafkaHandler(),
+        )(runtime, {});
+
+        expect(connId).toBe("a");
+        expect(conn).toBe(runtime.config.connections["a"]);
+        expect(clientManager).toBe(runtime.clientManagers["a"]);
+      });
+
+      it("should auto-route when toolArguments is undefined entirely", () => {
+        const runtime = runtimeWithConnections({ only: KAFKA });
+
+        const { connId } = resolveConnectionOf(kafkaHandler())(
+          runtime,
+          undefined,
+        );
+
+        expect(connId).toBe("only");
+      });
+
+      it.each([
+        [
+          "two or more are viable (ambiguous; schema should have required connectionId)",
+          () => runtimeWithConnections({ a: KAFKA, b: KAFKA }),
+          "Wacky -- connectionId omitted but this tool is enabled for 2 connections (a, b); cannot auto-route",
+        ],
+        [
+          "none are viable (registration backstop; tool should not have registered)",
+          () => runtimeWithConnections({ a: {}, b: {} }),
+          "Wacky -- connectionId omitted but this tool is enabled for 0 connections (none); cannot auto-route",
+        ],
+      ])(
+        "should throw when connectionId is omitted and %s",
+        (_label, buildRuntime, message) => {
+          expect(() =>
+            resolveConnectionOf(kafkaHandler())(buildRuntime(), {}),
+          ).toThrow(message);
+        },
+      );
+
+      it.each([
+        ["a number", 123, "number"],
+        ["null", null, "object"],
+        ["an object", { id: "a" }, "object"],
+      ])(
+        "should throw rather than auto-route when connectionId is present but %s, even with a sole viable connection",
+        (_label, requested, typeofName) => {
+          // Sole viable connection: absent the guard, a non-string would fall
+          // through to the omitted-path and silently auto-route to "a".
+          const runtime = runtimeWithConnections({ a: KAFKA, b: {} });
+
+          expect(() =>
+            resolveConnectionOf(kafkaHandler())(runtime, {
+              connectionId: requested,
+            }),
+          ).toThrow(
+            `Wacky -- connectionId present but not a string (got ${typeofName}); the injected schema should have rejected this`,
+          );
+        },
+      );
+
+      it("should resolve a sole OAuth connection without narrowing its type", () => {
+        const { conn } = resolveConnectionOf(new StubHandler())(
+          ccloudOAuthRuntime(),
+          undefined,
+        );
+
+        expect(conn.type).toBe("oauth");
+      });
+    });
+
+    describe("resolveDirectConnection()", () => {
+      const KAFKA = { kafka: { bootstrap_servers: "b:9092" } };
+
+      function resolveDirectConnectionOf(handler: StubHandler) {
+        return handler["resolveDirectConnection"].bind(
+          handler,
+        ) as (typeof handler)["resolveDirectConnection"];
+      }
+
+      const kafkaHandler = () => new StubHandler({ predicate: hasKafka });
+
+      it("should narrow the explicitly requested direct connection's id, config, and client manager", () => {
+        const runtime = runtimeWithConnections({
+          "conn-a": KAFKA,
+          "conn-b": KAFKA,
+        });
+
+        const { connId, conn, clientManager } = resolveDirectConnectionOf(
+          kafkaHandler(),
+        )(runtime, { connectionId: "conn-b" });
+
+        expect(connId).toBe("conn-b");
+        expect(conn.type).toBe("direct");
+        expect(conn).toBe(runtime.config.connections["conn-b"]);
+        expect(clientManager).toBe(runtime.clientManagers["conn-b"]);
+      });
+
+      it("should auto-route to the sole direct connection when connectionId is omitted", () => {
+        const runtime = runtimeWithConnections({ a: KAFKA, b: {} });
+
+        const { connId, conn } = resolveDirectConnectionOf(kafkaHandler())(
+          runtime,
+          {},
+        );
+
+        expect(connId).toBe("a");
+        expect(conn.type).toBe("direct");
+      });
+
+      it("should throw when the resolved connection is OAuth-typed (direct-only backstop)", () => {
+        expect(() =>
+          resolveDirectConnectionOf(new StubHandler())(
+            ccloudOAuthRuntime(),
+            undefined,
+          ),
+        ).toThrow(
+          'Wacky -- connection "default" is oauth-typed; this tool requires a direct connection',
+        );
+      });
+
+      it("should propagate resolveConnection's listing error for an unknown id (delegation)", () => {
+        const runtime = runtimeWithConnections({ a: KAFKA, b: KAFKA });
+
+        expect(() =>
+          resolveDirectConnectionOf(kafkaHandler())(runtime, {
+            connectionId: "ghost",
+          }),
+        ).toThrow(
+          'Wacky -- connection "ghost" is not an enabled connection for this tool; enabled: a, b',
+        );
+      });
+    });
+
     describe("resolveParam()", () => {
       // BaseToolHandler.resolveParam() is protected, so we have to work a little bit to get at
       // it for this test suite.

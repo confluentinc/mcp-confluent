@@ -1,5 +1,8 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import type { ConnectionConfig } from "@src/config/models.js";
+import type {
+  ConnectionConfig,
+  DirectConnectionConfig,
+} from "@src/config/models.js";
 import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
@@ -112,6 +115,30 @@ export interface ToolConfig {
   inputSchema: ZodRawShape;
   annotations: ToolAnnotations;
 }
+
+/**
+ * What the connection-resolution helpers hand back: the chosen connection id,
+ * its resolved config, and the client manager bound to it.
+ *
+ * Generic over the connection arm so the type-neutral resolvers
+ * ({@linkcode BaseToolHandler.resolveConnection}) and the direct-narrowing one
+ * ({@linkcode BaseToolHandler.resolveDirectConnection}) share a single name —
+ * the latter instantiates it via the {@link ResolvedDirectConnection} alias.
+ */
+export interface ResolvedConnection<
+  C extends ConnectionConfig = ConnectionConfig,
+> {
+  connId: string;
+  conn: C;
+  clientManager: BaseClientManager;
+}
+
+/**
+ * A {@link ResolvedConnection} pre-narrowed to the direct arm — the return type
+ * of {@linkcode BaseToolHandler.resolveDirectConnection}.
+ */
+export type ResolvedDirectConnection =
+  ResolvedConnection<DirectConnectionConfig>;
 
 export abstract class BaseToolHandler implements ToolHandler {
   abstract handle(
@@ -252,17 +279,114 @@ export abstract class BaseToolHandler implements ToolHandler {
    * connection, so this is unambiguous; if multi-connection support lands
    * later, handlers can switch to iterating ids.
    */
-  protected resolveSoleConnection(runtime: ServerRuntime): {
-    connId: string;
-    conn: ConnectionConfig;
-    clientManager: BaseClientManager;
-  } {
+  protected resolveSoleConnection(runtime: ServerRuntime): ResolvedConnection {
     const connId = this.enabledConnectionIds(runtime)[0]!;
     return {
       connId,
       conn: runtime.config.connections[connId]!,
       clientManager: runtime.clientManagers[connId]!,
     };
+  }
+
+  /**
+   * Resolves which connection a tool call targets: the explicit `connectionId`
+   * argument when present, else the sole connection enabled for this tool.
+   * Throws a listing error when the id is unknown/not-enabled, when it is
+   * present but not a string, or when omitted while two or more connections are
+   * candidates (the augmented schema makes all three unreachable in normal MCP
+   * flow — these are defensive backstops against internal call sites).
+   *
+   * Reads `connectionId` off the **raw** `toolArguments` rather than off the
+   * handler's locally-parsed object: the framework already validated it against
+   * the registered schema (see {@linkcode getRegisteredToolConfig}), and a
+   * handler's own `z.object` re-`parse()` would strip the key it never declared.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
+   */
+  protected resolveConnection(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): ResolvedConnection {
+    // The connection this tool call should route to.
+    let determinedId: string;
+
+    // What connection ids this tool possibly supports.
+    const enabledIds = this.enabledConnectionIds(runtime);
+
+    // The requested connection id, if the caller provided one. Per the Zod schema injected by
+    // `getRegisteredToolConfig()` it should be a string that is one of the enabled ids; both
+    // expectations are enforced below rather than assumed.
+    const requestedId = toolArguments?.connectionId;
+
+    if (typeof requestedId === "string") {
+      if (!enabledIds.includes(requestedId)) {
+        throw new Error(
+          `Wacky -- connection "${requestedId}" is not an enabled connection for this tool; enabled: ${enabledIds.join(", ")}`,
+        );
+      }
+      // Explicit requested ID must be valid based on the injected schema enum already having validated it, so can
+      // at this point trust fully.
+      determinedId = requestedId;
+    } else if (requestedId !== undefined) {
+      // Unreachable in normal operation: Zod has already validated `args`
+      // against the registered schema before `handle()` runs, and that schema
+      // either declares `connectionId` as a string enum (multi-connection
+      // tools — a non-string fails parsing) or omits it entirely (single-
+      // connection tools — an unknown key is stripped). Either way a non-string
+      // can't survive to reach this branch. It exists purely as a symmetric
+      // peer to the two backstops below, so a malformed value can never quietly
+      // masquerade as an omission and auto-route.
+      throw new Error(
+        `Wacky -- connectionId present but not a string (got ${typeof requestedId}); the injected schema should have rejected this`,
+      );
+    } else if (enabledIds.length === 1) {
+      // No requested ID, but only one enabled connection — unambiguous, so route there.
+      determinedId = enabledIds[0]!;
+    } else {
+      // Not a string and not a sole enabled connection. Should have been blocked by the injected schema.
+      throw new Error(
+        `Wacky -- connectionId omitted but this tool is enabled for ${enabledIds.length} connections (${enabledIds.join(", ") || "none"}); cannot auto-route`,
+      );
+    }
+
+    return {
+      connId: determinedId,
+      conn: runtime.config.connections[determinedId]!,
+      clientManager: runtime.clientManagers[determinedId]!,
+    };
+  }
+
+  /**
+   * Like {@linkcode resolveConnection}, but narrows the resolved connection to
+   * a {@link DirectConnectionConfig} — throwing if the addressed connection is
+   * OAuth-typed. The throw is a defensive backstop: a tool's `connectionId`
+   * enum only offers connections its predicate enables, and the direct-block
+   * predicates exclude OAuth, so an OAuth connection is unreachable here via
+   * normal MCP flow.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
+   */
+  protected resolveDirectConnection(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): ResolvedDirectConnection {
+    // Reuse resolveConnection for id selection + validation; this method only
+    // adds the direct-vs-oauth narrowing on top of its type-neutral result.
+    const { connId, conn, clientManager } = this.resolveConnection(
+      runtime,
+      toolArguments,
+    );
+
+    // A resolved OAuth connection means the wiring is broken (a non-oauth tool
+    // somehow offered an oauth id), not that a caller legitimately asked for one.
+    if (conn.type !== "direct") {
+      throw new Error(
+        `Wacky -- connection "${connId}" is ${conn.type}-typed; this tool requires a direct connection`,
+      );
+    }
+
+    // conn is narrowed to DirectConnectionConfig by the guard above.
+    return { connId, conn, clientManager };
   }
 
   /**

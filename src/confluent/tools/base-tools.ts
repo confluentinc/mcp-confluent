@@ -182,6 +182,17 @@ export abstract class BaseToolHandler implements ToolHandler {
 
     // Otherwise, inject a required connectionId parameter into the Zod
     // inputSchema with an enum of the enabled connection IDs.
+
+    // Point the agent at list-connections so it can learn which tools each
+    // connection supports — but only when that tool is itself reachable;
+    // naming a tool the operator blocked would send the agent chasing a ghost.
+    // Leading space lives inside the pointer so the blocked case (empty
+    // pointer) leaves no dangling trailing space on the description.
+    const listConnectionsPointer = runtime.isToolAllowed(
+      ToolName.LIST_CONNECTIONS,
+    )
+      ? " Discover connections and learn what tools are supported by each connection by invoking 'list-connections'."
+      : "";
     return {
       ...config,
       inputSchema: {
@@ -189,7 +200,7 @@ export abstract class BaseToolHandler implements ToolHandler {
         connectionId: z
           .enum(ids as [string, ...string[]])
           .describe(
-            `Which configured connection to target. One of: ${ids.join(", ")}. `,
+            `Which configured connection to target. One of: ${ids.join(", ")}.${listConnectionsPointer}`,
           ),
       },
     };

@@ -6,6 +6,7 @@ import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { constructDirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 
 /**
  * Aggregate of all runtime state threaded through the server.
@@ -24,14 +25,36 @@ export class ServerRuntime {
    */
   readonly oauthHolder: OAuthHolder | undefined;
 
+  /**
+   * Tool names the operator's allow/block-list left enabled, or `undefined`
+   * when no list was configured (all tools allowed — cli.ts's default-on
+   * behavior). The `undefined`-means-unfiltered sentinel is this class's own
+   * business: callers ask {@link isToolAllowed} rather than branching on it.
+   */
+  private readonly allowedToolNames: ReadonlySet<ToolName> | undefined;
+
   constructor(
     config: MCPServerConfiguration,
     clientManagers: Record<string, BaseClientManager>,
     oauthHolder: OAuthHolder | undefined = undefined,
+    allowedToolNames: ReadonlySet<ToolName> | undefined = undefined,
   ) {
     this.config = config;
     this.clientManagers = clientManagers;
     this.oauthHolder = oauthHolder;
+    this.allowedToolNames = allowedToolNames;
+  }
+
+  /**
+   * Whether the operator's allow/block-list leaves `name` invokable. Always
+   * `true` when no list was configured. The single source of truth for the
+   * operator filter, shared by tool registration and the `list-connections`
+   * tool so the advertised set and the reported set can never diverge.
+   */
+  isToolAllowed(name: ToolName): boolean {
+    return (
+      this.allowedToolNames === undefined || this.allowedToolNames.has(name)
+    );
   }
 
   /**
@@ -53,7 +76,10 @@ export class ServerRuntime {
     return managers[0]!;
   }
 
-  static fromConfig(config: MCPServerConfiguration): ServerRuntime {
+  static fromConfig(
+    config: MCPServerConfiguration,
+    allowedToolNames: ReadonlySet<ToolName> | undefined = undefined,
+  ): ServerRuntime {
     const oauthConns = Object.values(config.connections).filter(
       (c): c is OAuthConnectionConfig => c.type === "oauth",
     );
@@ -95,6 +121,11 @@ export class ServerRuntime {
         return [id, constructDirectClientManager(conn)] as const;
       }),
     );
-    return new ServerRuntime(config, clientManagers, oauthHolder);
+    return new ServerRuntime(
+      config,
+      clientManagers,
+      oauthHolder,
+      allowedToolNames,
+    );
   }
 }

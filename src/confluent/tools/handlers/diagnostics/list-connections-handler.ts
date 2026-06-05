@@ -59,7 +59,7 @@ export class ListConnectionsHandler extends ToolMetadataHandler {
     }
 
     for (const bucket of Object.values(connections)) {
-      bucket.enabledTools.sort();
+      bucket.enabledTools.sort((a, b) => a.localeCompare(b));
     }
 
     return this.createStructuredResponse(renderSummary(connections), {

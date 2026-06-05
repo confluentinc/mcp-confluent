@@ -64,7 +64,7 @@ export class ListConnectionsHandler extends ToolMetadataHandler {
     return {
       name: ToolName.LIST_CONNECTIONS,
       description:
-        "List every configured connection and the tools you can invoke against each. The connection id (the map key) is the value to pass as the `connectionId` argument on tools that ask for one. Call this when a tool offers a choice of connections, or to discover which connection supports the capability you need.",
+        "List every configured connection and the connection-routable tools you can invoke against each. The connection id (the map key) is the value to pass as the `connectionId` argument on tools that ask for one. Connection-agnostic tools (e.g. docs and diagnostics that take no `connectionId`) are always available and appear in `tools/list`, not here. Call this when a tool offers a choice of connections, or to discover which connection supports the capability you need.",
       inputSchema: listConnectionsArguments.shape,
       annotations: READ_ONLY,
     };

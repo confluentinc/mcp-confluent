@@ -136,7 +136,7 @@ no-header / wrong-header / correct-header pattern.
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
-import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -151,7 +151,7 @@ const handler = new ListTopicsHandler();
 describe("my-handler", { tags: [Tag.KAFKA] }, () => {
   // early-return short-circuits the describe body when creds are absent.
   // see "Skip Pattern" below for why this isn't `describe.skipIf`.
-  if (skipIfNotEnabled(handler, integrationConnection())) {
+  if (skipIfDisabled(handler, integrationConnection())) {
     return;
   }
 
@@ -265,18 +265,18 @@ problem.
 
 ## Credential Gating by Tool Domain
 
-Tests gate via the `skipIfNotEnabled` helper, which runs the handler's predicate against the single integration-fixture connection.
+Tests gate via the `skipIfDisabled` helper, which runs the handler's predicate against the single integration-fixture connection.
 This is the same predicate the server uses in `getToolHandlersToRegister()` to decide whether to register the tool, so if the server can register it the test runs; if not, the helper calls `it.skip` and returns `true` so the describe body bails.
 The skip reason defaults to the verdict's `ToolDisabledReason`, so the message names the missing config without a hand-typed string.
 
 ```ts
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
-import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 
 const handler = new ListTopicsHandler();
 
-if (skipIfNotEnabled(handler, integrationConnection())) {
+if (skipIfDisabled(handler, integrationConnection())) {
   return;
 }
 ```
@@ -300,7 +300,7 @@ handler's predicate; if none fit, add a new predicate there first.
 The skip reason comes from the predicate's `ToolDisabledReason`, so you no longer hand-type or maintain per-test label strings — the per-test labels #288 anticipated collapsing are gone, sourced from the one enum the predicates already carry.
 Reference the right predicate on the handler and the verdict carries the user-facing phrasing; the REST-proxy tests (`get-topic-config`, `alter-topic-config`) still call `getTestClusterId()` from `@tests/harness/kafka-admin.js` to address the cluster, which throws if `kafka.cluster_id` is missing from the fixture.
 
-A few gates need an explicit reason the generic verdict can't express, and pass it as `skipIfNotEnabled`'s `reasonOverride` (third arg):
+A few gates need an explicit reason the generic verdict can't express, and pass it as `skipIfDisabled`'s `reasonOverride` (third arg):
 the OAuth-fixture and OAuth-seeding gates pass `OAUTH_FIXTURE_NOT_LOADED_REASON` / `DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON`;
 the Confluent Platform gates pass their docker-compose + `CP_KAFKA_*` setup-runbook string.
 The transport smoke tests don't gate on a handler predicate at all — they ask "did any connection load?" via `integrationConnectionLoaded()`.
@@ -419,7 +419,7 @@ describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
       it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
       return;
     }
-    if (skipIfNotEnabled(handler, integrationConnection())) {
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
 
@@ -434,7 +434,7 @@ describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
       return;
     }
     if (
-      skipIfNotEnabled(
+      skipIfDisabled(
         handler,
         integrationConnection({ oauth: true }),
         OAUTH_FIXTURE_NOT_LOADED_REASON,
@@ -500,7 +500,7 @@ Gate after the OAuth credential check:
 
 ```ts
 if (
-  skipIfNotEnabled(
+  skipIfDisabled(
     handler,
     integrationConnection(),
     DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,

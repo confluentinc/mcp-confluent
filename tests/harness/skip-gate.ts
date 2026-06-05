@@ -17,7 +17,7 @@ export const skipReporter = {
 /**
  * Integration-test skip gate. Returns `true` — after registering a skipped
  * placeholder via `it.skip` — when `handler` is not enabled for `conn`, so a
- * gate reads as a one-liner: `if (skipIfNotEnabled(handler, integrationConnection())) return;`.
+ * gate reads as a one-liner: `if (skipIfDisabled(handler, integrationConnection())) return;`.
  *
  * Call it at describe-body scope (collection time), where `it.skip` is valid;
  * the caller keeps the `return` so the rest of the describe body is skipped.

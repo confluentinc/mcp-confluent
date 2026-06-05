@@ -3,6 +3,18 @@ import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { it } from "vitest";
 
 /**
+ * Indirection over `it.skip` so {@linkcode skipIfNotEnabled}'s skip side effect
+ * is spyable. Vitest's `it.skip` is a non-configurable property, so `vi.spyOn`
+ * can't intercept it directly; spy on `skipReporter.skip` instead (the
+ * node-deps namespace pattern from `.claude/rules/unit-tests.md`).
+ */
+export const skipReporter = {
+  skip(reason: string): void {
+    it.skip(reason, () => {});
+  },
+};
+
+/**
  * Integration-test skip gate. Returns `true` — after registering a skipped
  * placeholder via `it.skip` — when `handler` is not enabled for `conn`, so a
  * gate reads as a one-liner: `if (skipIfNotEnabled(handler, integrationConnection())) return;`.
@@ -24,6 +36,6 @@ export function skipIfNotEnabled(
 ): boolean {
   const verdict = handler.predicate(conn);
   if (verdict.enabled) return false;
-  it.skip(reasonOverride ?? verdict.reason, () => {});
+  skipReporter.skip(reasonOverride ?? verdict.reason);
   return true;
 }

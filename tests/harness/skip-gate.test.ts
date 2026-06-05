@@ -1,35 +1,45 @@
-import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
+import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
+import { skipIfNotEnabled, skipReporter } from "@tests/harness/skip-gate.js";
 import { StubHandler } from "@tests/stubs/index.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 describe("skip-gate.ts", () => {
   describe("skipIfNotEnabled()", () => {
-    // Called at describe-body (collection) scope, exactly as integration gates
-    // use it — so the disabled cases' it.skip() registers against this suite
-    // (surfacing as skipped placeholders named after the reason / override).
-    const enabledReturn = skipIfNotEnabled(new StubHandler(), {
-      type: "direct",
-    });
-    const disabledReturn = skipIfNotEnabled(
-      new StubHandler({ enabled: false }),
-      { type: "direct" },
-    );
-    const overrideReturn = skipIfNotEnabled(
-      new StubHandler({ enabled: false }),
-      { type: "direct" },
-      "custom precondition reason",
-    );
+    // The side effect under test is "the helper calls it.skip with the right
+    // reason". it.skip itself is non-configurable (can't be spied), so the
+    // helper routes through skipReporter.skip, which we spy on here.
 
-    it("should return false (no skip) when the handler is enabled for the connection", () => {
-      expect(enabledReturn).toBe(false);
+    it("should return false and not skip when the handler is enabled", () => {
+      const skip = vi.spyOn(skipReporter, "skip").mockImplementation(() => {});
+
+      expect(skipIfNotEnabled(new StubHandler(), { type: "direct" })).toBe(
+        false,
+      );
+      expect(skip).not.toHaveBeenCalled();
     });
 
-    it("should return true when the handler is disabled for the connection", () => {
-      expect(disabledReturn).toBe(true);
+    it("should skip with the verdict reason and return true when disabled", () => {
+      const skip = vi.spyOn(skipReporter, "skip").mockImplementation(() => {});
+
+      expect(
+        skipIfNotEnabled(new StubHandler({ enabled: false }), {
+          type: "direct",
+        }),
+      ).toBe(true);
+      expect(skip).toHaveBeenCalledWith(ToolDisabledReason.MissingFlinkBlock);
     });
 
-    it("should return true when disabled with a reason override", () => {
-      expect(overrideReturn).toBe(true);
+    it("should skip with the reasonOverride when one is provided", () => {
+      const skip = vi.spyOn(skipReporter, "skip").mockImplementation(() => {});
+
+      expect(
+        skipIfNotEnabled(
+          new StubHandler({ enabled: false }),
+          { type: "direct" },
+          "custom precondition reason",
+        ),
+      ).toBe(true);
+      expect(skip).toHaveBeenCalledWith("custom precondition reason");
     });
   });
 });

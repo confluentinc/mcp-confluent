@@ -136,6 +136,7 @@ no-header / wrong-header / correct-header pattern.
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -150,9 +151,7 @@ const handler = new ListTopicsHandler();
 describe("my-handler", { tags: [Tag.KAFKA] }, () => {
   // early-return short-circuits the describe body when creds are absent.
   // see "Skip Pattern" below for why this isn't `describe.skipIf`.
-  const verdict = handler.predicate(integrationConnection());
-  if (!verdict.enabled) {
-    it.skip(verdict.reason, () => {});
+  if (skipIfNotEnabled(handler, integrationConnection())) {
     return;
   }
 
@@ -266,19 +265,18 @@ problem.
 
 ## Credential Gating by Tool Domain
 
-Tests gate on the handler's predicate against the single integration-fixture connection: `handler.predicate(integrationConnection())`.
-This is the same predicate the server uses in `getToolHandlersToRegister()` to decide whether to register the tool, so if the server can register it the test runs; if not, the test skips.
-The verdict's `ToolDisabledReason` is the skip reason, so the message names the missing config without a hand-typed string.
+Tests gate via the `skipIfNotEnabled` helper, which runs the handler's predicate against the single integration-fixture connection.
+This is the same predicate the server uses in `getToolHandlersToRegister()` to decide whether to register the tool, so if the server can register it the test runs; if not, the helper calls `it.skip` and returns `true` so the describe body bails.
+The skip reason defaults to the verdict's `ToolDisabledReason`, so the message names the missing config without a hand-typed string.
 
 ```ts
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
 
 const handler = new ListTopicsHandler();
 
-const verdict = handler.predicate(integrationConnection());
-if (!verdict.enabled) {
-  it.skip(verdict.reason, () => {});
+if (skipIfNotEnabled(handler, integrationConnection())) {
   return;
 }
 ```
@@ -302,10 +300,10 @@ handler's predicate; if none fit, add a new predicate there first.
 The skip reason comes from the predicate's `ToolDisabledReason`, so you no longer hand-type or maintain per-test label strings — the per-test labels #288 anticipated collapsing are gone, sourced from the one enum the predicates already carry.
 Reference the right predicate on the handler and the verdict carries the user-facing phrasing; the REST-proxy tests (`get-topic-config`, `alter-topic-config`) still call `getTestClusterId()` from `@tests/harness/kafka-admin.js` to address the cluster, which throws if `kafka.cluster_id` is missing from the fixture.
 
-A few gates keep an explicit reason instead — because the generic verdict can't express their actionable guidance — and swap only the condition to the predicate form:
-the transport smoke tests' "did any connection load?" check uses `integrationConnectionLoaded()`;
-the OAuth-fixture and OAuth-seeding gates keep `OAUTH_FIXTURE_NOT_LOADED_REASON` / `DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON`;
-the Confluent Platform gates keep their docker-compose + `CP_KAFKA_*` setup-runbook string.
+A few gates need an explicit reason the generic verdict can't express, and pass it as `skipIfNotEnabled`'s `reasonOverride` (third arg):
+the OAuth-fixture and OAuth-seeding gates pass `OAUTH_FIXTURE_NOT_LOADED_REASON` / `DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON`;
+the Confluent Platform gates pass their docker-compose + `CP_KAFKA_*` setup-runbook string.
+The transport smoke tests don't gate on a handler predicate at all — they ask "did any connection load?" via `integrationConnectionLoaded()`.
 
 ### Auth gap for direct-Kafka handlers (deliberate)
 
@@ -421,9 +419,7 @@ describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
       it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
       return;
     }
-    const verdict = handler.predicate(integrationConnection());
-    if (!verdict.enabled) {
-      it.skip(verdict.reason, () => {});
+    if (skipIfNotEnabled(handler, integrationConnection())) {
       return;
     }
 
@@ -437,8 +433,13 @@ describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
       it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
       return;
     }
-    if (!handler.predicate(integrationConnection({ oauth: true })).enabled) {
-      it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+    if (
+      skipIfNotEnabled(
+        handler,
+        integrationConnection({ oauth: true }),
+        OAUTH_FIXTURE_NOT_LOADED_REASON,
+      )
+    ) {
       return;
     }
     const credentials = getOAuthCredentialsFromEnv();
@@ -498,14 +499,19 @@ OAuth describes that need test-side seeding (admin client, SR client, env-id loo
 Gate after the OAuth credential check:
 
 ```ts
-if (!handler.predicate(integrationConnection()).enabled) {
-  it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+if (
+  skipIfNotEnabled(
+    handler,
+    integrationConnection(),
+    DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
+  )
+) {
   return;
 }
 ```
 
 Reuses the handler's own `widenForOAuth(...)` predicate against the direct connection — strips the OAuth special case, falls back to the direct check the seeding helper needs.
-The reason stays the explicit `DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON` constant (not the verdict reason), since it names a seeding precondition the generic verdict can't express.
+The `reasonOverride` keeps the explicit `DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON` (not the verdict reason), since it names a seeding precondition the generic verdict can't express.
 OAuth describes that don't seed (e.g. `list-organizations`, `list-billing-costs`) skip this gate.
 
 ## CI Matrix

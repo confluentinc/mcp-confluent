@@ -19,12 +19,11 @@ const listConnectionsArguments = z.object({});
  * connection — the same two gates tool registration applies, so this listing
  * can never claim a tool the server didn't advertise.
  *
- * Always enabled (`alwaysEnabled`): an agent routing a `connectionId`-bearing
- * call needs the inventory regardless of which service blocks any one
- * connection carries. `alwaysEnabled` is also load-bearing the other way — it
- * keeps `getRegisteredToolConfig` from injecting a `connectionId` parameter
- * onto this tool (it reports on every connection, so targeting one is
- * meaningless) and avoids triggering an OAuth login for a mere listing.
+ * This tool itself is always enabled (predicate = `alwaysEnabled`) but intentionally excludes
+ * connection-agnostic tools from the per-connection lists: a tool whose predicate is `alwaysEnabled`
+ * applies to every connection, so listing it under each connection would misrepresent it as
+ * connection-routable. This tool answers "which connections are available and which tools
+ * are directly useable on each."
  *
  * The tool catalog is supplied through the thunk that {@link
  * ToolMetadataHandler} owns, for the ESM-cycle reason documented there.
@@ -43,6 +42,12 @@ export class ListConnectionsHandler extends ToolMetadataHandler {
         .filter(
           ([name, handler]) =>
             runtime.isToolAllowed(name) &&
+            // Skip connection-agnostic tools (predicate === alwaysEnabled):
+            // they take no connectionId and apply to every connection, so
+            // listing them per connection would misrepresent them as
+            // connection-routable. This map answers "which tools route to
+            // this connection id?" — the always-on set is orthogonal.
+            handler.predicate !== alwaysEnabled &&
             handler.enabledConnectionIds(runtime).includes(connId),
         )
         .map(([name]) => name)

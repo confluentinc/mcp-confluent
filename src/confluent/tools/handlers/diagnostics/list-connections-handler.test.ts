@@ -20,7 +20,8 @@ describe("ListConnectionsHandler", () => {
   }
 
   /** The three-tool universe shared by the mapping tests: two kafka-gated
-   *  tools and one always-enabled tool. */
+   *  tools and one always-enabled (connection-agnostic) tool, the latter
+   *  present to prove it is excluded from every per-connection list. */
   function threeToolUniverse(): Array<readonly [ToolName, ToolHandler]> {
     return [
       [ToolName.LIST_TOPICS, new StubHandler({ predicate: hasKafka })],
@@ -54,29 +55,48 @@ describe("ListConnectionsHandler", () => {
       return first?.type === "text" ? first.text : "";
     }
 
-    it("should map each connection to the tools whose predicate enables it, sorted", () => {
+    it("should map each connection to its connection-routable tools, sorted, excluding connection-agnostic ones", () => {
       const runtime = runtimeWithConnections({ k: KAFKA, bare: {} });
 
       const result = handlerWith(threeToolUniverse()).handle(runtime);
 
+      // SEARCH_PRODUCT_DOCS (alwaysEnabled) is connection-agnostic and absent
+      // from both lists; "bare" therefore has no routable tools at all.
       expect(result.structuredContent).toEqual({
         connections: {
-          k: {
-            enabledTools: [
-              ToolName.CREATE_TOPICS,
-              ToolName.LIST_TOPICS,
-              ToolName.SEARCH_PRODUCT_DOCS,
-            ],
-          },
-          bare: { enabledTools: [ToolName.SEARCH_PRODUCT_DOCS] },
+          k: { enabledTools: [ToolName.CREATE_TOPICS, ToolName.LIST_TOPICS] },
+          bare: { enabledTools: [] },
         },
       });
       expect(result.isError).toBe(false);
     });
 
+    it("should never list connection-agnostic (alwaysEnabled) tools, even when they are the only tools", () => {
+      const runtime = runtimeWithConnections({ k: KAFKA, other: KAFKA });
+
+      const result = handlerWith([
+        [
+          ToolName.SEARCH_PRODUCT_DOCS,
+          new StubHandler({ predicate: alwaysEnabled }),
+        ],
+        [
+          ToolName.GET_PRODUCT_DOC_PAGE,
+          new StubHandler({ predicate: alwaysEnabled }),
+        ],
+      ]).handle(runtime);
+
+      expect(result.structuredContent).toEqual({
+        connections: {
+          k: { enabledTools: [] },
+          other: { enabledTools: [] },
+        },
+      });
+    });
+
     it("should exclude tools blocked by the operator allow/block filter", () => {
-      // CREATE_TOPICS is absent from the allow set, so it must not surface on
-      // any connection even though its predicate enables it on "k".
+      // CREATE_TOPICS is absent from the allow set, so it must not surface even
+      // though its predicate enables it on "k". SEARCH_PRODUCT_DOCS is allowed
+      // but connection-agnostic, so it is excluded for that reason instead.
       const runtime = runtimeWithConnections(
         { k: KAFKA },
         undefined,
@@ -86,11 +106,7 @@ describe("ListConnectionsHandler", () => {
       const result = handlerWith(threeToolUniverse()).handle(runtime);
 
       expect(result.structuredContent).toEqual({
-        connections: {
-          k: {
-            enabledTools: [ToolName.LIST_TOPICS, ToolName.SEARCH_PRODUCT_DOCS],
-          },
-        },
+        connections: { k: { enabledTools: [ToolName.LIST_TOPICS] } },
       });
     });
 

@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { TransportType } from "@src/mcp/transports/types.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnectionLoaded } from "@tests/harness/runtime.js";
 import {
   startServer,
   type StartedServer,
@@ -10,9 +10,6 @@ import {
 import { activeTransports } from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-// transport-layer test (not tool-group), same fixture as the spawned server
-const runtime = integrationRuntime();
 
 // stdio is single-client by construction (one process, one stdin/stdout pair); only HTTP and SSE
 // share a Fastify port across sessions, so multi-client coverage is restricted to those two
@@ -24,7 +21,7 @@ describe(
   "multi-client",
   { tags: [Tag.SMOKE, Tag.REQUIRES_KAFKA_CONFIG] },
   () => {
-    if (Object.keys(runtime.config.connections).length === 0) {
+    if (!integrationConnectionLoaded()) {
       it.skip("requires at least one configured connection in integration.yaml", () => {});
       return;
     }

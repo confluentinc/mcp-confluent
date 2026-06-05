@@ -754,6 +754,30 @@ describe("config/models.ts", () => {
         );
       });
     });
+
+    describe("getConnectionConfig", () => {
+      it("should return the connection config registered under the given id", () => {
+        const config = new MCPServerConfiguration({
+          connections: { local: directConnection },
+        });
+
+        expect(config.getConnectionConfig("local")).toBe(directConnection);
+      });
+
+      it("should throw, naming the unknown id and the defined ids (sorted), for an unknown connection id", () => {
+        // ids declared out of order to prove the message sorts them.
+        const config = new MCPServerConfiguration({
+          connections: {
+            staging: directConnection,
+            local: directConnection,
+          },
+        });
+
+        expect(() => config.getConnectionConfig("ghost")).toThrow(
+          'Unknown connection id "ghost"; defined connections: local, staging',
+        );
+      });
+    });
   });
 
   describe("oauth connection arm", () => {

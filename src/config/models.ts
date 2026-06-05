@@ -249,7 +249,7 @@ export class MCPServerConfiguration {
     if (conn === undefined) {
       throw new Error(
         `Unknown connection id "${connectionId}"; defined connections: ${
-          Object.keys(this.connections).join(", ") || "none"
+          this.getConnectionNames().join(", ") || "none"
         }`,
       );
     }

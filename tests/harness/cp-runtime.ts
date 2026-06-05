@@ -23,6 +23,9 @@ const CP_FIXTURE_PATH = resolve(
   "test-fixtures/yaml_configs/integration.cp.yaml",
 );
 
+/** The connection name the CP fixture gives its single connection. */
+const CP_CONNECTION_NAME = "cp";
+
 /**
  * The {@linkcode ServerRuntime} the spawned MCP server would see when using
  * the CP fixture. Same role as {@linkcode integrationRuntime} in runtime.ts
@@ -43,19 +46,25 @@ export function cpIntegrationRuntime(): ServerRuntime {
 }
 
 /**
- * The sole {@link ConnectionConfig} the spawned CP server would see, loaded
+ * The {@link ConnectionConfig} the spawned CP server would see, resolved by name
  * from the CP fixture. The CP-fixture peer of {@linkcode integrationConnection}
  * in runtime.ts: a single connection is the right-sized input for a
- * {@linkcode ConnectionPredicate} gate, with no ServerRuntime to build. Returns
- * an empty `direct` connection on load failure so block-based predicates yield
- * a clean disabled verdict.
+ * {@linkcode ConnectionPredicate} gate, with no ServerRuntime to build.
+ *
+ * Resolves by id via {@linkcode MCPServerConfiguration.getConfig} rather than
+ * `getSoleConnection()` — the #532 epic is removing the sole-connection
+ * accessors repo-wide (see #541's completion bar). On load failure (creds
+ * absent) returns an empty `direct` connection so the gate skips cleanly; a
+ * loaded fixture missing the `cp` connection is drift and throws loudly.
  */
 export function cpIntegrationConnection(): ConnectionConfig {
+  let config: MCPServerConfiguration;
   try {
-    return loadConfigFromYaml(CP_FIXTURE_PATH, process.env).getSoleConnection();
+    config = loadConfigFromYaml(CP_FIXTURE_PATH, process.env);
   } catch {
     return { type: "direct" };
   }
+  return config.getConfig(CP_CONNECTION_NAME);
 }
 
 export interface CpSpawnConfigOptions {

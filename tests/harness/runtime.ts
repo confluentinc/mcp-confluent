@@ -80,23 +80,25 @@ export function integrationRuntime(
  * `getSoleConnection()` — the #532 epic is removing the sole-connection accessors
  * repo-wide (see #541's completion bar), so new code must not depend on them.
  *
- * On load failure (a required `${VAR}` missing) or a missing connection returns
- * an empty `direct` connection, so every block-based predicate yields a clean
- * disabled verdict whose {@linkcode ToolDisabledReason} names the missing config.
+ * On load failure (a required `${VAR}` missing — creds absent) returns an empty
+ * `direct` connection, so every block-based predicate yields a clean disabled
+ * verdict and the gate skips. A fixture that loads but lacks the expected
+ * connection name is fixture drift, not a creds-skip — {@linkcode MCPServerConfiguration.getConfig}
+ * throws loudly rather than letting the whole suite silently skip.
  */
 export function integrationConnection(
   options: { oauth?: boolean } = {},
 ): ConnectionConfig {
-  const name = FIXTURE_CONNECTION_NAME[options.oauth ? "oauth" : "direct"];
-  const fixturePath = options.oauth ? OAUTH_FIXTURE_PATH : BASE_FIXTURE_PATH;
-  try {
-    return loadConfigFromYaml(fixturePath, process.env).getConfig(name);
-  } catch {
-    // Either the fixture failed to load (a required `${VAR}` missing) or it
-    // carries no connection by that name; an empty direct connection yields a
-    // clean disabled verdict for the gate.
-    return { type: "direct" };
-  }
+  const config = tryLoadIntegrationConfig(options);
+  // Fixture failed to load (a required `${VAR}` missing — i.e. creds absent):
+  // an empty direct connection yields a clean disabled verdict, so the gate skips.
+  if (config === undefined) return { type: "direct" };
+  // Fixture loaded: resolve the expected connection by name. A miss here is
+  // fixture drift (renamed/removed connection), not a credential-skip case, so
+  // let getConfig throw loudly rather than silently skipping the whole suite.
+  return config.getConfig(
+    FIXTURE_CONNECTION_NAME[options.oauth ? "oauth" : "direct"],
+  );
 }
 
 /**

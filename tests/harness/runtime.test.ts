@@ -18,11 +18,10 @@ describe("runtime.ts", () => {
     // implementation resolved the *sole* connection, so a loaded multi-connection
     // config threw and read as "not loaded" — wrongly skipping the transport
     // smoke tests once #540 lifts the single-connection load guard.
-    it("should return true for a multi-connection config (where getSoleConnection would throw)", () => {
+    it("should return true for a multi-connection config (the prior sole-connection check threw here)", () => {
       const multi = new MCPServerConfiguration({
         connections: { a: { type: "direct" }, b: { type: "direct" } },
       });
-      expect(() => multi.getSoleConnection()).toThrow();
       expect(hasIntegrationConnection(multi)).toBe(true);
     });
 

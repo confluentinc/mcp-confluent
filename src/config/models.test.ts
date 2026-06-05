@@ -764,13 +764,17 @@ describe("config/models.ts", () => {
         expect(config.getConfig("local")).toBe(directConnection);
       });
 
-      it("should throw, naming the unknown id and the defined ids, for an unknown connection id", () => {
+      it("should throw, naming the unknown id and the defined ids (sorted), for an unknown connection id", () => {
+        // ids declared out of order to prove the message sorts them.
         const config = new MCPServerConfiguration({
-          connections: { local: directConnection },
+          connections: {
+            staging: directConnection,
+            local: directConnection,
+          },
         });
 
         expect(() => config.getConfig("ghost")).toThrow(
-          'Unknown connection id "ghost"; defined connections: local',
+          'Unknown connection id "ghost"; defined connections: local, staging',
         );
       });
     });

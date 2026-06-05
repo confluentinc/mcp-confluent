@@ -13,7 +13,7 @@ import {
   integrationConnection,
   integrationRuntime,
 } from "@tests/harness/runtime.js";
-import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -37,7 +37,7 @@ describe(
     ],
   },
   () => {
-    if (skipIfNotEnabled(handler, integrationConnection())) {
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
 

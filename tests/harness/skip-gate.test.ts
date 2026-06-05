@@ -1,5 +1,5 @@
 import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
-import { skipIfNotEnabled, skipReporter } from "@tests/harness/skip-gate.js";
+import { skipIfDisabled, skipReporter } from "@tests/harness/skip-gate.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,9 +12,7 @@ describe("skip-gate.ts", () => {
     it("should return false and not skip when the handler is enabled", () => {
       const skip = vi.spyOn(skipReporter, "skip").mockImplementation(() => {});
 
-      expect(skipIfNotEnabled(new StubHandler(), { type: "direct" })).toBe(
-        false,
-      );
+      expect(skipIfDisabled(new StubHandler(), { type: "direct" })).toBe(false);
       expect(skip).not.toHaveBeenCalled();
     });
 
@@ -22,7 +20,7 @@ describe("skip-gate.ts", () => {
       const skip = vi.spyOn(skipReporter, "skip").mockImplementation(() => {});
 
       expect(
-        skipIfNotEnabled(new StubHandler({ enabled: false }), {
+        skipIfDisabled(new StubHandler({ enabled: false }), {
           type: "direct",
         }),
       ).toBe(true);
@@ -33,7 +31,7 @@ describe("skip-gate.ts", () => {
       const skip = vi.spyOn(skipReporter, "skip").mockImplementation(() => {});
 
       expect(
-        skipIfNotEnabled(
+        skipIfDisabled(
           new StubHandler({ enabled: false }),
           { type: "direct" },
           "custom precondition reason",

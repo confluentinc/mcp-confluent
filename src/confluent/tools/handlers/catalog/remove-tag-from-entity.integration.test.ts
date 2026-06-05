@@ -14,7 +14,7 @@ import {
   withSharedCatalogTagsClient,
   withSharedSrClient,
 } from "@tests/harness/schema-registry.js";
-import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -40,7 +40,7 @@ describe(
     ],
   },
   () => {
-    if (skipIfNotEnabled(handler, integrationConnection())) {
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
     // test-side deps beyond the handler predicate (kafka admin + SR cluster id discovery); gating

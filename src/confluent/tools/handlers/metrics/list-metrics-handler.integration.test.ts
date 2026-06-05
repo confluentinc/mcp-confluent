@@ -1,7 +1,7 @@
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
-import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -17,7 +17,7 @@ describe(
   "list-metrics-handler",
   { tags: [Tag.METRICS, Tag.REQUIRES_TELEMETRY_CONFIG] },
   () => {
-    if (skipIfNotEnabled(handler, integrationConnection())) {
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
 

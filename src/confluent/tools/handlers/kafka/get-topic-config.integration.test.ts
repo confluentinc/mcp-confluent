@@ -21,7 +21,7 @@ import {
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
-import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -46,7 +46,7 @@ describe(
         it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
         return;
       }
-      if (skipIfNotEnabled(handler, integrationConnection())) {
+      if (skipIfDisabled(handler, integrationConnection())) {
         return;
       }
 
@@ -96,7 +96,7 @@ describe(
           return;
         }
         if (
-          skipIfNotEnabled(
+          skipIfDisabled(
             handler,
             integrationConnection({ oauth: true }),
             OAUTH_FIXTURE_NOT_LOADED_REASON,
@@ -113,7 +113,7 @@ describe(
         // fixture; gate the OAuth describe on the same predicate the direct describe uses so an
         // OAuth-only CI lane without direct creds skips cleanly instead of crashing in beforeAll
         if (
-          skipIfNotEnabled(
+          skipIfDisabled(
             handler,
             integrationConnection(),
             DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,

@@ -1,7 +1,7 @@
 import { ListTableFlowCatalogIntegrationsHandler } from "@src/confluent/tools/handlers/tableflow/catalog/list-tableflow-catalog-integrations-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
-import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -23,7 +23,7 @@ describe(
     ],
   },
   () => {
-    if (skipIfNotEnabled(handler, integrationConnection())) {
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
 

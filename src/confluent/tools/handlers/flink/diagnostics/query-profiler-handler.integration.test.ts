@@ -6,7 +6,7 @@ import {
   withSharedFlinkStatementCleanup,
 } from "@tests/harness/flink.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
-import { skipIfNotEnabled } from "@tests/harness/skip-gate.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -30,7 +30,7 @@ describe(
   },
   () => {
     // composes hasFlink + hasTelemetry, stricter than the rest of the flink suite
-    if (skipIfNotEnabled(handler, integrationConnection())) {
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
 

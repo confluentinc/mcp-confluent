@@ -3,7 +3,7 @@ import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { it } from "vitest";
 
 /**
- * Indirection over `it.skip` so {@linkcode skipIfNotEnabled}'s skip side effect
+ * Indirection over `it.skip` so {@linkcode skipIfDisabled}'s skip side effect
  * is spyable. Vitest's `it.skip` is a non-configurable property, so `vi.spyOn`
  * can't intercept it directly; spy on `skipReporter.skip` instead (the
  * node-deps namespace pattern from `.claude/rules/unit-tests.md`).
@@ -29,7 +29,7 @@ export const skipReporter = {
  * Pass `reasonOverride` for gates whose precondition the generic verdict can't
  * express — the OAuth fixture/seeding gates and the Confluent Platform setup runbook.
  */
-export function skipIfNotEnabled(
+export function skipIfDisabled(
   handler: ToolHandler,
   conn: ConnectionConfig,
   reasonOverride?: string,

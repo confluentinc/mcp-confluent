@@ -299,7 +299,7 @@ The predicates referenced below live in
 `src/confluent/tools/connection-predicates.ts`. Pick the one matching the
 handler's predicate; if none fit, add a new predicate there first.
 
-The skip reason comes from the predicate's `ToolDisabledReason`, so you no longer hand-type or maintain per-test label strings (this is the #288/#289 cleanup, landed via #535).
+The skip reason comes from the predicate's `ToolDisabledReason`, so you no longer hand-type or maintain per-test label strings — the per-test labels #288 anticipated collapsing are gone, sourced from the one enum the predicates already carry.
 Reference the right predicate on the handler and the verdict carries the user-facing phrasing; the REST-proxy tests (`get-topic-config`, `alter-topic-config`) still call `getTestClusterId()` from `@tests/harness/kafka-admin.js` to address the cluster, which throws if `kafka.cluster_id` is missing from the fixture.
 
 A few gates keep an explicit reason instead — because the generic verdict can't express their actionable guidance — and swap only the condition to the predicate form:

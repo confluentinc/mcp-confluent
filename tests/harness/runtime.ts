@@ -1,5 +1,8 @@
 import { loadConfigFromYaml } from "@src/config/index.js";
-import { MCPServerConfiguration } from "@src/config/models.js";
+import {
+  type ConnectionConfig,
+  MCPServerConfiguration,
+} from "@src/config/models.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -42,11 +45,13 @@ export interface SpawnConfigOptions {
  * injection, which gating doesn't depend on), so the test's view of
  * "configured" matches the server's by construction.
  *
- * Tests use this to gate via {@linkcode ToolHandler.enabledConnectionIds}
- * (the same predicate the server itself uses to decide whether to register
- * a tool). If the YAML fails to load (any required `${VAR}` missing), we
- * return an empty runtime so handlers' gates yield a clean skip with the
- * tool's `requiredConnectionPath` as the reason.
+ * Used by the seeding harness helpers (kafka-admin, schema-registry, flink,
+ * connect, confluent-cloud) that need per-connection config to build their own
+ * api-key-authed clients. Per-handler skip gating moved to
+ * {@linkcode integrationConnection} — a single connection is the right-sized
+ * input for a {@linkcode ConnectionPredicate}, with no ServerRuntime to build.
+ * If the YAML fails to load (any required `${VAR}` missing), returns an empty
+ * runtime.
  */
 export function integrationRuntime(
   options: { oauth?: boolean } = {},
@@ -60,6 +65,51 @@ export function integrationRuntime(
       new MCPServerConfiguration({ connections: {} }),
       {},
     );
+  }
+}
+
+/**
+ * The sole {@link ConnectionConfig} the spawned MCP server would see, loaded
+ * from the same fixture as {@linkcode integrationRuntime}. Integration fixtures
+ * hold exactly one connection, so a single connection is the right-sized input
+ * for a {@linkcode ConnectionPredicate} gate: `handler.predicate(integrationConnection())`
+ * answers "is this tool enabled?" without constructing a whole ServerRuntime.
+ *
+ * On load failure (a required `${VAR}` missing) returns an empty `direct`
+ * connection, so every block-based predicate yields a clean disabled verdict
+ * whose {@linkcode ToolDisabledReason} names the missing config.
+ */
+export function integrationConnection(
+  options: { oauth?: boolean } = {},
+): ConnectionConfig {
+  return tryIntegrationConnection(options) ?? { type: "direct" };
+}
+
+/**
+ * Whether the integration fixture actually loaded a connection. The transport
+ * smoke tests gate on this instead of a per-handler predicate: they need any
+ * connection to exist (so the spawned server boots), not a specific service block.
+ */
+export function integrationConnectionLoaded(
+  options: { oauth?: boolean } = {},
+): boolean {
+  return tryIntegrationConnection(options) !== undefined;
+}
+
+/**
+ * Loads the sole connection from the chosen integration fixture, or `undefined`
+ * when the YAML fails to load. The seam both {@linkcode integrationConnection}
+ * (empty-connection fallback for predicate gates) and
+ * {@linkcode integrationConnectionLoaded} (existence check) build on.
+ */
+function tryIntegrationConnection(options: {
+  oauth?: boolean;
+}): ConnectionConfig | undefined {
+  const fixturePath = options.oauth ? OAUTH_FIXTURE_PATH : BASE_FIXTURE_PATH;
+  try {
+    return loadConfigFromYaml(fixturePath, process.env).getSoleConnection();
+  } catch {
+    return undefined;
   }
 }
 

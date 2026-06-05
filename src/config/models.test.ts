@@ -755,13 +755,13 @@ describe("config/models.ts", () => {
       });
     });
 
-    describe("getConfig", () => {
-      it("should return the connection registered under the given id", () => {
+    describe("getConnectionConfig", () => {
+      it("should return the connection config registered under the given id", () => {
         const config = new MCPServerConfiguration({
           connections: { local: directConnection },
         });
 
-        expect(config.getConfig("local")).toBe(directConnection);
+        expect(config.getConnectionConfig("local")).toBe(directConnection);
       });
 
       it("should throw, naming the unknown id and the defined ids (sorted), for an unknown connection id", () => {
@@ -773,7 +773,7 @@ describe("config/models.ts", () => {
           },
         });
 
-        expect(() => config.getConfig("ghost")).toThrow(
+        expect(() => config.getConnectionConfig("ghost")).toThrow(
           'Unknown connection id "ghost"; defined connections: local, staging',
         );
       });

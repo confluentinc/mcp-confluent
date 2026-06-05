@@ -238,13 +238,14 @@ export class MCPServerConfiguration {
   }
 
   /**
-   * Returns the connection registered under `connectionId`, throwing if no such
-   * connection is defined. The by-id accessor for the multi-connection world:
-   * callers route to a known connection (a tool's `connectionId` enum is built
-   * from the defined ids, so an unknown id is a programming error, not user
-   * input). Prefer this over reaching into `connections[id]` directly.
+   * Returns the {@link ConnectionConfig} registered under `connectionId`,
+   * throwing if no such connection is defined. The by-id accessor for the
+   * multi-connection world: callers route to a known connection (a tool's
+   * `connectionId` enum is built from the defined ids, so an unknown id is a
+   * programming error, not user input). Prefer this over reaching into
+   * `connections[id]` directly.
    */
-  getConfig(connectionId: string): ConnectionConfig {
+  getConnectionConfig(connectionId: string): ConnectionConfig {
     const conn = this.connections[connectionId];
     if (conn === undefined) {
       throw new Error(

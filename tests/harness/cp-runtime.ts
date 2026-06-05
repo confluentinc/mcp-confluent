@@ -51,7 +51,7 @@ export function cpIntegrationRuntime(): ServerRuntime {
  * in runtime.ts: a single connection is the right-sized input for a
  * {@linkcode ConnectionPredicate} gate, with no ServerRuntime to build.
  *
- * Resolves by id via {@linkcode MCPServerConfiguration.getConfig} rather than
+ * Resolves by id via {@linkcode MCPServerConfiguration.getConnectionConfig} rather than
  * `getSoleConnection()` — the #532 epic is removing the sole-connection
  * accessors repo-wide (see #541's completion bar). On load failure (creds
  * absent) returns an empty `direct` connection so the gate skips cleanly; a
@@ -64,7 +64,7 @@ export function cpIntegrationConnection(): ConnectionConfig {
   } catch {
     return { type: "direct" };
   }
-  return config.getConfig(CP_CONNECTION_NAME);
+  return config.getConnectionConfig(CP_CONNECTION_NAME);
 }
 
 export interface CpSpawnConfigOptions {

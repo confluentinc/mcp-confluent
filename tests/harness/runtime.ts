@@ -76,14 +76,14 @@ export function integrationRuntime(
  * a {@linkcode ConnectionPredicate} gate: `handler.predicate(integrationConnection())`
  * answers "is this tool enabled?" without constructing a whole ServerRuntime.
  *
- * Resolves by id via {@linkcode MCPServerConfiguration.getConfig} rather than
+ * Resolves by id via {@linkcode MCPServerConfiguration.getConnectionConfig} rather than
  * `getSoleConnection()` — the #532 epic is removing the sole-connection accessors
  * repo-wide (see #541's completion bar), so new code must not depend on them.
  *
  * On load failure (a required `${VAR}` missing — creds absent) returns an empty
  * `direct` connection, so every block-based predicate yields a clean disabled
  * verdict and the gate skips. A fixture that loads but lacks the expected
- * connection name is fixture drift, not a creds-skip — {@linkcode MCPServerConfiguration.getConfig}
+ * connection name is fixture drift, not a creds-skip — {@linkcode MCPServerConfiguration.getConnectionConfig}
  * throws loudly rather than letting the whole suite silently skip.
  */
 export function integrationConnection(
@@ -95,8 +95,8 @@ export function integrationConnection(
   if (config === undefined) return { type: "direct" };
   // Fixture loaded: resolve the expected connection by name. A miss here is
   // fixture drift (renamed/removed connection), not a credential-skip case, so
-  // let getConfig throw loudly rather than silently skipping the whole suite.
-  return config.getConfig(
+  // let getConnectionConfig throw loudly rather than silently skipping the whole suite.
+  return config.getConnectionConfig(
     FIXTURE_CONNECTION_NAME[options.oauth ? "oauth" : "direct"],
   );
 }

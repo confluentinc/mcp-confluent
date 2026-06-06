@@ -96,11 +96,16 @@ describe("list-consumer-groups-handler.ts", () => {
   describe("handle()", () => {
     const handler = new ListConsumerGroupsHandler();
 
-    it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+    it("should route only to its resolved connection in a multi-connection config", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
+      // runtimeWithDecoy gives a two-connection runtime (the DEFAULT_CONNECTION_ID
+      // real connection + a decoy keyed DECOY_CONNECTION_ID). assertHandleCase
+      // detects the decoy and injects `connectionId: DEFAULT_CONNECTION_ID` into
+      // the provided args for handle(), then asserts the decoy's manager went
+      // untouched — so `args` deliberately omits connectionId here.
       await assertHandleCase({
         handler,
         runtime: runtimeWithDecoy(

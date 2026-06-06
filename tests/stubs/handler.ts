@@ -81,7 +81,11 @@ export function classifyThrown(label: string, thrown: unknown): string {
  *   with `runtimeWith(connectionConfig, connectionId, clientManager)` so the
  *   connection shape and mocked client are both under test control.
  * @param args - Tool arguments forwarded to `handle()`. Defaults to `{}`.
- *   Supply only the fields relevant to the case under test.
+ *   Supply only the fields relevant to the case under test. Not always passed
+ *   through verbatim: against a decoy runtime (see below) the harness injects a
+ *   `connectionId` naming the non-decoy connection id present in the runtime when
+ *   you didn't supply one, so the handler receives `{ ...args, connectionId }`.
+ * Pass your own `connectionId` to opt out of that injection.
  * @param outcome - What to expect: `{ resolves: substring }` asserts the
  *   response text contains the substring; `{ throws: substring }` asserts the
  *   thrown error message contains it (or `"ZodError"` for any {@link ZodError});
@@ -96,10 +100,13 @@ export function classifyThrown(label: string, thrown: unknown): string {
  *
  * When the runtime carries a {@link DECOY_CONNECTION_ID} connection (built via
  * `runtimeWithDecoy`), this also routes the call to the real connection — by
- * injecting `connectionId` when the caller didn't supply one — and asserts the
- * decoy's client manager was never touched. That makes every handle() test a
- * routing test for free; a handler that still grabs `enabledConnectionIds[0]`
- * lands on the (first) decoy and fails the untouched assertion.
+ * injecting `connectionId: <real id>` when the caller didn't supply one, where
+ * `<real id>` is the sole non-decoy connection id (the `connectionId` passed to
+ * `runtimeWithDecoy`, i.e. `DEFAULT_CONNECTION_ID` unless overridden) — and
+ * asserts the decoy's client manager was never touched. That makes every
+ * handle() test a routing test for free; a handler that still grabs
+ * `enabledConnectionIds[0]` lands on the (first) decoy and fails the untouched
+ * assertion.
  */
 export async function assertHandleCase(options: {
   handler: Pick<BaseToolHandler, "handle">;
@@ -118,18 +125,33 @@ export async function assertHandleCase(options: {
     name = "(handler)",
   } = options;
 
-  // When a decoy connection is present, route to the real connection (the
-  // non-decoy id) unless the caller already pinned a connectionId, and capture
-  // the decoy's manager so we can prove the handler never touched it.
-  const decoyManager =
-    DECOY_CONNECTION_ID in runtime.config.connections
-      ? (runtime.clientManagers[
-          DECOY_CONNECTION_ID
-        ] as Mocked<DirectClientManager>)
-      : undefined;
-  const realConnectionId = Object.keys(runtime.config.connections).find(
-    (id) => id !== DECOY_CONNECTION_ID,
-  );
+  // When a decoy connection is present (a runtimeWithDecoy runtime), route the
+  // call to the real connection and capture the decoy's manager so we can prove
+  // the handler never touched it. Validate the runtime shape up front: a decoy
+  // with no manager, or with zero / more than one non-decoy sibling, would
+  // otherwise inject `connectionId: undefined` and silently neuter the routing
+  // assertion instead of failing where the mistake is.
+  let decoyManager: Mocked<DirectClientManager> | undefined;
+  let realConnectionId: string | undefined;
+  if (DECOY_CONNECTION_ID in runtime.config.connections) {
+    decoyManager = runtime.clientManagers[DECOY_CONNECTION_ID] as
+      | Mocked<DirectClientManager>
+      | undefined;
+    if (!decoyManager) {
+      throw new Error(
+        `Wacky -- ${name}: decoy connection "${DECOY_CONNECTION_ID}" has no client manager; build decoy runtimes with runtimeWithDecoy`,
+      );
+    }
+    const nonDecoyIds = Object.keys(runtime.config.connections).filter(
+      (id) => id !== DECOY_CONNECTION_ID,
+    );
+    if (nonDecoyIds.length !== 1) {
+      throw new Error(
+        `Wacky -- ${name}: a decoy runtime must have exactly one non-decoy connection to route to; found ${nonDecoyIds.length} (${nonDecoyIds.join(", ") || "none"})`,
+      );
+    }
+    realConnectionId = nonDecoyIds[0];
+  }
   const effectiveArgs =
     decoyManager && args.connectionId === undefined
       ? { ...args, connectionId: realConnectionId }

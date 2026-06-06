@@ -1,7 +1,6 @@
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
@@ -22,7 +21,7 @@ describe("list-topics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -33,27 +32,6 @@ describe("list-topics-handler.ts", () => {
         });
       });
 
-      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
-        const clientManager = getMockedClientManager();
-        const admin = await clientManager.getAdminClient();
-        admin.listTopics.mockResolvedValue(["topic-a", "topic-b"]);
-
-        const { runtime, decoyClientManager } = runtimeWithDecoy(
-          { kafka: { bootstrap_servers: "broker:9092" } },
-          DEFAULT_CONNECTION_ID,
-          clientManager,
-        );
-
-        await assertHandleCase({
-          handler,
-          runtime,
-          args: { connectionId: DEFAULT_CONNECTION_ID },
-          outcome: { resolves: "Kafka topics: topic-a,topic-b" },
-          clientManager,
-          untouchedClientManager: decoyClientManager,
-        });
-      });
-
       it("should let admin errors propagate (no try/catch around the read op)", async () => {
         const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
@@ -61,7 +39,7 @@ describe("list-topics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,

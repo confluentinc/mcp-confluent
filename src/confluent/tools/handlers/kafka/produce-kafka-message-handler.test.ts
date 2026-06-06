@@ -1,7 +1,6 @@
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
@@ -29,7 +28,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -45,40 +44,6 @@ describe("produce-kafka-message-handler.ts", () => {
         });
       });
 
-      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
-        const clientManager = getMockedClientManager();
-        const producer = await clientManager.getProducer();
-        producer.send.mockResolvedValue([
-          {
-            topicName: "smoke",
-            partition: 0,
-            offset: "5",
-            errorCode: 0,
-          },
-        ]);
-
-        const { runtime, decoyClientManager } = runtimeWithDecoy(
-          { kafka: { bootstrap_servers: "broker:9092" } },
-          DEFAULT_CONNECTION_ID,
-          clientManager,
-        );
-
-        await assertHandleCase({
-          handler,
-          runtime,
-          args: {
-            topicName: "smoke",
-            value: { message: "hello", useSchemaRegistry: false },
-            connectionId: DEFAULT_CONNECTION_ID,
-          },
-          outcome: {
-            resolves: "Message produced successfully to [Topic: smoke",
-          },
-          clientManager,
-          untouchedClientManager: decoyClientManager,
-        });
-      });
-
       it("should return an isError response when producer.send throws", async () => {
         const clientManager = getMockedClientManager();
         const producer = await clientManager.getProducer();
@@ -86,7 +51,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -114,7 +79,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -144,7 +109,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,

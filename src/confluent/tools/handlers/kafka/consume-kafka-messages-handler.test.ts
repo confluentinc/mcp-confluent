@@ -448,29 +448,6 @@ describe("consume-kafka-messages-handler.ts", () => {
         consumer.disconnect.mockResolvedValue(undefined);
       });
 
-      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
-        const { runtime, decoyClientManager } = runtimeWithDecoy(
-          { kafka: { bootstrap_servers: "broker:9092" } },
-          DEFAULT_CONNECTION_ID,
-          clientManager,
-        );
-
-        await assertHandleCase({
-          handler,
-          runtime,
-          args: {
-            topics: [{ name: "smoke", start: "earliest" }],
-            maxMessages: 1,
-            timeoutMs: 50,
-            valueFormat: {},
-            connectionId: DEFAULT_CONNECTION_ID,
-          },
-          outcome: { resolves: "Consumed 0 messages from topics smoke" },
-          clientManager,
-          untouchedClientManager: decoyClientManager,
-        });
-      });
-
       it("should pass derived offsetReset='earliest' to buildKafkaConsumer when every entry agrees on `start: 'earliest'`", async () => {
         // The consumer's `auto.offset.reset` is no longer a peer top-level
         // input; the handler derives it from the per-topic `start` values.
@@ -479,7 +456,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         // are needed (the simple-call fast path is preserved).
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -508,7 +485,7 @@ describe("consume-kafka-messages-handler.ts", () => {
       it("should propagate the default offsetReset ('earliest') to buildKafkaConsumer when every entry omits `start`", async () => {
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -546,7 +523,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -577,7 +554,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -608,7 +585,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -640,7 +617,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             {
               kafka: { bootstrap_servers: "broker:9092" },
               schema_registry: { endpoint: "https://sr.example" },
@@ -670,7 +647,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             {
               kafka: { bootstrap_servers: "broker:9092" },
               schema_registry: { endpoint: "https://sr.example" },
@@ -699,7 +676,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -728,7 +705,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             {
               kafka: { bootstrap_servers: "broker:9092" },
               schema_registry: { endpoint: "https://sr.example" },
@@ -754,7 +731,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         // first thing buildPreflightPlan does).
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -780,7 +757,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         // pick a default that surprises a caller.
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -806,7 +783,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -835,7 +812,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -864,7 +841,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -890,7 +867,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -921,7 +898,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -954,7 +931,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -998,7 +975,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1040,7 +1017,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1078,7 +1055,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1118,7 +1095,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1173,7 +1150,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1238,7 +1215,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1289,7 +1266,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1336,7 +1313,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1391,7 +1368,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1446,7 +1423,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1500,7 +1477,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1532,7 +1509,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1580,6 +1557,9 @@ describe("consume-kafka-messages-handler.ts", () => {
         // in production, where the SDK has already validated and
         // defaulted the inputs.
         const handlePromise = handler.handle(
+          // Direct handle() call (not assertHandleCase), so no decoy/auto-route
+          // here — a single-connection runtime keeps this orchestrator-race test
+          // focused on the maxReached arm.
           runtimeWith(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,

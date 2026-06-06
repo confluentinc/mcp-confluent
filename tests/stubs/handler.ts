@@ -6,6 +6,15 @@ import { type Mock, type Mocked, expect } from "vitest";
 import { ZodError } from "zod";
 import type { MockedClientManager } from "./clients.js";
 
+/**
+ * Reserved connection id for the decoy connection planted by `runtimeWithDecoy`.
+ * {@link assertHandleCase} recognizes a runtime carrying this connection and,
+ * for it, auto-routes the call to the real connection (injecting `connectionId`)
+ * and asserts the decoy's client manager is never touched — turning any handle()
+ * test into a routing test without a bespoke test body.
+ */
+export const DECOY_CONNECTION_ID = "decoy";
+
 export type Resolves = {
   /** Substring that must appear in the resolved response text. */
   resolves: string;
@@ -82,12 +91,15 @@ export function classifyThrown(label: string, thrown: unknown): string {
  *   getter on the manager was called on a successful resolve, proving the
  *   handler reached the client layer. Omit in cases that short-circuit
  *   before touching the client.
- * @param untouchedClientManager - When supplied, asserts that no getter on this
- *   manager was called by the handler — the negative half of a routing test,
- *   proving the call did not leak onto a connection it should have avoided
- *   (e.g. the decoy planted by `runtimeWithDecoy`).
  * @param name - Label prepended to assertion failure messages and used in
  *   discovery-sentinel output. Defaults to `"(handler)"`.
+ *
+ * When the runtime carries a {@link DECOY_CONNECTION_ID} connection (built via
+ * `runtimeWithDecoy`), this also routes the call to the real connection — by
+ * injecting `connectionId` when the caller didn't supply one — and asserts the
+ * decoy's client manager was never touched. That makes every handle() test a
+ * routing test for free; a handler that still grabs `enabledConnectionIds[0]`
+ * lands on the (first) decoy and fails the untouched assertion.
  */
 export async function assertHandleCase(options: {
   handler: Pick<BaseToolHandler, "handle">;
@@ -95,7 +107,6 @@ export async function assertHandleCase(options: {
   args?: Record<string, unknown>;
   outcome: HandleOutcome;
   clientManager?: MockedClientManager;
-  untouchedClientManager?: Mocked<DirectClientManager>;
   name?: string;
 }): Promise<void> {
   const {
@@ -104,9 +115,25 @@ export async function assertHandleCase(options: {
     args = {},
     outcome,
     clientManager,
-    untouchedClientManager,
     name = "(handler)",
   } = options;
+
+  // When a decoy connection is present, route to the real connection (the
+  // non-decoy id) unless the caller already pinned a connectionId, and capture
+  // the decoy's manager so we can prove the handler never touched it.
+  const decoyManager =
+    DECOY_CONNECTION_ID in runtime.config.connections
+      ? (runtime.clientManagers[
+          DECOY_CONNECTION_ID
+        ] as Mocked<DirectClientManager>)
+      : undefined;
+  const realConnectionId = Object.keys(runtime.config.connections).find(
+    (id) => id !== DECOY_CONNECTION_ID,
+  );
+  const effectiveArgs =
+    decoyManager && args.connectionId === undefined
+      ? { ...args, connectionId: realConnectionId }
+      : args;
 
   if (typeof outcome === "object" && "resolves" in outcome) {
     expect(
@@ -121,14 +148,14 @@ export async function assertHandleCase(options: {
   const callCountsBefore = clientManager
     ? snapshotGetterCallCounts(clientManager)
     : new Map<string, number>();
-  const untouchedCountsBefore = untouchedClientManager
-    ? snapshotGetterCallCounts(untouchedClientManager)
+  const decoyCountsBefore = decoyManager
+    ? snapshotGetterCallCounts(decoyManager)
     : new Map<string, number>();
 
   let result: CallToolResult | undefined;
   let thrown: unknown;
   try {
-    result = await handler.handle(runtime, args, undefined);
+    result = await handler.handle(runtime, effectiveArgs, undefined);
   } catch (err) {
     thrown = err;
   }
@@ -153,13 +180,13 @@ export async function assertHandleCase(options: {
     );
   }
 
-  if (untouchedClientManager) {
-    for (const [key, value] of Object.entries(untouchedClientManager)) {
+  if (decoyManager) {
+    for (const [key, value] of Object.entries(decoyManager)) {
       if (typeof value === "function" && "mock" in value) {
         expect(
           (value as Mock).mock.calls.length,
-          `${name}: ${key} on the untouched client manager was called, but routing should have avoided that connection`,
-        ).toBe(untouchedCountsBefore.get(key) ?? 0);
+          `${name}: ${key} on the decoy connection's client manager was called, but routing should have stayed on the addressed connection`,
+        ).toBe(decoyCountsBefore.get(key) ?? 0);
       }
     }
   }

@@ -101,19 +101,16 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      const { runtime, decoyClientManager } = runtimeWithDecoy(
-        { kafka: { bootstrap_servers: "broker:9092" } },
-        DEFAULT_CONNECTION_ID,
-        clientManager,
-      );
-
       await assertHandleCase({
         handler,
-        runtime,
-        args: { connectionId: DEFAULT_CONNECTION_ID },
+        runtime: runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        ),
+        args: {},
         outcome: { resolves: "Found 0 consumer groups." },
         clientManager,
-        untouchedClientManager: decoyClientManager,
       });
     });
 

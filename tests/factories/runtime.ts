@@ -8,7 +8,11 @@ import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import type { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { createMockInstance, type HandleCase } from "@tests/stubs/index.js";
+import {
+  DECOY_CONNECTION_ID,
+  createMockInstance,
+  type HandleCase,
+} from "@tests/stubs/index.js";
 import { fileURLToPath } from "node:url";
 import type { Mocked } from "vitest";
 
@@ -75,19 +79,19 @@ export function runtimeWith(
   );
 }
 
-/** Connection ID of the decoy connection planted by {@link runtimeWithDecoy}. */
-export const DECOY_CONNECTION_ID = "decoy";
-
 /**
- * Single-connection sugar like {@link runtimeWith}, but plants a second
+ * Drop-in replacement for {@link runtimeWith} that additionally plants a
  * "decoy" connection carrying the same service blocks — enabled for the same
- * tools, with its own client manager that correct routing must never touch.
+ * tools, with its own auto-minted client manager that correct routing must
+ * never touch.
  *
  * The decoy is inserted FIRST, so a handler resolving via the legacy
  * sole-connection accessor (which grabs `enabledConnectionIds[0]`) routes to
- * the decoy and trips the test. Tests keep addressing the real connection by
- * its existing id and never name the decoy. Returns that decoy's auto-minted
- * mock manager so the caller can assert it stayed untouched.
+ * the decoy and trips the test. {@link assertHandleCase} recognizes the decoy
+ * (by {@link DECOY_CONNECTION_ID}) and, for any handle() test built on this
+ * runtime, auto-routes to the real connection and asserts the decoy stayed
+ * untouched — so swapping a suite's `runtimeWith` for this turns every existing
+ * success case into a routing test with no other change.
  */
 export function runtimeWithDecoy(
   connectionConfig: Omit<DirectConnectionConfig, "type"> = {},
@@ -96,13 +100,13 @@ export function runtimeWithDecoy(
     DirectClientManager,
   ),
   allowedToolNames?: ReadonlySet<ToolName>,
-): { runtime: ServerRuntime; decoyClientManager: Mocked<DirectClientManager> } {
+): ServerRuntime {
   if (connectionId === DECOY_CONNECTION_ID) {
     throw new Error(
       `Wacky -- runtimeWithDecoy's real connection id collides with the reserved decoy id "${DECOY_CONNECTION_ID}"`,
     );
   }
-  const runtime = runtimeWithConnections(
+  return runtimeWithConnections(
     {
       [DECOY_CONNECTION_ID]: connectionConfig,
       [connectionId]: connectionConfig,
@@ -110,14 +114,6 @@ export function runtimeWithDecoy(
     { [connectionId]: clientManager }, // decoy's manager is auto-minted by the factory
     allowedToolNames,
   );
-  // runtimeWithConnections minted a fresh createMockInstance(DirectClientManager)
-  // for the decoy; recover its precise mock type for the untouched-assertion.
-  return {
-    runtime,
-    decoyClientManager: runtime.clientManagers[
-      DECOY_CONNECTION_ID
-    ] as Mocked<DirectClientManager>,
-  };
 }
 
 /** Runtime with no service blocks — the disabled-baseline shape used by predicate-derivation tests in `base-tools.test.ts` and as a no-config runtime by handlers that don't read connection state. */

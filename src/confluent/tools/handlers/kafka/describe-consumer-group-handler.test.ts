@@ -161,19 +161,16 @@ describe("describe-consumer-group-handler.ts", () => {
         groups: [fakeGroupDescription({ groupId: "my-group" })],
       });
 
-      const { runtime, decoyClientManager } = runtimeWithDecoy(
-        { kafka: { bootstrap_servers: "broker:9092" } },
-        DEFAULT_CONNECTION_ID,
-        clientManager,
-      );
-
       await assertHandleCase({
         handler,
-        runtime,
-        args: { groupId: "my-group", connectionId: DEFAULT_CONNECTION_ID },
+        runtime: runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        ),
+        args: { groupId: "my-group" },
         outcome: { resolves: 'Consumer group "my-group" is' },
         clientManager,
-        untouchedClientManager: decoyClientManager,
       });
     });
 

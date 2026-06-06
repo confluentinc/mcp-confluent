@@ -3,7 +3,6 @@ import {
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   KAFKA_CONN,
-  runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
@@ -60,7 +59,10 @@ describe("get-topic-config.ts", () => {
           restClient.GET.mockResolvedValue({ data: {} });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            // runtimeWithDecoy plants a second same-config connection; assertHandleCase
+            // routes to the real one and asserts the decoy stays untouched, so every
+            // case here doubles as a routing test.
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -71,28 +73,6 @@ describe("get-topic-config.ts", () => {
           });
         },
       );
-
-      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
-        const clientManager = getMockedClientManager();
-        const restClient =
-          await clientManager.getConfluentCloudKafkaRestClient();
-        restClient.GET.mockResolvedValue({ data: {} });
-
-        const { runtime, decoyClientManager } = runtimeWithDecoy(
-          KAFKA_CONN,
-          DEFAULT_CONNECTION_ID,
-          clientManager,
-        );
-
-        await assertHandleCase({
-          handler,
-          runtime,
-          args: { topicName: "my-topic", connectionId: DEFAULT_CONNECTION_ID },
-          outcome: { resolves: "Topic configuration for 'my-topic'" },
-          clientManager,
-          untouchedClientManager: decoyClientManager,
-        });
-      });
     });
   });
 });

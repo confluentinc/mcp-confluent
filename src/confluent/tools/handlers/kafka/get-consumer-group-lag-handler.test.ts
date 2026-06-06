@@ -222,19 +222,16 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 0, low: "0", high: "100" }),
       ]);
 
-      const { runtime, decoyClientManager } = runtimeWithDecoy(
-        { kafka: { bootstrap_servers: "broker:9092" } },
-        DEFAULT_CONNECTION_ID,
-        clientManager,
-      );
-
       await assertHandleCase({
         handler,
-        runtime,
-        args: { groupId: "g1", connectionId: DEFAULT_CONNECTION_ID },
+        runtime: runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        ),
+        args: { groupId: "g1" },
         outcome: { resolves: 'Consumer group "g1" has' },
         clientManager,
-        untouchedClientManager: decoyClientManager,
       });
     });
 

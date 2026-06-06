@@ -2,7 +2,6 @@ import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-topics-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
@@ -23,7 +22,7 @@ describe("create-topics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -34,30 +33,6 @@ describe("create-topics-handler.ts", () => {
         });
       });
 
-      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
-        const clientManager = getMockedClientManager();
-        const admin = await clientManager.getAdminClient();
-        admin.createTopics.mockResolvedValue(true);
-
-        const { runtime, decoyClientManager } = runtimeWithDecoy(
-          { kafka: { bootstrap_servers: "broker:9092" } },
-          DEFAULT_CONNECTION_ID,
-          clientManager,
-        );
-
-        await assertHandleCase({
-          handler,
-          runtime,
-          args: {
-            topics: [{ topic: "smoke", numPartitions: 1 }],
-            connectionId: DEFAULT_CONNECTION_ID,
-          },
-          outcome: { resolves: "Created Kafka topics: smoke" },
-          clientManager,
-          untouchedClientManager: decoyClientManager,
-        });
-      });
-
       it("should surface a failure response when admin.createTopics resolves false", async () => {
         const clientManager = getMockedClientManager();
         const admin = await clientManager.getAdminClient();
@@ -65,7 +40,7 @@ describe("create-topics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -83,7 +58,7 @@ describe("create-topics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -114,7 +89,7 @@ describe("create-topics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,

@@ -40,19 +40,16 @@ describe("get-partition-offsets-handler.ts", () => {
         { partition: 0, low: "0", high: "100", offset: "100" },
       ]);
 
-      const { runtime, decoyClientManager } = runtimeWithDecoy(
-        { kafka: { bootstrap_servers: "broker:9092" } },
-        DEFAULT_CONNECTION_ID,
-        clientManager,
-      );
-
       await assertHandleCase({
         handler,
-        runtime,
-        args: { topicName: "orders", connectionId: DEFAULT_CONNECTION_ID },
+        runtime: runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        ),
+        args: { topicName: "orders" },
         outcome: { resolves: 'Partition offsets for "orders"' },
         clientManager,
-        untouchedClientManager: decoyClientManager,
       });
     });
 

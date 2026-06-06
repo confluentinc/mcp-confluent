@@ -109,7 +109,10 @@ function renderSummary(connections: Record<string, ConnectionListing>): string {
   const lines = entries.map(([id, { description, enabledTools }]) => {
     const count = enabledTools.length;
     const list = count > 0 ? enabledTools.join(", ") : "(none)";
-    const label = description !== undefined ? `${id} — "${description}"` : id;
+    // JSON.stringify quotes and escapes the description so an embedded quote or
+    // newline can't make the summary line ambiguous or wrap onto another line.
+    const label =
+      description !== undefined ? `${id} — ${JSON.stringify(description)}` : id;
     return `  ${label} (${count} tool${count === 1 ? "" : "s"}): ${list}`;
   });
   return [

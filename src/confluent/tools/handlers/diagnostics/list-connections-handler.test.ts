@@ -143,6 +143,20 @@ describe("ListConnectionsHandler", () => {
       expect(textOf(result)).toContain('k — "Prod east" (2 tools):');
     });
 
+    it("should escape quotes and newlines in the description so the summary line stays single-line and unambiguous", () => {
+      const runtime = runtimeWithConnections({
+        k: { description: 'say "hi"\nthere', ...KAFKA },
+      });
+
+      const result = handlerWith(threeToolUniverse()).handle(runtime);
+
+      // JSON.stringify escapes the embedded quote and collapses the newline to
+      // a literal \n, so the label cannot break the summary across lines.
+      expect(textOf(result)).toContain('k — "say \\"hi\\"\\nthere" (2 tools):');
+      // The raw newline must not survive into the rendered text.
+      expect(textOf(result)).not.toContain('say "hi"\nthere');
+    });
+
     it("should omit the description key for a connection that has none", () => {
       const runtime = runtimeWithConnections({ k: KAFKA });
 

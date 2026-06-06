@@ -19,6 +19,7 @@ import { z } from "zod";
  */
 export interface DirectConnectionConfig {
   readonly type: "direct";
+  readonly description?: string;
   readonly kafka?: KafkaDirectConfig;
   readonly schema_registry?: SchemaRegistryDirectConfig;
   readonly confluent_cloud?: ConfluentCloudDirectConfig;
@@ -44,6 +45,7 @@ export interface DirectConnectionConfig {
  */
 export interface OAuthConnectionConfig {
   readonly type: "oauth";
+  readonly description?: string;
   readonly ccloud_env: "devel" | "stag" | "prod";
   readonly kafka_debug?: string;
 }
@@ -305,10 +307,23 @@ const apiKeyAuthSchema = z
 
 const authConfigSchema = z.discriminatedUnion("type", [apiKeyAuthSchema]);
 
+/**
+ * Optional human-readable label for a connection, shared by both connection arms.
+ * A blank or whitespace-only value trims to empty and coerces to `undefined` — an empty
+ * description is harmless, just uninformative, so it is treated as if the field were omitted
+ * rather than failing the parse.
+ */
+const connectionDescriptionSchema = z
+  .string()
+  .trim()
+  .transform((s) => (s.length === 0 ? undefined : s))
+  .optional();
+
 /** Zod schema for direct connection type */
 const directConnectionSchema = z
   .object({
     type: z.literal("direct"),
+    description: connectionDescriptionSchema,
     confluent_cloud: z
       .object({
         endpoint: z
@@ -458,6 +473,7 @@ const TELEMETRY_DEFAULT_ENDPOINT = "https://api.telemetry.confluent.cloud";
 const oauthConnectionSchema = z
   .object({
     type: z.literal("oauth"),
+    description: connectionDescriptionSchema,
     ccloud_env: z.enum(["devel", "stag", "prod"]).default("prod"),
     kafka_debug: z
       .string()

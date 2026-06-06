@@ -13,6 +13,15 @@ import { z } from "zod";
 const listConnectionsArguments = z.object({});
 
 /**
+ * Per-connection entry in the `list-connections` payload. `description` is the operator's
+ * optional label from config, present only when the connection defined a non-blank one.
+ */
+interface ConnectionListing {
+  description?: string;
+  enabledTools: ToolName[];
+}
+
+/**
  * Discovery tool: maps each configured connection id to the tools an agent can
  * actually invoke against it. "Actually invokable" means a tool both survived
  * the operator's allow/block-list and whose predicate enables that specific
@@ -35,9 +44,15 @@ export class ListConnectionsHandler extends ToolMetadataHandler {
   ): CallToolResult {
     listConnectionsArguments.parse(toolArguments ?? {});
 
-    const connections: Record<string, { enabledTools: ToolName[] }> = {};
-    for (const connId of Object.keys(runtime.config.connections)) {
-      connections[connId] = { enabledTools: [] };
+    const connections: Record<string, ConnectionListing> = {};
+    for (const [connId, conn] of Object.entries(runtime.config.connections)) {
+      // Omit the key entirely when there is no description (a blank one coerces
+      // to undefined at config-parse time), so the listing never carries an
+      // empty-string label.
+      connections[connId] =
+        conn.description !== undefined
+          ? { description: conn.description, enabledTools: [] }
+          : { enabledTools: [] };
     }
 
     // Single pass over the catalog: compute each tool's enabled connection ids
@@ -86,17 +101,19 @@ export class ListConnectionsHandler extends ToolMetadataHandler {
  * payload is authoritative; this text is the at-a-glance view. Handler tests
  * pin the empty-config sentence so the no-connections path stays stable.
  */
-function renderSummary(
-  connections: Record<string, { enabledTools: ToolName[] }>,
-): string {
+function renderSummary(connections: Record<string, ConnectionListing>): string {
   const entries = Object.entries(connections);
   if (entries.length === 0) {
     return "No connections are configured.";
   }
-  const lines = entries.map(([id, { enabledTools }]) => {
+  const lines = entries.map(([id, { description, enabledTools }]) => {
     const count = enabledTools.length;
     const list = count > 0 ? enabledTools.join(", ") : "(none)";
-    return `  ${id} (${count} tool${count === 1 ? "" : "s"}): ${list}`;
+    // JSON.stringify quotes and escapes the description so an embedded quote or
+    // newline can't make the summary line ambiguous or wrap onto another line.
+    const label =
+      description !== undefined ? `${id} — ${JSON.stringify(description)}` : id;
+    return `  ${label} (${count} tool${count === 1 ? "" : "s"}): ${list}`;
   });
   return [
     `${entries.length} connection${entries.length === 1 ? "" : "s"} configured:`,

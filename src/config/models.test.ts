@@ -780,6 +780,85 @@ describe("config/models.ts", () => {
     });
   });
 
+  describe("connection description", () => {
+    it("should parse and trim a description on a direct connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            description: "  Production east cluster  ",
+            kafka: { bootstrap_servers: "broker:9092" },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (result.data.connections["production"] as DirectConnectionConfig)
+            .description,
+        ).toBe("Production east cluster");
+      }
+    });
+
+    it("should parse a description on an oauth connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: { type: "oauth", description: "My CCloud login" },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const conn = result.data.connections.foo;
+        // Narrow off the discriminant so `.description` is read through the
+        // OAuth arm's type — this keeps compile-time proof that the arm
+        // actually exposes the field, which an untyped cast would erase.
+        if (conn?.type !== "oauth")
+          throw new Error("expected oauth connection after type assertion");
+        expect(conn.description).toBe("My CCloud login");
+      }
+    });
+
+    it.each(["", "   ", "\t\n"])(
+      "should coerce a blank description (%j) to undefined rather than rejecting",
+      (description) => {
+        const result = mcpConfigSchema.safeParse({
+          connections: {
+            production: {
+              type: "direct",
+              description,
+              kafka: { bootstrap_servers: "broker:9092" },
+            },
+          },
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(
+            (result.data.connections["production"] as DirectConnectionConfig)
+              .description,
+          ).toBeUndefined();
+        }
+      },
+    );
+
+    it("should leave description undefined when omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            kafka: { bootstrap_servers: "broker:9092" },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (result.data.connections["production"] as DirectConnectionConfig)
+            .description,
+        ).toBeUndefined();
+      }
+    });
+  });
+
   describe("oauth connection arm", () => {
     it("should default ccloud_env to 'prod' when omitted", () => {
       const result = mcpConfigSchema.safeParse({

@@ -1,4 +1,5 @@
 connections:
   default:
     type: oauth
+    description: "CCloud devel via OAuth"
     ccloud_env: devel

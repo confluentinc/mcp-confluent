@@ -125,6 +125,37 @@ describe("ListConnectionsHandler", () => {
       expect(textOf(result)).toContain("bare (0 tools): (none)");
     });
 
+    it("should echo a connection's description into the structured payload and text summary", () => {
+      const runtime = runtimeWithConnections({
+        k: { description: "Prod east", ...KAFKA },
+      });
+
+      const result = handlerWith(threeToolUniverse()).handle(runtime);
+
+      expect(result.structuredContent).toEqual({
+        connections: {
+          k: {
+            description: "Prod east",
+            enabledTools: [ToolName.CREATE_TOPICS, ToolName.LIST_TOPICS],
+          },
+        },
+      });
+      expect(textOf(result)).toContain('k — "Prod east" (2 tools):');
+    });
+
+    it("should omit the description key for a connection that has none", () => {
+      const runtime = runtimeWithConnections({ k: KAFKA });
+
+      const result = handlerWith(threeToolUniverse()).handle(runtime);
+
+      const bucket = (
+        result.structuredContent as {
+          connections: Record<string, unknown>;
+        }
+      ).connections.k;
+      expect(bucket).not.toHaveProperty("description");
+    });
+
     it("should return an empty mapping with explanatory text when no connections are configured", () => {
       const result = handlerWith(threeToolUniverse()).handle(
         runtimeWithConnections({}),

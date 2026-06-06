@@ -71,6 +71,7 @@ server:
 connections:
   ccloud-oauth:
     type: oauth
+    description: "Confluent Cloud Production"
 ```
 
 Get a starter file via `--init-oauth-config`.
@@ -89,8 +90,9 @@ server:
   log_level: info
 
 connections:
-  default:
+  staging:
     type: direct
+    description: "Confluent Cloud Staging via API Keys"
     kafka: { ... }
     schema_registry: { ... }
     confluent_cloud: { ... }
@@ -100,6 +102,8 @@ connections:
 ```
 
 The connection name (`default` above) is freeform.
+Either connection flavor also accepts an optional `description` — a free-text label echoed back by the `list-connections` tool so an agent can tell your connections apart.
+A blank or whitespace-only `description` is treated as no description.
 
 #### Service blocks
 

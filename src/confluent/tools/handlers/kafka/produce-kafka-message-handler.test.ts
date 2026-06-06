@@ -2,6 +2,7 @@ import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -41,6 +42,40 @@ describe("produce-kafka-message-handler.ts", () => {
             resolves: "Message produced successfully to [Topic: smoke",
           },
           clientManager,
+        });
+      });
+
+      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+        const clientManager = getMockedClientManager();
+        const producer = await clientManager.getProducer();
+        producer.send.mockResolvedValue([
+          {
+            topicName: "smoke",
+            partition: 0,
+            offset: "5",
+            errorCode: 0,
+          },
+        ]);
+
+        const { runtime, decoyClientManager } = runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime,
+          args: {
+            topicName: "smoke",
+            value: { message: "hello", useSchemaRegistry: false },
+            connectionId: DEFAULT_CONNECTION_ID,
+          },
+          outcome: {
+            resolves: "Message produced successfully to [Topic: smoke",
+          },
+          clientManager,
+          untouchedClientManager: decoyClientManager,
         });
       });
 

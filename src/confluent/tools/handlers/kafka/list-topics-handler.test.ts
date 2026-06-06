@@ -2,6 +2,7 @@ import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topi
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -29,6 +30,27 @@ describe("list-topics-handler.ts", () => {
           args: {},
           outcome: { resolves: "Kafka topics: topic-a,topic-b" },
           clientManager,
+        });
+      });
+
+      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.listTopics.mockResolvedValue(["topic-a", "topic-b"]);
+
+        const { runtime, decoyClientManager } = runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime,
+          args: { connectionId: DEFAULT_CONNECTION_ID },
+          outcome: { resolves: "Kafka topics: topic-a,topic-b" },
+          clientManager,
+          untouchedClientManager: decoyClientManager,
         });
       });
 

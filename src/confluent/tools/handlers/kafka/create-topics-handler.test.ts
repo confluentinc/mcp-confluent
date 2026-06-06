@@ -3,6 +3,7 @@ import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -30,6 +31,30 @@ describe("create-topics-handler.ts", () => {
           args: { topics: [{ topic: "smoke", numPartitions: 1 }] },
           outcome: { resolves: "Created Kafka topics: smoke" },
           clientManager,
+        });
+      });
+
+      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.createTopics.mockResolvedValue(true);
+
+        const { runtime, decoyClientManager } = runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime,
+          args: {
+            topics: [{ topic: "smoke", numPartitions: 1 }],
+            connectionId: DEFAULT_CONNECTION_ID,
+          },
+          outcome: { resolves: "Created Kafka topics: smoke" },
+          clientManager,
+          untouchedClientManager: decoyClientManager,
         });
       });
 

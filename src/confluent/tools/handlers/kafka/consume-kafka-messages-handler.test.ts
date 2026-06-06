@@ -19,6 +19,7 @@ import {
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -445,6 +446,29 @@ describe("consume-kafka-messages-handler.ts", () => {
         consumer.subscribe.mockResolvedValue(undefined);
         consumer.run.mockResolvedValue(undefined);
         consumer.disconnect.mockResolvedValue(undefined);
+      });
+
+      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+        const { runtime, decoyClientManager } = runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime,
+          args: {
+            topics: [{ name: "smoke", start: "earliest" }],
+            maxMessages: 1,
+            timeoutMs: 50,
+            valueFormat: {},
+            connectionId: DEFAULT_CONNECTION_ID,
+          },
+          outcome: { resolves: "Consumed 0 messages from topics smoke" },
+          clientManager,
+          untouchedClientManager: decoyClientManager,
+        });
       });
 
       it("should pass derived offsetReset='earliest' to buildKafkaConsumer when every entry agrees on `start: 'earliest'`", async () => {

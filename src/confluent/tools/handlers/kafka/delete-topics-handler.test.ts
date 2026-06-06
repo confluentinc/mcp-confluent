@@ -2,6 +2,7 @@ import { DeleteTopicsHandler } from "@src/confluent/tools/handlers/kafka/delete-
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -29,6 +30,27 @@ describe("delete-topics-handler.ts", () => {
           args: { topicNames: ["smoke"] },
           outcome: { resolves: "Deleted Kafka topics: smoke" },
           clientManager,
+        });
+      });
+
+      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.deleteTopics.mockResolvedValue(undefined);
+
+        const { runtime, decoyClientManager } = runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime,
+          args: { topicNames: ["smoke"], connectionId: DEFAULT_CONNECTION_ID },
+          outcome: { resolves: "Deleted Kafka topics: smoke" },
+          clientManager,
+          untouchedClientManager: decoyClientManager,
         });
       });
 

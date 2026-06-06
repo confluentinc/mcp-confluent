@@ -4,6 +4,7 @@ import {
   HandleCaseWithConn,
   KAFKA_CONN,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -77,6 +78,32 @@ describe("alter-topic-config.ts", () => {
           });
         },
       );
+
+      it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+        const clientManager = getMockedClientManager();
+        const restClient =
+          await clientManager.getConfluentCloudKafkaRestClient();
+        restClient.POST.mockResolvedValue({ data: undefined });
+
+        const { runtime, decoyClientManager } = runtimeWithDecoy(
+          KAFKA_CONN,
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime,
+          args: {
+            topicName: "my-topic",
+            topicConfigs: VALID_CONFIGS,
+            connectionId: DEFAULT_CONNECTION_ID,
+          },
+          outcome: { resolves: "Successfully altered topic config" },
+          clientManager,
+          untouchedClientManager: decoyClientManager,
+        });
+      });
     });
   });
 });

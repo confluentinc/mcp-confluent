@@ -13,8 +13,15 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { textOf } from "@tests/call-tool-result.js";
 import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
-import { kafkaRuntime } from "@tests/factories/runtime.js";
-import { getMockedClientManager } from "@tests/stubs/index.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  kafkaRuntime,
+  runtimeWithDecoy,
+} from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
@@ -201,6 +208,35 @@ describe("get-consumer-group-lag-handler.ts", () => {
 
   describe("handle()", () => {
     const handler = new GetConsumerGroupLagHandler();
+
+    it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchOffsets.mockResolvedValue([
+        {
+          topic: "orders",
+          partitions: [fakeFetchedPartition({ partition: 0, offset: "80" })],
+        },
+      ]);
+      admin.fetchTopicOffsets.mockResolvedValue([
+        fakeWatermark({ partition: 0, low: "0", high: "100" }),
+      ]);
+
+      const { runtime, decoyClientManager } = runtimeWithDecoy(
+        { kafka: { bootstrap_servers: "broker:9092" } },
+        DEFAULT_CONNECTION_ID,
+        clientManager,
+      );
+
+      await assertHandleCase({
+        handler,
+        runtime,
+        args: { groupId: "g1", connectionId: DEFAULT_CONNECTION_ID },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
+        untouchedClientManager: decoyClientManager,
+      });
+    });
 
     it("should forward groupId verbatim to admin.fetchOffsets and not pass a topics field when the filter is omitted", async () => {
       const clientManager = getMockedClientManager();

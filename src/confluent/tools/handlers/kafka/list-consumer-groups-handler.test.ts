@@ -7,8 +7,15 @@ import {
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
 import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
-import { kafkaRuntime } from "@tests/factories/runtime.js";
-import { getMockedClientManager } from "@tests/stubs/index.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  kafkaRuntime,
+  runtimeWithDecoy,
+} from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
@@ -88,6 +95,27 @@ describe("list-consumer-groups-handler.ts", () => {
 
   describe("handle()", () => {
     const handler = new ListConsumerGroupsHandler();
+
+    it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
+
+      const { runtime, decoyClientManager } = runtimeWithDecoy(
+        { kafka: { bootstrap_servers: "broker:9092" } },
+        DEFAULT_CONNECTION_ID,
+        clientManager,
+      );
+
+      await assertHandleCase({
+        handler,
+        runtime,
+        args: { connectionId: DEFAULT_CONNECTION_ID },
+        outcome: { resolves: "Found 0 consumer groups." },
+        clientManager,
+        untouchedClientManager: decoyClientManager,
+      });
+    });
 
     it("should return an empty structured payload and 'Found 0 consumer groups.' when listGroups returns nothing", async () => {
       const clientManager = getMockedClientManager();

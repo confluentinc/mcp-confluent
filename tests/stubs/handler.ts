@@ -1,7 +1,8 @@
+import type { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import type { CallToolResult } from "@src/confluent/schema.js";
 import type { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
-import { type Mock, expect } from "vitest";
+import { type Mock, type Mocked, expect } from "vitest";
 import { ZodError } from "zod";
 import type { MockedClientManager } from "./clients.js";
 
@@ -34,6 +35,23 @@ export type HandleCase = {
   outcome: HandleOutcome;
 };
 
+/**
+ * Snapshots the current call count of every getter (a `vi.fn()` enumerable
+ * property) on a mocked client manager, so a later comparison counts only the
+ * deltas the handler itself produced.
+ */
+function snapshotGetterCallCounts(
+  clientManager: Mocked<DirectClientManager>,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const [key, value] of Object.entries(clientManager)) {
+    if (typeof value === "function" && "mock" in value) {
+      counts.set(key, (value as Mock).mock.calls.length);
+    }
+  }
+  return counts;
+}
+
 /** Classifies a thrown value into the string used for matching in HandleOutcome. */
 export function classifyThrown(label: string, thrown: unknown): string {
   if (thrown instanceof ZodError) return "ZodError";
@@ -64,6 +82,10 @@ export function classifyThrown(label: string, thrown: unknown): string {
  *   getter on the manager was called on a successful resolve, proving the
  *   handler reached the client layer. Omit in cases that short-circuit
  *   before touching the client.
+ * @param untouchedClientManager - When supplied, asserts that no getter on this
+ *   manager was called by the handler — the negative half of a routing test,
+ *   proving the call did not leak onto a connection it should have avoided
+ *   (e.g. the decoy planted by `runtimeWithDecoy`).
  * @param name - Label prepended to assertion failure messages and used in
  *   discovery-sentinel output. Defaults to `"(handler)"`.
  */
@@ -73,6 +95,7 @@ export async function assertHandleCase(options: {
   args?: Record<string, unknown>;
   outcome: HandleOutcome;
   clientManager?: MockedClientManager;
+  untouchedClientManager?: Mocked<DirectClientManager>;
   name?: string;
 }): Promise<void> {
   const {
@@ -81,6 +104,7 @@ export async function assertHandleCase(options: {
     args = {},
     outcome,
     clientManager,
+    untouchedClientManager,
     name = "(handler)",
   } = options;
 
@@ -94,14 +118,12 @@ export async function assertHandleCase(options: {
   // Snapshot getter call counts before the handler runs so the dynamic walk
   // below only counts deltas from the handler itself, not from test setup
   // calls like `const flinkRest = cm.getConfluentCloudFlinkRestClient()`.
-  const callCountsBefore = new Map<string, number>();
-  if (clientManager) {
-    for (const [key, value] of Object.entries(clientManager)) {
-      if (typeof value === "function" && "mock" in value) {
-        callCountsBefore.set(key, (value as Mock).mock.calls.length);
-      }
-    }
-  }
+  const callCountsBefore = clientManager
+    ? snapshotGetterCallCounts(clientManager)
+    : new Map<string, number>();
+  const untouchedCountsBefore = untouchedClientManager
+    ? snapshotGetterCallCounts(untouchedClientManager)
+    : new Map<string, number>();
 
   let result: CallToolResult | undefined;
   let thrown: unknown;
@@ -129,6 +151,17 @@ export async function assertHandleCase(options: {
     throw new Error(
       `${name}: outcome is "DISCOVER" — replace with: ${discovered}`,
     );
+  }
+
+  if (untouchedClientManager) {
+    for (const [key, value] of Object.entries(untouchedClientManager)) {
+      if (typeof value === "function" && "mock" in value) {
+        expect(
+          (value as Mock).mock.calls.length,
+          `${name}: ${key} on the untouched client manager was called, but routing should have avoided that connection`,
+        ).toBe(untouchedCountsBefore.get(key) ?? 0);
+      }
+    }
   }
 
   if (thrown === undefined) {

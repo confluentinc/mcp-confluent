@@ -1038,12 +1038,15 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    */
   async handle(
     runtime: ServerRuntime,
-    toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,
+    toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
     const { maxMessages, timeoutMs, valueFormat, keyFormat } = parsed;
 
-    const { connId, conn, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, conn, clientManager } = this.resolveConnection(
+      runtime,
+      toolArguments,
+    );
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
     // Auto-decode when SR is reachable on this connection (OAuth always; direct

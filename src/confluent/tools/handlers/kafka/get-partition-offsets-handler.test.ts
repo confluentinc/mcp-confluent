@@ -2,8 +2,15 @@ import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { GetPartitionOffsetsHandler } from "@src/confluent/tools/handlers/kafka/get-partition-offsets-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
-import { kafkaRuntime } from "@tests/factories/runtime.js";
-import { getMockedClientManager } from "@tests/stubs/index.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  kafkaRuntime,
+  runtimeWithDecoy,
+} from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 describe("get-partition-offsets-handler.ts", () => {
@@ -25,6 +32,26 @@ describe("get-partition-offsets-handler.ts", () => {
 
   describe("handle()", () => {
     const handler = new GetPartitionOffsetsHandler();
+
+    it("should route to the explicitly addressed connection in a multi-connection config", async () => {
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.fetchTopicOffsets.mockResolvedValue([
+        { partition: 0, low: "0", high: "100", offset: "100" },
+      ]);
+
+      await assertHandleCase({
+        handler,
+        runtime: runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        ),
+        args: { topicName: "orders" },
+        outcome: { resolves: 'Partition offsets for "orders"' },
+        clientManager,
+      });
+    });
 
     it("should return a structured payload with low/highWatermark as strings and computed messageCount for every partition", async () => {
       const clientManager = getMockedClientManager();

@@ -1,7 +1,7 @@
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -21,7 +21,7 @@ describe("list-topics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -39,7 +39,7 @@ describe("list-topics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,

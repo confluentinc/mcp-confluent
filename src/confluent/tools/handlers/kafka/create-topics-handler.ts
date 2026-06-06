@@ -51,7 +51,10 @@ export class CreateTopicsHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = createTopicArgs.parse(toolArguments);
-    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, clientManager } = this.resolveConnection(
+      runtime,
+      toolArguments,
+    );
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
     const admin = await clientManager.getKafkaAdminClient(
       resolved.clusterId,

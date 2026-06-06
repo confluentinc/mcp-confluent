@@ -121,7 +121,10 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       produceKafkaMessageArguments.parse(toolArguments);
     const { topicName, value, key } = parsed;
 
-    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, clientManager } = this.resolveConnection(
+      runtime,
+      toolArguments,
+    );
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
     const needsRegistry =

@@ -1,5 +1,6 @@
 connections:
   local:
     type: direct
+    description: "Local dev broker"
     kafka:
       bootstrap_servers: "localhost:9092"

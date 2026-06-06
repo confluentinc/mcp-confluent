@@ -37,6 +37,11 @@ connections:
   ccloud-oauth:
     type: oauth
 
+    # Optional human-readable label for this connection, echoed back by the
+    # `list-connections` tool so an agent can tell your connections apart.
+    # A blank value is treated as no description.
+    description: "Confluent Cloud (OAuth login)"
+
     # librdkafka `debug` contexts to emit on stderr for this OAuth connection's
     # native Kafka client. Reach for it when an OAuth/OAUTHBEARER SASL handshake
     # misbehaves and you need to see which side broke — works the same in

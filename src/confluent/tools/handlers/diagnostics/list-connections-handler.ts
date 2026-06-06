@@ -50,9 +50,9 @@ export class ListConnectionsHandler extends ToolMetadataHandler {
       // to undefined at config-parse time), so the listing never carries an
       // empty-string label.
       connections[connId] =
-        conn.description !== undefined
-          ? { description: conn.description, enabledTools: [] }
-          : { enabledTools: [] };
+        conn.description === undefined
+          ? { enabledTools: [] }
+          : { description: conn.description, enabledTools: [] };
     }
 
     // Single pass over the catalog: compute each tool's enabled connection ids
@@ -112,7 +112,7 @@ function renderSummary(connections: Record<string, ConnectionListing>): string {
     // JSON.stringify quotes and escapes the description so an embedded quote or
     // newline can't make the summary line ambiguous or wrap onto another line.
     const label =
-      description !== undefined ? `${id} — ${JSON.stringify(description)}` : id;
+      description === undefined ? id : `${id} — ${JSON.stringify(description)}`;
     return `  ${label} (${count} tool${count === 1 ? "" : "s"}): ${list}`;
   });
   return [

@@ -24,6 +24,7 @@ describe("config/yaml-fixtures.test.ts", () => {
       );
       const conn = config.getSoleDirectConnection();
       expect(conn.type).toBe("direct");
+      expect(conn.description).toBe("Local dev broker");
       expect(conn.kafka?.bootstrap_servers).toBe("localhost:9092");
       expect(conn.kafka?.auth).toBeUndefined();
       expect(conn.schema_registry).toBeUndefined();
@@ -199,6 +200,7 @@ describe("config/yaml-fixtures.test.ts", () => {
       // also serves as a compile-time check on the OAuth arm of ConnectionConfig.
       if (conn.type !== "oauth")
         throw new Error("expected oauth connection after type assertion");
+      expect(conn.description).toBe("CCloud devel via OAuth");
       expect(conn.ccloud_env).toBe("devel");
     });
   });

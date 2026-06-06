@@ -808,10 +808,12 @@ describe("config/models.ts", () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        const conn = result.data.connections.foo as unknown as Record<
-          string,
-          unknown
-        >;
+        const conn = result.data.connections.foo;
+        // Narrow off the discriminant so `.description` is read through the
+        // OAuth arm's type — this keeps compile-time proof that the arm
+        // actually exposes the field, which an untyped cast would erase.
+        if (conn?.type !== "oauth")
+          throw new Error("expected oauth connection after type assertion");
         expect(conn.description).toBe("My CCloud login");
       }
     });

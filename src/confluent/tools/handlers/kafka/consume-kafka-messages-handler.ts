@@ -1028,9 +1028,11 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    * @param runtime - The {@link ServerRuntime} (config + active client
    *   manager + OAuth holder). Supplied by the MCP server dispatcher;
    *   the handler resolves cluster/env/registry clients off of it.
-   * @param toolArguments - Parsed args matching `consumeKafkaMessagesArgs`.
-   *   The handler re-parses internally to apply defaults at the
-   *   boundary.
+   * @param toolArguments - Raw tool arguments (`Record<string, unknown>`) as
+   *   handed in by the MCP dispatcher. The handler parses them with
+   *   `consumeKafkaMessagesArgs` to apply defaults; `resolveConnection` reads
+   *   `connectionId` off this unparsed object (a handler-local `z.object`
+   *   re-parse would strip the key it never declared).
    * @returns A {@link CallToolResult}. Success path emits a text block
    *   summarizing the consumed messages; failures (build/preflight/run
    *   errors) surface via `createResponse(text, true)` with the
@@ -1038,12 +1040,15 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    */
   async handle(
     runtime: ServerRuntime,
-    toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,
+    toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
     const { maxMessages, timeoutMs, valueFormat, keyFormat } = parsed;
 
-    const { connId, conn, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, conn, clientManager } = this.resolveConnection(
+      runtime,
+      toolArguments,
+    );
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
     // Auto-decode when SR is reachable on this connection (OAuth always; direct

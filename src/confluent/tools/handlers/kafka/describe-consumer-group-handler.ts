@@ -120,7 +120,10 @@ export class DescribeConsumerGroupHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = describeConsumerGroupArgs.parse(toolArguments);
-    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, clientManager } = this.resolveConnection(
+      runtime,
+      toolArguments,
+    );
     const { clusterId, envId } = resolveKafkaClusterArgs(
       parsed,
       runtime,

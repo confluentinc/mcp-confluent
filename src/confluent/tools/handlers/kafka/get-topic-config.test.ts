@@ -3,7 +3,7 @@ import {
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   KAFKA_CONN,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -59,7 +59,10 @@ describe("get-topic-config.ts", () => {
           restClient.GET.mockResolvedValue({ data: {} });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            // runtimeWithDecoy plants a second same-config connection; assertHandleCase
+            // routes to the real one and asserts the decoy stays untouched, so every
+            // case here doubles as a routing test.
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,

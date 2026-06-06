@@ -85,6 +85,7 @@ Detailed conventions (handler structure, input schema rules, registration checkl
 - `noImplicitAny` is disabled in tsconfig due to OpenAPI type resolution issues.
 - REST API calls use `openapi-fetch` with typed paths from the generated schema — prefer this over raw fetch.
 - Application code reads configuration from `MCPServerConfiguration` / `ConnectionConfig`, never from `process.env`. A `no-restricted-syntax` rule in `eslint.config.mjs` enforces this; the only bootstrap files exempt are `src/index.ts`, `src/cli.ts`, `src/env.ts`, `src/logger.ts`. The `-e` dotenv mutation in `cli.ts` is intentional — it seeds env vars for linked C/Node libraries (OpenSSL, cyrus-sasl, krb5, undici) that read `process.env` outside our control.
+- Always pass an explicit comparator to `.sort()` / `.toSorted()` — never a bare call. Bare `Array.prototype.sort()` coerces elements to strings (so `[2, 10]` sorts to `[10, 2]`), and SonarQube (which gates CI) flags every comparator-less call as `typescript:S2871`. For strings use `(a, b) => a.localeCompare(b)`; for numbers `(a, b) => a - b`. This holds even when the elements are already strings and the default order happens to be correct — the comparator states the intent and survives a later element-type change.
 
 ## Unit Test Conventions
 

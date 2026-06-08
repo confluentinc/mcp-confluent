@@ -22,6 +22,17 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 describe("base-tools.ts", () => {
+  describe("LIST_CONFIGURED_CONNECTIONS_POINTER", () => {
+    it("should name the discovery tool by its current wire name", () => {
+      // Tripwire: the pointer's tool name is derived from the ToolName enum, so a
+      // future rename that changes the enum value flips this expected literal red
+      // and forces a conscious update instead of letting the prose drift stale.
+      expect(LIST_CONFIGURED_CONNECTIONS_POINTER).toBe(
+        "Discover connections and learn what tools are supported by each connection by invoking 'list-configured-connections'.",
+      );
+    });
+  });
+
   describe("BaseToolHandler", () => {
     const handler = new StubHandler();
 

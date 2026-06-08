@@ -44,8 +44,7 @@ export const CONNECTION_ID_DESCRIPTION_PREFIX =
  * discovery tool. Emitted only when that tool is itself reachable; the joining space
  * is added at the call site so a blocked tool leaves no dangling trailing space.
  */
-export const LIST_CONFIGURED_CONNECTIONS_POINTER =
-  "Discover connections and learn what tools are supported by each connection by invoking 'list-configured-connections'.";
+export const LIST_CONFIGURED_CONNECTIONS_POINTER = `Discover connections and learn what tools are supported by each connection by invoking '${ToolName.LIST_CONFIGURED_CONNECTIONS}'.`;
 
 /**
  * Operator-facing taxonomy of tool kinds.

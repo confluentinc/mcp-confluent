@@ -12,7 +12,6 @@ global_job_config:
     commands:
       - sem-version node 22
       - checkout
-      - . vault-setup --version v3 --role mcp-confluent
 
 blocks:
   - name: "Confirm Publish"
@@ -21,6 +20,7 @@ blocks:
       jobs:
         - name: "Confirm Publish"
           commands:
+            - . vault-setup --version v3 --role mcp-confluent
             - |
               if [ "$CONFIRM_PUBLISH" != "yes" ]; then
                 echo "Aborting: set CONFIRM_PUBLISH=yes to publish $RELEASE_NAME to npm (got '$CONFIRM_PUBLISH')."
@@ -41,6 +41,7 @@ blocks:
       jobs:
         - name: "Publish to npm"
           commands:
+            - . vault-setup --version v3 --role mcp-confluent
             # Download the .tgz asset from the existing GitHub Release
             - gh release download "$RELEASE_NAME" --pattern "*.tgz" --dir release-assets/
             - TGZ_FILE=$(find release-assets/ -name "*.tgz" | head -1)

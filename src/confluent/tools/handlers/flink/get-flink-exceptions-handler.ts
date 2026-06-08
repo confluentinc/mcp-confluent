@@ -34,11 +34,14 @@ export class GetFlinkExceptionsHandler extends FlinkToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { statementName, environmentId, organizationId } =
       getFlinkExceptionsArguments.parse(toolArguments);
 
-    const flink = this.getFlinkDirectConfig(runtime.config);
+    const { conn, clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
+    const flink = this.getFlinkDirectConfig(conn);
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
       flink,
       organizationId,

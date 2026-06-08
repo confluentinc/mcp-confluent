@@ -69,10 +69,11 @@ export class ListOrganizationsHandler extends BaseToolHandler {
     const { pageSize, pageToken } = listOrganizationsArguments.parse(
       toolArguments ?? {},
     );
+    const { clientManager } = this.resolveConnection(runtime, toolArguments);
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(
-        runtime.clientManager.getConfluentCloudRestClient(),
+        clientManager.getConfluentCloudRestClient(),
       );
 
       const { data: response, error } = await pathBasedClient[

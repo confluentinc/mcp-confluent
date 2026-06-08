@@ -44,7 +44,7 @@ blocks:
             - . vault-setup --version v3 --role mcp-confluent
             # Download the .tgz asset from the existing GitHub Release
             - gh release download "$RELEASE_NAME" --pattern "*.tgz" --dir release-assets/
-            - TGZ_FILE=$(find release-assets/ -name "*.tgz" | head -1)
+            - TGZ_FILE=$(find ./release-assets/ -name "*.tgz" | head -1)
             - |
               if [ -z "$TGZ_FILE" ]; then
                 echo "Error: no .tgz asset found on GitHub Release $RELEASE_NAME"

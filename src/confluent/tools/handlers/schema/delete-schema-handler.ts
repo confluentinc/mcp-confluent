@@ -40,7 +40,7 @@ export class DeleteSchemaHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { clientManager } = this.resolveSoleConnection(runtime);
+    const { clientManager } = this.resolveConnection(runtime, toolArguments);
     const { subject, version, permanent, environment_id } =
       deleteSchemaArguments.parse(toolArguments);
 

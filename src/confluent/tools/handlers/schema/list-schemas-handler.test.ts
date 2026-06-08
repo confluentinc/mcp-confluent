@@ -2,7 +2,7 @@ import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -41,7 +41,11 @@ describe("list-schemas-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: {},
           outcome: { resolves: '"subject-a":{"version":1,"id":10' },
           clientManager,
@@ -67,7 +71,11 @@ describe("list-schemas-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { subjectPrefix: "order-" },
           outcome: { resolves: '"order-events"' },
           clientManager,
@@ -85,7 +93,11 @@ describe("list-schemas-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { environment_id: "env-42" },
           outcome: { resolves: "{}" },
           clientManager,
@@ -101,7 +113,11 @@ describe("list-schemas-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: {},
           outcome: {
             resolves: "Failed to list schemas: registry unreachable",

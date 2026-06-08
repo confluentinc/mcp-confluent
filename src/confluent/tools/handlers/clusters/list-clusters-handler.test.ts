@@ -4,7 +4,7 @@ import {
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -56,7 +56,7 @@ describe("list-clusters-handler.ts", () => {
 
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -81,7 +81,7 @@ describe("list-clusters-handler.ts", () => {
       it("should throw a discovery hint under direct when neither environmentId arg nor conn kafka.env_id is present", async () => {
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             CCLOUD_CONN,
             DEFAULT_CONNECTION_ID,
             getMockedClientManager(),

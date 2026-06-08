@@ -2,7 +2,7 @@ import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organiza
 import {
   CCLOUD_CONN,
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -85,7 +85,7 @@ describe("list-organizations-handler.ts", () => {
             .GET.mockResolvedValue({ data: cloudGetData });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               CCLOUD_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,

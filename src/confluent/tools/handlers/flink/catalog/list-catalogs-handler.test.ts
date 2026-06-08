@@ -4,6 +4,7 @@ import {
   FLINK_CONN,
   HandleCaseWithConn,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -56,7 +57,7 @@ describe("list-catalogs-handler.ts", () => {
         async ({ args, outcome, connectionConfig = FLINK_CONN }) => {
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -104,7 +105,7 @@ describe("list-catalogs-handler.ts", () => {
       it("should embed config environment_id as catalog name in the POST SQL statement", async () => {
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,

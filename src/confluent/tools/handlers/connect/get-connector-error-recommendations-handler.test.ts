@@ -5,8 +5,10 @@ import {
   CONNECT_CONN,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
+  assertHandleCase,
   getMockedClientManager,
   type MockedClientManager,
 } from "@tests/stubs/index.js";
@@ -45,6 +47,32 @@ describe("get-connector-error-recommendations-handler.ts", () => {
     });
 
     describe("handle()", () => {
+      it("should route only to its resolved connection in a multi-connection config", async () => {
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
+          data: {
+            error: null,
+            event_id: "evt-routed",
+            recommendations: ["check the credentials"],
+          },
+        });
+
+        // runtimeWithDecoy plants a same-shaped decoy connection first; the
+        // handler must route to DEFAULT_CONNECTION_ID, not enabledIds[0].
+        // assertHandleCase injects that id and asserts the decoy's manager
+        // stays untouched, so args deliberately omits connectionId.
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CONNECT_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: baseArgs,
+          outcome: { resolves: "Error recommendations for cypher-source" },
+          clientManager,
+        });
+      });
+
       it("should project the cypher-source fixture into recommendations", async () => {
         const recommendations = [
           "Verify that the 'database.user' and 'database.password' values in the connector configuration are correct and match the credentials for the PostgreSQL database.",

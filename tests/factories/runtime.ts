@@ -157,6 +157,19 @@ export const FLINK_CONN = {
   },
 };
 
+/**
+ * Flink + telemetry connection fixture for handle() tests of the query profiler,
+ * whose `flinkWithTelemetry` predicate enables a connection only when both blocks
+ * are present — so routing-aware resolution rejects a flink-only connection.
+ */
+export const FLINK_TELEMETRY_CONN = {
+  ...FLINK_CONN,
+  telemetry: {
+    endpoint: "https://api.telemetry.confluent.cloud",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+  },
+};
+
 /** Shared Kafka connection config fixture for handle() tests. */
 export const KAFKA_CONN = {
   kafka: {

@@ -373,6 +373,22 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
   `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.
 
+### Routing tests for multi-connection handlers
+
+A handler that resolves its connection via `resolveConnection(runtime, toolArguments)` (or `resolveDirectConnection`) must route to the caller-addressed `connectionId`, not unconditionally to `enabledConnectionIds[0]`.
+`runtimeWithDecoy` (in `tests/factories/runtime.ts`) is a drop-in replacement for `runtimeWith` that proves this: it plants a "decoy" connection — same service blocks, enabled for the same tools, its own auto-minted client manager — inserted _before_ the real one, so a handler that still grabs the first enabled connection lands on the decoy.
+`assertHandleCase` recognizes a decoy-bearing runtime (by the reserved `DECOY_CONNECTION_ID`), auto-injects `connectionId` for the real connection when the caller omitted it, and asserts the decoy's client manager was never touched.
+
+There are two ways to get this coverage, and which one a suite uses depends on how its `handle()` tests are already written:
+
+- **Suites whose `handle()` tests run through `assertHandleCase`** (the `it.each` suites and the per-`it()` `assertHandleCase` suites): swap the suite's `runtimeWith` for `runtimeWithDecoy`.
+  That one-word change turns every existing success case into a routing test — no new test body, and no `connectionId` in the args (the harness injects it).
+  The `it.each` suites need the edit only in the loop's runtime expression; the per-`it()` suites swap each `handle()` runtime.
+- **Suites whose main `handle()` tests call `handler.handle(...)` directly** (not through the harness — e.g. the consumer-group / offsets suites that need bespoke `mockResolvedValueOnce` sequencing): the auto-route and auto-assert fire only inside `assertHandleCase`, so a direct call sees no decoy handling.
+  Add one dedicated routing test that calls `assertHandleCase` with a `runtimeWithDecoy` runtime, alongside the suite's direct-call tests.
+
+A reverted handler (one that goes back to `resolveSoleConnection()`) trips the decoy's untouched assertion on every converted case, so the coverage is not vacuous.
+
 ## Test Server & Runtime Fixtures
 
 - `createTestServer(clientManager, toolNames?)` from `@tests/server.js` boots a real `McpServer`
@@ -382,4 +398,5 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   `@tests/factories/runtime.js`: `bareRuntime()`, `kafkaRuntime()`, `flinkRuntime()`,
   `tableflowRuntime()`, `schemaRegistryRuntime()`, `confluentCloudRuntime()`,
   `telemetryRuntime()`, etc. For uncommon shapes, use `runtimeWith(connectionConfig?, connectionId?, clientManager?)` (all args optional; `connectionId` defaults to `"default"`).
+  Reach for `runtimeWithDecoy(...)` (same signature) when the `handle()` test should double as a routing test — see "Routing tests for multi-connection handlers" above.
   These same factories are used by `base-tools.test.ts` and `connection-predicates.test.ts` for the centralized enablement coverage — handler `*.test.ts` files should not re-derive that coverage (see the Handler Tests section above).

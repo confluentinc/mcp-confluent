@@ -131,9 +131,9 @@ export class ListBillingCostsHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { startDate, endDate, pageSize, pageToken } =
       listBillingCostsArguments.parse(toolArguments);
+    const { clientManager } = this.resolveConnection(runtime, toolArguments);
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(

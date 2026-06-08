@@ -3,7 +3,7 @@ import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
   FlinkGetCase,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -69,7 +69,7 @@ describe("list-flink-statements-handler.ts", () => {
             .GET.mockResolvedValue({ data: flinkGetData });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -88,7 +88,7 @@ describe("list-flink-statements-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,

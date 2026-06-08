@@ -5,8 +5,12 @@ import {
   CCLOUD_CONN,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
-import { getMockedClientManager } from "@tests/stubs/index.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
@@ -28,6 +32,29 @@ describe("list-billing-costs-handler.ts", () => {
     });
 
     describe("handle()", () => {
+      it("should route only to its resolved connection in a multi-connection config", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
+          data: { api_version: "v1", kind: "CostList", data: [] },
+        });
+
+        // runtimeWithDecoy plants a same-shaped decoy connection first; the
+        // handler must route to DEFAULT_CONNECTION_ID, not enabledIds[0].
+        // assertHandleCase injects that id and asserts the decoy's manager
+        // stays untouched, so args deliberately omits connectionId.
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CCLOUD_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: VALID_ARGS,
+          outcome: { resolves: "Successfully retrieved billing costs" },
+          clientManager,
+        });
+      });
+
       it("should aggregate line items, sort product breakdown by amount desc, and surface totals in _meta", async () => {
         const clientManager = getMockedClientManager();
         clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({

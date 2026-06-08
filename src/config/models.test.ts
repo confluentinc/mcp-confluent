@@ -859,6 +859,85 @@ describe("config/models.ts", () => {
     });
   });
 
+  describe("connection read_only", () => {
+    it("should accept read_only: true on a direct connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            read_only: true,
+            kafka: { bootstrap_servers: "broker:9092" },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (result.data.connections["production"] as DirectConnectionConfig)
+            .read_only,
+        ).toBe(true);
+      }
+    });
+
+    it("should accept read_only: true on an oauth connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: { type: "oauth", read_only: true },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const conn = result.data.connections.foo;
+        // Narrow off the discriminant so `.read_only` is read through the
+        // OAuth arm's type — compile-time proof the arm exposes the field.
+        if (conn?.type !== "oauth")
+          throw new Error("expected oauth connection after type assertion");
+        expect(conn.read_only).toBe(true);
+      }
+    });
+
+    it("should default read_only to false when omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            kafka: { bootstrap_servers: "broker:9092" },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (result.data.connections["production"] as DirectConnectionConfig)
+            .read_only,
+        ).toBe(false);
+      }
+    });
+
+    it.each([
+      ["a string", "true"],
+      ["a number", 1],
+      ["null", null],
+    ])("should reject a non-boolean read_only (%s)", (_label, read_only) => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            read_only,
+            kafka: { bootstrap_servers: "broker:9092" },
+          },
+        },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find(
+          (i) => i.path.join(".") === "connections.production.read_only",
+        );
+        expect(issue?.code).toBe("invalid_type");
+      }
+    });
+  });
+
   describe("oauth connection arm", () => {
     it("should default ccloud_env to 'prod' when omitted", () => {
       const result = mcpConfigSchema.safeParse({
@@ -869,6 +948,7 @@ describe("config/models.ts", () => {
         expect(result.data.connections.foo).toEqual({
           type: "oauth",
           ccloud_env: "prod",
+          read_only: false,
         });
       }
     });
@@ -929,6 +1009,7 @@ describe("config/models.ts", () => {
           type: "oauth",
           ccloud_env: "prod",
           kafka_debug: "security,broker",
+          read_only: false,
         });
       }
     });

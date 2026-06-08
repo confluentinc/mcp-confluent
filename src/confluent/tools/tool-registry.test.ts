@@ -81,6 +81,25 @@ describe("tool-registry.ts", () => {
         }
       });
 
+      it("should annotate every connection-agnostic (alwaysEnabled) tool as READ_ONLY so the read-only overlay is a no-op for them", () => {
+        // The read-only verdict overlay disables a tool on a read_only
+        // connection only when its readOnlyHint !== true. Connection-agnostic
+        // tools take no connectionId and so should never be suppressed by a
+        // connection's read_only flag; this holds for free precisely because
+        // every alwaysEnabled tool is READ_ONLY. Pinning it here means the
+        // overlay needs no special-case for the alwaysEnabled set — if a future
+        // mutating tool is wired to alwaysEnabled, this fails instead.
+        for (const name of ALL_TOOL_NAMES) {
+          const handler = ToolHandlerRegistry.getToolHandler(name);
+          if (handler.predicate !== alwaysEnabled) continue;
+          const config = handler.getRegisteredToolConfig(runtimeWith());
+          expect(
+            config.annotations,
+            `Connection-agnostic tool ${name} must be READ_ONLY`,
+          ).toBe(READ_ONLY);
+        }
+      });
+
       for (const name of ALL_TOOL_NAMES) {
         it(`${name}: should not implement getRequiredEnvVars() (deleted in issue-228)`, () => {
           const handler = ToolHandlerRegistry.getToolHandler(name);

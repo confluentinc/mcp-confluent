@@ -1,5 +1,9 @@
 import { CallToolResult } from "@src/confluent/schema.js";
-import { READ_ONLY, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import {
+  CREATE_UPDATE,
+  READ_ONLY,
+  ToolHandler,
+} from "@src/confluent/tools/base-tools.js";
 import {
   alwaysEnabled,
   hasKafka,
@@ -168,6 +172,32 @@ describe("ListConnectionsHandler", () => {
         }
       ).connections.k;
       expect(bucket).not.toHaveProperty("description");
+    });
+
+    it("should drop mutating tools from a read_only connection while keeping read-only ones", () => {
+      // The read-only verdict overlay disables CREATE_TOPICS (mutating) on a
+      // read_only connection but leaves LIST_TOPICS (READ_ONLY) enabled, so
+      // list-connections inherits the reduced set for free via
+      // enabledConnectionIds().
+      const runtime = runtimeWithConnections({
+        prod: { read_only: true, ...KAFKA },
+        dev: KAFKA,
+      });
+
+      const result = handlerWith([
+        [ToolName.LIST_TOPICS, new StubHandler({ predicate: hasKafka })],
+        [
+          ToolName.CREATE_TOPICS,
+          new StubHandler({ predicate: hasKafka, annotations: CREATE_UPDATE }),
+        ],
+      ]).handle(runtime);
+
+      expect(result.structuredContent).toEqual({
+        connections: {
+          prod: { enabledTools: [ToolName.LIST_TOPICS] },
+          dev: { enabledTools: [ToolName.CREATE_TOPICS, ToolName.LIST_TOPICS] },
+        },
+      });
     });
 
     it("should return an empty mapping with explanatory text when no connections are configured", () => {

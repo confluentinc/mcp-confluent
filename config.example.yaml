@@ -76,6 +76,14 @@ connections:
     # A blank value is treated as no description.
     description: "Primary Confluent Cloud connection"
 
+    # Read-only policy (default false). With `read_only: true`, every tool that
+    # mutates state is auto-disabled for this connection — only read-only tools
+    # stay enabled (a tool's posture comes from its `readOnlyHint` annotation).
+    # Use it to hand an agent a staging/prod connection while keeping full
+    # read/write on a dev one. Left at the default here so this connection
+    # stays read/write:
+    # read_only: true
+
     # --- Kafka ---
     # `bootstrap_servers` is required for any Kafka client (admin, producer,
     # consumer). `rest_endpoint` + `cluster_id` + `env_id` are required for

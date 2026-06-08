@@ -312,10 +312,14 @@ export const flinkWithTelemetry: ConnectionPredicate = allOf(
  * and tests); the value is the human-readable phrasing surfaced to end users
  * through startup logs and diagnostic tooling.
  *
- * Adding a reason: name the symbol after what's missing from the connection
- * config (not which predicate emitted it — multiple predicates may share a
- * reason), and write the value as a declarative phrase a misconfigured user
- * could act on.
+ * Adding a reason: name the symbol after the condition it describes — what's
+ * missing from the connection config, or the policy it violates (not which
+ * predicate or overlay emitted it — multiple sites may share a reason). Write
+ * the value as a declarative phrase a misconfigured user could act on. Most
+ * reasons originate in a predicate body; {@linkcode ReadOnlyConnection} is the
+ * exception — it is produced by the read-only verdict overlay in
+ * `BaseToolHandler`, which composes a tool's mutation posture with the
+ * connection's `read_only` flag, a cross-cutting check no predicate can make.
  */
 export enum ToolDisabledReason {
   MissingKafkaBlock = "no 'kafka' block in connection config",
@@ -330,4 +334,5 @@ export enum ToolDisabledReason {
   MissingTableflowBlock = "no 'tableflow' block in connection config",
   OAuthNoServiceBlocks = "OAuth connections carry no service blocks",
   OAuthNotDirectCapable = "OAuth connection cannot satisfy a direct-only requirement",
+  ReadOnlyConnection = "connection is marked read_only; tools that mutate state are disabled",
 }

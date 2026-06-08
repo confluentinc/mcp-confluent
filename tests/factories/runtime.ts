@@ -8,7 +8,11 @@ import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import type { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { createMockInstance, type HandleCase } from "@tests/stubs/index.js";
+import {
+  DECOY_CONNECTION_ID,
+  createMockInstance,
+  type HandleCase,
+} from "@tests/stubs/index.js";
 import { fileURLToPath } from "node:url";
 import type { Mocked } from "vitest";
 
@@ -71,6 +75,43 @@ export function runtimeWith(
   return runtimeWithConnections(
     { [connectionId]: connectionConfig },
     { [connectionId]: clientManager },
+    allowedToolNames,
+  );
+}
+
+/**
+ * Drop-in replacement for {@link runtimeWith} that additionally plants a
+ * "decoy" connection carrying the same service blocks — enabled for the same
+ * tools, with its own auto-minted client manager that correct routing must
+ * never touch.
+ *
+ * The decoy is inserted FIRST, so a handler resolving via the legacy
+ * sole-connection accessor (which grabs `enabledConnectionIds[0]`) routes to
+ * the decoy and trips the test. {@link assertHandleCase} recognizes the decoy
+ * (by {@link DECOY_CONNECTION_ID}) and, for any handle() test built on this
+ * runtime, auto-routes to the real connection and asserts the decoy stayed
+ * untouched — so swapping a suite's `runtimeWith` for this turns every existing
+ * success case into a routing test with no other change.
+ */
+export function runtimeWithDecoy(
+  connectionConfig: Omit<DirectConnectionConfig, "type"> = {},
+  connectionId = DEFAULT_CONNECTION_ID,
+  clientManager: Mocked<DirectClientManager> = createMockInstance(
+    DirectClientManager,
+  ),
+  allowedToolNames?: ReadonlySet<ToolName>,
+): ServerRuntime {
+  if (connectionId === DECOY_CONNECTION_ID) {
+    throw new Error(
+      `Wacky -- runtimeWithDecoy's real connection id collides with the reserved decoy id "${DECOY_CONNECTION_ID}"`,
+    );
+  }
+  return runtimeWithConnections(
+    {
+      [DECOY_CONNECTION_ID]: connectionConfig,
+      [connectionId]: connectionConfig,
+    },
+    { [connectionId]: clientManager }, // decoy's manager is auto-minted by the factory
     allowedToolNames,
   );
 }

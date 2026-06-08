@@ -12,8 +12,15 @@ import {
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
 import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
-import { kafkaRuntime } from "@tests/factories/runtime.js";
-import { getMockedClientManager } from "@tests/stubs/index.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  kafkaRuntime,
+  runtimeWithDecoy,
+} from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
@@ -146,6 +153,31 @@ describe("describe-consumer-group-handler.ts", () => {
 
   describe("handle()", () => {
     const handler = new DescribeConsumerGroupHandler();
+
+    it("should route only to its resolved connection in a multi-connection config", async () => {
+      const clientManager = getMockedClientManager();
+      const admin = await clientManager.getAdminClient();
+      admin.describeGroups.mockResolvedValue({
+        groups: [fakeGroupDescription({ groupId: "my-group" })],
+      });
+
+      // runtimeWithDecoy gives a two-connection runtime (the DEFAULT_CONNECTION_ID
+      // real connection + a decoy keyed DECOY_CONNECTION_ID). assertHandleCase
+      // detects the decoy and injects `connectionId: DEFAULT_CONNECTION_ID` into
+      // the provided args for handle(), then asserts the decoy's manager went
+      // untouched — so `args` deliberately omits connectionId here.
+      await assertHandleCase({
+        handler,
+        runtime: runtimeWithDecoy(
+          { kafka: { bootstrap_servers: "broker:9092" } },
+          DEFAULT_CONNECTION_ID,
+          clientManager,
+        ),
+        args: { groupId: "my-group" },
+        outcome: { resolves: 'Consumer group "my-group" is' },
+        clientManager,
+      });
+    });
 
     it("should forward the single groupId as a one-element array to describeGroups", async () => {
       const clientManager = getMockedClientManager();

@@ -17,6 +17,7 @@ export {
   type FlinkTelemetryPoint,
 } from "./flink-telemetry.js";
 export {
+  DECOY_CONNECTION_ID,
   assertHandleCase,
   classifyThrown,
   type HandleCase,

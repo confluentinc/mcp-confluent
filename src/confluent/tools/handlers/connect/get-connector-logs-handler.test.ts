@@ -5,8 +5,10 @@ import {
   CONNECT_CONN,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
+  assertHandleCase,
   getMockedClientManager,
   mockFetch,
   type MockedClientManager,
@@ -92,6 +94,50 @@ describe("get-connector-logs-handler.ts", () => {
     });
 
     describe("handle()", () => {
+      it("should route only to its resolved connection in a multi-connection config", async () => {
+        // Omit organizationId from args and config so the handler must resolve
+        // it via the REST client — the only routing-observable client-manager
+        // call here (token exchange and log search both go through fetch).
+        clientManager
+          .getConfluentCloudRestClient()
+          .GET.mockResolvedValue({ data: { data: [{ id: "org-routed" }] } });
+        fetchSpy.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+          jsonResponse({
+            data: [
+              {
+                level: "ERROR",
+                task_id: "task-0",
+                id: "lcc-routed",
+                message: "boom",
+                timestamp: "2026-04-29T04:47:22.097Z",
+              },
+            ],
+          }),
+        );
+
+        const argsWithoutOrg = {
+          environmentId: baseArgs.environmentId,
+          clusterId: baseArgs.clusterId,
+          connectorName: baseArgs.connectorName,
+        };
+
+        // runtimeWithDecoy plants a same-shaped decoy connection first; the
+        // handler must route to DEFAULT_CONNECTION_ID, not enabledIds[0].
+        // assertHandleCase injects that id and asserts the decoy's manager
+        // stays untouched, so args deliberately omits connectionId.
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CONNECT_CONN_WITH_CC,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: argsWithoutOrg,
+          outcome: { resolves: "Logs for cypher-source" },
+          clientManager,
+        });
+      });
+
       it("should exchange API key for a data-plane token then call the logging API with Bearer auth", async () => {
         const entries = [
           {

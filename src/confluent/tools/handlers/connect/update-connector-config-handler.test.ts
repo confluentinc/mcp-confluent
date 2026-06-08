@@ -6,7 +6,7 @@ import {
   CONNECT_CONN,
   ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -113,7 +113,7 @@ describe("update-connector-config-handler.ts", () => {
 
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,

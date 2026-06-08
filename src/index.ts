@@ -56,7 +56,7 @@ export function getToolHandlersToRegister(
   // Pass 1: drop tools excluded by the allow/block list (logged per-tool —
   // the reason is config-driven, not predicate-driven, so it doesn't fold
   // into the grouped warning emitted later). The filter lives on the runtime
-  // so registration and the list-connections tool read one source of truth.
+  // so registration and the list-configured-connections tool read one source of truth.
   const candidates: Array<readonly [ToolName, ToolHandler]> = [];
   for (const toolName of Object.values(ToolName)) {
     if (!runtime.isToolAllowed(toolName)) {

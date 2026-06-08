@@ -294,7 +294,7 @@ describe("index.ts", () => {
         ToolName.GET_TOPIC_CONFIG,
         ToolName.LIST_CLUSTERS,
         ToolName.EXPLAIN_DISABLED_TOOLS,
-        ToolName.LIST_CONNECTIONS,
+        ToolName.LIST_CONFIGURED_CONNECTIONS,
         // Schema Registry (hasSchemaRegistryOrOAuth)
         ToolName.LIST_SCHEMAS,
         ToolName.DELETE_SCHEMA,

@@ -8,11 +8,11 @@ All notable changes to this MCP server will be documented in this file.
 
 #### New Tools / Tool Features
 
-- **`list-connections` tool.** Read-only, always-enabled discovery tool mapping each configured connection id to the connection-routable tools enabled on it.
+- **`list-configured-connections` tool.** Read-only, always-enabled discovery tool mapping each configured connection id to the connection-routable tools enabled on it.
 
 #### Configuration
 
-- **Per-connection `description` field.** Optional free-text label on any connection, echoed back by `list-connections`.
+- **Per-connection `description` field.** Optional free-text label on any connection, echoed back by `list-configured-connections`.
 
 ## 1.4.0
 

@@ -6,7 +6,7 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 
 /**
  * Base class for tools that introspect the server's own tool catalog —
- * `list-connections`, `explain-disabled-tools`, and (incoming) the
+ * `list-configured-connections`, `explain-disabled-tools`, and (incoming) the
  * `describe-connection` tool of #550.
  *
  * The catalog is reached through `registryAccessor`, a thunk, rather than a

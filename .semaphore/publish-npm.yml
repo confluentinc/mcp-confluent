@@ -33,7 +33,7 @@ blocks:
                 echo "Aborting: $RELEASE_NAME is a prerelease (isPrerelease=$IS_PRERELEASE); this task only publishes stable releases to the 'latest' tag."
                 exit 1
               fi
-            - echo "Confirmed: publishing $RELEASE_NAME to npm."
+            - 'echo "Confirmed: publishing $RELEASE_NAME to npm."'
 
   - name: "Publish to npm"
     dependencies: ["Confirm Publish"]

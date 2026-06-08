@@ -1,7 +1,7 @@
 import { CreateTableFlowCatalogIntegrationHandler } from "@src/confluent/tools/handlers/tableflow/catalog/create-tableflow-catalog-integration-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
   TABLEFLOW_CONN,
   TableflowHandleCase,
 } from "@tests/factories/runtime.js";
@@ -114,7 +114,7 @@ describe("create-tableflow-catalog-integration-handler.ts", () => {
           }
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,

@@ -1,7 +1,7 @@
 import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tableflow/topic/list-tableflow-topics-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
   TABLEFLOW_CONN,
   TableflowHandleCase,
 } from "@tests/factories/runtime.js";
@@ -91,7 +91,7 @@ describe("list-tableflow-topics-handler.ts", () => {
           }
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,

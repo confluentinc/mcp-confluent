@@ -1,7 +1,8 @@
 import { ListTableFlowRegionsHandler } from "@src/confluent/tools/handlers/tableflow/list-tableflow-regions-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
+  TABLEFLOW_CONN,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -22,7 +23,11 @@ describe("list-tableflow-regions-handler.ts", () => {
           .GET.mockResolvedValue({ data: [] });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { cloud: "AWS" },
           outcome: { resolves: "Tableflow Regions" },
           clientManager,
@@ -37,7 +42,11 @@ describe("list-tableflow-regions-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { cloud: "AWS" },
           outcome: { resolves: "Failed to list Tableflow regions:" },
           clientManager,
@@ -52,7 +61,11 @@ describe("list-tableflow-regions-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { cloud: "AWS" },
           outcome: { resolves: "Tableflow Regions" },
           clientManager,
@@ -81,7 +94,11 @@ describe("list-tableflow-regions-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: {},
           outcome: { resolves: "Tableflow Regions" },
           clientManager,
@@ -112,7 +129,11 @@ describe("list-tableflow-regions-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { pageSize: 20, pageToken: "abc" },
           outcome: { resolves: "Tableflow Regions" },
           clientManager,

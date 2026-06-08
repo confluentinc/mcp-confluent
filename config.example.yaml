@@ -71,6 +71,11 @@ connections:
   default:
     type: direct
 
+    # Optional human-readable label for this connection, echoed back by the
+    # `list-connections` tool so an agent can tell your connections apart.
+    # A blank value is treated as no description.
+    description: "Primary Confluent Cloud connection"
+
     # --- Kafka ---
     # `bootstrap_servers` is required for any Kafka client (admin, producer,
     # consumer). `rest_endpoint` + `cluster_id` + `env_id` are required for

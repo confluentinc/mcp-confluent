@@ -1,13 +1,12 @@
-import { FlinkDirectConfig } from "@src/config/models.js";
+import {
+  DirectConnectionConfig,
+  FlinkDirectConfig,
+} from "@src/config/models.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import {
-  bareRuntime,
-  FLINK_CONN,
-  runtimeWith,
-} from "@tests/factories/runtime.js";
+import { FLINK_CONN } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
 
 const FLINK_CONFIG: FlinkDirectConfig = {
@@ -65,20 +64,14 @@ describe("flink-tool-handler.ts", () => {
 
     describe("getFlinkDirectConfig()", () => {
       it("should return the flink block when present", () => {
-        const runtime = runtimeWith(FLINK_CONN);
-        const flink = handler["getFlinkDirectConfig"](runtime.config);
-        expect(flink).toBe(runtime.config.getSoleDirectConnection().flink);
+        const conn: DirectConnectionConfig = { type: "direct", ...FLINK_CONN };
+        const flink = handler["getFlinkDirectConfig"](conn);
+        expect(flink).toBe(conn.flink);
       });
 
       it("should throw Wacky when the connection has no flink block", () => {
         expect(() =>
-          handler["getFlinkDirectConfig"](bareRuntime().config),
-        ).toThrow("Wacky --");
-      });
-
-      it("should throw Wacky when connection config is empty", () => {
-        expect(() =>
-          handler["getFlinkDirectConfig"](runtimeWith({}).config),
+          handler["getFlinkDirectConfig"]({ type: "direct" }),
         ).toThrow("Wacky --");
       });
     });

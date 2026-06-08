@@ -1,7 +1,8 @@
 import { UpdateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/update-tableflow-topic-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
+  TABLEFLOW_CONN,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -49,7 +50,11 @@ describe("update-tableflow-topic-handler.ts", () => {
           );
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: UPDATE_ARGS,
           outcome: { resolves: `Tableflow Topic ${TOPIC_NAME} updated` },
           clientManager,
@@ -64,7 +69,11 @@ describe("update-tableflow-topic-handler.ts", () => {
           .PATCH.mockResolvedValue({ error: { message: "not found" } } as any);
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: UPDATE_ARGS,
           outcome: {
             resolves: `Failed to update Tableflow topic for  ${TOPIC_NAME}`,
@@ -83,7 +92,11 @@ describe("update-tableflow-topic-handler.ts", () => {
         );
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: UPDATE_ARGS,
           outcome: { resolves: `Tableflow Topic ${TOPIC_NAME} updated` },
           clientManager,

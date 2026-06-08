@@ -71,9 +71,13 @@ export class UpdateTableFlowTopicHandler extends TableflowToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { display_name, tableflowTopicConfig } =
       updateTableflowTopicArguments.parse(toolArguments);
+
+    const { clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

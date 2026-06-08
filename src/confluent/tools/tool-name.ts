@@ -67,5 +67,5 @@ export enum ToolName {
   GET_PRODUCT_DOC_PAGE = "get-product-doc-page",
   LIST_ORGANIZATIONS = "list-organizations",
   EXPLAIN_DISABLED_TOOLS = "explain-disabled-tools",
-  LIST_CONNECTIONS = "list-connections",
+  LIST_CONFIGURED_CONNECTIONS = "list-configured-connections",
 }

@@ -33,6 +33,21 @@ export const DESTRUCTIVE: ToolAnnotations = {
 } as const;
 
 /**
+ * Opening clause of the injected `connectionId` parameter description, before the
+ * comma-separated list of viable connection ids is appended.
+ */
+export const CONNECTION_ID_DESCRIPTION_PREFIX =
+  "Which configured connection to target. One of: ";
+
+/**
+ * Sentence appended to the `connectionId` description that steers the agent at the
+ * discovery tool. Emitted only when that tool is itself reachable; the joining space
+ * is added at the call site so a blocked tool leaves no dangling trailing space.
+ */
+export const LIST_CONFIGURED_CONNECTIONS_POINTER =
+  "Discover connections and learn what tools are supported by each connection by invoking 'list-configured-connections'.";
+
+/**
  * Operator-facing taxonomy of tool kinds.
  *
  * Answers "what kind of tool is this?" — orthogonal to the
@@ -183,15 +198,15 @@ export abstract class BaseToolHandler implements ToolHandler {
     // Otherwise, inject a required connectionId parameter into the Zod
     // inputSchema with an enum of the enabled connection IDs.
 
-    // Point the agent at list-connections so it can learn which tools each
-    // connection supports — but only when that tool is itself reachable;
-    // naming a tool the operator blocked would send the agent chasing a ghost.
-    // Leading space lives inside the pointer so the blocked case (empty
-    // pointer) leaves no dangling trailing space on the description.
-    const listConnectionsPointer = runtime.isToolAllowed(
-      ToolName.LIST_CONNECTIONS,
+    // Point the agent at list-configured-connections so it can learn which
+    // tools each connection supports — but only when that tool is itself
+    // reachable; naming a tool the operator blocked would send the agent
+    // chasing a ghost. The joining space is added here so the blocked case
+    // (empty pointer) leaves no dangling trailing space on the description.
+    const listConfiguredConnectionsPointer = runtime.isToolAllowed(
+      ToolName.LIST_CONFIGURED_CONNECTIONS,
     )
-      ? " Discover connections and learn what tools are supported by each connection by invoking 'list-connections'."
+      ? ` ${LIST_CONFIGURED_CONNECTIONS_POINTER}`
       : "";
     return {
       ...config,
@@ -200,7 +215,7 @@ export abstract class BaseToolHandler implements ToolHandler {
         connectionId: z
           .enum(ids as [string, ...string[]])
           .describe(
-            `Which configured connection to target. One of: ${ids.join(", ")}.${listConnectionsPointer}`,
+            `${CONNECTION_ID_DESCRIPTION_PREFIX}${ids.join(", ")}.${listConfiguredConnectionsPointer}`,
           ),
       },
     };

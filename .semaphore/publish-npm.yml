@@ -12,7 +12,6 @@ global_job_config:
     commands:
       - sem-version node 22
       - checkout
-      - . vault-setup --version v3 --role mcp-confluent
 
 blocks:
   - name: "Confirm Publish"

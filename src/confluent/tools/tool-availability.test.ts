@@ -1,4 +1,8 @@
-import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import {
+  CREATE_UPDATE,
+  ToolCategory,
+  ToolHandler,
+} from "@src/confluent/tools/base-tools.js";
 import {
   ConnectionPredicate,
   PredicateResult,
@@ -145,6 +149,27 @@ describe("tool-availability.ts", () => {
       ).toEqual([]);
     });
 
+    it("should bucket a mutating tool under ReadOnlyConnection when its sole connection is read_only", () => {
+      // hasKafka passes on the read_only connection, but the read-only overlay
+      // disables the mutating (CREATE_UPDATE) tool — so it surfaces in the log
+      // grouping under the read-only reason, not a missing-block one.
+      const mutatingTool = new StubHandler({
+        predicate: hasKafka,
+        annotations: CREATE_UPDATE,
+      });
+      const groups = groupDisabledToolsByReason(
+        [[ToolName.CREATE_TOPICS, mutatingTool]],
+        runtimeWith({ read_only: true, ...KAFKA_CONN }),
+      );
+      expect(groups).toEqual([
+        {
+          connectionId: "default",
+          reason: ToolDisabledReason.ReadOnlyConnection,
+          toolNames: [ToolName.CREATE_TOPICS],
+        },
+      ]);
+    });
+
     it("should order groups lexicographically by connectionId, regardless of insertion order", () => {
       // `zeta` is inserted first; `alpha` is appended after. Lexicographic
       // ordering puts `alpha` first. Pins the helper's ordering against JS
@@ -255,6 +280,31 @@ describe("tool-availability.ts", () => {
         disabledGroups: [],
         enabledCount: 1,
         disabledCount: 0,
+      });
+    });
+
+    it("should report a read_only-suppressed mutating tool under the ReadOnlyConnection reason bucket", () => {
+      // The predicate (hasKafka) passes, so the only thing disabling this write
+      // tool is the read-only overlay — it lands in disabledGroups under
+      // ReadOnlyConnection, the "flip the flag and these return" set.
+      const mutatingTool = new StubHandler({
+        predicate: hasKafka,
+        annotations: CREATE_UPDATE,
+      });
+      const report = buildToolGatingReport(
+        [[ToolName.CREATE_TOPICS, mutatingTool]],
+        runtimeWith({ read_only: true, ...KAFKA_CONN }),
+      );
+      expect(report).toEqual({
+        groupBy: "reason",
+        disabledGroups: [
+          {
+            reason: ToolDisabledReason.ReadOnlyConnection,
+            tools: [ToolName.CREATE_TOPICS],
+          },
+        ],
+        enabledCount: 0,
+        disabledCount: 1,
       });
     });
 

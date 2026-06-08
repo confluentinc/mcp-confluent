@@ -146,6 +146,20 @@ export const CCLOUD_CONN = {
   },
 };
 
+/**
+ * Catalog/search connection fixture. `hasCCloudCatalogSupport` enables a
+ * connection only when it carries a `confluent_cloud` block and a
+ * `schema_registry` block with api_key auth — so a bare schema-registry
+ * connection is not a valid route for these tools.
+ */
+export const CATALOG_CONN = {
+  ...CCLOUD_CONN,
+  schema_registry: {
+    endpoint: "https://sr.example.com",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+  },
+};
+
 /** Shared Flink connection config fixture for handle() tests. */
 export const FLINK_CONN = {
   flink: {

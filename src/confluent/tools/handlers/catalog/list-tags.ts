@@ -11,8 +11,14 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 
 export class ListTagsHandler extends BaseToolHandler {
-  async handle(runtime: ServerRuntime): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
+  async handle(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): Promise<CallToolResult> {
+    const { clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );

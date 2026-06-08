@@ -34,9 +34,12 @@ export class RemoveTagFromEntityHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { tagName, typeName, qualifiedName } =
       removeTagFromEntityArguments.parse(toolArguments);
+    const { clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),

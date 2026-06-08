@@ -67,7 +67,10 @@ describe("list-tableflow-topics-handler.ts", () => {
           connectionConfig: TABLEFLOW_CONN,
           args: {},
           mockResponse: { error: { message: "unauthorized" } },
-          outcome: { resolves: "Failed to list Tableflow topics" },
+          outcome: {
+            resolves: "Failed to list Tableflow topics",
+            isError: true,
+          },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
         },

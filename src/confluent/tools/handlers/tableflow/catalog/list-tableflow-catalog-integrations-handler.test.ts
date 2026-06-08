@@ -69,6 +69,7 @@ describe("list-tableflow-catalog-integrations-handler.ts", () => {
           mockResponse: { error: { message: "unauthorized" } },
           outcome: {
             resolves: "Failed to list Tableflow catalog integrations",
+            isError: true,
           },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",

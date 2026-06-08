@@ -61,7 +61,7 @@ describe("list-environments-handler.ts", () => {
             "resolve with a validation-error response when the API returns an unexpected payload",
           args: {},
           cloudGetData: { not: "an EnvironmentList" },
-          outcome: { resolves: "Invalid environment list data" },
+          outcome: { resolves: "Invalid environment list data", isError: true },
         },
       ];
 

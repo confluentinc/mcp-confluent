@@ -48,7 +48,10 @@ describe("list-tableflow-regions-handler.ts", () => {
             clientManager,
           ),
           args: { cloud: "AWS" },
-          outcome: { resolves: "Failed to list Tableflow regions:" },
+          outcome: {
+            resolves: "Failed to list Tableflow regions:",
+            isError: true,
+          },
           clientManager,
         });
       });

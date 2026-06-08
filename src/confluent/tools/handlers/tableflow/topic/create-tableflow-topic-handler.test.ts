@@ -91,6 +91,7 @@ describe("create-tableflow-topic-handler.ts", () => {
           mockResponse: { error: { message: "conflict" } },
           outcome: {
             resolves: "Failed to create Tableflow topic for  my-topic",
+            isError: true,
           },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",

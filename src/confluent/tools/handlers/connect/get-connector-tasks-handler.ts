@@ -13,11 +13,13 @@ export class GetConnectorTasksHandler extends ConnectToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { clusterId, environmentId, connectorName } =
       connectorByNameArguments.parse(toolArguments);
 
-    const conn = runtime.config.getSoleDirectConnection();
+    const { conn, clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
     const { environment_id, kafka_cluster_id } =
       this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
 

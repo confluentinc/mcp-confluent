@@ -3,9 +3,10 @@ import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagno
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   DEFAULT_CONNECTION_ID,
-  FLINK_CONN,
+  FLINK_TELEMETRY_CONN,
   FlinkGetCase,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -78,7 +79,7 @@ describe("query-profiler-handler.ts", () => {
           args,
           outcome,
           flinkGetData,
-          connectionConfig = FLINK_CONN,
+          connectionConfig = FLINK_TELEMETRY_CONN,
         }) => {
           const clientManager = getMockedClientManager();
           if (flinkGetData !== undefined) {
@@ -91,7 +92,7 @@ describe("query-profiler-handler.ts", () => {
           }
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -110,8 +111,8 @@ describe("query-profiler-handler.ts", () => {
           .GET.mockResolvedValueOnce({ error: { code: 500 } });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
-            FLINK_CONN,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
           ),
@@ -128,8 +129,8 @@ describe("query-profiler-handler.ts", () => {
           .GET.mockResolvedValue({ data: {} });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
-            FLINK_CONN,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
           ),
@@ -146,8 +147,8 @@ describe("query-profiler-handler.ts", () => {
           .GET.mockResolvedValue({ data: { Graph: "{not json" } });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
-            FLINK_CONN,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
           ),
@@ -168,7 +169,11 @@ describe("query-profiler-handler.ts", () => {
         });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
           args: { statementName: STATEMENT_NAME },
           outcome: { resolves: "high_backpressure" },
           clientManager: cm,
@@ -186,7 +191,11 @@ describe("query-profiler-handler.ts", () => {
         });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
           args: { statementName: STATEMENT_NAME },
           outcome: { resolves: '"severity": "high"' },
           clientManager: cm,
@@ -205,7 +214,11 @@ describe("query-profiler-handler.ts", () => {
         });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
           args: { statementName: STATEMENT_NAME },
           outcome: { resolves: "high_consumer_lag" },
           clientManager: cm,
@@ -222,7 +235,11 @@ describe("query-profiler-handler.ts", () => {
         });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
           args: { statementName: STATEMENT_NAME },
           outcome: { resolves: "late_data" },
           clientManager: cm,
@@ -240,7 +257,11 @@ describe("query-profiler-handler.ts", () => {
         });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
           args: { statementName: STATEMENT_NAME },
           outcome: { resolves: "large_state" },
           clientManager: cm,
@@ -256,7 +277,7 @@ describe("query-profiler-handler.ts", () => {
           data: { data: [] },
         });
         const result = await handler.handle(
-          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+          runtimeWith(FLINK_TELEMETRY_CONN, DEFAULT_CONNECTION_ID, cm),
           { statementName: STATEMENT_NAME, includeAnalysis: false },
         );
         const text = result.content

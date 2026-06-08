@@ -5,7 +5,7 @@ import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
   FlinkGetCase,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -84,7 +84,7 @@ describe("detect-issues-handler.ts", () => {
           }
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -129,7 +129,7 @@ describe("detect-issues-handler.ts", () => {
 
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               FLINK_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -169,7 +169,7 @@ describe("detect-issues-handler.ts", () => {
           });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               FLINK_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -184,7 +184,7 @@ describe("detect-issues-handler.ts", () => {
           wireFlinkPair(clientManager, { status: { phase: "DEGRADED" } });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               FLINK_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -199,7 +199,7 @@ describe("detect-issues-handler.ts", () => {
           wireFlinkPair(clientManager, { status: { phase: "STOPPED" } });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               FLINK_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -216,7 +216,7 @@ describe("detect-issues-handler.ts", () => {
           });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               FLINK_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -233,7 +233,7 @@ describe("detect-issues-handler.ts", () => {
           });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               FLINK_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -248,7 +248,7 @@ describe("detect-issues-handler.ts", () => {
           wireFlinkPair(clientManager, { status: { phase: "COMPLETED" } });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               FLINK_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -307,7 +307,7 @@ describe("detect-issues-handler.ts", () => {
             wireFlinkPair(cm, { status: { phase: "RUNNING" } }, exceptions);
             await assertHandleCase({
               handler,
-              runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+              runtime: runtimeWithDecoy(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
               args: { statementName: STATEMENT_NAME, includeMetrics: false },
               outcome: { resolves: expected },
               clientManager: cm,
@@ -323,7 +323,7 @@ describe("detect-issues-handler.ts", () => {
           wireFlinkPair(cm, { status: { phase: "RUNNING" } }, exceptions);
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
+            runtime: runtimeWithDecoy(FLINK_CONN, DEFAULT_CONNECTION_ID, cm),
             args: { statementName: STATEMENT_NAME, includeMetrics: false },
             outcome: { resolves: "frequent_exceptions" },
             clientManager: cm,
@@ -338,7 +338,7 @@ describe("detect-issues-handler.ts", () => {
           .GET.mockResolvedValueOnce({ error: { code: 500 } });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -361,7 +361,7 @@ describe("detect-issues-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,

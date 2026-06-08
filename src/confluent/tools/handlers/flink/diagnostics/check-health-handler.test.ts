@@ -5,7 +5,7 @@ import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
   FlinkGetCase,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -74,7 +74,7 @@ describe("check-health-handler.ts", () => {
           }
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -106,7 +106,7 @@ describe("check-health-handler.ts", () => {
           });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               FLINK_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -126,7 +126,7 @@ describe("check-health-handler.ts", () => {
         ]);
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -144,7 +144,7 @@ describe("check-health-handler.ts", () => {
         });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -162,7 +162,7 @@ describe("check-health-handler.ts", () => {
         ]);
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -180,7 +180,7 @@ describe("check-health-handler.ts", () => {
           .GET.mockResolvedValueOnce({ error: { code: 500, message: "boom" } });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,

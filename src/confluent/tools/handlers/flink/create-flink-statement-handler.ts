@@ -62,7 +62,6 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const {
       catalogName,
       databaseName,
@@ -72,7 +71,11 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
       environmentId,
       organizationId,
     } = createFlinkStatementArguments.parse(toolArguments);
-    const flink = this.getFlinkDirectConfig(runtime.config);
+    const { conn, clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
+    const flink = this.getFlinkDirectConfig(conn);
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
       flink,
       organizationId,

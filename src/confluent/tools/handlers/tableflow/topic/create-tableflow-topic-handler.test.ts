@@ -1,7 +1,7 @@
 import { CreateTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/create-tableflow-topic-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
   TABLEFLOW_CONN,
   TableflowHandleCase,
 } from "@tests/factories/runtime.js";
@@ -91,6 +91,7 @@ describe("create-tableflow-topic-handler.ts", () => {
           mockResponse: { error: { message: "conflict" } },
           outcome: {
             resolves: "Failed to create Tableflow topic for  my-topic",
+            isError: true,
           },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
@@ -115,7 +116,7 @@ describe("create-tableflow-topic-handler.ts", () => {
           }
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,

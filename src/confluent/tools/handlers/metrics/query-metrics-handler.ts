@@ -73,8 +73,11 @@ export class QueryMetricsHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const args = queryMetricsArguments.parse(toolArguments);
+    const { conn, clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
     const {
       metric,
       dataset = "cloud",
@@ -90,8 +93,7 @@ export class QueryMetricsHandler extends BaseToolHandler {
     try {
       const telemetryClient =
         clientManager.getConfluentCloudTelemetryRestClient();
-      const connKafkaClusterId =
-        runtime.config.getSoleDirectConnection().kafka?.cluster_id;
+      const connKafkaClusterId = conn.kafka?.cluster_id;
       const effectiveFilter = buildEffectiveFilter(
         filter,
         metric,

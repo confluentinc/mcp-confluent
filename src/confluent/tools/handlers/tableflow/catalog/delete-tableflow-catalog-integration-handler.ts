@@ -25,12 +25,15 @@ export class DeleteTableFlowCatalogIntegrationHandler extends TableflowToolHandl
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { id, environmentId, clusterId } =
       deleteTableflowCatalogIntegrationArguments.parse(toolArguments);
 
+    const { conn, clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
     const { environment_id, kafka_cluster_id } =
-      this.resolveTableflowEnvAndClusterId(runtime, environmentId, clusterId);
+      this.resolveTableflowEnvAndClusterId(conn, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

@@ -56,10 +56,10 @@ npx -y @confluentinc/mcp-confluent --list-tools
 
 These tools need no service blocks or authentication — they're enabled even on a bare config, regardless of which deployment the rest of your config targets.
 
-| Category          | Tools                                                   | Description                                                                                 |
-| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| **Documentation** | `search-product-docs`, `get-product-doc-page`           | Search Confluent product docs and fetch full page content                                   |
-| **Diagnostics**   | `explain-disabled-tools`, `list-configured-connections` | Explain why tools are absent, and list configured connections and the tools enabled on each |
+| Category          | Tools                                                                  | Description                                                                                                                             |
+| ----------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Documentation** | `search-product-docs`, `get-product-doc-page`                          | Search Confluent product docs and fetch full page content                                                                               |
+| **Diagnostics**   | `explain-disabled-tools`, `list-configured-connections`, `config-help` | Explain why tools are absent, list configured connections and the tools enabled on each, and suggest the YAML to enable a specific tool |
 
 ### Available Tools for Confluent Cloud
 
@@ -404,6 +404,7 @@ kafka:
   produce-message: Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both ke...
 
 mcp-server-diagnostics:
+  config-help: Call when the user wants to enable or unlock a specific tool (e.g. "how do I enable the tableflow tools?", "what config does cr...
   explain-disabled-tools: Call when the user asks why a tool is missing or unavailable (e.g., "why can't I list Kafka topics?", "where are the ...
   list-configured-connections: List every configured connection and the connection-routable tools you can invoke against each. The connection id (th...
 

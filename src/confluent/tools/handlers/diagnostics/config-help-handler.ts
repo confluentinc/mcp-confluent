@@ -158,8 +158,9 @@ function apiKeyAuth(indent: string, keyVar: string, secretVar: string): string {
  */
 function yamlKey(connId: string): string {
   if (/^[A-Za-z0-9_-]+$/.test(connId)) return connId;
-  const escaped = connId.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
-  return `"${escaped}"`;
+  // A YAML double-quoted scalar accepts the same C-style escapes JSON uses
+  // (\\, \", \n, \t, \uXXXX), so JSON.stringify produces a valid quoted key.
+  return JSON.stringify(connId);
 }
 
 /**

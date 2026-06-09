@@ -59,6 +59,7 @@ describe("Confluent Platform tool gating", () => {
     ToolName.GET_PRODUCT_DOC_PAGE,
     ToolName.EXPLAIN_DISABLED_TOOLS,
     ToolName.LIST_CONFIGURED_CONNECTIONS,
+    ToolName.CONFIG_HELP,
   ];
 
   const ALL_TOOL_NAMES = Object.values(ToolName);

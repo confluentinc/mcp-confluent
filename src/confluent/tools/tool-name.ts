@@ -68,4 +68,5 @@ export enum ToolName {
   LIST_ORGANIZATIONS = "list-organizations",
   EXPLAIN_DISABLED_TOOLS = "explain-disabled-tools",
   LIST_CONFIGURED_CONNECTIONS = "list-configured-connections",
+  CONFIG_HELP = "config-help",
 }

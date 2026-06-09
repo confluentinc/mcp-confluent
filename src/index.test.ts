@@ -295,6 +295,7 @@ describe("index.ts", () => {
         ToolName.LIST_CLUSTERS,
         ToolName.EXPLAIN_DISABLED_TOOLS,
         ToolName.LIST_CONFIGURED_CONNECTIONS,
+        ToolName.CONFIG_HELP,
         // Schema Registry (hasSchemaRegistryOrOAuth)
         ToolName.LIST_SCHEMAS,
         ToolName.DELETE_SCHEMA,

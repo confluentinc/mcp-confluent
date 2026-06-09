@@ -7,7 +7,6 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   alwaysEnabled,
-  PredicateResult,
   ToolDisabledReason,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolMetadataHandler } from "@src/confluent/tools/tool-metadata-handler.js";
@@ -29,22 +28,22 @@ const configHelpArguments = z.object({
  * Per-connection advice for the target tool. `enabled` mirrors the tool's
  * predicate verdict on that connection; the remaining fields are populated
  * only when the tool is disabled there:
- *   - `current_state` — the {@link ToolDisabledReason}'s human phrasing.
- *   - `suggested_yaml` — a copy-pasteable YAML fragment that closes the gap,
+ *   - `currentState` — the {@link ToolDisabledReason}'s human phrasing.
+ *   - `suggestedYaml` — a copy-pasteable YAML fragment that closes the gap,
  *     present whenever the gap is a missing direct-connection block or field.
  *   - `note` — guidance when there is no YAML to suggest (OAuth connections
  *     carry no service blocks, so the tool simply isn't reachable that way).
  */
 interface ConnectionAdvice {
   enabled: boolean;
-  current_state?: string;
-  suggested_yaml?: string;
+  currentState?: string;
+  suggestedYaml?: string;
   note?: string;
 }
 
 interface ConfigHelpPayload {
   tool: string;
-  already_enabled: boolean;
+  alreadyEnabled: boolean;
   connections: Record<string, ConnectionAdvice>;
 }
 
@@ -60,7 +59,7 @@ interface ConfigHelpPayload {
  *
  * The mechanism is the same verdict map every diagnostic surface reads:
  * {@link BaseToolHandler.connectionVerdicts} turns the target handler's
- * `predicate` into a per-connection {@link PredicateResult}; a disabled verdict
+ * `predicate` into a per-connection `PredicateResult`; a disabled verdict
  * carries a {@link ToolDisabledReason}, which {@link adviceForReason} maps to
  * the YAML that closes that specific gap. The tool only suggests — it never
  * mutates config, and (per the issue's out-of-scope note) it assumes the
@@ -100,14 +99,14 @@ export class ConfigHelpHandler extends ToolMetadataHandler {
       const advice = adviceForReason(verdict.reason, connId);
       connections[connId] = {
         enabled: false,
-        current_state: verdict.reason,
+        currentState: verdict.reason,
         ...advice,
       };
     }
 
     const payload: ConfigHelpPayload = {
       tool,
-      already_enabled: alreadyEnabled,
+      alreadyEnabled,
       connections,
     };
     return this.createStructuredResponse(renderAdvice(payload), { ...payload });
@@ -150,13 +149,26 @@ function apiKeyAuth(indent: string, keyVar: string, secretVar: string): string {
 }
 
 /**
+ * Render a connection id as a YAML mapping key. Connection ids are only
+ * constrained to non-empty trimmed strings (`mcpConfigSchema`), so an id
+ * containing `:`, spaces, or other YAML-significant characters would produce an
+ * invalid key if emitted bare. Plain ids (e.g. `default`) stay unquoted to keep
+ * the snippet readable; anything else is double-quoted with embedded quotes and
+ * backslashes escaped.
+ */
+function yamlKey(connId: string): string {
+  if (/^[A-Za-z0-9_-]+$/.test(connId)) return connId;
+  return `"${connId.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/**
  * Wrap a connection-scoped block body in the `connections.<connId>` envelope so
  * the snippet can be pasted at the top level of a config YAML file. `blockBody`
  * lines are expected to start at four-space indentation (one level under
  * `  <connId>:`).
  */
 function wrap(connId: string, blockBody: string): string {
-  return `connections:\n  ${connId}:\n${blockBody}`;
+  return `connections:\n  ${yamlKey(connId)}:\n${blockBody}`;
 }
 
 /**
@@ -166,18 +178,20 @@ function wrap(connId: string, blockBody: string): string {
  * service blocks, so the fix is a different connection type, surfaced as a
  * `note` instead.
  *
- * Exhaustive over `ToolDisabledReason` by construction (the `switch` returns in
- * every arm); a new reason added to the enum surfaces here as a missing case at
- * review time.
+ * Exhaustive over `ToolDisabledReason`: every arm returns, and the `default`
+ * arm pins `reason` to `never`, so a new reason added to the enum fails
+ * `tsc --noEmit` here until it gets a case. The `default` also throws at
+ * runtime as a belt-and-suspenders guard against an unmapped reason reaching
+ * the spread in `handle()`.
  */
 function adviceForReason(
   reason: ToolDisabledReason,
   connId: string,
-): Pick<ConnectionAdvice, "suggested_yaml" | "note"> {
+): Pick<ConnectionAdvice, "suggestedYaml" | "note"> {
   switch (reason) {
     case ToolDisabledReason.MissingKafkaBlock:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [
             `    kafka:`,
@@ -188,7 +202,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.MissingKafkaBootstrap:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [
             `    kafka:`,
@@ -198,7 +212,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.MissingKafkaAuth:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [
             `    kafka:`,
@@ -208,7 +222,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.MissingKafkaRestEndpoint:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [`    kafka:`, `      rest_endpoint: "\${KAFKA_REST_ENDPOINT}"`].join(
             "\n",
@@ -217,7 +231,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.MissingSchemaRegistryBlock:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [
             `    schema_registry:`,
@@ -232,7 +246,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.MissingSchemaRegistryApiKeyAuth:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [
             `    schema_registry:`,
@@ -246,7 +260,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.MissingConfluentCloudBlock:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [
             `    confluent_cloud:`,
@@ -260,7 +274,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.MissingFlinkBlock:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [
             `    flink:`,
@@ -274,7 +288,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.MissingTelemetryBlock:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [
             `    telemetry:`,
@@ -284,7 +298,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.MissingTableflowBlock:
       return {
-        suggested_yaml: wrap(
+        suggestedYaml: wrap(
           connId,
           [
             `    tableflow:`,
@@ -300,6 +314,10 @@ function adviceForReason(
       return {
         note: `Connection "${connId}" is an OAuth connection. This tool requires a direct (api_key) connection and cannot run against OAuth — switch to a direct connection carrying the required block.`,
       };
+    default: {
+      const exhaustive: never = reason;
+      throw new Error(`Unmapped ToolDisabledReason: ${String(exhaustive)}`);
+    }
   }
 }
 
@@ -309,14 +327,14 @@ function adviceForReason(
  * already-enabled and per-connection headers so the format stays stable.
  */
 function renderAdvice(payload: ConfigHelpPayload): string {
-  const { tool, already_enabled, connections } = payload;
+  const { tool, alreadyEnabled, connections } = payload;
   const entries = Object.entries(connections);
 
   if (entries.length === 0) {
     return `No connections are configured, so there is nothing to enable "${tool}" against. Add a connection to your config first.`;
   }
 
-  if (already_enabled) {
+  if (alreadyEnabled) {
     const enabledIds = entries
       .filter(([, advice]) => advice.enabled)
       .map(([id]) => id)
@@ -325,11 +343,11 @@ function renderAdvice(payload: ConfigHelpPayload): string {
   }
 
   const blocks = entries.map(([connId, advice]) => {
-    const header = `  connection "${connId}" — ${advice.current_state ?? "disabled"}`;
-    if (advice.suggested_yaml !== undefined) {
+    const header = `  connection "${connId}" — ${advice.currentState ?? "disabled"}`;
+    if (advice.suggestedYaml !== undefined) {
       // Indent the YAML two spaces so it reads as a nested block under the
       // connection header rather than as top-level config.
-      const indented = advice.suggested_yaml
+      const indented = advice.suggestedYaml
         .split("\n")
         .map((line) => (line.length > 0 ? `    ${line}` : line))
         .join("\n");

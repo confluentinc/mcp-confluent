@@ -79,12 +79,12 @@ describe("ConfigHelpHandler", () => {
 
       expect(result.structuredContent).toEqual({
         tool: ToolName.LIST_TABLEFLOW_TOPICS,
-        already_enabled: false,
+        alreadyEnabled: false,
         connections: {
           default: {
             enabled: false,
-            current_state: "no 'tableflow' block in connection config",
-            suggested_yaml:
+            currentState: "no 'tableflow' block in connection config",
+            suggestedYaml:
               'connections:\n  default:\n    tableflow:\n      auth:\n        type: api_key\n        key: "${TABLEFLOW_API_KEY}"\n        secret: "${TABLEFLOW_API_SECRET}"',
           },
         },
@@ -108,12 +108,12 @@ describe("ConfigHelpHandler", () => {
 
       expect(result.structuredContent).toEqual({
         tool: ToolName.LIST_CONNECTORS,
-        already_enabled: false,
+        alreadyEnabled: false,
         connections: {
           default: {
             enabled: false,
-            current_state: "'kafka' block does not have 'auth' field",
-            suggested_yaml:
+            currentState: "'kafka' block does not have 'auth' field",
+            suggestedYaml:
               'connections:\n  default:\n    kafka:\n      auth:\n        type: api_key\n        key: "${KAFKA_API_KEY}"\n        secret: "${KAFKA_API_SECRET}"',
           },
         },
@@ -133,7 +133,7 @@ describe("ConfigHelpHandler", () => {
 
       expect(result.structuredContent).toEqual({
         tool: ToolName.LIST_TABLEFLOW_TOPICS,
-        already_enabled: true,
+        alreadyEnabled: true,
         connections: { default: { enabled: true } },
       });
       expect(textOf(result)).toContain(
@@ -149,7 +149,7 @@ describe("ConfigHelpHandler", () => {
       });
 
       expect(result.structuredContent).toMatchObject({
-        already_enabled: true,
+        alreadyEnabled: true,
         connections: { default: { enabled: true } },
       });
     });
@@ -166,7 +166,7 @@ describe("ConfigHelpHandler", () => {
       ).connections;
       const advice = Object.values(connections)[0]!;
       expect(advice.enabled).toBe(false);
-      expect(advice).not.toHaveProperty("suggested_yaml");
+      expect(advice).not.toHaveProperty("suggestedYaml");
       expect(advice.note).toContain("OAuth connection");
     });
 
@@ -252,10 +252,10 @@ describe("ConfigHelpHandler", () => {
 
       const advice = (
         result.structuredContent as {
-          connections: Record<string, { suggested_yaml?: string }>;
+          connections: Record<string, { suggestedYaml?: string }>;
         }
       ).connections.default!;
-      expect(advice.suggested_yaml).toContain(expected);
+      expect(advice.suggestedYaml).toContain(expected);
     });
 
     it("should emit a note for an OAuth direct-only gap (OAuthNotDirectCapable)", () => {
@@ -273,7 +273,7 @@ describe("ConfigHelpHandler", () => {
           }
         ).connections,
       )[0]!;
-      expect(advice).not.toHaveProperty("suggested_yaml");
+      expect(advice).not.toHaveProperty("suggestedYaml");
       expect(advice.note).toContain("direct (api_key) connection");
     });
 
@@ -298,6 +298,38 @@ describe("ConfigHelpHandler", () => {
       );
     });
 
+    it("should quote a connection id with YAML-significant characters in the suggested key", () => {
+      // Connection ids are only constrained to non-empty trimmed strings, so an
+      // id containing ':' would produce an invalid bare YAML key.
+      const runtime = runtimeWithConnections({ "weird:id": {} });
+
+      const result = handlerWith(universe()).handle(runtime, {
+        tool: ToolName.LIST_TABLEFLOW_TOPICS,
+      });
+
+      const advice = (
+        result.structuredContent as {
+          connections: Record<string, { suggestedYaml?: string }>;
+        }
+      ).connections["weird:id"]!;
+      expect(advice.suggestedYaml).toContain('connections:\n  "weird:id":\n');
+    });
+
+    it("should leave a plain connection id unquoted in the suggested key", () => {
+      const runtime = runtimeWithConnections({ default: {} });
+
+      const result = handlerWith(universe()).handle(runtime, {
+        tool: ToolName.LIST_TABLEFLOW_TOPICS,
+      });
+
+      const advice = (
+        result.structuredContent as {
+          connections: Record<string, { suggestedYaml?: string }>;
+        }
+      ).connections.default!;
+      expect(advice.suggestedYaml).toContain("connections:\n  default:\n");
+    });
+
     it("should explain when no connections are configured", () => {
       const result = handlerWith(universe()).handle(
         runtimeWithConnections({}),
@@ -306,7 +338,7 @@ describe("ConfigHelpHandler", () => {
 
       expect(result.structuredContent).toEqual({
         tool: ToolName.LIST_TABLEFLOW_TOPICS,
-        already_enabled: false,
+        alreadyEnabled: false,
         connections: {},
       });
       expect(textOf(result)).toContain("No connections are configured");

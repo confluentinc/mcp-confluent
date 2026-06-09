@@ -34,9 +34,13 @@ export class ListTableFlowRegionsHandler extends TableflowToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { cloud, pageSize, pageToken } =
       listTableFlowRegionsArguments.parse(toolArguments);
+
+    const { clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

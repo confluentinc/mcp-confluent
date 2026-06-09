@@ -1,7 +1,7 @@
 import { ListTableFlowTopicsHandler } from "@src/confluent/tools/handlers/tableflow/topic/list-tableflow-topics-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
   TABLEFLOW_CONN,
   TableflowHandleCase,
 } from "@tests/factories/runtime.js";
@@ -67,7 +67,10 @@ describe("list-tableflow-topics-handler.ts", () => {
           connectionConfig: TABLEFLOW_CONN,
           args: {},
           mockResponse: { error: { message: "unauthorized" } },
-          outcome: { resolves: "Failed to list Tableflow topics" },
+          outcome: {
+            resolves: "Failed to list Tableflow topics",
+            isError: true,
+          },
           expectedEnvId: "env-from-config",
           expectedClusterId: "lkc-from-config",
         },
@@ -91,7 +94,7 @@ describe("list-tableflow-topics-handler.ts", () => {
           }
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,

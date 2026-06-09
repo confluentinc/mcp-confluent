@@ -38,12 +38,15 @@ export class ListTableFlowTopicsHandler extends TableflowToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { clusterId, environmentId } =
       listTableFlowTopicArguments.parse(toolArguments);
 
+    const { conn, clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
     const { environment_id, kafka_cluster_id } =
-      this.resolveTableflowEnvAndClusterId(runtime, environmentId, clusterId);
+      this.resolveTableflowEnvAndClusterId(conn, environmentId, clusterId);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

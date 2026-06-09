@@ -1,9 +1,19 @@
+import { DirectConnectionConfig } from "@src/config/models.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   alwaysEnabled,
+  ConnectionPredicate,
+  hasCCloudCatalogSupport,
+  hasConfluentCloud,
+  hasFlink,
+  hasKafka,
   hasKafkaAuth,
+  hasKafkaBootstrap,
+  hasKafkaRestWithAuth,
+  hasSchemaRegistry,
   hasTableflow,
+  hasTelemetry,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ConfigHelpHandler } from "@src/confluent/tools/handlers/diagnostics/config-help-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -174,6 +184,118 @@ describe("ConfigHelpHandler", () => {
     it("should throw a ZodError when the tool argument is missing", () => {
       const runtime = runtimeWithConnections({ default: {} });
       expect(() => handlerWith(universe()).handle(runtime, {})).toThrow();
+    });
+
+    // Drive each ToolDisabledReason → suggested-YAML arm of adviceForReason
+    // through handle(): a stub tool whose predicate yields the reason against a
+    // connection shaped to trip exactly that gap.
+    it.each<{
+      reason: string;
+      predicate: ConnectionPredicate;
+      config: Omit<DirectConnectionConfig, "type">;
+      expected: string;
+    }>([
+      {
+        reason: "MissingKafkaBlock",
+        predicate: hasKafka,
+        config: {},
+        expected: "    kafka:",
+      },
+      {
+        reason: "MissingKafkaBootstrap",
+        predicate: hasKafkaBootstrap,
+        config: { kafka: { rest_endpoint: "https://r" } },
+        expected: "bootstrap_servers",
+      },
+      {
+        reason: "MissingKafkaRestEndpoint",
+        predicate: hasKafkaRestWithAuth,
+        config: { kafka: { bootstrap_servers: "b:9092" } },
+        expected: "rest_endpoint",
+      },
+      {
+        reason: "MissingSchemaRegistryBlock",
+        predicate: hasSchemaRegistry,
+        config: {},
+        expected: "    schema_registry:",
+      },
+      {
+        reason: "MissingSchemaRegistryApiKeyAuth",
+        predicate: hasCCloudCatalogSupport,
+        config: { schema_registry: { endpoint: "https://sr" } },
+        expected: "    schema_registry:",
+      },
+      {
+        reason: "MissingConfluentCloudBlock",
+        predicate: hasConfluentCloud,
+        config: {},
+        expected: "    confluent_cloud:",
+      },
+      {
+        reason: "MissingFlinkBlock",
+        predicate: hasFlink,
+        config: {},
+        expected: "    flink:",
+      },
+      {
+        reason: "MissingTelemetryBlock",
+        predicate: hasTelemetry,
+        config: {},
+        expected: "    telemetry:",
+      },
+    ])("should suggest YAML for $reason", ({ predicate, config, expected }) => {
+      const runtime = runtimeWithConnections({ default: config });
+
+      const result = handlerWith([
+        [ToolName.LIST_CONNECTORS, new StubHandler({ predicate })],
+      ]).handle(runtime, { tool: ToolName.LIST_CONNECTORS });
+
+      const advice = (
+        result.structuredContent as {
+          connections: Record<string, { suggested_yaml?: string }>;
+        }
+      ).connections.default!;
+      expect(advice.suggested_yaml).toContain(expected);
+    });
+
+    it("should emit a note for an OAuth direct-only gap (OAuthNotDirectCapable)", () => {
+      const result = handlerWith([
+        [
+          ToolName.LIST_CONNECTORS,
+          new StubHandler({ predicate: hasConfluentCloud }),
+        ],
+      ]).handle(ccloudOAuthRuntime(), { tool: ToolName.LIST_CONNECTORS });
+
+      const advice = Object.values(
+        (
+          result.structuredContent as {
+            connections: Record<string, { note?: string }>;
+          }
+        ).connections,
+      )[0]!;
+      expect(advice).not.toHaveProperty("suggested_yaml");
+      expect(advice.note).toContain("direct (api_key) connection");
+    });
+
+    it("should list every connection when a tool is already enabled on more than one", () => {
+      const enabledTableflow = {
+        tableflow: {
+          auth: { type: "api_key" as const, key: "k", secret: "s" },
+        },
+      };
+      const runtime = runtimeWithConnections({
+        beta: enabledTableflow,
+        alpha: enabledTableflow,
+      });
+
+      const result = handlerWith(universe()).handle(runtime, {
+        tool: ToolName.LIST_TABLEFLOW_TOPICS,
+      });
+
+      // Connection ids are rendered sorted regardless of insertion order.
+      expect(textOf(result)).toContain(
+        "already enabled on connection(s): alpha, beta",
+      );
     });
 
     it("should explain when no connections are configured", () => {

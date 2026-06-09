@@ -158,7 +158,8 @@ function apiKeyAuth(indent: string, keyVar: string, secretVar: string): string {
  */
 function yamlKey(connId: string): string {
   if (/^[A-Za-z0-9_-]+$/.test(connId)) return connId;
-  return `"${connId.replaceAll(/\\/g, String.raw`\\`).replaceAll(/"/g, String.raw`\"`)}"`;
+  const escaped = connId.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+  return `"${escaped}"`;
 }
 
 /**

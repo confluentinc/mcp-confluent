@@ -142,6 +142,23 @@ export function buildToolGatingReport(
   let disabledCount = 0;
 
   for (const [toolName, handler] of handlers) {
+    // The allow/block-list gate runs ahead of the predicate check: a tool the
+    // list excludes is never advertised, so it must count as disabled even when
+    // its config requirements are met. Reporting it as enabled would leave the
+    // operator no way to discover it (the default tool set has no escape-hatch
+    // flag — `--allow-tools` is the path, and this reason names it).
+    if (!runtime.isToolAllowed(toolName)) {
+      disabledCount += 1;
+      const key =
+        groupBy === "reason"
+          ? ToolDisabledReason.NotInDefaultToolSet
+          : handler.category;
+      let bucket = groups.get(key);
+      bucket ??= [];
+      groups.set(key, bucket);
+      bucket.push(toolName);
+      continue;
+    }
     const classification = classifyTool(handler.connectionVerdicts(runtime));
     if (classification.kind === "enabled") {
       enabledCount += 1;

@@ -201,6 +201,90 @@ describe("tool-availability.ts", () => {
       });
     });
 
+    it("should report a tool whose predicate passes but the allow/block-list excludes as disabled under NotInDefaultToolSet", () => {
+      // The allow/block-list gate runs ahead of the predicate: a tool the list
+      // excludes is never advertised, so it must count as disabled even though
+      // its predicate would pass. This is the discovery path for the curated
+      // default tool set (no escape-hatch flag — `--allow-tools` is the way).
+      const handler = stubWithPredicate(alwaysEnabled);
+      const runtime = runtimeWith(
+        KAFKA_CONN,
+        "default",
+        undefined,
+        new Set<ToolName>(), // empty allow-set excludes everything
+      );
+      const report = buildToolGatingReport(
+        [[ToolName.LIST_TOPICS, handler]],
+        runtime,
+      );
+      expect(report).toEqual({
+        groupBy: "reason",
+        disabledGroups: [
+          {
+            reason: ToolDisabledReason.NotInDefaultToolSet,
+            tools: [ToolName.LIST_TOPICS],
+          },
+        ],
+        enabledCount: 0,
+        disabledCount: 1,
+      });
+    });
+
+    it("should count an allow-listed tool as enabled and an excluded one as disabled", () => {
+      const allowed = stubWithPredicate(alwaysEnabled);
+      const excluded = stubWithPredicate(alwaysEnabled);
+      const runtime = runtimeWith(
+        KAFKA_CONN,
+        "default",
+        undefined,
+        new Set<ToolName>([ToolName.LIST_TOPICS]),
+      );
+      const report = buildToolGatingReport(
+        [
+          [ToolName.LIST_TOPICS, allowed],
+          [ToolName.CREATE_TOPICS, excluded],
+        ],
+        runtime,
+      );
+      expect(report).toEqual({
+        groupBy: "reason",
+        disabledGroups: [
+          {
+            reason: ToolDisabledReason.NotInDefaultToolSet,
+            tools: [ToolName.CREATE_TOPICS],
+          },
+        ],
+        enabledCount: 1,
+        disabledCount: 1,
+      });
+    });
+
+    it("should bucket an allow/block-list-excluded tool under its category when groupBy is 'category'", () => {
+      const handler = stubWithPredicate(alwaysEnabled, ToolCategory.Kafka);
+      const runtime = runtimeWith(
+        KAFKA_CONN,
+        "default",
+        undefined,
+        new Set<ToolName>(),
+      );
+      const report = buildToolGatingReport(
+        [[ToolName.LIST_TOPICS, handler]],
+        runtime,
+        "category",
+      );
+      expect(report).toEqual({
+        groupBy: "category",
+        disabledGroups: [
+          {
+            category: ToolCategory.Kafka,
+            tools: [ToolName.LIST_TOPICS],
+          },
+        ],
+        enabledCount: 0,
+        disabledCount: 1,
+      });
+    });
+
     it("should group fully-disabled tools by reason, sorted lex by reason", () => {
       const kafkaTool = stubWithPredicate(disabledForKafka);
       const otherKafkaTool = stubWithPredicate(disabledForKafka);

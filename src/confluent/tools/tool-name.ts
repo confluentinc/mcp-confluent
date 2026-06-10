@@ -69,3 +69,34 @@ export enum ToolName {
   EXPLAIN_DISABLED_TOOLS = "explain-disabled-tools",
   LIST_CONFIGURED_CONNECTIONS = "list-configured-connections",
 }
+
+/**
+ * The curated set of tools advertised when the operator configures no
+ * allow/block-list. A 69-tool surface dilutes the assistant's tool selection
+ * and overwhelms first-time users, so the no-filter default is this 10-tool
+ * "discovery + core" set rather than the entire {@link ToolName} enum.
+ *
+ * This is an upper bound: the effective set is intersected with each tool's
+ * connection predicate, so a tool here still won't be advertised if its
+ * service block is absent (e.g. {@link ToolName.CREATE_FLINK_STATEMENT} needs
+ * a `flink:` block). {@link ToolName.SEARCH_PRODUCT_DOCS} and
+ * {@link ToolName.EXPLAIN_DISABLED_TOOLS} are always enabled, so the server
+ * can never end up advertising zero tools.
+ *
+ * Operators widen this with `--allow-tools` (replaces the default with an
+ * explicit set) or `--block-tools` (starts from the full catalog minus the
+ * blocked tools). `explain-disabled-tools` lists what is off by default and
+ * how to enable it.
+ */
+export const DEFAULT_ENABLED_TOOLS: readonly ToolName[] = [
+  ToolName.LIST_ENVIRONMENTS,
+  ToolName.LIST_CLUSTERS,
+  ToolName.LIST_TOPICS,
+  ToolName.PRODUCE_MESSAGE,
+  ToolName.CONSUME_MESSAGES,
+  ToolName.LIST_FLINK_STATEMENTS,
+  ToolName.CREATE_FLINK_STATEMENT,
+  ToolName.LIST_SCHEMAS,
+  ToolName.SEARCH_PRODUCT_DOCS,
+  ToolName.EXPLAIN_DISABLED_TOOLS,
+];

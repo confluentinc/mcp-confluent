@@ -327,11 +327,15 @@ You can also maintain allow/block lists in files (one tool name per line):
 npx -y @confluentinc/mcp-confluent -c config.yaml --allow-tools-file allow.txt --block-tools-file block.txt
 ```
 
-### Example: List All Available Tools
+### Example: List the Enabled Tools
 
 ```bash
 npx -y @confluentinc/mcp-confluent --list-tools
 ```
+
+Without `--allow-tools`/`--block-tools` this prints the curated default set (10 tools).
+Add `--allow-tools <names>` to enable more, or `--block-tools <names>` to print the full catalog minus a few.
+The example output below is from a server widened past the default set.
 
 <details>
 <summary>Show output</summary>
@@ -432,7 +436,8 @@ tableflow:
 </details>
 
 > **Tip:** The allow-list is applied before the block-list.
-> If neither is provided, all tools are enabled by default.
+> If neither is provided, a curated default set of 10 tools is enabled (not the full catalog) — see [CONFIGURATION.md](CONFIGURATION.md#tool-enablement-which-block-lights-up-what) for the list and how to widen it.
+> Use `--allow-tools` to enable tools that are off by default, or `--block-tools` to start from the full catalog minus a few tools.
 
 ## Configuring MCP Clients
 

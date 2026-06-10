@@ -6,7 +6,10 @@ import {
   parseCliArgs,
 } from "@src/cli.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
+import {
+  DEFAULT_ENABLED_TOOLS,
+  ToolName,
+} from "@src/confluent/tools/tool-name.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 import {
   beforeEach,
@@ -27,9 +30,15 @@ describe("cli.ts", () => {
   const ALL_TOOL_NAMES = Object.values(ToolName).sort();
 
   describe("getFilteredToolNames()", () => {
-    it("should return all tools sorted when both lists are empty", () => {
+    it("should return the curated default set sorted when both lists are empty", () => {
       const result = getFilteredToolNames([], []);
-      expect(result).toEqual(ALL_TOOL_NAMES);
+      expect(result).toEqual([...DEFAULT_ENABLED_TOOLS].sort());
+    });
+
+    it("should not return the full catalog when both lists are empty", () => {
+      const result = getFilteredToolNames([], []);
+      expect(result.length).toBeLessThan(ALL_TOOL_NAMES.length);
+      expect(result.length).toBe(DEFAULT_ENABLED_TOOLS.length);
     });
 
     it("should return only the specified tools when allow list contains valid names", () => {

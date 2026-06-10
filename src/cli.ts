@@ -1,6 +1,9 @@
 import { Command, CommanderError, Option } from "@commander-js/extra-typings";
 import { dotenvLib, fs, path } from "@src/confluent/node-deps.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
+import {
+  DEFAULT_ENABLED_TOOLS,
+  ToolName,
+} from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 
@@ -359,16 +362,18 @@ export function loadDotEnvFile(envFile: string): Record<string, string> {
  *   1. If allow list (`allowTools`) is non-empty, only those
  *      tool names present in the allow list (and valid) will be enabled. Any invalid
  *      tool names in the allow list are ignored and a warning is logged.
- *   2. If block list (`blockTools`) is non-empty, any tool
- *      names present in the block list (and valid) will be removed from the enabled
- *      set. Any invalid tool names in the block list are ignored and a warning is logged.
- *   3. If both lists are empty, all available tools are enabled.
+ *   2. If block list (`blockTools`) is non-empty, the enabled set starts from
+ *      the full catalog and any tool names present in the block list (and valid)
+ *      are removed. Any invalid tool names in the block list are ignored and a
+ *      warning is logged.
+ *   3. If both lists are empty, only {@link DEFAULT_ENABLED_TOOLS} are enabled
+ *      (not the full catalog) — see that constant for the rationale.
  *
  * The returned list is always sorted alphabetically.
  *
  * @param allowTools - Array of tool names to explicitly allow/enable. If nonempty, only these tools will possibly
- *                    be enabled (subject to block list). If not provided or empty, all tools are initially
- *                    considered for enabling.
+ *                    be enabled (subject to block list). If empty (and the block list is also empty), the
+ *                    curated default set is enabled.
  * @param blockTools - Array of tool names to block. If nonempty, these tools will be disabled (even if
  *                      they are in the allow list).
  *
@@ -385,8 +390,10 @@ export function getFilteredToolNames(
     (!allowTools || allowTools.length === 0) &&
     (!blockTools || blockTools.length === 0)
   ) {
+    filteredToolNames = new Set(DEFAULT_ENABLED_TOOLS);
     logger.info(
-      "No allow/block tool lists provided; all tools are enabled by default.",
+      `No allow/block tool lists provided; enabling the default set of ${DEFAULT_ENABLED_TOOLS.length} tools. ` +
+        "Enable others with --allow-tools, or call the explain-disabled-tools tool to see the full catalog.",
     );
   } else {
     if (allowTools.length > 0) {

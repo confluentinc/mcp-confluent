@@ -28,17 +28,17 @@ import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
  * Resolve the operator's tool allow/block-list into the set `ServerRuntime`
- * gates on — or `undefined` when neither list was configured, preserving the
- * "no filter configured" sentinel rather than materializing an all-tools set
- * that would mean the same thing while muddying the runtime's contract.
+ * gates on. When neither list is configured, this is the curated
+ * {@link DEFAULT_ENABLED_TOOLS} set rather than the full catalog — the
+ * defaulting lives in `getFilteredToolNames`, so this resolver and the
+ * `--list-tools` output stay in lockstep. Always returns a concrete set;
+ * `ServerRuntime.isToolAllowed` still tolerates `undefined` for callers (tests)
+ * that construct a runtime without an allow-list.
  */
 export function resolveAllowedToolNames(
   allowTools: string[],
   blockTools: string[],
-): ReadonlySet<ToolName> | undefined {
-  if (allowTools.length === 0 && blockTools.length === 0) {
-    return undefined;
-  }
+): ReadonlySet<ToolName> {
   return new Set(getFilteredToolNames(allowTools, blockTools));
 }
 
@@ -58,12 +58,23 @@ export function getToolHandlersToRegister(
   // into the grouped warning emitted later). The filter lives on the runtime
   // so registration and the list-configured-connections tool read one source of truth.
   const candidates: Array<readonly [ToolName, ToolHandler]> = [];
+  const excludedByList: ToolName[] = [];
   for (const toolName of Object.values(ToolName)) {
     if (!runtime.isToolAllowed(toolName)) {
-      logger.warn(`Tool ${toolName} disabled due to allow/block list rules`);
+      excludedByList.push(toolName);
+      logger.debug(`Tool ${toolName} disabled due to allow/block list rules`);
       continue;
     }
     candidates.push([toolName, ToolHandlerRegistry.getToolHandler(toolName)]);
+  }
+  // One summary line instead of one warning per excluded tool — with the
+  // default tool set most of the catalog is off, and per-tool warnings would
+  // bury the startup log. The per-tool detail stays at debug above.
+  if (excludedByList.length > 0) {
+    logger.info(
+      `${excludedByList.length} tool(s) are off due to allow/block-list rules. ` +
+        "Enable specific tools with --allow-tools, or call the explain-disabled-tools tool to see them.",
+    );
   }
 
   // Pass 2: register tools that are enabled on at least one connection.

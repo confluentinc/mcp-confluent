@@ -9,7 +9,10 @@ import {
   ToolCategory,
   type ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
+import {
+  DEFAULT_ENABLED_TOOLS,
+  ToolName,
+} from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import {
   getToolHandlersToRegister,
@@ -379,10 +382,13 @@ describe("index.ts", () => {
   });
 
   describe("resolveAllowedToolNames()", () => {
-    it("should return undefined when neither an allow nor a block list is configured", () => {
-      // The `undefined` sentinel keeps ServerRuntime in its "no filter" state
-      // rather than carrying an all-tools set that means the same thing.
-      expect(resolveAllowedToolNames([], [])).toBeUndefined();
+    it("should return exactly the curated default set when neither an allow nor a block list is configured", () => {
+      // No filter no longer means "all tools" — it means the curated
+      // DEFAULT_ENABLED_TOOLS set, resolved through getFilteredToolNames so
+      // the runtime gate and --list-tools agree.
+      const allowed = resolveAllowedToolNames([], []);
+      expect(allowed).toBeInstanceOf(Set);
+      expect([...allowed].sort()).toEqual([...DEFAULT_ENABLED_TOOLS].sort());
     });
 
     it("should restrict to exactly the allow list when one is provided", () => {

@@ -283,8 +283,18 @@ Or use `--disable-auth` on the command line. **Never** disable auth in productio
 
 ## Tool enablement: which block lights up what
 
-Tools auto-enable based on which service blocks are present in the resolved configuration.
-Run `--list-tools` to see the live set for your config, or use the `explain-disabled-tools` MCP tool to ask the running server why a specific tool is missing.
+Two gates decide whether a tool is advertised, and a tool must pass both.
+
+1. **The default tool set.**
+   When you start the server without `--allow-tools`/`--block-tools`, only a curated set of 10 tools is enabled — not the full catalog.
+   A 69-tool surface dilutes the assistant's tool selection and overwhelms first-time users, so the no-filter default is a "discovery + core" starter set: `list-environments`, `list-clusters`, `list-topics`, `produce-message`, `consume-messages`, `list-flink-statements`, `create-flink-statement`, `list-schemas`, `search-product-docs`, and `explain-disabled-tools`.
+   See [Narrowing or widening the tool set](#narrowing-or-widening-the-tool-set) to change this.
+2. **Service blocks.**
+   Each tool also requires the relevant service block to be present in the resolved configuration (the table below).
+   The default set is an upper bound: a default tool still won't appear if its block is missing — e.g. `create-flink-statement` needs a `flink:` block.
+   `search-product-docs` and `explain-disabled-tools` are always on regardless of config, so the server never advertises zero tools.
+
+Run `--list-tools` to see the live set for your config, or use the `explain-disabled-tools` MCP tool to ask the running server why a specific tool is missing — it now also reports tools that are off because they are not in the default set, with the flag to turn them on.
 
 | Block(s) required                                        | Tools enabled                                                                                                                                                                                                                                                                                                                                                |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -300,6 +310,24 @@ Run `--list-tools` to see the live set for your config, or use the `explain-disa
 | `confluent_cloud` + `kafka.auth` (direct only)           | `create-connector`                                                                                                                                                                                                                                                                                                                                           |
 | `schema_registry` with api-key auth (direct only)        | `search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`                                                                                                                                                                                                               |
 | `telemetry`                                              | `list-available-metrics`, `query-metrics`                                                                                                                                                                                                                                                                                                                    |
+
+### Narrowing or widening the tool set
+
+Two CLI flags override the default set.
+Both accept a comma-separated list of tool names; invalid names are ignored with a warning.
+
+- `--allow-tools <names>` — **replace** the default set with exactly these tools.
+  To enable a tool that is off by default (e.g. `delete-topics`), list it here.
+  This is the only way to add tools beyond the default set, so include every tool you want.
+- `--block-tools <names>` — start from the **full catalog** and remove these tools.
+  Use this when you want nearly everything except a few destructive tools.
+  Note the asymmetry: a block-only invocation is the full catalog minus the blocked names, not the 10-tool default minus them.
+
+When both are given, the allow list is applied first and the block list is subtracted from it.
+The file variants `--allow-tools-file <path>` and `--block-tools-file <path>` read one tool name per line (`#` comments allowed) and are used only when the corresponding inline flag is absent.
+Either gate still intersects with the service-block requirements above — allow-listing a Flink tool without a `flink:` block won't advertise it.
+
+Run `--list-tools` to print the resolved set for a given combination of flags without starting the server.
 
 ## Legacy env-var configuration (deprecated)
 

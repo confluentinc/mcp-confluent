@@ -330,4 +330,8 @@ export enum ToolDisabledReason {
   MissingTableflowBlock = "no 'tableflow' block in connection config",
   OAuthNoServiceBlocks = "OAuth connections carry no service blocks",
   OAuthNotDirectCapable = "OAuth connection cannot satisfy a direct-only requirement",
+  // Not a predicate verdict: the tool's config requirements are met, but the
+  // operator's allow/block-list (by default, the curated DEFAULT_ENABLED_TOOLS
+  // set) excludes it. Attributed by buildToolGatingReport, not by any predicate.
+  NotInDefaultToolSet = "off by default; enable it with --allow-tools",
 }

@@ -1,3 +1,4 @@
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -28,27 +29,34 @@ import type { ZodRawShape } from "zod";
  * (e.g. `hasKafka`) rather than the binary `enabled` toggle — needed by tests
  * that vary which connections a tool is viable for. Pass `inputSchema` to give
  * the stub a non-empty authored schema (e.g. for `getRegisteredToolConfig`
- * tests that assert the augmented schema preserves pre-existing fields).
+ * tests that assert the augmented schema preserves pre-existing fields). Pass
+ * `annotations` to vary the stub's mutation posture (e.g. `CREATE_UPDATE` /
+ * `DESTRUCTIVE`) — needed by the read-only verdict-overlay tests; defaults to
+ * `READ_ONLY`.
  */
 export class StubHandler extends BaseToolHandler {
   readonly category: ToolCategory;
   readonly predicate: ConnectionPredicate;
   private readonly authoredInputSchema: ZodRawShape;
+  private readonly annotations: ToolAnnotations;
 
   constructor({
     enabled = true,
     category = ToolCategory.Kafka,
     predicate,
     inputSchema = {},
+    annotations = READ_ONLY,
   }: {
     enabled?: boolean;
     category?: ToolCategory;
     predicate?: ConnectionPredicate;
     inputSchema?: ZodRawShape;
+    annotations?: ToolAnnotations;
   } = {}) {
     super();
     this.category = category;
     this.authoredInputSchema = inputSchema;
+    this.annotations = annotations;
     this.predicate =
       predicate ??
       (enabled
@@ -64,7 +72,7 @@ export class StubHandler extends BaseToolHandler {
       name: ToolName.LIST_TOPICS,
       description: "stub",
       inputSchema: this.authoredInputSchema,
-      annotations: READ_ONLY,
+      annotations: this.annotations,
     };
   }
 

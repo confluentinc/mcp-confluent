@@ -8,7 +8,9 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   alwaysEnabled,
   ConnectionPredicate,
+  ENABLED,
   PredicateResult,
+  ToolDisabledReason,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -261,8 +263,10 @@ export abstract class BaseToolHandler implements ToolHandler {
   abstract readonly category: ToolCategory;
 
   /**
-   * IDs of connections that satisfy this tool's {@linkcode predicate}. A
-   * non-empty result enables the tool; an empty result disables it.
+   * IDs of connections that satisfy this tool's {@linkcode predicate} and are
+   * not blocked by the read-only overlay. A non-empty result enables the tool;
+   * an empty result disables it. Derived from {@linkcode connectionVerdicts} so
+   * the two stay in lockstep.
    *
    * Customize tool gating by declaring {@linkcode predicate}, never by
    * replacing this derivation.
@@ -270,15 +274,17 @@ export abstract class BaseToolHandler implements ToolHandler {
    * @final — concrete on `BaseToolHandler`; subclasses must not override.
    */
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return Object.entries(runtime.config.connections)
-      .filter(([, conn]) => this.predicate(conn).enabled)
+    return [...this.connectionVerdicts(runtime)]
+      .filter(([, verdict]) => verdict.enabled)
       .map(([id]) => id);
   }
 
   /**
-   * Per-connection verdict map for this tool, derived from
-   * {@linkcode predicate}. Powers grouped startup logging and
-   * the diagnostic-tool surface.
+   * Per-connection verdict map for this tool — the single source of truth for
+   * enablement. Each verdict composes the {@linkcode predicate} with the
+   * read-only overlay (see {@linkcode connectionVerdict}). Powers grouped
+   * startup logging, the diagnostic-tool surface, and
+   * {@linkcode enabledConnectionIds}.
    *
    * Customize tool gating by declaring {@linkcode predicate}, never by
    * replacing this derivation.
@@ -289,9 +295,31 @@ export abstract class BaseToolHandler implements ToolHandler {
     return new Map(
       Object.entries(runtime.config.connections).map(([id, conn]) => [
         id,
-        this.predicate(conn),
+        this.connectionVerdict(conn),
       ]),
     );
+  }
+
+  /**
+   * Single-connection verdict composing the two gating layers: the
+   * {@linkcode predicate} (service reachability) and the read-only overlay.
+   *
+   * A connection the predicate already disables keeps that verdict unchanged —
+   * service reachability is the more fundamental reason and wins, so a
+   * connection missing the service block is never reported as "read-only
+   * blocked". Otherwise, a `read_only` connection disables any tool that
+   * mutates state (`annotations.readOnlyHint !== true`).
+   */
+  private connectionVerdict(conn: ConnectionConfig): PredicateResult {
+    const verdict = this.predicate(conn);
+    if (!verdict.enabled) return verdict;
+    if (
+      conn.read_only === true &&
+      this.getToolConfig().annotations.readOnlyHint !== true
+    ) {
+      return { enabled: false, reason: ToolDisabledReason.ReadOnlyConnection };
+    }
+    return ENABLED;
   }
 
   /**

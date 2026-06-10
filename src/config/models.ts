@@ -20,6 +20,7 @@ import { z } from "zod";
 export interface DirectConnectionConfig {
   readonly type: "direct";
   readonly description?: string;
+  readonly read_only?: boolean;
   readonly kafka?: KafkaDirectConfig;
   readonly schema_registry?: SchemaRegistryDirectConfig;
   readonly confluent_cloud?: ConfluentCloudDirectConfig;
@@ -46,6 +47,7 @@ export interface DirectConnectionConfig {
 export interface OAuthConnectionConfig {
   readonly type: "oauth";
   readonly description?: string;
+  readonly read_only?: boolean;
   readonly ccloud_env: "devel" | "stag" | "prod";
   readonly kafka_debug?: string;
 }
@@ -319,11 +321,20 @@ const connectionDescriptionSchema = z
   .transform((s) => (s.length === 0 ? undefined : s))
   .optional();
 
+/**
+ * Opt-in read-only policy for a connection, shared by both connection arms.
+ * When `true`, tools whose `annotations.readOnlyHint !== true` are disabled for
+ * this connection — see the verdict overlay in `BaseToolHandler`. Defaults to
+ * `false` so an omitted flag leaves a connection fully read/write.
+ */
+const connectionReadOnlySchema = z.boolean().default(false);
+
 /** Zod schema for direct connection type */
 const directConnectionSchema = z
   .object({
     type: z.literal("direct"),
     description: connectionDescriptionSchema,
+    read_only: connectionReadOnlySchema,
     confluent_cloud: z
       .object({
         endpoint: z
@@ -474,6 +485,7 @@ const oauthConnectionSchema = z
   .object({
     type: z.literal("oauth"),
     description: connectionDescriptionSchema,
+    read_only: connectionReadOnlySchema,
     ccloud_env: z.enum(["devel", "stag", "prod"]).default("prod"),
     kafka_debug: z
       .string()

@@ -17,7 +17,6 @@ export enum ToolName {
   LIST_FLINK_DATABASES = "list-flink-databases",
   LIST_FLINK_TABLES = "list-flink-tables",
   DESCRIBE_FLINK_TABLE = "describe-flink-table",
-  GET_FLINK_TABLE_INFO = "get-flink-table-info",
   CHECK_FLINK_STATEMENT_HEALTH = "check-flink-statement-health",
   DETECT_FLINK_STATEMENT_ISSUES = "detect-flink-statement-issues",
   GET_FLINK_STATEMENT_PROFILE = "get-flink-statement-profile",

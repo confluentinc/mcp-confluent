@@ -83,62 +83,86 @@ export class DescribeTableHandler extends FlinkCatalogToolHandler {
     const database_input = resolveDatabaseName(databaseName, conn);
 
     const statementsCreated: string[] = [];
+    const flinkScope = {
+      organizationId: organization_id,
+      environmentId: environment_id,
+      computePoolId: compute_pool_id,
+    };
 
     // Only run getSchemaMapping for lkc-* inputs; resolveToSchemaName
     // passes friendly names through, so the roundtrip would just leak a
-    // statement.
+    // statement. Done once here and shared by both INFORMATION_SCHEMA queries
+    // below — the whole reason this tool absorbed get-flink-table-info rather
+    // than living alongside it.
     let schema_name: string | undefined = database_input;
     if (database_input?.startsWith("lkc-")) {
-      const lookup = await getSchemaMapping(clientManager, catalog_name, {
-        organizationId: organization_id,
-        environmentId: environment_id,
-        computePoolId: compute_pool_id,
-      });
+      const lookup = await getSchemaMapping(
+        clientManager,
+        catalog_name,
+        flinkScope,
+      );
       if (lookup.statementName) statementsCreated.push(lookup.statementName);
       schema_name = resolveToSchemaName(database_input, lookup.mappings);
     }
 
-    // Query INFORMATION_SCHEMA.COLUMNS for full schema details
-    // Must fully qualify with catalog and use backticks per Confluent Cloud requirements
-    // If schema_name is provided, filter by it; otherwise search all databases for the table
+    // Both queries fully qualify with catalog and backtick-quote per Confluent
+    // Cloud requirements. If schema_name is provided, filter by it; otherwise
+    // search all databases for the table.
     const schemaFilter = schema_name
       ? ` AND \`TABLE_SCHEMA\` = '${schema_name}'`
       : "";
-    const sql = `SELECT \`TABLE_SCHEMA\`, \`COLUMN_NAME\`, \`ORDINAL_POSITION\`, \`DATA_TYPE\`, \`FULL_DATA_TYPE\`, \`IS_NULLABLE\`, \`IS_HIDDEN\`, \`IS_GENERATED\`, \`GENERATION_EXPRESSION\`, \`IS_METADATA\`, \`METADATA_KEY\` FROM \`${catalog_name}\`.\`INFORMATION_SCHEMA\`.\`COLUMNS\` WHERE \`TABLE_NAME\` = '${tableName}' AND \`IS_HIDDEN\` = 'NO'${schemaFilter}`;
 
-    const result = await executeFlinkSql(clientManager, sql, {
-      organizationId: organization_id,
-      environmentId: environment_id,
-      computePoolId: compute_pool_id,
-    });
-    if (result.statementName) statementsCreated.push(result.statementName);
+    // Column-level schema (the primary "describe" payload).
+    const columnsSql = `SELECT \`TABLE_SCHEMA\`, \`COLUMN_NAME\`, \`ORDINAL_POSITION\`, \`DATA_TYPE\`, \`FULL_DATA_TYPE\`, \`IS_NULLABLE\`, \`IS_HIDDEN\`, \`IS_GENERATED\`, \`GENERATION_EXPRESSION\`, \`IS_METADATA\`, \`METADATA_KEY\` FROM \`${catalog_name}\`.\`INFORMATION_SCHEMA\`.\`COLUMNS\` WHERE \`TABLE_NAME\` = '${tableName}' AND \`IS_HIDDEN\` = 'NO'${schemaFilter}`;
+    // Table-level metadata: watermarks, distribution, table type.
+    const tableInfoSql = `SELECT \`TABLE_CATALOG\`, \`TABLE_SCHEMA\`, \`TABLE_NAME\`, \`TABLE_TYPE\`, \`IS_DISTRIBUTED\`, \`DISTRIBUTION_ALGORITHM\`, \`DISTRIBUTION_BUCKETS\`, \`IS_WATERMARKED\`, \`WATERMARK_COLUMN\`, \`WATERMARK_EXPRESSION\`, \`WATERMARK_IS_HIDDEN\`, \`COMMENT\` FROM \`${catalog_name}\`.\`INFORMATION_SCHEMA\`.\`TABLES\` WHERE \`TABLE_NAME\` = '${tableName}'${schemaFilter}`;
+
+    const columnsResult = await executeFlinkSql(
+      clientManager,
+      columnsSql,
+      flinkScope,
+    );
+    if (columnsResult.statementName)
+      statementsCreated.push(columnsResult.statementName);
+
+    // Columns are the essential payload — if that query fails, the whole call
+    // fails (matches the pre-merge describe-flink-table behavior).
+    if (!columnsResult.success) {
+      return this.createResponse(
+        `Failed to describe table: ${columnsResult.error}`,
+        true,
+        {
+          flinkStatementsCreated: statementsCreated,
+        } satisfies FlinkStatementMeta,
+      );
+    }
+
+    const infoResult = await executeFlinkSql(
+      clientManager,
+      tableInfoSql,
+      flinkScope,
+    );
+    if (infoResult.statementName)
+      statementsCreated.push(infoResult.statementName);
+
     const meta: FlinkStatementMeta = {
       flinkStatementsCreated: statementsCreated,
     };
 
-    if (!result.success) {
-      return this.createResponse(
-        `Failed to describe table: ${result.error}`,
-        true,
-        meta,
-      );
-    }
+    const columns = columnsResult.data ?? [];
+    // Table metadata is supplementary: a failed/empty TABLES query must not sink
+    // a successful columns describe, so degrade to null rather than erroring.
+    const metadata = infoResult.success ? (infoResult.data?.[0] ?? null) : null;
 
-    const columns = result.data ?? [];
-    if (columns.length === 0) {
+    if (columns.length === 0 && metadata === null) {
       const scope = schema_name
         ? `'${catalog_name}.${schema_name}.${tableName}'`
         : `'${tableName}' in catalog '${catalog_name}'`;
-      return this.createResponse(
-        `Table ${scope} not found or has no columns.`,
-        true,
-        meta,
-      );
+      return this.createResponse(`Table ${scope} not found.`, true, meta);
     }
 
-    // Include TABLE_SCHEMA in response so user knows which database the table is in
     return this.createResponse(
-      `Table '${tableName}' schema:\n${JSON.stringify(columns, null, 2)}`,
+      `Table '${tableName}':\n${JSON.stringify({ metadata, columns }, null, 2)}`,
       false,
       meta,
     );
@@ -148,7 +172,7 @@ export class DescribeTableHandler extends FlinkCatalogToolHandler {
     return {
       name: ToolName.DESCRIBE_FLINK_TABLE,
       description:
-        "Get full schema details for a Flink table via INFORMATION_SCHEMA.COLUMNS. Returns column names, data types (including $rowtime), nullability, and metadata column info.",
+        "Describe a Flink table: returns its full column schema (names, data types including $rowtime, nullability, and metadata columns) together with table-level metadata (watermark configuration, distribution, and table type). Use this whenever you need to understand a table's shape before querying it — it answers in one call what previously required both a column lookup and a separate table-info lookup.",
       inputSchema: describeTableArguments.shape,
       annotations: READ_ONLY,
     };

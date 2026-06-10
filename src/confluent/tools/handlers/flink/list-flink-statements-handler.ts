@@ -124,7 +124,7 @@ export class ListFlinkStatementsHandler extends FlinkToolHandler {
     return {
       name: ToolName.LIST_FLINK_STATEMENTS,
       description:
-        "Retrieve a sorted, filtered, paginated list of all statements.",
+        "List the Flink SQL statements in an environment, optionally filtered by compute pool, label, or status phase (e.g. RUNNING, FAILED). Use this to discover what statements exist and their current phase before reading, diagnosing, or deleting one by name.",
       inputSchema: listFlinkStatementsArguments.shape,
       annotations: READ_ONLY,
     };

@@ -76,7 +76,8 @@ export class DeleteFlinkStatementHandler extends FlinkToolHandler {
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.DELETE_FLINK_STATEMENTS,
-      description: "Make a request to delete a statement.",
+      description:
+        "Stop and delete a Flink SQL statement by name, halting any processing it is doing and removing it from the environment. Use this to tear down a streaming statement created with create-flink-statement, or to clean up a statement that is failing or no longer needed.",
       inputSchema: deleteFlinkStatementArguments.shape,
       annotations: DESTRUCTIVE,
     };

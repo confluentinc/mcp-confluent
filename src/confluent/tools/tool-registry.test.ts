@@ -212,7 +212,6 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_FLINK_DATABASES]: hasFlink,
         [ToolName.LIST_FLINK_TABLES]: hasFlink,
         [ToolName.DESCRIBE_FLINK_TABLE]: hasFlink,
-        [ToolName.GET_FLINK_TABLE_INFO]: hasFlink,
         [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlink,
         [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
         [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
@@ -448,7 +447,6 @@ describe("tool-registry.ts", () => {
         setup: mockFlinkSqlEmpty,
       },
       [ToolName.DESCRIBE_FLINK_TABLE]: { outcome: { throws: "ZodError" } },
-      [ToolName.GET_FLINK_TABLE_INFO]: { outcome: { throws: "ZodError" } },
       // Connect
       [ToolName.LIST_CONNECTORS]: {
         outcome: { throws: "Environment ID is required" },

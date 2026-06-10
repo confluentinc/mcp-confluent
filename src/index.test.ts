@@ -311,7 +311,6 @@ describe("index.ts", () => {
         ToolName.LIST_FLINK_DATABASES,
         ToolName.LIST_FLINK_TABLES,
         ToolName.DESCRIBE_FLINK_TABLE,
-        ToolName.GET_FLINK_TABLE_INFO,
         ToolName.CHECK_FLINK_STATEMENT_HEALTH,
         ToolName.DETECT_FLINK_STATEMENT_ISSUES,
         ToolName.GET_FLINK_STATEMENT_PROFILE,

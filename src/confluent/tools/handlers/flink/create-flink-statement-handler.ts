@@ -133,7 +133,8 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.CREATE_FLINK_STATEMENT,
-      description: "Make a request to create a statement.",
+      description:
+        "Submit a long-lived Flink SQL statement and return its handle without waiting for results. Use this for statements you want to keep running and manage explicitly — streaming SELECTs, INSERT INTO pipelines, or anything you'll later poll with read-flink-statement, watch with check-flink-statement-health, or stop with delete-flink-statements.",
       inputSchema: createFlinkStatementArguments.shape,
       annotations: CREATE_UPDATE,
     };

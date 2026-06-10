@@ -87,7 +87,7 @@ describe(
         ).toBeDefined();
       });
 
-      it("should return the schema for the seeded kafka-backed table", async () => {
+      it("should return both the column schema and table metadata for the seeded kafka-backed table", async () => {
         // catalog SQL filter uses TABLE_SCHEMA (friendly name), not the lkc-* id, so we need to
         // resolve the friendly name via list-databases
         const dbResult = await server.client.callTool({
@@ -109,6 +109,7 @@ describe(
         ).toBeDefined();
 
         // CCloud may take a while to auto-discover kafka topics as Flink tables
+        let describeText = "";
         await expect
           .poll(
             async () => {
@@ -118,11 +119,16 @@ describe(
               });
               trackStatementsFromMeta(result, createdStatements);
               if (result.isError === true) throw new Error(textContent(result));
-              return textContent(result);
+              describeText = textContent(result);
+              return describeText;
             },
             { timeout: 90_000, interval: 5_000 },
           )
-          .toContain(`Table '${tableName}' schema:`);
+          .toContain(`Table '${tableName}':`);
+
+        // merged tool: column schema (COLUMNS) and table metadata (TABLES) in one payload
+        expect(describeText).toContain("COLUMN_NAME");
+        expect(describeText).toContain("IS_WATERMARKED");
       }, 120_000);
     });
   },

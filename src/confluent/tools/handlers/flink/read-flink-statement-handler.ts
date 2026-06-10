@@ -109,7 +109,8 @@ export class ReadFlinkStatementHandler extends FlinkToolHandler {
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.READ_FLINK_STATEMENT,
-      description: "Make a request to read a statement and its results",
+      description:
+        "Fetch result rows from an already-created Flink SQL statement, paginating until the page token is exhausted or the timeout elapses. Use this to sample output from a streaming statement created with create-flink-statement; set a timeout since Kafka-backed tables stream indefinitely, and retry if the statement is still starting up.",
       inputSchema: readFlinkStatementArguments.shape,
       annotations: READ_ONLY,
     };

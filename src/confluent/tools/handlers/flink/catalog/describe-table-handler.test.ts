@@ -16,6 +16,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 const TABLE_NAME = "my-table";
 
+// Blanket response carrying both a terminal phase and a result row, so a single
+// mockResolvedValue serves every GET (status poll + results fetch) of both the
+// COLUMNS and the TABLES query this handler runs.
 const SQL_RESPONSE = {
   status: { phase: "COMPLETED" },
   results: { data: [{ COLUMN_NAME: "id", DATA_TYPE: "BIGINT" }] },
@@ -46,7 +49,7 @@ describe("describe-table-handler.ts", () => {
         {
           label: "use org/env/compute IDs from config when args absent",
           args: { tableName: TABLE_NAME },
-          outcome: { resolves: `Table '${TABLE_NAME}' schema` },
+          outcome: { resolves: `Table '${TABLE_NAME}':` },
         },
         {
           label: "use explicit org/env/compute args over config",
@@ -56,7 +59,7 @@ describe("describe-table-handler.ts", () => {
             environmentId: "env-from-args",
             computePoolId: "lfcp-from-args",
           },
-          outcome: { resolves: `Table '${TABLE_NAME}' schema` },
+          outcome: { resolves: `Table '${TABLE_NAME}':` },
         },
       ];
 
@@ -77,13 +80,76 @@ describe("describe-table-handler.ts", () => {
         },
       );
 
-      it("should surface the executeFlinkSql statement name via _meta.flinkStatementsCreated on success", async () => {
+      it("should return both table metadata and column schema in one response", async () => {
+        flinkRest.POST.mockResolvedValue({ data: {} });
+        flinkRest.GET
+          // COLUMNS query: status poll, then results
+          .mockResolvedValueOnce({ data: { status: { phase: "COMPLETED" } } })
+          .mockResolvedValueOnce({
+            data: { results: { data: [{ COLUMN_NAME: "id" }] } },
+          })
+          // TABLES query: status poll, then results
+          .mockResolvedValueOnce({ data: { status: { phase: "COMPLETED" } } })
+          .mockResolvedValueOnce({
+            data: {
+              results: {
+                data: [{ TABLE_TYPE: "BASE TABLE", IS_WATERMARKED: "YES" }],
+              },
+            },
+          });
+
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { tableName: TABLE_NAME },
+        );
+
+        expect(result.isError).not.toBe(true);
+        const text = (result.content[0] as { text: string }).text;
+        const payload = JSON.parse(text.slice(text.indexOf("{")));
+        expect(payload).toEqual({
+          metadata: { TABLE_TYPE: "BASE TABLE", IS_WATERMARKED: "YES" },
+          columns: [{ COLUMN_NAME: "id" }],
+        });
+        // one POST per query
+        expect(flinkRest.POST).toHaveBeenCalledTimes(2);
+      });
+
+      it("should still return columns when the table-metadata query fails", async () => {
+        flinkRest.POST.mockResolvedValue({ data: {} });
+        flinkRest.GET
+          // COLUMNS query succeeds
+          .mockResolvedValueOnce({ data: { status: { phase: "COMPLETED" } } })
+          .mockResolvedValueOnce({
+            data: { results: { data: [{ COLUMN_NAME: "id" }] } },
+          })
+          // TABLES query fails
+          .mockResolvedValueOnce({
+            data: { status: { phase: "FAILED", detail: "metadata boom" } },
+          });
+
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { tableName: TABLE_NAME },
+        );
+
+        expect(result.isError).not.toBe(true);
+        const text = (result.content[0] as { text: string }).text;
+        const payload = JSON.parse(text.slice(text.indexOf("{")));
+        expect(payload).toEqual({
+          metadata: null,
+          columns: [{ COLUMN_NAME: "id" }],
+        });
+      });
+
+      it("should surface a statement name per query via _meta.flinkStatementsCreated on success", async () => {
         const result = await handler.handle(
           runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
           { tableName: TABLE_NAME },
         );
         expect(result.isError).not.toBe(true);
+        // one statement for the COLUMNS query, one for the TABLES query
         expect(result._meta?.flinkStatementsCreated).toEqual([
+          expect.stringMatching(/^mcp-query-/),
           expect.stringMatching(/^mcp-query-/),
         ]);
       });
@@ -99,20 +165,22 @@ describe("describe-table-handler.ts", () => {
           runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
           { tableName: TABLE_NAME },
         );
+        // columns query fails first, so the call errors before the metadata query runs
         expect(result.isError).toBe(true);
         expect(result._meta?.flinkStatementsCreated).toEqual([
           expect.stringMatching(/^mcp-query-/),
         ]);
       });
 
-      it("should surface BOTH statement names when an lkc-* databaseName triggers the resolver lookup", async () => {
+      it("should surface the resolver lookup plus both query statements when an lkc-* databaseName is given", async () => {
         const result = await handler.handle(
           runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
           { tableName: TABLE_NAME, databaseName: "lkc-explicit" },
         );
         expect(result.isError).not.toBe(true);
-        // resolver lookup + main query each mint their own statement
+        // resolver lookup + COLUMNS query + TABLES query each mint a statement
         expect(result._meta?.flinkStatementsCreated).toEqual([
+          expect.stringMatching(/^mcp-query-/),
           expect.stringMatching(/^mcp-query-/),
           expect.stringMatching(/^mcp-query-/),
         ]);
@@ -140,11 +208,12 @@ describe("describe-table-handler.ts", () => {
               clientManager,
             ),
             args,
-            outcome: { resolves: `Table '${TABLE_NAME}' schema` },
+            outcome: { resolves: `Table '${TABLE_NAME}':` },
             clientManager,
           });
 
-          expect(flinkRest.POST).toHaveBeenCalledOnce();
+          // one POST per query, both against the resolved catalog
+          expect(flinkRest.POST).toHaveBeenCalledTimes(2);
           expect(flinkRest.POST).toHaveBeenCalledWith(
             expect.any(String),
             expect.objectContaining({

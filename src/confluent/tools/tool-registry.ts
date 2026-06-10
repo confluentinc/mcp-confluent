@@ -27,7 +27,6 @@ import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/sea
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
 import { ReadEnvironmentHandler } from "@src/confluent/tools/handlers/environments/read-environment-handler.js";
 import { DescribeTableHandler } from "@src/confluent/tools/handlers/flink/catalog/describe-table-handler.js";
-import { GetTableInfoHandler } from "@src/confluent/tools/handlers/flink/catalog/get-table-info-handler.js";
 import { ListCatalogsHandler } from "@src/confluent/tools/handlers/flink/catalog/list-catalogs-handler.js";
 import { ListDatabasesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-databases-handler.js";
 import { ListTablesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-tables-handler.js";
@@ -91,7 +90,6 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_FLINK_DATABASES, new ListDatabasesHandler()],
     [ToolName.LIST_FLINK_TABLES, new ListTablesHandler()],
     [ToolName.DESCRIBE_FLINK_TABLE, new DescribeTableHandler()],
-    [ToolName.GET_FLINK_TABLE_INFO, new GetTableInfoHandler()],
     [ToolName.CHECK_FLINK_STATEMENT_HEALTH, new CheckHealthHandler()],
     [ToolName.DETECT_FLINK_STATEMENT_ISSUES, new DetectIssuesHandler()],
     [ToolName.GET_FLINK_STATEMENT_PROFILE, new QueryProfilerHandler()],

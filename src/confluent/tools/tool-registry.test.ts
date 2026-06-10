@@ -269,7 +269,7 @@ describe("tool-registry.ts", () => {
         [ToolName.GET_PRODUCT_DOC_PAGE]: alwaysEnabled,
         // Diagnostics (no service-block requirement)
         [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
-        [ToolName.LIST_CONNECTIONS]: alwaysEnabled,
+        [ToolName.LIST_CONFIGURED_CONNECTIONS]: alwaysEnabled,
       };
 
       it.each(
@@ -567,10 +567,10 @@ describe("tool-registry.ts", () => {
         outcome: { resolves: "registered tools are advertised via tools/list" },
         bypassesClientLayer: true,
       },
-      // list-connections also walks the registry's predicate map rather than
+      // list-configured-connections also walks the registry's predicate map rather than
       // any client; against the single-connection smoke runtime it emits its
       // connection-count header.
-      [ToolName.LIST_CONNECTIONS]: {
+      [ToolName.LIST_CONFIGURED_CONNECTIONS]: {
         outcome: { resolves: "1 connection configured:" },
         bypassesClientLayer: true,
       },

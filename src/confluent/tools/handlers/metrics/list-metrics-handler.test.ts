@@ -5,6 +5,7 @@ import { textOf } from "@tests/call-tool-result.js";
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -96,7 +97,7 @@ describe("list-metrics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -114,7 +115,7 @@ describe("list-metrics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -206,7 +207,7 @@ describe("list-metrics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -221,7 +222,7 @@ describe("list-metrics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,

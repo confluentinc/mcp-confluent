@@ -1,7 +1,9 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import {
+  CONNECTION_ID_DESCRIPTION_PREFIX,
   CREATE_UPDATE,
   DESTRUCTIVE,
+  LIST_CONFIGURED_CONNECTIONS_POINTER,
   READ_ONLY,
 } from "@src/confluent/tools/base-tools.js";
 import {
@@ -23,6 +25,17 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 describe("base-tools.ts", () => {
+  describe("LIST_CONFIGURED_CONNECTIONS_POINTER", () => {
+    it("should name the discovery tool by its current wire name", () => {
+      // Tripwire: the pointer's tool name is derived from the ToolName enum, so a
+      // future rename that changes the enum value flips this expected literal red
+      // and forces a conscious update instead of letting the prose drift stale.
+      expect(LIST_CONFIGURED_CONNECTIONS_POINTER).toBe(
+        "Discover connections and learn what tools are supported by each connection by invoking 'list-configured-connections'.",
+      );
+    });
+  });
+
   describe("BaseToolHandler", () => {
     const handler = new StubHandler();
 
@@ -287,24 +300,21 @@ describe("base-tools.ts", () => {
           expect(connectionId.description).toContain("a, b");
         });
 
-        const CONNECTION_ID_BASE =
-          "Which configured connection to target. One of: a, b.";
-        const LIST_CONNECTIONS_POINTER =
-          "Discover connections and learn what tools are supported by each connection by invoking 'list-connections'.";
+        const CONNECTION_ID_BASE = `${CONNECTION_ID_DESCRIPTION_PREFIX}a, b.`;
 
-        it("should append the list-connections pointer single-spaced when list-connections is allowed", () => {
-          // No allow-list configured ⇒ every tool, including list-connections, is allowed.
+        it("should append the list-configured-connections pointer single-spaced when list-configured-connections is allowed", () => {
+          // No allow-list configured ⇒ every tool, including list-configured-connections, is allowed.
           const connectionId = injectedConnectionId(
             runtimeWithConnections({ a: KAFKA, b: KAFKA }),
           );
 
           expect(connectionId.description).toBe(
-            `${CONNECTION_ID_BASE} ${LIST_CONNECTIONS_POINTER}`,
+            `${CONNECTION_ID_BASE} ${LIST_CONFIGURED_CONNECTIONS_POINTER}`,
           );
         });
 
-        it("should omit the pointer with no dangling trailing space when list-connections is blocked", () => {
-          // Allow-list excludes list-connections; the gated tool itself stays allowed.
+        it("should omit the pointer with no dangling trailing space when list-configured-connections is blocked", () => {
+          // Allow-list excludes list-configured-connections; the gated tool itself stays allowed.
           const connectionId = injectedConnectionId(
             runtimeWithConnections(
               { a: KAFKA, b: KAFKA },

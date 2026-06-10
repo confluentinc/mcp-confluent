@@ -48,7 +48,7 @@ export class ServerRuntime {
   /**
    * Whether the operator's allow/block-list leaves `name` invokable. Always
    * `true` when no list was configured. The single source of truth for the
-   * operator filter, shared by tool registration and the `list-connections`
+   * operator filter, shared by tool registration and the `list-configured-connections`
    * tool so the advertised set and the reported set can never diverge.
    */
   isToolAllowed(name: ToolName): boolean {

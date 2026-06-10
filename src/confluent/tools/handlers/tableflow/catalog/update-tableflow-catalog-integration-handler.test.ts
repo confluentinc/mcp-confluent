@@ -1,7 +1,8 @@
 import { UpdateTableFlowCatalogIntegrationHandler } from "@src/confluent/tools/handlers/tableflow/catalog/update-tableflow-catalog-integration-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
+  TABLEFLOW_CONN,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -31,7 +32,11 @@ describe("update-tableflow-catalog-integration-handler.ts", () => {
           .POST.mockResolvedValue({ data: { display_name: "my-catalog" } });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: UPDATE_ARGS,
           outcome: {
             resolves: "Tableflow Catalog Integration my-catalog updated",
@@ -47,7 +52,11 @@ describe("update-tableflow-catalog-integration-handler.ts", () => {
           .POST.mockResolvedValue({ error: { message: "not found" } });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: UPDATE_ARGS,
           outcome: {
             resolves:
@@ -66,7 +75,11 @@ describe("update-tableflow-catalog-integration-handler.ts", () => {
         });
         await assertHandleCase({
           handler,
-          runtime: runtimeWith({}, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            TABLEFLOW_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: UPDATE_ARGS,
           outcome: {
             resolves: "Tableflow Catalog Integration my-catalog updated",

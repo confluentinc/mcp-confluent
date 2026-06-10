@@ -28,8 +28,8 @@ export class ReadEnvironmentHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { environmentId } = readEnvironmentArguments.parse(toolArguments);
+    const { clientManager } = this.resolveConnection(runtime, toolArguments);
 
     try {
       const pathBasedClient = wrapAsPathBasedClient(

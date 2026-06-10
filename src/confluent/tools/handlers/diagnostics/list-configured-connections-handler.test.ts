@@ -4,19 +4,19 @@ import {
   alwaysEnabled,
   hasKafka,
 } from "@src/confluent/tools/connection-predicates.js";
-import { ListConnectionsHandler } from "@src/confluent/tools/handlers/diagnostics/list-connections-handler.js";
+import { ListConfiguredConnectionsHandler } from "@src/confluent/tools/handlers/diagnostics/list-configured-connections-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { runtimeWithConnections } from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
-describe("ListConnectionsHandler", () => {
+describe("ListConfiguredConnectionsHandler", () => {
   const KAFKA = { kafka: { bootstrap_servers: "b:9092" } };
 
   function handlerWith(
     entries: Array<readonly [ToolName, ToolHandler]>,
-  ): ListConnectionsHandler {
-    return new ListConnectionsHandler(() => entries);
+  ): ListConfiguredConnectionsHandler {
+    return new ListConfiguredConnectionsHandler(() => entries);
   }
 
   /** The three-tool universe shared by the mapping tests: two kafka-gated
@@ -36,8 +36,8 @@ describe("ListConnectionsHandler", () => {
   describe("getToolConfig()", () => {
     const config = handlerWith([]).getToolConfig();
 
-    it("should name the tool list-connections", () => {
-      expect(config.name).toBe(ToolName.LIST_CONNECTIONS);
+    it("should name the tool list-configured-connections", () => {
+      expect(config.name).toBe("list-configured-connections");
     });
 
     it("should be read-only", () => {

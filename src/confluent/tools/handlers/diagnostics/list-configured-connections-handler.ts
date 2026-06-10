@@ -10,10 +10,10 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
-const listConnectionsArguments = z.object({});
+const listConfiguredConnectionsArguments = z.object({});
 
 /**
- * Per-connection entry in the `list-connections` payload. `description` is the operator's
+ * Per-connection entry in the `list-configured-connections` payload. `description` is the operator's
  * optional label from config, present only when the connection defined a non-blank one.
  */
 interface ConnectionListing {
@@ -37,12 +37,12 @@ interface ConnectionListing {
  * The tool catalog is supplied through the thunk that {@link
  * ToolMetadataHandler} owns, for the ESM-cycle reason documented there.
  */
-export class ListConnectionsHandler extends ToolMetadataHandler {
+export class ListConfiguredConnectionsHandler extends ToolMetadataHandler {
   handle(
     runtime: ServerRuntime,
     toolArguments?: Record<string, unknown>,
   ): CallToolResult {
-    listConnectionsArguments.parse(toolArguments ?? {});
+    listConfiguredConnectionsArguments.parse(toolArguments ?? {});
 
     const connections: Record<string, ConnectionListing> = {};
     for (const [connId, conn] of Object.entries(runtime.config.connections)) {
@@ -84,10 +84,10 @@ export class ListConnectionsHandler extends ToolMetadataHandler {
 
   getToolConfig(): ToolConfig {
     return {
-      name: ToolName.LIST_CONNECTIONS,
+      name: ToolName.LIST_CONFIGURED_CONNECTIONS,
       description:
         "List every configured connection and the connection-routable tools you can invoke against each. The connection id (the map key) is the value to pass as the `connectionId` argument on tools that ask for one. Connection-agnostic tools (e.g. docs and diagnostics that take no `connectionId`) are always available and appear in `tools/list`, not here. Call this when a tool offers a choice of connections, or to discover which connection supports the capability you need.",
-      inputSchema: listConnectionsArguments.shape,
+      inputSchema: listConfiguredConnectionsArguments.shape,
       annotations: READ_ONLY,
     };
   }

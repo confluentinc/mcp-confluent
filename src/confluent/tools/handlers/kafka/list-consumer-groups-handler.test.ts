@@ -9,12 +9,12 @@ import { textOf } from "@tests/call-tool-result.js";
 import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
 import {
   DEFAULT_CONNECTION_ID,
-  kafkaRuntime,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
   getMockedClientManager,
+  type MockedClientManager,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
@@ -96,42 +96,33 @@ describe("list-consumer-groups-handler.ts", () => {
   describe("handle()", () => {
     const handler = new ListConsumerGroupsHandler();
 
-    it("should route only to its resolved connection in a multi-connection config", async () => {
-      const clientManager = getMockedClientManager();
-      const admin = await clientManager.getAdminClient();
-      admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
-
-      // runtimeWithDecoy gives a two-connection runtime (the DEFAULT_CONNECTION_ID
-      // real connection + a decoy keyed DECOY_CONNECTION_ID). assertHandleCase
-      // detects the decoy and injects `connectionId: DEFAULT_CONNECTION_ID` into
-      // the provided args for handle(), then asserts the decoy's manager went
-      // untouched — so `args` deliberately omits connectionId here.
-      await assertHandleCase({
-        handler,
-        runtime: runtimeWithDecoy(
-          { kafka: { bootstrap_servers: "broker:9092" } },
-          DEFAULT_CONNECTION_ID,
-          clientManager,
-        ),
-        args: {},
-        outcome: { resolves: "Found 0 consumer groups." },
+    // Every case runs through assertHandleCase against a decoy runtime: the
+    // harness injects connectionId for the real connection and asserts the
+    // decoy's manager stays untouched, so routing is exercised on every
+    // behaviour path rather than in a single bespoke test.
+    const decoyRuntime = (clientManager: MockedClientManager) =>
+      runtimeWithDecoy(
+        { kafka: { bootstrap_servers: "broker:9092" } },
+        DEFAULT_CONNECTION_ID,
         clientManager,
-      });
-    });
+      );
 
     it("should return an empty structured payload and 'Found 0 consumer groups.' when listGroups returns nothing", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {});
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        outcome: { resolves: "Found 0 consumer groups.", isError: false },
+        clientManager,
+      });
 
       expect(admin.listGroups).toHaveBeenCalledOnce();
       expect(admin.listGroups).toHaveBeenCalledWith({});
-
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({ groups: [], errors: [] });
-      expect(textOf(result)).toBe("Found 0 consumer groups.");
+      expect(result!.structuredContent).toEqual({ groups: [], errors: [] });
+      expect(textOf(result!)).toBe("Found 0 consumer groups.");
     });
 
     it("should map numeric librdkafka state/type enums to TitleCase strings on the response", async () => {
@@ -164,7 +155,12 @@ describe("list-consumer-groups-handler.ts", () => {
         errors: [],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {});
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        outcome: { resolves: "Found 3 consumer groups:", isError: false },
+        clientManager,
+      });
 
       const expectedPayload = {
         groups: [
@@ -192,12 +188,11 @@ describe("list-consumer-groups-handler.ts", () => {
         ],
         errors: [],
       };
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual(expectedPayload);
-      expect(textOf(result)).toBe(
+      expect(result!.structuredContent).toEqual(expectedPayload);
+      expect(textOf(result!)).toBe(
         `Found 3 consumer groups:\n${JSON.stringify(expectedPayload, null, 2)}`,
       );
-      expect(textOf(result)).toContain('"groupId": "live"');
+      expect(textOf(result!)).toContain('"groupId": "live"');
     });
 
     it("should forward matchStates to listGroups as the corresponding numeric enum values", async () => {
@@ -205,8 +200,12 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      await handler.handle(kafkaRuntime(clientManager), {
-        matchStates: ["Stable", "Empty"],
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { matchStates: ["Stable", "Empty"] },
+        outcome: { resolves: "consumer groups" },
+        clientManager,
       });
 
       expect(admin.listGroups).toHaveBeenCalledOnce();
@@ -223,8 +222,12 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      await handler.handle(kafkaRuntime(clientManager), {
-        matchType: "Consumer",
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { matchType: "Consumer" },
+        outcome: { resolves: "consumer groups" },
+        clientManager,
       });
 
       expect(admin.listGroups).toHaveBeenCalledOnce();
@@ -238,9 +241,12 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockResolvedValue({ groups: [], errors: [] });
 
-      await handler.handle(kafkaRuntime(clientManager), {
-        matchStates: ["Stable"],
-        matchType: "Classic",
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { matchStates: ["Stable"], matchType: "Classic" },
+        outcome: { resolves: "consumer groups" },
+        clientManager,
       });
 
       expect(admin.listGroups).toHaveBeenCalledOnce();
@@ -258,11 +264,15 @@ describe("list-consumer-groups-handler.ts", () => {
         errors: [],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        matchStates: ["Stable"],
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { matchStates: ["Stable"] },
+        outcome: { resolves: "Found 2 consumer groups (filtered):" },
+        clientManager,
       });
 
-      expect(textOf(result)).toMatch(
+      expect(textOf(result!)).toMatch(
         /^Found 2 consumer groups \(filtered\):\n/,
       );
     });
@@ -278,10 +288,14 @@ describe("list-consumer-groups-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {});
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        outcome: { resolves: "Found 1 consumer group:", isError: false },
+        clientManager,
+      });
 
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({
+      expect(result!.structuredContent).toEqual({
         groups: [
           {
             groupId: "g1",
@@ -309,10 +323,14 @@ describe("list-consumer-groups-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {});
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        outcome: { resolves: "all brokers down", isError: true },
+        clientManager,
+      });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toContain("all brokers down");
+      expect(textOf(result!)).toContain("all brokers down");
     });
 
     it("should let listGroups rejections propagate without try/catch swallow", async () => {
@@ -320,9 +338,11 @@ describe("list-consumer-groups-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.listGroups.mockRejectedValue(new Error("network unreachable"));
 
-      await expect(
-        handler.handle(kafkaRuntime(clientManager), {}),
-      ).rejects.toThrow("network unreachable");
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        outcome: { throws: "network unreachable" },
+      });
     });
   });
 });

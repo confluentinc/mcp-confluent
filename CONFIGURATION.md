@@ -105,6 +105,11 @@ The connection name (`staging` above) is freeform.
 Either connection flavor also accepts an optional `description` — a free-text label echoed back by the `list-configured-connections` tool so an agent can tell your connections apart.
 A blank or whitespace-only `description` is treated as no description.
 
+Either connection flavor also accepts an optional `read_only` flag (default `false`).
+When set to `read_only: true`, every tool that mutates state is automatically disabled for that connection, leaving only the read-only tools enabled.
+A tool's mutation posture comes from its `readOnlyHint` annotation, so there is nothing to configure per-tool: reads stay available while writes — produce, create/alter/delete, and the like — can never fire against that connection.
+This is the recommended posture for handing an agent a staging or production connection while keeping full read/write on a throwaway dev cluster.
+
 #### Service blocks
 
 | Block             | Purpose                                                                                                                                                                                 |

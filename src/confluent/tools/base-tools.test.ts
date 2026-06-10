@@ -1,5 +1,8 @@
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import {
   CONNECTION_ID_DESCRIPTION_PREFIX,
+  CREATE_UPDATE,
+  DESTRUCTIVE,
   LIST_CONFIGURED_CONNECTIONS_POINTER,
   READ_ONLY,
 } from "@src/confluent/tools/base-tools.js";
@@ -69,6 +72,78 @@ describe("base-tools.ts", () => {
               {
                 enabled: false,
                 reason: ToolDisabledReason.MissingFlinkBlock,
+              },
+            ],
+          ]),
+        );
+      });
+    });
+
+    describe("read-only verdict overlay", () => {
+      const READ_ONLY_KAFKA = {
+        read_only: true,
+        kafka: { bootstrap_servers: "b:9092" },
+      };
+
+      it("should keep a READ_ONLY tool enabled on a read_only connection", () => {
+        const handler = new StubHandler({
+          predicate: hasKafka,
+          annotations: READ_ONLY,
+        });
+
+        expect(
+          handler.connectionVerdicts(runtimeWith(READ_ONLY_KAFKA)),
+        ).toEqual(new Map([[DEFAULT_CONNECTION_ID, { enabled: true }]]));
+        expect(
+          handler.enabledConnectionIds(runtimeWith(READ_ONLY_KAFKA)),
+        ).toEqual([DEFAULT_CONNECTION_ID]);
+      });
+
+      it.each([
+        ["CREATE_UPDATE", CREATE_UPDATE],
+        ["DESTRUCTIVE", DESTRUCTIVE],
+      ])(
+        "should disable a %s tool on a read_only connection with the ReadOnlyConnection reason",
+        (_label, annotations: ToolAnnotations) => {
+          const handler = new StubHandler({ predicate: hasKafka, annotations });
+
+          expect(
+            handler.connectionVerdicts(runtimeWith(READ_ONLY_KAFKA)),
+          ).toEqual(
+            new Map([
+              [
+                DEFAULT_CONNECTION_ID,
+                {
+                  enabled: false,
+                  reason: ToolDisabledReason.ReadOnlyConnection,
+                },
+              ],
+            ]),
+          );
+          expect(
+            handler.enabledConnectionIds(runtimeWith(READ_ONLY_KAFKA)),
+          ).toEqual([]);
+        },
+      );
+
+      it("should report the predicate's reason (not ReadOnlyConnection) when the predicate fails on a read_only connection", () => {
+        // A read_only connection that also lacks the required service block: the
+        // predicate failure is the more fundamental reason and wins — the
+        // connection is "missing kafka", not "read-only blocked".
+        const handler = new StubHandler({
+          predicate: hasKafka,
+          annotations: DESTRUCTIVE,
+        });
+
+        expect(
+          handler.connectionVerdicts(runtimeWith({ read_only: true })),
+        ).toEqual(
+          new Map([
+            [
+              DEFAULT_CONNECTION_ID,
+              {
+                enabled: false,
+                reason: ToolDisabledReason.MissingKafkaBlock,
               },
             ],
           ]),

@@ -131,7 +131,10 @@ describe("config/index.ts", () => {
 `;
 
       const config = parseYamlConfiguration(yamlContent, {});
-      expect(config.getSoleDirectConnection()).toEqual({ type: "direct" });
+      expect(config.getSoleDirectConnection()).toEqual({
+        type: "direct",
+        read_only: false,
+      });
     });
 
     it("should throw error when bootstrap_servers is missing", () => {
@@ -300,6 +303,7 @@ describe("config/index.ts", () => {
       expect(config.getSoleConnection()).toEqual({
         type: "oauth",
         ccloud_env: "prod",
+        read_only: false,
       });
     });
 
@@ -315,6 +319,7 @@ describe("config/index.ts", () => {
       expect(config.getSoleConnection()).toEqual({
         type: "oauth",
         ccloud_env: "stag",
+        read_only: false,
       });
     });
 

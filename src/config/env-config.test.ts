@@ -104,7 +104,10 @@ describe("config/env-config.ts", () => {
 
       it("should build an empty direct connection when no service env vars are set (docs-only setup)", () => {
         const config = buildConfigFromEnvAndCli(envWith());
-        expect(config.getSoleDirectConnection()).toEqual({ type: "direct" });
+        expect(config.getSoleDirectConnection()).toEqual({
+          type: "direct",
+          read_only: false,
+        });
       });
 
       it("should throw when BOOTSTRAP_SERVERS has an invalid format", () => {
@@ -1113,7 +1116,11 @@ describe("config/env-config.ts", () => {
       it("should produce an OAuth connection with ccloud_env=prod when --oauth is alone", () => {
         const config = buildConfigFromEnvAndCli(envWith({}), { oauth: true });
         const conn = config.getSoleConnection();
-        expect(conn).toEqual({ type: "oauth", ccloud_env: "prod" });
+        expect(conn).toEqual({
+          type: "oauth",
+          ccloud_env: "prod",
+          read_only: false,
+        });
       });
 
       it("should propagate ccloudEnv into the OAuth connection", () => {
@@ -1122,7 +1129,11 @@ describe("config/env-config.ts", () => {
           ccloudEnv: "stag",
         });
         const conn = config.getSoleConnection();
-        expect(conn).toEqual({ type: "oauth", ccloud_env: "stag" });
+        expect(conn).toEqual({
+          type: "oauth",
+          ccloud_env: "stag",
+          read_only: false,
+        });
       });
 
       it("should ignore api-key env vars when --oauth is set", () => {
@@ -1137,7 +1148,11 @@ describe("config/env-config.ts", () => {
           { oauth: true, ccloudEnv: "devel" },
         );
         const conn = config.getSoleConnection();
-        expect(conn).toEqual({ type: "oauth", ccloud_env: "devel" });
+        expect(conn).toEqual({
+          type: "oauth",
+          ccloud_env: "devel",
+          read_only: false,
+        });
       });
 
       it("should thread OAUTH_KAFKA_DEBUG into the synthesized OAuth connection's kafka_debug", () => {
@@ -1150,6 +1165,7 @@ describe("config/env-config.ts", () => {
           type: "oauth",
           ccloud_env: "prod",
           kafka_debug: "security,broker",
+          read_only: false,
         });
       });
 

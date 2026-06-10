@@ -21,6 +21,7 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  type MockedClientManager,
 } from "@tests/stubs/index.js";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
@@ -209,36 +210,19 @@ describe("get-consumer-group-lag-handler.ts", () => {
   describe("handle()", () => {
     const handler = new GetConsumerGroupLagHandler();
 
-    it("should route only to its resolved connection in a multi-connection config", async () => {
-      const clientManager = getMockedClientManager();
-      const admin = await clientManager.getAdminClient();
-      admin.fetchOffsets.mockResolvedValue([
-        {
-          topic: "orders",
-          partitions: [fakeFetchedPartition({ partition: 0, offset: "80" })],
-        },
-      ]);
-      admin.fetchTopicOffsets.mockResolvedValue([
-        fakeWatermark({ partition: 0, low: "0", high: "100" }),
-      ]);
-
-      // runtimeWithDecoy gives a two-connection runtime (the DEFAULT_CONNECTION_ID
-      // real connection + a decoy keyed DECOY_CONNECTION_ID). assertHandleCase
-      // detects the decoy and injects `connectionId: DEFAULT_CONNECTION_ID` into
-      // the provided args for handle(), then asserts the decoy's manager went
-      // untouched — so `args` deliberately omits connectionId here.
-      await assertHandleCase({
-        handler,
-        runtime: runtimeWithDecoy(
-          { kafka: { bootstrap_servers: "broker:9092" } },
-          DEFAULT_CONNECTION_ID,
-          clientManager,
-        ),
-        args: { groupId: "g1" },
-        outcome: { resolves: 'Consumer group "g1" has' },
+    // Connection-reaching behaviour cases run through assertHandleCase against a
+    // decoy runtime: the harness injects connectionId for the real connection and
+    // asserts the decoy's manager stays untouched, so routing is exercised on
+    // every such path. (The three throw-shape cases below pin librdkafka
+    // code/errno/origin on the thrown error via .rejects.toMatchObject, which the
+    // harness's message-only throws matcher can't express, so they stay as direct
+    // handle() calls.)
+    const decoyRuntime = (clientManager: MockedClientManager) =>
+      runtimeWithDecoy(
+        { kafka: { bootstrap_servers: "broker:9092" } },
+        DEFAULT_CONNECTION_ID,
         clientManager,
-      });
-    });
+      );
 
     it("should forward groupId verbatim to admin.fetchOffsets and not pass a topics field when the filter is omitted", async () => {
       const clientManager = getMockedClientManager();
@@ -250,7 +234,13 @@ describe("get-consumer-group-lag-handler.ts", () => {
         groups: [fakeRealGroup("g1")],
       });
 
-      await handler.handle(kafkaRuntime(clientManager), { groupId: "g1" });
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
+      });
 
       expect(admin.fetchOffsets).toHaveBeenCalledOnce();
       expect(admin.fetchOffsets).toHaveBeenCalledWith({ groupId: "g1" });
@@ -275,9 +265,12 @@ describe("get-consumer-group-lag-handler.ts", () => {
         })),
       }));
 
-      await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
-        topics: ["orders", "shipments"],
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1", topics: ["orders", "shipments"] },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
       });
 
       expect(admin.fetchOffsets).toHaveBeenCalledOnce();
@@ -304,12 +297,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 1, low: "0", high: "200" }),
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has', isError: false },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({
+      expect(result!.structuredContent).toEqual({
         groupId: "g1",
         topics: [
           {
@@ -361,12 +357,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         throw new Error(`unexpected topic ${topic}`);
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has', isError: false },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
-      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      const payload = result!.structuredContent as GetConsumerGroupLagResponse;
       expect(payload.totalLag).toBe(25);
       expect(payload.topics.map((t) => t.topic)).toEqual([
         "orders",
@@ -391,11 +390,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 1, low: "0", high: "999" }),
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
       });
 
-      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      const payload = result!.structuredContent as GetConsumerGroupLagResponse;
       expect(payload.topics[0]!.partitions[1]).toEqual({
         partition: 1,
         committedOffset: null,
@@ -436,12 +439,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 0, low: "0", high: "100" }),
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has', isError: false },
+        clientManager,
       });
 
-      expect(result.isError, textOf(result)).not.toBe(true);
-      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      const payload = result!.structuredContent as GetConsumerGroupLagResponse;
       expect(payload.topics[0]!.partitions[0]).toEqual({
         partition: 0,
         committedOffset: "80",
@@ -487,11 +493,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 1, high: "200" }),
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
       });
 
-      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      const payload = result!.structuredContent as GetConsumerGroupLagResponse;
       const partitions = payload.topics[0]!.partitions;
       expect(partitions[1]).toEqual({
         partition: 1,
@@ -522,11 +532,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 0, low: "0", high: "100" }),
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
       });
 
-      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      const payload = result!.structuredContent as GetConsumerGroupLagResponse;
       expect(payload.topics[0]!.partitions[0]!.lag).toBe(-5);
       // Negative lag IS included in totalLag — clamping to zero would
       // hide the rebalance-race state the diagnostic is there to expose.
@@ -553,12 +567,16 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 0, high: "100" }),
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
       });
 
       const partition = (
-        result.structuredContent as GetConsumerGroupLagResponse
+        result!.structuredContent as GetConsumerGroupLagResponse
       ).topics[0]!.partitions[0]!;
       expect(partition.metadata).toBe("checkpoint-A");
       expect(partition.leaderEpoch).toBe(7);
@@ -587,7 +605,13 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 2, high: "100" }),
       ]);
 
-      await handler.handle(kafkaRuntime(clientManager), { groupId: "g1" });
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
+      });
 
       expect(admin.fetchTopicOffsets).toHaveBeenCalledOnce();
       expect(admin.fetchTopicOffsets).toHaveBeenCalledWith("orders");
@@ -598,12 +622,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockRejectedValue(fakeNotFoundError());
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "ghost-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "ghost-group" },
+        outcome: {
+          resolves: 'Consumer group "ghost-group" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "ghost-group" not found on this cluster.',
       );
     });
@@ -637,12 +667,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         groups: [fakeRealGroup("g1")],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has', isError: false },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({
+      expect(result!.structuredContent).toEqual({
         groupId: "g1",
         topics: [],
         totalLag: 0,
@@ -667,12 +700,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
         groups: [fakeUnknownGroupTombstone("ghost-group")],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "ghost-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "ghost-group" },
+        outcome: {
+          resolves: 'Consumer group "ghost-group" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "ghost-group" not found on this cluster.',
       );
     });
@@ -683,12 +722,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
       admin.fetchOffsets.mockResolvedValue([]);
       admin.describeGroups.mockRejectedValue(fakeNotFoundError());
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "ghost-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "ghost-group" },
+        outcome: {
+          resolves: 'Consumer group "ghost-group" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "ghost-group" not found on this cluster.',
       );
     });
@@ -706,12 +751,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "ghost-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "ghost-group" },
+        outcome: {
+          resolves: 'Consumer group "ghost-group" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "ghost-group" not found on this cluster.',
       );
     });
@@ -731,7 +782,13 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 0, high: "30" }),
       ]);
 
-      await handler.handle(kafkaRuntime(clientManager), { groupId: "g1" });
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
+      });
 
       expect(admin.describeGroups).not.toHaveBeenCalled();
     });
@@ -748,13 +805,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
         groups: [fakeUnknownGroupTombstone("ghost-group")],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "ghost-group",
-        topics: ["does-not-exist"],
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "ghost-group", topics: ["does-not-exist"] },
+        outcome: {
+          resolves: 'Consumer group "ghost-group" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "ghost-group" not found on this cluster.',
       );
       // The topic-existence path (via the watermark cache) never fires
@@ -846,11 +908,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         fakeWatermark({ partition: 1, low: "0", high: maxSafe }),
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
       });
 
-      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      const payload = result!.structuredContent as GetConsumerGroupLagResponse;
       // Per-partition lag stays precise (each is in-range).
       expect(payload.topics[0]!.partitions[0]!.lag).toBe(
         Number.MAX_SAFE_INTEGER,
@@ -889,12 +955,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         topics: [{ name: "shipments", partitions: [] }],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
-        topics: ["orders", "shipments"],
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1", topics: ["orders", "shipments"] },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
       });
 
-      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      const payload = result!.structuredContent as GetConsumerGroupLagResponse;
       const shipments = payload.topics.find((t) => t.topic === "shipments");
       expect(shipments).toEqual({ topic: "shipments", partitions: [] });
       // The orders topic still has its lag computed.
@@ -923,13 +992,15 @@ describe("get-consumer-group-lag-handler.ts", () => {
         { name: "shipments", partitions: [] },
       ] as unknown as Awaited<ReturnType<typeof admin.fetchTopicMetadata>>);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
-        topics: ["shipments"],
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1", topics: ["shipments"] },
+        outcome: { resolves: 'Consumer group "g1" has', isError: false },
+        clientManager,
       });
 
-      expect(result.isError, textOf(result)).not.toBe(true);
-      const payload = result.structuredContent as GetConsumerGroupLagResponse;
+      const payload = result!.structuredContent as GetConsumerGroupLagResponse;
       expect(payload.topics).toEqual([{ topic: "shipments", partitions: [] }]);
     });
 
@@ -952,9 +1023,12 @@ describe("get-consumer-group-lag-handler.ts", () => {
         ],
       });
 
-      await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
-        topics: ["alpha", "bravo", "charlie"],
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1", topics: ["alpha", "bravo", "charlie"] },
+        outcome: { resolves: 'Consumer group "g1" has' },
+        clientManager,
       });
 
       expect(admin.fetchTopicMetadata).toHaveBeenCalledOnce();
@@ -982,13 +1056,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
-        topics: ["alpha", "bravo"],
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1", topics: ["alpha", "bravo"] },
+        outcome: {
+          resolves: "Topic not found in [alpha, bravo] on this cluster.",
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         "Topic not found in [alpha, bravo] on this cluster.",
       );
       // The simplification deletes the per-topic-probe fallback path:
@@ -1020,12 +1099,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: {
+          resolves: 'Topic "deleted-since-commit" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Topic "deleted-since-commit" not found on this cluster.',
       );
     });
@@ -1048,13 +1133,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
-        topics: ["does-not-exist"],
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1", topics: ["does-not-exist"] },
+        outcome: {
+          resolves: 'Topic "does-not-exist" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Topic "does-not-exist" not found on this cluster.',
       );
     });
@@ -1077,13 +1167,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
-        topics: ["mystery-topic"],
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1", topics: ["mystery-topic"] },
+        outcome: {
+          resolves: 'Topic "mystery-topic" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Topic "mystery-topic" not found on this cluster.',
       );
     });
@@ -1102,13 +1197,18 @@ describe("get-consumer-group-lag-handler.ts", () => {
       });
       admin.fetchTopicMetadata.mockResolvedValue({ topics: [] });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
-        topics: ["silently-omitted-topic"],
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1", topics: ["silently-omitted-topic"] },
+        outcome: {
+          resolves: 'Topic "silently-omitted-topic" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Topic "silently-omitted-topic" not found on this cluster.',
       );
     });
@@ -1133,13 +1233,16 @@ describe("get-consumer-group-lag-handler.ts", () => {
         return [fakeWatermark({ partition: 0, high: "5" })];
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g1",
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g1" },
+        outcome: {
+          resolves:
+            'Consumer group "g1" has 25 message(s) of lag across 2 topic(s).',
+        },
+        clientManager,
       });
-
-      expect(textOf(result)).toContain(
-        'Consumer group "g1" has 25 message(s) of lag across 2 topic(s).',
-      );
     });
   });
 });

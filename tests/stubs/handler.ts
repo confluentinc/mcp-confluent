@@ -97,6 +97,10 @@ export function classifyThrown(label: string, thrown: unknown): string {
  *   before touching the client.
  * @param name - Label prepended to assertion failure messages and used in
  *   discovery-sentinel output. Defaults to `"(handler)"`.
+ * @returns The resolved {@link CallToolResult} when the handler resolved, or
+ *   `undefined` when it threw — so callers needing to pin exact
+ *   `structuredContent` / `textOf` beyond the `resolves` substring can assert on
+ *   the result after the harness call.
  *
  * When the runtime carries a {@link DECOY_CONNECTION_ID} connection (built via
  * `runtimeWithDecoy`), this also routes the call to the real connection — by
@@ -115,7 +119,7 @@ export async function assertHandleCase(options: {
   outcome: HandleOutcome;
   clientManager?: MockedClientManager;
   name?: string;
-}): Promise<void> {
+}): Promise<CallToolResult | undefined> {
   const {
     handler,
     runtime,
@@ -262,4 +266,6 @@ export async function assertHandleCase(options: {
       `${name}: unexpected error — update outcome with actual`,
     ).toContain((outcome as Throws).throws);
   }
+
+  return result;
 }

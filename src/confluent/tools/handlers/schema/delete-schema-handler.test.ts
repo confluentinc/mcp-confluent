@@ -1,7 +1,7 @@
 import { DeleteSchemaHandler } from "@src/confluent/tools/handlers/schema/delete-schema-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -30,7 +30,11 @@ describe("delete-schema-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { subject: "my-subject" },
           outcome: { resolves: 'Successfully deleted subject "my-subject"' },
           clientManager,
@@ -58,7 +62,11 @@ describe("delete-schema-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { subject: "my-subject", version: "3" },
           outcome: {
             resolves: 'Successfully deleted version 3 of subject "my-subject"',
@@ -88,7 +96,11 @@ describe("delete-schema-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { subject: "my-subject", version: "latest" },
           outcome: { resolves: "Successfully deleted version latest" },
           clientManager,
@@ -115,7 +127,11 @@ describe("delete-schema-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { subject: "my-subject", permanent: true },
           outcome: { resolves: 'Successfully deleted subject "my-subject"' },
           clientManager,
@@ -142,7 +158,11 @@ describe("delete-schema-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { subject: "my-subject", environment_id: "env-42" },
           outcome: { resolves: "Successfully deleted" },
           clientManager,
@@ -164,7 +184,11 @@ describe("delete-schema-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(SR_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
           args: { subject: "missing" },
           outcome: {
             resolves: 'Failed to delete subject "missing"',

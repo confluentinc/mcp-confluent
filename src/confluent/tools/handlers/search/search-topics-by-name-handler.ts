@@ -20,8 +20,11 @@ export class SearchTopicsByNameHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { topicName } = searchTopicsByNameArguments.parse(toolArguments);
+    const { clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),
     );

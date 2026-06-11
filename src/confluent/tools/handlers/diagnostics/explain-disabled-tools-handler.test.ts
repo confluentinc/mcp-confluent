@@ -10,6 +10,7 @@ import {
   bareRuntime,
   ccloudOAuthRuntime,
   runtimeWith,
+  runtimeWithConnections,
 } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
@@ -105,6 +106,28 @@ describe("explain-disabled-tools-handler.ts", () => {
         );
         expect(oauthGroup).toBeDefined();
         expect(oauthGroup!.tools).toContain(ToolName.LIST_FLINK_STATEMENTS);
+      });
+
+      it("should keep connection-independent tools enabled and bucket every other tool under NoConnectionsConfigured on a zero-connection config", async () => {
+        const result = handler.handle(runtimeWithConnections({}), undefined);
+        const report = getReport(result);
+
+        const allDisabledTools = report.disabledGroups.flatMap((g) => g.tools);
+        // The alwaysEnabled tools stay enabled with no connections at all.
+        expect(allDisabledTools).not.toContain(ToolName.SEARCH_PRODUCT_DOCS);
+        expect(allDisabledTools).not.toContain(ToolName.EXPLAIN_DISABLED_TOOLS);
+
+        // Every connection-dependent tool collapses into a single group: there
+        // is no connection to attribute a per-service reason to.
+        expect(report.disabledGroups).toHaveLength(1);
+        expect(report.disabledGroups[0]).toHaveProperty(
+          "reason",
+          ToolDisabledReason.NoConnectionsConfigured,
+        );
+        expect(report.disabledGroups[0]!.tools).toContain(ToolName.LIST_TOPICS);
+        expect(report.enabledCount + report.disabledCount).toBe(
+          Array.from(ToolHandlerRegistry.allHandlers()).length,
+        );
       });
 
       it("should account for every registered tool in the enabled and disabled counts (no double-counting, no skips)", async () => {

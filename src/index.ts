@@ -66,7 +66,9 @@ export function getToolHandlersToRegister(
     candidates.push([toolName, ToolHandlerRegistry.getToolHandler(toolName)]);
   }
 
-  // Pass 2: register tools that are enabled on at least one connection.
+  // Pass 2: register tools that are enabled on at least one connection, plus
+  // connection-independent tools (docs, diagnostics), which carry no per-connection
+  // verdict and so stay available even on a zero-connection config.
   for (const [toolName, handler] of candidates) {
     const enabledIds = handler.enabledConnectionIds(runtime);
     const unknownIds = enabledIds.filter((id) => !knownIds.has(id));
@@ -75,7 +77,7 @@ export function getToolHandlersToRegister(
         `Tool ${toolName}: enabledConnectionIds() returned unknown connection ID(s): ${unknownIds.join(", ")}`,
       );
     }
-    if (enabledIds.length > 0) {
+    if (enabledIds.length > 0 || handler.isConnectionIndependent) {
       toolHandlersToRegister.set(toolName, handler);
       logger.info(`Tool ${toolName} enabled`);
     }
@@ -448,7 +450,7 @@ async function main() {
       await transportManager.stop();
       // shutdown() is race-safe with an in-flight bootstrap.
       runtime.oauthHolder?.shutdown();
-      await runtime.clientManager.disconnect();
+      await runtime.disconnectAll();
       process.exit(0);
     };
 

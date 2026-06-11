@@ -36,12 +36,12 @@ export function disabledToolGroupKey(group: DisabledToolGroup): string {
  * `groupBy` records which axis the bucket discriminators carry so
  * consumers (renderer, MCP-client UIs) can pick the right framing.
  *
- * Single-connection scope today (the server enforces one connection; see
- * `enforceSingleConnectionOnly()` in `src/config/models.ts`). When
- * multi-connection support lands as part of issue #151's follow-ups the
- * shape regrows around connections — per-connection sections plus a
- * cross-connection-deltas section calling out tools enabled on some
- * connections but not others.
+ * This is a flat report: each tool counts once as enabled or disabled across
+ * the whole config, with no per-connection breakdown. On a multi-connection
+ * config that flatten is lossy (a tool enabled on one connection and disabled
+ * on another reads as simply enabled). #559 regrows the shape around
+ * connections — per-connection sections plus a cross-connection-deltas section
+ * calling out tools enabled on some connections but not others.
  */
 export interface ToolGatingReport {
   readonly groupBy: "reason" | "category";
@@ -110,23 +110,19 @@ export function groupDisabledToolsByReason(
 }
 
 /**
- * Assemble a {@linkcode ToolGatingReport} for the given handler set against
- * the configured connection.
+ * Assemble a {@linkcode ToolGatingReport} for the given handler set against the
+ * configured connections.
  *
- * v1 (single-connection scope):
  * - `disabledGroups` is sorted lex by reason; tools within a group follow
  *   handler iteration order.
- * - Each tool contributes once to `enabledCount` *or* `disabledCount`:
- *   a tool whose predicate produces an `enabled: true` verdict on at
- *   least one configured connection counts as enabled (and is omitted
- *   from `disabledGroups`); otherwise it counts as disabled and lands
- *   under the first disabled verdict's reason. This flatten is lossy
- *   on a multi-connection runtime — see the handler module-doc for
- *   the consequences and the v2 (multi-connection) shape on
- *   {@linkcode ToolGatingReport}.
- * - Throws `Wacky -- ...` if any handler returns an empty verdict map
- *   (a runtime-shaped invariant violation rather than a tool-state
- *   condition; see `classifyTool` for the rationale).
+ * - Each tool contributes once to `enabledCount` *or* `disabledCount`, via
+ *   {@linkcode classifyHandler}: connection-independent tools count as enabled;
+ *   a connection-dependent tool enabled on at least one connection counts as
+ *   enabled (and is omitted from `disabledGroups`); otherwise it counts as
+ *   disabled and lands under either the first disabled verdict's reason or
+ *   {@linkcode ToolDisabledReason.NoConnectionsConfigured} when the config has
+ *   no connections at all. The single-connection-vs-multi flatten is lossy —
+ *   see {@linkcode ToolGatingReport} and #559.
  */
 export function buildToolGatingReport(
   handlers: Iterable<readonly [ToolName, ToolHandler]>,
@@ -142,7 +138,7 @@ export function buildToolGatingReport(
   let disabledCount = 0;
 
   for (const [toolName, handler] of handlers) {
-    const classification = classifyTool(handler.connectionVerdicts(runtime));
+    const classification = classifyHandler(handler, runtime);
     if (classification.kind === "enabled") {
       enabledCount += 1;
       continue;
@@ -169,44 +165,52 @@ export function buildToolGatingReport(
   return { groupBy, disabledGroups, enabledCount, disabledCount };
 }
 
+type ToolClassification =
+  | { kind: "enabled" }
+  | { kind: "disabled"; reason: ToolDisabledReason };
+
 /**
- * Reduce a tool's per-connection verdict map to a single classification for
- * the v1 flat report. Under the single-connection invariant the verdict map
- * has exactly one entry, so this is a pass-through; the implementation
- * tolerates multi-entry maps (test fixtures synthesise them) by treating
- * "enabled on at least one connection" as enabled and otherwise reporting
- * the first disabled verdict's reason.
- *
- * v2 multi-connection: drop this helper. The aggregation moves into the
- * caller, which builds per-connection rows and cross-connection deltas
- * directly from the verdict map.
+ * Classify a single handler for the flat gating report. Three cases, in order:
+ * a connection-independent tool is enabled regardless of how many connections
+ * exist; a connection-dependent tool on a zero-connection config is disabled
+ * under {@linkcode ToolDisabledReason.NoConnectionsConfigured} (there is no
+ * per-connection verdict to attribute a reason to); otherwise the per-connection
+ * verdicts decide via {@linkcode classifyVerdicts}.
  */
-function classifyTool(
+function classifyHandler(
+  handler: ToolHandler,
+  runtime: ServerRuntime,
+): ToolClassification {
+  if (handler.isConnectionIndependent) return { kind: "enabled" };
+  const verdicts = handler.connectionVerdicts(runtime);
+  if (verdicts.size === 0) {
+    return {
+      kind: "disabled",
+      reason: ToolDisabledReason.NoConnectionsConfigured,
+    };
+  }
+  return classifyVerdicts(verdicts);
+}
+
+/**
+ * Reduce a non-empty per-connection verdict map to a single classification for
+ * the flat report: "enabled on at least one connection" wins, otherwise the
+ * first disabled verdict's reason. This flatten is lossy on a multi-connection
+ * runtime — see {@linkcode ToolGatingReport} for the consequences and #559 for
+ * the per-connection shape that replaces it.
+ *
+ * {@linkcode classifyHandler} handles the connection-independent and
+ * zero-connection cases, so the map handed here is always non-empty and there
+ * is always a verdict to read.
+ */
+function classifyVerdicts(
   verdicts: Map<string, PredicateResult>,
-): { kind: "enabled" } | { kind: "disabled"; reason: ToolDisabledReason } {
+): ToolClassification {
   let firstDisabledReason: ToolDisabledReason | undefined;
   for (const verdict of verdicts.values()) {
     if (verdict.enabled) return { kind: "enabled" };
-    if (firstDisabledReason === undefined) {
-      firstDisabledReason = verdict.reason;
-    }
+    firstDisabledReason ??= verdict.reason;
   }
-  if (firstDisabledReason === undefined) {
-    // Wacky -- handler returned an empty verdict map. BaseToolHandler builds
-    // verdicts directly from `runtime.config.connections`, so an empty map
-    // means there are zero configured connections, which
-    // `enforceSingleConnectionOnly()` in `src/config/models.ts` should have
-    // prevented at bootstrap. Fail loudly rather than fabricate a
-    // misleading `ToolDisabledReason` and ship it in the operator-facing
-    // report — a wrong-by-name reason is harder to diagnose than a stack
-    // trace.
-    throw new Error(
-      "Wacky -- classifyTool received an empty verdict map: a handler's " +
-        "connectionVerdicts() returned no entries. BaseToolHandler derives " +
-        "verdicts from runtime.config.connections; an empty map implies zero " +
-        "configured connections, which enforceSingleConnectionOnly() in " +
-        "src/config/models.ts should have rejected at bootstrap.",
-    );
-  }
-  return { kind: "disabled", reason: firstDisabledReason };
+  // Non-empty map with no enabled verdict, so a disabled reason was recorded.
+  return { kind: "disabled", reason: firstDisabledReason! };
 }

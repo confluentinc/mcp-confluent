@@ -15,6 +15,10 @@ All notable changes to this MCP server will be documented in this file.
 - **Per-connection `description` field.** Optional free-text label on any connection, echoed back by `list-configured-connections`.
 - **Per-connection `read_only` flag.** Set `read_only: true` on a connection to auto-disable every state-mutating tool for it, leaving only read-only tools enabled.
 
+### Changed
+
+- **A YAML config may now define multiple connections — or none.** Point a single `config.yaml` at several clusters at once — for example a local Apache Kafka broker alongside Confluent Cloud — or run with no connection at all (documentation search and server-diagnostic tools still work). At most one of those connections may use OAuth to Confluent Cloud.
+
 ## 1.4.0
 
 ### Added

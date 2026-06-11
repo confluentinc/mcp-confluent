@@ -182,6 +182,19 @@ describe("ServerRuntime", () => {
     });
   });
 
+  describe("disconnectAll()", () => {
+    it("should disconnect every configured client manager", async () => {
+      const cm1 = createMockInstance(DirectClientManager);
+      const cm2 = createMockInstance(DirectClientManager);
+      const runtime = new ServerRuntime(config, { conn1: cm1, conn2: cm2 });
+
+      await runtime.disconnectAll();
+
+      expect(cm1.disconnect).toHaveBeenCalledOnce();
+      expect(cm2.disconnect).toHaveBeenCalledOnce();
+    });
+  });
+
   describe("isToolAllowed()", () => {
     it("should return true for any tool when no allow/block list was configured", () => {
       const runtime = new ServerRuntime(config, {});
@@ -281,7 +294,7 @@ describe("ServerRuntime", () => {
       expect(runtime.oauthHolder?.getDataPlaneToken()).toBeUndefined();
     });
 
-    it("should construct OAuthClientManager instances for every connection when an oauth connection is present", () => {
+    it("should construct an OAuthClientManager for an oauth connection", () => {
       const oauthConfig = new MCPServerConfiguration({
         connections: {
           [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "stag" },
@@ -295,11 +308,28 @@ describe("ServerRuntime", () => {
       );
     });
 
+    it("should construct per-connection manager types for a mixed direct + oauth config", () => {
+      const mixedConfig = new MCPServerConfiguration({
+        connections: {
+          local: connWith({ kafka: { bootstrap_servers: "localhost:9092" } }),
+          cloud: { type: "oauth", ccloud_env: "devel" },
+        },
+      });
+
+      const runtime = ServerRuntime.fromConfig(mixedConfig);
+
+      expect(runtime.clientManagers["local"]).toBeInstanceOf(
+        DirectClientManager,
+      );
+      expect(runtime.clientManagers["cloud"]).toBeInstanceOf(
+        OAuthClientManager,
+      );
+      expect(runtime.oauthHolder).toBeInstanceOf(OAuthHolder);
+    });
+
     it("should throw when more than one OAuth connection is defined", () => {
-      // enforceSingleConnectionOnly() prevents multi-connection records today,
-      // so this case is reached only by callers that bypass the schema (tests
-      // constructing MCPServerConfiguration directly). The defensive throw
-      // becomes load-bearing when multi-connection support lands (#151).
+      // Only one OAuth connection is supported (single shared CCloud identity);
+      // fromConfig rejects a second one rather than silently dropping it.
       const multiOauthConfig = new MCPServerConfiguration({
         connections: {
           "oauth-1": { type: "oauth", ccloud_env: "devel" },

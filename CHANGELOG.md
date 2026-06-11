@@ -51,6 +51,10 @@ All notable changes to this MCP server will be documented in this file.
 
 - **`read-connector` tool.** Its content is now covered by `get-connector-config` (config map) and `get-connector-tasks` (per-task configs and connector type).
 
+### Fixed
+
+- Introduced new optional tool argument `messageName` to`produce-message` tool to fix producing messages using PROTOBUF as format ([#127](https://github.com/confluentinc/mcp-confluent/issues/127))
+
 ## 1.3.0
 
 ### Added

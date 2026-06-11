@@ -12,7 +12,7 @@
 # Start the stack first:
 #   docker compose -f docker-compose.cp-test.yml up -d
 # Then run CP integration tests:
-#   npm run test:integration -- --tags-filter=@cp
+#   pnpm run test:integration -- --tags-filter=@cp
 server:
   log_level: error
 

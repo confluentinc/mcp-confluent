@@ -133,12 +133,12 @@ test-integration:
 			set -- "$$@" "src/confluent/tools/handlers/$$TAG_SUFFIX"; \
 		fi; \
 	fi; \
-	if [ ! -f dist/index.js ]; then npm run build; fi && \
+	if [ ! -f dist/index.js ]; then pnpm run build; fi && \
 	INTEGRATION_TEST_TRANSPORT="$$TRANSPORT_VAL" npx vitest run \
 		--project integration \
 		--outputFile.junit=TEST-integration.xml \
 		"$$@"
-# ^ `npm run build` is skipped when `dist/index.js` already exists. CI's
+# ^ `pnpm run build` is skipped when `dist/index.js` already exists. CI's
 # integration prologue builds before invoking `make test-integration`, so
 # this avoids the double build per matrix cell. Local devs running cold
 # (no `dist/`) still get an automatic build; for staleness control,

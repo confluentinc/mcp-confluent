@@ -1,7 +1,7 @@
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import {
   DEFAULT_CONNECTION_ID,
-  runtimeWithDecoy,
+  runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -28,7 +28,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWithDecoy(
+          runtime: runtimeWith(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -51,7 +51,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWithDecoy(
+          runtime: runtimeWith(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -79,7 +79,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWithDecoy(
+          runtime: runtimeWith(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -90,6 +90,30 @@ describe("produce-kafka-message-handler.ts", () => {
           },
           outcome: { resolves: "Error producing message to [Topic: smoke" },
           clientManager,
+        });
+      });
+
+      it("should throw a ZodError when a PROTOBUF value omits messageName", async () => {
+        // The valueOptions superRefine requires messageName for PROTOBUF
+        // produces that use schema registry; without it the schema rejects
+        // before the handler touches the client.
+        const clientManager = getMockedClientManager();
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWith(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: {
+              message: { user_id: "USR-001" },
+              useSchemaRegistry: true,
+              schemaType: "PROTOBUF",
+            },
+          },
+          outcome: { throws: "ZodError" },
         });
       });
 
@@ -109,7 +133,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWithDecoy(
+          runtime: runtimeWith(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,

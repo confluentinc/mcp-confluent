@@ -94,8 +94,7 @@ export type SchemaCheckResult = { type: "no-schema"; subject: string } | null;
  *
  * This is a pure factory: it maps a {@link SchemaType} to its serializer
  * constructor and forwards the caller-built {@link SerializerConfig}. The
- * format-specific *decisions* — schema-id vs. use-latest for AVRO/JSON,
- * auto-register vs. use-latest plus the descriptor registry for PROTOBUF — live
+ * format-specific *decisions* — schema-id vs. use-latest for AVRO/JSON, plus the descriptor registry for PROTOBUF — live
  * with the callers ({@link serializeMessage}, {@link serializeProtobufMessage}),
  * which is why the config arrives ready-made. For PROTOBUF the descriptor
  * registry rides inside the config as its optional `registry` field
@@ -105,7 +104,7 @@ export type SchemaCheckResult = { type: "no-schema"; subject: string } | null;
  * @param registry - The schema registry client instance
  * @param serdeType - Whether this is for key or value serialization
  * @param serializerConfig - The serializer configuration to forward (use-latest,
- *   use-schema-id, auto-register, and/or the PROTOBUF descriptor registry)
+ *   use-schema-id, and/or the PROTOBUF descriptor registry)
  * @returns The appropriate Serializer instance
  * @throws Error if the schema type is unknown or unsupported
  */
@@ -362,33 +361,6 @@ export function protobufMessageFrom(
   }
   return fromJson(messageDesc, payload as Parameters<typeof fromJson>[1]);
 }
-
-/**
- * Bridges a raw `.proto` schema string and a plain JS payload into the form the
- * `@confluentinc/schemaregistry` {@link ProtobufSerializer} requires: a typed
- * message object (carrying `$typeName`) plus the descriptor registry describing
- * it. A plain object from tool input has neither, which is why it otherwise
- * fails with "message type name is empty". Convenience wrapper around
- * {@link protobufRegistryFromProto} + {@link protobufMessageFrom}.
- *
- * @param protoText - The `.proto` schema definition (proto3)
- * @param messageName - Fully-qualified message type name (e.g. `com.example.User`)
- * @param payload - The payload to encode. Keys must match the proto field names
- *   exactly (e.g. `user_id`, not `userId`) — see {@link protobufMessageFrom}.
- * @returns The typed protobuf message and the registry describing it
- * @throws Error if the `.proto` text cannot be parsed, or if `messageName` does
- *   not match a message in the schema
- */
-export function buildProtobufMessage(
-  protoText: string,
-  messageName: string,
-  payload: object,
-): { message: object; registry: MutableRegistry } {
-  const registry = protobufRegistryFromProto(protoText);
-  const message = protobufMessageFrom(registry, messageName, payload);
-  return { message, registry };
-}
-
 /**
  * Serializes a message using the provided options and schema registry configuration.
  * This function:
@@ -506,8 +478,6 @@ export async function serializeMessage(
  * Serializes a Protobuf payload, registering or looking up the schema in the
  * format the SDK's deserializer can read back.
  *
- * - When the caller supplies the `.proto` text, the serializer auto-registers
- *   it (as a base64 `FileDescriptorProto`) and serializes.
  * - When no schema is supplied (use-latest), the previously-registered schema is
  *   fetched, its descriptor rebuilt from the stored serialized form, and the
  *   serializer uses the latest version.
@@ -539,12 +509,15 @@ async function serializeProtobufMessage(
   let protobufRegistry: MutableRegistry;
   let serializerConfig: SerializerConfig;
   if (options.schema) {
-    // Provide path: let the serializer register the schema in the serialized
-    // format the deserializer expects.
+    // Provide path: the serializer registers the schema in the binary format
+    // the deserializer expects. subjectNameStrategy overrides TopicNameStrategy
+    // so the serializer uses the caller-resolved subject instead of deriving
+    // one from the topic name.
     protobufRegistry = protobufRegistryFromProto(options.schema);
     serializerConfig = {
-      autoRegisterSchemas: true,
       normalizeSchemas: Boolean(options.normalize),
+      autoRegisterSchemas: true,
+      subjectNameStrategy: () => subject,
     };
   } else {
     // Use-latest path: rebuild the descriptor from the stored serialized schema.
@@ -554,7 +527,10 @@ async function serializeProtobufMessage(
       "PROTOBUF",
     );
     protobufRegistry = protobufRegistryFromSerialized(latest.schema);
-    serializerConfig = { useLatestVersion: true };
+    serializerConfig = {
+      useLatestVersion: true,
+      subjectNameStrategy: () => subject,
+    };
   }
 
   const message = protobufMessageFrom(

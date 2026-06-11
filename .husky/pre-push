@@ -3,9 +3,9 @@
 # Run typechecking and linting in parallel, and only allow the push if
 # both succeed.
 
-npm run lint &
+pnpm run lint &
 LINT_PID=$!
-npm run typecheck &
+pnpm run typecheck &
 TYPE_PID=$!
 
 wait $LINT_PID; EC_LINT=$?

@@ -134,7 +134,7 @@ test-integration:
 		fi; \
 	fi; \
 	if [ ! -f dist/index.js ]; then pnpm run build; fi && \
-	INTEGRATION_TEST_TRANSPORT="$$TRANSPORT_VAL" npx vitest run \
+	INTEGRATION_TEST_TRANSPORT="$$TRANSPORT_VAL" pnpm exec vitest run \
 		--project integration \
 		--outputFile.junit=TEST-integration.xml \
 		"$$@"

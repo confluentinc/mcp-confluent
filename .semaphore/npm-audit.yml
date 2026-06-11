@@ -43,7 +43,7 @@ blocks:
             # ( || true to avoid exiting non-zero on unfixable advisories that
             # require manual, possibly-breaking changes to package.json)
             - pnpm audit --fix || true
-            - pnpm install --no-frozen-lockfile || true
+            - pnpm install --no-frozen-lockfile
             - |
               if git diff --quiet -- package.json pnpm-lock.yaml; then
                 echo "No changes after pnpm audit --fix; nothing to do."

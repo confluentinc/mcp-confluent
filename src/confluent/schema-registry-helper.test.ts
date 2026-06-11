@@ -1,12 +1,14 @@
+import { MutableRegistry } from "@bufbuild/protobuf";
 import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
 import {
-  buildProtobufMessage,
   checkSchemaNeeded,
   deserializeMessage,
   getDeserializer,
   getLatestSchemaIfExists,
   getLatestSchemaOfTypeOrThrow,
   getSerializer,
+  protobufMessageFrom,
+  protobufRegistryFromProto,
   protobufRegistryFromSerialized,
   serializeMessage,
 } from "@src/confluent/schema-registry-helper.js";
@@ -22,6 +24,32 @@ message User {
   string email = 3;
   int32 age = 4;
 }`;
+
+/**
+ * Bridges a raw `.proto` schema string and a plain JS payload into the form the
+ * `@confluentinc/schemaregistry` {@link ProtobufSerializer} requires: a typed
+ * message object (carrying `$typeName`) plus the descriptor registry describing
+ * it. A plain object from tool input has neither, which is why it otherwise
+ * fails with "message type name is empty". Convenience wrapper around
+ * {@link protobufRegistryFromProto} + {@link protobufMessageFrom}.
+ *
+ * @param protoText - The `.proto` schema definition (proto3)
+ * @param messageName - Fully-qualified message type name (e.g. `com.example.User`)
+ * @param payload - The payload to encode. Keys must match the proto field names
+ *   exactly (e.g. `user_id`, not `userId`) — see {@link protobufMessageFrom}.
+ * @returns The typed protobuf message and the registry describing it
+ * @throws Error if the `.proto` text cannot be parsed, or if `messageName` does
+ *   not match a message in the schema
+ */
+export function buildProtobufMessage(
+  protoText: string,
+  messageName: string,
+  payload: object,
+): { message: object; registry: MutableRegistry } {
+  const registry = protobufRegistryFromProto(protoText);
+  const message = protobufMessageFrom(registry, messageName, payload);
+  return { message, registry };
+}
 
 describe("schema-registry-helper.ts", () => {
   describe("checkSchemaNeeded()", () => {

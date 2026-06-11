@@ -103,6 +103,7 @@ below affect source-code edits too, so they're called out here:
 - For handler-style tests that need a stubbed class instance, use `createMockInstance(Class)`
   from `@tests/stubs/index.js`; it returns a `Mocked<T>` with every method pre-stubbed as
   `vi.fn()`.
+- **Test-only helpers belong in test files.** Functions that exist solely to support tests (builders, factories, convenience wrappers around production code) must live in `*.test.ts` files or under `tests/`. Do not export them from production source files — they bloat the public API surface and obscure what the module actually provides to callers.
 
 ## Integration Test Conventions
 

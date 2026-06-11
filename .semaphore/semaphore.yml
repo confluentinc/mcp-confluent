@@ -76,7 +76,6 @@ blocks:
     task:
       prologue: &integration-prologue
         commands:
-          - pnpm install --frozen-lockfile
           # chromium is needed for any @oauth-tagged tests as well as the OAuth smoke test
           - |
             PLAYWRIGHT_VERSION=$(node -p "require('playwright-core/package.json').version")

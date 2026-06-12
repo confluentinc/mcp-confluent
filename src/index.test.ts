@@ -17,6 +17,7 @@ import {
   outputApiKey,
   outputInitConfig,
   outputToolList,
+  performCleanup,
   resolveAllowedToolNames,
   resolveTelemetryWriteKey,
 } from "@src/index.js";
@@ -832,6 +833,43 @@ describe("index.ts", () => {
       // "no key supplied" so the caller routes through TelemetryService's
       // falsy-writeKey disabled path rather than passing "" to Segment.
       expect(result).toBeFalsy();
+    });
+  });
+
+  describe("performCleanup()", () => {
+    function cleanupDeps() {
+      return {
+        telemetry: { shutdown: vi.fn().mockResolvedValue(undefined) },
+        transportManager: { stop: vi.fn().mockResolvedValue(undefined) },
+        runtime: { oauthHolder: undefined, disconnectAll: vi.fn() },
+      };
+    }
+
+    it("should run every shutdown step then exit 0", async () => {
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockResolvedValue(undefined);
+      const exit = vi.fn();
+
+      await performCleanup(deps, exit);
+
+      expect(deps.telemetry.shutdown).toHaveBeenCalledOnce();
+      expect(deps.transportManager.stop).toHaveBeenCalledOnce();
+      expect(deps.runtime.disconnectAll).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(0);
+    });
+
+    it("should still exit 0 when a shutdown step rejects", async () => {
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockRejectedValue(
+        new Error("disconnect boom"),
+      );
+      const exit = vi.fn();
+
+      await performCleanup(deps, exit);
+
+      expect(exit).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(0);
     });
   });
 });

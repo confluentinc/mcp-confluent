@@ -85,9 +85,21 @@ export class ServerRuntime {
    * {@link clientManager} getter could only reach one.
    */
   async disconnectAll(): Promise<void> {
-    await Promise.all(
+    // allSettled, not all: a single manager's disconnect() rejection must not
+    // abandon its siblings mid-shutdown. Wait for every disconnect, then raise
+    // an AggregateError carrying all failures so no error is silently dropped.
+    const results = await Promise.allSettled(
       Object.values(this.clientManagers).map((manager) => manager.disconnect()),
     );
+    const failures = results
+      .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+      .map((r) => r.reason);
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures,
+        `Failed to disconnect ${failures.length} of ${results.length} client manager(s)`,
+      );
+    }
   }
 
   static fromConfig(

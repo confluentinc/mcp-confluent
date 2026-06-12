@@ -193,6 +193,50 @@ describe("ServerRuntime", () => {
       expect(cm1.disconnect).toHaveBeenCalledOnce();
       expect(cm2.disconnect).toHaveBeenCalledOnce();
     });
+
+    it("should await every disconnect even when one rejects, surfacing an AggregateError", async () => {
+      const cm1 = createMockInstance(DirectClientManager);
+      const cm2 = createMockInstance(DirectClientManager);
+      const boom = new Error("conn1 disconnect failed");
+      cm1.disconnect.mockRejectedValue(boom);
+      cm2.disconnect.mockResolvedValue(undefined);
+      const runtime = new ServerRuntime(config, { conn1: cm1, conn2: cm2 });
+
+      let caught: unknown;
+      await runtime.disconnectAll().catch((e) => {
+        caught = e;
+      });
+
+      expect(cm1.disconnect).toHaveBeenCalledOnce();
+      expect(cm2.disconnect).toHaveBeenCalledOnce();
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([boom]);
+    });
+
+    it("should aggregate every failure when multiple managers fail to disconnect", async () => {
+      const cm1 = createMockInstance(DirectClientManager);
+      const cm2 = createMockInstance(DirectClientManager);
+      const cm3 = createMockInstance(DirectClientManager);
+      const boom1 = new Error("conn1 disconnect failed");
+      const boom2 = new Error("conn2 disconnect failed");
+      cm1.disconnect.mockRejectedValue(boom1);
+      cm2.disconnect.mockRejectedValue(boom2);
+      cm3.disconnect.mockResolvedValue(undefined);
+      const runtime = new ServerRuntime(config, {
+        conn1: cm1,
+        conn2: cm2,
+        conn3: cm3,
+      });
+
+      let caught: unknown;
+      await runtime.disconnectAll().catch((e) => {
+        caught = e;
+      });
+
+      expect(cm3.disconnect).toHaveBeenCalledOnce();
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([boom1, boom2]);
+    });
   });
 
   describe("isToolAllowed()", () => {

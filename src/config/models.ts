@@ -668,15 +668,10 @@ export const DEFAULT_SERVER_CONFIG = serverConfigSchema.parse({});
 
 export const mcpConfigSchema = z
   .object({
-    connections: z
-      .record(
-        z.string().trim().min(1, "Connection name cannot be empty"),
-        connectionConfigSchema,
-      )
-      .refine(
-        enforceSingleConnectionOnly,
-        "Exactly one connection must be defined (multiple connections not yet supported)",
-      ),
+    connections: z.record(
+      z.string().trim().min(1, "Connection name cannot be empty"),
+      connectionConfigSchema,
+    ),
     server: serverConfigSchema.default(() => DEFAULT_SERVER_CONFIG),
   })
   .strict();
@@ -689,11 +684,4 @@ export function formatZodIssues(issues: z.ZodError["issues"]): string {
       return path ? `  - ${path}: ${issue.message}` : `  - ${issue.message}`;
     })
     .join("\n");
-}
-
-// Temporary guard: remove when multi-connection support (#151) lands.
-function enforceSingleConnectionOnly(
-  connections: Record<string, unknown>,
-): boolean {
-  return Object.keys(connections).length === 1;
 }

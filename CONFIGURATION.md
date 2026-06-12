@@ -363,11 +363,11 @@ To migrate, run `--init-config`, then translate each variable you currently set 
 For a side-by-side, every `${VAR:-...}` placeholder in `config.example.yaml` names the env var that field used to come from.
 You can keep secrets in your existing `.env` and reference them via `${VAR}` from the YAML — that is job 1 above, and is the recommended migration target.
 
-## Future plans
+## Multiple connections
 
-The configuration schema accepts multiple named entries under `connections:` and the YAML parser validates them, but today the server expects exactly one.
-Once the rest of the runtime catches up, a single `config.yaml` will be able to point at several Confluent Cloud or local clusters at the same time; you will not need to restructure existing configs for that to work.
-This capability will be YAML-only — the legacy env-var path has no way to express it.
+A single `config.yaml` may define several named entries under `connections:` — for example a Confluent Cloud connection alongside a local Apache Kafka broker — and each tool call routes to the connection you address.
+A config may also define no connections at all; the connection-independent tools (documentation search and the server-diagnostic tools) stay available regardless.
+This capability is YAML-only — the legacy env-var path can express only a single connection.
 
 ## Troubleshooting
 

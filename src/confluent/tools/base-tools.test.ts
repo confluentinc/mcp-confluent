@@ -513,6 +513,45 @@ describe("base-tools.ts", () => {
       });
     });
 
+    describe("resolvedTargetConnectionId()", () => {
+      const KAFKA = { kafka: { bootstrap_servers: "b:9092" } };
+
+      it("should return undefined for a connection-independent tool", () => {
+        const handler = new StubHandler({ enabled: true }); // predicate = alwaysEnabled
+        expect(
+          handler.resolvedTargetConnectionId(ccloudOAuthRuntime(), {}),
+        ).toBeUndefined();
+      });
+
+      it("should return the sole enabled connection id when connectionId is omitted", () => {
+        const handler = new StubHandler({ predicate: hasKafka });
+        const runtime = runtimeWithConnections({ a: KAFKA, b: {} });
+        expect(handler.resolvedTargetConnectionId(runtime, {})).toBe("a");
+      });
+
+      it("should return the explicitly requested connection id", () => {
+        const handler = new StubHandler({ predicate: hasKafka });
+        const runtime = runtimeWithConnections({ a: KAFKA, b: KAFKA });
+        expect(
+          handler.resolvedTargetConnectionId(runtime, { connectionId: "b" }),
+        ).toBe("b");
+      });
+
+      it("should return undefined when the call is ambiguous (multiple enabled, connectionId omitted)", () => {
+        const handler = new StubHandler({ predicate: hasKafka });
+        const runtime = runtimeWithConnections({ a: KAFKA, b: KAFKA });
+        expect(handler.resolvedTargetConnectionId(runtime, {})).toBeUndefined();
+      });
+
+      it("should return undefined when the requested connectionId is not an enabled connection", () => {
+        const handler = new StubHandler({ predicate: hasKafka });
+        const runtime = runtimeWithConnections({ a: KAFKA, b: {} });
+        expect(
+          handler.resolvedTargetConnectionId(runtime, { connectionId: "b" }),
+        ).toBeUndefined();
+      });
+    });
+
     describe("resolveDirectConnection()", () => {
       const KAFKA = { kafka: { bootstrap_servers: "b:9092" } };
 

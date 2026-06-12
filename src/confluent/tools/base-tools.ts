@@ -129,6 +129,15 @@ export interface ToolHandler {
    * See {@linkcode BaseToolHandler.isConnectionIndependent}.
    */
   readonly isConnectionIndependent: boolean;
+
+  /**
+   * The connection id this invocation routes to, or `undefined` when it routes
+   * to none. See {@linkcode BaseToolHandler.resolvedTargetConnectionId}.
+   */
+  resolvedTargetConnectionId(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): string | undefined;
 }
 
 export interface ToolConfig {
@@ -295,6 +304,32 @@ export abstract class BaseToolHandler implements ToolHandler {
    */
   get isConnectionIndependent(): boolean {
     return this.predicate === alwaysEnabled;
+  }
+
+  /**
+   * The connection id this invocation routes to — the OAuth-login gate uses it
+   * to launch the browser flow only when a call actually targets the OAuth
+   * connection, not merely because one exists somewhere in the config.
+   *
+   * Delegates to {@linkcode resolveConnection} so routing is decided in one
+   * place rather than duplicated in the gate. Returns `undefined` for a
+   * connection-independent tool (it routes to no connection) and for a call
+   * `resolveConnection` can't resolve unambiguously (e.g. a multi-connection
+   * tool invoked without a `connectionId`); in the latter case the gate declines
+   * to pre-launch a login and `handle()` reports the routing error to the caller.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
+   */
+  resolvedTargetConnectionId(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): string | undefined {
+    if (this.isConnectionIndependent) return undefined;
+    try {
+      return this.resolveConnection(runtime, toolArguments).connId;
+    } catch {
+      return undefined;
+    }
   }
 
   /**

@@ -1,5 +1,8 @@
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
-import { DEFAULT_CONNECTION_ID } from "@tests/factories/runtime.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  runtimeWithDecoy,
+} from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
   getMockedClientManager,

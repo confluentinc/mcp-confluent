@@ -22,7 +22,11 @@ import {
 } from "@src/index.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { ccloudOAuthRuntime, runtimeWith } from "@tests/factories/runtime.js";
+import {
+  ccloudOAuthRuntime,
+  runtimeWith,
+  runtimeWithConnections,
+} from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import {
   createFsWrappers,
@@ -234,6 +238,17 @@ describe("index.ts", () => {
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
       expect(result.has(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+
+    it("should register the connection-independent tools on a zero-connection config", () => {
+      const result = getToolHandlersToRegister(runtimeWithConnections({}));
+
+      expect(result.has(ToolName.SEARCH_PRODUCT_DOCS)).toBe(true);
+      expect(result.has(ToolName.GET_PRODUCT_DOC_PAGE)).toBe(true);
+      expect(result.has(ToolName.LIST_CONFIGURED_CONNECTIONS)).toBe(true);
+      expect(result.has(ToolName.EXPLAIN_DISABLED_TOOLS)).toBe(true);
+      // A connection-dependent tool has no connection to enable it.
+      expect(result.has(ToolName.LIST_TOPICS)).toBe(false);
     });
 
     it("should emit one grouped warn per (connectionId, reason) for fully-disabled tools", () => {

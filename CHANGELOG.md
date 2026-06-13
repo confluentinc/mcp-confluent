@@ -8,6 +8,7 @@ All notable changes to this MCP server will be documented in this file.
 
 #### New Tools / Tool Features
 
+- **`create-schema` tool.** Registers a schema (or a new version) under a subject in the Schema Registry, peer to `list-schemas` and `delete-schema`.
 - **`list-configured-connections` tool.** Read-only, always-enabled discovery tool mapping each configured connection id to the connection-routable tools enabled on it.
 
 #### Configuration

@@ -53,6 +53,7 @@ import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
 import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organizations/list-organizations-handler.js";
+import { CreateSchemaHandler } from "@src/confluent/tools/handlers/schema/create-schema-handler.js";
 import { DeleteSchemaHandler } from "@src/confluent/tools/handlers/schema/delete-schema-handler.js";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
@@ -127,6 +128,7 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_ENVIRONMENTS, new ListEnvironmentsHandler()],
     [ToolName.READ_ENVIRONMENT, new ReadEnvironmentHandler()],
     [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],
+    [ToolName.CREATE_SCHEMA, new CreateSchemaHandler()],
     [ToolName.DELETE_SCHEMA, new DeleteSchemaHandler()],
     [ToolName.CONSUME_MESSAGES, new ConsumeKafkaMessagesHandler()],
     [ToolName.GET_PARTITION_OFFSETS, new GetPartitionOffsetsHandler()],

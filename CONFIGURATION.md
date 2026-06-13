@@ -109,6 +109,7 @@ Either connection flavor also accepts an optional `read_only` flag (default `fal
 When set to `read_only: true`, every tool that mutates state is automatically disabled for that connection, leaving only the read-only tools enabled.
 A tool's mutation posture comes from its `readOnlyHint` annotation, so there is nothing to configure per-tool: reads stay available while writes — produce, create/alter/delete, and the like — can never fire against that connection.
 This is the recommended posture for handing an agent a staging or production connection while keeping full read/write on a throwaway dev cluster.
+The `list-configured-connections` tool reports each connection's read-onlyness, so an agent can see at a glance which connections are read-only or write-enabled.
 
 #### Service blocks
 

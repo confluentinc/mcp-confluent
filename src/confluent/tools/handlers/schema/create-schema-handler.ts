@@ -86,11 +86,16 @@ export class CreateSchemaHandler extends BaseToolHandler {
         normalize,
       );
       logger.info(
-        { subject, id: metadata.id, version: metadata.version },
+        {
+          subject,
+          id: metadata.id,
+          version: metadata.version,
+          guid: metadata.guid,
+        },
         "Successfully registered schema",
       );
       return this.createResponse(
-        `Successfully registered schema for subject "${subject}". Schema ID: ${metadata.id}, version: ${metadata.version}.`,
+        `Successfully registered schema for subject "${subject}". Schema ID: ${metadata.id}, version: ${metadata.version}, GUID: ${metadata.guid}.`,
       );
     } catch (error) {
       logger.error(

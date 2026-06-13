@@ -68,7 +68,7 @@ describe("create-schema-handler.ts", () => {
           },
           outcome: {
             resolves:
-              'Successfully registered schema for subject "my-subject". Schema ID: 42, version: 1.',
+              'Successfully registered schema for subject "my-subject". Schema ID: 42, version: 1, GUID: abc-guid.',
           },
           clientManager,
         });
@@ -84,6 +84,7 @@ describe("create-schema-handler.ts", () => {
         sr.registerFullResponse.mockResolvedValue({
           id: 7,
           version: 2,
+          guid: "refs-guid",
           subject: "with-refs",
           schema: AVRO_SCHEMA,
           schemaType: "AVRO",
@@ -121,6 +122,7 @@ describe("create-schema-handler.ts", () => {
         sr.registerFullResponse.mockResolvedValue({
           id: 9,
           version: 1,
+          guid: "proto-guid",
           subject: "proto-subject",
           schema: 'syntax = "proto3";',
           schemaType: "PROTOBUF",
@@ -157,6 +159,7 @@ describe("create-schema-handler.ts", () => {
         sr.registerFullResponse.mockResolvedValue({
           id: 1,
           version: 1,
+          guid: "env-guid",
           subject: "env-subject",
           schema: AVRO_SCHEMA,
           schemaType: "AVRO",

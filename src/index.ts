@@ -69,10 +69,13 @@ export function getToolHandlersToRegister(
   // Pass 2: register tools that are enabled on at least one connection.
   for (const [toolName, handler] of candidates) {
     const enabledIds = handler.enabledConnectionIds(runtime);
+    // Unreachable: enabledConnectionIds() is derived by iterating
+    // runtime.config.connections, so every id it yields is already a known key.
+    // A non-empty unknownIds means that derivation has broken.
     const unknownIds = enabledIds.filter((id) => !knownIds.has(id));
     if (unknownIds.length > 0) {
       throw new Error(
-        `Tool ${toolName}: enabledConnectionIds() returned unknown connection ID(s): ${unknownIds.join(", ")}`,
+        `Wacky -- Tool ${toolName}: enabledConnectionIds() returned unknown connection ID(s): ${unknownIds.join(", ")}`,
       );
     }
     if (enabledIds.length > 0) {

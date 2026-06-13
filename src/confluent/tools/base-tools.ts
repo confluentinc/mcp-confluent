@@ -14,6 +14,7 @@ import {
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
+import { quoteJoinIds } from "@src/utils/quote-join-ids.js";
 import { z, ZodRawShape } from "zod";
 
 /**
@@ -36,7 +37,8 @@ export const DESTRUCTIVE: ToolAnnotations = {
 
 /**
  * Opening clause of the injected `connectionId` parameter description, before the
- * comma-separated list of viable connection ids is appended.
+ * quoted, comma-separated list of viable connection ids (see
+ * {@linkcode quoteJoinIds}) is appended.
  */
 export const CONNECTION_ID_DESCRIPTION_PREFIX =
   "Which configured connection to target. One of: ";
@@ -78,15 +80,15 @@ export interface ToolHandler {
   ): Promise<CallToolResult> | CallToolResult;
 
   /**
-   * Produce the actual config registered with MCP for this tool, potentially
-   * injecting a required `connectionId` parameter when the tool can target more
-   * than one connection. See the method body for the rules.
+   * Produce the actual config registered with MCP for this tool, injecting a
+   * required `connectionId` parameter when the server holds more than one
+   * connection. See {@linkcode BaseToolHandler.getRegisteredToolConfig} for the
+   * rules.
    *
    * This method is called when setting up the MCP server, and we ourselves make
    * the downcall to the handler-authored `getToolConfig()`.
-   * {@linkcode BaseToolHandler.getRegisteredToolConfig} for the rules.
    */
-  getRegisteredToolConfig(runtime: ServerRuntime): ToolConfig;
+  getRegisteredToolConfig(runtime: ServerRuntime): RegisteredToolConfig;
 
   /**
    * The connection predicate that gates this tool's enablement. Lifted onto
@@ -133,6 +135,18 @@ export interface ToolConfig {
 }
 
 /**
+ * The config actually registered with MCP, produced by
+ * {@linkcode BaseToolHandler.getRegisteredToolConfig}. Differs from the
+ * handler-authored {@linkcode ToolConfig} in that `inputSchema` is a resolved,
+ * strict Zod object rather than a bare shape: strict so unknown parameters are
+ * rejected (not silently stripped) before `handle()` runs, and resolved because
+ * a multi-connection server injects the required `connectionId` enum into it.
+ */
+export interface RegisteredToolConfig extends Omit<ToolConfig, "inputSchema"> {
+  inputSchema: z.ZodObject;
+}
+
+/**
  * What the connection-resolution helpers hand back: the chosen connection id,
  * its resolved config, and the client manager bound to it.
  *
@@ -166,38 +180,66 @@ export abstract class BaseToolHandler implements ToolHandler {
   protected abstract getToolConfig(): ToolConfig;
 
   /**
-   * Produce the actual config registered with MCP for this tool, potentially
-   * injecting a required `connectionId` parameter when the tool can target more
-   * than one connection. See the method body for the rules.
+   * Produce the actual config registered with MCP for this tool.
    *
-   * This method is called when setting up the MCP server, and we ourselves make
-   * the downcall to the handler-authored `getToolConfig()`.
+   *   * If the tool is connection-oriented and the server is configured
+   *    with multiple connections, injects a required `connectionId` parameter
+   *    indicating which connection the tool call should route to.
+   *    See {@linkcode registeredInputShape} for more details.
+   *
+   *   * Wrap the input schema in `z.object(...).strict()` to uniformly reject
+   *     unknown parameters before `handle()` runs.
+   *
+   * This method is called for each active tool when setting up the MCP server.
    *
    * @final — concrete on `BaseToolHandler`; subclasses must not override.
    */
-  getRegisteredToolConfig(runtime: ServerRuntime): ToolConfig {
+  getRegisteredToolConfig(runtime: ServerRuntime): RegisteredToolConfig {
     const config = this.getToolConfig();
+    return {
+      ...config,
+      inputSchema: z
+        .object(this.registeredInputShape(config, runtime))
+        .strict(),
+    };
+  }
 
-    // alwaysEnabled is an identity-checked sentinel, so bail before the
-    // per-connection scan below: connection-agnostic tools (docs, diagnostics)
-    // never route to a connection and so never need a connectionId parameter.
-    if (this.predicate === alwaysEnabled) return config;
+  /**
+   * The input shape to register, before strict-wrapping: the authored shape,
+   * plus a required `connectionId` enum when the server holds more than one
+   * connection AND this tool is connection-oriented. A single-element enum (when
+   * only one connection is viable) is still injected on a multi-connection server,
+   * so that an explicit request for a non-viable connection (e.g. to a disabled
+   * tool because it is read_only) is rejected by the enum rather than silently
+   * auto-routed.
+   */
+  private registeredInputShape(
+    config: ToolConfig,
+    runtime: ServerRuntime,
+  ): ZodRawShape {
+    // alwaysEnabled is an identity-checked sentinel: connection-agnostic tools
+    // (docs, diagnostics) never route to a connection and so never need a
+    // connectionId parameter.
+    if (this.predicate === alwaysEnabled) return config.inputSchema;
+
+    // A single-connection (or zero-connection) server has no ambiguity as to
+    // which connection a call routes to, so the call auto-routes with no extra
+    // argument. The zero-connection case also covers the `--list-tools` runtime,
+    // which wants the unaugmented view.
+    if (runtime.config.getConnectionNames().length <= 1)
+      return config.inputSchema;
 
     const ids = this.enabledConnectionIds(runtime);
 
-    // A tool viable on a single connection has no ambiguity as to which
-    // connection it routes to, so return the tool's authored config verbatim.
-
-    // (We might find that in multi-connection configurations, we might
-    //  want to surface the `connectionId` parameter regardless but then
-    //  lock it to a single value with `z.enum([theSoleEnabledId])`. Will
-    //  have to get farther along epic #532 before we can make that
-    //  determination, though. We have enough information in serverRuntime
-    //  to be able to migrate, though, so is not a blocker at this time.)
-    if (ids.length <= 1) return config;
-
-    // Otherwise, inject a required connectionId parameter into the Zod
-    // inputSchema with an enum of the enabled connection IDs.
+    // A tool viable on no connection is never registered (the enablement filter
+    // in index.ts drops it), so this method is never called for one. Reaching
+    // here means the wiring is broken; bail loudly rather than build an illegal
+    // `z.enum([])`.
+    if (ids.length === 0) {
+      throw new Error(
+        `Wacky -- tool ${config.name} resolved to zero enabled connections on a multi-connection server; it should never have been registered`,
+      );
+    }
 
     // Point the agent at list-configured-connections so it can learn which
     // tools each connection supports — but only when that tool is itself
@@ -210,15 +252,12 @@ export abstract class BaseToolHandler implements ToolHandler {
       ? ` ${LIST_CONFIGURED_CONNECTIONS_POINTER}`
       : "";
     return {
-      ...config,
-      inputSchema: {
-        ...config.inputSchema,
-        connectionId: z
-          .enum(ids as [string, ...string[]])
-          .describe(
-            `${CONNECTION_ID_DESCRIPTION_PREFIX}${ids.join(", ")}.${listConfiguredConnectionsPointer}`,
-          ),
-      },
+      ...config.inputSchema,
+      connectionId: z
+        .enum(ids as [string, ...string[]])
+        .describe(
+          `${CONNECTION_ID_DESCRIPTION_PREFIX}${quoteJoinIds(ids)}.${listConfiguredConnectionsPointer}`,
+        ),
     };
   }
 
@@ -384,9 +423,9 @@ export abstract class BaseToolHandler implements ToolHandler {
       // Unreachable in normal operation: Zod has already validated `args`
       // against the registered schema before `handle()` runs, and that schema
       // either declares `connectionId` as a string enum (multi-connection
-      // tools — a non-string fails parsing) or omits it entirely (single-
-      // connection tools — an unknown key is stripped). Either way a non-string
-      // can't survive to reach this branch. It exists purely as a symmetric
+      // servers — a non-string fails parsing) or omits it entirely (single-
+      // connection servers — the strict schema rejects the unknown key). Either
+      // way a non-string can't survive to reach this branch. It exists purely as a symmetric
       // peer to the two backstops below, so a malformed value can never quietly
       // masquerade as an omission and auto-route.
       throw new Error(

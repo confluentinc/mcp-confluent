@@ -1,6 +1,7 @@
 import { validateBootstrapServers } from "@src/config/validation.js";
 import { logLevels } from "@src/logger.js";
 import { TransportType } from "@src/mcp/transports/types.js";
+import { quoteJoinIds } from "@src/utils/quote-join-ids.js";
 import { z } from "zod";
 
 // The following interfaces and types define subcomponents of class MCPServerConfiguration, which represents our entire server configuration.
@@ -254,7 +255,7 @@ export class MCPServerConfiguration {
     if (conn === undefined) {
       throw new Error(
         `Unknown connection id "${connectionId}"; defined connections: ${
-          this.getConnectionNames().join(", ") || "none"
+          quoteJoinIds(this.getConnectionNames()) || "none"
         }`,
       );
     }

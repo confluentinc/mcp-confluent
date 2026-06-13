@@ -15,6 +15,10 @@ All notable changes to this MCP server will be documented in this file.
 - **Per-connection `description` field.** Optional free-text label on any connection, echoed back by `list-configured-connections`.
 - **Per-connection `read_only` flag.** Set `read_only: true` on a connection to auto-disable every state-mutating tool for it, leaving only read-only tools enabled.
 
+### Fixed
+
+- `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.
+
 ## 1.4.0
 
 ### Added

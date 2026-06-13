@@ -93,6 +93,55 @@ describe("produce-kafka-message-handler.ts", () => {
         });
       });
 
+      it("should serialize a numeric Avro value and send the buffer to the producer", async () => {
+        const clientManager = getMockedClientManager();
+        const producer = await clientManager.getProducer();
+        producer.send.mockResolvedValue([
+          { topicName: "smoke", partition: 0, offset: "5", errorCode: 0 },
+        ]);
+        // Latest registered value schema is a top-level Avro long, so the
+        // numeric payload serializes against it rather than tripping the old
+        // object-only guard.
+        const registry = clientManager.getSchemaRegistryClient();
+        registry.getAssociationsByResourceName.mockResolvedValue([]);
+        registry.getLatestSchemaMetadata.mockResolvedValue({
+          id: 1,
+          version: 1,
+          subject: "smoke-value",
+          schema: '"long"',
+          schemaType: "AVRO",
+        });
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: {
+              message: 123,
+              useSchemaRegistry: true,
+              schemaType: "AVRO",
+            },
+          },
+          outcome: {
+            resolves: "Message produced successfully to [Topic: smoke",
+          },
+          clientManager,
+        });
+
+        // Confluent wire format: magic byte 0x00, 4-byte big-endian schema id
+        // (1), then the Avro long zigzag-varint encoding of 123 (0xF6 0x01).
+        // No key entry, since the args carry only a value.
+        expect(producer.send).toHaveBeenCalledWith({
+          topic: "smoke",
+          messages: [{ value: Buffer.from([0, 0, 0, 0, 1, 0xf6, 0x01]) }],
+        });
+      });
+
       it("should call getSchemaRegistrySdkClient with the resolved envId when value.useSchemaRegistry is true", async () => {
         // Pin the SR-under-OAuth wiring at the handler-test layer. Under
         // direct-mode runtime, `resolveKafkaClusterArgs` returns

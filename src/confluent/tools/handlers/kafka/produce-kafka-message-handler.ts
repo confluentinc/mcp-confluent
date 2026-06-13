@@ -25,9 +25,9 @@ import { z } from "zod";
 
 const messageOptions = z.object({
   message: z
-    .union([z.object({}).passthrough(), z.string()])
+    .union([z.object({}).passthrough(), z.string(), z.number(), z.boolean()])
     .describe(
-      "The payload to produce. If using schema registry, this should be an object matching the schema. Otherwise, a string.",
+      "The payload to produce. When using schema registry, this should match the schema: an object for record schemas, or a primitive (string/number/boolean) for top-level primitive schemas such as Avro long. Without schema registry, a string is sent raw and anything else is JSON-encoded.",
     ),
   useSchemaRegistry: z
     .boolean()

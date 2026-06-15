@@ -2,7 +2,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
-import { hasKafka } from "@src/confluent/tools/connection-predicates.js";
+import {
+  hasKafka,
+  kafkaBootstrapOrOAuth,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
@@ -10,6 +13,7 @@ import { createMcpServer, type ToolCallProps } from "@src/mcp/server.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import {
   ccloudOAuthRuntime,
+  localPlusOAuthRuntime,
   runtimeWith,
   runtimeWithConnections,
 } from "@tests/factories/runtime.js";
@@ -118,20 +122,59 @@ describe("MCP server tool-call gate", () => {
     return client;
   }
 
-  // StubHandler({ enabled: false }) yields a predicate that's not
-  // `alwaysEnabled` (it returns a disabled-result), which is the condition
-  // the gate uses to decide to launch the OAuth login. The "tool disabled"
-  // semantics are incidental — the gate doesn't read the predicate's
-  // result, only its identity.
-  it("should call ensureLoggedIn() before handle() when an OAuth holder is present and predicate is not alwaysEnabled", async () => {
+  it("should call ensureLoggedIn() before handle() when the call routes to the OAuth connection", async () => {
     const holder = createMockInstance(OAuthHolder);
     holder.ensureLoggedIn.mockResolvedValue(undefined);
-    const handler = new StubHandler({ enabled: false });
+    // Enabled on the sole OAuth connection, so the call unambiguously routes there.
+    const handler = new StubHandler({ predicate: kafkaBootstrapOrOAuth });
 
     const client = await startWith(handler, ccloudOAuthRuntime(holder));
     await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
 
     expect(holder.ensureLoggedIn).toHaveBeenCalledOnce();
+  });
+
+  it("should NOT call ensureLoggedIn() when the call routes to a local direct connection in a mixed config", async () => {
+    // The bug: invoking a local-only tool in a local+OAuth config used to launch
+    // the browser anyway, because the old gate fired whenever an OAuth holder
+    // merely existed. A `hasKafka` tool is enabled only on the local connection,
+    // so the call routes to direct — no OAuth login is needed.
+    const holder = createMockInstance(OAuthHolder);
+    holder.ensureLoggedIn.mockResolvedValue(undefined);
+    const handler = new StubHandler({ predicate: hasKafka });
+
+    const client = await startWith(handler, localPlusOAuthRuntime(holder));
+    await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
+
+    expect(holder.ensureLoggedIn).not.toHaveBeenCalled();
+  });
+
+  it("should call ensureLoggedIn() when a both-connections tool is explicitly routed to the OAuth connection", async () => {
+    const holder = createMockInstance(OAuthHolder);
+    holder.ensureLoggedIn.mockResolvedValue(undefined);
+    const handler = new StubHandler({ predicate: kafkaBootstrapOrOAuth });
+
+    const client = await startWith(handler, localPlusOAuthRuntime(holder));
+    await client.callTool({
+      name: ToolName.LIST_TOPICS,
+      arguments: { connectionId: "ccloud-oauth" },
+    });
+
+    expect(holder.ensureLoggedIn).toHaveBeenCalledOnce();
+  });
+
+  it("should NOT call ensureLoggedIn() when a both-connections tool is explicitly routed to the local connection", async () => {
+    const holder = createMockInstance(OAuthHolder);
+    holder.ensureLoggedIn.mockResolvedValue(undefined);
+    const handler = new StubHandler({ predicate: kafkaBootstrapOrOAuth });
+
+    const client = await startWith(handler, localPlusOAuthRuntime(holder));
+    await client.callTool({
+      name: ToolName.LIST_TOPICS,
+      arguments: { connectionId: "local" },
+    });
+
+    expect(holder.ensureLoggedIn).not.toHaveBeenCalled();
   });
 
   it("should NOT call ensureLoggedIn() when handler.predicate is alwaysEnabled (e.g., docs lookups)", async () => {
@@ -163,7 +206,7 @@ describe("MCP server tool-call gate", () => {
     holder.ensureLoggedIn.mockRejectedValue(
       new Error("PKCE login timed out after 120000ms"),
     );
-    const handler = new StubHandler({ enabled: false });
+    const handler = new StubHandler({ predicate: kafkaBootstrapOrOAuth });
     const handleSpy = vi.spyOn(handler, "handle");
     const trackSpy = vi.fn();
 

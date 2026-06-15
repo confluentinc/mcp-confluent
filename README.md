@@ -204,8 +204,8 @@ The full configuration reference — YAML schema, every service block, env-var i
 
 > **Compatibility note.** This release ships full parity between YAML (`-c config.yaml`) and the legacy env-var path (`-e config.env`) for a single connection.
 > The env-var-only path will emit a startup warning in a near-future release and be removed a release or two later.
-> Multi-connection support (next release) will be YAML-only.
-> See [CONFIGURATION.md → Two paths, one configuration](CONFIGURATION.md#two-paths-one-configuration).
+> Defining multiple connections (or none) is YAML-only — the env-var path can express only a single connection.
+> See [CONFIGURATION.md → Two paths, one configuration](CONFIGURATION.md#two-paths-one-configuration) and [CONFIGURATION.md → Multiple connections (and zero connections)](CONFIGURATION.md#multiple-connections-and-zero-connections).
 
 ### Prerequisites & setup for Tableflow commands
 

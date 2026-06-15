@@ -19,12 +19,21 @@ global_job_config:
   prologue:
     commands:
       - sem-version node 22
+      # corepack ships with Node 22 and activates the pnpm version pinned in
+      # package.json's `packageManager` field, so the CLI version is the
+      # single source of truth shared with local dev.
+      - corepack enable
       - checkout
-      - cache restore npm-cache-
-      - npm ci --prefer-offline
+      - pnpm config set store-dir ~/.pnpm-store
+      # Fuzzy-match restore: an exact key hit (lockfile unchanged) skips all
+      # downloads; the bare `pnpm-store-` prefix lets a changed lockfile still
+      # warm-start from the previous store instead of fetching everything.
+      - cache restore pnpm-store-$(checksum pnpm-lock.yaml),pnpm-store-
+      - pnpm install --frozen-lockfile
   epilogue:
-    commands:
-      - cache store npm-cache-$(checksum package-lock.json) ~/.npm
+    always:
+      commands:
+        - cache store pnpm-store-$(checksum pnpm-lock.yaml) ~/.pnpm-store
 
 blocks:
   - name: "Build & Test"
@@ -33,11 +42,11 @@ blocks:
       jobs:
         - name: "Build & Test"
           commands:
-            - npm run lint
-            - npm run typecheck
-            - npm run build
-            - npm run test:harness
-            - npm run test:unit:coverage
+            - pnpm run lint
+            - pnpm run typecheck
+            - pnpm run build
+            - pnpm run test:harness
+            - pnpm run test:unit:coverage
       epilogue:
         always:
           commands:
@@ -67,7 +76,6 @@ blocks:
     task:
       prologue: &integration-prologue
         commands:
-          - npm ci --prefer-offline --include=dev
           # chromium is needed for any @oauth-tagged tests as well as the OAuth smoke test
           - |
             PLAYWRIGHT_VERSION=$(node -p "require('playwright-core/package.json').version")
@@ -76,7 +84,7 @@ blocks:
               cache store "playwright-chromium-${PLAYWRIGHT_VERSION}" ~/.cache/ms-playwright
           - . vault-setup --version v3 --role mcp-confluent
           - make setup-test-env
-          - npm run build
+          - pnpm run build
       epilogue: &integration-epilogue
         always:
           commands:
@@ -85,7 +93,7 @@ blocks:
       jobs:
         - name: "@catalog"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@catalog
 
   - name: "Integration Tests: billing"
@@ -98,7 +106,7 @@ blocks:
       jobs:
         - name: "@billing"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@billing
 
   - name: "Integration Tests: clusters"
@@ -111,7 +119,7 @@ blocks:
       jobs:
         - name: "@clusters"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@clusters
 
   - name: "Integration Tests: connect"
@@ -124,7 +132,7 @@ blocks:
       jobs:
         - name: "@connect"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@connect
 
   - name: "Integration Tests: docs"
@@ -137,7 +145,7 @@ blocks:
       jobs:
         - name: "@docs"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@docs
 
   - name: "Integration Tests: environments"
@@ -150,7 +158,7 @@ blocks:
       jobs:
         - name: "@environments"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@environments
 
   - name: "Integration Tests: flink"
@@ -163,7 +171,7 @@ blocks:
       jobs:
         - name: "@flink"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@flink
 
   - name: "Integration Tests: kafka"
@@ -176,7 +184,7 @@ blocks:
       jobs:
         - name: "@kafka"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@kafka
 
   - name: "Integration Tests: metrics"
@@ -189,7 +197,7 @@ blocks:
       jobs:
         - name: "@metrics"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@metrics
 
   - name: "Integration Tests: organizations"
@@ -202,7 +210,7 @@ blocks:
       jobs:
         - name: "@organizations"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@organizations
 
   - name: "Integration Tests: schema"
@@ -215,7 +223,7 @@ blocks:
       jobs:
         - name: "@schema"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@schema
 
   - name: "Integration Tests: tableflow"
@@ -228,7 +236,7 @@ blocks:
       jobs:
         - name: "@tableflow"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@tableflow
 
   # Smoke block: fires on any non-test src/ change, so transport-layer
@@ -245,7 +253,7 @@ blocks:
       jobs:
         - name: "@smoke"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS=@smoke
 
 after_pipeline:

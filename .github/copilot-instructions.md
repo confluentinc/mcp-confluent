@@ -76,7 +76,7 @@ disables the tool. Both methods are `@final` — handlers must not override them
   Kafka admin/producer/consumer via `@confluentinc/kafka-javascript`.
 
 - **`src/confluent/openapi-schema.d.ts`** — generated from `openapi.json` via
-  `npm run generate:openapi-types` (openapi-typescript). Never hand-edited.
+  `pnpm run generate:openapi-types` (openapi-typescript). Never hand-edited.
 
 - **`src/confluent/node-deps.ts`** — namespace-object wrapper around Node builtins, third-party
   constructors, and env access. ESM named imports are read-only from outside the defining
@@ -203,7 +203,7 @@ Do not comment on these for style, patterns, or best practices (build artifacts,
 coverage output, etc. are already excluded via `.gitignore` and won't appear in diffs):
 
 - `src/confluent/openapi-schema.d.ts` — generated from `openapi.json` by
-  `npm run generate:openapi-types`. The "OpenAPI Types" CI job re-runs the generator and fails on
+  `pnpm run generate:openapi-types`. The "OpenAPI Types" CI job re-runs the generator and fails on
   drift; trust it. Never hand-edit this file.
 - `openapi.json` — a vendored snapshot of the public Confluent Cloud API spec, not this project's
   own contract. It's only edited when a handler needs a Confluent Cloud endpoint the snapshot

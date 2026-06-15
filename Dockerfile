@@ -5,18 +5,22 @@ FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 
 
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml ./
 
-RUN npm ci
+# corepack activates the pnpm version pinned in package.json's
+# `packageManager` field, matching CI and local dev.
+RUN corepack enable && pnpm install --frozen-lockfile
 
 COPY tsconfig.json tsconfig.build.json ./
 COPY src/ ./src/
 COPY assets/ ./assets/
 
-RUN npm run build
+RUN pnpm run build
 
-# remove dev dependencies, keeping compiled native modules intact
-RUN npm prune --omit=dev
+# remove dev dependencies, keeping compiled native modules intact. pnpm uses
+# relative symlinks with the .pnpm store nested under node_modules, so the
+# pruned node_modules copies cleanly into the production stage below.
+RUN pnpm prune --prod
 
 # Production stage
 FROM ${NODE_IMAGE}

@@ -1,6 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ToolHandler } from "@src/confluent/tools/base-tools.js";
-import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
@@ -64,11 +63,18 @@ export function createMcpServer({
           clientVersion: clientInfo?.version,
         };
         try {
-          // Gate launch of the browser OAuth login flow only on the
-          // first tool call that needs Confluent OAuth tokens.
+          // Launch the browser OAuth login flow only when this call actually
+          // routes to the OAuth connection — not merely because an OAuth
+          // connection exists somewhere in the config. A call targeting a
+          // local/direct connection in a mixed setup needs no login.
+          const targetConnectionId = handler.resolvedTargetConnectionId(
+            runtime,
+            args,
+          );
           if (
             runtime.oauthHolder !== undefined &&
-            handler.predicate !== alwaysEnabled
+            targetConnectionId !== undefined &&
+            runtime.config.connections[targetConnectionId]?.type === "oauth"
           ) {
             await runtime.oauthHolder.ensureLoggedIn();
           }

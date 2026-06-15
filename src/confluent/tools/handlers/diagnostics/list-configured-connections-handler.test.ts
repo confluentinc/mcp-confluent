@@ -68,8 +68,11 @@ describe("ListConfiguredConnectionsHandler", () => {
       // from both lists; "bare" therefore has no routable tools at all.
       expect(result.structuredContent).toEqual({
         connections: {
-          k: { enabledTools: [ToolName.CREATE_TOPICS, ToolName.LIST_TOPICS] },
-          bare: { enabledTools: [] },
+          k: {
+            readOnly: false,
+            enabledTools: [ToolName.CREATE_TOPICS, ToolName.LIST_TOPICS],
+          },
+          bare: { readOnly: false, enabledTools: [] },
         },
       });
       expect(result.isError).toBe(false);
@@ -91,8 +94,8 @@ describe("ListConfiguredConnectionsHandler", () => {
 
       expect(result.structuredContent).toEqual({
         connections: {
-          k: { enabledTools: [] },
-          other: { enabledTools: [] },
+          k: { readOnly: false, enabledTools: [] },
+          other: { readOnly: false, enabledTools: [] },
         },
       });
     });
@@ -110,7 +113,9 @@ describe("ListConfiguredConnectionsHandler", () => {
       const result = handlerWith(threeToolUniverse()).handle(runtime);
 
       expect(result.structuredContent).toEqual({
-        connections: { k: { enabledTools: [ToolName.LIST_TOPICS] } },
+        connections: {
+          k: { readOnly: false, enabledTools: [ToolName.LIST_TOPICS] },
+        },
       });
     });
 
@@ -124,7 +129,7 @@ describe("ListConfiguredConnectionsHandler", () => {
       ]).handle(runtime);
 
       expect(result.structuredContent).toEqual({
-        connections: { bare: { enabledTools: [] } },
+        connections: { bare: { readOnly: false, enabledTools: [] } },
       });
       expect(textOf(result)).toContain("bare (0 tools): (none)");
     });
@@ -140,6 +145,7 @@ describe("ListConfiguredConnectionsHandler", () => {
         connections: {
           k: {
             description: "Prod east",
+            readOnly: false,
             enabledTools: [ToolName.CREATE_TOPICS, ToolName.LIST_TOPICS],
           },
         },
@@ -194,10 +200,58 @@ describe("ListConfiguredConnectionsHandler", () => {
 
       expect(result.structuredContent).toEqual({
         connections: {
-          prod: { enabledTools: [ToolName.LIST_TOPICS] },
-          dev: { enabledTools: [ToolName.CREATE_TOPICS, ToolName.LIST_TOPICS] },
+          prod: { readOnly: true, enabledTools: [ToolName.LIST_TOPICS] },
+          dev: {
+            readOnly: false,
+            enabledTools: [ToolName.CREATE_TOPICS, ToolName.LIST_TOPICS],
+          },
         },
       });
+    });
+
+    it("should report each connection's read-only-ness as a boolean in the structured payload", () => {
+      const runtime = runtimeWithConnections({
+        prod: { read_only: true, ...KAFKA },
+        dev: KAFKA,
+      });
+
+      const result = handlerWith(threeToolUniverse()).handle(runtime);
+
+      const { connections } = result.structuredContent as {
+        connections: Record<string, { readOnly: boolean }>;
+      };
+      expect(connections.prod?.readOnly).toBe(true);
+      expect(connections.dev?.readOnly).toBe(false);
+    });
+
+    it("should report readOnly false for a connection that never set read_only", () => {
+      // The handler coerces an absent read_only to a definite false, so the
+      // payload always carries a boolean rather than leaking undefined.
+      const runtime = runtimeWithConnections({ k: KAFKA });
+
+      const result = handlerWith(threeToolUniverse()).handle(runtime);
+
+      const bucket = (
+        result.structuredContent as {
+          connections: Record<string, { readOnly: boolean }>;
+        }
+      ).connections.k;
+      expect(bucket?.readOnly).toBe(false);
+    });
+
+    it("should mark read-only connections in the text summary", () => {
+      const runtime = runtimeWithConnections({
+        prod: { read_only: true, ...KAFKA },
+        dev: KAFKA,
+      });
+
+      const result = handlerWith([
+        [ToolName.LIST_TOPICS, new StubHandler({ predicate: hasKafka })],
+      ]).handle(runtime);
+
+      expect(textOf(result)).toContain("prod [read-only] (1 tool):");
+      expect(textOf(result)).toContain("dev (1 tool):");
+      expect(textOf(result)).not.toContain("dev [read-only]");
     });
 
     it("should return an empty mapping with explanatory text when no connections are configured", () => {

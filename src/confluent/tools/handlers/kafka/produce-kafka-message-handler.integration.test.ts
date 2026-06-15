@@ -303,12 +303,15 @@ describe(
         it("should round-trip an explicit partition, timestamp, and headers through the broker", async () => {
           const isoTimestamp = "2026-05-14T17:00:00Z";
           const expectedMs = String(Date.parse(isoTimestamp));
+          // unique per transport: the topic is shared across the describe.each
+          // iterations, so the read-back must single out this case's own record
+          const expectedValue = `metadata via ${transport}`;
 
           const produceResult = await server.client.callTool({
             name: ToolName.PRODUCE_MESSAGE,
             arguments: {
               topicName: topic,
-              value: { message: `metadata via ${transport}` },
+              value: { message: expectedValue },
               partition: TARGET_PARTITION,
               timestamp: isoTimestamp,
               headers: { source: "clusterA", trace: ["x", "y"] },
@@ -338,12 +341,19 @@ describe(
               );
               void consumer!.run({
                 eachMessage: async (payload) => {
+                  // skip any sibling transport's record on the shared topic; only
+                  // this case's record proves its own metadata round-tripped
+                  if (payload.message.value?.toString() !== expectedValue) {
+                    return;
+                  }
                   clearTimeout(timer);
                   resolve(payload);
                 },
               });
             },
           );
+
+          expect(record.message.value?.toString()).toBe(expectedValue);
 
           expect(record.partition).toBe(TARGET_PARTITION);
           expect(record.message.timestamp).toBe(expectedMs);

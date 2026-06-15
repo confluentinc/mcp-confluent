@@ -313,6 +313,35 @@ describe("produce-kafka-message-handler.ts", () => {
           expect(producer.send).not.toHaveBeenCalled();
         });
 
+        it("should reject a fractional timestamp at the schema boundary", async () => {
+          // ms-since-epoch must be a whole millisecond; a float would stringify
+          // to e.g. "123.45", which Kafka's record timestamp can't represent.
+          await expect(
+            handler.handle(
+              runtimeWith(
+                { kafka: { bootstrap_servers: "broker:9092" } },
+                DEFAULT_CONNECTION_ID,
+              ),
+              {
+                topicName: "smoke",
+                value: { message: "hi", useSchemaRegistry: false },
+                timestamp: 123.45,
+              },
+            ),
+          ).rejects.toMatchObject({
+            issues: [
+              {
+                path: ["timestamp"],
+                code: "invalid_union",
+                errors: [
+                  [expect.objectContaining({ expected: "string" })],
+                  [expect.objectContaining({ expected: "int" })],
+                ],
+              },
+            ],
+          });
+        });
+
         it("should reject a negative partition at the schema boundary", async () => {
           await expect(
             handler.handle(

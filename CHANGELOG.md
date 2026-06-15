@@ -4,20 +4,22 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
-### Added
+### Fixed
+
+- `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.
+
+### Changed
+
+- **Configuration**: _A YAML config may now define multiple connections — or none._ Point a single `config.yaml` at several clusters at once — for example a local Apache Kafka broker alongside Confluent Cloud — or run with no connection at all (documentation search and server-diagnostic tools still work). At most one of those connections may use OAuth to Confluent Cloud.
+
+#### Added
+
+- **Configuration**: _Per-connection `description` field._ Optional free-text label on any connection, echoed back by `list-configured-connections`.
+- **Configuration**: _Per-connection `read_only` flag._ Set `read_only: true` on a connection to auto-disable every state-mutating tool for it, leaving only read-only tools enabled.
 
 #### New Tools / Tool Features
 
 - **`list-configured-connections` tool.** Read-only, always-enabled discovery tool mapping each configured connection id to the connection-routable tools enabled on it.
-
-#### Configuration
-
-- **Per-connection `description` field.** Optional free-text label on any connection, echoed back by `list-configured-connections`.
-- **Per-connection `read_only` flag.** Set `read_only: true` on a connection to auto-disable every state-mutating tool for it, leaving only read-only tools enabled.
-
-### Fixed
-
-- `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.
 
 ## 1.4.0
 

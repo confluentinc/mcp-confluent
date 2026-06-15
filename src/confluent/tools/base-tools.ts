@@ -123,6 +123,21 @@ export interface ToolHandler {
    * `describe-tool-availability` diagnostic tool.
    */
   connectionVerdicts(runtime: ServerRuntime): Map<string, PredicateResult>;
+
+  /**
+   * Whether this tool is enabled irrespective of the configured connections.
+   * See {@linkcode BaseToolHandler.isConnectionIndependent}.
+   */
+  readonly isConnectionIndependent: boolean;
+
+  /**
+   * The connection id this invocation routes to, or `undefined` when it routes
+   * to none. See {@linkcode BaseToolHandler.resolvedTargetConnectionId}.
+   */
+  resolvedTargetConnectionId(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): string | undefined;
 }
 
 export interface ToolConfig {
@@ -178,10 +193,10 @@ export abstract class BaseToolHandler implements ToolHandler {
   getRegisteredToolConfig(runtime: ServerRuntime): ToolConfig {
     const config = this.getToolConfig();
 
-    // alwaysEnabled is an identity-checked sentinel, so bail before the
-    // per-connection scan below: connection-agnostic tools (docs, diagnostics)
-    // never route to a connection and so never need a connectionId parameter.
-    if (this.predicate === alwaysEnabled) return config;
+    // Connection-independent tools (docs, diagnostics) never route to a
+    // connection and so never need a connectionId parameter; bail before the
+    // per-connection scan below.
+    if (this.isConnectionIndependent) return config;
 
     const ids = this.enabledConnectionIds(runtime);
 
@@ -280,6 +295,45 @@ export abstract class BaseToolHandler implements ToolHandler {
   }
 
   /**
+   * Whether this tool is enabled regardless of the configured connections —
+   * true exactly when its {@linkcode predicate} is `alwaysEnabled`, the only
+   * predicate that returns enabled without inspecting a connection. Such tools
+   * (docs lookup, server diagnostics) never route to a connection, so they
+   * register even on a zero-connection config, where the per-connection verdict
+   * map driving {@linkcode enabledConnectionIds} is empty.
+   */
+  get isConnectionIndependent(): boolean {
+    return this.predicate === alwaysEnabled;
+  }
+
+  /**
+   * The connection id this invocation routes to — the OAuth-login gate uses it
+   * to launch the browser flow only when a call actually targets the OAuth
+   * connection, not merely because one exists somewhere in the config.
+   *
+   * Returns `undefined` for a connection-independent tool — it routes to no
+   * connection, so there is nothing to pre-launch a login for.
+   *
+   * Otherwise delegates to {@linkcode resolveConnection} so routing is decided
+   * in one place rather than duplicated in the gate, and propagates its throw.
+   * Every throw path there is a `"Wacky --"` invariant violation: the injected
+   * schema (see {@linkcode getRegisteredToolConfig}) makes `connectionId`
+   * required for multi-connection tools and strips it for single-connection
+   * ones, so a call that can't resolve means that contract broke. Surfacing the
+   * error rather than swallowing it to `undefined` lets the broken invariant
+   * reach the caller instead of being silently re-discovered inside `handle()`.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
+   */
+  resolvedTargetConnectionId(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): string | undefined {
+    if (this.isConnectionIndependent) return undefined;
+    return this.resolveConnection(runtime, toolArguments).connId;
+  }
+
+  /**
    * Per-connection verdict map for this tool — the single source of truth for
    * enablement. Each verdict composes the {@linkcode predicate} with the
    * read-only overlay (see {@linkcode connectionVerdict}). Powers grouped
@@ -323,14 +377,13 @@ export abstract class BaseToolHandler implements ToolHandler {
   }
 
   /**
-   * Resolves the single connection enabled for this tool, returning the
-   * connection id, its config, and the matching client manager. Designed
-   * for handlers that look up `runtime.clientManagers[connId]` (multi-
-   * connection-ready shape).
+   * Resolves the first connection enabled for this tool, returning the
+   * connection id, its config, and the matching client manager.
    *
-   * Selects `enabledConnectionIds(runtime)[0]` — current runtime is single-
-   * connection, so this is unambiguous; if multi-connection support lands
-   * later, handlers can switch to iterating ids.
+   * Selects `enabledConnectionIds(runtime)[0]`. On a multi-connection config
+   * that arbitrarily picks the first enabled connection, which is why handlers
+   * route via {@linkcode resolveConnection} instead. Single-connection
+   * scaffolding with no remaining production callers; deletion tracked in #554.
    */
   protected resolveSoleConnection(runtime: ServerRuntime): ResolvedConnection {
     const connId = this.enabledConnectionIds(runtime)[0]!;

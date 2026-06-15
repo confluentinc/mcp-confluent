@@ -33,32 +33,24 @@ const explainDisabledToolsArguments = z.object({
  * absence — which config piece is missing, and which tools each gap would
  * unlock. This handler returns that view.
  *
- * v1 scope (today's release): the server enforces a single configured
- * connection (see `enforceSingleConnectionOnly()` in
- * `src/config/models.ts`), so the output is a flat list of disabled tools
- * grouped by the missing config piece (kafka block, flink block, schema
- * registry block, …). Tools enabled on the active connection are
- * intentionally absent — `tools/list` already advertises them.
+ * Current shape: a flat list of disabled tools grouped by the missing config
+ * piece (kafka block, flink block, schema registry block, …), or by
+ * `NoConnectionsConfigured` when the config has no connections at all. Tools
+ * enabled on any connection are intentionally absent — `tools/list` already
+ * advertises them.
  *
- * v2 plan (#559, when multi-connection support lands under epic #532):
- * regrow output around connections. The text body becomes one block per
- * connection (header + per-connection gaps) plus a `Cross-connection
- * deltas` section that surfaces tools enabled on some connections but not
- * others — the canonical "what does connection B need to reach parity with
- * connection A?" view. The structured `_meta` shape mirrors that change;
- * see the {@linkcode ToolGatingReport} JSDoc in `tool-availability.ts` for
- * the exact target type.
+ * The flatten is *lossy* on a multi-connection config: a tool enabled on at
+ * least one connection is reported as enabled (and omitted from
+ * `disabledGroups` entirely), and a tool disabled on several connections with
+ * different reasons is bucketed under the first disabled verdict its iteration
+ * produces — the cross-connection asymmetry vanishes from the output.
  *
- * Until v2 lands, the helper accepts a multi-connection runtime without
- * crashing, but the v1 flatten is *lossy*: a tool whose predicate is
- * enabled on at least one configured connection is reported as enabled
- * (and therefore omitted from `disabledGroups` entirely), and a tool
- * disabled on multiple connections with different reasons is bucketed
- * under the first disabled verdict its iteration produces — the
- * cross-connection asymmetry vanishes from the output. Today's
- * single-connection invariant means neither lossy case can fire in
- * production; this paragraph exists so a future reader does not mistake
- * defensive iteration for parity reporting.
+ * #559 regrows the output around connections: one block per connection
+ * (header + per-connection gaps) plus a `Cross-connection deltas` section
+ * surfacing tools enabled on some connections but not others — the canonical
+ * "what does connection B need to reach parity with connection A?" view. The
+ * structured `_meta` shape mirrors that change; see the
+ * {@linkcode ToolGatingReport} JSDoc in `tool-availability.ts`.
  *
  * Always enabled (predicate is `alwaysEnabled`) so an operator can call it
  * to diagnose a config that left every other tool disabled.

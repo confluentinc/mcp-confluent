@@ -219,6 +219,16 @@ describe("produce-kafka-message-handler.ts", () => {
             },
           },
           {
+            // pins that the string arm accepts anything Date.parse handles, not
+            // strictly ISO 8601 — the explicit GMT offset keeps it deterministic
+            // across the runner's local timezone
+            name: "a non-ISO Date.parse-able timestamp string",
+            extraArgs: { timestamp: "14 May 2026 17:00:00 GMT" },
+            expectedExtras: {
+              timestamp: String(Date.parse("14 May 2026 17:00:00 GMT")),
+            },
+          },
+          {
             name: "a ms-since-epoch timestamp passed through as a string",
             extraArgs: { timestamp: 1750000000000 },
             expectedExtras: { timestamp: "1750000000000" },

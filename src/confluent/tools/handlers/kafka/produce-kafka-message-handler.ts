@@ -93,7 +93,7 @@ const produceKafkaMessageArguments = z.object({
     .union([z.string(), z.number().int().min(0)])
     .optional()
     .describe(
-      'Record timestamp: an ISO 8601 string (e.g. "2026-05-14T17:00:00Z") or non-negative integer ms-since-epoch number. If omitted, the broker stamps the produce time.',
+      'Record timestamp: a Date.parse-able date-time string (ISO 8601 recommended, e.g. "2026-05-14T17:00:00Z") or a non-negative integer ms-since-epoch number. If omitted, the record is stamped with the producer client\'s current time (CreateTime); a topic configured for LogAppendTime instead has the broker override the timestamp on append.',
     ),
   headers: z
     .record(z.string(), z.union([z.string(), z.array(z.string())]))
@@ -107,9 +107,9 @@ type ProduceKafkaMessageArguments = z.infer<
 >;
 
 /**
- * Parse a user-supplied record timestamp into epoch milliseconds, accepting an
- * ISO 8601 string or a ms-since-epoch number. Returns null when the value can't
- * be parsed into a finite instant.
+ * Parse a user-supplied record timestamp into epoch milliseconds, accepting any
+ * Date.parse-able date-time string or a ms-since-epoch number. Returns null when
+ * the value can't be parsed into a finite instant.
  */
 function toEpochMs(input: string | number): number | null {
   const ms = typeof input === "number" ? input : Date.parse(input);

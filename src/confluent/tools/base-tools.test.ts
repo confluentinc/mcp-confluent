@@ -537,18 +537,22 @@ describe("base-tools.ts", () => {
         ).toBe("b");
       });
 
-      it("should return undefined when the call is ambiguous (multiple enabled, connectionId omitted)", () => {
+      it("should throw a Wacky routing error when the call is ambiguous (multiple enabled, connectionId omitted)", () => {
         const handler = new StubHandler({ predicate: hasKafka });
         const runtime = runtimeWithConnections({ a: KAFKA, b: KAFKA });
-        expect(handler.resolvedTargetConnectionId(runtime, {})).toBeUndefined();
+        expect(() => handler.resolvedTargetConnectionId(runtime, {})).toThrow(
+          "Wacky -- connectionId omitted but this tool is enabled for 2 connections (a, b); cannot auto-route",
+        );
       });
 
-      it("should return undefined when the requested connectionId is not an enabled connection", () => {
+      it("should throw a Wacky routing error when the requested connectionId is not an enabled connection", () => {
         const handler = new StubHandler({ predicate: hasKafka });
         const runtime = runtimeWithConnections({ a: KAFKA, b: {} });
-        expect(
+        expect(() =>
           handler.resolvedTargetConnectionId(runtime, { connectionId: "b" }),
-        ).toBeUndefined();
+        ).toThrow(
+          'Wacky -- connection "b" is not an enabled connection for this tool; enabled: a',
+        );
       });
     });
 

@@ -311,12 +311,17 @@ export abstract class BaseToolHandler implements ToolHandler {
    * to launch the browser flow only when a call actually targets the OAuth
    * connection, not merely because one exists somewhere in the config.
    *
-   * Delegates to {@linkcode resolveConnection} so routing is decided in one
-   * place rather than duplicated in the gate. Returns `undefined` for a
-   * connection-independent tool (it routes to no connection) and for a call
-   * `resolveConnection` can't resolve unambiguously (e.g. a multi-connection
-   * tool invoked without a `connectionId`); in the latter case the gate declines
-   * to pre-launch a login and `handle()` reports the routing error to the caller.
+   * Returns `undefined` for a connection-independent tool — it routes to no
+   * connection, so there is nothing to pre-launch a login for.
+   *
+   * Otherwise delegates to {@linkcode resolveConnection} so routing is decided
+   * in one place rather than duplicated in the gate, and propagates its throw.
+   * Every throw path there is a `"Wacky --"` invariant violation: the injected
+   * schema (see {@linkcode getRegisteredToolConfig}) makes `connectionId`
+   * required for multi-connection tools and strips it for single-connection
+   * ones, so a call that can't resolve means that contract broke. Surfacing the
+   * error rather than swallowing it to `undefined` lets the broken invariant
+   * reach the caller instead of being silently re-discovered inside `handle()`.
    *
    * @final — concrete on `BaseToolHandler`; subclasses must not override.
    */
@@ -325,11 +330,7 @@ export abstract class BaseToolHandler implements ToolHandler {
     toolArguments: Record<string, unknown> | undefined,
   ): string | undefined {
     if (this.isConnectionIndependent) return undefined;
-    try {
-      return this.resolveConnection(runtime, toolArguments).connId;
-    } catch {
-      return undefined;
-    }
+    return this.resolveConnection(runtime, toolArguments).connId;
   }
 
   /**

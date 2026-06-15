@@ -192,10 +192,15 @@ describe("MCP server tool-call gate", () => {
   });
 
   it("should be a no-op when runtime.oauthHolder is undefined (api_key path)", async () => {
-    const handler = new StubHandler({ enabled: false });
+    // A normally-enabled tool that routes cleanly to the sole connection; the
+    // gate must skip the OAuth branch purely because no holder exists.
+    const handler = new StubHandler({ predicate: hasKafka });
     const handleSpy = vi.spyOn(handler, "handle");
 
-    const client = await startWith(handler, runtimeWith()); // No oauthHolder.
+    const client = await startWith(
+      handler,
+      runtimeWith({ kafka: { bootstrap_servers: "b:9092" } }), // No oauthHolder.
+    );
     await client.callTool({ name: ToolName.LIST_TOPICS, arguments: {} });
 
     expect(handleSpy).toHaveBeenCalledOnce();

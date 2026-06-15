@@ -178,17 +178,7 @@ describe("base-tools.ts", () => {
             }),
           ],
           [
-            "connection-centric tool, two connections but none viable",
-            () => ({
-              handler: new StubHandler({
-                predicate: hasKafka,
-                inputSchema: { topicName: z.string() },
-              }),
-              runtime: runtimeWithConnections({ a: {}, b: {} }),
-            }),
-          ],
-          [
-            "connection-centric tool, single viable connection",
+            "connection-centric tool, single-connection server",
             () => ({
               handler: new StubHandler({
                 predicate: hasKafka,
@@ -197,23 +187,13 @@ describe("base-tools.ts", () => {
               runtime: runtimeWithConnections({ a: KAFKA }),
             }),
           ],
-          [
-            "connection-centric tool, multiple connections but only one viable",
-            () => ({
-              handler: new StubHandler({
-                predicate: hasKafka,
-                inputSchema: { topicName: z.string() },
-              }),
-              runtime: runtimeWithConnections({ a: KAFKA, b: {} }),
-            }),
-          ],
         ])("should not inject connectionId for %s", (_label, build) => {
           const { handler, runtime } = build();
           const reg = handler.getRegisteredToolConfig(runtime);
 
-          expect(reg.inputSchema).not.toHaveProperty("connectionId");
+          expect(reg.inputSchema.shape).not.toHaveProperty("connectionId");
           // authored field(s) and metadata pass through unchanged
-          expect(Object.keys(reg.inputSchema)).toEqual(
+          expect(Object.keys(reg.inputSchema.shape)).toEqual(
             Object.keys(handler["getToolConfig"]().inputSchema),
           );
           expect(reg.name).toBe(ToolName.LIST_TOPICS);
@@ -235,7 +215,29 @@ describe("base-tools.ts", () => {
           );
 
           expect(scan).not.toHaveBeenCalled();
-          expect(reg.inputSchema).not.toHaveProperty("connectionId");
+          expect(reg.inputSchema.shape).not.toHaveProperty("connectionId");
+        });
+      });
+
+      describe("guards an impossible state", () => {
+        it("should throw a Wacky error for a connection-gated tool viable on no connection of a multi-connection server", () => {
+          // Unreachable in production: a tool enabled on zero connections is
+          // never registered (the enablement filter in index.ts drops it), so
+          // getRegisteredToolConfig() is never called for it. Constructing the
+          // impossible state directly proves the guard fires instead of building
+          // an illegal z.enum([]).
+          const handler = new StubHandler({
+            predicate: hasKafka,
+            inputSchema: { topicName: z.string() },
+          });
+
+          expect(() =>
+            handler.getRegisteredToolConfig(
+              runtimeWithConnections({ a: {}, b: {} }),
+            ),
+          ).toThrow(
+            `Wacky -- tool ${ToolName.LIST_TOPICS} resolved to zero enabled connections on a multi-connection server; it should never have been registered`,
+          );
         });
       });
 
@@ -256,7 +258,7 @@ describe("base-tools.ts", () => {
         ): z.ZodEnum {
           const connectionId =
             multiViableHandler().getRegisteredToolConfig(runtime).inputSchema
-              .connectionId;
+              .shape.connectionId;
           if (!(connectionId instanceof z.ZodEnum)) {
             throw new Error("connectionId should be a ZodEnum");
           }
@@ -276,12 +278,32 @@ describe("base-tools.ts", () => {
             }),
           );
 
-          const connectionId = reg.inputSchema.connectionId;
+          const connectionId = reg.inputSchema.shape.connectionId;
           expect(connectionId).toBeInstanceOf(z.ZodEnum);
           if (!(connectionId instanceof z.ZodEnum)) {
             throw new Error("connectionId should be a ZodEnum");
           }
           expect(connectionId.options).toEqual(["conn-z", "conn-a"]);
+        });
+
+        it("should inject a required single-id connectionId enum when the server is multi-connection but only one connection is viable", () => {
+          // #590: the trigger is the *server* having more than one connection,
+          // not the *tool* being viable on more than one. A tool viable on a
+          // single connection of a multi-connection server still gets a required
+          // connectionId — so an explicit request for a non-viable connection
+          // (e.g. a read_only one) is rejected by the enum rather than silently
+          // auto-routed to the lone viable connection.
+          const reg = multiViableHandler().getRegisteredToolConfig(
+            runtimeWithConnections({ a: KAFKA, b: {} }),
+          );
+
+          const connectionId = reg.inputSchema.shape.connectionId;
+          expect(connectionId).toBeInstanceOf(z.ZodEnum);
+          if (!(connectionId instanceof z.ZodEnum)) {
+            throw new Error("connectionId should be a ZodEnum");
+          }
+          expect(connectionId.options).toEqual(["a"]);
+          expect(connectionId.isOptional()).toBe(false);
         });
 
         it("should mark connectionId as required (not optional)", () => {
@@ -297,10 +319,12 @@ describe("base-tools.ts", () => {
             runtimeWithConnections({ a: KAFKA, b: KAFKA }),
           );
 
-          expect(connectionId.description).toContain("a, b");
+          // The quote-wrapping/escaping logic itself is proven directly in
+          // quote-join-ids.test.ts; here we only assert the description adopts it.
+          expect(connectionId.description).toContain('"a", "b"');
         });
 
-        const CONNECTION_ID_BASE = `${CONNECTION_ID_DESCRIPTION_PREFIX}a, b.`;
+        const CONNECTION_ID_BASE = `${CONNECTION_ID_DESCRIPTION_PREFIX}"a", "b".`;
 
         it("should append the list-configured-connections pointer single-spaced when list-configured-connections is allowed", () => {
           // No allow-list configured ⇒ every tool, including list-configured-connections, is allowed.
@@ -331,7 +355,7 @@ describe("base-tools.ts", () => {
             runtimeWithConnections({ a: KAFKA, b: KAFKA }),
           );
 
-          expect(Object.keys(reg.inputSchema)).toEqual([
+          expect(Object.keys(reg.inputSchema.shape)).toEqual([
             "topicName",
             "connectionId",
           ]);
@@ -362,6 +386,66 @@ describe("base-tools.ts", () => {
           expect(reg.name).toBe(ToolName.LIST_TOPICS);
           expect(reg.description).toBe("stub");
           expect(reg.annotations).toBe(READ_ONLY);
+        });
+      });
+
+      describe("wraps the registered schema in a strict object (#590, part 2)", () => {
+        function kafkaHandler(): StubHandler {
+          return new StubHandler({
+            predicate: hasKafka,
+            inputSchema: { topicName: z.string() },
+          });
+        }
+
+        it("should reject an unknown key when no connectionId is injected (single-connection server)", () => {
+          const reg = kafkaHandler().getRegisteredToolConfig(
+            runtimeWith(KAFKA),
+          );
+
+          const parsed = reg.inputSchema.safeParse({
+            topicName: "t",
+            bogus: "x",
+          });
+
+          expect(parsed.success).toBe(false);
+          if (parsed.success) throw new Error("expected a strict rejection");
+          expect(parsed.error.issues).toEqual([
+            expect.objectContaining({
+              code: "unrecognized_keys",
+              keys: ["bogus"],
+            }),
+          ]);
+        });
+
+        it("should reject an unknown key alongside a valid connectionId (multi-connection server)", () => {
+          const reg = kafkaHandler().getRegisteredToolConfig(
+            runtimeWithConnections({ a: KAFKA, b: KAFKA }),
+          );
+
+          const parsed = reg.inputSchema.safeParse({
+            topicName: "t",
+            connectionId: "a",
+            bogus: "x",
+          });
+
+          expect(parsed.success).toBe(false);
+          if (parsed.success) throw new Error("expected a strict rejection");
+          expect(parsed.error.issues).toEqual([
+            expect.objectContaining({
+              code: "unrecognized_keys",
+              keys: ["bogus"],
+            }),
+          ]);
+        });
+
+        it("should accept input carrying only declared keys", () => {
+          const reg = kafkaHandler().getRegisteredToolConfig(
+            runtimeWith(KAFKA),
+          );
+
+          const parsed = reg.inputSchema.safeParse({ topicName: "t" });
+
+          expect(parsed.success).toBe(true);
         });
       });
     });

@@ -87,7 +87,7 @@ const produceKafkaMessageArguments = z.object({
     .min(0)
     .optional()
     .describe(
-      "Target partition number. If omitted, the producer's partitioner chooses (by key hash, else round-robin).",
+      "Target partition number. If omitted, the producer's partitioner picks one — hashing the record key when one is set, or choosing a partition otherwise (random by default under librdkafka).",
     ),
   timestamp: z
     .union([z.string(), z.number().int().min(0)])
@@ -186,7 +186,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       const ms = toEpochMs(timestamp);
       if (ms === null) {
         return this.createResponse(
-          `Invalid timestamp '${timestamp}': expected an ISO 8601 string or ms-since-epoch number.`,
+          `Invalid timestamp '${timestamp}': expected a Date.parse-able date-time string (e.g. ISO 8601) or a non-negative integer ms-since-epoch number.`,
           true,
         );
       }

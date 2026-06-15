@@ -30,7 +30,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
       it("should attribute partition selection to the producer's partitioner, not the broker", () => {
         // partitioning is a producer-client decision; calling it the broker's
-        // job misleads tool users about where the key-hash/round-robin happens
+        // job misleads tool users about where the key-hash/partition selection happens
         const partition = handler.getToolConfig().inputSchema
           .partition as z.ZodType;
         expect(partition.description).toContain("producer's partitioner");
@@ -328,7 +328,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
           expect(result.isError).toBe(true);
           expect(textOf(result)).toContain(
-            "Invalid timestamp 'not-a-date': expected an ISO 8601 string or ms-since-epoch number.",
+            "Invalid timestamp 'not-a-date': expected a Date.parse-able date-time string (e.g. ISO 8601) or a non-negative integer ms-since-epoch number.",
           );
           expect(producer.send).not.toHaveBeenCalled();
         });

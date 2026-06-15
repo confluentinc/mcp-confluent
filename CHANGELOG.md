@@ -10,7 +10,7 @@ All notable changes to this MCP server will be documented in this file.
 
 ### Changed
 
-- **Configuration**: _A YAML config may now define multiple connections — or none._ Point a single `config.yaml` at several clusters at once — for example a local Apache Kafka broker alongside Confluent Cloud — or run with no connection at all (documentation search and server-diagnostic tools still work). At most one of those connections may use OAuth to Confluent Cloud.
+- **Configuration**: _A YAML config may now define multiple connections — or none._ Point a single `config.yaml` at several clusters at once — for example a local Apache Kafka broker alongside Confluent Cloud — or run with no connection at all (documentation search and server-diagnostic tools still work). At most one of those connections may use OAuth to Confluent Cloud. See [CONFIGURATION.md → Multiple connections (and zero connections)](CONFIGURATION.md#multiple-connections-and-zero-connections).
 
 #### Added
 

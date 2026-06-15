@@ -87,13 +87,13 @@ const produceKafkaMessageArguments = z.object({
     .min(0)
     .optional()
     .describe(
-      "Target partition number. If omitted, the broker's partitioner chooses (by key hash, else round-robin).",
+      "Target partition number. If omitted, the producer's partitioner chooses (by key hash, else round-robin).",
     ),
   timestamp: z
-    .union([z.string(), z.number().int()])
+    .union([z.string(), z.number().int().min(0)])
     .optional()
     .describe(
-      'Record timestamp: an ISO 8601 string (e.g. "2026-05-14T17:00:00Z") or integer ms-since-epoch number. If omitted, the broker stamps the produce time.',
+      'Record timestamp: an ISO 8601 string (e.g. "2026-05-14T17:00:00Z") or non-negative integer ms-since-epoch number. If omitted, the broker stamps the produce time.',
     ),
   headers: z
     .record(z.string(), z.union([z.string(), z.array(z.string())]))

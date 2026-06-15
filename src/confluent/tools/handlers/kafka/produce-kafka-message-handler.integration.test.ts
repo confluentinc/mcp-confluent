@@ -339,17 +339,25 @@ describe(
                   reject(new Error("timed out waiting for produced record")),
                 20_000,
               );
-              void consumer!.run({
-                eachMessage: async (payload) => {
-                  // skip any sibling transport's record on the shared topic; only
-                  // this case's record proves its own metadata round-tripped
-                  if (payload.message.value?.toString() !== expectedValue) {
-                    return;
-                  }
+              consumer!
+                .run({
+                  eachMessage: async (payload) => {
+                    // skip any sibling transport's record on the shared topic; only
+                    // this case's record proves its own metadata round-tripped
+                    if (payload.message.value?.toString() !== expectedValue) {
+                      return;
+                    }
+                    clearTimeout(timer);
+                    resolve(payload);
+                  },
+                })
+                // a run() rejection (rebalance, network) would otherwise surface
+                // as an unhandled rejection and flake the suite; fail this case
+                // deterministically instead
+                .catch((err) => {
                   clearTimeout(timer);
-                  resolve(payload);
-                },
-              });
+                  reject(err);
+                });
             },
           );
 

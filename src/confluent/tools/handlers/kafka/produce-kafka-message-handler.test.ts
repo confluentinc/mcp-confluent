@@ -12,6 +12,7 @@ import {
   getMockedClientManager,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 describe("produce-kafka-message-handler.ts", () => {
   describe("ProduceKafkaMessageHandler", () => {
@@ -25,6 +26,15 @@ describe("produce-kafka-message-handler.ts", () => {
         expect(Object.keys(config.inputSchema)).toEqual(
           expect.arrayContaining(["partition", "timestamp", "headers"]),
         );
+      });
+
+      it("should attribute partition selection to the producer's partitioner, not the broker", () => {
+        // partitioning is a producer-client decision; calling it the broker's
+        // job misleads tool users about where the key-hash/round-robin happens
+        const partition = handler.getToolConfig().inputSchema
+          .partition as z.ZodType;
+        expect(partition.description).toContain("producer's partitioner");
+        expect(partition.description).not.toMatch(/broker/i);
       });
     });
 
@@ -339,6 +349,27 @@ describe("produce-kafka-message-handler.ts", () => {
                 ],
               },
             ],
+          });
+        });
+
+        it("should reject a negative timestamp at the schema boundary", async () => {
+          // ms-since-epoch is non-negative; -1 in particular is Kafka's
+          // "no timestamp" sentinel (see consume-messages), so accepting it
+          // would let a producer forge a phantom no-timestamp record.
+          await expect(
+            handler.handle(
+              runtimeWith(
+                { kafka: { bootstrap_servers: "broker:9092" } },
+                DEFAULT_CONNECTION_ID,
+              ),
+              {
+                topicName: "smoke",
+                value: { message: "hi", useSchemaRegistry: false },
+                timestamp: -1,
+              },
+            ),
+          ).rejects.toMatchObject({
+            issues: [{ path: ["timestamp"], code: "too_small" }],
           });
         });
 

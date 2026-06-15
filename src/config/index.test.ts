@@ -212,19 +212,16 @@ describe("config/index.ts", () => {
       );
     });
 
-    it("should throw error when connections map is empty", () => {
+    it("should accept an empty connections map", () => {
       const yamlContent = `connections: {}
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /Configuration validation failed/,
-      );
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /Exactly one connection must be defined/,
-      );
+      const config = parseYamlConfiguration(yamlContent, {});
+
+      expect(config.getConnectionNames()).toEqual([]);
     });
 
-    it("should throw error when connections map has more than one entry", () => {
+    it("should accept more than one connection", () => {
       const yamlContent = `connections:
   local:
     type: "direct"
@@ -236,12 +233,18 @@ describe("config/index.ts", () => {
       bootstrap_servers: "staging:9092"
 `;
 
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /Configuration validation failed/,
+      const config = parseYamlConfiguration(yamlContent, {});
+
+      expect(config.getConnectionNames()).toEqual(["local", "staging"]);
+      const local = config.getConnectionConfig("local");
+      const staging = config.getConnectionConfig("staging");
+      // Each connection keeps its own blocks — they don't collapse into one.
+      expect(local.type === "direct" && local.kafka?.bootstrap_servers).toBe(
+        "localhost:9092",
       );
-      expect(() => parseYamlConfiguration(yamlContent, {})).toThrow(
-        /Exactly one connection must be defined/,
-      );
+      expect(
+        staging.type === "direct" && staging.kafka?.bootstrap_servers,
+      ).toBe("staging:9092");
     });
 
     it("should throw error when connection name is whitespace-only", () => {

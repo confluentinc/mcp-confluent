@@ -8,13 +8,13 @@ It covers the YAML config file (`-c config.yaml`), the legacy env-var path (`-e 
 - [Two paths, one configuration](#two-paths-one-configuration)
 - [Quick start (YAML)](#quick-start-yaml)
 - [Anatomy of a YAML config](#anatomy-of-a-yaml-config)
+- [Multiple connections (and zero connections)](#multiple-connections-and-zero-connections)
 - [`${VAR}` interpolation](#var-interpolation)
 - [How env vars and `.env` files fit into the YAML world](#how-env-vars-and-env-files-fit-into-the-yaml-world)
 - [Authentication modes](#authentication-modes)
 - [HTTP/SSE transport security](#httpsse-transport-security)
 - [Tool enablement: which block lights up what](#tool-enablement-which-block-lights-up-what)
 - [Legacy env-var configuration (deprecated)](#legacy-env-var-configuration-deprecated)
-- [Future plans](#future-plans)
 - [Troubleshooting](#troubleshooting)
 
 ## Two paths, one configuration
@@ -54,7 +54,8 @@ The two flags are mutually exclusive.
 
 ## Anatomy of a YAML config
 
-A config picks one of two connection flavors — OAuth or direct — and optionally adds a top-level `server:` block for transport/security/logging settings.
+A config is a `connections:` map plus an optional top-level `server:` block for transport/security/logging settings.
+Each connection block is one of two types — OAuth or direct — taken in turn below; a single configuragion may hold several connections and mix their types (see [Multiple connections (and zero connections)](#multiple-connections-and-zero-connections)).
 The fully annotated reference is [`config.example.yaml`](config.example.yaml); per-field comments live there rather than being duplicated here.
 Compact examples for common local-Docker setups live in [`sample_configs/`](sample_configs/).
 
@@ -124,9 +125,9 @@ The `list-configured-connections` tool reports each connection's read-onlyness, 
 
 Field-level details, defaults, and which CLI/env-var each field replaces are in [`config.example.yaml`](config.example.yaml).
 
-### The common `server:` block
+### The top-level `server:` block
 
-Both connection flavors above accept the same top-level `server:` block.
+The top-level `server:` block sits beside `connections:` and applies to the whole config, regardless of which connection flavors you defined.
 It is entirely optional — omit it to accept the same defaults today's env-var users get.
 The fully annotated example is in [`config.example.yaml`](config.example.yaml); when present, it replaces these env vars:
 
@@ -145,6 +146,19 @@ The fully annotated example is in [`config.example.yaml`](config.example.yaml); 
 | `server.auth.disabled`             | `MCP_AUTH_DISABLED` / `--disable-auth`                                |
 
 `server.transports` and the `--transport` CLI flag are mutually exclusive — declare transports in YAML or on the command line, not both.
+
+## Multiple connections (and zero connections)
+
+A single `config.yaml` may define several named entries under `connections:` — for example a Confluent Cloud connection alongside a local Apache Kafka broker — and each tool call routes to the connection you address by id.
+There is no fixed ceiling on the number of connections.
+
+One rule constrains the mix: you may pair as many `type: direct` connections as you like, but **at most one** may be `type: oauth`.
+The shared Confluent Cloud sign-in owns a single browser session and identity, so a second OAuth connection is rejected at startup with `Multiple OAuth connections defined in configuration; only one is supported`.
+
+A config may also define **no connections at all**.
+The four connection-independent tools — `search-product-docs`, `get-product-doc-page`, `explain-disabled-tools`, and `list-configured-connections` — stay enabled regardless, so an empty config still gives you documentation search plus the server-diagnostic tools.
+
+This capability is YAML-only — the legacy env-var path can express only a single connection.
 
 ## `${VAR}` interpolation
 
@@ -226,6 +240,7 @@ connections:
 
 OAuth connections carry no service blocks.
 Resource IDs (cluster_id, environment_id, ...) that direct-mode connections pin in YAML instead flow in as tool arguments at call time.
+A server may define at most one OAuth connection, alongside any number of `type: direct` connections — see [Multiple connections (and zero connections)](#multiple-connections-and-zero-connections).
 Get a starter file via `--init-oauth-config`.
 
 **OAuth-eligible tools.** Not every tool has been migrated to OAuth yet — REST-only categories (Connect, Tableflow, Flink, Metrics, Catalog & Tags) still require `type: direct`.
@@ -340,7 +355,7 @@ Run the server without `-c` and these variables, read either from the parent she
 | FLINK_COMPUTE_POOL_ID         | Flink compute pool ID; must start with `lfcp-`.                                                                                                                                                                                 |                                         | For Flink tools                      |
 | FLINK_DATABASE_NAME           | Default Flink database, used as `sql.current-database`.                                                                                                                                                                         |                                         | No                                   |
 | FLINK_ENV_ID                  | Flink environment ID; must start with `env-`.                                                                                                                                                                                   |                                         | For Flink tools                      |
-| FLINK_ENV_NAME                | **Deprecated** (removed in v1.4.0). Use `FLINK_CATALOG_NAME` instead.                                                                                                                                                           |                                         | No                                   |
+| FLINK_ENV_NAME                | **Deprecated** alias, still accepted; rename to `FLINK_CATALOG_NAME` (removal tracked in [#598](https://github.com/confluentinc/mcp-confluent/issues/598)).                                                                     |                                         | No                                   |
 | FLINK_ORG_ID                  | Confluent Cloud organization ID.                                                                                                                                                                                                |                                         | For Flink tools                      |
 | FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API.                                                                                                                                                                                  |                                         | For Flink tools                      |
 | KAFKA_API_KEY                 | Kafka SASL username.                                                                                                                                                                                                            |                                         | For authenticated Kafka              |
@@ -363,12 +378,6 @@ Run the server without `-c` and these variables, read either from the parent she
 To migrate, run `--init-config`, then translate each variable you currently set into the matching block from [`config.example.yaml`](config.example.yaml).
 For a side-by-side, every `${VAR:-...}` placeholder in `config.example.yaml` names the env var that field used to come from.
 You can keep secrets in your existing `.env` and reference them via `${VAR}` from the YAML — that is job 1 above, and is the recommended migration target.
-
-## Future plans
-
-The configuration schema accepts multiple named entries under `connections:` and the YAML parser validates them, but today the server expects exactly one.
-Once the rest of the runtime catches up, a single `config.yaml` will be able to point at several Confluent Cloud or local clusters at the same time; you will not need to restructure existing configs for that to work.
-This capability will be YAML-only — the legacy env-var path has no way to express it.
 
 ## Troubleshooting
 

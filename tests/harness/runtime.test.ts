@@ -17,7 +17,7 @@ describe("runtime.ts", () => {
     // Regression guard for the multi-connection smoke-gate bug: the prior
     // implementation resolved the *sole* connection, so a loaded multi-connection
     // config threw and read as "not loaded" — wrongly skipping the transport
-    // smoke tests once #540 lifts the single-connection load guard.
+    // smoke tests now that multiple connections are allowed.
     it("should return true for a multi-connection config (the prior sole-connection check threw here)", () => {
       const multi = new MCPServerConfiguration({
         connections: { a: { type: "direct" }, b: { type: "direct" } },

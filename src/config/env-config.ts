@@ -450,7 +450,7 @@ function buildFlinkBlock(env: Environment): {
  * `logger.warn` when only the legacy var is set so the deprecation lands in
  * server logs at startup.
  *
- * TODO: Remove FLINK_ENV_NAME support in v1.4.0. See issue #209.
+ * TODO: Remove FLINK_ENV_NAME support. See issue #598.
  */
 function resolveFlinkCatalogName(env: Environment): string | undefined {
   if (env.FLINK_CATALOG_NAME && env.FLINK_ENV_NAME) {
@@ -461,7 +461,7 @@ function resolveFlinkCatalogName(env: Environment): string | undefined {
   if (env.FLINK_CATALOG_NAME) return env.FLINK_CATALOG_NAME;
   if (env.FLINK_ENV_NAME) {
     logger.warn(
-      "FLINK_ENV_NAME is deprecated and will be removed in v1.4.0; rename to FLINK_CATALOG_NAME.",
+      "FLINK_ENV_NAME is deprecated (removal tracked in issue #598); rename to FLINK_CATALOG_NAME.",
     );
     return env.FLINK_ENV_NAME;
   }

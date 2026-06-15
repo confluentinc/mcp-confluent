@@ -45,7 +45,7 @@ export interface SchemaRegistryOptions {
  * Includes the message payload and schema registry configuration.
  */
 export type MessageOptions = {
-  message: Buffer | object | string;
+  message: Buffer | object | string | number | boolean;
   useSchemaRegistry?: boolean;
   schemaType?: SchemaType;
   schema?: string;
@@ -254,10 +254,13 @@ export async function serializeMessage(
       );
     }
   }
-  // Validate message type
-  if (typeof options.message !== "object" || options.message === null) {
+  // Primitives (number/boolean/string) are valid payloads for top-level
+  // primitive schemas (e.g. Avro "long"); only null/undefined is rejected here
+  // because the serializer refuses it with a cryptic "message is empty". Every
+  // other shape is validated against the actual schema by the serializer.
+  if (options.message === null || options.message === undefined) {
     throw new Error(
-      "When using schema registry, message must be an object matching the schema.",
+      "When using schema registry, a non-null message payload is required.",
     );
   }
   let serializer: Serializer;

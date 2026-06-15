@@ -296,3 +296,27 @@ export function ccloudOAuthRuntime(holder?: OAuthHolder): ServerRuntime {
     holder,
   );
 }
+
+/**
+ * Mixed runtime: a `local` direct connection (kafka block) alongside a
+ * `ccloud-oauth` OAuth connection, with a stub `OAuthClientManager` and a
+ * caller-supplied {@link OAuthHolder}. The shape the OAuth-login gate tests
+ * use to prove a local-routed call doesn't trigger the browser bounce while an
+ * OAuth-routed one does.
+ */
+export function localPlusOAuthRuntime(holder?: OAuthHolder): ServerRuntime {
+  const config = new MCPServerConfiguration({
+    connections: {
+      local: { type: "direct", kafka: { bootstrap_servers: "localhost:9092" } },
+      "ccloud-oauth": { type: "oauth", ccloud_env: "devel" },
+    },
+  });
+  return new ServerRuntime(
+    config,
+    {
+      local: createMockInstance(DirectClientManager),
+      "ccloud-oauth": createMockInstance(OAuthClientManager),
+    },
+    holder,
+  );
+}

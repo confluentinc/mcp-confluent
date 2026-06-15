@@ -8,9 +8,11 @@
 # rather than the YAML itself. Plain literal values are also fine when you do
 # not need interpolation.
 #
-# Each sub-block under `connections.<name>` is independently optional; remove
-# the ones you do not need. At least one of `kafka`, `schema_registry`,
-# `confluent_cloud`, `flink`, `tableflow`, or `telemetry` must remain.
+# Each service block under a `direct` connection (`kafka`, `schema_registry`,
+# `confluent_cloud`, `flink`, `tableflow`, `telemetry`) is independently
+# optional; remove the ones you do not need, but at least one must remain. An
+# `oauth` connection carries no service blocks — see the commented-out example
+# at the end of this file.
 
 # --- Server ---
 # MCP server transport, authentication, and logging settings.
@@ -64,10 +66,10 @@ server:
     # disabled: true
 
 connections:
-  # Connection name is freeform. Today exactly one connection is read at
-  # runtime; multi-connection support is the focus of the next release, and
-  # this plural structure is here so that landing it does not require any
-  # schema changes on your side.
+  # Connection name is freeform. A config may define several named connections
+  # and route each tool call to one by id — and may mix api-key (`direct`)
+  # connections with at most one browser-login (`oauth`) connection. See the
+  # commented-out OAuth connection at the end of this file.
   default:
     type: direct
 
@@ -160,3 +162,17 @@ connections:
     #     type: api_key
     #     key: "${TELEMETRY_API_KEY}"
     #     secret: "${TELEMETRY_API_SECRET}"
+
+  # --- OAuth connection (browser login instead of API keys) ---
+  # A config may pair any number of `direct` connections like the one above with
+  # at most one `oauth` connection. Uncomment to add one: on the first tool call
+  # needing Confluent Cloud access, the server opens the CCloud sign-in page
+  # (PKCE) and reuses that session for the rest of the process — no API keys to
+  # provision. OAuth connections carry no service blocks; resource IDs
+  # (cluster_id, environment_id, ...) are passed as tool arguments at call time.
+  # Not every tool is OAuth-eligible yet (see CONFIGURATION.md → Authentication
+  # modes). For an OAuth-only starter, run `--init-oauth-config` instead.
+  # ccloud:
+  #   type: oauth
+  #   description: "Confluent Cloud (OAuth login)"
+  #   # read_only: true

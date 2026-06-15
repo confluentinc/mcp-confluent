@@ -10,6 +10,7 @@ import {
 } from "@tests/harness/connection-types.js";
 import {
   connectTestAdmin,
+  connectTestConsumer,
   getTestClusterId,
 } from "@tests/harness/kafka-admin.js";
 import {
@@ -255,5 +256,113 @@ describe(
         });
       },
     );
+
+    describe("with record metadata (partition, timestamp, headers)", () => {
+      if (!activeConnectionTypes.includes(ConnectionType.DIRECT)) {
+        it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
+        return;
+      }
+      if (skipIfDisabled(handler, integrationConnection())) {
+        return;
+      }
+
+      const NUM_PARTITIONS = 3;
+      const TARGET_PARTITION = 1;
+      let admin: KafkaJS.Admin;
+      const topic = uniqueName("produce-metadata");
+
+      beforeAll(async () => {
+        admin = await connectTestAdmin();
+        await admin.createTopics({
+          topics: [{ topic, numPartitions: NUM_PARTITIONS }],
+        });
+      });
+
+      afterAll(async () => {
+        await admin.deleteTopics({ topics: [topic] }).catch(() => {
+          // teardown-only; a cleanup failure shouldn't fail an already-asserted test
+        });
+        await admin.disconnect();
+      });
+
+      describe.each(activeTransports)("via %s transport", (transport) => {
+        let server: StartedServer;
+        let consumer: KafkaJS.Consumer | undefined;
+
+        beforeAll(async () => {
+          server = await startServer({ transport });
+        });
+
+        afterAll(async () => {
+          await consumer?.disconnect().catch(() => {
+            // disconnect race during teardown isn't actionable
+          });
+          await server?.stop();
+        });
+
+        it("should round-trip an explicit partition, timestamp, and headers through the broker", async () => {
+          const isoTimestamp = "2026-05-14T17:00:00Z";
+          const expectedMs = String(Date.parse(isoTimestamp));
+          // unique per transport: the topic is shared across the describe.each
+          // iterations, so the read-back must single out this case's own record
+          const expectedValue = `metadata via ${transport}`;
+
+          const produceResult = await server.client.callTool({
+            name: ToolName.PRODUCE_MESSAGE,
+            arguments: {
+              topicName: topic,
+              value: { message: expectedValue },
+              partition: TARGET_PARTITION,
+              timestamp: isoTimestamp,
+              headers: { source: "clusterA", trace: ["x", "y"] },
+            },
+          });
+
+          const produceText = textContent(produceResult);
+          expect(produceText).toMatch(
+            /Message produced successfully to \[Topic: /,
+          );
+          // the explicit partition target reached the broker, per the delivery report
+          expect(produceText).toContain(`Partition: ${TARGET_PARTITION}`);
+
+          // read the record back from the start of the topic to prove all three
+          // metadata fields survived the broker round-trip
+          consumer = await connectTestConsumer(
+            uniqueName(`md-reader-${transport}`),
+            { fromBeginning: true },
+          );
+          await consumer.subscribe({ topics: [topic] });
+          const record = await new Promise<KafkaJS.EachMessagePayload>(
+            (resolve, reject) => {
+              const timer = setTimeout(
+                () =>
+                  reject(new Error("timed out waiting for produced record")),
+                20_000,
+              );
+              void consumer!.run({
+                eachMessage: async (payload) => {
+                  // skip any sibling transport's record on the shared topic; only
+                  // this case's record proves its own metadata round-tripped
+                  if (payload.message.value?.toString() !== expectedValue) {
+                    return;
+                  }
+                  clearTimeout(timer);
+                  resolve(payload);
+                },
+              });
+            },
+          );
+
+          expect(record.message.value?.toString()).toBe(expectedValue);
+
+          expect(record.partition).toBe(TARGET_PARTITION);
+          expect(record.message.timestamp).toBe(expectedMs);
+          expect(record.message.headers?.source?.toString()).toBe("clusterA");
+          const trace = record.message.headers?.trace;
+          const traceValues = Array.isArray(trace) ? trace : [trace];
+          expect(traceValues.map((v) => v?.toString())).toEqual(["x", "y"]);
+        });
+      });
+    });
   },
 );

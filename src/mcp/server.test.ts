@@ -269,8 +269,8 @@ describe("createMcpServer registered schema", () => {
   }
 
   // Proves the registration path advertises getRegisteredToolConfig() — not the
-  // raw authored getToolConfig() — by exercising the one case where they differ:
-  // a connection-gated tool viable on more than one connection gains a routing
+  // raw authored getToolConfig() — by exercising the connectionId injection: a
+  // connection-gated tool viable on more than one connection gains a routing
   // connectionId enum.
   it("should advertise a required connectionId enum for a connection-gated tool viable on multiple connections", async () => {
     const client = await startWith(
@@ -322,5 +322,38 @@ describe("createMcpServer registered schema", () => {
     });
 
     expect(handleSpy).toHaveBeenCalledOnce();
+  });
+
+  // #590, part 2: the registered schema is strict, so an unknown parameter is
+  // rejected before handle() runs rather than silently stripped. A single-
+  // connection server (no connectionId injected) proves the strictness is a
+  // property of the registration boundary, not of the connectionId injection.
+  const oneKafka = () =>
+    runtimeWith({ kafka: { bootstrap_servers: "a:9092" } });
+
+  it("should reject an unknown parameter before handle() runs on a single-connection server", async () => {
+    const handler = new StubHandler({ predicate: hasKafka });
+    const handleSpy = vi.spyOn(handler, "handle");
+    const client = await startWith(handler, oneKafka());
+
+    const result = await client.callTool({
+      name: ToolName.LIST_TOPICS,
+      arguments: { bogusParam: "nope" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(handleSpy).not.toHaveBeenCalled();
+  });
+
+  it("should advertise additionalProperties:false on the registered input schema", async () => {
+    const client = await startWith(
+      new StubHandler({ predicate: hasKafka }),
+      oneKafka(),
+    );
+
+    const { tools } = await client.listTools();
+    const listTopics = tools.find((t) => t.name === ToolName.LIST_TOPICS);
+
+    expect(listTopics?.inputSchema?.additionalProperties).toBe(false);
   });
 });

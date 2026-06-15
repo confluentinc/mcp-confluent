@@ -1,4 +1,8 @@
-import { RecordMetadata } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import {
+  IHeaders,
+  Message,
+  RecordMetadata,
+} from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
 import {
   checkSchemaNeeded,
@@ -77,10 +81,60 @@ const produceKafkaMessageArguments = z.object({
     .describe(
       "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments.",
     ),
+  partition: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      "Target partition number. If omitted, the producer's partitioner chooses (by key hash, else round-robin).",
+    ),
+  timestamp: z
+    .union([z.string(), z.number().int().min(0)])
+    .optional()
+    .describe(
+      'Record timestamp: an ISO 8601 string (e.g. "2026-05-14T17:00:00Z") or non-negative integer ms-since-epoch number. If omitted, the broker stamps the produce time.',
+    ),
+  headers: z
+    .record(z.string(), z.union([z.string(), z.array(z.string())]))
+    .optional()
+    .describe(
+      "Kafka record headers as a map of name to a string or array of strings (multi-valued). Sent as raw headers, independent of schema-registry serialization of the key/value.",
+    ),
 });
 type ProduceKafkaMessageArguments = z.infer<
   typeof produceKafkaMessageArguments
 >;
+
+/**
+ * Parse a user-supplied record timestamp into epoch milliseconds, accepting an
+ * ISO 8601 string or a ms-since-epoch number. Returns null when the value can't
+ * be parsed into a finite instant.
+ */
+function toEpochMs(input: string | number): number | null {
+  const ms = typeof input === "number" ? input : Date.parse(input);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * Build the producer message from the serialized key/value and the optional
+ * record-level metadata, omitting any field the caller didn't supply.
+ */
+function assembleProducerMessage(parts: {
+  value: Buffer | string;
+  key?: Buffer | string;
+  partition?: number;
+  timestampMs?: number;
+  headers?: IHeaders;
+}): Message {
+  const message: Message = { value: parts.value };
+  if (parts.key !== undefined) message.key = parts.key;
+  if (parts.partition !== undefined) message.partition = parts.partition;
+  if (parts.timestampMs !== undefined)
+    message.timestamp = String(parts.timestampMs);
+  if (parts.headers !== undefined) message.headers = parts.headers;
+  return message;
+}
 
 /**
  * Handler for producing messages to a Kafka topic, with support for Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value.
@@ -119,13 +173,25 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
   ): Promise<CallToolResult> {
     const parsed: ProduceKafkaMessageArguments =
       produceKafkaMessageArguments.parse(toolArguments);
-    const { topicName, value, key } = parsed;
+    const { topicName, value, key, partition, timestamp, headers } = parsed;
 
     const { connId, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
+
+    let timestampMs: number | undefined;
+    if (timestamp !== undefined) {
+      const ms = toEpochMs(timestamp);
+      if (ms === null) {
+        return this.createResponse(
+          `Invalid timestamp '${timestamp}': expected an ISO 8601 string or ms-since-epoch number.`,
+          true,
+        );
+      }
+      timestampMs = ms;
+    }
 
     const needsRegistry =
       (value && value.useSchemaRegistry) || (key && key.useSchemaRegistry);
@@ -194,9 +260,13 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
         deliveryReport = await producer.send({
           topic: topicName,
           messages: [
-            typeof keyToSend !== "undefined"
-              ? { key: keyToSend, value: valueToSend }
-              : { value: valueToSend },
+            assembleProducerMessage({
+              value: valueToSend,
+              key: keyToSend,
+              partition,
+              timestampMs,
+              headers,
+            }),
           ],
         });
       } catch (err) {
@@ -229,7 +299,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.PRODUCE_MESSAGE,
-      description: `Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value.\n\nBefore producing, check if the topic has a registered schema for <topicName>-value and <topicName>-key. If a schema exists, set useSchemaRegistry to true and specify the appropriate schemaType. If the topic does not exist, it can be created via the ${ToolName.CREATE_TOPICS} tool.`,
+      description: `Produce records to a Kafka topic. Supports Confluent Schema Registry serialization (AVRO, JSON, PROTOBUF) for both key and value, plus optional record-level partition, timestamp, and headers for faithful reproduction of records across clusters.\n\nBefore producing, check if the topic has a registered schema for <topicName>-value and <topicName>-key. If a schema exists, set useSchemaRegistry to true and specify the appropriate schemaType. If the topic does not exist, it can be created via the ${ToolName.CREATE_TOPICS} tool.`,
       inputSchema: produceKafkaMessageArguments.shape,
       annotations: CREATE_UPDATE,
     };

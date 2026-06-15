@@ -22,6 +22,7 @@ import {
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
+import { withSharedSrClient } from "@tests/harness/schema-registry.js";
 import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
@@ -172,6 +173,78 @@ describe(
                 value: { message: `hello from oauth ${transport}` },
                 cluster_id: clusterId,
                 environment_id: environmentId,
+              },
+            });
+
+            const text = textContent(result);
+            expect(text).toMatch(/Message produced successfully to \[Topic: /);
+            expect(text).toContain(topic);
+          });
+        });
+      },
+    );
+
+    describe(
+      "with a top-level Avro primitive value schema",
+      { tags: [Tag.REQUIRES_SCHEMA_REGISTRY_CONFIG] },
+      () => {
+        if (!activeConnectionTypes.includes(ConnectionType.DIRECT)) {
+          it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
+          return;
+        }
+        // kafka gate (handler predicate), then a schema-registry gate so a
+        // fixture carrying kafka but no schema_registry block skips cleanly
+        // rather than failing when the produce call reaches for an SR client.
+        if (skipIfDisabled(handler, integrationConnection())) {
+          return;
+        }
+        const connection = integrationConnection();
+        if (connection.type !== "direct" || !connection.schema_registry) {
+          it.skip("requires schema_registry config", () => {});
+          return;
+        }
+
+        let admin: KafkaJS.Admin;
+        const topic = uniqueName("produce-avro-long");
+        // shared SR client only for subject cleanup; the produce call itself
+        // registers the schema via its `schema` argument
+        const { createdSubjects } = withSharedSrClient();
+
+        beforeAll(async () => {
+          admin = await connectTestAdmin();
+          await admin.createTopics({ topics: [{ topic, numPartitions: 1 }] });
+        });
+
+        afterAll(async () => {
+          await admin.deleteTopics({ topics: [topic] }).catch(() => {
+            // teardown-only; a cleanup failure shouldn't fail an already-asserted test
+          });
+          await admin.disconnect();
+        });
+
+        describe.each(activeTransports)("via %s transport", (transport) => {
+          let server: StartedServer;
+
+          beforeAll(async () => {
+            server = await startServer({ transport });
+          });
+
+          afterAll(async () => {
+            await server?.stop();
+          });
+
+          it("should serialize and produce a numeric long value against a primitive schema", async () => {
+            createdSubjects.push(`${topic}-value`);
+            const result = await server.client.callTool({
+              name: ToolName.PRODUCE_MESSAGE,
+              arguments: {
+                topicName: topic,
+                value: {
+                  message: 123,
+                  useSchemaRegistry: true,
+                  schemaType: "AVRO",
+                  schema: '"long"',
+                },
               },
             });
 

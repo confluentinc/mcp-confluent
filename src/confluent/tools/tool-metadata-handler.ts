@@ -48,10 +48,16 @@ export abstract class ToolMetadataHandler extends BaseToolHandler {
   /**
    * The catalog filtered to the tools that route to a specific connection: those
    * the operator left enabled ({@link ServerRuntime.isToolAllowed}) AND that are
-   * not connection-independent. Connection-agnostic tools (docs, diagnostics)
-   * apply to every connection and take no `connectionId`, so listing them per
-   * connection would misrepresent them as connection-routable; operator-blocked
-   * tools were never advertised, so a per-connection view must not claim them.
+   * not connection-independent. The criterion is the predicate-level property
+   * {@link ToolHandler.isConnectionIndependent} (`predicate === alwaysEnabled`):
+   * such a tool is enabled regardless of which connections exist and never routes
+   * a call through a connection's client manager or depends on its service blocks,
+   * so listing it under each connection would misrepresent it as connection-routable.
+   * Whether the tool *accepts* a `connectionId` argument is irrelevant —
+   * `describe-configured-connection` is itself connection-independent yet takes a
+   * `connectionId` as a lookup key (not a routing target), which is precisely why
+   * the parameter's presence can't be the test. Operator-blocked tools were never
+   * advertised, so a per-connection view must not claim them either.
    *
    * Shared by `list-configured-connections` (the all-connections overview) and
    * `describe-configured-connection` (the single-connection card). Not used by

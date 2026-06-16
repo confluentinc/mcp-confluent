@@ -109,10 +109,18 @@ function isUnwrappable(value: unknown): value is { unwrap: () => unknown } {
  * wrapper down to the underlying object so `.shape` is reachable. Kept fully
  * typed (no `any`) so a Zod-shape change that breaks the unwrap fails loudly
  * here rather than slipping past the drift check it backs.
+ *
+ * Refined blocks (`kafka`, `telemetry` are `z.object(...).refine(...).optional()`)
+ * resolve in a single `.unwrap()`: unlike Zod v3's `ZodEffects`, Zod v4's
+ * `.refine()` returns a schema that STILL exposes `.shape`, so peeling the
+ * `.optional()` lands directly on a shape-bearing object. If that ever stops
+ * holding the loop exits without a shape and the throw below fires — the drift
+ * check fails loud, never silently. The refined `kafka`/`telemetry` cases in the
+ * `it.each` are the live proof this resolves correctly.
  */
 function blockSchemaShapeKeys(blockKey: string): string[] {
-  // ZodOptional exposes `.unwrap()` but no `.shape`; refined objects expose
-  // `.shape`. Peel optionals/effects until the object shape surfaces.
+  // ZodOptional exposes `.unwrap()` but no `.shape`; (Zod v4) objects — refined
+  // or not — expose `.shape`. Peel optional wrappers until the shape surfaces.
   let schema: unknown = (
     directConnectionSchema.shape as Record<string, unknown>
   )[blockKey];

@@ -97,23 +97,6 @@
     "yaml": "^2.8.3",
     "zod": "^4.0"
   },
-  "pnpm": {
-    "overrides": {
-      "zod": "^4.0",
-      "shell-quote@>=1.1.0 <=1.8.3": ">=1.8.4",
-      "protobufjs@<=7.6.2": ">=7.6.3",
-      "form-data@>=4.0.0 <4.0.6": ">=4.0.6",
-      "tar@<=7.5.15": ">=7.5.16",
-      "vite@>=8.0.0 <=8.0.15": ">=8.0.16",
-      "js-yaml@<=4.1.1": ">=4.2.0",
-      "protobufjs@<=7.6.0": ">=7.6.1"
-    },
-    "onlyBuiltDependencies": [
-      "@confluentinc/kafka-javascript",
-      "fsevents",
-      "protobufjs"
-    ]
-  },
   "files": [
     "dist",
     "config.example.yaml",

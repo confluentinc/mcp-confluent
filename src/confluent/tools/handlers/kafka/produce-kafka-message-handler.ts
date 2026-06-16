@@ -109,11 +109,13 @@ type ProduceKafkaMessageArguments = z.infer<
 /**
  * Parse a user-supplied record timestamp into epoch milliseconds, accepting any
  * Date.parse-able date-time string or a ms-since-epoch number. Returns null when
- * the value can't be parsed into a finite instant.
+ * the value can't be parsed into a finite, non-negative instant — Date.parse maps
+ * pre-1970 date-times to negative ms, which the numeric branch already rejects at
+ * the Zod boundary, so the string branch must reject them too.
  */
 function toEpochMs(input: string | number): number | null {
   const ms = typeof input === "number" ? input : Date.parse(input);
-  return Number.isFinite(ms) ? ms : null;
+  return Number.isFinite(ms) && ms >= 0 ? ms : null;
 }
 
 /**

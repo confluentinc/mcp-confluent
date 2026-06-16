@@ -333,6 +333,34 @@ describe("produce-kafka-message-handler.ts", () => {
           expect(producer.send).not.toHaveBeenCalled();
         });
 
+        it("should reject a pre-1970 date string that Date.parse maps to a negative epoch", async () => {
+          // Date.parse("1969-12-31...") returns a negative ms-since-epoch, which
+          // the numeric branch already rejects at the Zod boundary (.min(0)).
+          // The string branch must converge on the same rule rather than letting
+          // a negative timestamp slip through to the producer.
+          const clientManager = getMockedClientManager();
+          const producer = await clientManager.getProducer();
+
+          const result = await handler.handle(
+            runtimeWith(
+              { kafka: { bootstrap_servers: "broker:9092" } },
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            {
+              topicName: "smoke",
+              value: { message: "hello", useSchemaRegistry: false },
+              timestamp: "1969-12-31T00:00:00Z",
+            },
+          );
+
+          expect(result.isError).toBe(true);
+          expect(textOf(result)).toContain(
+            "Invalid timestamp '1969-12-31T00:00:00Z': expected a Date.parse-able date-time string (e.g. ISO 8601) or a non-negative integer ms-since-epoch number.",
+          );
+          expect(producer.send).not.toHaveBeenCalled();
+        });
+
         it("should reject a fractional timestamp at the schema boundary", async () => {
           // ms-since-epoch must be a whole millisecond; a float would stringify
           // to e.g. "123.45", which Kafka's record timestamp can't represent.

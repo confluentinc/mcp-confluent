@@ -91,7 +91,9 @@ export class DescribeConfiguredConnectionHandler extends ToolMetadataHandler {
       if (verdict.enabled) {
         enabledTools.push(name);
       } else {
-        (disabledTools[verdict.reason] ??= []).push(name);
+        const bucket = disabledTools[verdict.reason] ?? [];
+        disabledTools[verdict.reason] = bucket;
+        bucket.push(name);
       }
     }
     enabledTools.sort((a, b) => a.localeCompare(b));

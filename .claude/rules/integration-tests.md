@@ -28,12 +28,12 @@ don't conflict.
 
 ## Running Tests Locally
 
-- `npm run test` - full sweep: builds `dist/` then runs both unit and
+- `pnpm run test` - full sweep: builds `dist/` then runs both unit and
   integration projects.
-- `npm run test:unit` - unit tests only (fast, no build).
-- `npm run test:integration` - integration tests only (builds `dist/` then
+- `pnpm run test:unit` - unit tests only (fast, no build).
+- `pnpm run test:integration` - integration tests only (builds `dist/` then
   runs `--project integration`).
-- `npm run test:integration -- --tags-filter=@kafka` - one tool group at a time.
+- `pnpm run test:integration -- --tags-filter=@kafka` - one tool group at a time.
 
 Set up local creds by copying `.env.integration.example` to `.env.integration`
 and filling in the vars your chosen tests need. `tests/harness/setup.ts` loads
@@ -105,7 +105,7 @@ Three non-obvious things the harness does for you:
    and propagates the matching `cflt-mcp-api-key` header to the SDK
    transport.
 3. For HTTP and SSE, calls `findFreePort()` to allocate a fresh TCP port per
-   test file. Tests can run in parallel even if `npm run start:http` is
+   test file. Tests can run in parallel even if `pnpm run start:http` is
    already bound to 8080 locally.
 
 Always call `stop()` in `afterAll` to tear down the child process. The harness

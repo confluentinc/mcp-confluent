@@ -330,8 +330,15 @@ const connectionDescriptionSchema = z
  */
 const connectionReadOnlySchema = z.boolean().default(false);
 
-/** Zod schema for direct connection type */
-const directConnectionSchema = z
+/**
+ * Zod schema for direct connection type.
+ *
+ * Exported so the `describe-configured-connection` field-visibility drift test
+ * can read each block's `.shape` keys and assert they match the visibility
+ * allow-list in `describe-fields.ts` — the runtime belt to that file's
+ * compile-time `Record<keyof …>` exhaustiveness. See `describe-fields.ts`.
+ */
+export const directConnectionSchema = z
   .object({
     type: z.literal("direct"),
     description: connectionDescriptionSchema,
@@ -481,8 +488,11 @@ const directConnectionSchema = z
 export const CONFLUENT_CLOUD_DEFAULT_ENDPOINT = "https://api.confluent.cloud";
 const TELEMETRY_DEFAULT_ENDPOINT = "https://api.telemetry.confluent.cloud";
 
-/** Zod schema for the OAuth (PKCE) connection arm. */
-const oauthConnectionSchema = z
+/**
+ * Zod schema for the OAuth (PKCE) connection arm. Exported alongside
+ * {@link directConnectionSchema} for the field-visibility drift test.
+ */
+export const oauthConnectionSchema = z
   .object({
     type: z.literal("oauth"),
     description: connectionDescriptionSchema,

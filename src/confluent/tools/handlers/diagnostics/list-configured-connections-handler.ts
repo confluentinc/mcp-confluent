@@ -62,19 +62,11 @@ export class ListConfiguredConnectionsHandler extends ToolMetadataHandler {
           : { description: conn.description, readOnly, enabledTools: [] };
     }
 
-    // Single pass over the catalog: compute each tool's enabled connection ids
-    // once and distribute it into those buckets. Asking
+    // Single pass over the connection-routable catalog: compute each tool's
+    // enabled connection ids once and distribute it into those buckets. Asking
     // enabledConnectionIds() once per connection instead would be
     // O(tools × connections²), since it rescans every connection each call.
-    for (const [name, handler] of this.getToolNamesAndHandlers()) {
-      // Skip tools the operator filtered out, and connection-agnostic tools
-      // (predicate === alwaysEnabled): they take no connectionId and apply to
-      // every connection, so listing them per connection would misrepresent
-      // them as connection-routable. This map answers "which tools route to
-      // this connection id?" — the always-on set is orthogonal.
-      if (!runtime.isToolAllowed(name) || handler.predicate === alwaysEnabled) {
-        continue;
-      }
+    for (const [name, handler] of this.connectionRoutableTools(runtime)) {
       for (const connId of handler.enabledConnectionIds(runtime)) {
         connections[connId]?.enabledTools.push(name);
       }

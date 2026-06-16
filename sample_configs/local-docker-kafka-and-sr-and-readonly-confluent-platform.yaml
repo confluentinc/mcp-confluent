@@ -1,0 +1,57 @@
+# Example MCP Confluent Server configuration — two connections.
+#
+# A read/write local (Docker) Kafka + Schema Registry connection paired with a
+# read-only self-managed Confluent Platform (CP) cluster.
+#
+# Local Docker: the Confluent for VS Code extension makes spinning up and
+# managing the local Kafka and Schema Registry Docker containers simple. Your
+# local Docker Kafka bootstrap server string and Schema Registry URL will vary —
+# adjust the localhost:9092 / http://localhost:8081 values below to match your
+# containers.
+
+connections:
+  # Read/write local development cluster (Docker).
+  local:
+    type: "direct"
+    description: "Local Docker Kafka + Schema Registry (read/write)"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+    schema_registry:
+      endpoint: "http://localhost:8081"
+
+  # Read-only Confluent Platform. CP is not a distinct mode — it is just a set
+  # of connection values the direct-connection code already accepts; the seven
+  # Kafka and Schema Registry tools register, and every Confluent Cloud tool
+  # (Flink, Tableflow, Billing, Metrics, ...) auto-disables.
+  #
+  # Auth assumption: PLAIN over SASL_SSL for Kafka, HTTP Basic for Schema
+  # Registry. If your CP cluster uses SCRAM, mTLS, or another mechanism,
+  # override security.protocol and sasl.mechanisms via kafka.extra_properties
+  # below.
+  #
+  # TLS trust: if your CP brokers or Schema Registry use an internal CA not in
+  # Node's default trust store, set NODE_EXTRA_CA_CERTS=/path/to/ca.pem in your
+  # environment.
+  #
+  # `read_only: true` auto-disables every mutating tool for this connection.
+  cp:
+    type: "direct"
+    description: "Confluent Platform (read-only)"
+    read_only: true
+    kafka:
+      bootstrap_servers: "cp-broker.internal:9092"
+      auth:
+        type: "api_key"
+        key: "${CP_KAFKA_API_KEY}"
+        secret: "${CP_KAFKA_API_SECRET}"
+      # extra_properties:
+      #   security.protocol: "SASL_SSL"
+      #   sasl.mechanisms: "PLAIN"
+      # # For SCRAM instead:
+      # #   sasl.mechanisms: "SCRAM-SHA-512"
+    schema_registry:
+      endpoint: "https://cp-sr.internal:8081"
+      auth:
+        type: "api_key"
+        key: "${CP_SCHEMA_REGISTRY_API_KEY}"
+        secret: "${CP_SCHEMA_REGISTRY_API_SECRET}"

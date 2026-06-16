@@ -83,24 +83,46 @@ const ALL_MAPS: Record<string, Readonly<Record<string, FieldVisibility>>> = {
   "oauth connection": OAUTH_CONNECTION_FIELD_VISIBILITY,
 };
 
+/** Narrows a value to a Zod object exposing a `shape` record. */
+function hasShape(value: unknown): value is { shape: Record<string, unknown> } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "shape" in value &&
+    typeof (value as { shape: unknown }).shape === "object"
+  );
+}
+
+/** Narrows a value to a wrapper schema (ZodOptional/effects) exposing `unwrap()`. */
+function isUnwrappable(value: unknown): value is { unwrap: () => unknown } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "unwrap" in value &&
+    typeof (value as { unwrap: unknown }).unwrap === "function"
+  );
+}
+
 /**
  * The Zod field schemas for the six direct-connection service blocks,
  * each unwrapped from its `.optional()` (and, where present, `.refine()`)
- * wrapper down to the underlying object so `.shape` is reachable.
+ * wrapper down to the underlying object so `.shape` is reachable. Kept fully
+ * typed (no `any`) so a Zod-shape change that breaks the unwrap fails loudly
+ * here rather than slipping past the drift check it backs.
  */
 function blockSchemaShapeKeys(blockKey: string): string[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let schema: any = (directConnectionSchema.shape as Record<string, unknown>)[
-    blockKey
-  ];
   // ZodOptional exposes `.unwrap()` but no `.shape`; refined objects expose
   // `.shape`. Peel optionals/effects until the object shape surfaces.
-  while (
-    schema &&
-    !("shape" in schema) &&
-    typeof schema.unwrap === "function"
-  ) {
+  let schema: unknown = (
+    directConnectionSchema.shape as Record<string, unknown>
+  )[blockKey];
+  while (!hasShape(schema) && isUnwrappable(schema)) {
     schema = schema.unwrap();
+  }
+  if (!hasShape(schema)) {
+    throw new Error(
+      `Wacky -- could not resolve a Zod object shape for block "${blockKey}"`,
+    );
   }
   return Object.keys(schema.shape);
 }

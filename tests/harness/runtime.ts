@@ -102,6 +102,19 @@ export function integrationConnection(
 }
 
 /**
+ * The fixture connection's id — the value a test passes as the `connectionId`
+ * argument to a connection-addressed tool (e.g. `describe-configured-connection`).
+ * A constant rather than a `getSoleConnection()`-style lookup so it stays correct
+ * for the multi-connection fixtures #543 introduces, and so a fixture rename
+ * surfaces here rather than as a mysterious "unknown connection id" at call time.
+ */
+export function integrationConnectionName(
+  options: { oauth?: boolean } = {},
+): string {
+  return FIXTURE_CONNECTION_NAME[options.oauth ? "oauth" : "direct"];
+}
+
+/**
  * Whether the integration fixture loaded at least one connection. The transport
  * smoke tests gate on this instead of a per-handler predicate: they need any
  * connection to exist (so the spawned server boots), not a specific service block.

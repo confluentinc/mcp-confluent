@@ -10,9 +10,10 @@ WORKDIR /app
 # (and others), producing an image whose native addon never gets compiled.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# corepack activates the pnpm version pinned in package.json's
-# `packageManager` field, matching CI and local dev.
-RUN corepack enable && pnpm install --frozen-lockfile
+# Install any recent pnpm; it reads package.json's `packageManager` field and
+# self-switches to the pinned version, keeping that field the single source of
+# truth shared with CI and local dev (no version pin or Corepack needed).
+RUN npm install --global pnpm && pnpm install --frozen-lockfile
 
 COPY tsconfig.json tsconfig.build.json ./
 COPY src/ ./src/

@@ -163,7 +163,7 @@ The tests skip cleanly when those env vars are unset, so `pnpm run test:unit` an
   npm install -g pnpm
   ```
   See pnpm's [installation guide](https://pnpm.io/installation) for other options.
-  The exact pnpm version is pinned in the `packageManager` field of `package.json` and pnpm switches to it automatically, so a recent pnpm install is all you need -- no separate Corepack setup required.
+  The exact pnpm version is pinned in the `packageManager` field of `package.json`, and pnpm automatically runs that pinned version (via its built-in package-manager version management), so a recent pnpm install is all you need -- no separate Corepack setup required.
 - A local environment with Kafka or Schema Registry running, or a **Confluent Cloud** account with appropriate API keys or login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
 
 ### General Setup Steps

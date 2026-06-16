@@ -90,7 +90,7 @@ library's core.
 
 This project uses [pnpm](https://pnpm.io/installation) (Node.js 22+).
 If you don't have pnpm yet, install it once -- `brew install pnpm` on macOS, or any [other method](https://pnpm.io/installation) on other platforms.
-The exact pnpm version is pinned in the `packageManager` field of `package.json` and pnpm switches to it automatically, so a recent pnpm install is all you need -- no separate Corepack setup required.
+The exact pnpm version is pinned in the `packageManager` field of `package.json`, and pnpm automatically runs that pinned version (via its built-in package-manager version management), so a recent pnpm install is all you need -- no separate Corepack setup required.
 
 1. **Install Dependencies:**
 

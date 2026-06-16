@@ -36,16 +36,17 @@ blocks:
         - name: "Run audit and create/update PR"
           commands:
             - pnpm install --frozen-lockfile
-            # `pnpm audit --fix` writes `pnpm.overrides` entries pinning vulnerable
-            # transitive deps to fixed versions; a follow-up install applies those
-            # overrides to pnpm-lock.yaml. Unlike `npm audit fix`, it does not bump
-            # the dependency tree directly, so review the generated overrides.
+            # `pnpm audit --fix` writes `overrides` entries (to pnpm-workspace.yaml
+            # under pnpm 10+) pinning vulnerable transitive deps to fixed versions;
+            # a follow-up install applies those overrides to pnpm-lock.yaml. Unlike
+            # `npm audit fix`, it does not bump the dependency tree directly, so
+            # review the generated overrides.
             # ( || true to avoid exiting non-zero on unfixable advisories that
             # require manual, possibly-breaking changes to package.json)
             - pnpm audit --fix || true
             - pnpm install --no-frozen-lockfile
             - |
-              if git diff --quiet -- package.json pnpm-lock.yaml; then
+              if git diff --quiet -- package.json pnpm-workspace.yaml pnpm-lock.yaml; then
                 echo "No changes after pnpm audit --fix; nothing to do."
                 exit 0
               fi
@@ -59,7 +60,7 @@ blocks:
               TITLE="[${TARGET_BRANCH}] chore(deps): pnpm audit fix"
 
               git checkout -b "$BRANCH"
-              git add package.json pnpm-lock.yaml
+              git add package.json pnpm-workspace.yaml pnpm-lock.yaml
               git commit -m "$TITLE"
               git push --force -u origin "$BRANCH"
 
@@ -70,5 +71,5 @@ blocks:
                   --base "$TARGET_BRANCH" \
                   --head "$BRANCH" \
                   --title "$TITLE" \
-                  --body "Automated security update produced by \`pnpm audit --fix\` on \`${TARGET_BRANCH}\`. Please review the generated \`pnpm.overrides\` in \`package.json\` and the \`pnpm-lock.yaml\` changes before merging. Note: \`pnpm audit --fix\` pins vulnerable transitive deps via overrides rather than bumping the dependency tree, so each override should be re-evaluated as upstream fixes land. This PR is created/updated via the [\`scheduled-npm-audit\`](https://github.com/confluentinc/mcp-confluent/blob/${TARGET_BRANCH}/.semaphore/npm-audit.yml) Semaphore task."
+                  --body "Automated security update produced by \`pnpm audit --fix\` on \`${TARGET_BRANCH}\`. Please review the generated \`overrides\` in \`pnpm-workspace.yaml\` and the \`pnpm-lock.yaml\` changes before merging. Note: \`pnpm audit --fix\` pins vulnerable transitive deps via overrides rather than bumping the dependency tree, so each override should be re-evaluated as upstream fixes land. This PR is created/updated via the [\`scheduled-npm-audit\`](https://github.com/confluentinc/mcp-confluent/blob/${TARGET_BRANCH}/.semaphore/npm-audit.yml) Semaphore task."
               fi

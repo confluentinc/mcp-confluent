@@ -5,7 +5,10 @@ FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 
 
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml carries `overrides` and `onlyBuiltDependencies`; without it
+# the install would skip the native build scripts for @confluentinc/kafka-javascript
+# (and others), producing an image whose native addon never gets compiled.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # corepack activates the pnpm version pinned in package.json's
 # `packageManager` field, matching CI and local dev.

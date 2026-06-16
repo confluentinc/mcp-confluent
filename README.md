@@ -155,6 +155,15 @@ The tests skip cleanly when those env vars are unset, so `pnpm run test:unit` an
   nvm install 22
   nvm use 22
   ```
+- **[pnpm](https://pnpm.io/installation)** -- only needed to build from source (the `npx` quick start above does not require it).
+  On macOS the simplest install is Homebrew; `npm` works cross-platform:
+  ```bash
+  brew install pnpm        # macOS
+  # or, cross-platform:
+  npm install -g pnpm
+  ```
+  See pnpm's [installation guide](https://pnpm.io/installation) for other options.
+  The exact pnpm version is pinned in the `packageManager` field of `package.json` and pnpm switches to it automatically, so a recent pnpm install is all you need -- no separate Corepack setup required.
 - A local environment with Kafka or Schema Registry running, or a **Confluent Cloud** account with appropriate API keys or login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
 
 ### General Setup Steps

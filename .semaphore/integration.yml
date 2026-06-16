@@ -19,10 +19,11 @@ global_job_config:
   prologue:
     commands:
       - sem-version node 22
-      # Install any recent pnpm; it reads package.json's `packageManager` field
-      # and self-switches to the pinned version (no version pin or Corepack needed).
-      - npm install --global pnpm
       - checkout
+      # Install any recent pnpm after checkout so the repo's `.npmrc` governs the
+      # install; pnpm reads package.json's `packageManager` field and self-switches
+      # to the pinned version (no version pin or Corepack needed).
+      - npm install --global pnpm
       - pnpm config set store-dir ~/.pnpm-store
       - cache restore pnpm-store-$(checksum pnpm-lock.yaml),pnpm-store-
       - pnpm install --frozen-lockfile

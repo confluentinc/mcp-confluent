@@ -11,10 +11,11 @@ global_job_config:
   prologue:
     commands:
       - sem-version node 22
-      # Install any recent pnpm; it reads package.json's `packageManager` field
-      # and self-switches to the pinned version (no version pin or Corepack needed).
-      - npm install --global pnpm
       - checkout
+      # Install any recent pnpm after checkout so the repo's `.npmrc` governs the
+      # install; pnpm reads package.json's `packageManager` field and self-switches
+      # to the pinned version (no version pin or Corepack needed).
+      - npm install --global pnpm
       - . vault-setup --version v3 --role mcp-confluent
       - |
         TARGET_BRANCH="${TARGET_BRANCH:-main}"

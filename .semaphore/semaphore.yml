@@ -19,11 +19,12 @@ global_job_config:
   prologue:
     commands:
       - sem-version node 22
-      # corepack ships with Node 22 and activates the pnpm version pinned in
-      # package.json's `packageManager` field, so the CLI version is the
-      # single source of truth shared with local dev.
-      - corepack enable
       - checkout
+      # Install any recent pnpm after checkout so the repo's `.npmrc` governs the
+      # install; pnpm reads package.json's `packageManager` field and self-switches
+      # to the pinned version, keeping that field the single source of truth shared
+      # with local dev (no version pin or Corepack needed).
+      - npm install --global pnpm
       - pnpm config set store-dir ~/.pnpm-store
       # Fuzzy-match restore: an exact key hit (lockfile unchanged) skips all
       # downloads; the bare `pnpm-store-` prefix lets a changed lockfile still

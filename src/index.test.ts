@@ -218,7 +218,7 @@ describe("index.ts", () => {
       expect(() =>
         getToolHandlersToRegister(runtimeAllowing(ToolName.LIST_TOPICS)),
       ).toThrow(
-        "Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
+        "Wacky -- Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
       );
     });
 

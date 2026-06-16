@@ -19,6 +19,7 @@ global_job_config:
   prologue:
     commands:
       - sem-version node 22
+      - corepack enable
       - checkout
       - |
         if [ -n "$TARGET_BRANCH" ]; then
@@ -111,15 +112,17 @@ blocks:
     task:
       prologue:
         commands:
-          - cache restore npm-cache-$(checksum package-lock.json)
-          - npm ci --prefer-offline
+          - pnpm config set store-dir ~/.pnpm-store
+          - cache restore pnpm-store-$(checksum pnpm-lock.yaml),pnpm-store-
+          - pnpm install --frozen-lockfile
       epilogue:
-        commands:
-          - cache store npm-cache-$(checksum package-lock.json) ~/.npm
+        always:
+          commands:
+            - cache store pnpm-store-$(checksum pnpm-lock.yaml) ~/.pnpm-store
       jobs:
         - name: "Build"
           commands:
-            - npm run build
+            - pnpm run build
             - |
               if [ "$IS_PRERELEASE" = "false" ]; then
                 VAULT_FIELD=TELEMETRY_WRITE_KEY
@@ -127,7 +130,7 @@ blocks:
                 VAULT_FIELD=TELEMETRY_WRITE_KEY_DEV
               fi
               . vault-get-secret --vault-role=mcp-confluent --secret-key="$VAULT_FIELD" --export-as=TELEMETRY_WRITE_KEY mcpconfluent/telemetry
-            - npm pack
+            - pnpm pack
             - TGZ_FILE=$(ls *.tgz)
             - artifact push workflow ${TGZ_FILE} --destination release-assets/${TGZ_FILE} --force
 

@@ -774,7 +774,7 @@ describe("config/models.ts", () => {
         });
 
         expect(() => config.getConnectionConfig("ghost")).toThrow(
-          'Unknown connection id "ghost"; defined connections: local, staging',
+          'Unknown connection id "ghost"; defined connections: "local", "staging"',
         );
       });
     });

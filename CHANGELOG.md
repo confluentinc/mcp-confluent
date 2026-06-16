@@ -11,15 +11,16 @@ All notable changes to this MCP server will be documented in this file.
 ### Changed
 
 - **Configuration**: _A YAML config may now define multiple connections — or none._ Point a single `config.yaml` at several clusters at once — for example a local Apache Kafka broker alongside Confluent Cloud — or run with no connection at all (documentation search and server-diagnostic tools still work). At most one of those connections may use OAuth to Confluent Cloud. See [CONFIGURATION.md → Multiple connections (and zero connections)](CONFIGURATION.md#multiple-connections-and-zero-connections).
+  - When multiple connections are enabled, all connection-oriented tools will be driven with the connection id the tool should be invoked against, even if said tool was only invokable against a single connection to improve clarity and consistency (such as would be the case for a mutating tool invocation when one connection is marked read_only and the other allows writes).
 
 #### Added
 
 - **Configuration**: _Per-connection `description` field._ Optional free-text label on any connection, echoed back by `list-configured-connections`.
-- **Configuration**: _Per-connection `read_only` flag._ Set `read_only: true` on a connection to auto-disable every state-mutating tool for it, leaving only read-only tools enabled.
+- **Configuration**: _Per-connection `read_only` flag._ Set `read_only: true` on a connection to auto-disable every state-mutating tool for it, leaving only read-only tools enabled. **Defaults to `false`** --- resources reachable by a connection may be mutated or deleted from. The `list-configured-connections` tool reports each connection's read-onlyness.
 
 #### New Tools / Tool Features
 
-- **`list-configured-connections` tool.** Read-only, always-enabled discovery tool mapping each configured connection id to the connection-routable tools enabled on it.
+- **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.
 - **`produce-message` record-level `partition`, `timestamp`, and `headers`.** Three optional arguments for faithfully reproducing a record on another cluster: `partition` (non-negative integer) pins the target partition; `timestamp` accepts a `Date.parse`-able date-time string (ISO 8601 recommended) or a non-negative integer ms-since-epoch number (an unparseable value returns an error instead of silently stamping wall-clock time); `headers` maps a header name to a string or array of strings (multi-valued), carried as raw Kafka headers independent of Schema Registry serialization.
 
 ## 1.4.0

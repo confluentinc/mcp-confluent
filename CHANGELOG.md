@@ -21,6 +21,7 @@ All notable changes to this MCP server will be documented in this file.
 #### New Tools / Tool Features
 
 - **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.
+- **`describe-configured-connection` tool.** Read-only, always-enabled discovery tool that, given one connection id, reports its non-secret config (never credentials), read-only-ness, and the tools enabled on it alongside the reason each disabled tool is gated off.
 
 ## 1.4.0
 

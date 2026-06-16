@@ -11,7 +11,9 @@ global_job_config:
   prologue:
     commands:
       - sem-version node 22
-      - corepack enable
+      # Install any recent pnpm; it reads package.json's `packageManager` field
+      # and self-switches to the pinned version (no version pin or Corepack needed).
+      - npm install --global pnpm
       - checkout
       - . vault-setup --version v3 --role mcp-confluent
       - |

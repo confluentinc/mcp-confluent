@@ -94,6 +94,7 @@ web_modules/
 !/config.example.yaml
 !/config.oauth.example.yaml
 !/pnpm-lock.yaml
+!/pnpm-workspace.yaml
 !/docker-compose.yml
 !/service.yml
 

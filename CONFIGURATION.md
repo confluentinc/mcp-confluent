@@ -151,6 +151,7 @@ The fully annotated example is in [`config.example.yaml`](config.example.yaml); 
 
 A single `config.yaml` may define several named entries under `connections:` — for example a Confluent Cloud connection alongside a local Apache Kafka broker — and each tool call routes to the connection you address by id.
 There is no fixed ceiling on the number of connections.
+Ready-to-use two-connection starters pairing a read/write local-Docker connection with a read-only Cloud or Confluent Platform connection — across OAuth, API-key, and CP auth — live in [`sample_configs/`](sample_configs/).
 
 One rule constrains the mix: you may pair as many `type: direct` connections as you like, but **at most one** may be `type: oauth`.
 The shared Confluent Cloud sign-in owns a single browser session and identity, so a second OAuth connection is rejected at startup with `Multiple OAuth connections defined in configuration; only one is supported`.

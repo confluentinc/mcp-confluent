@@ -1,9 +1,9 @@
 import { loadConfigFromYaml } from "@src/config/index.js";
 import { combinedSchema } from "@src/env-schema.js";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 const FIXTURES_DIR = fileURLToPath(
   new URL("../../test-fixtures/yaml_configs", import.meta.url),
@@ -443,6 +443,42 @@ describe("config/yaml-fixtures.test.ts", () => {
       const knownKeys = new Set(Object.keys(combinedSchema.shape));
       const unknown = [...found].filter((name) => !knownKeys.has(name));
       expect(unknown).toEqual([]);
+    });
+  });
+
+  describe("sample_configs starters", () => {
+    // Every shipped sample_configs/*.yaml must still parse as the schema
+    // evolves — a starter that silently stops loading is worse than none.
+    // Discover the files at runtime so a newly added sample is covered without
+    // touching this test. Same rationale as the config.example.yaml test above.
+    const SAMPLE_DIR = fileURLToPath(
+      new URL("../../sample_configs", import.meta.url),
+    );
+
+    let sampleFiles: string[];
+
+    beforeEach(() => {
+      sampleFiles = readdirSync(SAMPLE_DIR).filter((name) =>
+        /\.ya?ml$/.test(name),
+      );
+    });
+
+    it("should parse every sample without throwing", () => {
+      expect(sampleFiles.length).toBeGreaterThan(0);
+      for (const name of sampleFiles) {
+        const filePath = path.join(SAMPLE_DIR, name);
+        // Feed a dummy value for each no-default ${VAR} placeholder so
+        // interpolation succeeds. Placeholders carrying a :-default are left to
+        // resolve their default — those defaults are crafted to satisfy
+        // field-shape constraints (e.g. the env- prefix on env_id) that a blind
+        // "dummy" would violate.
+        const raw = readFileSync(filePath, "utf-8");
+        const env: Record<string, string> = {};
+        for (const match of raw.matchAll(/\$\{([A-Za-z_]\w*)\}/g)) {
+          env[match[1]!] = "dummy";
+        }
+        expect(() => loadConfigFromYaml(filePath, env), name).not.toThrow();
+      }
     });
   });
 

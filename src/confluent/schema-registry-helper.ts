@@ -253,6 +253,14 @@ export async function serializeMessage(
   if (!registry) {
     throw new Error("Schema Registry client is required for serialization");
   }
+  // The HeaderSchemaIdSerializer writes the schema-id header into the headers
+  // object it's handed; with no accumulator it throws a cryptic library
+  // "Missing Headers". Fail fast here with an actionable message instead.
+  if (options.schemaIdLocation === "header" && !recordHeaders) {
+    throw new Error(
+      "schemaIdLocation 'header' requires a record-header accumulator to write the schema-id header into.",
+    );
+  }
   // Default subject naming
   const subject =
     options.subject ||

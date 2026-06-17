@@ -305,6 +305,27 @@ describe("schema-registry-helper.ts", () => {
         expect((serialized as Buffer)[0]).toBe(0);
       });
 
+      it("should throw an actionable error when header mode is selected without a record-header accumulator", async () => {
+        stubRegistryForGuid('"string"');
+
+        await expect(
+          serializeMessage(
+            "orders",
+            {
+              message: "hello",
+              useSchemaRegistry: true,
+              schemaType: "AVRO",
+              schemaIdLocation: "header",
+            },
+            SerdeType.VALUE,
+            registry,
+            undefined,
+          ),
+        ).rejects.toThrow(
+          /schemaIdLocation.*header.*record-header accumulator/i,
+        );
+      });
+
       it("should throw a subject-scoped error when the registry returns no guid for header mode", async () => {
         registry.getAssociationsByResourceName.mockResolvedValue([]);
         registry.getLatestSchemaMetadata.mockResolvedValue({

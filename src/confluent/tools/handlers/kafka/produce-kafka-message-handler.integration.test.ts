@@ -427,8 +427,12 @@ describe(
           it("should write the schema id to the record header, leave the payload prefix-free, and decode it back through consume-messages", async () => {
             createdSubjects.push(`${topic}-value`);
             // unique per transport: the topic is shared across the describe.each
-            // iterations, so each read-back must single out its own record
+            // iterations, so each read-back must single out its own record. The
+            // marker rides in both the Avro value (asserted after decode) and a
+            // plain record header (used to single out this record in the raw
+            // read-back, since every iteration produces a __value_schema_id).
             const marker = `hdr-${transport}`;
+            const MARKER_HEADER = "x-produce-marker";
 
             const produceResult = await server.client.callTool({
               name: ToolName.PRODUCE_MESSAGE,
@@ -441,6 +445,7 @@ describe(
                   schema: valueSchema,
                   schemaIdLocation: "header",
                 },
+                headers: { [MARKER_HEADER]: marker },
               },
             });
             const produceText = textContent(produceResult);
@@ -466,12 +471,13 @@ describe(
                 consumer!
                   .run({
                     eachMessage: async (payload) => {
-                      const idHeader =
-                        payload.message.headers?.[VALUE_SCHEMA_ID_HEADER];
-                      // skip sibling transports' records: only ours carries a
-                      // header-located id whose decode yields this marker. Records
-                      // without the header (or a non-matching one) aren't ours.
-                      if (!idHeader) {
+                      // skip sibling transports' records: every iteration writes a
+                      // __value_schema_id header, so single out ours by the unique
+                      // marker header instead of the schema-id header's presence.
+                      if (
+                        payload.message.headers?.[MARKER_HEADER]?.toString() !==
+                        marker
+                      ) {
                         return;
                       }
                       clearTimeout(timer);

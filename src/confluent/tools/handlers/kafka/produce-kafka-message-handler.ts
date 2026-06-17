@@ -62,7 +62,7 @@ const messageOptions = z.object({
     .optional()
     .default("prefix")
     .describe(
-      'Where the Schema Registry schema ID is written when useSchemaRegistry is true. "prefix" (default) embeds it as magic bytes at the front of the serialized payload — the standard Confluent wire format. "header" writes the schema GUID to the __value_schema_id / __key_schema_id Kafka record header and leaves the payload as bare serialized bytes; the matching consume-message decode reads it back from the header. Ignored when useSchemaRegistry is false.',
+      'Where the Schema Registry schema ID is written when useSchemaRegistry is true. "prefix" (default) embeds it as magic bytes at the front of the serialized payload — the standard Confluent wire format. "header" writes the schema GUID to the __value_schema_id / __key_schema_id Kafka record header and leaves the payload as bare serialized bytes; the matching consume-messages decode reads it back from the header. Ignored when useSchemaRegistry is false.',
     ),
 });
 

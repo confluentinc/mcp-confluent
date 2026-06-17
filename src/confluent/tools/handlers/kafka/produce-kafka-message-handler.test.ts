@@ -73,6 +73,39 @@ describe("produce-kafka-message-handler.ts", () => {
         });
       });
 
+      it("should omit the headers field from the sent message when no headers are supplied", async () => {
+        // The common case: a caller produces without headers. The accumulator
+        // is seeded by spreading the optional `headers` (undefined here, which
+        // object-spreads to {}), and an empty accumulator is sent as `undefined`
+        // so no headers field rides on the record. Regression guard: pins that
+        // the no-headers path neither throws nor emits an empty headers map.
+        const clientManager = getMockedClientManager();
+        const producer = await clientManager.getProducer();
+        producer.send.mockResolvedValue([
+          { topicName: "smoke", partition: 0, offset: "5", errorCode: 0 },
+        ]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: { message: "hello", useSchemaRegistry: false },
+          },
+          outcome: {
+            resolves: "Message produced successfully to [Topic: smoke",
+          },
+          clientManager,
+        });
+
+        const message = producer.send.mock.calls[0]![0].messages[0]!;
+        expect(message).not.toHaveProperty("headers");
+      });
+
       it("should return an isError response when producer.send throws", async () => {
         const clientManager = getMockedClientManager();
         const producer = await clientManager.getProducer();

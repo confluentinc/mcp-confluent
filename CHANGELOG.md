@@ -26,7 +26,7 @@ All notable changes to this MCP server will be documented in this file.
 - **`produce-message` improvements:**
   - **Record-level `partition`, `timestamp`, and `headers`.** Three optional arguments for faithfully reproducing a record on another cluster: `partition` (non-negative integer) pins the target partition; `timestamp` accepts a `Date.parse`-able date-time string (ISO 8601 recommended) or a non-negative integer ms-since-epoch number (an unparseable value returns an error instead of silently stamping wall-clock time); `headers` maps a header name to a string or array of strings (multi-valued), carried as raw Kafka headers independent of Schema Registry serialization.
   - **Support for schema-id-in-headers**: The tool can be asked to encode the schema id(s) in the Kafka message headers. By default, however, schema ids will be encoded in the preamble 'magic bytes' by the Confluent serializer.
-- `consume-message` tool now also supports deserializing records based on schema ids encoded in the message headers.
+- `consume-messages` tool now also supports deserializing records based on schema ids encoded in the message headers.
 
 ## 1.4.0
 

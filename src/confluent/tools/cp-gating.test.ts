@@ -53,6 +53,7 @@ describe("Confluent Platform tool gating", () => {
     ToolName.GET_PARTITION_OFFSETS,
     // Schema Registry
     ToolName.LIST_SCHEMAS,
+    ToolName.CREATE_SCHEMA,
     ToolName.DELETE_SCHEMA,
     // Always-available tools (no service-block requirement)
     ToolName.SEARCH_PRODUCT_DOCS,

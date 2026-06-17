@@ -314,6 +314,7 @@ describe("index.ts", () => {
         ToolName.DESCRIBE_CONFIGURED_CONNECTION,
         // Schema Registry (hasSchemaRegistryOrOAuth)
         ToolName.LIST_SCHEMAS,
+        ToolName.CREATE_SCHEMA,
         ToolName.DELETE_SCHEMA,
       ];
 

@@ -47,6 +47,7 @@ export enum ToolName {
   LIST_ENVIRONMENTS = "list-environments",
   READ_ENVIRONMENT = "read-environment",
   LIST_SCHEMAS = "list-schemas",
+  CREATE_SCHEMA = "create-schema",
   DELETE_SCHEMA = "delete-schema",
   GET_TOPIC_CONFIG = "get-topic-config",
   CREATE_TABLEFLOW_TOPIC = "create-tableflow-topic",

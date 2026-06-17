@@ -664,6 +664,12 @@ describe("produce-kafka-message-handler.ts", () => {
           expect(schemaIdLocation.parse(undefined)).toBe("prefix");
           expect(schemaIdLocation.parse("header")).toBe("header");
           expect(schemaIdLocation.description).toContain("__value_schema_id");
+          // The two wire formats carry different identifiers: prefix embeds the
+          // integer schema ID as magic bytes, header writes the schema GUID
+          // (UUID). The docs must keep that distinction precise so a caller
+          // inspecting raw records knows what to expect on each side.
+          expect(schemaIdLocation.description).toMatch(/GUID/);
+          expect(schemaIdLocation.description).toMatch(/integer schema ID/i);
         },
       );
     });

@@ -1,6 +1,11 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import {
+  KEY_SCHEMA_ID_HEADER,
+  SchemaRegistryClient,
+  SerdeType,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import { CallToolResult } from "@src/confluent/schema.js";
@@ -954,9 +959,9 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       buffer: Buffer | undefined,
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
-    ): Promise<unknown> => {
+    ): Promise<{ value: unknown; decoded: boolean }> => {
       if (options.disableSchemaRegistry || !registry) {
-        return buffer?.toString();
+        return { value: buffer?.toString(), decoded: false };
       }
       const subject =
         options.subject ||
@@ -966,37 +971,53 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         subject,
       );
       if (!schema || !schema.schemaType) {
-        return buffer?.toString();
+        return { value: buffer?.toString(), decoded: false };
       }
       try {
-        return await schemaRegistryHelper.deserializeMessage(
+        const value = await schemaRegistryHelper.deserializeMessage(
           topic,
           buffer as Buffer,
           schema.schemaType,
           registry,
           serdeType,
+          message.headers,
         );
+        return { value, decoded: true };
       } catch (err) {
         logger.error(
           { error: err, topic, schemaType: schema.schemaType, serdeType },
           `Error deserializing message ${serdeType} for topic ${topic}`,
         );
-        return buffer?.toString();
+        return { value: buffer?.toString(), decoded: false };
       }
     };
 
-    processedValue = await deserializeWithOptions(
+    const valueResult = await deserializeWithOptions(
       message.value as Buffer,
       valueOptions,
       SerdeType.VALUE,
     );
+    processedValue = valueResult.value;
+    let keyDecoded = false;
     if (message.key) {
-      processedKey = await deserializeWithOptions(
+      const keyResult = await deserializeWithOptions(
         message.key as Buffer,
         keyOptions,
         SerdeType.KEY,
       );
+      processedKey = keyResult.value;
+      keyDecoded = keyResult.decoded;
     }
+
+    // Drop a side's schema-id header only when that side was actually decoded:
+    // it's wire metadata the deserializer consumed, redundant once the payload
+    // is structured. A side that bypassed decoding (disableSchemaRegistry, no
+    // registry on the connection) or attempted decode but fell back to raw (no
+    // schema for the subject, deserialization threw) keeps its header so a caller
+    // inspecting the raw record can verify the schema-id-in-header encoding.
+    const droppedSchemaIdHeaders = new Set<string>();
+    if (valueResult.decoded) droppedSchemaIdHeaders.add(VALUE_SCHEMA_ID_HEADER);
+    if (keyDecoded) droppedSchemaIdHeaders.add(KEY_SCHEMA_ID_HEADER);
 
     return {
       key: processedKey,
@@ -1005,10 +1026,9 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       offset: message.offset,
       headers: message.headers
         ? Object.fromEntries(
-            Object.entries(message.headers).map(([key, value]) => [
-              key,
-              value?.toString() || "",
-            ]),
+            Object.entries(message.headers)
+              .filter(([key]) => !droppedSchemaIdHeaders.has(key))
+              .map(([key, value]) => [key, value?.toString() || ""]),
           )
         : undefined,
       topic,

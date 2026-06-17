@@ -4,11 +4,13 @@
  * using various schema formats (AVRO, JSON, PROTOBUF).
  */
 
+import { IHeaders } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import {
   AvroDeserializer,
   AvroSerializer,
   Deserializer,
   DeserializerConfig,
+  HeaderSchemaIdSerializer,
   JsonDeserializer,
   JsonSerializer,
   ProtobufDeserializer,
@@ -19,6 +21,14 @@ import {
   SerializerConfig,
 } from "@confluentinc/schemaregistry";
 import { logger } from "@src/logger.js";
+
+/**
+ * Where the Schema Registry schema ID rides on the wire. "prefix" embeds it as
+ * magic bytes at the front of the serialized payload (the default Confluent
+ * wire format); "header" writes the schema GUID to the __value_schema_id /
+ * __key_schema_id Kafka record header and leaves the payload as bare bytes.
+ */
+export type SchemaIdLocation = "prefix" | "header";
 
 /**
  * Supported schema types for Confluent Schema Registry.
@@ -38,6 +48,7 @@ export interface SchemaRegistryOptions {
   schema?: string;
   subject?: string;
   normalize?: boolean;
+  schemaIdLocation?: SchemaIdLocation;
 }
 
 /**
@@ -51,6 +62,7 @@ export type MessageOptions = {
   schema?: string;
   subject?: string;
   normalize?: boolean;
+  schemaIdLocation?: SchemaIdLocation;
 };
 
 /**
@@ -71,6 +83,8 @@ export type SchemaCheckResult = { type: "no-schema"; subject: string } | null;
  * @param registry - The schema registry client instance
  * @param serdeType - Whether this is for key or value serialization
  * @param schemaId - Optional schema ID to use for serialization
+ * @param schemaIdLocation - Where to write the schema ID on the wire; "header"
+ *   uses the GUID-in-record-header format, anything else the magic-byte prefix
  * @returns The appropriate Serializer instance
  * @throws Error if the schema type is unknown or unsupported
  */
@@ -79,11 +93,15 @@ export function getSerializer(
   registry: SchemaRegistryClient,
   serdeType: SerdeType,
   schemaId?: number,
+  schemaIdLocation?: SchemaIdLocation,
 ): Serializer {
   const serializerConfig: SerializerConfig =
     typeof schemaId === "number"
       ? { useSchemaId: schemaId }
       : { useLatestVersion: true };
+  if (schemaIdLocation === "header") {
+    serializerConfig.schemaIdSerializer = HeaderSchemaIdSerializer;
+  }
 
   const serializers = {
     AVRO: () => new AvroSerializer(registry, serdeType, serializerConfig),
@@ -206,6 +224,9 @@ export async function getLatestSchemaIfExists(
  * @param options - The message options including schema, type, and payload
  * @param serdeType - Whether this is for key or value serialization
  * @param registry - The schema registry client instance (if used)
+ * @param recordHeaders - Mutable record-header accumulator. Required for
+ *   `schemaIdLocation: "header"`, where the serializer writes the schema-id
+ *   header into it; ignored by the prefix format and the raw (non-registry) path.
  * @returns The serialized message as a Buffer or string
  * @throws Error if serialization fails, schema registration fails, or message type is invalid
  */
@@ -214,6 +235,7 @@ export async function serializeMessage(
   options: MessageOptions,
   serdeType: SerdeType,
   registry: SchemaRegistryClient | undefined,
+  recordHeaders?: IHeaders,
 ): Promise<Buffer | string> {
   if (!options.useSchemaRegistry) {
     if (typeof options.message !== "string") {
@@ -230,6 +252,14 @@ export async function serializeMessage(
   }
   if (!registry) {
     throw new Error("Schema Registry client is required for serialization");
+  }
+  // The HeaderSchemaIdSerializer writes the schema-id header into the headers
+  // object it's handed; with no accumulator it throws a cryptic library
+  // "Missing Headers". Fail fast here with an actionable message instead.
+  if (options.schemaIdLocation === "header" && !recordHeaders) {
+    throw new Error(
+      "schemaIdLocation 'header' requires a record-header accumulator to write the schema-id header into.",
+    );
   }
   // Default subject naming
   const subject =
@@ -270,12 +300,17 @@ export async function serializeMessage(
       registry,
       serdeType,
       schemaId,
+      options.schemaIdLocation,
     );
   } catch (err) {
     throw new Error(`Failed to get serializer: ${err}`);
   }
   try {
-    return await serializer.serialize(topicName, options.message);
+    return await serializer.serialize(
+      topicName,
+      options.message,
+      recordHeaders,
+    );
   } catch (err) {
     throw new Error(
       `Failed to serialize message for subject '${subject}': ${err}`,
@@ -294,6 +329,9 @@ export async function serializeMessage(
  * @param schemaType - The schema type (AVRO, JSON, PROTOBUF)
  * @param registry - The schema registry client
  * @param serdeType - Whether this is key or value
+ * @param headers - Raw record headers. When present, the default dual
+ *   deserializer reads a header-located schema ID (__value_schema_id /
+ *   __key_schema_id) before falling back to the magic-byte prefix.
  * @returns The deserialized object
  * @throws Error if deserialization fails
  */
@@ -303,10 +341,11 @@ export async function deserializeMessage(
   schemaType: SchemaType,
   registry: SchemaRegistryClient,
   serdeType: SerdeType,
+  headers?: IHeaders,
 ): Promise<unknown> {
   try {
     const deserializer = getDeserializer(schemaType, registry, serdeType);
-    return await deserializer.deserialize(topic, message);
+    return await deserializer.deserialize(topic, message, headers);
   } catch (err) {
     throw new Error(`Failed to deserialize message: ${err}`);
   }

@@ -1,4 +1,5 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import { VALUE_SCHEMA_ID_HEADER } from "@confluentinc/schemaregistry";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
@@ -372,5 +373,152 @@ describe(
         });
       });
     });
+
+    describe(
+      "with a header-located schema id (schemaIdLocation: header)",
+      { tags: [Tag.REQUIRES_SCHEMA_REGISTRY_CONFIG] },
+      () => {
+        if (!activeConnectionTypes.includes(ConnectionType.DIRECT)) {
+          it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
+          return;
+        }
+        if (skipIfDisabled(handler, integrationConnection())) {
+          return;
+        }
+        const connection = integrationConnection();
+        if (connection.type !== "direct" || !connection.schema_registry) {
+          it.skip("requires schema_registry config", () => {});
+          return;
+        }
+
+        let admin: KafkaJS.Admin;
+        const topic = uniqueName("produce-sr-header");
+        const { createdSubjects } = withSharedSrClient();
+        const valueSchema =
+          '{"type":"record","name":"R","fields":[{"name":"x","type":"string"}]}';
+
+        beforeAll(async () => {
+          admin = await connectTestAdmin();
+          await admin.createTopics({ topics: [{ topic, numPartitions: 1 }] });
+        });
+
+        afterAll(async () => {
+          await admin.deleteTopics({ topics: [topic] }).catch(() => {
+            // teardown-only; a cleanup failure shouldn't fail an already-asserted test
+          });
+          await admin.disconnect();
+        });
+
+        describe.each(activeTransports)("via %s transport", (transport) => {
+          let server: StartedServer;
+          let consumer: KafkaJS.Consumer | undefined;
+
+          beforeAll(async () => {
+            server = await startServer({ transport });
+          });
+
+          afterAll(async () => {
+            await consumer?.disconnect().catch(() => {
+              // disconnect race during teardown isn't actionable
+            });
+            await server?.stop();
+          });
+
+          it("should write the schema id to the record header, leave the payload prefix-free, and decode it back through consume-messages", async () => {
+            createdSubjects.push(`${topic}-value`);
+            // unique per transport: the topic is shared across the describe.each
+            // iterations, so each read-back must single out its own record
+            const marker = `hdr-${transport}`;
+
+            const produceResult = await server.client.callTool({
+              name: ToolName.PRODUCE_MESSAGE,
+              arguments: {
+                topicName: topic,
+                value: {
+                  message: { x: marker },
+                  useSchemaRegistry: true,
+                  schemaType: "AVRO",
+                  schema: valueSchema,
+                  schemaIdLocation: "header",
+                },
+              },
+            });
+            const produceText = textContent(produceResult);
+            expect(produceText).toMatch(
+              /Message produced successfully to \[Topic: /,
+            );
+
+            // raw read-back proves the wire format: the schema id rides in the
+            // __value_schema_id header and the payload carries no magic-byte
+            // prefix (a prefixed record would start with 0x00)
+            consumer = await connectTestConsumer(
+              uniqueName(`hdr-reader-${transport}`),
+              { fromBeginning: true },
+            );
+            await consumer.subscribe({ topics: [topic] });
+            const record = await new Promise<KafkaJS.EachMessagePayload>(
+              (resolve, reject) => {
+                const timer = setTimeout(
+                  () =>
+                    reject(new Error("timed out waiting for produced record")),
+                  20_000,
+                );
+                consumer!
+                  .run({
+                    eachMessage: async (payload) => {
+                      const idHeader =
+                        payload.message.headers?.[VALUE_SCHEMA_ID_HEADER];
+                      // skip sibling transports' records: only ours carries a
+                      // header-located id whose decode yields this marker. Records
+                      // without the header (or a non-matching one) aren't ours.
+                      if (!idHeader) {
+                        return;
+                      }
+                      clearTimeout(timer);
+                      resolve(payload);
+                    },
+                  })
+                  .catch((err) => {
+                    clearTimeout(timer);
+                    reject(err);
+                  });
+              },
+            );
+
+            const idHeader = record.message.headers?.[VALUE_SCHEMA_ID_HEADER];
+            expect(Buffer.isBuffer(idHeader)).toBe(true);
+            // bare Avro payload — no leading magic byte 0
+            expect(record.message.value?.[0]).not.toBe(0);
+
+            // and the consume-messages tool decodes the header-located id back
+            // into the structured value (proves the consume side reads the header)
+            const consumeResult = await server.client.callTool({
+              name: ToolName.CONSUME_MESSAGES,
+              arguments: {
+                topics: [{ name: topic, start: "earliest" }],
+                maxMessages: 10,
+                timeoutMs: 15_000,
+              },
+            });
+            expect(textContent(consumeResult)).toContain(marker);
+
+            // bypassing deserialization surfaces the raw record, schema-id header
+            // included — the manual path for verifying the on-the-wire encoding
+            const rawConsumeResult = await server.client.callTool({
+              name: ToolName.CONSUME_MESSAGES,
+              arguments: {
+                topics: [{ name: topic, start: "earliest" }],
+                maxMessages: 10,
+                timeoutMs: 15_000,
+                valueFormat: { disableSchemaRegistry: true },
+              },
+            });
+            expect(textContent(rawConsumeResult)).toContain(
+              VALUE_SCHEMA_ID_HEADER,
+            );
+          });
+        });
+      },
+    );
   },
 );

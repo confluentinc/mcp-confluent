@@ -57,6 +57,13 @@ const messageOptions = z.object({
       "Schema Registry subject. Defaults to {topicName}-value or {topicName}-key.",
     ),
   normalize: z.boolean().optional(),
+  schemaIdLocation: z
+    .enum(["prefix", "header"])
+    .optional()
+    .default("prefix")
+    .describe(
+      'Where the Schema Registry schema ID is written when useSchemaRegistry is true. "prefix" (default) embeds it as magic bytes at the front of the serialized payload — the standard Confluent wire format. "header" writes the schema GUID to the __value_schema_id / __key_schema_id Kafka record header and leaves the payload as bare serialized bytes; the matching consume-message decode reads it back from the header. Ignored when useSchemaRegistry is false.',
+    ),
 });
 
 const valueOptions = z.object({}).extend(messageOptions.shape);
@@ -225,6 +232,11 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       if (keySchemaResult) return keySchemaResult;
     }
 
+    // One header map per record: seeded from the caller's headers, then handed
+    // to both serialize calls so a schemaIdLocation: "header" side writes its
+    // __value_schema_id / __key_schema_id into the same map the record carries.
+    const recordHeaders: IHeaders = { ...(headers ?? {}) };
+
     let valueToSend: Buffer | string;
     let keyToSend: Buffer | string | undefined;
     try {
@@ -233,6 +245,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
         value as MessageOptions,
         SerdeType.VALUE,
         registry,
+        recordHeaders,
       );
       if (key) {
         keyToSend = await serializeMessage(
@@ -240,6 +253,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
           key as MessageOptions,
           SerdeType.KEY,
           registry,
+          recordHeaders,
         );
       }
     } catch (err) {
@@ -267,7 +281,10 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
               key: keyToSend,
               partition,
               timestampMs,
-              headers,
+              headers:
+                Object.keys(recordHeaders).length > 0
+                  ? recordHeaders
+                  : undefined,
             }),
           ],
         });

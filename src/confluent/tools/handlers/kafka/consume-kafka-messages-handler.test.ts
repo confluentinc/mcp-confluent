@@ -3,7 +3,12 @@ import type {
   EachMessagePayload,
   KafkaMessage,
 } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import {
+  KEY_SCHEMA_ID_HEADER,
+  SchemaRegistryClient,
+  SerdeType,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import {
@@ -1674,6 +1679,85 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
       });
 
+      describe("schema-id header echo (per-side, keyed on decode intent)", () => {
+        // A side's schema-id header is dropped only when that side was actually
+        // decoded: it's wire metadata the deserializer consumed, redundant once
+        // the payload is structured. When a side bypasses decoding
+        // (disableSchemaRegistry / no registry), the header is kept so a caller
+        // inspecting the raw record can verify the encoding.
+        const fakeRegistry = {} as SchemaRegistryClient;
+        const headers = {
+          [VALUE_SCHEMA_ID_HEADER]: Buffer.from([1, 2, 3]),
+          [KEY_SCHEMA_ID_HEADER]: Buffer.from([4, 5, 6]),
+          "x-trace": Buffer.from("abc"),
+        };
+        const valueIdString = Buffer.from([1, 2, 3]).toString();
+        const keyIdString = Buffer.from([4, 5, 6]).toString();
+
+        it.each([
+          {
+            name: "drops both when both sides decode (default, registry present)",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            expected: { "x-trace": "abc" },
+          },
+          {
+            name: "keeps __value_schema_id but drops __key_schema_id when only the value side bypasses decoding",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: true },
+            keyFormat: { disableSchemaRegistry: false },
+            expected: {
+              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
+              "x-trace": "abc",
+            },
+          },
+          {
+            name: "keeps both when both sides bypass decoding",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: true },
+            keyFormat: { disableSchemaRegistry: true },
+            expected: {
+              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
+              [KEY_SCHEMA_ID_HEADER]: keyIdString,
+              "x-trace": "abc",
+            },
+          },
+          {
+            name: "keeps both when the connection has no registry at all (nothing was decoded)",
+            registry: () => undefined,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            expected: {
+              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
+              [KEY_SCHEMA_ID_HEADER]: keyIdString,
+              "x-trace": "abc",
+            },
+          },
+        ])(
+          "should $name",
+          async ({ registry, valueFormat, keyFormat, expected }) => {
+            // A decoding side calls getLatestSchemaIfExists; stub it to null so
+            // both sides fall back to raw without touching the empty fake SDK —
+            // the drop decision keys on decode *intent*, not decode success.
+            vi.spyOn(
+              schemaRegistryHelper,
+              "getLatestSchemaIfExists",
+            ).mockResolvedValue(null);
+
+            const result = await handler.processMessage(
+              "topic-x",
+              0,
+              fakeMessage({ headers }),
+              registry(),
+              valueFormat,
+              keyFormat,
+            );
+            expect(result.headers).toEqual(expected);
+          },
+        );
+      });
+
       it("should pass message.timestamp through formatMessageTimestamp (integration with the '-1' sentinel)", async () => {
         // Cross-check that processMessage actually wires through
         // formatMessageTimestamp — the unit-test for that helper above
@@ -1730,6 +1814,37 @@ describe("consume-kafka-messages-handler.ts", () => {
             "AVRO",
             fakeRegistry,
             SerdeType.VALUE,
+            undefined,
+          );
+        });
+
+        it("should forward the raw record headers to deserializeMessage so a header-located schema id decodes", async () => {
+          vi.spyOn(
+            schemaRegistryHelper,
+            "getLatestSchemaIfExists",
+          ).mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          const deserializeSpy = vi
+            .spyOn(schemaRegistryHelper, "deserializeMessage")
+            .mockResolvedValue({ field: 7 });
+          const headers = { [VALUE_SCHEMA_ID_HEADER]: Buffer.from([1, 2, 3]) };
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage({ headers }),
+            fakeRegistry,
+            { disableSchemaRegistry: false },
+            { disableSchemaRegistry: true },
+          );
+
+          expect(result.value).toEqual({ field: 7 });
+          expect(deserializeSpy).toHaveBeenCalledWith(
+            "topic-x",
+            Buffer.from("v"),
+            "AVRO",
+            fakeRegistry,
+            SerdeType.VALUE,
+            headers,
           );
         });
 
@@ -1838,6 +1953,7 @@ describe("consume-kafka-messages-handler.ts", () => {
             "AVRO",
             fakeRegistry,
             SerdeType.KEY,
+            undefined,
           );
         });
 

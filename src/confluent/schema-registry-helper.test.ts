@@ -1,4 +1,9 @@
-import { SerdeType } from "@confluentinc/schemaregistry";
+import { IHeaders } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import {
+  KEY_SCHEMA_ID_HEADER,
+  SerdeType,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
 import {
   checkSchemaNeeded,
   deserializeMessage,
@@ -6,6 +11,9 @@ import {
 } from "@src/confluent/schema-registry-helper.js";
 import { getMockedSchemaRegistry } from "@tests/stubs/index.js";
 import { beforeEach, describe, expect, it } from "vitest";
+
+const MAGIC_BYTE_V1 = 1;
+const TEST_GUID = "89e3a8f1-1111-2222-3333-444455556666";
 
 describe("schema-registry-helper.ts", () => {
   describe("checkSchemaNeeded()", () => {
@@ -199,6 +207,128 @@ describe("schema-registry-helper.ts", () => {
         ).rejects.toThrow(
           "When using schema registry, a non-null message payload is required.",
         );
+      });
+    });
+
+    describe("schemaIdLocation (header vs prefix wire format)", () => {
+      // The header serializer encodes the schema GUID (MAGIC_BYTE_V1 + 16-byte
+      // UUID), not the int id, so the registry stub must surface a guid for the
+      // serialize step and resolve it back by guid for the deserialize step.
+      function stubRegistryForGuid(schema: string): void {
+        registry.getAssociationsByResourceName.mockResolvedValue([]);
+        registry.getLatestSchemaMetadata.mockResolvedValue({
+          id: 1,
+          guid: TEST_GUID,
+          version: 1,
+          subject: "orders-value",
+          schema,
+          schemaType: "AVRO",
+        });
+        registry.getByGuid.mockResolvedValue({ schema, schemaType: "AVRO" });
+      }
+
+      it("should write the schema GUID to the value header, leave the payload prefix-free, and round-trip via the header", async () => {
+        stubRegistryForGuid('"string"');
+        const recordHeaders: IHeaders = {};
+
+        const serialized = await serializeMessage(
+          "orders",
+          {
+            message: "hello",
+            useSchemaRegistry: true,
+            schemaType: "AVRO",
+            schemaIdLocation: "header",
+          },
+          SerdeType.VALUE,
+          registry,
+          recordHeaders,
+        );
+
+        const idHeader = recordHeaders[VALUE_SCHEMA_ID_HEADER];
+        expect(Buffer.isBuffer(idHeader)).toBe(true);
+        expect((idHeader as Buffer).length).toBe(17);
+        expect((idHeader as Buffer)[0]).toBe(MAGIC_BYTE_V1);
+        // Bare Avro string "hello": zigzag length 0x0a then the bytes — no
+        // leading magic byte 0 + 4-byte id that the prefix format prepends.
+        expect((serialized as Buffer)[0]).not.toBe(0);
+
+        const roundTripped = await deserializeMessage(
+          "orders",
+          serialized as Buffer,
+          "AVRO",
+          registry,
+          SerdeType.VALUE,
+          recordHeaders,
+        );
+        expect(roundTripped).toBe("hello");
+      });
+
+      it("should write the __key_schema_id header for SerdeType.KEY in header mode", async () => {
+        stubRegistryForGuid('"string"');
+        const recordHeaders: IHeaders = {};
+
+        await serializeMessage(
+          "orders",
+          {
+            message: "k1",
+            useSchemaRegistry: true,
+            schemaType: "AVRO",
+            schemaIdLocation: "header",
+          },
+          SerdeType.KEY,
+          registry,
+          recordHeaders,
+        );
+
+        expect(Buffer.isBuffer(recordHeaders[KEY_SCHEMA_ID_HEADER])).toBe(true);
+        expect(recordHeaders[VALUE_SCHEMA_ID_HEADER]).toBeUndefined();
+      });
+
+      it("should leave the headers accumulator untouched and prefix the payload in prefix mode (default)", async () => {
+        stubRegistryForGuid('"string"');
+        const recordHeaders: IHeaders = {};
+
+        const serialized = await serializeMessage(
+          "orders",
+          {
+            message: "hello",
+            useSchemaRegistry: true,
+            schemaType: "AVRO",
+            schemaIdLocation: "prefix",
+          },
+          SerdeType.VALUE,
+          registry,
+          recordHeaders,
+        );
+
+        expect(recordHeaders[VALUE_SCHEMA_ID_HEADER]).toBeUndefined();
+        expect((serialized as Buffer)[0]).toBe(0);
+      });
+
+      it("should throw a subject-scoped error when the registry returns no guid for header mode", async () => {
+        registry.getAssociationsByResourceName.mockResolvedValue([]);
+        registry.getLatestSchemaMetadata.mockResolvedValue({
+          id: 1,
+          version: 1,
+          subject: "orders-value",
+          schema: '"string"',
+          schemaType: "AVRO",
+        });
+
+        await expect(
+          serializeMessage(
+            "orders",
+            {
+              message: "hello",
+              useSchemaRegistry: true,
+              schemaType: "AVRO",
+              schemaIdLocation: "header",
+            },
+            SerdeType.VALUE,
+            registry,
+            {},
+          ),
+        ).rejects.toThrow(/orders-value.*guid/i);
       });
     });
   });

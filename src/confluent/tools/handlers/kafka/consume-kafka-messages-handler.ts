@@ -1,6 +1,11 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import {
+  KEY_SCHEMA_ID_HEADER,
+  SchemaRegistryClient,
+  SerdeType,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import { CallToolResult } from "@src/confluent/schema.js";
@@ -975,6 +980,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
           schema.schemaType,
           registry,
           serdeType,
+          message.headers,
         );
       } catch (err) {
         logger.error(
@@ -998,6 +1004,17 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       );
     }
 
+    // Drop a side's schema-id header only when that side was actually decoded:
+    // it's wire metadata the deserializer consumed, redundant once the payload
+    // is structured. A side that bypassed decoding (disableSchemaRegistry, or no
+    // registry on the connection) keeps its header so a caller inspecting the raw
+    // record can verify the schema-id-in-header encoding.
+    const droppedSchemaIdHeaders = new Set<string>();
+    if (registry && !valueOptions.disableSchemaRegistry)
+      droppedSchemaIdHeaders.add(VALUE_SCHEMA_ID_HEADER);
+    if (registry && !keyOptions.disableSchemaRegistry)
+      droppedSchemaIdHeaders.add(KEY_SCHEMA_ID_HEADER);
+
     return {
       key: processedKey,
       value: processedValue,
@@ -1005,10 +1022,9 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       offset: message.offset,
       headers: message.headers
         ? Object.fromEntries(
-            Object.entries(message.headers).map(([key, value]) => [
-              key,
-              value?.toString() || "",
-            ]),
+            Object.entries(message.headers)
+              .filter(([key]) => !droppedSchemaIdHeaders.has(key))
+              .map(([key, value]) => [key, value?.toString() || ""]),
           )
         : undefined,
       topic,

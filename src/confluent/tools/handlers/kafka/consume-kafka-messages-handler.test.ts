@@ -2020,6 +2020,31 @@ describe("consume-kafka-messages-handler.ts", () => {
           );
         });
 
+        it("should skip value deserialization entirely when message.value is null (a tombstone never triggers SR work)", async () => {
+          const getLatestSpy = vi
+            .spyOn(schemaRegistryHelper, "getLatestSchemaIfExists")
+            .mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          const deserializeSpy = vi
+            .spyOn(schemaRegistryHelper, "deserializeMessage")
+            .mockResolvedValue({ decoded: true });
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage({ value: null }),
+            fakeRegistry,
+            { disableSchemaRegistry: false },
+            { disableSchemaRegistry: true },
+          );
+
+          expect(result.value).toBeUndefined();
+          // A null payload (tombstone / absent value) short-circuits before any
+          // SR lookup, so the deserializer is never handed a non-Buffer value
+          // and no spurious error is logged on the inevitable failure.
+          expect(getLatestSpy).not.toHaveBeenCalled();
+          expect(deserializeSpy).not.toHaveBeenCalled();
+        });
+
         it("should skip key deserialization entirely when message.key is null (the SR branch never fires for an absent key)", async () => {
           const getLatestSpy = vi.spyOn(
             schemaRegistryHelper,

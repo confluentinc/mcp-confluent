@@ -960,6 +960,13 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<{ value: unknown; decoded: boolean }> => {
+      // A null/undefined payload (Kafka tombstone, or an absent key/value)
+      // can't be decoded — short-circuit before any SR lookup so the
+      // deserializer is never handed a non-Buffer and no spurious error is
+      // logged on the inevitable failure.
+      if (buffer == null) {
+        return { value: undefined, decoded: false };
+      }
       if (options.disableSchemaRegistry || !registry) {
         return { value: buffer?.toString(), decoded: false };
       }

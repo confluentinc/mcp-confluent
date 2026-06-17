@@ -271,6 +271,7 @@ describe("tool-registry.ts", () => {
         // Diagnostics (no service-block requirement)
         [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
         [ToolName.LIST_CONFIGURED_CONNECTIONS]: alwaysEnabled,
+        [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: alwaysEnabled,
       };
 
       it.each(
@@ -574,6 +575,12 @@ describe("tool-registry.ts", () => {
       // connection-count header.
       [ToolName.LIST_CONFIGURED_CONNECTIONS]: {
         outcome: { resolves: "1 connection configured:" },
+        bypassesClientLayer: true,
+      },
+      // describe-configured-connection requires a connectionId argument, so the
+      // zero-arg smoke call trips its Zod schema before touching any client.
+      [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: {
+        outcome: { throws: "ZodError" },
         bypassesClientLayer: true,
       },
       // Organizations

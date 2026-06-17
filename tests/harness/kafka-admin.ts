@@ -36,16 +36,25 @@ export async function connectTestProducer(): Promise<KafkaJS.Producer> {
  * offset}])` directly without subscribing or running a poll loop — the
  * write goes to the group coordinator regardless of assignment state — and
  * must `consumer.disconnect()` when done.
+ *
+ * Pass `{ fromBeginning: true }` for the read-back use case (subscribe + run a
+ * poll loop to read records already on the topic); a fresh group otherwise
+ * resets to the latest offset and would miss records produced before it
+ * subscribed.
  */
 export async function connectTestConsumer(
   groupId: string,
+  options: { fromBeginning?: boolean } = {},
 ): Promise<KafkaJS.Consumer> {
-  // `ConsumerConstructorConfig` is rdkafka-style (top-level `group.id`)
-  // with the kafkajs-style camelCased shape nested under `kafkaJS`. Use the
-  // nested form so the parameter spelling matches the rest of the
-  // kafkajs-flavored test code.
+  // `ConsumerConstructorConfig` is rdkafka-style (top-level keys) with the
+  // kafkajs-style camelCased shape nested under `kafkaJS`. `fromBeginning` is
+  // a kafkajs *subscribe*-time option, not a consumer-constructor one, so
+  // nesting it here is silently dropped; control the start position the way
+  // the production consumer does (direct-client-manager.ts) — via the
+  // top-level librdkafka `auto.offset.reset` key.
   const consumer = newKafkaClient("mcp-confluent-it-consumer").consumer({
     kafkaJS: { groupId },
+    ...(options.fromBeginning ? { "auto.offset.reset": "earliest" } : {}),
   });
   await consumer.connect();
   return consumer;

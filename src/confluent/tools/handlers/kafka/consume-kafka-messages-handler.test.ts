@@ -3,7 +3,12 @@ import type {
   EachMessagePayload,
   KafkaMessage,
 } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import {
+  KEY_SCHEMA_ID_HEADER,
+  SchemaRegistryClient,
+  SerdeType,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import {
@@ -1674,6 +1679,148 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
       });
 
+      describe("schema-id header echo (per-side, keyed on actual decode)", () => {
+        // A side's schema-id header is dropped only when that side was actually
+        // decoded: it's wire metadata the deserializer consumed, redundant once
+        // the payload is structured. A side that bypasses decoding
+        // (disableSchemaRegistry / no registry) OR attempts decode but falls
+        // back to raw (no schema for the subject / deserialization throws)
+        // keeps its header so a caller inspecting the raw record can verify the
+        // schema-id-in-header encoding even in the missing-schema/failure cases.
+        const fakeRegistry = {} as SchemaRegistryClient;
+        const headers = {
+          [VALUE_SCHEMA_ID_HEADER]: Buffer.from([1, 2, 3]),
+          [KEY_SCHEMA_ID_HEADER]: Buffer.from([4, 5, 6]),
+          "x-trace": Buffer.from("abc"),
+        };
+        const valueIdString = Buffer.from([1, 2, 3]).toString();
+        const keyIdString = Buffer.from([4, 5, 6]).toString();
+
+        // Per-side decode result a case wants the spies to simulate. Only
+        // consulted for a side that actually attempts decode (registry present
+        // and disableSchemaRegistry false).
+        type DecodeOutcome = "decode" | "no-schema" | "throw";
+
+        it.each([
+          {
+            name: "drops both when both sides decode successfully (default, registry present)",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "decode" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+            expected: { "x-trace": "abc" },
+          },
+          {
+            name: "keeps __value_schema_id but drops __key_schema_id when only the value side bypasses decoding",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: true },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "decode" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+            expected: {
+              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
+              "x-trace": "abc",
+            },
+          },
+          {
+            name: "keeps both when both sides bypass decoding",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: true },
+            keyFormat: { disableSchemaRegistry: true },
+            valueOutcome: "decode" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+            expected: {
+              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
+              [KEY_SCHEMA_ID_HEADER]: keyIdString,
+              "x-trace": "abc",
+            },
+          },
+          {
+            name: "keeps both when the connection has no registry at all (nothing was decoded)",
+            registry: () => undefined,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "decode" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+            expected: {
+              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
+              [KEY_SCHEMA_ID_HEADER]: keyIdString,
+              "x-trace": "abc",
+            },
+          },
+          {
+            name: "keeps __value_schema_id when the value side attempts decode but the subject has no schema (raw fallback)",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "no-schema" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+            expected: {
+              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
+              "x-trace": "abc",
+            },
+          },
+          {
+            name: "keeps __value_schema_id when the value side attempts decode but deserialization throws (raw fallback)",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "throw" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+            expected: {
+              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
+              "x-trace": "abc",
+            },
+          },
+        ])(
+          "should $name",
+          async ({
+            registry,
+            valueFormat,
+            keyFormat,
+            valueOutcome,
+            keyOutcome,
+            expected,
+          }) => {
+            const outcomeFor = (serdeType: SerdeType): DecodeOutcome =>
+              serdeType === SerdeType.KEY ? keyOutcome : valueOutcome;
+
+            vi.spyOn(
+              schemaRegistryHelper,
+              "getLatestSchemaIfExists",
+            ).mockImplementation(async (_registry, subject) =>
+              outcomeFor(
+                subject.endsWith("-key") ? SerdeType.KEY : SerdeType.VALUE,
+              ) === "no-schema"
+                ? null
+                : { schema: "{}", schemaType: "AVRO" },
+            );
+            vi.spyOn(
+              schemaRegistryHelper,
+              "deserializeMessage",
+            ).mockImplementation(
+              async (_topic, _buffer, _schemaType, _registry, serdeType) => {
+                if (outcomeFor(serdeType) === "throw") {
+                  throw new Error("boom");
+                }
+                return { decoded: serdeType };
+              },
+            );
+
+            const result = await handler.processMessage(
+              "topic-x",
+              0,
+              fakeMessage({ headers }),
+              registry(),
+              valueFormat,
+              keyFormat,
+            );
+            expect(result.headers).toEqual(expected);
+          },
+        );
+      });
+
       it("should pass message.timestamp through formatMessageTimestamp (integration with the '-1' sentinel)", async () => {
         // Cross-check that processMessage actually wires through
         // formatMessageTimestamp — the unit-test for that helper above
@@ -1730,6 +1877,37 @@ describe("consume-kafka-messages-handler.ts", () => {
             "AVRO",
             fakeRegistry,
             SerdeType.VALUE,
+            undefined,
+          );
+        });
+
+        it("should forward the raw record headers to deserializeMessage so a header-located schema id decodes", async () => {
+          vi.spyOn(
+            schemaRegistryHelper,
+            "getLatestSchemaIfExists",
+          ).mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          const deserializeSpy = vi
+            .spyOn(schemaRegistryHelper, "deserializeMessage")
+            .mockResolvedValue({ field: 7 });
+          const headers = { [VALUE_SCHEMA_ID_HEADER]: Buffer.from([1, 2, 3]) };
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage({ headers }),
+            fakeRegistry,
+            { disableSchemaRegistry: false },
+            { disableSchemaRegistry: true },
+          );
+
+          expect(result.value).toEqual({ field: 7 });
+          expect(deserializeSpy).toHaveBeenCalledWith(
+            "topic-x",
+            Buffer.from("v"),
+            "AVRO",
+            fakeRegistry,
+            SerdeType.VALUE,
+            headers,
           );
         });
 
@@ -1838,7 +2016,33 @@ describe("consume-kafka-messages-handler.ts", () => {
             "AVRO",
             fakeRegistry,
             SerdeType.KEY,
+            undefined,
           );
+        });
+
+        it("should skip value deserialization entirely when message.value is null (a tombstone never triggers SR work)", async () => {
+          const getLatestSpy = vi
+            .spyOn(schemaRegistryHelper, "getLatestSchemaIfExists")
+            .mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          const deserializeSpy = vi
+            .spyOn(schemaRegistryHelper, "deserializeMessage")
+            .mockResolvedValue({ decoded: true });
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage({ value: null }),
+            fakeRegistry,
+            { disableSchemaRegistry: false },
+            { disableSchemaRegistry: true },
+          );
+
+          expect(result.value).toBeUndefined();
+          // A null payload (tombstone / absent value) short-circuits before any
+          // SR lookup, so the deserializer is never handed a non-Buffer value
+          // and no spurious error is logged on the inevitable failure.
+          expect(getLatestSpy).not.toHaveBeenCalled();
+          expect(deserializeSpy).not.toHaveBeenCalled();
         });
 
         it("should skip key deserialization entirely when message.key is null (the SR branch never fires for an absent key)", async () => {

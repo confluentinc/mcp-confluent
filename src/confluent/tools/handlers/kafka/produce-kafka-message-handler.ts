@@ -126,6 +126,26 @@ function toEpochMs(input: string | number): number | null {
 }
 
 /**
+ * Reduce a librdkafka delivery report into user-facing text plus the aggregate
+ * error flag — any record with a non-zero errorCode marks the whole response an
+ * error.
+ */
+function formatDeliveryReport(deliveryReport: RecordMetadata[]): {
+  message: string;
+  isError: boolean;
+} {
+  const message = deliveryReport
+    .map((metadata) =>
+      metadata.errorCode !== 0
+        ? `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`
+        : `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`,
+    )
+    .join("\n");
+  const isError = deliveryReport.some((metadata) => metadata.errorCode !== 0);
+  return { message, isError };
+}
+
+/**
  * Build the producer message from the serialized key/value and the optional
  * record-level metadata, omitting any field the caller didn't supply.
  */
@@ -170,6 +190,39 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
   }
 
   /**
+   * Run the pre-serialization schema check for both sides. Returns an error
+   * CallToolResult when either side needs a registered schema that isn't there
+   * (and none was provided to register), or null when both sides are ready.
+   */
+  async checkSchemasReady(
+    topicName: string,
+    value: MessageOptions,
+    key: MessageOptions | undefined,
+    registry: SchemaRegistryClient | undefined,
+  ): Promise<CallToolResult | null> {
+    const valueSchemaCheck = await checkSchemaNeeded(
+      topicName,
+      value,
+      SerdeType.VALUE,
+      registry,
+    );
+    const valueSchemaResult = this.handleSchemaCheckResult(valueSchemaCheck);
+    if (valueSchemaResult) return valueSchemaResult;
+
+    if (key) {
+      const keySchemaCheck = await checkSchemaNeeded(
+        topicName,
+        key,
+        SerdeType.KEY,
+        registry,
+      );
+      const keySchemaResult = this.handleSchemaCheckResult(keySchemaCheck);
+      if (keySchemaResult) return keySchemaResult;
+    }
+    return null;
+  }
+
+  /**
    * Main handler for producing a message to a Kafka topic, including schema registry logic and serialization.
    * Handles both value and key, and returns a CallToolResult with the outcome.
    * @param clientManager - The client manager for Kafka and registry clients
@@ -210,32 +263,18 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       registry = await clientManager.getSchemaRegistrySdkClient(resolved.envId);
     }
 
-    // Check for latest schema if needed (value)
-    const valueSchemaCheck = await checkSchemaNeeded(
+    const schemaIssue = await this.checkSchemasReady(
       topicName,
       value as MessageOptions,
-      SerdeType.VALUE,
+      key as MessageOptions | undefined,
       registry,
     );
-    const valueSchemaResult = this.handleSchemaCheckResult(valueSchemaCheck);
-    if (valueSchemaResult) return valueSchemaResult;
-
-    // Check for latest schema if needed (key)
-    if (key) {
-      const keySchemaCheck = await checkSchemaNeeded(
-        topicName,
-        key as MessageOptions,
-        SerdeType.KEY,
-        registry,
-      );
-      const keySchemaResult = this.handleSchemaCheckResult(keySchemaCheck);
-      if (keySchemaResult) return keySchemaResult;
-    }
+    if (schemaIssue) return schemaIssue;
 
     // One header map per record: seeded from the caller's headers, then handed
     // to both serialize calls so a schemaIdLocation: "header" side writes its
     // __value_schema_id / __key_schema_id into the same map the record carries.
-    const recordHeaders: IHeaders = { ...(headers ?? {}) };
+    const recordHeaders: IHeaders = { ...headers };
 
     let valueToSend: Buffer | string;
     let keyToSend: Buffer | string | undefined;
@@ -294,18 +333,8 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
           true,
         );
       }
-      const formattedResponse = deliveryReport
-        .map((metadata) => {
-          if (metadata.errorCode !== 0) {
-            return `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`;
-          }
-          return `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`;
-        })
-        .join("\n");
-      const isError = deliveryReport.some(
-        (metadata) => metadata.errorCode !== 0,
-      );
-      return this.createResponse(formattedResponse, isError);
+      const { message, isError } = formatDeliveryReport(deliveryReport);
+      return this.createResponse(message, isError);
     } finally {
       await disposeIfOAuth(runtime, connId, producer);
     }

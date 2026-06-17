@@ -248,6 +248,7 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
         // Schema Registry
         [ToolName.LIST_SCHEMAS]: hasSchemaRegistryOrOAuth,
+        [ToolName.CREATE_SCHEMA]: hasSchemaRegistryOrOAuth,
         [ToolName.DELETE_SCHEMA]: hasSchemaRegistryOrOAuth,
         // Tableflow
         [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
@@ -410,6 +411,7 @@ describe("tool-registry.ts", () => {
           cm.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
         },
       },
+      [ToolName.CREATE_SCHEMA]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_SCHEMA]: { outcome: { throws: "ZodError" } },
       // Flink
       [ToolName.LIST_FLINK_STATEMENTS]: {

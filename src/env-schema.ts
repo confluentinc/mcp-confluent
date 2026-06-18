@@ -197,15 +197,6 @@ const configSchema = z
       )
       .trim()
       .min(1),
-    // Deprecated alias of FLINK_CATALOG_NAME, still accepted. Removal tracked
-    // in issue #598 (the v1.4.0 cutoff it originally targeted came and went).
-    FLINK_ENV_NAME: z
-      .string()
-      .describe(
-        "DEPRECATED: rename to FLINK_CATALOG_NAME (removal tracked in issue #598). Same meaning — the Flink catalog name used as `sql.current-catalog`.",
-      )
-      .trim()
-      .min(1),
     FLINK_DATABASE_NAME: z
       .string()
       .describe(

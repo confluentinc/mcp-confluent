@@ -4,6 +4,10 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Removed
+
+- The deprecated `FLINK_ENV_NAME` environment variable. Use `FLINK_CATALOG_NAME` (or a connection's `flink.catalog_name` in YAML) instead.
+
 ### Fixed
 
 - `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.

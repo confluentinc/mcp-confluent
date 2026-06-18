@@ -36,7 +36,7 @@ const createTopicArgs = z.object({
           .describe(
             "Replication factor for the topic. If not specified, the broker default is used. " +
               "Confluent Cloud clusters only ever support a value of 3 (or omit this to take the default); " +
-              "on-premises or other clusters may accept other values.",
+              "Confluent Platform or other clusters may accept other values.",
           ),
       }),
     )

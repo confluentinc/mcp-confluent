@@ -1,4 +1,4 @@
-import { DEFAULT_CONNECTION_NAME } from "@src/config/env-config.js";
+import { DEFAULT_CONNECTION_ID } from "@src/config/env-config.js";
 import type { DirectConnectionConfig } from "@src/config/models.js";
 import {
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
@@ -679,13 +679,13 @@ describe("config/models.ts", () => {
   });
 
   describe("MCPServerConfiguration", () => {
-    describe("getConnectionNames", () => {
-      it("should return connection names sorted alphabetically", () => {
+    describe("getConnectionIds", () => {
+      it("should return connection ids sorted alphabetically", () => {
         const config = new MCPServerConfiguration({
           connections: { staging: directConnection, local: directConnection },
         });
 
-        expect(config.getConnectionNames()).toEqual(["local", "staging"]);
+        expect(config.getConnectionIds()).toEqual(["local", "staging"]);
       });
     });
 
@@ -737,7 +737,7 @@ describe("config/models.ts", () => {
       it("should throw when the sole connection is OAuth-typed", () => {
         const config = new MCPServerConfiguration({
           connections: {
-            [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "devel" },
+            [DEFAULT_CONNECTION_ID]: { type: "oauth", ccloud_env: "devel" },
           },
         });
 

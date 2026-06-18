@@ -23,8 +23,8 @@ const CP_FIXTURE_PATH = resolve(
   "test-fixtures/yaml_configs/integration.cp.yaml",
 );
 
-/** The connection name the CP fixture gives its single connection. */
-const CP_CONNECTION_NAME = "cp";
+/** The connection id the CP fixture gives its single connection. */
+const CP_CONNECTION_ID = "cp";
 
 /**
  * The {@linkcode ServerRuntime} the spawned MCP server would see when using
@@ -64,7 +64,7 @@ export function cpIntegrationConnection(): ConnectionConfig {
   } catch {
     return { type: "direct" };
   }
-  return config.getConnectionConfig(CP_CONNECTION_NAME);
+  return config.getConnectionConfig(CP_CONNECTION_ID);
 }
 
 export interface CpSpawnConfigOptions {

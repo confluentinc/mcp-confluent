@@ -102,7 +102,7 @@ connections:
     telemetry: { ... }
 ```
 
-The connection name (`staging` above) is freeform.
+The connection id (`staging` above) is freeform.
 Either connection flavor also accepts an optional `description` — a free-text label echoed back by the `list-configured-connections` tool so an agent can tell your connections apart.
 A blank or whitespace-only `description` is treated as no description.
 

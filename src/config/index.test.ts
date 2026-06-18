@@ -218,7 +218,7 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      expect(config.getConnectionNames()).toEqual([]);
+      expect(config.getConnectionIds()).toEqual([]);
     });
 
     it("should accept more than one connection", () => {
@@ -235,7 +235,7 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      expect(config.getConnectionNames()).toEqual(["local", "staging"]);
+      expect(config.getConnectionIds()).toEqual(["local", "staging"]);
       const local = config.getConnectionConfig("local");
       const staging = config.getConnectionConfig("staging");
       // Each connection keeps its own blocks — they don't collapse into one.
@@ -247,7 +247,7 @@ describe("config/index.ts", () => {
       ).toBe("staging:9092");
     });
 
-    it("should throw error when connection name is whitespace-only", () => {
+    it("should throw error when connection id is whitespace-only", () => {
       const yamlContent = `connections:
   " ":
     type: "direct"

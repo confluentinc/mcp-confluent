@@ -1,6 +1,6 @@
 import {
   buildConfigFromEnvAndCli,
-  DEFAULT_CONNECTION_NAME,
+  DEFAULT_CONNECTION_ID,
 } from "@src/config/env-config.js";
 import { describe, expect, it } from "vitest";
 
@@ -69,13 +69,13 @@ describe("config/env-config.ts", () => {
         expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
       });
 
-      it("should use the default connection name", () => {
+      it("should use the default connection id", () => {
         const config = buildConfigFromEnvAndCli(
           envWith({ BOOTSTRAP_SERVERS: "localhost:9092" }),
         );
 
         expect(Object.keys(config.connections)).toEqual([
-          DEFAULT_CONNECTION_NAME,
+          DEFAULT_CONNECTION_ID,
         ]);
       });
 

@@ -240,7 +240,7 @@ export abstract class BaseToolHandler implements ToolHandler {
     // which connection a call routes to, so the call auto-routes with no extra
     // argument. The zero-connection case also covers the `--list-tools` runtime,
     // which wants the unaugmented view.
-    if (runtime.config.getConnectionNames().length <= 1)
+    if (runtime.config.getConnectionIds().length <= 1)
       return config.inputSchema;
 
     const ids = this.enabledConnectionIds(runtime);

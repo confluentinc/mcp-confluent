@@ -16,7 +16,13 @@ import {
 import { fileURLToPath } from "node:url";
 import type { Mocked } from "vitest";
 
-/** Connection ID used by the named runtime factories and their default single-connection runtimes. */
+/**
+ * Connection id used by the named runtime factories and their default
+ * single-connection runtimes. An arbitrary fixture id — distinct from the
+ * production env-var synthesis constant of the same name (`"_default"`,
+ * exported from `@src/config/env-config.js`); the differing values are
+ * intentional.
+ */
 export const DEFAULT_CONNECTION_ID = "default";
 
 const CCLOUD_OAUTH_FIXTURE = fileURLToPath(

@@ -51,7 +51,7 @@ export class Lazy<T> {
    * The instance is set to undefined after cleanup.
    */
   close(): void {
-    if (this.instance) {
+    if (this.instance !== undefined) {
       if (this.closeHandler) {
         logger.debug(
           `Initiating close handler for lazy instance of type ${typeof this.instance}`,
@@ -129,7 +129,7 @@ export class AsyncLazy<T> {
    * @returns A promise that resolves when the cleanup is complete
    */
   async close(): Promise<void> {
-    if (this.instance) {
+    if (this.instance !== undefined) {
       if (this.closeHandler) {
         logger.debug(
           `Initiating close handler for lazy instance of type ${typeof this.instance}`,

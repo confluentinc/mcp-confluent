@@ -77,6 +77,20 @@ describe("Lazy", () => {
     expect(lazy.get()).toBe(0);
     expect(supplier).toHaveBeenCalledOnce();
   });
+
+  it("should clear a falsy cached value (0) on close() so the next get() rebuilds", () => {
+    const closeHandler = vi.fn();
+    const supplier = vi.fn(() => 0);
+    const lazy = new Lazy(supplier, closeHandler);
+
+    lazy.get();
+    lazy.close();
+    lazy.get();
+
+    expect(closeHandler).toHaveBeenCalledOnce();
+    expect(closeHandler).toHaveBeenCalledWith(0);
+    expect(supplier).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("AsyncLazy", () => {
@@ -168,5 +182,19 @@ describe("AsyncLazy", () => {
     expect(await lazy.get()).toBe(0);
     expect(await lazy.get()).toBe(0);
     expect(supplier).toHaveBeenCalledOnce();
+  });
+
+  it("should clear a falsy cached value (0) on close() so the next get() rebuilds", async () => {
+    const closeHandler = vi.fn(async () => {});
+    const supplier = vi.fn(async () => 0);
+    const lazy = new AsyncLazy(supplier, closeHandler);
+
+    await lazy.get();
+    await lazy.close();
+    await lazy.get();
+
+    expect(closeHandler).toHaveBeenCalledOnce();
+    expect(closeHandler).toHaveBeenCalledWith(0);
+    expect(supplier).toHaveBeenCalledTimes(2);
   });
 });

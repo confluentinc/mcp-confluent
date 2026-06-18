@@ -1,5 +1,12 @@
+import { AuthConfig } from "@src/mcp/transports/auth.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const AUTH_CONFIG: AuthConfig = {
+  apiKey: "test-key",
+  enabled: true,
+  allowedHosts: ["localhost"],
+};
 
 describe("server.ts", () => {
   describe("HttpServer", () => {
@@ -21,6 +28,90 @@ describe("server.ts", () => {
         expect(spec.servers?.[0]?.url).toBe("http://test-host:9999");
 
         await fastify.close();
+      });
+
+      it("should register an onRequest auth hook when an auth config was supplied", async () => {
+        const httpServer = new HttpServer({ auth: AUTH_CONFIG });
+        const addHook = vi.spyOn(httpServer.getInstance(), "addHook");
+
+        await httpServer.prepare({ host: "test-host", port: 9999 });
+
+        expect(addHook).toHaveBeenCalledWith("onRequest", expect.any(Function));
+      });
+
+      it("should not register an auth hook when no auth config was supplied", async () => {
+        const httpServer = new HttpServer();
+        const addHook = vi.spyOn(httpServer.getInstance(), "addHook");
+
+        await httpServer.prepare({ host: "test-host", port: 9999 });
+
+        expect(addHook).not.toHaveBeenCalledWith(
+          "onRequest",
+          expect.any(Function),
+        );
+      });
+
+      it("should short-circuit a second prepare() without re-registering plugins", async () => {
+        const httpServer = new HttpServer();
+        await httpServer.prepare({ host: "test-host", port: 9999 });
+
+        const register = vi.spyOn(httpServer.getInstance(), "register");
+        await httpServer.prepare({ host: "test-host", port: 9999 });
+
+        expect(register).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("start()", () => {
+      it("should ready the instance then listen on the configured host and port", async () => {
+        const httpServer = new HttpServer();
+        const fastify = httpServer.getInstance();
+        const ready = vi.spyOn(fastify, "ready").mockResolvedValue(fastify);
+        // fastify's `listen` is overloaded; vi.spyOn resolves to the void-returning
+        // overload, so the resolved address value is irrelevant here — we assert the
+        // call arguments, not the return.
+        const listen = vi.spyOn(fastify, "listen").mockResolvedValue(undefined);
+
+        await httpServer.start({ host: "test-host", port: 9999 });
+
+        expect(ready).toHaveBeenCalledOnce();
+        expect(listen).toHaveBeenCalledWith({
+          port: 9999,
+          host: "test-host",
+        });
+      });
+
+      it("should rethrow when listen fails", async () => {
+        const httpServer = new HttpServer();
+        const fastify = httpServer.getInstance();
+        vi.spyOn(fastify, "ready").mockResolvedValue(fastify);
+        vi.spyOn(fastify, "listen").mockRejectedValue(new Error("listen boom"));
+
+        await expect(
+          httpServer.start({ host: "test-host", port: 9999 }),
+        ).rejects.toThrow("listen boom");
+      });
+    });
+
+    describe("stop()", () => {
+      it("should close the fastify instance", async () => {
+        const httpServer = new HttpServer();
+        const close = vi
+          .spyOn(httpServer.getInstance(), "close")
+          .mockResolvedValue(undefined);
+
+        await httpServer.stop();
+
+        expect(close).toHaveBeenCalledOnce();
+      });
+
+      it("should rethrow when close fails", async () => {
+        const httpServer = new HttpServer();
+        vi.spyOn(httpServer.getInstance(), "close").mockRejectedValue(
+          new Error("close boom"),
+        );
+
+        await expect(httpServer.stop()).rejects.toThrow("close boom");
       });
     });
   });

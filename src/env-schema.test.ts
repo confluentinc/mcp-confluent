@@ -22,7 +22,12 @@ describe("env-schema.ts", () => {
     it("should not recognize the removed FLINK_ENV_NAME variable", () => {
       const result = combinedSchema.safeParse({ FLINK_ENV_NAME: "legacy" });
 
-      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error(
+          `Expected parse to succeed but it failed: ${result.error.message}`,
+        );
+      }
+
       expect(result.data).not.toHaveProperty("FLINK_ENV_NAME");
     });
   });

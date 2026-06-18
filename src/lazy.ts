@@ -32,13 +32,15 @@ export class Lazy<T> {
    * @throws If the supplier function fails to initialize the value
    */
   get(): T {
-    try {
-      this.instance = this.supplier();
-      logger.debug(
-        `Lazy instance created with type ${this.instance?.constructor.name || typeof this.instance}`,
-      );
-    } catch (error) {
-      throw new Error(`Failed to initialize lazy instance: ${error}`);
+    if (this.instance === undefined) {
+      try {
+        this.instance = this.supplier();
+        logger.debug(
+          `Lazy instance created with type ${this.instance?.constructor.name || typeof this.instance}`,
+        );
+      } catch (error) {
+        throw new Error(`Failed to initialize lazy instance: ${error}`);
+      }
     }
     return this.instance!;
   }
@@ -99,11 +101,19 @@ export class AsyncLazy<T> {
    * @throws If the supplier function fails to initialize the value
    */
   async get(): Promise<T> {
-    if (!this.instance) {
+    if (this.instance === undefined) {
       if (!this.initializationPromise) {
         this.initializationPromise = this.supplier();
       }
-      this.instance = await this.initializationPromise;
+      try {
+        this.instance = await this.initializationPromise;
+      } catch (error) {
+        // A rejected supplier must leave the wrapper retryable: clear the
+        // cached promise so the next get() re-invokes the supplier rather
+        // than re-awaiting the same rejection forever.
+        this.initializationPromise = null;
+        throw error;
+      }
     }
     logger.debug(
       `Async Lazy instance created with type ${this.instance?.constructor.name || typeof this.instance}`,
@@ -112,8 +122,10 @@ export class AsyncLazy<T> {
   }
 
   /**
-   * Closes and cleans up the lazy-loaded instance if it exists
-   * If a closeHandler was provided, it will be called with the instance
+   * Closes and cleans up the lazy-loaded instance if it exists.
+   * If a closeHandler was provided, it will be called with the instance.
+   * The instance and any cached initialization promise are reset afterward,
+   * so the next get() rebuilds.
    * @returns A promise that resolves when the cleanup is complete
    */
   async close(): Promise<void> {
@@ -125,6 +137,8 @@ export class AsyncLazy<T> {
         await this.closeHandler(this.instance);
         logger.debug(`Lazy instance closed with type ${typeof this.instance}`);
       }
+      this.instance = undefined;
+      this.initializationPromise = null;
     }
   }
 }

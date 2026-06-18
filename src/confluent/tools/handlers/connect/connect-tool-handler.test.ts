@@ -2,6 +2,7 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { directConnectionOf } from "@tests/factories/config.js";
 import { runtimeWith } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
 
@@ -37,7 +38,7 @@ describe("connect-tool-handler.ts", () => {
         handler["resolveConnectEnvAndClusterId"].bind(handler);
 
       it("should use arg values when both args and config are present", () => {
-        const conn = runtimeWith(CONNECT_CONN).config.getSoleDirectConnection();
+        const conn = directConnectionOf(runtimeWith(CONNECT_CONN).config);
         const result = resolveConnectEnvAndClusterId(
           conn,
           "env-from-arg",
@@ -48,7 +49,7 @@ describe("connect-tool-handler.ts", () => {
       });
 
       it("should fall back to config values when args are absent", () => {
-        const conn = runtimeWith(CONNECT_CONN).config.getSoleDirectConnection();
+        const conn = directConnectionOf(runtimeWith(CONNECT_CONN).config);
         const result = resolveConnectEnvAndClusterId(
           conn,
           undefined,
@@ -59,24 +60,28 @@ describe("connect-tool-handler.ts", () => {
       });
 
       it("should throw when environment_id is absent from both arg and config", () => {
-        const conn = runtimeWith({
-          kafka: {
-            cluster_id: "lkc-from-config",
-            rest_endpoint: "https://pkc-example.confluent.cloud:443",
-          },
-        }).config.getSoleDirectConnection();
+        const conn = directConnectionOf(
+          runtimeWith({
+            kafka: {
+              cluster_id: "lkc-from-config",
+              rest_endpoint: "https://pkc-example.confluent.cloud:443",
+            },
+          }).config,
+        );
         expect(() =>
           resolveConnectEnvAndClusterId(conn, undefined, "lkc-from-arg"),
         ).toThrow("Environment ID is required");
       });
 
       it("should throw when kafka_cluster_id is absent from both arg and config", () => {
-        const conn = runtimeWith({
-          kafka: {
-            env_id: "env-from-config",
-            rest_endpoint: "https://pkc-example.confluent.cloud:443",
-          },
-        }).config.getSoleDirectConnection();
+        const conn = directConnectionOf(
+          runtimeWith({
+            kafka: {
+              env_id: "env-from-config",
+              rest_endpoint: "https://pkc-example.confluent.cloud:443",
+            },
+          }).config,
+        );
         expect(() =>
           resolveConnectEnvAndClusterId(conn, "env-from-arg", undefined),
         ).toThrow("Kafka Cluster ID is required");

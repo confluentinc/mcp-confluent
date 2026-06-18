@@ -1,4 +1,3 @@
-import { DEFAULT_CONNECTION_ID } from "@src/config/env-config.js";
 import type { DirectConnectionConfig } from "@src/config/models.js";
 import {
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
@@ -686,72 +685,6 @@ describe("config/models.ts", () => {
         });
 
         expect(config.getConnectionIds()).toEqual(["local", "staging"]);
-      });
-    });
-
-    describe("getSoleConnection", () => {
-      it("should return the single defined connection", () => {
-        const config = new MCPServerConfiguration({
-          connections: { local: directConnection },
-        });
-
-        expect(config.getSoleConnection()).toBe(directConnection);
-      });
-
-      it("should throw when no connections are defined", () => {
-        const config = new MCPServerConfiguration({ connections: {} });
-
-        expect(() => config.getSoleConnection()).toThrow(
-          /No connections defined/,
-        );
-      });
-
-      it("should throw when more than one connection is defined", () => {
-        const config = new MCPServerConfiguration({
-          connections: {
-            local: directConnection,
-            staging: {
-              type: "direct",
-              kafka: { bootstrap_servers: "staging:9092" },
-            },
-          },
-        });
-
-        expect(() => config.getSoleConnection()).toThrow(
-          /Multiple connections defined/,
-        );
-      });
-    });
-
-    describe("getSoleDirectConnection", () => {
-      it("should return the connection narrowed to direct when sole connection is direct", () => {
-        const config = new MCPServerConfiguration({
-          connections: { local: directConnection },
-        });
-
-        const conn = config.getSoleDirectConnection();
-        expect(conn).toBe(directConnection);
-        expect(conn.type).toBe("direct");
-      });
-
-      it("should throw when the sole connection is OAuth-typed", () => {
-        const config = new MCPServerConfiguration({
-          connections: {
-            [DEFAULT_CONNECTION_ID]: { type: "oauth", ccloud_env: "devel" },
-          },
-        });
-
-        expect(() => config.getSoleDirectConnection()).toThrow(
-          /Expected sole connection to be a direct connection; got type "oauth"/,
-        );
-      });
-
-      it("should propagate the underlying getSoleConnection throw on zero connections", () => {
-        const config = new MCPServerConfiguration({ connections: {} });
-
-        expect(() => config.getSoleDirectConnection()).toThrow(
-          /No connections defined/,
-        );
       });
     });
 

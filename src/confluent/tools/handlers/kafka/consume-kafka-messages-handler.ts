@@ -1,6 +1,11 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import {
+  KEY_SCHEMA_ID_HEADER,
+  SchemaRegistryClient,
+  SerdeType,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import { CallToolResult } from "@src/confluent/schema.js";
@@ -249,6 +254,32 @@ export function formatMessageTimestamp(ts: string | undefined): string {
   const ms = Number(ts);
   if (!Number.isFinite(ms)) return ts;
   return new Date(ms).toISOString();
+}
+
+const SCHEMA_ID_HEADER_KEYS: ReadonlySet<string> = new Set([
+  VALUE_SCHEMA_ID_HEADER,
+  KEY_SCHEMA_ID_HEADER,
+]);
+
+/**
+ * Render a record header for the echoed consume response. The schema-id
+ * headers (__value_schema_id / __key_schema_id) carry the schema GUID as raw
+ * bytes; decode them to the canonical GUID string so callers see the same
+ * schema identifier the CCloud UI and VS Code extension surface. Every other
+ * header — and any schema-id header whose bytes don't decode to a GUID — is
+ * stringified as-is.
+ */
+function echoHeaderValue(
+  key: string,
+  value: Buffer | string | (Buffer | string)[] | undefined,
+): string {
+  if (SCHEMA_ID_HEADER_KEYS.has(key) && Buffer.isBuffer(value)) {
+    const guid = schemaRegistryHelper.decodeSchemaGuidHeader(value);
+    if (guid !== null) {
+      return guid;
+    }
+  }
+  return value?.toString() || "";
 }
 
 /**
@@ -955,8 +986,15 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<unknown> => {
+      // A null/undefined payload (Kafka tombstone, or an absent key/value)
+      // can't be decoded — short-circuit before any SR lookup so the
+      // deserializer is never handed a non-Buffer and no spurious error is
+      // logged on the inevitable failure.
+      if (buffer == null) {
+        return undefined;
+      }
       if (options.disableSchemaRegistry || !registry) {
-        return buffer?.toString();
+        return buffer.toString();
       }
       const subject =
         options.subject ||
@@ -966,22 +1004,23 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         subject,
       );
       if (!schema || !schema.schemaType) {
-        return buffer?.toString();
+        return buffer.toString();
       }
       try {
         return await schemaRegistryHelper.deserializeMessage(
           topic,
-          buffer as Buffer,
+          buffer,
           schema.schemaType,
           registry,
           serdeType,
+          message.headers,
         );
       } catch (err) {
         logger.error(
           { error: err, topic, schemaType: schema.schemaType, serdeType },
           `Error deserializing message ${serdeType} for topic ${topic}`,
         );
-        return buffer?.toString();
+        return buffer.toString();
       }
     };
 
@@ -1007,7 +1046,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         ? Object.fromEntries(
             Object.entries(message.headers).map(([key, value]) => [
               key,
-              value?.toString() || "",
+              echoHeaderValue(key, value),
             ]),
           )
         : undefined,

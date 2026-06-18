@@ -1,6 +1,6 @@
 import { AuthConfig } from "@src/mcp/transports/auth.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const AUTH_CONFIG: AuthConfig = {
   apiKey: "test-key",
@@ -8,11 +8,41 @@ const AUTH_CONFIG: AuthConfig = {
   allowedHosts: ["localhost"],
 };
 
+const openServers: HttpServer[] = [];
+
+/**
+ * Register an HttpServer so its real Fastify instance is closed in afterEach.
+ * Each test constructs a live Fastify; closing it in teardown keeps the suite
+ * free of leaked handles even on the rejection-path tests that never reach an
+ * in-test close.
+ */
+function track(httpServer: HttpServer): HttpServer {
+  openServers.push(httpServer);
+  return httpServer;
+}
+
+afterEach(async () => {
+  // Restore per-test spies first so a stubbed close()/listen() doesn't
+  // intercept the real close below; `restoreMocks: true` only restores ahead
+  // of the *next* test, which is too late for this teardown.
+  vi.restoreAllMocks();
+  await Promise.all(
+    openServers.splice(0).map((httpServer) =>
+      httpServer
+        .getInstance()
+        .close()
+        .catch(() => {
+          // teardown-only; a close failure shouldn't fail an asserted test
+        }),
+    ),
+  );
+});
+
 describe("server.ts", () => {
   describe("HttpServer", () => {
     describe("prepare()", () => {
       it("should build the swagger servers[0].url from the passed ServerConfig", async () => {
-        const httpServer = new HttpServer();
+        const httpServer = track(new HttpServer());
         await httpServer.prepare({ host: "test-host", port: 9999 });
 
         // @fastify/swagger augments the FastifyInstance with .swagger() but
@@ -26,12 +56,10 @@ describe("server.ts", () => {
         ).swagger();
 
         expect(spec.servers?.[0]?.url).toBe("http://test-host:9999");
-
-        await fastify.close();
       });
 
       it("should register an onRequest auth hook when an auth config was supplied", async () => {
-        const httpServer = new HttpServer({ auth: AUTH_CONFIG });
+        const httpServer = track(new HttpServer({ auth: AUTH_CONFIG }));
         const addHook = vi.spyOn(httpServer.getInstance(), "addHook");
 
         await httpServer.prepare({ host: "test-host", port: 9999 });
@@ -40,7 +68,7 @@ describe("server.ts", () => {
       });
 
       it("should not register an auth hook when no auth config was supplied", async () => {
-        const httpServer = new HttpServer();
+        const httpServer = track(new HttpServer());
         const addHook = vi.spyOn(httpServer.getInstance(), "addHook");
 
         await httpServer.prepare({ host: "test-host", port: 9999 });
@@ -52,7 +80,7 @@ describe("server.ts", () => {
       });
 
       it("should short-circuit a second prepare() without re-registering plugins", async () => {
-        const httpServer = new HttpServer();
+        const httpServer = track(new HttpServer());
         await httpServer.prepare({ host: "test-host", port: 9999 });
 
         const register = vi.spyOn(httpServer.getInstance(), "register");
@@ -64,7 +92,7 @@ describe("server.ts", () => {
 
     describe("start()", () => {
       it("should ready the instance then listen on the configured host and port", async () => {
-        const httpServer = new HttpServer();
+        const httpServer = track(new HttpServer());
         const fastify = httpServer.getInstance();
         const ready = vi.spyOn(fastify, "ready").mockResolvedValue(fastify);
         // fastify's `listen` is overloaded; vi.spyOn resolves to the void-returning
@@ -82,7 +110,7 @@ describe("server.ts", () => {
       });
 
       it("should rethrow when listen fails", async () => {
-        const httpServer = new HttpServer();
+        const httpServer = track(new HttpServer());
         const fastify = httpServer.getInstance();
         vi.spyOn(fastify, "ready").mockResolvedValue(fastify);
         vi.spyOn(fastify, "listen").mockRejectedValue(new Error("listen boom"));
@@ -95,7 +123,7 @@ describe("server.ts", () => {
 
     describe("stop()", () => {
       it("should close the fastify instance", async () => {
-        const httpServer = new HttpServer();
+        const httpServer = track(new HttpServer());
         const close = vi
           .spyOn(httpServer.getInstance(), "close")
           .mockResolvedValue(undefined);
@@ -106,7 +134,7 @@ describe("server.ts", () => {
       });
 
       it("should rethrow when close fails", async () => {
-        const httpServer = new HttpServer();
+        const httpServer = track(new HttpServer());
         vi.spyOn(httpServer.getInstance(), "close").mockRejectedValue(
           new Error("close boom"),
         );

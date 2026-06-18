@@ -500,8 +500,11 @@ describe(
 
             const idHeader = record.message.headers?.[VALUE_SCHEMA_ID_HEADER];
             expect(Buffer.isBuffer(idHeader)).toBe(true);
+            // A non-Buffer value would make the byte check below pass
+            // vacuously (undefined?.[0] !== 0), hiding a missing payload.
+            expect(Buffer.isBuffer(record.message.value)).toBe(true);
             // bare Avro payload — no leading magic byte 0
-            expect(record.message.value?.[0]).not.toBe(0);
+            expect((record.message.value as Buffer)[0]).not.toBe(0);
 
             // and the consume-messages tool decodes the header-located id back
             // into the structured value (proves the consume side reads the

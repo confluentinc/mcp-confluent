@@ -46,16 +46,16 @@ export function cpIntegrationRuntime(): ServerRuntime {
 }
 
 /**
- * The {@link ConnectionConfig} the spawned CP server would see, resolved by name
+ * The {@link ConnectionConfig} the spawned CP server would see, resolved by id
  * from the CP fixture. The CP-fixture peer of {@linkcode integrationConnection}
  * in runtime.ts: a single connection is the right-sized input for a
  * {@linkcode ConnectionPredicate} gate, with no ServerRuntime to build.
  *
- * Resolves by id via {@linkcode MCPServerConfiguration.getConnectionConfig} rather than
- * `getSoleConnection()` — the #532 epic is removing the sole-connection
- * accessors repo-wide (see #541's completion bar). On load failure (creds
- * absent) returns an empty `direct` connection so the gate skips cleanly; a
- * loaded fixture missing the `cp` connection is drift and throws loudly.
+ * Resolves by id via {@linkcode MCPServerConfiguration.getConnectionConfig}: a
+ * configured connection is addressed by its id, never by a count-dependent
+ * "sole" lookup. On load failure (creds absent) returns an empty `direct`
+ * connection so the gate skips cleanly; a loaded fixture missing the `cp`
+ * connection is drift and throws loudly.
  */
 export function cpIntegrationConnection(): ConnectionConfig {
   let config: MCPServerConfiguration;

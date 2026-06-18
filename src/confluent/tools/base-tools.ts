@@ -415,24 +415,6 @@ export abstract class BaseToolHandler implements ToolHandler {
   }
 
   /**
-   * Resolves the first connection enabled for this tool, returning the
-   * connection id, its config, and the matching client manager.
-   *
-   * Selects `enabledConnectionIds(runtime)[0]`. On a multi-connection config
-   * that arbitrarily picks the first enabled connection, which is why handlers
-   * route via {@linkcode resolveConnection} instead. Single-connection
-   * scaffolding with no remaining production callers; deletion tracked in #554.
-   */
-  protected resolveSoleConnection(runtime: ServerRuntime): ResolvedConnection {
-    const connId = this.enabledConnectionIds(runtime)[0]!;
-    return {
-      connId,
-      conn: runtime.config.connections[connId]!,
-      clientManager: runtime.clientManagers[connId]!,
-    };
-  }
-
-  /**
    * Resolves which connection a tool call targets: the explicit `connectionId`
    * argument when present, else the sole connection enabled for this tool.
    * Throws a listing error when the id is unknown/not-enabled, when it is

@@ -58,31 +58,8 @@ export class ServerRuntime {
   }
 
   /**
-   * Single-connection scaffolding: returns the sole client manager, throwing
-   * when zero or more than one connection is configured. Has no remaining
-   * callers; deletion tracked in #554.
-   */
-  get clientManager(): BaseClientManager {
-    const managers = Object.values(this.clientManagers);
-    if (managers.length === 0) {
-      throw new Error("ServerRuntime has no client managers");
-    }
-    if (managers.length > 1) {
-      // This getter is the single-connection scaffolding; a config with more
-      // than one connection has no "sole" manager. Callers route by id via
-      // clientManagers[id]. Deletion of this getter tracked in #554.
-      throw new Error(
-        "ServerRuntime has multiple client managers; use clientManagers[id] directly",
-      );
-    }
-    return managers[0]!;
-  }
-
-  /**
-   * Disconnect every per-connection client manager. The teardown counterpart
-   * to the per-connection construction in {@link fromConfig}; a multi-connection
-   * config tears all of its connections down, where the single-connection
-   * {@link clientManager} getter could only reach one.
+   * Disconnect every per-connection client manager — the teardown counterpart
+   * to the per-connection construction in {@link fromConfig}.
    */
   async disconnectAll(): Promise<void> {
     // allSettled, not all: a single manager's disconnect() rejection must not

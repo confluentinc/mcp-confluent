@@ -393,7 +393,7 @@ A few case kinds legitimately stay as direct `handler.handle(...)` calls rather 
 
 Such cases don't carry decoy coverage; the suite's other (harness-routed) cases provide it.
 
-A reverted handler (one that goes back to `resolveSoleConnection()`) trips the decoy's untouched assertion on every routed case, so the coverage is not vacuous.
+A handler that resolves by grabbing `enabledConnectionIds[0]` instead of the caller's `connectionId` trips the decoy's untouched assertion on every routed case, so the coverage is not vacuous.
 
 ## Test Server & Runtime Fixtures
 

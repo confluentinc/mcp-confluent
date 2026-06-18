@@ -13,7 +13,6 @@ import {
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   bareRuntime,
-  CCLOUD_CONN,
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   kafkaRuntime,
@@ -447,25 +446,6 @@ describe("base-tools.ts", () => {
 
           expect(parsed.success).toBe(true);
         });
-      });
-    });
-
-    describe("resolveSoleConnection()", () => {
-      const resolveSoleConnection = handler["resolveSoleConnection"].bind(
-        handler,
-      ) as (typeof handler)["resolveSoleConnection"];
-
-      it("should return the sole direct connection's id, config, and client manager", () => {
-        const runtime = runtimeWith(CCLOUD_CONN);
-        const { connId, conn, clientManager } = resolveSoleConnection(runtime);
-        expect(connId).toBe(DEFAULT_CONNECTION_ID);
-        expect(conn.type).toBe("direct");
-        expect(clientManager).toBeDefined();
-      });
-
-      it("should return the sole OAuth connection without narrowing", () => {
-        const { conn } = resolveSoleConnection(ccloudOAuthRuntime());
-        expect(conn.type).toBe("oauth");
       });
     });
 

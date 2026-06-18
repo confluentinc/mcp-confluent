@@ -1,5 +1,5 @@
 connections:
-  local:
+  default:
     type: direct
     kafka:
       bootstrap_servers: "localhost:9092"

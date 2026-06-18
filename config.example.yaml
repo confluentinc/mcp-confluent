@@ -66,7 +66,7 @@ server:
     # disabled: true
 
 connections:
-  # Connection name is freeform. A config may define several named connections
+  # Connection id is freeform. A config may define several connections
   # and route each tool call to one by id — and may mix api-key (`direct`)
   # connections with at most one browser-login (`oauth`) connection. See the
   # commented-out OAuth connection at the end of this file.

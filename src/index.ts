@@ -412,7 +412,7 @@ async function main() {
     const telemetry = TelemetryService.getInstance();
 
     logger.info(
-      `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
+      `${mcpConfig.getConnectionIds().length} connections loaded successfully`,
     );
 
     const runtime = ServerRuntime.fromConfig(mcpConfig, allowedToolNames);

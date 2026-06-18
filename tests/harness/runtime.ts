@@ -70,7 +70,7 @@ export function integrationRuntime(
 
 /**
  * The {@link ConnectionConfig} the spawned MCP server would see, looked up by
- * the fixture's connection name (see {@linkcode FIXTURE_CONNECTION_NAME}) in the
+ * the fixture's connection id (see {@linkcode FIXTURE_CONNECTION_ID}) in the
  * same fixture {@linkcode integrationRuntime} loads. Integration fixtures hold
  * exactly one connection, so this single connection is the right-sized input for
  * a {@linkcode ConnectionPredicate} gate: `handler.predicate(integrationConnection())`
@@ -83,7 +83,7 @@ export function integrationRuntime(
  * On load failure (a required `${VAR}` missing — creds absent) returns an empty
  * `direct` connection, so every block-based predicate yields a clean disabled
  * verdict and the gate skips. A fixture that loads but lacks the expected
- * connection name is fixture drift, not a creds-skip — {@linkcode MCPServerConfiguration.getConnectionConfig}
+ * connection id is fixture drift, not a creds-skip — {@linkcode MCPServerConfiguration.getConnectionConfig}
  * throws loudly rather than letting the whole suite silently skip.
  */
 export function integrationConnection(
@@ -93,16 +93,16 @@ export function integrationConnection(
   // Fixture failed to load (a required `${VAR}` missing — i.e. creds absent):
   // an empty direct connection yields a clean disabled verdict, so the gate skips.
   if (config === undefined) return { type: "direct" };
-  // Fixture loaded: resolve the expected connection by name. A miss here is
+  // Fixture loaded: resolve the expected connection by id. A miss here is
   // fixture drift (renamed/removed connection), not a credential-skip case, so
   // let getConnectionConfig throw loudly rather than silently skipping the whole suite.
   return config.getConnectionConfig(
-    FIXTURE_CONNECTION_NAME[options.oauth ? "oauth" : "direct"],
+    FIXTURE_CONNECTION_ID[options.oauth ? "oauth" : "direct"],
   );
 }
 
 /**
- * The fixture connection's name — its key in the `connections` map, which is
+ * The fixture connection's id — its key in the `connections` map, which is
  * also the value a test passes as the `connectionId` argument to a
  * connection-addressed tool (e.g. `describe-configured-connection`); the map key
  * and the routing id are one and the same. A constant rather than a
@@ -110,10 +110,10 @@ export function integrationConnection(
  * multi-connection fixtures #543 introduces, and so a fixture rename surfaces
  * here rather than as a mysterious "unknown connection id" at call time.
  */
-export function integrationConnectionName(
+export function integrationConnectionId(
   options: { oauth?: boolean } = {},
 ): string {
-  return FIXTURE_CONNECTION_NAME[options.oauth ? "oauth" : "direct"];
+  return FIXTURE_CONNECTION_ID[options.oauth ? "oauth" : "direct"];
 }
 
 /**
@@ -214,12 +214,12 @@ const OAUTH_FIXTURE_PATH = resolve(
 );
 
 /**
- * The connection name each integration fixture gives its single connection.
+ * The connection id each integration fixture gives its single connection.
  * {@linkcode integrationConnection} looks the connection up by this key rather
  * than via `getSoleConnection()`, which the #532 epic is removing repo-wide
  * (it encodes the single-connection assumption and throws once two exist).
  */
-const FIXTURE_CONNECTION_NAME: Record<"direct" | "oauth", string> = {
+const FIXTURE_CONNECTION_ID: Record<"direct" | "oauth", string> = {
   direct: "integration",
   oauth: "integration-oauth",
 };

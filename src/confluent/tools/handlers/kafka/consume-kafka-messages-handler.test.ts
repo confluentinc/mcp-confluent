@@ -5,6 +5,7 @@ import type {
 } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import {
   KEY_SCHEMA_ID_HEADER,
+  SchemaId,
   SchemaRegistryClient,
   SerdeType,
   VALUE_SCHEMA_ID_HEADER,
@@ -1679,22 +1680,34 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
       });
 
-      describe("schema-id header echo (per-side, keyed on actual decode)", () => {
-        // A side's schema-id header is dropped only when that side was actually
-        // decoded: it's wire metadata the deserializer consumed, redundant once
-        // the payload is structured. A side that bypasses decoding
-        // (disableSchemaRegistry / no registry) OR attempts decode but falls
-        // back to raw (no schema for the subject / deserialization throws)
-        // keeps its header so a caller inspecting the raw record can verify the
-        // schema-id-in-header encoding even in the missing-schema/failure cases.
+      describe("schema-id header echo (always kept, decoded to GUID)", () => {
+        // Per Stefan's #607 review: the __value_schema_id / __key_schema_id
+        // headers identify the key/value schema by GUID, mirroring the CCloud
+        // UI and the VS Code extension. Keep them on every echoed record and
+        // surface the decoded GUID rather than the raw bytes — independent of
+        // whether that side's payload decoded, bypassed decoding, or fell back
+        // to raw.
         const fakeRegistry = {} as SchemaRegistryClient;
+        const VALUE_GUID = "89e3a8f1-1111-2222-3333-444455556666";
+        const KEY_GUID = "0f9d2c77-aaaa-bbbb-cccc-ddddeeeeffff";
         const headers = {
-          [VALUE_SCHEMA_ID_HEADER]: Buffer.from([1, 2, 3]),
-          [KEY_SCHEMA_ID_HEADER]: Buffer.from([4, 5, 6]),
+          [VALUE_SCHEMA_ID_HEADER]: new SchemaId(
+            "AVRO",
+            undefined,
+            VALUE_GUID,
+          ).guidToBytes(),
+          [KEY_SCHEMA_ID_HEADER]: new SchemaId(
+            "AVRO",
+            undefined,
+            KEY_GUID,
+          ).guidToBytes(),
           "x-trace": Buffer.from("abc"),
         };
-        const valueIdString = Buffer.from([1, 2, 3]).toString();
-        const keyIdString = Buffer.from([4, 5, 6]).toString();
+        const decodedHeaders = {
+          [VALUE_SCHEMA_ID_HEADER]: VALUE_GUID,
+          [KEY_SCHEMA_ID_HEADER]: KEY_GUID,
+          "x-trace": "abc",
+        };
 
         // Per-side decode result a case wants the spies to simulate. Only
         // consulted for a side that actually attempts decode (registry present
@@ -1703,85 +1716,53 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         it.each([
           {
-            name: "drops both when both sides decode successfully (default, registry present)",
+            name: "both sides decode successfully",
             registry: () => fakeRegistry,
             valueFormat: { disableSchemaRegistry: false },
             keyFormat: { disableSchemaRegistry: false },
             valueOutcome: "decode" as DecodeOutcome,
             keyOutcome: "decode" as DecodeOutcome,
-            expected: { "x-trace": "abc" },
           },
           {
-            name: "keeps __value_schema_id but drops __key_schema_id when only the value side bypasses decoding",
+            name: "the value side bypasses decoding",
             registry: () => fakeRegistry,
             valueFormat: { disableSchemaRegistry: true },
             keyFormat: { disableSchemaRegistry: false },
             valueOutcome: "decode" as DecodeOutcome,
             keyOutcome: "decode" as DecodeOutcome,
-            expected: {
-              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
-              "x-trace": "abc",
-            },
           },
           {
-            name: "keeps both when both sides bypass decoding",
-            registry: () => fakeRegistry,
-            valueFormat: { disableSchemaRegistry: true },
-            keyFormat: { disableSchemaRegistry: true },
-            valueOutcome: "decode" as DecodeOutcome,
-            keyOutcome: "decode" as DecodeOutcome,
-            expected: {
-              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
-              [KEY_SCHEMA_ID_HEADER]: keyIdString,
-              "x-trace": "abc",
-            },
-          },
-          {
-            name: "keeps both when the connection has no registry at all (nothing was decoded)",
+            name: "the connection has no registry at all",
             registry: () => undefined,
             valueFormat: { disableSchemaRegistry: false },
             keyFormat: { disableSchemaRegistry: false },
             valueOutcome: "decode" as DecodeOutcome,
             keyOutcome: "decode" as DecodeOutcome,
-            expected: {
-              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
-              [KEY_SCHEMA_ID_HEADER]: keyIdString,
-              "x-trace": "abc",
-            },
           },
           {
-            name: "keeps __value_schema_id when the value side attempts decode but the subject has no schema (raw fallback)",
+            name: "the value side falls back to raw (no schema for the subject)",
             registry: () => fakeRegistry,
             valueFormat: { disableSchemaRegistry: false },
             keyFormat: { disableSchemaRegistry: false },
             valueOutcome: "no-schema" as DecodeOutcome,
             keyOutcome: "decode" as DecodeOutcome,
-            expected: {
-              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
-              "x-trace": "abc",
-            },
           },
           {
-            name: "keeps __value_schema_id when the value side attempts decode but deserialization throws (raw fallback)",
+            name: "the value side falls back to raw (deserialization throws)",
             registry: () => fakeRegistry,
             valueFormat: { disableSchemaRegistry: false },
             keyFormat: { disableSchemaRegistry: false },
             valueOutcome: "throw" as DecodeOutcome,
             keyOutcome: "decode" as DecodeOutcome,
-            expected: {
-              [VALUE_SCHEMA_ID_HEADER]: valueIdString,
-              "x-trace": "abc",
-            },
           },
         ])(
-          "should $name",
+          "should keep both schema-id headers as decoded GUIDs when $name",
           async ({
             registry,
             valueFormat,
             keyFormat,
             valueOutcome,
             keyOutcome,
-            expected,
           }) => {
             const outcomeFor = (serdeType: SerdeType): DecodeOutcome =>
               serdeType === SerdeType.KEY ? keyOutcome : valueOutcome;
@@ -1816,9 +1797,28 @@ describe("consume-kafka-messages-handler.ts", () => {
               valueFormat,
               keyFormat,
             );
-            expect(result.headers).toEqual(expected);
+            expect(result.headers).toEqual(decodedHeaders);
           },
         );
+
+        it("should fall back to the raw stringified value for a schema-id header that isn't a decodable GUID", async () => {
+          // Defensive: a __value_schema_id carrying non-GUID bytes (here a
+          // payload-format magic-byte-0 buffer) can't be decoded to a GUID, so
+          // the echo falls back to the same stringification every other header
+          // receives rather than emitting a bogus GUID.
+          const rawBytes = Buffer.from([0, 0, 0, 0, 7]);
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage({ headers: { [VALUE_SCHEMA_ID_HEADER]: rawBytes } }),
+            undefined,
+            { disableSchemaRegistry: true },
+            { disableSchemaRegistry: true },
+          );
+          expect(result.headers).toEqual({
+            [VALUE_SCHEMA_ID_HEADER]: rawBytes.toString(),
+          });
+        });
       });
 
       it("should pass message.timestamp through formatMessageTimestamp (integration with the '-1' sentinel)", async () => {

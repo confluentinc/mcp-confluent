@@ -652,7 +652,7 @@ describe("produce-kafka-message-handler.ts", () => {
 
     describe("getToolConfig() schemaIdLocation", () => {
       it.each([{ side: "value" as const }, { side: "key" as const }])(
-        "should expose a prefix/header schemaIdLocation defaulting to prefix on $side",
+        "should expose a payload/header schemaIdLocation defaulting to payload on $side",
         ({ side }) => {
           // `key` is declared optional, so its schema is a ZodOptional wrapper;
           // `value` is the bare object. Unwrap when needed to reach the shape.
@@ -661,10 +661,10 @@ describe("produce-kafka-message-handler.ts", () => {
             field instanceof z.ZodOptional ? field.unwrap() : field
           ) as z.ZodObject<{ schemaIdLocation: z.ZodType }>;
           const schemaIdLocation = sideSchema.shape.schemaIdLocation;
-          expect(schemaIdLocation.parse(undefined)).toBe("prefix");
+          expect(schemaIdLocation.parse(undefined)).toBe("payload");
           expect(schemaIdLocation.parse("header")).toBe("header");
           expect(schemaIdLocation.description).toContain("__value_schema_id");
-          // The two wire formats carry different identifiers: prefix embeds the
+          // The two wire formats carry different identifiers: payload embeds the
           // integer schema ID as magic bytes, header writes the schema GUID
           // (UUID). The docs must keep that distinction precise so a caller
           // inspecting raw records knows what to expect on each side.

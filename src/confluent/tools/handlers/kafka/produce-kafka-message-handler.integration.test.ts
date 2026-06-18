@@ -38,6 +38,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new ProduceKafkaMessageHandler();
 
+/**
+ * Canonical schema-GUID (UUID) shape the consume side decodes a header-located
+ * schema id into, asserted to appear in the rendered consume output.
+ */
+const GUID_PATTERN =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
 describe(
   "produce-kafka-message-handler",
   { tags: [Tag.KAFKA, Tag.REQUIRES_KAFKA_CONFIG] },
@@ -497,7 +504,10 @@ describe(
             expect(record.message.value?.[0]).not.toBe(0);
 
             // and the consume-messages tool decodes the header-located id back
-            // into the structured value (proves the consume side reads the header)
+            // into the structured value (proves the consume side reads the
+            // header). The __value_schema_id header survives decode, now
+            // rendered as its canonical schema GUID — so a caller sees which
+            // schema the record used, mirroring the CCloud UI.
             const consumeResult = await server.client.callTool({
               name: ToolName.CONSUME_MESSAGES,
               arguments: {
@@ -506,10 +516,14 @@ describe(
                 timeoutMs: 15_000,
               },
             });
-            expect(textContent(consumeResult)).toContain(marker);
+            const consumeText = textContent(consumeResult);
+            expect(consumeText).toContain(marker);
+            expect(consumeText).toContain(VALUE_SCHEMA_ID_HEADER);
+            expect(consumeText).toMatch(GUID_PATTERN);
 
             // bypassing deserialization surfaces the raw record, schema-id header
-            // included — the manual path for verifying the on-the-wire encoding
+            // included — the manual path for verifying the on-the-wire encoding.
+            // The header still decodes to the GUID, not raw bytes.
             const rawConsumeResult = await server.client.callTool({
               name: ToolName.CONSUME_MESSAGES,
               arguments: {
@@ -519,9 +533,9 @@ describe(
                 valueFormat: { disableSchemaRegistry: true },
               },
             });
-            expect(textContent(rawConsumeResult)).toContain(
-              VALUE_SCHEMA_ID_HEADER,
-            );
+            const rawConsumeText = textContent(rawConsumeResult);
+            expect(rawConsumeText).toContain(VALUE_SCHEMA_ID_HEADER);
+            expect(rawConsumeText).toMatch(GUID_PATTERN);
           });
         });
       },

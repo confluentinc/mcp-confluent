@@ -15,6 +15,7 @@ import {
   JsonSerializer,
   ProtobufDeserializer,
   ProtobufSerializer,
+  SchemaId,
   SchemaRegistryClient,
   SerdeType,
   Serializer,
@@ -23,12 +24,12 @@ import {
 import { logger } from "@src/logger.js";
 
 /**
- * Where the Schema Registry schema ID rides on the wire. "prefix" embeds it as
+ * Where the Schema Registry schema ID rides on the wire. "payload" embeds it as
  * magic bytes at the front of the serialized payload (the default Confluent
  * wire format); "header" writes the schema GUID to the __value_schema_id /
  * __key_schema_id Kafka record header and leaves the payload as bare bytes.
  */
-export type SchemaIdLocation = "prefix" | "header";
+export type SchemaIdLocation = "payload" | "header";
 
 /**
  * Supported schema types for Confluent Schema Registry.
@@ -226,7 +227,7 @@ export async function getLatestSchemaIfExists(
  * @param registry - The schema registry client instance (if used)
  * @param recordHeaders - Mutable record-header accumulator. Required for
  *   `schemaIdLocation: "header"`, where the serializer writes the schema-id
- *   header into it; ignored by the prefix format and the raw (non-registry) path.
+ *   header into it; ignored by the payload format and the raw (non-registry) path.
  * @returns The serialized message as a Buffer or string
  * @throws Error if serialization fails, schema registration fails, or message type is invalid
  */
@@ -348,5 +349,24 @@ export async function deserializeMessage(
     return await deserializer.deserialize(topic, message, headers);
   } catch (err) {
     throw new Error(`Failed to deserialize message: ${err}`);
+  }
+}
+
+/**
+ * Decode a header-located schema-id record-header value into its canonical
+ * schema GUID string. The header wire format (written by the serde library's
+ * HeaderSchemaIdSerializer) is MAGIC_BYTE_V1 followed by the 16-byte GUID; the
+ * schema type only governs the Protobuf message-index tail that the GUID read
+ * ignores, so a fixed type is safe here. Returns null when the bytes aren't a
+ * recognizable GUID header (e.g. a payload-format magic-byte-0 buffer, or
+ * garbage), letting the caller fall back to echoing the raw value.
+ */
+export function decodeSchemaGuidHeader(headerValue: Buffer): string | null {
+  try {
+    const schemaId = new SchemaId("AVRO");
+    schemaId.fromBytes(headerValue);
+    return schemaId.guid ?? null;
+  } catch {
+    return null;
   }
 }

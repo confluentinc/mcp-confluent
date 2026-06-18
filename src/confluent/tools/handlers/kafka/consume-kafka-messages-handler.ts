@@ -256,6 +256,32 @@ export function formatMessageTimestamp(ts: string | undefined): string {
   return new Date(ms).toISOString();
 }
 
+const SCHEMA_ID_HEADER_KEYS: ReadonlySet<string> = new Set([
+  VALUE_SCHEMA_ID_HEADER,
+  KEY_SCHEMA_ID_HEADER,
+]);
+
+/**
+ * Render a record header for the echoed consume response. The schema-id
+ * headers (__value_schema_id / __key_schema_id) carry the schema GUID as raw
+ * bytes; decode them to the canonical GUID string so callers see the same
+ * schema identifier the CCloud UI and VS Code extension surface. Every other
+ * header — and any schema-id header whose bytes don't decode to a GUID — is
+ * stringified as-is.
+ */
+function echoHeaderValue(
+  key: string,
+  value: Buffer | string | (Buffer | string)[] | undefined,
+): string {
+  if (SCHEMA_ID_HEADER_KEYS.has(key) && Buffer.isBuffer(value)) {
+    const guid = schemaRegistryHelper.decodeSchemaGuidHeader(value);
+    if (guid !== null) {
+      return guid;
+    }
+  }
+  return value?.toString() || "";
+}
+
 /**
  * Internal normalized form for the per-topic consume options. Each parsed
  * `topics` entry's `start` union collapses into one of these tagged
@@ -959,16 +985,16 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       buffer: Buffer | undefined,
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
-    ): Promise<{ value: unknown; decoded: boolean }> => {
+    ): Promise<unknown> => {
       // A null/undefined payload (Kafka tombstone, or an absent key/value)
       // can't be decoded — short-circuit before any SR lookup so the
       // deserializer is never handed a non-Buffer and no spurious error is
       // logged on the inevitable failure.
       if (buffer == null) {
-        return { value: undefined, decoded: false };
+        return undefined;
       }
       if (options.disableSchemaRegistry || !registry) {
-        return { value: buffer?.toString(), decoded: false };
+        return buffer.toString();
       }
       const subject =
         options.subject ||
@@ -978,53 +1004,38 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         subject,
       );
       if (!schema || !schema.schemaType) {
-        return { value: buffer?.toString(), decoded: false };
+        return buffer.toString();
       }
       try {
-        const value = await schemaRegistryHelper.deserializeMessage(
+        return await schemaRegistryHelper.deserializeMessage(
           topic,
-          buffer as Buffer,
+          buffer,
           schema.schemaType,
           registry,
           serdeType,
           message.headers,
         );
-        return { value, decoded: true };
       } catch (err) {
         logger.error(
           { error: err, topic, schemaType: schema.schemaType, serdeType },
           `Error deserializing message ${serdeType} for topic ${topic}`,
         );
-        return { value: buffer?.toString(), decoded: false };
+        return buffer.toString();
       }
     };
 
-    const valueResult = await deserializeWithOptions(
+    processedValue = await deserializeWithOptions(
       message.value as Buffer,
       valueOptions,
       SerdeType.VALUE,
     );
-    processedValue = valueResult.value;
-    let keyDecoded = false;
     if (message.key) {
-      const keyResult = await deserializeWithOptions(
+      processedKey = await deserializeWithOptions(
         message.key as Buffer,
         keyOptions,
         SerdeType.KEY,
       );
-      processedKey = keyResult.value;
-      keyDecoded = keyResult.decoded;
     }
-
-    // Drop a side's schema-id header only when that side was actually decoded:
-    // it's wire metadata the deserializer consumed, redundant once the payload
-    // is structured. A side that bypassed decoding (disableSchemaRegistry, no
-    // registry on the connection) or attempted decode but fell back to raw (no
-    // schema for the subject, deserialization threw) keeps its header so a caller
-    // inspecting the raw record can verify the schema-id-in-header encoding.
-    const droppedSchemaIdHeaders = new Set<string>();
-    if (valueResult.decoded) droppedSchemaIdHeaders.add(VALUE_SCHEMA_ID_HEADER);
-    if (keyDecoded) droppedSchemaIdHeaders.add(KEY_SCHEMA_ID_HEADER);
 
     return {
       key: processedKey,
@@ -1033,9 +1044,10 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       offset: message.offset,
       headers: message.headers
         ? Object.fromEntries(
-            Object.entries(message.headers)
-              .filter(([key]) => !droppedSchemaIdHeaders.has(key))
-              .map(([key, value]) => [key, value?.toString() || ""]),
+            Object.entries(message.headers).map(([key, value]) => [
+              key,
+              echoHeaderValue(key, value),
+            ]),
           )
         : undefined,
       topic,

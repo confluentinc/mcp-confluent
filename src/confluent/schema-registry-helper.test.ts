@@ -1,11 +1,13 @@
 import { IHeaders } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import {
   KEY_SCHEMA_ID_HEADER,
+  SchemaId,
   SerdeType,
   VALUE_SCHEMA_ID_HEADER,
 } from "@confluentinc/schemaregistry";
 import {
   checkSchemaNeeded,
+  decodeSchemaGuidHeader,
   deserializeMessage,
   serializeMessage,
 } from "@src/confluent/schema-registry-helper.js";
@@ -210,7 +212,7 @@ describe("schema-registry-helper.ts", () => {
       });
     });
 
-    describe("schemaIdLocation (header vs prefix wire format)", () => {
+    describe("schemaIdLocation (header vs payload wire format)", () => {
       // The header serializer encodes the schema GUID (MAGIC_BYTE_V1 + 16-byte
       // UUID), not the int id, so the registry stub must surface a guid for the
       // serialize step and resolve it back by guid for the deserialize step.
@@ -284,7 +286,7 @@ describe("schema-registry-helper.ts", () => {
         expect(recordHeaders[VALUE_SCHEMA_ID_HEADER]).toBeUndefined();
       });
 
-      it("should leave the headers accumulator untouched and prefix the payload in prefix mode (default)", async () => {
+      it("should leave the headers accumulator untouched and prepend the magic-byte prefix in payload mode (default)", async () => {
         stubRegistryForGuid('"string"');
         const recordHeaders: IHeaders = {};
 
@@ -294,7 +296,7 @@ describe("schema-registry-helper.ts", () => {
             message: "hello",
             useSchemaRegistry: true,
             schemaType: "AVRO",
-            schemaIdLocation: "prefix",
+            schemaIdLocation: "payload",
           },
           SerdeType.VALUE,
           registry,
@@ -351,6 +353,32 @@ describe("schema-registry-helper.ts", () => {
           ),
         ).rejects.toThrow(/orders-value.*guid/i);
       });
+    });
+  });
+
+  describe("decodeSchemaGuidHeader()", () => {
+    it("should decode a MAGIC_BYTE_V1 GUID header back to its canonical UUID string", () => {
+      const headerBytes = new SchemaId(
+        "AVRO",
+        undefined,
+        TEST_GUID,
+      ).guidToBytes();
+
+      expect(decodeSchemaGuidHeader(headerBytes)).toBe(TEST_GUID);
+    });
+
+    it("should return null for a payload-format value (magic byte 0, not a GUID header)", () => {
+      // The payload wire format never rides in a header; a magic-byte-0 buffer
+      // is a payload prefix, not a GUID, and must not be mistaken for one.
+      const payloadPrefix = Buffer.from([0, 0, 0, 0, 1]);
+
+      expect(decodeSchemaGuidHeader(payloadPrefix)).toBeNull();
+    });
+
+    it("should return null for bytes that aren't a recognizable schema-id header", () => {
+      const garbage = Buffer.from([0xff, 0xfe, 0xfd]);
+
+      expect(decodeSchemaGuidHeader(garbage)).toBeNull();
     });
   });
 });

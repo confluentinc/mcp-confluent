@@ -5,8 +5,8 @@ import {
   createAuthHook,
   generateApiKey,
 } from "@src/mcp/transports/auth.js";
-import { FastifyReply, FastifyRequest } from "fastify";
-import { Mock, describe, expect, it, vi } from "vitest";
+import type { FastifyReply, FastifyRequest } from "fastify";
+import { describe, expect, it, vi, type Mock } from "vitest";
 
 /**
  * Minimal stand-in for the slice of {@link FastifyReply} the auth hook touches:

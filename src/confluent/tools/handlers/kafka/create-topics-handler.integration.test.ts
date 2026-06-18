@@ -84,6 +84,32 @@ describe(
             })
             .toContain(topic);
         });
+
+        // CCloud clusters only ever permit a replication factor of 3 — the broker
+        // rejects any other value at creation. So this proves the explicit
+        // replicationFactor argument round-trips to the broker and is accepted; it
+        // can't prove a *non-default* value takes effect, because the cluster permits
+        // no other value. The unit test pins the forwarding for arbitrary values.
+        it("should accept an explicit replicationFactor of 3", async () => {
+          const topic = uniqueName(`create-rf-${transport}`);
+          createdTopics.push(topic);
+
+          const result = await server.client.callTool({
+            name: ToolName.CREATE_TOPICS,
+            arguments: {
+              topics: [{ topic, numPartitions: 1, replicationFactor: 3 }],
+            },
+          });
+
+          expect(result.isError, textContent(result)).not.toBe(true);
+
+          await expect
+            .poll(() => admin().listTopics(), {
+              timeout: 15_000,
+              interval: 500,
+            })
+            .toContain(topic);
+        });
       });
     });
 

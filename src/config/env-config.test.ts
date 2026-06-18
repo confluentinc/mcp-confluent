@@ -30,7 +30,6 @@ function envWith(overrides: Partial<EnvInput> = {}): EnvInput {
     FLINK_ENV_ID: undefined,
     FLINK_ORG_ID: undefined,
     FLINK_COMPUTE_POOL_ID: undefined,
-    FLINK_ENV_NAME: undefined,
     FLINK_CATALOG_NAME: undefined,
     FLINK_DATABASE_NAME: undefined,
     TELEMETRY_ENDPOINT: undefined,
@@ -407,31 +406,6 @@ describe("config/env-config.ts", () => {
         const conn = config.getSoleDirectConnection();
         expect(conn.flink?.catalog_name).toBe("my-environment");
         expect(conn.flink?.database_name).toBe("my-cluster");
-      });
-
-      it("should accept the deprecated FLINK_ENV_NAME and map it to catalog_name", () => {
-        const config = buildConfigFromEnvAndCli(
-          envWith({
-            ...allRequiredFlinkEnvVars,
-            FLINK_ENV_NAME: "legacy-name",
-          }),
-        );
-        const conn = config.getSoleDirectConnection();
-        expect(conn.flink?.catalog_name).toBe("legacy-name");
-      });
-
-      it("should throw when both FLINK_CATALOG_NAME and FLINK_ENV_NAME are set", () => {
-        expect(() =>
-          buildConfigFromEnvAndCli(
-            envWith({
-              ...allRequiredFlinkEnvVars,
-              FLINK_CATALOG_NAME: "preferred",
-              FLINK_ENV_NAME: "legacy",
-            }),
-          ),
-        ).toThrow(
-          /Both FLINK_CATALOG_NAME and the deprecated FLINK_ENV_NAME are set; remove FLINK_ENV_NAME\./,
-        );
       });
 
       it("should be valid as a standalone block (no kafka, sr, confluent_cloud, or tableflow)", () => {

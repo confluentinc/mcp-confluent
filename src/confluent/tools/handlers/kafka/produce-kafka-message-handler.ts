@@ -136,9 +136,9 @@ function formatDeliveryReport(deliveryReport: RecordMetadata[]): {
 } {
   const message = deliveryReport
     .map((metadata) =>
-      metadata.errorCode !== 0
-        ? `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`
-        : `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`,
+      metadata.errorCode === 0
+        ? `Message produced successfully to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset}]`
+        : `Error producing message to [Topic: ${metadata.topicName}, Partition: ${metadata.partition}, Offset: ${metadata.offset} with ErrorCode: ${metadata.errorCode}]`,
     )
     .join("\n");
   const isError = deliveryReport.some((metadata) => metadata.errorCode !== 0);
@@ -265,8 +265,8 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
 
     const schemaIssue = await this.checkSchemasReady(
       topicName,
-      value as MessageOptions,
-      key as MessageOptions | undefined,
+      value,
+      key,
       registry,
     );
     if (schemaIssue) return schemaIssue;
@@ -281,7 +281,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
     try {
       valueToSend = await serializeMessage(
         topicName,
-        value as MessageOptions,
+        value,
         SerdeType.VALUE,
         registry,
         recordHeaders,
@@ -289,7 +289,7 @@ export class ProduceKafkaMessageHandler extends BaseToolHandler {
       if (key) {
         keyToSend = await serializeMessage(
           topicName,
-          key as MessageOptions,
+          key,
           SerdeType.KEY,
           registry,
           recordHeaders,

@@ -1,3 +1,7 @@
+import {
+  KEY_SCHEMA_ID_HEADER,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
 import { CREATE_UPDATE } from "@src/confluent/tools/base-tools.js";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -67,6 +71,39 @@ describe("produce-kafka-message-handler.ts", () => {
           },
           clientManager,
         });
+      });
+
+      it("should omit the headers field from the sent message when no headers are supplied", async () => {
+        // The common case: a caller produces without headers. The accumulator
+        // is seeded by spreading the optional `headers` (undefined here, which
+        // object-spreads to {}), and an empty accumulator is sent as `undefined`
+        // so no headers field rides on the record. Regression guard: pins that
+        // the no-headers path neither throws nor emits an empty headers map.
+        const clientManager = getMockedClientManager();
+        const producer = await clientManager.getProducer();
+        producer.send.mockResolvedValue([
+          { topicName: "smoke", partition: 0, offset: "5", errorCode: 0 },
+        ]);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: { message: "hello", useSchemaRegistry: false },
+          },
+          outcome: {
+            resolves: "Message produced successfully to [Topic: smoke",
+          },
+          clientManager,
+        });
+
+        const message = producer.send.mock.calls[0]![0].messages[0]!;
+        expect(message).not.toHaveProperty("headers");
       });
 
       it("should return an isError response when producer.send throws", async () => {
@@ -429,6 +466,212 @@ describe("produce-kafka-message-handler.ts", () => {
           });
         });
       });
+
+      describe("schema-id-in-headers (schemaIdLocation: header)", () => {
+        // Header mode encodes the schema GUID, so the registry stub must surface
+        // a guid for both the value and key subject lookups.
+        function stubGuidRegistry(
+          clientManager: ReturnType<typeof getMockedClientManager>,
+        ): void {
+          const registry = clientManager.getSchemaRegistryClient();
+          registry.getAssociationsByResourceName.mockResolvedValue([]);
+          registry.getLatestSchemaMetadata.mockResolvedValue({
+            id: 1,
+            guid: "89e3a8f1-1111-2222-3333-444455556666",
+            version: 1,
+            subject: "smoke-value",
+            schema: '"string"',
+            schemaType: "AVRO",
+          });
+        }
+
+        it("should write __value_schema_id to the record headers and send a prefix-free value buffer", async () => {
+          const clientManager = getMockedClientManager();
+          const producer = await clientManager.getProducer();
+          producer.send.mockResolvedValue([
+            { topicName: "smoke", partition: 0, offset: "5", errorCode: 0 },
+          ]);
+          stubGuidRegistry(clientManager);
+
+          await assertHandleCase({
+            handler,
+            runtime: runtimeWithDecoy(
+              { kafka: { bootstrap_servers: "broker:9092" } },
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args: {
+              topicName: "smoke",
+              value: {
+                message: "hello",
+                useSchemaRegistry: true,
+                schemaType: "AVRO",
+                schemaIdLocation: "header",
+              },
+            },
+            outcome: {
+              resolves: "Message produced successfully to [Topic: smoke",
+            },
+            clientManager,
+          });
+
+          const sent = producer.send.mock.calls[0]![0];
+          const message = sent.messages[0]!;
+          expect(
+            Buffer.isBuffer(message.headers?.[VALUE_SCHEMA_ID_HEADER]),
+          ).toBe(true);
+          // Bare Avro string — no leading magic byte 0 + 4-byte id prefix.
+          expect((message.value as Buffer)[0]).not.toBe(0);
+        });
+
+        it("should write both __value_schema_id and __key_schema_id when key and value both use header mode", async () => {
+          const clientManager = getMockedClientManager();
+          const producer = await clientManager.getProducer();
+          producer.send.mockResolvedValue([
+            { topicName: "smoke", partition: 0, offset: "5", errorCode: 0 },
+          ]);
+          stubGuidRegistry(clientManager);
+
+          await assertHandleCase({
+            handler,
+            runtime: runtimeWithDecoy(
+              { kafka: { bootstrap_servers: "broker:9092" } },
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args: {
+              topicName: "smoke",
+              value: {
+                message: "v",
+                useSchemaRegistry: true,
+                schemaType: "AVRO",
+                schemaIdLocation: "header",
+              },
+              key: {
+                message: "k",
+                useSchemaRegistry: true,
+                schemaType: "AVRO",
+                schemaIdLocation: "header",
+              },
+            },
+            outcome: {
+              resolves: "Message produced successfully to [Topic: smoke",
+            },
+            clientManager,
+          });
+
+          const message = producer.send.mock.calls[0]![0].messages[0]!;
+          expect(
+            Buffer.isBuffer(message.headers?.[VALUE_SCHEMA_ID_HEADER]),
+          ).toBe(true);
+          expect(Buffer.isBuffer(message.headers?.[KEY_SCHEMA_ID_HEADER])).toBe(
+            true,
+          );
+        });
+
+        it("should preserve user-supplied headers alongside the injected schema-id header", async () => {
+          const clientManager = getMockedClientManager();
+          const producer = await clientManager.getProducer();
+          producer.send.mockResolvedValue([
+            { topicName: "smoke", partition: 0, offset: "5", errorCode: 0 },
+          ]);
+          stubGuidRegistry(clientManager);
+
+          await assertHandleCase({
+            handler,
+            runtime: runtimeWithDecoy(
+              { kafka: { bootstrap_servers: "broker:9092" } },
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args: {
+              topicName: "smoke",
+              value: {
+                message: "hello",
+                useSchemaRegistry: true,
+                schemaType: "AVRO",
+                schemaIdLocation: "header",
+              },
+              headers: { source: "clusterA" },
+            },
+            outcome: {
+              resolves: "Message produced successfully to [Topic: smoke",
+            },
+            clientManager,
+          });
+
+          const message = producer.send.mock.calls[0]![0].messages[0]!;
+          expect(message.headers?.source).toBe("clusterA");
+          expect(
+            Buffer.isBuffer(message.headers?.[VALUE_SCHEMA_ID_HEADER]),
+          ).toBe(true);
+        });
+
+        it("should let the serializer's schema-id header win over a user header of the same name", async () => {
+          // The real schema id is authoritative; a caller can't forge it by
+          // pre-seeding __value_schema_id with a bogus string.
+          const clientManager = getMockedClientManager();
+          const producer = await clientManager.getProducer();
+          producer.send.mockResolvedValue([
+            { topicName: "smoke", partition: 0, offset: "5", errorCode: 0 },
+          ]);
+          stubGuidRegistry(clientManager);
+
+          await assertHandleCase({
+            handler,
+            runtime: runtimeWithDecoy(
+              { kafka: { bootstrap_servers: "broker:9092" } },
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args: {
+              topicName: "smoke",
+              value: {
+                message: "hello",
+                useSchemaRegistry: true,
+                schemaType: "AVRO",
+                schemaIdLocation: "header",
+              },
+              headers: { [VALUE_SCHEMA_ID_HEADER]: "user-junk" },
+            },
+            outcome: {
+              resolves: "Message produced successfully to [Topic: smoke",
+            },
+            clientManager,
+          });
+
+          const idHeader =
+            producer.send.mock.calls[0]![0].messages[0]!.headers?.[
+              VALUE_SCHEMA_ID_HEADER
+            ];
+          expect(Buffer.isBuffer(idHeader)).toBe(true);
+          expect(idHeader).not.toBe("user-junk");
+        });
+      });
+    });
+
+    describe("getToolConfig() schemaIdLocation", () => {
+      it.each([{ side: "value" as const }, { side: "key" as const }])(
+        "should expose a payload/header schemaIdLocation defaulting to payload on $side",
+        ({ side }) => {
+          // `key` is declared optional, so its schema is a ZodOptional wrapper;
+          // `value` is the bare object. Unwrap when needed to reach the shape.
+          const field = handler.getToolConfig().inputSchema[side];
+          const sideSchema = (
+            field instanceof z.ZodOptional ? field.unwrap() : field
+          ) as z.ZodObject<{ schemaIdLocation: z.ZodType }>;
+          const schemaIdLocation = sideSchema.shape.schemaIdLocation;
+          expect(schemaIdLocation.parse(undefined)).toBe("payload");
+          expect(schemaIdLocation.parse("header")).toBe("header");
+          expect(schemaIdLocation.description).toContain("__value_schema_id");
+          // The two wire formats carry different identifiers: payload embeds the
+          // integer schema ID as magic bytes, header writes the schema GUID
+          // (UUID). The docs must keep that distinction precise so a caller
+          // inspecting raw records knows what to expect on each side.
+          expect(schemaIdLocation.description).toMatch(/GUID/);
+          expect(schemaIdLocation.description).toMatch(/integer schema ID/i);
+        },
+      );
     });
   });
 });

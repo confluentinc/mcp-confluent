@@ -74,7 +74,7 @@ export class DescribeConfiguredConnectionHandler extends ToolMetadataHandler {
     if (conn === undefined) {
       return this.createResponse(
         `Unknown connection id "${connectionId}". Configured connections: ${
-          quoteJoinIds(runtime.config.getConnectionNames()) || "none"
+          quoteJoinIds(runtime.config.getConnectionIds()) || "none"
         }.`,
         true,
       );

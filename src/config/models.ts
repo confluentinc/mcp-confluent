@@ -212,18 +212,18 @@ export class MCPServerConfiguration {
    * @throws Error if 0 or more than 1 connection is defined.
    */
   getSoleConnection(): ConnectionConfig {
-    const connectionNames = Object.keys(this.connections);
-    if (connectionNames.length === 0) {
+    const connectionIds = Object.keys(this.connections);
+    if (connectionIds.length === 0) {
       throw new Error("No connections defined in configuration");
     }
-    if (connectionNames.length > 1) {
+    if (connectionIds.length > 1) {
       throw new Error(
         "Multiple connections defined in configuration; only one is supported currently",
       );
     }
 
     // must be exactly one connection at this point, so return it.
-    return this.connections[connectionNames[0]!]!;
+    return this.connections[connectionIds[0]!]!;
   }
 
   /**
@@ -255,14 +255,14 @@ export class MCPServerConfiguration {
     if (conn === undefined) {
       throw new Error(
         `Unknown connection id "${connectionId}"; defined connections: ${
-          quoteJoinIds(this.getConnectionNames()) || "none"
+          quoteJoinIds(this.getConnectionIds()) || "none"
         }`,
       );
     }
     return conn;
   }
 
-  getConnectionNames(): string[] {
+  getConnectionIds(): string[] {
     return Object.keys(this.connections).sort((a, b) => a.localeCompare(b));
   }
 }
@@ -680,7 +680,7 @@ export const DEFAULT_SERVER_CONFIG = serverConfigSchema.parse({});
 export const mcpConfigSchema = z
   .object({
     connections: z.record(
-      z.string().trim().min(1, "Connection name cannot be empty"),
+      z.string().trim().min(1, "Connection id cannot be empty"),
       connectionConfigSchema,
     ),
     server: serverConfigSchema.default(() => DEFAULT_SERVER_CONFIG),

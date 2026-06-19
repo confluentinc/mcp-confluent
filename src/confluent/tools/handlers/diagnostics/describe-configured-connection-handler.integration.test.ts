@@ -1,7 +1,7 @@
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
+  integrationConnectionId,
   integrationConnectionLoaded,
-  integrationConnectionName,
 } from "@tests/harness/runtime.js";
 import {
   startServer,
@@ -24,7 +24,7 @@ describe("describe-configured-connection", { tags: [Tag.SMOKE] }, () => {
     return;
   }
 
-  const connectionId = integrationConnectionName();
+  const connectionId = integrationConnectionId();
 
   describe.each(activeTransports)("via %s transport", (transport) => {
     let server: StartedServer;

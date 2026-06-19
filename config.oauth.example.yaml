@@ -32,7 +32,7 @@
 #     # disabled: true
 
 connections:
-  # Connection name is freeform. The `type: oauth` declaration is the only
+  # Connection id is freeform. The `type: oauth` declaration is the only
   # required field.
   ccloud-oauth:
     type: oauth

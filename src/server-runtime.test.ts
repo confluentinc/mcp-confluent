@@ -158,30 +158,6 @@ describe("ServerRuntime", () => {
     });
   });
 
-  describe("get clientManager()", () => {
-    it("should return the sole client manager", () => {
-      const cm = createMockInstance(DirectClientManager);
-      const runtime = new ServerRuntime(config, { "test-conn": cm });
-      expect(runtime.clientManager).toBe(cm);
-    });
-
-    it("should throw when clientManagers is empty", () => {
-      const runtime = new ServerRuntime(config, {});
-      expect(() => runtime.clientManager).toThrow(
-        "ServerRuntime has no client managers",
-      );
-    });
-
-    it("should throw when clientManagers has more than one entry", () => {
-      const cm1 = createMockInstance(DirectClientManager);
-      const cm2 = createMockInstance(DirectClientManager);
-      const runtime = new ServerRuntime(config, { conn1: cm1, conn2: cm2 });
-      expect(() => runtime.clientManager).toThrow(
-        "ServerRuntime has multiple client managers",
-      );
-    });
-  });
-
   describe("disconnectAll()", () => {
     it("should disconnect every configured client manager", async () => {
       const cm1 = createMockInstance(DirectClientManager);

@@ -1,5 +1,5 @@
 connections:
-  production:
+  default:
     type: direct
     telemetry:
       endpoint: "https://api.telemetry.confluent.cloud"

@@ -1,5 +1,5 @@
 connections:
-  production:
+  default:
     type: direct
     confluent_cloud:
       endpoint: "https://custom.confluent.cloud"

@@ -91,9 +91,9 @@ export function runtimeWith(
  * tools, with its own auto-minted client manager that correct routing must
  * never touch.
  *
- * The decoy is inserted FIRST, so a handler resolving via the legacy
- * sole-connection accessor (which grabs `enabledConnectionIds[0]`) routes to
- * the decoy and trips the test. {@link assertHandleCase} recognizes the decoy
+ * The decoy is inserted FIRST, so a handler that resolves by grabbing
+ * `enabledConnectionIds[0]` instead of routing by the caller's `connectionId`
+ * lands on the decoy and trips the test. {@link assertHandleCase} recognizes the decoy
  * (by {@link DECOY_CONNECTION_ID}) and, for any handle() test built on this
  * runtime, auto-routes to the real connection and asserts the decoy stayed
  * untouched — so swapping a suite's `runtimeWith` for this turns every existing

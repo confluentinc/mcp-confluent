@@ -1,5 +1,5 @@
 connections:
-  production:
+  default:
     type: direct
     tableflow:
       auth:

@@ -3,6 +3,7 @@ import {
   loadConfigFromYaml,
   parseYamlConfiguration,
 } from "@src/config/index.js";
+import { directConnectionOf } from "@tests/factories/config.js";
 import {
   createFsWrappers,
   type MockedFsWrappers,
@@ -13,25 +14,21 @@ describe("config/index.ts", () => {
   describe("parseYamlConfiguration", () => {
     it("should successfully parse minimal valid config (kafka only)", () => {
       const yamlContent = `connections:
-  local:
+  default:
     type: "direct"
     kafka:
       bootstrap_servers: "localhost:9092"
 `;
 
-      const conn = parseYamlConfiguration(
-        yamlContent,
-        {},
-      ).getSoleDirectConnection();
+      const conn = directConnectionOf(parseYamlConfiguration(yamlContent, {}));
 
-      expect(conn.type).toBe("direct");
       expect(conn.kafka!.bootstrap_servers).toBe("localhost:9092");
       expect(conn.schema_registry).toBeUndefined();
     });
 
     it("should successfully parse full valid config (kafka + schema_registry)", () => {
       const yamlContent = `connections:
-  local:
+  default:
     type: "direct"
     kafka:
       bootstrap_servers: "localhost:9092"
@@ -39,10 +36,7 @@ describe("config/index.ts", () => {
       endpoint: "http://localhost:8081"
 `;
 
-      const conn = parseYamlConfiguration(
-        yamlContent,
-        {},
-      ).getSoleDirectConnection();
+      const conn = directConnectionOf(parseYamlConfiguration(yamlContent, {}));
 
       expect(conn.schema_registry).toBeDefined();
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
@@ -50,16 +44,13 @@ describe("config/index.ts", () => {
 
     it("should accept multiple bootstrap servers", () => {
       const yamlContent = `connections:
-  cluster:
+  default:
     type: "direct"
     kafka:
       bootstrap_servers: "broker1:9092,broker2:9092,broker3:9092"
 `;
 
-      const conn = parseYamlConfiguration(
-        yamlContent,
-        {},
-      ).getSoleDirectConnection();
+      const conn = directConnectionOf(parseYamlConfiguration(yamlContent, {}));
 
       expect(conn.kafka!.bootstrap_servers).toBe(
         "broker1:9092,broker2:9092,broker3:9092",
@@ -126,12 +117,12 @@ describe("config/index.ts", () => {
 
     it("should accept a direct connection with no service blocks", () => {
       const yamlContent = `connections:
-  local:
+  default:
     type: "direct"
 `;
 
       const config = parseYamlConfiguration(yamlContent, {});
-      expect(config.getSoleDirectConnection()).toEqual({
+      expect(directConnectionOf(config)).toEqual({
         type: "direct",
         read_only: false,
       });
@@ -265,7 +256,7 @@ describe("config/index.ts", () => {
 
     it("should accept https schema_registry endpoint", () => {
       const yamlContent = `connections:
-  local:
+  default:
     type: "direct"
     kafka:
       bootstrap_servers: "localhost:9092"
@@ -275,14 +266,14 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      expect(config.getSoleDirectConnection().schema_registry?.endpoint).toBe(
+      expect(directConnectionOf(config).schema_registry?.endpoint).toBe(
         "https://schema-registry.example.com:8081",
       );
     });
 
     it("should successfully parse config with schema_registry only (no kafka)", () => {
       const yamlContent = `connections:
-  local:
+  default:
     type: "direct"
     schema_registry:
       endpoint: "http://localhost:8081"
@@ -290,20 +281,20 @@ describe("config/index.ts", () => {
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
       expect(conn.kafka).toBeUndefined();
     });
 
     it("should parse a minimal oauth connection and apply the prod default", () => {
       const yamlContent = `connections:
-  prod-oauth:
+  default:
     type: "oauth"
 `;
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      expect(config.getSoleConnection()).toEqual({
+      expect(config.getConnectionConfig("default")).toEqual({
         type: "oauth",
         ccloud_env: "prod",
         read_only: false,
@@ -312,14 +303,14 @@ describe("config/index.ts", () => {
 
     it("should parse an explicit oauth ccloud_env value", () => {
       const yamlContent = `connections:
-  stag-oauth:
+  default:
     type: "oauth"
     ccloud_env: "stag"
 `;
 
       const config = parseYamlConfiguration(yamlContent, {});
 
-      expect(config.getSoleConnection()).toEqual({
+      expect(config.getConnectionConfig("default")).toEqual({
         type: "oauth",
         ccloud_env: "stag",
         read_only: false,
@@ -340,7 +331,7 @@ describe("config/index.ts", () => {
 
     it("should interpolate ${VAR} references using provided env before Zod validation", () => {
       const yamlContent = `connections:
-  local:
+  default:
     type: "direct"
     kafka:
       bootstrap_servers: "\${BOOTSTRAP}"
@@ -353,7 +344,7 @@ describe("config/index.ts", () => {
         SR_URL: "http://localhost:8081",
       });
 
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.kafka!.bootstrap_servers).toBe("broker1:9092");
       expect(conn.schema_registry!.endpoint).toBe("http://localhost:8081");
     });
@@ -462,7 +453,7 @@ describe("config/index.ts", () => {
 
     it("should successfully load and parse a valid config file", () => {
       const yamlContent = `connections:
-  local:
+  default:
     type: "direct"
     kafka:
       bootstrap_servers: "localhost:9092"
@@ -472,14 +463,14 @@ describe("config/index.ts", () => {
 
       const config = loadConfigFromYaml("/path/to/config.yaml", {});
 
-      expect(config.getSoleDirectConnection().kafka!.bootstrap_servers).toBe(
+      expect(directConnectionOf(config).kafka!.bootstrap_servers).toBe(
         "localhost:9092",
       );
     });
 
     it("should pass env argument to parseYamlConfiguration for variable interpolation", () => {
       const yamlContent = `connections:
-  local:
+  default:
     type: "direct"
     kafka:
       bootstrap_servers: "\${BOOTSTRAP_SERVERS}"
@@ -491,7 +482,7 @@ describe("config/index.ts", () => {
         BOOTSTRAP_SERVERS: "broker1:9092",
       });
 
-      expect(config.getSoleDirectConnection().kafka!.bootstrap_servers).toBe(
+      expect(directConnectionOf(config).kafka!.bootstrap_servers).toBe(
         "broker1:9092",
       );
     });

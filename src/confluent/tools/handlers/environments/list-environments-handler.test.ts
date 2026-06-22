@@ -105,20 +105,6 @@ describe("list-environments-handler.ts", () => {
         },
         {
           label:
-            "render a Pagination block with no link lines when metadata is present but empty",
-          args: {},
-          get: {
-            data: {
-              api_version: "org/v2",
-              kind: "EnvironmentList",
-              metadata: {},
-              data: [ENV_FIXTURE],
-            },
-          },
-          outcome: { resolves: "Pagination:" },
-        },
-        {
-          label:
             "resolve with a validation-error response when the API returns an unexpected payload",
           args: {},
           get: { data: { not: "an EnvironmentList" } },
@@ -160,6 +146,61 @@ describe("list-environments-handler.ts", () => {
           args,
           outcome,
           clientManager,
+        });
+      });
+
+      it("should render a Pagination header but no link lines when metadata is present but empty", async () => {
+        const clientManager = getMockedClientManager();
+        configureGet(clientManager, {
+          data: {
+            api_version: "org/v2",
+            kind: "EnvironmentList",
+            metadata: {},
+            data: [ENV_FIXTURE],
+          },
+        });
+
+        const result = await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CCLOUD_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          outcome: { resolves: "Pagination:", isError: false },
+          clientManager,
+        });
+
+        // The outer `metadata ?` guard is true (header renders), but every
+        // inner link ternary takes its false arm — so no link line appears.
+        const text = textOf(result!);
+        expect(text).toContain("Pagination:");
+        expect(text).not.toContain("Total Environments:");
+        expect(text).not.toContain("First Page:");
+        expect(text).not.toContain("Last Page:");
+        expect(text).not.toContain("Previous Page:");
+        expect(text).not.toContain("Next Page:");
+
+        // _meta still carries a pagination object, with every link undefined.
+        expect(result!._meta).toEqual({
+          environments: [
+            {
+              id: "env-abc123",
+              name: "production",
+              created_at: "2024-01-01T00:00:00Z",
+              updated_at: "2024-01-02T00:00:00Z",
+              deleted_at: undefined,
+              resource_name: "crn://confluent.cloud/environment=env-abc123",
+              stream_governance: undefined,
+            },
+          ],
+          total: undefined,
+          pagination: {
+            first: undefined,
+            last: undefined,
+            prev: undefined,
+            next: undefined,
+          },
         });
       });
 
@@ -218,6 +259,9 @@ describe("list-environments-handler.ts", () => {
         expect(text).toContain("Deleted At: 2024-03-03T00:00:00Z");
         expect(text).toContain("Stream Governance Package: ADVANCED");
         expect(text).toContain("Total Environments: 7");
+        expect(text).toContain(`First Page: ${FULL_LIST_METADATA.first}`);
+        expect(text).toContain(`Last Page: ${FULL_LIST_METADATA.last}`);
+        expect(text).toContain(`Previous Page: ${FULL_LIST_METADATA.prev}`);
         expect(text).toContain(`Next Page: ${FULL_LIST_METADATA.next}`);
       });
     });

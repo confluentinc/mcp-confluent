@@ -7,7 +7,7 @@ import {
 } from "@tests/harness/kafka-admin.js";
 import {
   integrationConnection,
-  integrationRuntime,
+  integrationDirectConnection,
 } from "@tests/harness/runtime.js";
 import {
   TEST_AVRO_SCHEMA,
@@ -27,7 +27,6 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new AddTagToTopicHandler();
-const runtime = integrationRuntime();
 
 describe(
   "add-tags-to-topic-handler",
@@ -45,7 +44,7 @@ describe(
     }
     // test-side deps beyond the handler predicate (kafka admin + SR cluster id discovery); gating
     // here keeps a missing field as a skip rather than a beforeAll throw that fails the suite
-    const conn = runtime.config.getSoleDirectConnection();
+    const conn = integrationDirectConnection();
     if (!conn.confluent_cloud) {
       it.skip("requires confluent_cloud config for SR cluster id discovery", () => {});
       return;

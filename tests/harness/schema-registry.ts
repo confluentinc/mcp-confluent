@@ -1,7 +1,7 @@
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import type { paths } from "@src/confluent/openapi-schema.js";
 import { createRetryOn429Middleware } from "@tests/harness/retry-on-429.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationDirectConnection } from "@tests/harness/runtime.js";
 import createClient, {
   type Client,
   wrapAsPathBasedClient,
@@ -14,7 +14,7 @@ import { afterAll, beforeAll } from "vitest";
  * client and server can never disagree on which registry they're talking to.
  */
 export function newTestSrClient(): SchemaRegistryClient {
-  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const conn = integrationDirectConnection();
   if (!conn.schema_registry?.endpoint || !conn.schema_registry.auth) {
     throw new Error(
       "test-side schema registry client requires schema_registry.endpoint + schema_registry.auth in test-fixtures/yaml_configs/integration.yaml",
@@ -35,7 +35,7 @@ export function newTestSrClient(): SchemaRegistryClient {
  * {@link SchemaRegistryClient} doesn't expose (e.g. `/catalog/v1/...`).
  */
 export function newTestSrRestClient(): Client<paths> {
-  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const conn = integrationDirectConnection();
   if (!conn.schema_registry?.endpoint || !conn.schema_registry.auth) {
     throw new Error(
       "test-side schema registry rest client requires schema_registry.endpoint + schema_registry.auth in test-fixtures/yaml_configs/integration.yaml",

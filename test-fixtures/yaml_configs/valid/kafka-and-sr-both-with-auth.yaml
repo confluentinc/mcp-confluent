@@ -1,5 +1,5 @@
 connections:
-  production:
+  default:
     type: direct
     kafka:
       bootstrap_servers: "broker.confluent.cloud:9092"

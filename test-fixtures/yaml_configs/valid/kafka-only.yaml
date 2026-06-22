@@ -1,5 +1,5 @@
 connections:
-  local:
+  default:
     type: direct
     description: "Local dev broker"
     kafka:

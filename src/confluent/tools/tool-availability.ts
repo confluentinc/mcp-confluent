@@ -152,61 +152,33 @@ export function buildToolGatingReport(
   // Per-connection accumulator: connectionId -> (bucketKey -> tools). Both
   // axes' keys (ToolDisabledReason / ToolCategory values) are string enums at
   // runtime, so a single string-keyed inner Map drives both code paths.
-  const sectionBuckets = new Map<string, Map<string, ToolName[]>>(
+  const sectionBuckets: SectionBuckets = new Map(
     connectionIds.map((id) => [id, new Map<string, ToolName[]>()]),
   );
   let enabledCount = 0;
   let disabledCount = 0;
 
   for (const [toolName, handler] of handlers) {
-    if (handler.isConnectionIndependent) {
+    if (
+      classifyAndBucketHandler(
+        toolName,
+        handler,
+        runtime,
+        groupBy,
+        sectionBuckets,
+      )
+    ) {
       enabledCount += 1;
-      continue;
-    }
-    const verdicts = handler.connectionVerdicts(runtime);
-    if (verdicts.size === 0) {
-      // No connections configured: nothing to attribute a per-connection
-      // verdict to, so the tool is dark with no section.
+    } else {
       disabledCount += 1;
-      continue;
     }
-
-    let anyEnabled = false;
-    for (const [connectionId, verdict] of verdicts) {
-      if (verdict.enabled) {
-        anyEnabled = true;
-        continue;
-      }
-      const key = groupBy === "reason" ? verdict.reason : handler.category;
-      const buckets = sectionBuckets.get(connectionId)!;
-      let bucket = buckets.get(key);
-      bucket ??= [];
-      buckets.set(key, bucket);
-      bucket.push(toolName);
-    }
-
-    if (anyEnabled) enabledCount += 1;
-    else disabledCount += 1;
   }
 
   const totalRegistered = enabledCount + disabledCount;
-  const connections: ConnectionGatingSection[] = connectionIds
-    .map((connectionId): ConnectionGatingSection => {
-      const disabledGroups = bucketsToGroups(
-        sectionBuckets.get(connectionId)!,
-        groupBy,
-      );
-      const sectionDisabled = disabledGroups.reduce(
-        (sum, group) => sum + group.tools.length,
-        0,
-      );
-      return {
-        connectionId,
-        disabledGroups,
-        enabledCount: totalRegistered - sectionDisabled,
-        disabledCount: sectionDisabled,
-      };
-    })
+  const connections = connectionIds
+    .map((id) =>
+      buildSection(id, sectionBuckets.get(id)!, groupBy, totalRegistered),
+    )
     .sort((a, b) => a.connectionId.localeCompare(b.connectionId));
 
   return {
@@ -214,6 +186,81 @@ export function buildToolGatingReport(
     connections,
     enabledCount,
     disabledCount,
+  };
+}
+
+/**
+ * Per-connection bucket accumulator: connectionId → (bucketKey → tools), where
+ * the bucket key is a {@linkcode ToolDisabledReason} or {@linkcode ToolCategory}
+ * string value depending on the report's axis.
+ */
+type SectionBuckets = Map<string, Map<string, ToolName[]>>;
+
+/**
+ * Classify one handler for the report and, as a side effect, bucket its tool
+ * into the section of every connection that disables it. Returns `true` when
+ * the tool is advertised (connection-independent, or enabled on at least one
+ * connection) — i.e. when it counts toward `enabledCount` rather than
+ * `disabledCount`. A connection-dependent tool on a zero-connection config is
+ * dark with no section to attribute it to.
+ */
+function classifyAndBucketHandler(
+  toolName: ToolName,
+  handler: ToolHandler,
+  runtime: ServerRuntime,
+  groupBy: "reason" | "category",
+  sectionBuckets: SectionBuckets,
+): boolean {
+  if (handler.isConnectionIndependent) return true;
+  const verdicts = handler.connectionVerdicts(runtime);
+  if (verdicts.size === 0) return false;
+
+  let anyEnabled = false;
+  for (const [connectionId, verdict] of verdicts) {
+    if (verdict.enabled) {
+      anyEnabled = true;
+      continue;
+    }
+    const key = groupBy === "reason" ? verdict.reason : handler.category;
+    pushToBucket(sectionBuckets.get(connectionId)!, key, toolName);
+  }
+  return anyEnabled;
+}
+
+/** Append `toolName` to `buckets[key]`, creating the bucket array on first use. */
+function pushToBucket(
+  buckets: Map<string, ToolName[]>,
+  key: string,
+  toolName: ToolName,
+): void {
+  let bucket = buckets.get(key);
+  bucket ??= [];
+  buckets.set(key, bucket);
+  bucket.push(toolName);
+}
+
+/**
+ * Assemble one connection's {@linkcode ConnectionGatingSection} from its bucket
+ * accumulator. `enabledCount` is the complement of this connection's disabled
+ * tally against the whole registered set, so connection-independent tools count
+ * as enabled here.
+ */
+function buildSection(
+  connectionId: string,
+  buckets: Map<string, ToolName[]>,
+  groupBy: "reason" | "category",
+  totalRegistered: number,
+): ConnectionGatingSection {
+  const disabledGroups = bucketsToGroups(buckets, groupBy);
+  const sectionDisabled = disabledGroups.reduce(
+    (sum, group) => sum + group.tools.length,
+    0,
+  );
+  return {
+    connectionId,
+    disabledGroups,
+    enabledCount: totalRegistered - sectionDisabled,
+    disabledCount: sectionDisabled,
   };
 }
 

@@ -38,8 +38,8 @@ import { CheckHealthHandler } from "@src/confluent/tools/handlers/flink/diagnost
 import { DetectIssuesHandler } from "@src/confluent/tools/handlers/flink/diagnostics/detect-issues-handler.js";
 import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
 import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
+import { GetFlinkStatementResultsHandler } from "@src/confluent/tools/handlers/flink/get-flink-statement-results-handler.js";
 import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
-import { ReadFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/read-flink-statement-handler.js";
 import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alter-topic-config.js";
 import { ConsumeKafkaMessagesHandler } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
 import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-topics-handler.js";
@@ -86,7 +86,10 @@ export class ToolHandlerRegistry {
     [ToolName.PRODUCE_MESSAGE, new ProduceKafkaMessageHandler()],
     [ToolName.LIST_FLINK_STATEMENTS, new ListFlinkStatementsHandler()],
     [ToolName.CREATE_FLINK_STATEMENT, new CreateFlinkStatementHandler()],
-    [ToolName.READ_FLINK_STATEMENT, new ReadFlinkStatementHandler()],
+    [
+      ToolName.GET_FLINK_STATEMENT_RESULTS,
+      new GetFlinkStatementResultsHandler(),
+    ],
     [ToolName.DELETE_FLINK_STATEMENTS, new DeleteFlinkStatementHandler()],
     [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS, new GetFlinkExceptionsHandler()],
     [ToolName.LIST_FLINK_CATALOGS, new ListCatalogsHandler()],

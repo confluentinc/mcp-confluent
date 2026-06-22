@@ -205,7 +205,7 @@ describe("tool-registry.ts", () => {
         // Flink
         [ToolName.LIST_FLINK_STATEMENTS]: hasFlink,
         [ToolName.CREATE_FLINK_STATEMENT]: hasFlink,
-        [ToolName.READ_FLINK_STATEMENT]: hasFlink,
+        [ToolName.GET_FLINK_STATEMENT_RESULTS]: hasFlink,
         [ToolName.DELETE_FLINK_STATEMENTS]: hasFlink,
         [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: hasFlink,
         [ToolName.LIST_FLINK_CATALOGS]: hasFlink,
@@ -424,7 +424,9 @@ describe("tool-registry.ts", () => {
         },
       },
       [ToolName.CREATE_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
-      [ToolName.READ_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_FLINK_STATEMENT_RESULTS]: {
+        outcome: { throws: "ZodError" },
+      },
       [ToolName.DELETE_FLINK_STATEMENTS]: { outcome: { throws: "ZodError" } },
       [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: {
         outcome: { throws: "ZodError" },

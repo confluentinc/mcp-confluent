@@ -6,7 +6,7 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
-const readFlinkStatementArguments = z.object({
+const getFlinkStatementResultsArguments = z.object({
   organizationId: z
     .string()
     .trim()
@@ -38,7 +38,7 @@ const readFlinkStatementArguments = z.object({
     ),
 });
 
-export class ReadFlinkStatementHandler extends FlinkToolHandler {
+export class GetFlinkStatementResultsHandler extends FlinkToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -48,7 +48,7 @@ export class ReadFlinkStatementHandler extends FlinkToolHandler {
       statementName,
       environmentId,
       organizationId,
-    } = readFlinkStatementArguments.parse(toolArguments);
+    } = getFlinkStatementResultsArguments.parse(toolArguments);
     const { conn, clientManager } = this.resolveDirectConnection(
       runtime,
       toolArguments,
@@ -93,7 +93,7 @@ export class ReadFlinkStatementHandler extends FlinkToolHandler {
 
       if (error) {
         return this.createResponse(
-          `Failed to read Flink SQL statement: ${JSON.stringify(error)}`,
+          `Failed to fetch Flink SQL statement results: ${JSON.stringify(error)}`,
           true,
         );
       }
@@ -108,9 +108,9 @@ export class ReadFlinkStatementHandler extends FlinkToolHandler {
   }
   getToolConfig(): ToolConfig {
     return {
-      name: ToolName.READ_FLINK_STATEMENT,
-      description: "Make a request to read a statement and its results",
-      inputSchema: readFlinkStatementArguments.shape,
+      name: ToolName.GET_FLINK_STATEMENT_RESULTS,
+      description: "Fetch the result rows produced by a Flink SQL statement.",
+      inputSchema: getFlinkStatementResultsArguments.shape,
       annotations: READ_ONLY,
     };
   }

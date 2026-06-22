@@ -58,6 +58,7 @@ All notable changes to this MCP server will be documented in this file.
 
 ### Changed
 
+- **`read-flink-statement` tool renamed to `get-flink-statement-results`.** The old name read as a peer to `read-connector` / `read-environment` (fetch the resource), but the tool actually returns a statement's _result rows_, not the statement definition. The new name matches the `get-…` verb the rest of the surface uses for result/data reads. Inputs, output shape, and behavior are unchanged; update any client config that pins the tool by name.
 - **`consume-messages`: breaking input-shape changes** alongside the new controls above.
   - `topicNames: string[]` replaced by `topics[]`, an array of per-topic option objects. Minimal call: `{topics: [{name: "orders"}]}`.
   - Top-level `offsetReset` removed; starting position is now per-topic via `start` (default remains `"earliest"`).

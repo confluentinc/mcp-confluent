@@ -47,6 +47,7 @@ export enum ToolName {
   LIST_ENVIRONMENTS = "list-environments",
   READ_ENVIRONMENT = "read-environment",
   LIST_SCHEMAS = "list-schemas",
+  CREATE_SCHEMA = "create-schema",
   DELETE_SCHEMA = "delete-schema",
   GET_TOPIC_CONFIG = "get-topic-config",
   CREATE_TABLEFLOW_TOPIC = "create-tableflow-topic",
@@ -67,4 +68,6 @@ export enum ToolName {
   GET_PRODUCT_DOC_PAGE = "get-product-doc-page",
   LIST_ORGANIZATIONS = "list-organizations",
   EXPLAIN_DISABLED_TOOLS = "explain-disabled-tools",
+  LIST_CONFIGURED_CONNECTIONS = "list-configured-connections",
+  DESCRIBE_CONFIGURED_CONNECTION = "describe-configured-connection",
 }

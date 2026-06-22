@@ -3,7 +3,7 @@ import {
   FLINK_CONN as BASE_FLINK_CONN,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -107,7 +107,7 @@ describe("create-flink-statement-handler.ts", () => {
             .POST.mockResolvedValue({ data: {} });
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -126,7 +126,7 @@ describe("create-flink-statement-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -159,7 +159,7 @@ describe("create-flink-statement-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN_NO_NAMES,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -189,7 +189,7 @@ describe("create-flink-statement-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -227,7 +227,7 @@ describe("create-flink-statement-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             FLINK_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,

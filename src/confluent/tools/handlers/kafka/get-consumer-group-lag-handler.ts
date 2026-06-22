@@ -139,7 +139,10 @@ export class GetConsumerGroupLagHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = getConsumerGroupLagArgs.parse(toolArguments);
-    const { connId, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, clientManager } = this.resolveConnection(
+      runtime,
+      toolArguments,
+    );
     const { clusterId, envId } = resolveKafkaClusterArgs(
       parsed,
       runtime,

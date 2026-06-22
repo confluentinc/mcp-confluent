@@ -32,10 +32,23 @@
 #     # disabled: true
 
 connections:
-  # Connection name is freeform. The `type: oauth` declaration is the only
+  # Connection id is freeform. The `type: oauth` declaration is the only
   # required field.
   ccloud-oauth:
     type: oauth
+
+    # Optional human-readable label for this connection, echoed back by the
+    # `list-configured-connections` tool so an agent can tell your connections apart.
+    # A blank value is treated as no description.
+    description: "Confluent Cloud (OAuth login)"
+
+    # Read-only policy (default false). With `read_only: true`, every tool that
+    # mutates state is auto-disabled for this connection — only read-only tools
+    # stay enabled (a tool's posture comes from its `readOnlyHint` annotation,
+    # so there is nothing to configure per-tool). This is the recommended
+    # posture for pointing an agent at a production Cloud login while keeping
+    # full read/write on a dev connection. Uncomment to lock this one down:
+    # read_only: true
 
     # librdkafka `debug` contexts to emit on stderr for this OAuth connection's
     # native Kafka client. Reach for it when an OAuth/OAUTHBEARER SASL handshake

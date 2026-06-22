@@ -12,8 +12,15 @@ import {
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
 import { fakeLibrdKafkaError } from "@tests/factories/librdkafka.js";
-import { kafkaRuntime } from "@tests/factories/runtime.js";
-import { getMockedClientManager } from "@tests/stubs/index.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  runtimeWithDecoy,
+} from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+  type MockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
@@ -147,6 +154,17 @@ describe("describe-consumer-group-handler.ts", () => {
   describe("handle()", () => {
     const handler = new DescribeConsumerGroupHandler();
 
+    // Every case runs through assertHandleCase against a decoy runtime: the
+    // harness injects connectionId for the real connection and asserts the
+    // decoy's manager stays untouched, so routing is exercised on every
+    // behaviour path rather than in a single bespoke test.
+    const decoyRuntime = (clientManager: MockedClientManager) =>
+      runtimeWithDecoy(
+        { kafka: { bootstrap_servers: "broker:9092" } },
+        DEFAULT_CONNECTION_ID,
+        clientManager,
+      );
+
     it("should forward the single groupId as a one-element array to describeGroups", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
@@ -154,8 +172,12 @@ describe("describe-consumer-group-handler.ts", () => {
         groups: [fakeGroupDescription({ groupId: "my-group" })],
       });
 
-      await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "my-group",
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "my-group" },
+        outcome: { resolves: 'Consumer group "my-group" is' },
+        clientManager,
       });
 
       expect(admin.describeGroups).toHaveBeenCalledOnce();
@@ -204,12 +226,19 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "orders-consumer",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "orders-consumer" },
+        outcome: {
+          resolves:
+            'Consumer group "orders-consumer" is Stable with 2 member(s)',
+          isError: false,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({
+      expect(result!.structuredContent).toEqual({
         groupId: "orders-consumer",
         state: "Stable",
         type: "Consumer",
@@ -238,7 +267,7 @@ describe("describe-consumer-group-handler.ts", () => {
           },
         ],
       });
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "orders-consumer" is Stable with 2 member(s); coordinator b7.example.com:9092.',
       );
     });
@@ -256,15 +285,21 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "orphan",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "orphan" },
+        outcome: {
+          resolves: 'Consumer group "orphan" is Empty with 0 member(s)',
+          isError: false,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
       expect(
-        (result.structuredContent as { members: unknown[] }).members,
+        (result!.structuredContent as { members: unknown[] }).members,
       ).toEqual([]);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "orphan" is Empty with 0 member(s); coordinator broker.example.com:9092.',
       );
     });
@@ -274,12 +309,18 @@ describe("describe-consumer-group-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.describeGroups.mockRejectedValue(fakeNotFoundError());
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "no-such-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "no-such-group" },
+        outcome: {
+          resolves: 'Consumer group "no-such-group" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "no-such-group" not found on this cluster.',
       );
     });
@@ -296,12 +337,18 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "no-such-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "no-such-group" },
+        outcome: {
+          resolves: 'Consumer group "no-such-group" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "no-such-group" not found on this cluster.',
       );
     });
@@ -326,12 +373,18 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "alive-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "alive-group" },
+        outcome: {
+          resolves: 'Consumer group "alive-group" is Stable',
+          isError: false,
+        },
+        clientManager,
       });
 
-      expect(result.isError, textOf(result)).not.toBe(true);
-      expect(result.structuredContent).toMatchObject({
+      expect(result!.structuredContent).toMatchObject({
         groupId: "alive-group",
         state: "Stable",
       });
@@ -360,12 +413,18 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "no-such-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "no-such-group" },
+        outcome: {
+          resolves: 'Consumer group "no-such-group" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "no-such-group" not found on this cluster.',
       );
     });
@@ -389,15 +448,17 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "rip-old-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "rip-old-group" },
+        outcome: { resolves: '"rip-old-group" is Dead', isError: false },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
-      expect((result.structuredContent as { state: string }).state).toBe(
+      expect((result!.structuredContent as { state: string }).state).toBe(
         "Dead",
       );
-      expect(textOf(result)).toContain('"rip-old-group" is Dead');
     });
 
     it("should translate a GroupDescription.error with any other code into a tool-level error citing the broker message verbatim", async () => {
@@ -415,12 +476,18 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g" },
+        outcome: {
+          resolves: "Broker: Group authorization failed",
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe("Broker: Group authorization failed");
+      expect(textOf(result!)).toBe("Broker: Group authorization failed");
     });
 
     it("should let a non-not-found describeGroups rejection propagate without try/catch swallow", async () => {
@@ -428,9 +495,12 @@ describe("describe-consumer-group-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.describeGroups.mockRejectedValue(new Error("network unreachable"));
 
-      await expect(
-        handler.handle(kafkaRuntime(clientManager), { groupId: "g" }),
-      ).rejects.toThrow("network unreachable");
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g" },
+        outcome: { throws: "network unreachable" },
+      });
     });
 
     it("should include groupInstanceId per member only when the upstream payload sets it (static membership)", async () => {
@@ -456,12 +526,16 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "mixed-membership",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "mixed-membership" },
+        outcome: { resolves: 'Consumer group "mixed-membership" is' },
+        clientManager,
       });
 
       const members = (
-        result.structuredContent as {
+        result!.structuredContent as {
           members: Array<Record<string, unknown>>;
         }
       ).members;
@@ -496,12 +570,16 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "fanout",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "fanout" },
+        outcome: { resolves: 'Consumer group "fanout" is' },
+        clientManager,
       });
 
       const members = (
-        result.structuredContent as {
+        result!.structuredContent as {
           members: Array<{ assignment: Array<{ topic: string }> }>;
         }
       ).members;
@@ -538,12 +616,16 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g" },
+        outcome: { resolves: 'Consumer group "g" is' },
+        clientManager,
       });
 
       const assignment = (
-        result.structuredContent as {
+        result!.structuredContent as {
           members: Array<{ assignment: Array<Record<string, unknown>> }>;
         }
       ).members[0]!.assignment;
@@ -582,12 +664,16 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g" },
+        outcome: { resolves: 'Consumer group "g" is' },
+        clientManager,
       });
 
       const member = (
-        result.structuredContent as {
+        result!.structuredContent as {
           members: Array<{
             assignment: Array<{ topic: string; partition: number }>;
           }>;
@@ -621,13 +707,16 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g" },
+        outcome: { resolves: 'Consumer group "g" is', isError: false },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
       const member = (
-        result.structuredContent as {
+        result!.structuredContent as {
           members: Array<{ assignment: unknown[] }>;
         }
       ).members[0]!;
@@ -646,12 +735,16 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g" },
+        outcome: { resolves: 'Consumer group "g" is' },
+        clientManager,
       });
 
       const member = (
-        result.structuredContent as {
+        result!.structuredContent as {
           members: Array<Record<string, unknown>>;
         }
       ).members[0]!;
@@ -670,12 +763,16 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g" },
+        outcome: { resolves: 'Consumer group "g" is' },
+        clientManager,
       });
 
       expect(
-        (result.structuredContent as { coordinator: Record<string, unknown> })
+        (result!.structuredContent as { coordinator: Record<string, unknown> })
           .coordinator,
       ).toEqual({
         id: 0,
@@ -696,12 +793,16 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g" },
+        outcome: { resolves: 'Consumer group "g" is' },
+        clientManager,
       });
 
       const coordinator = (
-        result.structuredContent as { coordinator: Record<string, unknown> }
+        result!.structuredContent as { coordinator: Record<string, unknown> }
       ).coordinator;
       expect("rack" in coordinator).toBe(false);
     });
@@ -717,12 +818,16 @@ describe("describe-consumer-group-handler.ts", () => {
         ],
       });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "g",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "g" },
+        outcome: { resolves: 'Consumer group "g" is' },
+        clientManager,
       });
 
       expect(
-        (result.structuredContent as { partitionAssignor: string })
+        (result!.structuredContent as { partitionAssignor: string })
           .partitionAssignor,
       ).toBe("cooperative-sticky");
     });
@@ -732,12 +837,18 @@ describe("describe-consumer-group-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.describeGroups.mockResolvedValue({ groups: [] });
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        groupId: "no-such-group",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { groupId: "no-such-group" },
+        outcome: {
+          resolves: 'Consumer group "no-such-group" not found on this cluster.',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(
+      expect(textOf(result!)).toBe(
         'Consumer group "no-such-group" not found on this cluster.',
       );
     });

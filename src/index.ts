@@ -27,39 +27,61 @@ import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
- * Determine the subset of ToolHandlers to register based on the filtered tool names
- * and which connections satisfy each tool's service requirements.
+ * Resolve the operator's tool allow/block-list into the set `ServerRuntime`
+ * gates on — or `undefined` when neither list was configured, preserving the
+ * "no filter configured" sentinel rather than materializing an all-tools set
+ * that would mean the same thing while muddying the runtime's contract.
+ */
+export function resolveAllowedToolNames(
+  allowTools: string[],
+  blockTools: string[],
+): ReadonlySet<ToolName> | undefined {
+  if (allowTools.length === 0 && blockTools.length === 0) {
+    return undefined;
+  }
+  return new Set(getFilteredToolNames(allowTools, blockTools));
+}
+
+/**
+ * Determine the subset of ToolHandlers to register: those left enabled by the
+ * runtime's operator allow/block-list (`runtime.isToolAllowed`) whose predicate
+ * is also satisfied (typically by at least one configured connection).
  **/
 export function getToolHandlersToRegister(
-  filteredToolNames: ToolName[],
   runtime: ServerRuntime,
 ): Map<ToolName, ToolHandler> {
-  const toolHandlers = new Map<ToolName, ToolHandler>();
+  const toolHandlersToRegister = new Map<ToolName, ToolHandler>();
   const knownIds = new Set(Object.keys(runtime.config.connections));
 
   // Pass 1: drop tools excluded by the allow/block list (logged per-tool —
   // the reason is config-driven, not predicate-driven, so it doesn't fold
-  // into the grouped warning emitted later).
+  // into the grouped warning emitted later). The filter lives on the runtime
+  // so registration and the list-configured-connections tool read one source of truth.
   const candidates: Array<readonly [ToolName, ToolHandler]> = [];
   for (const toolName of Object.values(ToolName)) {
-    if (!filteredToolNames.includes(toolName)) {
+    if (!runtime.isToolAllowed(toolName)) {
       logger.warn(`Tool ${toolName} disabled due to allow/block list rules`);
       continue;
     }
     candidates.push([toolName, ToolHandlerRegistry.getToolHandler(toolName)]);
   }
 
-  // Pass 2: register tools that are enabled on at least one connection.
+  // Pass 2: register tools that are enabled on at least one connection, plus
+  // connection-independent tools (docs, diagnostics), which carry no per-connection
+  // verdict and so stay available even on a zero-connection config.
   for (const [toolName, handler] of candidates) {
     const enabledIds = handler.enabledConnectionIds(runtime);
+    // Unreachable: enabledConnectionIds() is derived by iterating
+    // runtime.config.connections, so every id it yields is already a known key.
+    // A non-empty unknownIds means that derivation has broken.
     const unknownIds = enabledIds.filter((id) => !knownIds.has(id));
     if (unknownIds.length > 0) {
       throw new Error(
-        `Tool ${toolName}: enabledConnectionIds() returned unknown connection ID(s): ${unknownIds.join(", ")}`,
+        `Wacky -- Tool ${toolName}: enabledConnectionIds() returned unknown connection ID(s): ${unknownIds.join(", ")}`,
       );
     }
-    if (enabledIds.length > 0) {
-      toolHandlers.set(toolName, handler);
+    if (enabledIds.length > 0 || handler.isConnectionIndependent) {
+      toolHandlersToRegister.set(toolName, handler);
       logger.info(`Tool ${toolName} enabled`);
     }
   }
@@ -75,13 +97,13 @@ export function getToolHandlersToRegister(
   }
 
   // Raise an error if no tools are enabled, as the server would be non-functional without any tools.
-  if (toolHandlers.size === 0) {
+  if (toolHandlersToRegister.size === 0) {
     throw new Error(
       "No tools enabled. Please check your configuration and environment variables.",
     );
   }
 
-  return toolHandlers;
+  return toolHandlersToRegister;
 }
 
 /**
@@ -212,9 +234,17 @@ export function outputToolList(filteredToolNames: ToolName[]): void {
     ToolCategory,
     Array<{ name: ToolName; desc: string }>
   >();
+  // --list-tools runs before any config is loaded, so there is no real runtime.
+  // A zero-connection runtime makes getRegisteredToolConfig() return each tool's
+  // authored config verbatim (no connectionId augmentation), which is exactly
+  // the connection-independent catalog view this listing wants.
+  const runtime = new ServerRuntime(
+    new MCPServerConfiguration({ connections: {} }),
+    {},
+  );
   for (const toolName of filteredToolNames) {
     const handler = ToolHandlerRegistry.getToolHandler(toolName);
-    const config = handler.getToolConfig();
+    const config = handler.getRegisteredToolConfig(runtime);
     let desc = config.description.replaceAll(/\s+/g, " ").trim();
     if (desc.length > MAX_DESC_LENGTH) {
       desc = desc.slice(0, MAX_DESC_LENGTH - 3) + "...";
@@ -297,6 +327,35 @@ function runOutputInitConfig(oauth: boolean): EarlyExitResult {
   }
 }
 
+/**
+ * Tear the server down on a shutdown signal, then exit. Every step runs inside
+ * a try/finally so a rejection from any one — most plausibly a client manager
+ * failing to disconnect — is logged but never strands the process: the exit
+ * always fires. `exit` is injected (defaulting to `process.exit`) so this
+ * guarantee is unit-testable without stubbing the global.
+ */
+export async function performCleanup(
+  deps: {
+    telemetry: Pick<TelemetryService, "shutdown">;
+    transportManager: Pick<TransportManager, "stop">;
+    runtime: Pick<ServerRuntime, "oauthHolder" | "disconnectAll">;
+  },
+  exit: (code: number) => void = (code) => process.exit(code),
+): Promise<void> {
+  logger.info("Shutting down...");
+  try {
+    await deps.telemetry.shutdown();
+    await deps.transportManager.stop();
+    // shutdown() is race-safe with an in-flight bootstrap.
+    deps.runtime.oauthHolder?.shutdown();
+    await deps.runtime.disconnectAll();
+  } catch (error) {
+    logger.error({ err: error }, "Error during shutdown");
+  } finally {
+    exit(0);
+  }
+}
+
 async function main() {
   try {
     // Parse command line arguments.(NO LONGER LOADS ENV VARS FROM -e file!)
@@ -310,7 +369,7 @@ async function main() {
       process.exit(earlyExit.exitCode);
     }
 
-    const filteredToolNames = getFilteredToolNames(
+    const allowedToolNames = resolveAllowedToolNames(
       cliOptions.allowTools ?? [],
       cliOptions.blockTools ?? [],
     );
@@ -353,16 +412,16 @@ async function main() {
     const telemetry = TelemetryService.getInstance();
 
     logger.info(
-      `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
+      `${mcpConfig.getConnectionIds().length} connections loaded successfully`,
     );
 
-    const runtime = ServerRuntime.fromConfig(mcpConfig);
+    const runtime = ServerRuntime.fromConfig(mcpConfig, allowedToolNames);
 
     const serverVersion = getPackageVersion();
 
     telemetry.setCommonProperties({ serverVersion });
 
-    const toolHandlers = getToolHandlersToRegister(filteredToolNames, runtime);
+    const toolHandlers = getToolHandlersToRegister(runtime);
 
     logger.info(
       { enabledTools: [...toolHandlers.keys()] },
@@ -417,20 +476,13 @@ async function main() {
     });
 
     // Set up cleanup handlers
-    const performCleanup = async () => {
-      logger.info("Shutting down...");
-      await telemetry.shutdown();
-      await transportManager.stop();
-      // shutdown() is race-safe with an in-flight bootstrap.
-      runtime.oauthHolder?.shutdown();
-      await runtime.clientManager.disconnect();
-      process.exit(0);
-    };
+    const cleanup = () =>
+      performCleanup({ telemetry, transportManager, runtime });
 
-    process.on("SIGINT", performCleanup);
-    process.on("SIGTERM", performCleanup);
-    process.on("SIGQUIT", performCleanup);
-    process.on("SIGUSR2", performCleanup);
+    process.on("SIGINT", cleanup);
+    process.on("SIGTERM", cleanup);
+    process.on("SIGQUIT", cleanup);
+    process.on("SIGUSR2", cleanup);
   } catch (error) {
     if (error instanceof DisplayedCommandLineUsageError) {
       process.exit(0);

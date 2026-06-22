@@ -20,7 +20,9 @@ import { PauseConnectorHandler } from "@src/confluent/tools/handlers/connect/pau
 import { RestartConnectorHandler } from "@src/confluent/tools/handlers/connect/restart-connector-handler.js";
 import { ResumeConnectorHandler } from "@src/confluent/tools/handlers/connect/resume-connector-handler.js";
 import { UpdateConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/update-connector-config-handler.js";
+import { DescribeConfiguredConnectionHandler } from "@src/confluent/tools/handlers/diagnostics/describe-configured-connection-handler.js";
 import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
+import { ListConfiguredConnectionsHandler } from "@src/confluent/tools/handlers/diagnostics/list-configured-connections-handler.js";
 import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { SearchProductDocsHandler } from "@src/confluent/tools/handlers/docs/search-product-docs-handler.js";
 import { ListEnvironmentsHandler } from "@src/confluent/tools/handlers/environments/list-environments-handler.js";
@@ -52,6 +54,7 @@ import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
 import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organizations/list-organizations-handler.js";
+import { CreateSchemaHandler } from "@src/confluent/tools/handlers/schema/create-schema-handler.js";
 import { DeleteSchemaHandler } from "@src/confluent/tools/handlers/schema/delete-schema-handler.js";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
@@ -129,6 +132,7 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_ENVIRONMENTS, new ListEnvironmentsHandler()],
     [ToolName.READ_ENVIRONMENT, new ReadEnvironmentHandler()],
     [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],
+    [ToolName.CREATE_SCHEMA, new CreateSchemaHandler()],
     [ToolName.DELETE_SCHEMA, new DeleteSchemaHandler()],
     [ToolName.CONSUME_MESSAGES, new ConsumeKafkaMessagesHandler()],
     [ToolName.GET_PARTITION_OFFSETS, new GetPartitionOffsetsHandler()],
@@ -171,6 +175,18 @@ export class ToolHandlerRegistry {
     [
       ToolName.EXPLAIN_DISABLED_TOOLS,
       new ExplainDisabledToolsHandler(() => ToolHandlerRegistry.allHandlers()),
+    ],
+    [
+      ToolName.LIST_CONFIGURED_CONNECTIONS,
+      new ListConfiguredConnectionsHandler(() =>
+        ToolHandlerRegistry.allHandlers(),
+      ),
+    ],
+    [
+      ToolName.DESCRIBE_CONFIGURED_CONNECTION,
+      new DescribeConfiguredConnectionHandler(() =>
+        ToolHandlerRegistry.allHandlers(),
+      ),
     ],
   ]);
 

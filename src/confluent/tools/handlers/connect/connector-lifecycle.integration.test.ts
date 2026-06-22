@@ -6,7 +6,11 @@ import {
   waitForConnectorRunning,
   withSharedConnectorCleanup,
 } from "@tests/harness/connect.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import {
+  integrationConnection,
+  integrationDirectConnection,
+} from "@tests/harness/runtime.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -20,14 +24,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // All four lifecycle handlers share the same `hasConfluentCloud` predicate via
 // ConnectToolHandler, so any one of them is representative for the predicate gate.
 const handler = new PauseConnectorHandler();
-const runtime = integrationRuntime();
 
 describe(
   "connector-lifecycle",
   { tags: [Tag.CONNECT, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires confluent_cloud.auth config", () => {});
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
 
@@ -111,7 +113,7 @@ describe(
         // with `quickstart` flipped from "USERS" to "ORDERS"
         // asserting the response echoes the new value to prove the
         // round-trip applied.
-        const conn = runtime.config.getSoleDirectConnection();
+        const conn = integrationDirectConnection();
         const auth = conn.kafka?.auth;
         expect(
           auth,

@@ -1,5 +1,5 @@
 connections:
-  production:
+  default:
     type: direct
     schema_registry:
       endpoint: "https://sr.confluent.cloud"

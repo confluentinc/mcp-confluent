@@ -1,7 +1,8 @@
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { withSharedConnectorCleanup } from "@tests/harness/connect.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -13,14 +14,12 @@ import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new CreateConnectorHandler();
-const runtime = integrationRuntime();
 
 describe(
   "create-connector-handler",
   { tags: [Tag.CONNECT, Tag.REQUIRES_CONFLUENT_CLOUD_CONFIG] },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires confluent_cloud.auth + kafka.auth config", () => {});
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
 

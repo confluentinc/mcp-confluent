@@ -1,6 +1,6 @@
 import {
+  DirectConnectionConfig,
   FlinkDirectConfig,
-  MCPServerConfiguration,
 } from "@src/config/models.js";
 import {
   BaseToolHandler,
@@ -14,15 +14,15 @@ export abstract class FlinkToolHandler extends BaseToolHandler {
   readonly predicate = hasFlink;
 
   /**
-   * Extracts the Flink config block from the sole connection, asserting it exists.
+   * Extracts the Flink config block from the resolved connection, asserting it exists.
    * Throws "Wacky -- " if called on a connection without a flink block (should be
    * impossible in production given the hasFlink gate, but caught here rather than
    * silently propagating undefined).
    */
   protected getFlinkDirectConfig(
-    config: MCPServerConfiguration,
+    conn: DirectConnectionConfig,
   ): FlinkDirectConfig {
-    const flink = config.getSoleDirectConnection().flink;
+    const flink = conn.flink;
     if (!flink)
       throw new Error(
         "Wacky -- FlinkToolHandler invoked on a connection without a flink block",

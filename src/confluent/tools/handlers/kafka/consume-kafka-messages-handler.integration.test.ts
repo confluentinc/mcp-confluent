@@ -22,7 +22,8 @@ import {
   startOAuthServer,
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -51,9 +52,7 @@ describe(
         it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
         return;
       }
-      const directRuntime = integrationRuntime({ oauth: false });
-      if (handler.enabledConnectionIds(directRuntime).length === 0) {
-        it.skip("requires kafka.bootstrap_servers in test-fixtures/yaml_configs/integration.yaml", () => {});
+      if (skipIfDisabled(handler, integrationConnection())) {
         return;
       }
 
@@ -356,6 +355,62 @@ describe(
             });
           }
         });
+
+        it("should preserve a repeated-key header through the broker as a string array, not a comma-joined scalar", async () => {
+          // The bug behind #597: a record carrying the same header key twice
+          // (`trace: ["x", "y"]`) used to come back comma-joined as the
+          // scalar `"x,y"`, losing multiplicity. Seed such a record, consume
+          // it through the tool, and assert the array survives in the echoed
+          // JSON — the round-trip the produce suite's raw-consumer read-back
+          // can't prove, because only this tool does the header echoing.
+          const headerTopic = uniqueName("consume-mvh");
+          const markerValue = `mvh-${transport}`;
+          await admin.createTopics({
+            topics: [{ topic: headerTopic, numPartitions: 1 }],
+          });
+          try {
+            await producer.send({
+              topic: headerTopic,
+              messages: [
+                {
+                  value: markerValue,
+                  headers: { trace: ["x", "y"], source: "clusterA" },
+                },
+              ],
+            });
+
+            const result = await server.client.callTool({
+              name: ToolName.CONSUME_MESSAGES,
+              arguments: {
+                topics: [{ name: headerTopic }],
+                maxMessages: 1,
+                timeoutMs: 15_000,
+                valueFormat: { disableSchemaRegistry: true },
+              },
+            });
+
+            const text = textContent(result);
+            // Guard against the regression directly: the lossy form would
+            // surface the joined scalar in the echoed JSON.
+            expect(text).not.toContain('"trace": "x,y"');
+
+            const consumed = JSON.parse(text.slice(text.indexOf("["))) as {
+              value: string;
+              headers?: Record<string, unknown>;
+            }[];
+            const record = consumed.find((m) => m.value === markerValue);
+            expect(record, text).toBeDefined();
+            expect(record!.headers).toEqual({
+              trace: ["x", "y"],
+              source: "clusterA",
+            });
+          } finally {
+            await admin.deleteTopics({ topics: [headerTopic] }).catch(() => {
+              // teardown-only; a cleanup failure shouldn't fail an
+              // already-asserted test
+            });
+          }
+        });
       });
     });
 
@@ -367,9 +422,13 @@ describe(
           it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
           return;
         }
-        const oauthRuntime = integrationRuntime({ oauth: true });
-        if (handler.enabledConnectionIds(oauthRuntime).length === 0) {
-          it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+        if (
+          skipIfDisabled(
+            handler,
+            integrationConnection({ oauth: true }),
+            OAUTH_FIXTURE_NOT_LOADED_REASON,
+          )
+        ) {
           return;
         }
         const credentials = getOAuthCredentialsFromEnv();
@@ -380,9 +439,13 @@ describe(
         // `connectTestAdmin()`/`connectTestProducer()` build api-key kafka clients from the direct
         // fixture; gate the OAuth describe on the same predicate the direct describe uses so an
         // OAuth-only CI lane without direct creds skips cleanly instead of crashing in beforeAll
-        const directRuntime = integrationRuntime({ oauth: false });
-        if (handler.enabledConnectionIds(directRuntime).length === 0) {
-          it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+        if (
+          skipIfDisabled(
+            handler,
+            integrationConnection(),
+            DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
+          )
+        ) {
           return;
         }
 

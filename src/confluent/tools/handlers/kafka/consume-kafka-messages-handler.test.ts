@@ -3,7 +3,13 @@ import type {
   EachMessagePayload,
   KafkaMessage,
 } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import {
+  KEY_SCHEMA_ID_HEADER,
+  SchemaId,
+  SchemaRegistryClient,
+  SerdeType,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import {
@@ -19,6 +25,7 @@ import {
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -455,7 +462,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         // are needed (the simple-call fast path is preserved).
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -484,7 +491,7 @@ describe("consume-kafka-messages-handler.ts", () => {
       it("should propagate the default offsetReset ('earliest') to buildKafkaConsumer when every entry omits `start`", async () => {
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -522,7 +529,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -553,7 +560,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -584,7 +591,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -616,7 +623,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             {
               kafka: { bootstrap_servers: "broker:9092" },
               schema_registry: { endpoint: "https://sr.example" },
@@ -646,7 +653,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             {
               kafka: { bootstrap_servers: "broker:9092" },
               schema_registry: { endpoint: "https://sr.example" },
@@ -675,7 +682,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -704,7 +711,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             {
               kafka: { bootstrap_servers: "broker:9092" },
               schema_registry: { endpoint: "https://sr.example" },
@@ -730,7 +737,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         // first thing buildPreflightPlan does).
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -756,7 +763,7 @@ describe("consume-kafka-messages-handler.ts", () => {
         // pick a default that surprises a caller.
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -782,7 +789,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -811,7 +818,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -840,7 +847,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -866,7 +873,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -897,7 +904,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -930,7 +937,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -974,7 +981,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1016,7 +1023,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1054,7 +1061,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1094,7 +1101,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1149,7 +1156,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1214,7 +1221,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1265,7 +1272,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1312,7 +1319,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1367,7 +1374,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1422,7 +1429,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1476,7 +1483,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1508,7 +1515,7 @@ describe("consume-kafka-messages-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -1556,6 +1563,9 @@ describe("consume-kafka-messages-handler.ts", () => {
         // in production, where the SDK has already validated and
         // defaulted the inputs.
         const handlePromise = handler.handle(
+          // Direct handle() call (not assertHandleCase), so no decoy/auto-route
+          // here — a single-connection runtime keeps this orchestrator-race test
+          // focused on the maxReached arm.
           runtimeWith(
             { kafka: { bootstrap_servers: "broker:9092" } },
             DEFAULT_CONNECTION_ID,
@@ -1670,6 +1680,195 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
       });
 
+      it("should preserve a repeated-key header as a string array rather than comma-joining it", async () => {
+        // Kafka headers are an ordered list where keys may repeat, so the
+        // client surfaces a repeated key as an array. Stringifying the whole
+        // array (Array.prototype.toString) would collapse ["x", "y"] to the
+        // lossy "x,y" — indistinguishable from a single value containing a
+        // comma. Map per element so multiplicity survives (#597).
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage({ headers: { trace: ["x", "y"] } }),
+          undefined,
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
+        );
+        expect(result.headers).toEqual({ trace: ["x", "y"] });
+      });
+
+      it("should stringify each Buffer element of a repeated-key header independently", async () => {
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage({
+            headers: { trace: [Buffer.from("x"), Buffer.from("y")] },
+          }),
+          undefined,
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
+        );
+        expect(result.headers).toEqual({ trace: ["x", "y"] });
+      });
+
+      it("should keep scalar headers scalar while preserving sibling array headers", async () => {
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage({
+            headers: { source: Buffer.from("clusterA"), trace: ["x", "y"] },
+          }),
+          undefined,
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
+        );
+        expect(result.headers).toEqual({
+          source: "clusterA",
+          trace: ["x", "y"],
+        });
+      });
+
+      describe("schema-id header echo (always kept, decoded to GUID)", () => {
+        // Per Stefan's #607 review: the __value_schema_id / __key_schema_id
+        // headers identify the key/value schema by GUID, mirroring the CCloud
+        // UI and the VS Code extension. Keep them on every echoed record and
+        // surface the decoded GUID rather than the raw bytes — independent of
+        // whether that side's payload decoded, bypassed decoding, or fell back
+        // to raw.
+        const fakeRegistry = {} as SchemaRegistryClient;
+        const VALUE_GUID = "89e3a8f1-1111-2222-3333-444455556666";
+        const KEY_GUID = "0f9d2c77-aaaa-bbbb-cccc-ddddeeeeffff";
+        const headers = {
+          [VALUE_SCHEMA_ID_HEADER]: new SchemaId(
+            "AVRO",
+            undefined,
+            VALUE_GUID,
+          ).guidToBytes(),
+          [KEY_SCHEMA_ID_HEADER]: new SchemaId(
+            "AVRO",
+            undefined,
+            KEY_GUID,
+          ).guidToBytes(),
+          "x-trace": Buffer.from("abc"),
+        };
+        const decodedHeaders = {
+          [VALUE_SCHEMA_ID_HEADER]: VALUE_GUID,
+          [KEY_SCHEMA_ID_HEADER]: KEY_GUID,
+          "x-trace": "abc",
+        };
+
+        // Per-side decode result a case wants the spies to simulate. Only
+        // consulted for a side that actually attempts decode (registry present
+        // and disableSchemaRegistry false).
+        type DecodeOutcome = "decode" | "no-schema" | "throw";
+
+        it.each([
+          {
+            name: "both sides decode successfully",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "decode" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+          },
+          {
+            name: "the value side bypasses decoding",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: true },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "decode" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+          },
+          {
+            name: "the connection has no registry at all",
+            registry: () => undefined,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "decode" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+          },
+          {
+            name: "the value side falls back to raw (no schema for the subject)",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "no-schema" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+          },
+          {
+            name: "the value side falls back to raw (deserialization throws)",
+            registry: () => fakeRegistry,
+            valueFormat: { disableSchemaRegistry: false },
+            keyFormat: { disableSchemaRegistry: false },
+            valueOutcome: "throw" as DecodeOutcome,
+            keyOutcome: "decode" as DecodeOutcome,
+          },
+        ])(
+          "should keep both schema-id headers as decoded GUIDs when $name",
+          async ({
+            registry,
+            valueFormat,
+            keyFormat,
+            valueOutcome,
+            keyOutcome,
+          }) => {
+            const outcomeFor = (serdeType: SerdeType): DecodeOutcome =>
+              serdeType === SerdeType.KEY ? keyOutcome : valueOutcome;
+
+            vi.spyOn(
+              schemaRegistryHelper,
+              "getLatestSchemaIfExists",
+            ).mockImplementation(async (_registry, subject) =>
+              outcomeFor(
+                subject.endsWith("-key") ? SerdeType.KEY : SerdeType.VALUE,
+              ) === "no-schema"
+                ? null
+                : { schema: "{}", schemaType: "AVRO" },
+            );
+            vi.spyOn(
+              schemaRegistryHelper,
+              "deserializeMessage",
+            ).mockImplementation(
+              async (_topic, _buffer, _schemaType, _registry, serdeType) => {
+                if (outcomeFor(serdeType) === "throw") {
+                  throw new Error("boom");
+                }
+                return { decoded: serdeType };
+              },
+            );
+
+            const result = await handler.processMessage(
+              "topic-x",
+              0,
+              fakeMessage({ headers }),
+              registry(),
+              valueFormat,
+              keyFormat,
+            );
+            expect(result.headers).toEqual(decodedHeaders);
+          },
+        );
+
+        it("should fall back to the raw stringified value for a schema-id header that isn't a decodable GUID", async () => {
+          // Defensive: a __value_schema_id carrying non-GUID bytes (here a
+          // payload-format magic-byte-0 buffer) can't be decoded to a GUID, so
+          // the echo falls back to the same stringification every other header
+          // receives rather than emitting a bogus GUID.
+          const rawBytes = Buffer.from([0, 0, 0, 0, 7]);
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage({ headers: { [VALUE_SCHEMA_ID_HEADER]: rawBytes } }),
+            undefined,
+            { disableSchemaRegistry: true },
+            { disableSchemaRegistry: true },
+          );
+          expect(result.headers).toEqual({
+            [VALUE_SCHEMA_ID_HEADER]: rawBytes.toString(),
+          });
+        });
+      });
+
       it("should pass message.timestamp through formatMessageTimestamp (integration with the '-1' sentinel)", async () => {
         // Cross-check that processMessage actually wires through
         // formatMessageTimestamp — the unit-test for that helper above
@@ -1726,6 +1925,37 @@ describe("consume-kafka-messages-handler.ts", () => {
             "AVRO",
             fakeRegistry,
             SerdeType.VALUE,
+            undefined,
+          );
+        });
+
+        it("should forward the raw record headers to deserializeMessage so a header-located schema id decodes", async () => {
+          vi.spyOn(
+            schemaRegistryHelper,
+            "getLatestSchemaIfExists",
+          ).mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          const deserializeSpy = vi
+            .spyOn(schemaRegistryHelper, "deserializeMessage")
+            .mockResolvedValue({ field: 7 });
+          const headers = { [VALUE_SCHEMA_ID_HEADER]: Buffer.from([1, 2, 3]) };
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage({ headers }),
+            fakeRegistry,
+            { disableSchemaRegistry: false },
+            { disableSchemaRegistry: true },
+          );
+
+          expect(result.value).toEqual({ field: 7 });
+          expect(deserializeSpy).toHaveBeenCalledWith(
+            "topic-x",
+            Buffer.from("v"),
+            "AVRO",
+            fakeRegistry,
+            SerdeType.VALUE,
+            headers,
           );
         });
 
@@ -1834,7 +2064,33 @@ describe("consume-kafka-messages-handler.ts", () => {
             "AVRO",
             fakeRegistry,
             SerdeType.KEY,
+            undefined,
           );
+        });
+
+        it("should skip value deserialization entirely when message.value is null (a tombstone never triggers SR work)", async () => {
+          const getLatestSpy = vi
+            .spyOn(schemaRegistryHelper, "getLatestSchemaIfExists")
+            .mockResolvedValue({ schema: "{}", schemaType: "AVRO" });
+          const deserializeSpy = vi
+            .spyOn(schemaRegistryHelper, "deserializeMessage")
+            .mockResolvedValue({ decoded: true });
+
+          const result = await handler.processMessage(
+            "topic-x",
+            0,
+            fakeMessage({ value: null }),
+            fakeRegistry,
+            { disableSchemaRegistry: false },
+            { disableSchemaRegistry: true },
+          );
+
+          expect(result.value).toBeUndefined();
+          // A null payload (tombstone / absent value) short-circuits before any
+          // SR lookup, so the deserializer is never handed a non-Buffer value
+          // and no spurious error is logged on the inevitable failure.
+          expect(getLatestSpy).not.toHaveBeenCalled();
+          expect(deserializeSpy).not.toHaveBeenCalled();
         });
 
         it("should skip key deserialization entirely when message.key is null (the SR branch never fires for an absent key)", async () => {

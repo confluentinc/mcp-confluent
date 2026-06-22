@@ -5,8 +5,10 @@ import {
   CONNECT_CONN,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
+  assertHandleCase,
   getMockedClientManager,
   type MockedClientManager,
 } from "@tests/stubs/index.js";
@@ -45,6 +47,33 @@ describe("get-connector-error-summary-handler.ts", () => {
     });
 
     describe("handle()", () => {
+      it("should route only to its resolved connection in a multi-connection config", async () => {
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
+          data: {
+            name: "cypher-source",
+            connector: { state: "RUNNING", worker_id: "w1", trace: "" },
+            tasks: [{ id: 0, state: "RUNNING", worker_id: "w1" }],
+            type: "source",
+          },
+        });
+
+        // runtimeWithDecoy plants a same-shaped decoy connection first; the
+        // handler must route to DEFAULT_CONNECTION_ID, not enabledIds[0].
+        // assertHandleCase injects that id and asserts the decoy's manager
+        // stays untouched, so args deliberately omits connectionId.
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CONNECT_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: baseArgs,
+          outcome: { resolves: "Connector cypher-source is RUNNING" },
+          clientManager,
+        });
+      });
+
       it("should return a one-liner when the connector is healthy", async () => {
         clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
           data: {

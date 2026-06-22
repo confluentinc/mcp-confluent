@@ -1,4 +1,4 @@
-import { DEFAULT_CONNECTION_NAME } from "@src/config/env-config.js";
+import { DEFAULT_CONNECTION_ID } from "@src/config/env-config.js";
 import { type DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
 import {
@@ -7,6 +7,7 @@ import {
 } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
+import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { createMockInstance } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
@@ -157,31 +158,106 @@ describe("ServerRuntime", () => {
     });
   });
 
-  describe("get clientManager()", () => {
-    it("should return the sole client manager", () => {
-      const cm = createMockInstance(DirectClientManager);
-      const runtime = new ServerRuntime(config, { "test-conn": cm });
-      expect(runtime.clientManager).toBe(cm);
-    });
-
-    it("should throw when clientManagers is empty", () => {
-      const runtime = new ServerRuntime(config, {});
-      expect(() => runtime.clientManager).toThrow(
-        "ServerRuntime has no client managers",
-      );
-    });
-
-    it("should throw when clientManagers has more than one entry", () => {
+  describe("disconnectAll()", () => {
+    it("should disconnect every configured client manager", async () => {
       const cm1 = createMockInstance(DirectClientManager);
       const cm2 = createMockInstance(DirectClientManager);
       const runtime = new ServerRuntime(config, { conn1: cm1, conn2: cm2 });
-      expect(() => runtime.clientManager).toThrow(
-        "ServerRuntime has multiple client managers",
+
+      await runtime.disconnectAll();
+
+      expect(cm1.disconnect).toHaveBeenCalledOnce();
+      expect(cm2.disconnect).toHaveBeenCalledOnce();
+    });
+
+    it("should await every disconnect even when one rejects, surfacing an AggregateError", async () => {
+      const cm1 = createMockInstance(DirectClientManager);
+      const cm2 = createMockInstance(DirectClientManager);
+      const boom = new Error("conn1 disconnect failed");
+      cm1.disconnect.mockRejectedValue(boom);
+      cm2.disconnect.mockResolvedValue(undefined);
+      const runtime = new ServerRuntime(config, { conn1: cm1, conn2: cm2 });
+
+      let caught: unknown;
+      await runtime.disconnectAll().catch((e) => {
+        caught = e;
+      });
+
+      expect(cm1.disconnect).toHaveBeenCalledOnce();
+      expect(cm2.disconnect).toHaveBeenCalledOnce();
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([boom]);
+    });
+
+    it("should aggregate every failure when multiple managers fail to disconnect", async () => {
+      const cm1 = createMockInstance(DirectClientManager);
+      const cm2 = createMockInstance(DirectClientManager);
+      const cm3 = createMockInstance(DirectClientManager);
+      const boom1 = new Error("conn1 disconnect failed");
+      const boom2 = new Error("conn2 disconnect failed");
+      cm1.disconnect.mockRejectedValue(boom1);
+      cm2.disconnect.mockRejectedValue(boom2);
+      cm3.disconnect.mockResolvedValue(undefined);
+      const runtime = new ServerRuntime(config, {
+        conn1: cm1,
+        conn2: cm2,
+        conn3: cm3,
+      });
+
+      let caught: unknown;
+      await runtime.disconnectAll().catch((e) => {
+        caught = e;
+      });
+
+      expect(cm3.disconnect).toHaveBeenCalledOnce();
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([boom1, boom2]);
+    });
+  });
+
+  describe("isToolAllowed()", () => {
+    it("should return true for any tool when no allow/block list was configured", () => {
+      const runtime = new ServerRuntime(config, {});
+      expect(runtime.isToolAllowed(ToolName.LIST_TOPICS)).toBe(true);
+      expect(runtime.isToolAllowed(ToolName.CREATE_TOPICS)).toBe(true);
+    });
+
+    it("should return true for a tool present in the configured allow set", () => {
+      const runtime = new ServerRuntime(
+        config,
+        {},
+        undefined,
+        new Set([ToolName.LIST_TOPICS]),
       );
+      expect(runtime.isToolAllowed(ToolName.LIST_TOPICS)).toBe(true);
+    });
+
+    it("should return false for a tool absent from the configured allow set", () => {
+      const runtime = new ServerRuntime(
+        config,
+        {},
+        undefined,
+        new Set([ToolName.LIST_TOPICS]),
+      );
+      expect(runtime.isToolAllowed(ToolName.CREATE_TOPICS)).toBe(false);
     });
   });
 
   describe("fromConfig()", () => {
+    it("should thread allowedToolNames through so isToolAllowed gates accordingly", () => {
+      const runtime = ServerRuntime.fromConfig(
+        config,
+        new Set([ToolName.LIST_TOPICS]),
+      );
+      expect(runtime.isToolAllowed(ToolName.LIST_TOPICS)).toBe(true);
+      expect(runtime.isToolAllowed(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+
+    it("should leave every tool allowed when called without an allow set", () => {
+      const runtime = ServerRuntime.fromConfig(config);
+      expect(runtime.isToolAllowed(ToolName.CREATE_TOPICS)).toBe(true);
+    });
+
     it("should create a DirectClientManager for each connection", () => {
       const twoConnConfig = new MCPServerConfiguration({
         connections: {
@@ -215,7 +291,7 @@ describe("ServerRuntime", () => {
     it("should leave oauthHolder undefined when the config has no ccloud-oauth", () => {
       const noOauthConfig = new MCPServerConfiguration({
         connections: {
-          [DEFAULT_CONNECTION_NAME]: connWith({
+          [DEFAULT_CONNECTION_ID]: connWith({
             kafka: { bootstrap_servers: "broker:9092" },
           }),
         },
@@ -227,7 +303,7 @@ describe("ServerRuntime", () => {
     it("should construct an OAuthHolder when a connection has type 'oauth'", () => {
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "devel" },
+          [DEFAULT_CONNECTION_ID]: { type: "oauth", ccloud_env: "devel" },
         },
       });
 
@@ -238,25 +314,42 @@ describe("ServerRuntime", () => {
       expect(runtime.oauthHolder?.getDataPlaneToken()).toBeUndefined();
     });
 
-    it("should construct OAuthClientManager instances for every connection when an oauth connection is present", () => {
+    it("should construct an OAuthClientManager for an oauth connection", () => {
       const oauthConfig = new MCPServerConfiguration({
         connections: {
-          [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "stag" },
+          [DEFAULT_CONNECTION_ID]: { type: "oauth", ccloud_env: "stag" },
         },
       });
 
       const runtime = ServerRuntime.fromConfig(oauthConfig);
 
-      expect(runtime.clientManagers[DEFAULT_CONNECTION_NAME]).toBeInstanceOf(
+      expect(runtime.clientManagers[DEFAULT_CONNECTION_ID]).toBeInstanceOf(
         OAuthClientManager,
       );
     });
 
+    it("should construct per-connection manager types for a mixed direct + oauth config", () => {
+      const mixedConfig = new MCPServerConfiguration({
+        connections: {
+          local: connWith({ kafka: { bootstrap_servers: "localhost:9092" } }),
+          cloud: { type: "oauth", ccloud_env: "devel" },
+        },
+      });
+
+      const runtime = ServerRuntime.fromConfig(mixedConfig);
+
+      expect(runtime.clientManagers["local"]).toBeInstanceOf(
+        DirectClientManager,
+      );
+      expect(runtime.clientManagers["cloud"]).toBeInstanceOf(
+        OAuthClientManager,
+      );
+      expect(runtime.oauthHolder).toBeInstanceOf(OAuthHolder);
+    });
+
     it("should throw when more than one OAuth connection is defined", () => {
-      // enforceSingleConnectionOnly() prevents multi-connection records today,
-      // so this case is reached only by callers that bypass the schema (tests
-      // constructing MCPServerConfiguration directly). The defensive throw
-      // becomes load-bearing when multi-connection support lands (#151).
+      // Only one OAuth connection is supported (single shared CCloud identity);
+      // fromConfig rejects a second one rather than silently dropping it.
       const multiOauthConfig = new MCPServerConfiguration({
         connections: {
           "oauth-1": { type: "oauth", ccloud_env: "devel" },

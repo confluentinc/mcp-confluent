@@ -54,7 +54,7 @@ describe("tool-registry.ts", () => {
       it("should return valid ToolConfig for every registered tool", () => {
         for (const name of ALL_TOOL_NAMES) {
           const handler = ToolHandlerRegistry.getToolHandler(name);
-          const config = handler.getToolConfig();
+          const config = handler.getRegisteredToolConfig(runtimeWith());
 
           expect(config.name).toBe(name);
           expect(config.description.length).toBeGreaterThan(10);
@@ -65,7 +65,7 @@ describe("tool-registry.ts", () => {
       it("should have a valid annotation (READ_ONLY, CREATE_UPDATE, or DESTRUCTIVE) for every tool", () => {
         for (const name of ALL_TOOL_NAMES) {
           const handler = ToolHandlerRegistry.getToolHandler(name);
-          const config = handler.getToolConfig();
+          const config = handler.getRegisteredToolConfig(runtimeWith());
 
           expect(config.annotations).toBeDefined();
 
@@ -78,6 +78,25 @@ describe("tool-registry.ts", () => {
             isValidAnnotation,
             `Tool ${name} must use one of: READ_ONLY, CREATE_UPDATE, or DESTRUCTIVE`,
           ).toBe(true);
+        }
+      });
+
+      it("should annotate every connection-agnostic (alwaysEnabled) tool as READ_ONLY so the read-only overlay is a no-op for them", () => {
+        // The read-only verdict overlay disables a tool on a read_only
+        // connection only when its readOnlyHint !== true. Connection-agnostic
+        // tools take no connectionId and so should never be suppressed by a
+        // connection's read_only flag; this holds for free precisely because
+        // every alwaysEnabled tool is READ_ONLY. Pinning it here means the
+        // overlay needs no special-case for the alwaysEnabled set — if a future
+        // mutating tool is wired to alwaysEnabled, this fails instead.
+        for (const name of ALL_TOOL_NAMES) {
+          const handler = ToolHandlerRegistry.getToolHandler(name);
+          if (handler.predicate !== alwaysEnabled) continue;
+          const config = handler.getRegisteredToolConfig(runtimeWith());
+          expect(
+            config.annotations,
+            `Connection-agnostic tool ${name} must be READ_ONLY`,
+          ).toBe(READ_ONLY);
         }
       });
 
@@ -132,7 +151,7 @@ describe("tool-registry.ts", () => {
 
         for (const name of ALL_TOOL_NAMES) {
           const handler = ToolHandlerRegistry.getToolHandler(name);
-          const config = handler.getToolConfig();
+          const config = handler.getRegisteredToolConfig(runtimeWith());
 
           const prefix = name.split("-")[0]!;
 
@@ -229,6 +248,7 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
         // Schema Registry
         [ToolName.LIST_SCHEMAS]: hasSchemaRegistryOrOAuth,
+        [ToolName.CREATE_SCHEMA]: hasSchemaRegistryOrOAuth,
         [ToolName.DELETE_SCHEMA]: hasSchemaRegistryOrOAuth,
         // Tableflow
         [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
@@ -250,6 +270,8 @@ describe("tool-registry.ts", () => {
         [ToolName.GET_PRODUCT_DOC_PAGE]: alwaysEnabled,
         // Diagnostics (no service-block requirement)
         [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
+        [ToolName.LIST_CONFIGURED_CONNECTIONS]: alwaysEnabled,
+        [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: alwaysEnabled,
       };
 
       it.each(
@@ -390,6 +412,7 @@ describe("tool-registry.ts", () => {
           cm.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
         },
       },
+      [ToolName.CREATE_SCHEMA]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_SCHEMA]: { outcome: { throws: "ZodError" } },
       // Flink
       [ToolName.LIST_FLINK_STATEMENTS]: {
@@ -547,6 +570,19 @@ describe("tool-registry.ts", () => {
       // and the handler emits its all-enabled summary.
       [ToolName.EXPLAIN_DISABLED_TOOLS]: {
         outcome: { resolves: "registered tools are advertised via tools/list" },
+        bypassesClientLayer: true,
+      },
+      // list-configured-connections also walks the registry's predicate map rather than
+      // any client; against the single-connection smoke runtime it emits its
+      // connection-count header.
+      [ToolName.LIST_CONFIGURED_CONNECTIONS]: {
+        outcome: { resolves: "1 connection configured:" },
+        bypassesClientLayer: true,
+      },
+      // describe-configured-connection requires a connectionId argument, so the
+      // zero-arg smoke call trips its Zod schema before touching any client.
+      [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: {
+        outcome: { throws: "ZodError" },
         bypassesClientLayer: true,
       },
       // Organizations

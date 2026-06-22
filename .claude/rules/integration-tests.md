@@ -28,12 +28,12 @@ don't conflict.
 
 ## Running Tests Locally
 
-- `npm run test` - full sweep: builds `dist/` then runs both unit and
+- `pnpm run test` - full sweep: builds `dist/` then runs both unit and
   integration projects.
-- `npm run test:unit` - unit tests only (fast, no build).
-- `npm run test:integration` - integration tests only (builds `dist/` then
+- `pnpm run test:unit` - unit tests only (fast, no build).
+- `pnpm run test:integration` - integration tests only (builds `dist/` then
   runs `--project integration`).
-- `npm run test:integration -- --tags-filter=@kafka` - one tool group at a time.
+- `pnpm run test:integration -- --tags-filter=@kafka` - one tool group at a time.
 
 Set up local creds by copying `.env.integration.example` to `.env.integration`
 and filling in the vars your chosen tests need. `tests/harness/setup.ts` loads
@@ -105,7 +105,7 @@ Three non-obvious things the harness does for you:
    and propagates the matching `cflt-mcp-api-key` header to the SDK
    transport.
 3. For HTTP and SSE, calls `findFreePort()` to allocate a fresh TCP port per
-   test file. Tests can run in parallel even if `npm run start:http` is
+   test file. Tests can run in parallel even if `pnpm run start:http` is
    already bound to 8080 locally.
 
 Always call `stop()` in `afterAll` to tear down the child process. The harness
@@ -135,7 +135,8 @@ no-header / wrong-header / correct-header pattern.
 ```ts
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -146,13 +147,11 @@ import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new ListTopicsHandler();
-const runtime = integrationRuntime();
 
 describe("my-handler", { tags: [Tag.KAFKA] }, () => {
   // early-return short-circuits the describe body when creds are absent.
   // see "Skip Pattern" below for why this isn't `describe.skipIf`.
-  if (handler.enabledConnectionIds(runtime).length === 0) {
-    it.skip("requires kafka.bootstrap_servers config", () => {});
+  if (skipIfDisabled(handler, integrationConnection())) {
     return;
   }
 
@@ -266,30 +265,27 @@ problem.
 
 ## Credential Gating by Tool Domain
 
-Tests use `handler.enabledConnectionIds(runtime).length === 0` as the gate
-(the same predicate the server uses in `getToolHandlersToRegister()` to
-decide whether to register the tool). If the server can register it, the
-test runs; if not, the test skips.
+Tests gate via the `skipIfDisabled` helper, which runs the handler's predicate against the single integration-fixture connection.
+This is the same predicate the server uses in `getToolHandlersToRegister()` to decide whether to register the tool, so if the server can register it the test runs; if not, the helper calls `it.skip` and returns `true` so the describe body bails.
+The skip reason defaults to the verdict's `ToolDisabledReason`, so the message names the missing config without a hand-typed string.
 
 ```ts
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 
 const handler = new ListTopicsHandler();
-const runtime = integrationRuntime();
 
-if (handler.enabledConnectionIds(runtime).length === 0) {
-  it.skip("requires kafka.bootstrap_servers config", () => {});
+if (skipIfDisabled(handler, integrationConnection())) {
   return;
 }
 ```
 
-`integrationRuntime()` (in `@tests/harness/runtime.js`) builds the same
-`ServerRuntime` the spawned server would build, by calling
-{@linkcode loadConfigFromYaml} against
-`test-fixtures/yaml_configs/integration.yaml` (the same fixture the
-harness rewrites for each spawn). Both paths share that loader, so the
-test's view of "configured" matches the server's by construction.
+`integrationConnection()` (in `@tests/harness/runtime.js`) returns the sole connection from `test-fixtures/yaml_configs/integration.yaml` (the same fixture the harness rewrites for each spawn), loaded via {@linkcode loadConfigFromYaml}.
+Integration fixtures hold exactly one connection, so a single connection is the right-sized input for a predicate — no `ServerRuntime` to build.
+Pass `{ oauth: true }` for the OAuth fixture (`integration-oauth.yaml`).
+On load failure it returns an empty `direct` connection, so the predicate yields a clean disabled verdict whose reason names the missing config.
+Confluent Platform tests use the peer `cpIntegrationConnection()` from `@tests/harness/cp-runtime.js`, which reads `integration.cp.yaml`.
 
 The fixture is validated by the Zod schema in `src/config/models.ts`
 (`MCPServerConfiguration`). Adding a new service block to the YAML without
@@ -301,23 +297,13 @@ The predicates referenced below live in
 `src/confluent/tools/connection-predicates.ts`. Pick the one matching the
 handler's predicate; if none fit, add a new predicate there first.
 
-The skip-reason string is a hand-typed dotted-path label that names the
-YAML config block(s) the handler's predicate inspects. Picking the right
-label per test:
+The skip reason comes from the predicate's `ToolDisabledReason`, so you no longer hand-type or maintain per-test label strings — the per-test labels #288 anticipated collapsing are gone, sourced from the one enum the predicates already carry.
+Reference the right predicate on the handler and the verdict carries the user-facing phrasing; the REST-proxy tests (`get-topic-config`, `alter-topic-config`) still call `getTestClusterId()` from `@tests/harness/kafka-admin.js` to address the cluster, which throws if `kafka.cluster_id` is missing from the fixture.
 
-- Handlers gating on `hasKafkaBootstrap` (direct Kafka: `list-topics`,
-  `create-topics`, `delete-topics`, `produce-message`, `consume-messages`):
-  `"requires kafka.bootstrap_servers config"`.
-- Handlers gating on `hasKafkaRestWithAuth` (REST proxy: `get-topic-config`,
-  `alter-topic-config`): `"requires kafka.rest_endpoint + kafka.auth config"`.
-  These tests also call `getTestClusterId()` from `@tests/harness/kafka-admin.js`
-  to address the cluster — the helper throws (vs. silently returning
-  `undefined`) if `kafka.cluster_id` is missing from the fixture.
-- Other tool groups (e.g. `@schema`, `@flink`) follow the same shape:
-  pick the dotted YAML key(s) that the handler's predicate touches.
-
-A future cleanup will derive these strings from the handler's predicate
-automatically (see #288 and #289); for now, keep them in sync by hand.
+A few gates need an explicit reason the generic verdict can't express, and pass it as `skipIfDisabled`'s `reasonOverride` (third arg):
+the OAuth-fixture and OAuth-seeding gates pass `OAUTH_FIXTURE_NOT_LOADED_REASON` / `DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON`;
+the Confluent Platform gates pass their docker-compose + `CP_KAFKA_*` setup-runbook string.
+The transport smoke tests don't gate on a handler predicate at all — they ask "did any connection load?" via `integrationConnectionLoaded()`.
 
 ### Auth gap for direct-Kafka handlers (deliberate)
 
@@ -420,11 +406,11 @@ It honors the `INTEGRATION_TEST_CONNECTION_TYPE` env var:
 `all` is an explicit sentinel because the Semaphore Tasks UI serializes an empty-string dropdown option as the literal 2-char string `""`, which would slip past a plain emptiness check.
 The Makefile mirrors this on the tag-filter side: unset or `all` appends no clause, `oauth` appends `&& @oauth` (only OAuth describes collect), `direct` appends `&& !@oauth` so the direct-only lane doesn't double-execute direct-only tests through OAuth describes.
 
-Single-mode tests (the vast majority; everything that needs only direct api-key auth) don't need to touch this; they default to direct via the `integrationRuntime()` / `startServer({ transport })` calls.
+Single-mode tests (the vast majority; everything that needs only direct api-key auth) don't need to touch this; they default to direct via the `integrationConnection()` / `startServer({ transport })` calls.
 
 Dual-mode tests nest **one outer `describe` per handler with two inner connection-specific describes** (one per `ConnectionType` enum value, titled via template strings like `` `with a ${ConnectionType.DIRECT} connection` `` so the title stays in sync if the enum changes).
 Each inner describe is linear (no `isOAuth` branching inside) and gates itself via three early-return skip checks in cost order: connection-type filter, predicate gate, OAuth creds (OAuth describe only).
-The runtime is loaded **after** the filter gate so a CI run that excludes one mode never parses that mode's YAML.
+The connection is loaded **after** the filter gate so a CI run that excludes one mode never parses that mode's YAML.
 
 ```ts
 describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
@@ -433,9 +419,7 @@ describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
       it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
       return;
     }
-    const directRuntime = integrationRuntime({ oauth: false });
-    if (handler.enabledConnectionIds(directRuntime).length === 0) {
-      it.skip("requires <dotted.path> in test-fixtures/yaml_configs/integration.yaml", () => {});
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
 
@@ -449,9 +433,13 @@ describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
       it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
       return;
     }
-    const oauthRuntime = integrationRuntime({ oauth: true });
-    if (handler.enabledConnectionIds(oauthRuntime).length === 0) {
-      it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+    if (
+      skipIfDisabled(
+        handler,
+        integrationConnection({ oauth: true }),
+        OAUTH_FIXTURE_NOT_LOADED_REASON,
+      )
+    ) {
       return;
     }
     const credentials = getOAuthCredentialsFromEnv();
@@ -511,14 +499,19 @@ OAuth describes that need test-side seeding (admin client, SR client, env-id loo
 Gate after the OAuth credential check:
 
 ```ts
-const directRuntime = integrationRuntime({ oauth: false });
-if (handler.enabledConnectionIds(directRuntime).length === 0) {
-  it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+if (
+  skipIfDisabled(
+    handler,
+    integrationConnection(),
+    DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
+  )
+) {
   return;
 }
 ```
 
-Reuses the handler's own `widenForOAuth(...)` predicate against `directRuntime` — strips the OAuth special case, falls back to the direct check the seeding helper needs.
+Reuses the handler's own `widenForOAuth(...)` predicate against the direct connection — strips the OAuth special case, falls back to the direct check the seeding helper needs.
+The `reasonOverride` keeps the explicit `DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON` (not the verdict reason), since it names a seeding precondition the generic verdict can't express.
 OAuth describes that don't seed (e.g. `list-organizations`, `list-billing-costs`) skip this gate.
 
 ## CI Matrix

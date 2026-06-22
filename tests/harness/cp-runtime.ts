@@ -7,7 +7,10 @@
  */
 
 import { loadConfigFromYaml } from "@src/config/index.js";
-import { MCPServerConfiguration } from "@src/config/models.js";
+import {
+  type ConnectionConfig,
+  MCPServerConfiguration,
+} from "@src/config/models.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -19,6 +22,9 @@ const CP_FIXTURE_PATH = resolve(
   process.cwd(),
   "test-fixtures/yaml_configs/integration.cp.yaml",
 );
+
+/** The connection id the CP fixture gives its single connection. */
+const CP_CONNECTION_ID = "cp";
 
 /**
  * The {@linkcode ServerRuntime} the spawned MCP server would see when using
@@ -37,6 +43,28 @@ export function cpIntegrationRuntime(): ServerRuntime {
       {},
     );
   }
+}
+
+/**
+ * The {@link ConnectionConfig} the spawned CP server would see, resolved by id
+ * from the CP fixture. The CP-fixture peer of {@linkcode integrationConnection}
+ * in runtime.ts: a single connection is the right-sized input for a
+ * {@linkcode ConnectionPredicate} gate, with no ServerRuntime to build.
+ *
+ * Resolves by id via {@linkcode MCPServerConfiguration.getConnectionConfig}: a
+ * configured connection is addressed by its id, never by a count-dependent
+ * "sole" lookup. On load failure (creds absent) returns an empty `direct`
+ * connection so the gate skips cleanly; a loaded fixture missing the `cp`
+ * connection is drift and throws loudly.
+ */
+export function cpIntegrationConnection(): ConnectionConfig {
+  let config: MCPServerConfiguration;
+  try {
+    config = loadConfigFromYaml(CP_FIXTURE_PATH, process.env);
+  } catch {
+    return { type: "direct" };
+  }
+  return config.getConnectionConfig(CP_CONNECTION_ID);
 }
 
 export interface CpSpawnConfigOptions {

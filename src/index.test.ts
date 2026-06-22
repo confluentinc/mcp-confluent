@@ -17,10 +17,17 @@ import {
   outputApiKey,
   outputInitConfig,
   outputToolList,
+  performCleanup,
+  resolveAllowedToolNames,
   resolveTelemetryWriteKey,
 } from "@src/index.js";
 import { logger } from "@src/logger.js";
-import { ccloudOAuthRuntime, runtimeWith } from "@tests/factories/runtime.js";
+import { ServerRuntime } from "@src/server-runtime.js";
+import {
+  ccloudOAuthRuntime,
+  runtimeWith,
+  runtimeWithConnections,
+} from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import {
   createFsWrappers,
@@ -162,14 +169,20 @@ describe("index.ts", () => {
   });
 
   describe("getToolHandlersToRegister()", () => {
+    /** A single-(empty)-connection runtime whose operator allow-list is exactly
+     * `allowed` — the candidate set Pass 1 will consider. Pass no args for an
+     * empty allow-list (nothing invokable). */
+    function runtimeAllowing(...allowed: ToolName[]): ServerRuntime {
+      return runtimeWith({}, undefined, undefined, new Set(allowed));
+    }
+
     it("should include a tool when enabledConnectionIds returns connection IDs", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(
         new StubHandler(),
       );
 
       const result = getToolHandlersToRegister(
-        [ToolName.LIST_TOPICS],
-        runtimeWith(),
+        runtimeAllowing(ToolName.LIST_TOPICS),
       );
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
@@ -181,18 +194,15 @@ describe("index.ts", () => {
       );
 
       expect(() =>
-        getToolHandlersToRegister([ToolName.LIST_TOPICS], runtimeWith()),
+        getToolHandlersToRegister(runtimeAllowing(ToolName.LIST_TOPICS)),
       ).toThrow("No tools enabled");
     });
 
-    it("should exclude a tool absent from filteredToolNames", () => {
+    it("should exclude a tool absent from the runtime's allowed set", () => {
       const getToolHandler = vi.spyOn(ToolHandlerRegistry, "getToolHandler");
 
-      expect(() =>
-        getToolHandlersToRegister(
-          [], // LIST_TOPICS not in the allowed set
-          runtimeWith(),
-        ),
+      expect(
+        () => getToolHandlersToRegister(runtimeAllowing()), // empty allow-list
       ).toThrow("No tools enabled");
 
       expect(getToolHandler).not.toHaveBeenCalled();
@@ -206,9 +216,9 @@ describe("index.ts", () => {
       vi.spyOn(ToolHandlerRegistry, "getToolHandler").mockReturnValue(handler);
 
       expect(() =>
-        getToolHandlersToRegister([ToolName.LIST_TOPICS], runtimeWith()),
+        getToolHandlersToRegister(runtimeAllowing(ToolName.LIST_TOPICS)),
       ).toThrow(
-        "Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
+        "Wacky -- Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
       );
     });
 
@@ -224,12 +234,22 @@ describe("index.ts", () => {
       );
 
       const result = getToolHandlersToRegister(
-        [ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS],
-        runtimeWith(),
+        runtimeAllowing(ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS),
       );
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
       expect(result.has(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+
+    it("should register the connection-independent tools on a zero-connection config", () => {
+      const result = getToolHandlersToRegister(runtimeWithConnections({}));
+
+      expect(result.has(ToolName.SEARCH_PRODUCT_DOCS)).toBe(true);
+      expect(result.has(ToolName.GET_PRODUCT_DOC_PAGE)).toBe(true);
+      expect(result.has(ToolName.LIST_CONFIGURED_CONNECTIONS)).toBe(true);
+      expect(result.has(ToolName.EXPLAIN_DISABLED_TOOLS)).toBe(true);
+      // A connection-dependent tool has no connection to enable it.
+      expect(result.has(ToolName.LIST_TOPICS)).toBe(false);
     });
 
     it("should emit one grouped warn per (connectionId, reason) for fully-disabled tools", () => {
@@ -245,8 +265,11 @@ describe("index.ts", () => {
       );
 
       getToolHandlersToRegister(
-        [ToolName.LIST_TOPICS, ToolName.CREATE_TOPICS, ToolName.DELETE_TOPICS],
-        runtimeWith(),
+        runtimeAllowing(
+          ToolName.LIST_TOPICS,
+          ToolName.CREATE_TOPICS,
+          ToolName.DELETE_TOPICS,
+        ),
       );
 
       const warningMessages = warnSpy.mock.calls
@@ -287,8 +310,11 @@ describe("index.ts", () => {
         ToolName.GET_TOPIC_CONFIG,
         ToolName.LIST_CLUSTERS,
         ToolName.EXPLAIN_DISABLED_TOOLS,
+        ToolName.LIST_CONFIGURED_CONNECTIONS,
+        ToolName.DESCRIBE_CONFIGURED_CONNECTION,
         // Schema Registry (hasSchemaRegistryOrOAuth)
         ToolName.LIST_SCHEMAS,
+        ToolName.CREATE_SCHEMA,
         ToolName.DELETE_SCHEMA,
       ];
 
@@ -361,15 +387,33 @@ describe("index.ts", () => {
       });
 
       it("should enable exactly EXPECTED_OAUTH_ENABLED under an OAuth connection", () => {
-        const registered = getToolHandlersToRegister(
-          Object.values(ToolName),
-          ccloudOAuthRuntime(),
-        );
+        const registered = getToolHandlersToRegister(ccloudOAuthRuntime());
 
         expect([...registered.keys()].sort()).toEqual(
           [...EXPECTED_OAUTH_ENABLED].sort(),
         );
       });
+    });
+  });
+
+  describe("resolveAllowedToolNames()", () => {
+    it("should return undefined when neither an allow nor a block list is configured", () => {
+      // The `undefined` sentinel keeps ServerRuntime in its "no filter" state
+      // rather than carrying an all-tools set that means the same thing.
+      expect(resolveAllowedToolNames([], [])).toBeUndefined();
+    });
+
+    it("should restrict to exactly the allow list when one is provided", () => {
+      const allowed = resolveAllowedToolNames([ToolName.LIST_TOPICS], []);
+      expect(allowed).toBeInstanceOf(Set);
+      expect(allowed?.has(ToolName.LIST_TOPICS)).toBe(true);
+      expect(allowed?.has(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+
+    it("should return a set excluding the block list when only a block list is provided", () => {
+      const allowed = resolveAllowedToolNames([], [ToolName.LIST_TOPICS]);
+      expect(allowed?.has(ToolName.LIST_TOPICS)).toBe(false);
+      expect(allowed?.has(ToolName.CREATE_TOPICS)).toBe(true);
     });
   });
 
@@ -791,6 +835,43 @@ describe("index.ts", () => {
       // "no key supplied" so the caller routes through TelemetryService's
       // falsy-writeKey disabled path rather than passing "" to Segment.
       expect(result).toBeFalsy();
+    });
+  });
+
+  describe("performCleanup()", () => {
+    function cleanupDeps() {
+      return {
+        telemetry: { shutdown: vi.fn().mockResolvedValue(undefined) },
+        transportManager: { stop: vi.fn().mockResolvedValue(undefined) },
+        runtime: { oauthHolder: undefined, disconnectAll: vi.fn() },
+      };
+    }
+
+    it("should run every shutdown step then exit 0", async () => {
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockResolvedValue(undefined);
+      const exit = vi.fn();
+
+      await performCleanup(deps, exit);
+
+      expect(deps.telemetry.shutdown).toHaveBeenCalledOnce();
+      expect(deps.transportManager.stop).toHaveBeenCalledOnce();
+      expect(deps.runtime.disconnectAll).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(0);
+    });
+
+    it("should still exit 0 when a shutdown step rejects", async () => {
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockRejectedValue(
+        new Error("disconnect boom"),
+      );
+      const exit = vi.fn();
+
+      await performCleanup(deps, exit);
+
+      expect(exit).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(0);
     });
   });
 });

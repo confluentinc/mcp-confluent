@@ -1,4 +1,3 @@
-import { DEFAULT_CONNECTION_NAME } from "@src/config/env-config.js";
 import type { DirectConnectionConfig } from "@src/config/models.js";
 import {
   KAFKA_PROTECTED_EXTRA_PROPERTY_KEYS,
@@ -679,80 +678,196 @@ describe("config/models.ts", () => {
   });
 
   describe("MCPServerConfiguration", () => {
-    describe("getConnectionNames", () => {
-      it("should return connection names sorted alphabetically", () => {
+    describe("getConnectionIds", () => {
+      it("should return connection ids sorted alphabetically", () => {
         const config = new MCPServerConfiguration({
           connections: { staging: directConnection, local: directConnection },
         });
 
-        expect(config.getConnectionNames()).toEqual(["local", "staging"]);
+        expect(config.getConnectionIds()).toEqual(["local", "staging"]);
       });
     });
 
-    describe("getSoleConnection", () => {
-      it("should return the single defined connection", () => {
+    describe("getConnectionConfig", () => {
+      it("should return the connection config registered under the given id", () => {
         const config = new MCPServerConfiguration({
           connections: { local: directConnection },
         });
 
-        expect(config.getSoleConnection()).toBe(directConnection);
+        expect(config.getConnectionConfig("local")).toBe(directConnection);
       });
 
-      it("should throw when no connections are defined", () => {
-        const config = new MCPServerConfiguration({ connections: {} });
-
-        expect(() => config.getSoleConnection()).toThrow(
-          /No connections defined/,
-        );
-      });
-
-      it("should throw when more than one connection is defined", () => {
+      it("should throw, naming the unknown id and the defined ids (sorted), for an unknown connection id", () => {
+        // ids declared out of order to prove the message sorts them.
         const config = new MCPServerConfiguration({
           connections: {
+            staging: directConnection,
             local: directConnection,
-            staging: {
+          },
+        });
+
+        expect(() => config.getConnectionConfig("ghost")).toThrow(
+          'Unknown connection id "ghost"; defined connections: "local", "staging"',
+        );
+      });
+    });
+  });
+
+  describe("connection description", () => {
+    it("should parse and trim a description on a direct connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            description: "  Production east cluster  ",
+            kafka: { bootstrap_servers: "broker:9092" },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (result.data.connections["production"] as DirectConnectionConfig)
+            .description,
+        ).toBe("Production east cluster");
+      }
+    });
+
+    it("should parse a description on an oauth connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: { type: "oauth", description: "My CCloud login" },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const conn = result.data.connections.foo;
+        // Narrow off the discriminant so `.description` is read through the
+        // OAuth arm's type — this keeps compile-time proof that the arm
+        // actually exposes the field, which an untyped cast would erase.
+        if (conn?.type !== "oauth")
+          throw new Error("expected oauth connection after type assertion");
+        expect(conn.description).toBe("My CCloud login");
+      }
+    });
+
+    it.each(["", "   ", "\t\n"])(
+      "should coerce a blank description (%j) to undefined rather than rejecting",
+      (description) => {
+        const result = mcpConfigSchema.safeParse({
+          connections: {
+            production: {
               type: "direct",
-              kafka: { bootstrap_servers: "staging:9092" },
+              description,
+              kafka: { bootstrap_servers: "broker:9092" },
             },
           },
         });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(
+            (result.data.connections["production"] as DirectConnectionConfig)
+              .description,
+          ).toBeUndefined();
+        }
+      },
+    );
 
-        expect(() => config.getSoleConnection()).toThrow(
-          /Multiple connections defined/,
-        );
+    it("should leave description undefined when omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            kafka: { bootstrap_servers: "broker:9092" },
+          },
+        },
       });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (result.data.connections["production"] as DirectConnectionConfig)
+            .description,
+        ).toBeUndefined();
+      }
+    });
+  });
+
+  describe("connection read_only", () => {
+    it("should accept read_only: true on a direct connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            read_only: true,
+            kafka: { bootstrap_servers: "broker:9092" },
+          },
+        },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (result.data.connections["production"] as DirectConnectionConfig)
+            .read_only,
+        ).toBe(true);
+      }
     });
 
-    describe("getSoleDirectConnection", () => {
-      it("should return the connection narrowed to direct when sole connection is direct", () => {
-        const config = new MCPServerConfiguration({
-          connections: { local: directConnection },
-        });
-
-        const conn = config.getSoleDirectConnection();
-        expect(conn).toBe(directConnection);
-        expect(conn.type).toBe("direct");
+    it("should accept read_only: true on an oauth connection", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          foo: { type: "oauth", read_only: true },
+        },
       });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const conn = result.data.connections.foo;
+        // Narrow off the discriminant so `.read_only` is read through the
+        // OAuth arm's type — compile-time proof the arm exposes the field.
+        if (conn?.type !== "oauth")
+          throw new Error("expected oauth connection after type assertion");
+        expect(conn.read_only).toBe(true);
+      }
+    });
 
-      it("should throw when the sole connection is OAuth-typed", () => {
-        const config = new MCPServerConfiguration({
-          connections: {
-            [DEFAULT_CONNECTION_NAME]: { type: "oauth", ccloud_env: "devel" },
+    it("should default read_only to false when omitted", () => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            kafka: { bootstrap_servers: "broker:9092" },
           },
-        });
-
-        expect(() => config.getSoleDirectConnection()).toThrow(
-          /Expected sole connection to be a direct connection; got type "oauth"/,
-        );
+        },
       });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (result.data.connections["production"] as DirectConnectionConfig)
+            .read_only,
+        ).toBe(false);
+      }
+    });
 
-      it("should propagate the underlying getSoleConnection throw on zero connections", () => {
-        const config = new MCPServerConfiguration({ connections: {} });
-
-        expect(() => config.getSoleDirectConnection()).toThrow(
-          /No connections defined/,
-        );
+    it.each([
+      ["a string", "true"],
+      ["a number", 1],
+      ["null", null],
+    ])("should reject a non-boolean read_only (%s)", (_label, read_only) => {
+      const result = mcpConfigSchema.safeParse({
+        connections: {
+          production: {
+            type: "direct",
+            read_only,
+            kafka: { bootstrap_servers: "broker:9092" },
+          },
+        },
       });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find(
+          (i) => i.path.join(".") === "connections.production.read_only",
+        );
+        expect(issue?.code).toBe("invalid_type");
+      }
     });
   });
 
@@ -766,6 +881,7 @@ describe("config/models.ts", () => {
         expect(result.data.connections.foo).toEqual({
           type: "oauth",
           ccloud_env: "prod",
+          read_only: false,
         });
       }
     });
@@ -826,6 +942,7 @@ describe("config/models.ts", () => {
           type: "oauth",
           ccloud_env: "prod",
           kafka_debug: "security,broker",
+          read_only: false,
         });
       }
     });

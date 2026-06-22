@@ -9,27 +9,27 @@ MCP (Model Context Protocol) server that exposes Confluent Cloud resources (Kafk
 ## Build & Development Commands
 
 ```bash
-npm run build          # tsc && tsc-alias (compile + resolve path aliases)
-npm run dev            # watch mode: tsc + tsc-alias in parallel
-npm run lint           # eslint
-npm run lint:fix       # eslint --fix
-npm run format         # prettier --write
-npm run test                       # unit + integration (live CCloud, builds first)
-npm run test:unit                  # unit tests only (fast, no build)
-npm run test:unit:watch            # unit tests in watch mode
-npm run test:unit:coverage         # unit tests with coverage
-npm run test:integration           # integration tests only (live CCloud, builds first)
-npm run test:integration:coverage  # integration tests with coverage
-npm run test:coverage              # unit + integration with coverage
-npm run typecheck                  # tsc --noEmit (type-check only, includes test suite)
-npm run start          # node dist/index.js --env-file .env (stdio transport)
-npm run start:http     # HTTP transport
-npm run start:all      # all transports (http, sse, stdio)
-npm run inspector      # launch MCP inspector for manual testing
-npm run print:schema   # print tool schemas as markdown
+pnpm run build          # tsc && tsc-alias (compile + resolve path aliases)
+pnpm run dev            # watch mode: tsc + tsc-alias in parallel
+pnpm run lint           # eslint
+pnpm run lint:fix       # eslint --fix
+pnpm run format         # prettier --write
+pnpm run test                       # unit + integration (live CCloud, builds first)
+pnpm run test:unit                  # unit tests only (fast, no build)
+pnpm run test:unit:watch            # unit tests in watch mode
+pnpm run test:unit:coverage         # unit tests with coverage
+pnpm run test:integration           # integration tests only (live CCloud, builds first)
+pnpm run test:integration:coverage  # integration tests with coverage
+pnpm run test:coverage              # unit + integration with coverage
+pnpm run typecheck                  # tsc --noEmit (type-check only, includes test suite)
+pnpm run start          # node dist/index.js --env-file .env (stdio transport)
+pnpm run start:http     # HTTP transport
+pnpm run start:all      # all transports (http, sse, stdio)
+pnpm run inspector      # launch MCP inspector for manual testing
+pnpm run print:schema   # print tool schemas as markdown
 ```
 
-Pre-commit hook runs `npx prettier` and `npx eslint` automatically via Husky on staged files only. Pre-push hook runs `npm run lint` and `npm run typecheck` in parallel.
+Pre-commit hook runs `pnpm exec prettier` and `pnpm exec eslint` automatically via Husky on staged files only. Pre-push hook runs `pnpm run lint` and `pnpm run typecheck` in parallel.
 
 ## Architecture
 
@@ -76,7 +76,7 @@ Detailed conventions (handler structure, input schema rules, registration checkl
 2. Create handler class in `src/confluent/tools/handlers/<domain>/`. Extend the domain subclass if one exists (e.g., `FlinkToolHandler`); otherwise extend `BaseToolHandler` directly and implement `enabledConnectionIds(runtime)` using a predicate from `connection-predicates.ts`.
 3. Implement `getToolConfig()` (name, description, Zod input schema, `annotations`) and `handle()`.
 4. Register the handler in the `ToolHandlerRegistry.handlers` map in `src/confluent/tools/tool-registry.ts`.
-5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `npm run generate:openapi-types`. Commit the updated `src/confluent/openapi-schema.d.ts` alongside the `openapi.json` change.
+5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `pnpm run generate:openapi-types`. Commit the updated `src/confluent/openapi-schema.d.ts` alongside the `openapi.json` change.
 
 ## Code Conventions
 
@@ -85,6 +85,8 @@ Detailed conventions (handler structure, input schema rules, registration checkl
 - `noImplicitAny` is disabled in tsconfig due to OpenAPI type resolution issues.
 - REST API calls use `openapi-fetch` with typed paths from the generated schema — prefer this over raw fetch.
 - Application code reads configuration from `MCPServerConfiguration` / `ConnectionConfig`, never from `process.env`. A `no-restricted-syntax` rule in `eslint.config.mjs` enforces this; the only bootstrap files exempt are `src/index.ts`, `src/cli.ts`, `src/env.ts`, `src/logger.ts`. The `-e` dotenv mutation in `cli.ts` is intentional — it seeds env vars for linked C/Node libraries (OpenSSL, cyrus-sasl, krb5, undici) that read `process.env` outside our control.
+- When adding or renaming a field on a connection arm or service block in `src/config/models.ts`, classify it in the matching `*_FIELD_VISIBILITY` map in `src/confluent/tools/handlers/diagnostics/describe-fields.ts` — `tsc` and `describe-fields.test.ts` fail until you do. This is what keeps the `describe-configured-connection` card from leaking secrets or silently dropping a new knob. See `.claude/rules/config-fields.md`.
+- Always pass an explicit comparator to `.sort()` / `.toSorted()` — never a bare call. Bare `Array.prototype.sort()` coerces elements to strings (so `[2, 10]` sorts to `[10, 2]`), and SonarQube (which gates CI) flags every comparator-less call as `typescript:S2871`. For strings use `(a, b) => a.localeCompare(b)`; for numbers `(a, b) => a - b`. This holds even when the elements are already strings and the default order happens to be correct — the comparator states the intent and survives a later element-type change.
 
 ## Unit Test Conventions
 
@@ -109,6 +111,6 @@ below affect source-code edits too, so they're called out here:
 Integration tests spawn the real MCP server as a child process and exercise it against a real Confluent Cloud account over both stdio and streamable HTTP transports. Full rule at `.claude/rules/integration-tests.md` (auto-loads when editing `*.integration.test.ts` or `tests/harness/**`).
 
 - Colocate next to the handler: `my-handler.integration.test.ts` alongside `my-handler.ts`; tag with `{ tags: ["@<group>"] }` on the outer describe.
-- Run with `npm run test:integration -- --tags-filter=@kafka`. Local creds live in `.env.integration` (gitignored; example in `.env.integration.example`).
+- Run with `pnpm run test:integration -- --tags-filter=@kafka`. Local creds live in `.env.integration` (gitignored; example in `.env.integration.example`).
 - Use the `startServer({ transport, env? })` harness from `@tests/harness/start-server.js`; it handles the `NODE_ENV=test` guard, HTTP auth disable, and free-port allocation.
 - Gate on creds with an early-return inside the describe body (`if (!hasCreds) { it.skip(reason); return; }`), **not** `describe.skipIf` — the latter still runs nested hooks in vitest 4.

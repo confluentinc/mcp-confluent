@@ -9,7 +9,7 @@ paths:
 ## Framework & Location
 
 - Co-located `.test.ts` files alongside source code using Vitest
-- Run with `npm run test:unit` (single run) or `npm run test:unit:watch` (watch mode). `npm run test` runs both unit and integration; reach for it only when you want the full sweep.
+- Run with `pnpm run test:unit` (single run) or `pnpm run test:unit:watch` (watch mode). `pnpm run test` runs both unit and integration; reach for it only when you want the full sweep.
 - Config in `vitest.config.ts`; `@src/*` aliases resolved via `resolve.tsconfigPaths`
 - `restoreMocks: true` is set project-wide, so every `vi.spyOn` call is automatically restored
   after each test - no per-test restore hooks needed
@@ -373,6 +373,28 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 - Use `as any` only on partial mock return values (e.g., a mock admin client with only
   `listTopics`), not on the `ClientManager` mock itself; add an eslint-disable comment when needed.
 
+### Routing tests for multi-connection handlers
+
+A handler that resolves its connection via `resolveConnection(runtime, toolArguments)` (or `resolveDirectConnection`) must route to the caller-addressed `connectionId`, not unconditionally to `enabledConnectionIds[0]`.
+`runtimeWithDecoy` (in `tests/factories/runtime.ts`) is a drop-in replacement for `runtimeWith` that proves this: it plants a "decoy" connection — same service blocks, enabled for the same tools, its own auto-minted client manager — inserted _before_ the real one, so a handler that still grabs the first enabled connection lands on the decoy.
+`assertHandleCase` recognizes a decoy-bearing runtime (by the reserved `DECOY_CONNECTION_ID`), auto-injects `connectionId` for the real connection when the caller omitted it, and asserts the decoy's client manager was never touched.
+It returns the resolved `CallToolResult` (`undefined` if the handler threw), so a case that pins an exact `structuredContent` shape or an exact/regex `textOf` — beyond the `resolves` substring — can capture the return and assert after the harness call.
+
+To get routing coverage, run a suite's `handle()` cases through `assertHandleCase` with a `runtimeWithDecoy` runtime.
+That turns every case into a routing test — no `connectionId` in the args (the harness injects it), and no bespoke routing test body.
+The `it.each` suites need the edit only in the loop's runtime expression; the per-`it()` suites build each case's runtime with `runtimeWithDecoy`.
+The consumer-group and offsets suites (`list-consumer-groups`, `describe-consumer-group`, `get-consumer-group-lag`, `get-partition-offsets`) follow this shape — their behaviour cases all run through the harness, capturing the returned result for the shape/`textOf` assertions the substring check can't express.
+
+A few case kinds legitimately stay as direct `handler.handle(...)` calls rather than routing through the harness, because the harness's outcome assertions can't express what they pin:
+
+- **Thrown-error field shape.** A case asserting `code` / `errno` / `origin` on a thrown librdkafka error via `.rejects.toMatchObject({ ... })` — the harness's `{ throws }` matcher only sees the message (via `classifyThrown`), so it can't pin those fields.
+- **Zod-boundary rejections.** A case pinning `issues[].path` / `issues[].code` on a `ZodError` — `classifyThrown` collapses every `ZodError` to the string `"ZodError"`, so `{ throws: "ZodError" }` would discard the field-path specificity.
+  These also throw before connection resolution, so they exercise no routing worth covering.
+
+Such cases don't carry decoy coverage; the suite's other (harness-routed) cases provide it.
+
+A handler that resolves by grabbing `enabledConnectionIds[0]` instead of the caller's `connectionId` trips the decoy's untouched assertion on every routed case, so the coverage is not vacuous.
+
 ## Test Server & Runtime Fixtures
 
 - `createTestServer(clientManager, toolNames?)` from `@tests/server.js` boots a real `McpServer`
@@ -382,4 +404,5 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
   `@tests/factories/runtime.js`: `bareRuntime()`, `kafkaRuntime()`, `flinkRuntime()`,
   `tableflowRuntime()`, `schemaRegistryRuntime()`, `confluentCloudRuntime()`,
   `telemetryRuntime()`, etc. For uncommon shapes, use `runtimeWith(connectionConfig?, connectionId?, clientManager?)` (all args optional; `connectionId` defaults to `"default"`).
+  Reach for `runtimeWithDecoy(...)` (same signature) when the `handle()` test should double as a routing test — see "Routing tests for multi-connection handlers" above.
   These same factories are used by `base-tools.test.ts` and `connection-predicates.test.ts` for the centralized enablement coverage — handler `*.test.ts` files should not re-derive that coverage (see the Handler Tests section above).

@@ -6,7 +6,7 @@
 
 ### Manual testing instructions
 
-<!-- Include any special instructions to help reviewers verify your changes: which tool(s) to invoke, required env vars, transport(s) exercised (stdio/http/sse), and sample inputs/outputs. For quick iteration, `npm run inspector` launches the MCP Inspector. Delete this section if not applicable (e.g., docs-only or CI changes) -->
+<!-- Include any special instructions to help reviewers verify your changes: which tool(s) to invoke, required env vars, transport(s) exercised (stdio/http/sse), and sample inputs/outputs. For quick iteration, `pnpm run inspector` launches the MCP Inspector. Delete this section if not applicable (e.g., docs-only or CI changes) -->
 
 1.
 

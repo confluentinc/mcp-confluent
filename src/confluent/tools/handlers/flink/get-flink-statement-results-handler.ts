@@ -43,14 +43,17 @@ export class GetFlinkStatementResultsHandler extends FlinkToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const {
       timeoutInMilliseconds,
       statementName,
       environmentId,
       organizationId,
     } = getFlinkStatementResultsArguments.parse(toolArguments);
-    const flink = this.getFlinkDirectConfig(runtime.config);
+    const { conn, clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
+    const flink = this.getFlinkDirectConfig(conn);
     const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
       flink,
       organizationId,
@@ -90,7 +93,7 @@ export class GetFlinkStatementResultsHandler extends FlinkToolHandler {
 
       if (error) {
         return this.createResponse(
-          `Failed to read Flink SQL statement: ${JSON.stringify(error)}`,
+          `Failed to fetch Flink SQL statement results: ${JSON.stringify(error)}`,
           true,
         );
       }
@@ -106,7 +109,7 @@ export class GetFlinkStatementResultsHandler extends FlinkToolHandler {
   getToolConfig(): ToolConfig {
     return {
       name: ToolName.GET_FLINK_STATEMENT_RESULTS,
-      description: "Make a request to read a statement and its results",
+      description: "Fetch the result rows produced by a Flink SQL statement.",
       inputSchema: getFlinkStatementResultsArguments.shape,
       annotations: READ_ONLY,
     };

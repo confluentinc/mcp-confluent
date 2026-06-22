@@ -1,5 +1,5 @@
 import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationDirectConnection } from "@tests/harness/runtime.js";
 import { afterAll, beforeAll } from "vitest";
 
 /**
@@ -36,16 +36,25 @@ export async function connectTestProducer(): Promise<KafkaJS.Producer> {
  * offset}])` directly without subscribing or running a poll loop — the
  * write goes to the group coordinator regardless of assignment state — and
  * must `consumer.disconnect()` when done.
+ *
+ * Pass `{ fromBeginning: true }` for the read-back use case (subscribe + run a
+ * poll loop to read records already on the topic); a fresh group otherwise
+ * resets to the latest offset and would miss records produced before it
+ * subscribed.
  */
 export async function connectTestConsumer(
   groupId: string,
+  options: { fromBeginning?: boolean } = {},
 ): Promise<KafkaJS.Consumer> {
-  // `ConsumerConstructorConfig` is rdkafka-style (top-level `group.id`)
-  // with the kafkajs-style camelCased shape nested under `kafkaJS`. Use the
-  // nested form so the parameter spelling matches the rest of the
-  // kafkajs-flavored test code.
+  // `ConsumerConstructorConfig` is rdkafka-style (top-level keys) with the
+  // kafkajs-style camelCased shape nested under `kafkaJS`. `fromBeginning` is
+  // a kafkajs *subscribe*-time option, not a consumer-constructor one, so
+  // nesting it here is silently dropped; control the start position the way
+  // the production consumer does (direct-client-manager.ts) — via the
+  // top-level librdkafka `auto.offset.reset` key.
   const consumer = newKafkaClient("mcp-confluent-it-consumer").consumer({
     kafkaJS: { groupId },
+    ...(options.fromBeginning ? { "auto.offset.reset": "earliest" } : {}),
   });
   await consumer.connect();
   return consumer;
@@ -60,7 +69,7 @@ export async function connectTestConsumer(
  * `undefined` and produce a confusing downstream error.
  */
 export function getTestClusterId(): string {
-  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const conn = integrationDirectConnection();
   if (!conn.kafka?.cluster_id) {
     throw new Error(
       "test-side cluster id requires kafka.cluster_id in test-fixtures/yaml_configs/integration.yaml",
@@ -121,7 +130,7 @@ function newKafkaClient(clientId: string): KafkaJS.Kafka {
 // resolve from the same YAML fixture the server reads, so the test-side admin and the MCP server
 // can never disagree on which cluster they're talking to
 function kafkaConfig(clientId: string): GlobalConfig {
-  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const conn = integrationDirectConnection();
   if (!conn.kafka?.bootstrap_servers || !conn.kafka.auth) {
     throw new Error(
       "test-side kafka admin requires kafka.bootstrap_servers + kafka.auth in test-fixtures/yaml_configs/integration.yaml",

@@ -1,7 +1,10 @@
-import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import {
+  CREATE_UPDATE,
+  ToolCategory,
+  ToolHandler,
+} from "@src/confluent/tools/base-tools.js";
 import {
   ConnectionPredicate,
-  PredicateResult,
   ToolDisabledReason,
   alwaysEnabled,
   hasKafka,
@@ -41,24 +44,6 @@ const disabledForFlink: ConnectionPredicate = () => ({
   enabled: false,
   reason: ToolDisabledReason.MissingFlinkBlock,
 });
-
-/**
- * Returns a {@linkcode ToolHandler} whose `connectionVerdicts()` resolves
- * to an empty map — the invariant-violation shape the diagnostic tool
- * guards against. `BaseToolHandler.connectionVerdicts` is documented as
- * `@final` but the test deliberately monkey-patches the instance method
- * to reach a branch that should be unreachable in production (every
- * runtime carries at least one connection by `enforceSingleConnectionOnly`).
- */
-function handlerWithEmptyVerdicts(): ToolHandler {
-  const handler = new StubHandler();
-  (
-    handler as unknown as {
-      connectionVerdicts: () => Map<string, PredicateResult>;
-    }
-  ).connectionVerdicts = () => new Map();
-  return handler;
-}
 
 describe("tool-availability.ts", () => {
   describe("groupDisabledToolsByReason()", () => {
@@ -143,6 +128,27 @@ describe("tool-availability.ts", () => {
       expect(
         groupDisabledToolsByReason([[ToolName.LIST_TOPICS, handler]], runtime),
       ).toEqual([]);
+    });
+
+    it("should bucket a mutating tool under ReadOnlyConnection when its sole connection is read_only", () => {
+      // hasKafka passes on the read_only connection, but the read-only overlay
+      // disables the mutating (CREATE_UPDATE) tool — so it surfaces in the log
+      // grouping under the read-only reason, not a missing-block one.
+      const mutatingTool = new StubHandler({
+        predicate: hasKafka,
+        annotations: CREATE_UPDATE,
+      });
+      const groups = groupDisabledToolsByReason(
+        [[ToolName.CREATE_TOPICS, mutatingTool]],
+        runtimeWith({ read_only: true, ...KAFKA_CONN }),
+      );
+      expect(groups).toEqual([
+        {
+          connectionId: "default",
+          reason: ToolDisabledReason.ReadOnlyConnection,
+          toolNames: [ToolName.CREATE_TOPICS],
+        },
+      ]);
     });
 
     it("should order groups lexicographically by connectionId, regardless of insertion order", () => {
@@ -230,15 +236,13 @@ describe("tool-availability.ts", () => {
       });
     });
 
-    it("should classify a tool as enabled when at least one configured connection passes its predicate, omitting it from disabledGroups (lossy v1 flatten)", () => {
-      // Pins the v1 single-connection-scope behaviour against a synthesised
-      // multi-connection runtime: a tool enabled on `with-kafka` and
-      // disabled on `without-kafka` is reported as enabled overall, with
-      // no entry in `disabledGroups`. The asymmetry is dropped — the v2
-      // per-connection / cross-connection-deltas shape (see
-      // ToolGatingReport JSDoc) is the proper fix for this. This test
-      // exists so the lossy aggregation is documented in code rather
-      // than implied by prose.
+    it("should classify a tool as enabled when at least one configured connection passes its predicate, omitting it from disabledGroups (lossy flatten)", () => {
+      // Pins the lossy flatten against a multi-connection runtime: a tool
+      // enabled on `with-kafka` and disabled on `without-kafka` is reported as
+      // enabled overall, with no entry in `disabledGroups`. The asymmetry is
+      // dropped — the per-connection / cross-connection-deltas shape (#559, see
+      // ToolGatingReport JSDoc) is the proper fix. This test exists so the
+      // lossy aggregation is documented in code rather than implied by prose.
       const handler = stubWithPredicate(hasKafka);
       const runtime = runtimeWithConnections({
         "with-kafka": KAFKA_CONN,
@@ -258,20 +262,62 @@ describe("tool-availability.ts", () => {
       });
     });
 
-    it("should throw a 'Wacky --' error when a handler returns an empty verdict map (invariant violation)", () => {
-      // The empty-verdict-map case means a tool's `connectionVerdicts()`
-      // returned no entries — which only happens if `runtime.config.connections`
-      // is empty, which `enforceSingleConnectionOnly()` should have prevented
-      // at bootstrap. The diagnostic tool fails loudly with a `Wacky --`
-      // message rather than fabricating a misleading reason (e.g. the
-      // never-applicable `OAuthNoServiceBlocks`) and shipping it in the
-      // operator-facing report.
-      expect(() =>
-        buildToolGatingReport(
-          [[ToolName.LIST_TOPICS, handlerWithEmptyVerdicts()]],
-          runtimeWith({}),
-        ),
-      ).toThrow(/Wacky --.*empty verdict map/i);
+    it("should report a read_only-suppressed mutating tool under the ReadOnlyConnection reason bucket", () => {
+      // The predicate (hasKafka) passes, so the only thing disabling this write
+      // tool is the read-only overlay — it lands in disabledGroups under
+      // ReadOnlyConnection, the "flip the flag and these return" set.
+      const mutatingTool = new StubHandler({
+        predicate: hasKafka,
+        annotations: CREATE_UPDATE,
+      });
+      const report = buildToolGatingReport(
+        [[ToolName.CREATE_TOPICS, mutatingTool]],
+        runtimeWith({ read_only: true, ...KAFKA_CONN }),
+      );
+      expect(report).toEqual({
+        groupBy: "reason",
+        disabledGroups: [
+          {
+            reason: ToolDisabledReason.ReadOnlyConnection,
+            tools: [ToolName.CREATE_TOPICS],
+          },
+        ],
+        enabledCount: 0,
+        disabledCount: 1,
+      });
+    });
+
+    it("should bucket a connection-dependent tool under NoConnectionsConfigured on a zero-connection runtime", () => {
+      const handler = stubWithPredicate(hasKafka);
+      const report = buildToolGatingReport(
+        [[ToolName.LIST_TOPICS, handler]],
+        runtimeWithConnections({}),
+      );
+      expect(report).toEqual({
+        groupBy: "reason",
+        disabledGroups: [
+          {
+            reason: ToolDisabledReason.NoConnectionsConfigured,
+            tools: [ToolName.LIST_TOPICS],
+          },
+        ],
+        enabledCount: 0,
+        disabledCount: 1,
+      });
+    });
+
+    it("should report a connection-independent tool as enabled on a zero-connection runtime", () => {
+      const handler = stubWithPredicate(alwaysEnabled);
+      const report = buildToolGatingReport(
+        [[ToolName.SEARCH_PRODUCT_DOCS, handler]],
+        runtimeWithConnections({}),
+      );
+      expect(report).toEqual({
+        groupBy: "reason",
+        disabledGroups: [],
+        enabledCount: 1,
+        disabledCount: 0,
+      });
     });
 
     it("should preserve handler iteration order for tools within a single reason group", () => {

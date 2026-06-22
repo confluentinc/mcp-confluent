@@ -10,6 +10,10 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
+    // Required by several handlers that index the openapi-fetch path-based client with
+    // dynamically-built template-literal paths (kafka/tableflow/search/flink) and by the
+    // librdkafka GlobalConfig dotted-key indexing in direct-client-manager.ts. TypeScript
+    // can't resolve those computed index types, so it falls back to an implicit any.
     "noImplicitAny": false,
     "resolveJsonModule": true,
     "esModuleInterop": true,

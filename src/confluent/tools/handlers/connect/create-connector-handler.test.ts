@@ -4,7 +4,7 @@ import {
   CONNECT_CONN_WITH_AUTH,
   ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
-  runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -103,7 +103,7 @@ describe("create-connector-handler.ts", () => {
 
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -137,7 +137,7 @@ describe("create-connector-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             CONNECT_CONN_WITH_AUTH,
             DEFAULT_CONNECTION_ID,
             clientManager,

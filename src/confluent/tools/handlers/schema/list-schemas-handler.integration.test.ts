@@ -16,11 +16,12 @@ import {
   startOAuthServer,
   stopOAuthServer,
 } from "@tests/harness/oauth-flow.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationConnection } from "@tests/harness/runtime.js";
 import {
   TEST_AVRO_SCHEMA,
   withSharedSrClient,
 } from "@tests/harness/schema-registry.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -45,9 +46,7 @@ describe(
         it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
         return;
       }
-      const directRuntime = integrationRuntime({ oauth: false });
-      if (handler.enabledConnectionIds(directRuntime).length === 0) {
-        it.skip("requires schema_registry.endpoint + schema_registry.auth in test-fixtures/yaml_configs/integration.yaml", () => {});
+      if (skipIfDisabled(handler, integrationConnection())) {
         return;
       }
 
@@ -93,6 +92,23 @@ describe(
           const parsed = JSON.parse(textContent(result));
           expect(parsed).toHaveProperty(subject);
         });
+
+        it("should return an array of every version for the subject when latestOnly is false", async () => {
+          const result = await server.client.callTool({
+            name: ToolName.LIST_SCHEMAS,
+            arguments: { subjectPrefix: subject, latestOnly: false },
+          });
+
+          expect(result.isError, textContent(result)).not.toBe(true);
+          // with latestOnly:false the handler walks getAllVersions + getSchemaMetadata per
+          // version, so each subject maps to an array rather than a single metadata object
+          const parsed = JSON.parse(textContent(result));
+          expect(Array.isArray(parsed[subject])).toBe(true);
+          // the seeded subject has exactly one registered version; SR numbers versions from 1
+          expect(parsed[subject]).toHaveLength(1);
+          expect(parsed[subject][0].version).toBe(1);
+          expect(typeof parsed[subject][0].id).toBe("number");
+        });
       });
     });
 
@@ -104,9 +120,13 @@ describe(
           it.skip(CONNECTION_TYPE_OAUTH_FILTERED_REASON, () => {});
           return;
         }
-        const oauthRuntime = integrationRuntime({ oauth: true });
-        if (handler.enabledConnectionIds(oauthRuntime).length === 0) {
-          it.skip(OAUTH_FIXTURE_NOT_LOADED_REASON, () => {});
+        if (
+          skipIfDisabled(
+            handler,
+            integrationConnection({ oauth: true }),
+            OAUTH_FIXTURE_NOT_LOADED_REASON,
+          )
+        ) {
           return;
         }
         const credentials = getOAuthCredentialsFromEnv();
@@ -117,9 +137,13 @@ describe(
         // `withSharedSrClient()` builds an api-key SR client from the direct fixture; gate the
         // OAuth describe on the same predicate the direct describe uses so an OAuth-only CI lane
         // without direct creds skips cleanly instead of crashing in beforeAll
-        const directRuntime = integrationRuntime({ oauth: false });
-        if (handler.enabledConnectionIds(directRuntime).length === 0) {
-          it.skip(DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON, () => {});
+        if (
+          skipIfDisabled(
+            handler,
+            integrationConnection(),
+            DIRECT_FIXTURE_REQUIRED_FOR_OAUTH_SEEDING_REASON,
+          )
+        ) {
           return;
         }
 

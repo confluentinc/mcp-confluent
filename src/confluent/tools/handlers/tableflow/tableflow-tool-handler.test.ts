@@ -3,7 +3,6 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { runtimeWith } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
 
 class StubTableflowHandler extends TableflowToolHandler {
@@ -39,7 +38,7 @@ describe("tableflow-tool-handler.ts", () => {
       it("should prefer explicit args over connection config", () => {
         expect(
           handler["resolveTableflowEnvAndClusterId"](
-            runtimeWith(connWithBoth),
+            connWithBoth,
             "env-from-arg",
             "lkc-from-arg",
           ),
@@ -52,7 +51,7 @@ describe("tableflow-tool-handler.ts", () => {
       it("should fall back to connection config when args are absent", () => {
         expect(
           handler["resolveTableflowEnvAndClusterId"](
-            runtimeWith(connWithBoth),
+            connWithBoth,
             undefined,
             undefined,
           ),
@@ -65,7 +64,7 @@ describe("tableflow-tool-handler.ts", () => {
       it("should use the env arg and fall back to config for cluster_id when only env arg is supplied", () => {
         expect(
           handler["resolveTableflowEnvAndClusterId"](
-            runtimeWith(connWithBoth),
+            connWithBoth,
             "env-from-arg",
             undefined,
           ),
@@ -78,7 +77,7 @@ describe("tableflow-tool-handler.ts", () => {
       it("should fall back to config for env_id and use the cluster arg when only cluster arg is supplied", () => {
         expect(
           handler["resolveTableflowEnvAndClusterId"](
-            runtimeWith(connWithBoth),
+            connWithBoth,
             undefined,
             "lkc-from-arg",
           ),
@@ -105,7 +104,7 @@ describe("tableflow-tool-handler.ts", () => {
         };
         expect(() =>
           handler["resolveTableflowEnvAndClusterId"](
-            runtimeWith(connNoEnv),
+            connNoEnv,
             undefined,
             undefined,
           ),
@@ -123,7 +122,7 @@ describe("tableflow-tool-handler.ts", () => {
         };
         expect(() =>
           handler["resolveTableflowEnvAndClusterId"](
-            runtimeWith(connNoCluster),
+            connNoCluster,
             undefined,
             undefined,
           ),

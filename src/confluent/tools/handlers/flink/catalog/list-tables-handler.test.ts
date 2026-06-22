@@ -4,6 +4,7 @@ import {
   FLINK_CONN,
   HandleCaseWithConn,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -57,7 +58,7 @@ describe("list-tables-handler.ts", () => {
         async ({ args, outcome, connectionConfig = FLINK_CONN }) => {
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -113,7 +114,7 @@ describe("list-tables-handler.ts", () => {
         async ({ args, expectedCatalog }) => {
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               FLINK_CONN,
               DEFAULT_CONNECTION_ID,
               clientManager,

@@ -6,12 +6,23 @@ import { MCPServerConfiguration } from "@src/config/models.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import type { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
+import type { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { createMockInstance, type HandleCase } from "@tests/stubs/index.js";
+import {
+  DECOY_CONNECTION_ID,
+  createMockInstance,
+  type HandleCase,
+} from "@tests/stubs/index.js";
 import { fileURLToPath } from "node:url";
 import type { Mocked } from "vitest";
 
-/** Connection ID used by the named runtime factories and their default single-connection runtimes. */
+/**
+ * Connection id used by the named runtime factories and their default
+ * single-connection runtimes. An arbitrary fixture id — distinct from the
+ * production env-var synthesis constant of the same name (`"_default"`,
+ * exported from `@src/config/env-config.js`); the differing values are
+ * intentional.
+ */
 export const DEFAULT_CONNECTION_ID = "default";
 
 const CCLOUD_OAUTH_FIXTURE = fileURLToPath(
@@ -34,6 +45,7 @@ const CCLOUD_OAUTH_FIXTURE = fileURLToPath(
 export function runtimeWithConnections(
   connections: Record<string, Omit<DirectConnectionConfig, "type">>,
   clientManagers?: Partial<Record<string, Mocked<DirectClientManager>>>,
+  allowedToolNames?: ReadonlySet<ToolName>,
 ): ServerRuntime {
   const directConnections: Record<string, DirectConnectionConfig> = {};
   const resolvedClientManagers: Record<
@@ -48,6 +60,8 @@ export function runtimeWithConnections(
   return new ServerRuntime(
     new MCPServerConfiguration({ connections: directConnections }),
     resolvedClientManagers,
+    undefined,
+    allowedToolNames,
   );
 }
 
@@ -62,10 +76,49 @@ export function runtimeWith(
   clientManager: Mocked<DirectClientManager> = createMockInstance(
     DirectClientManager,
   ),
+  allowedToolNames?: ReadonlySet<ToolName>,
 ): ServerRuntime {
   return runtimeWithConnections(
     { [connectionId]: connectionConfig },
     { [connectionId]: clientManager },
+    allowedToolNames,
+  );
+}
+
+/**
+ * Drop-in replacement for {@link runtimeWith} that additionally plants a
+ * "decoy" connection carrying the same service blocks — enabled for the same
+ * tools, with its own auto-minted client manager that correct routing must
+ * never touch.
+ *
+ * The decoy is inserted FIRST, so a handler that resolves by grabbing
+ * `enabledConnectionIds[0]` instead of routing by the caller's `connectionId`
+ * lands on the decoy and trips the test. {@link assertHandleCase} recognizes the decoy
+ * (by {@link DECOY_CONNECTION_ID}) and, for any handle() test built on this
+ * runtime, auto-routes to the real connection and asserts the decoy stayed
+ * untouched — so swapping a suite's `runtimeWith` for this turns every existing
+ * success case into a routing test with no other change.
+ */
+export function runtimeWithDecoy(
+  connectionConfig: Omit<DirectConnectionConfig, "type"> = {},
+  connectionId = DEFAULT_CONNECTION_ID,
+  clientManager: Mocked<DirectClientManager> = createMockInstance(
+    DirectClientManager,
+  ),
+  allowedToolNames?: ReadonlySet<ToolName>,
+): ServerRuntime {
+  if (connectionId === DECOY_CONNECTION_ID) {
+    throw new Error(
+      `Wacky -- runtimeWithDecoy's real connection id collides with the reserved decoy id "${DECOY_CONNECTION_ID}"`,
+    );
+  }
+  return runtimeWithConnections(
+    {
+      [DECOY_CONNECTION_ID]: connectionConfig,
+      [connectionId]: connectionConfig,
+    },
+    { [connectionId]: clientManager }, // decoy's manager is auto-minted by the factory
+    allowedToolNames,
   );
 }
 
@@ -99,6 +152,20 @@ export const CCLOUD_CONN = {
   },
 };
 
+/**
+ * Catalog/search connection fixture. `hasCCloudCatalogSupport` enables a
+ * connection only when it carries a `confluent_cloud` block and a
+ * `schema_registry` block with api_key auth — so a bare schema-registry
+ * connection is not a valid route for these tools.
+ */
+export const CATALOG_CONN = {
+  ...CCLOUD_CONN,
+  schema_registry: {
+    endpoint: "https://sr.example.com",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+  },
+};
+
 /** Shared Flink connection config fixture for handle() tests. */
 export const FLINK_CONN = {
   flink: {
@@ -107,6 +174,19 @@ export const FLINK_CONN = {
     environment_id: "env-from-config",
     organization_id: "org-from-config",
     compute_pool_id: "lfcp-from-config",
+  },
+};
+
+/**
+ * Flink + telemetry connection fixture for handle() tests of the query profiler,
+ * whose `flinkWithTelemetry` predicate enables a connection only when both blocks
+ * are present — so routing-aware resolution rejects a flink-only connection.
+ */
+export const FLINK_TELEMETRY_CONN = {
+  ...FLINK_CONN,
+  telemetry: {
+    endpoint: "https://api.telemetry.confluent.cloud",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
   },
 };
 
@@ -219,6 +299,30 @@ export function ccloudOAuthRuntime(holder?: OAuthHolder): ServerRuntime {
   return new ServerRuntime(
     config,
     { [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager) },
+    holder,
+  );
+}
+
+/**
+ * Mixed runtime: a `local` direct connection (kafka block) alongside a
+ * `ccloud-oauth` OAuth connection, with a stub `OAuthClientManager` and a
+ * caller-supplied {@link OAuthHolder}. The shape the OAuth-login gate tests
+ * use to prove a local-routed call doesn't trigger the browser bounce while an
+ * OAuth-routed one does.
+ */
+export function localPlusOAuthRuntime(holder?: OAuthHolder): ServerRuntime {
+  const config = new MCPServerConfiguration({
+    connections: {
+      local: { type: "direct", kafka: { bootstrap_servers: "localhost:9092" } },
+      "ccloud-oauth": { type: "oauth", ccloud_env: "devel" },
+    },
+  });
+  return new ServerRuntime(
+    config,
+    {
+      local: createMockInstance(DirectClientManager),
+      "ccloud-oauth": createMockInstance(OAuthClientManager),
+    },
     holder,
   );
 }

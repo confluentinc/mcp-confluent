@@ -5,18 +5,26 @@ FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 
 
-COPY package.json package-lock.json ./
+# pnpm-workspace.yaml carries `overrides` and `onlyBuiltDependencies`; without it
+# the install would skip the native build scripts for @confluentinc/kafka-javascript
+# (and others), producing an image whose native addon never gets compiled.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-RUN npm ci
+# Install any recent pnpm; it reads package.json's `packageManager` field and
+# self-switches to the pinned version, keeping that field the single source of
+# truth shared with CI and local dev (no version pin or Corepack needed).
+RUN npm install --global pnpm && pnpm install --frozen-lockfile
 
 COPY tsconfig.json tsconfig.build.json ./
 COPY src/ ./src/
 COPY assets/ ./assets/
 
-RUN npm run build
+RUN pnpm run build
 
-# remove dev dependencies, keeping compiled native modules intact
-RUN npm prune --omit=dev
+# remove dev dependencies, keeping compiled native modules intact. pnpm uses
+# relative symlinks with the .pnpm store nested under node_modules, so the
+# pruned node_modules copies cleanly into the production stage below.
+RUN pnpm prune --prod
 
 # Production stage
 FROM ${NODE_IMAGE}

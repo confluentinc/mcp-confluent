@@ -1,6 +1,11 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import { SchemaRegistryClient, SerdeType } from "@confluentinc/schemaregistry";
+import {
+  KEY_SCHEMA_ID_HEADER,
+  SchemaRegistryClient,
+  SerdeType,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import { CallToolResult } from "@src/confluent/schema.js";
@@ -231,7 +236,15 @@ export interface ProcessedMessage {
    */
   timestamp: string;
   offset: string;
-  headers?: Record<string, string>;
+  /**
+   * Record headers echoed back to the caller. Kafka headers are an ordered
+   * list whose keys may repeat, so a repeated key is preserved as a
+   * `string[]` (multiplicity intact) while a single-occurrence key stays a
+   * scalar `string` — mirroring the per-key shape the underlying client
+   * surfaces. The schema-id headers decode to their GUID; every other value
+   * is stringified element-wise (see {@link echoHeaderValue}).
+   */
+  headers?: Record<string, string | string[]>;
   topic: string;
   partition: number;
 }
@@ -249,6 +262,50 @@ export function formatMessageTimestamp(ts: string | undefined): string {
   const ms = Number(ts);
   if (!Number.isFinite(ms)) return ts;
   return new Date(ms).toISOString();
+}
+
+const SCHEMA_ID_HEADER_KEYS: ReadonlySet<string> = new Set([
+  VALUE_SCHEMA_ID_HEADER,
+  KEY_SCHEMA_ID_HEADER,
+]);
+
+/**
+ * Render a record header for the echoed consume response, preserving
+ * multiplicity: a repeated-key header (surfaced by the client as an array)
+ * maps element-wise to a `string[]`, while a single-occurrence header stays a
+ * scalar `string`. Joining the array via `Array.prototype.toString` would
+ * collapse `["a", "b"]` to the lossy `"a,b"` — indistinguishable from a
+ * single value literally containing a comma (#597).
+ */
+function echoHeaderValue(
+  key: string,
+  value: Buffer | string | (Buffer | string)[] | undefined,
+): string | string[] {
+  if (Array.isArray(value)) {
+    return value.map((element) => echoSingleHeaderValue(key, element));
+  }
+  return echoSingleHeaderValue(key, value);
+}
+
+/**
+ * Stringify one header occurrence. The schema-id headers
+ * (__value_schema_id / __key_schema_id) carry the schema GUID as raw bytes;
+ * decode them to the canonical GUID string so callers see the same schema
+ * identifier the CCloud UI and VS Code extension surface. Every other
+ * value — and any schema-id header whose bytes don't decode to a GUID — is
+ * stringified as-is.
+ */
+function echoSingleHeaderValue(
+  key: string,
+  value: Buffer | string | undefined,
+): string {
+  if (SCHEMA_ID_HEADER_KEYS.has(key) && Buffer.isBuffer(value)) {
+    const guid = schemaRegistryHelper.decodeSchemaGuidHeader(value);
+    if (guid !== null) {
+      return guid;
+    }
+  }
+  return value?.toString() || "";
 }
 
 /**
@@ -955,8 +1012,15 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       options: ValueOptions | KeyOptions,
       serdeType: SerdeType,
     ): Promise<unknown> => {
+      // A null/undefined payload (Kafka tombstone, or an absent key/value)
+      // can't be decoded — short-circuit before any SR lookup so the
+      // deserializer is never handed a non-Buffer and no spurious error is
+      // logged on the inevitable failure.
+      if (buffer == null) {
+        return undefined;
+      }
       if (options.disableSchemaRegistry || !registry) {
-        return buffer?.toString();
+        return buffer.toString();
       }
       const subject =
         options.subject ||
@@ -966,22 +1030,23 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         subject,
       );
       if (!schema || !schema.schemaType) {
-        return buffer?.toString();
+        return buffer.toString();
       }
       try {
         return await schemaRegistryHelper.deserializeMessage(
           topic,
-          buffer as Buffer,
+          buffer,
           schema.schemaType,
           registry,
           serdeType,
+          message.headers,
         );
       } catch (err) {
         logger.error(
           { error: err, topic, schemaType: schema.schemaType, serdeType },
           `Error deserializing message ${serdeType} for topic ${topic}`,
         );
-        return buffer?.toString();
+        return buffer.toString();
       }
     };
 
@@ -1007,7 +1072,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
         ? Object.fromEntries(
             Object.entries(message.headers).map(([key, value]) => [
               key,
-              value?.toString() || "",
+              echoHeaderValue(key, value),
             ]),
           )
         : undefined,
@@ -1028,9 +1093,11 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    * @param runtime - The {@link ServerRuntime} (config + active client
    *   manager + OAuth holder). Supplied by the MCP server dispatcher;
    *   the handler resolves cluster/env/registry clients off of it.
-   * @param toolArguments - Parsed args matching `consumeKafkaMessagesArgs`.
-   *   The handler re-parses internally to apply defaults at the
-   *   boundary.
+   * @param toolArguments - Raw tool arguments (`Record<string, unknown>`) as
+   *   handed in by the MCP dispatcher. The handler parses them with
+   *   `consumeKafkaMessagesArgs` to apply defaults; `resolveConnection` reads
+   *   `connectionId` off this unparsed object (a handler-local `z.object`
+   *   re-parse would strip the key it never declared).
    * @returns A {@link CallToolResult}. Success path emits a text block
    *   summarizing the consumed messages; failures (build/preflight/run
    *   errors) surface via `createResponse(text, true)` with the
@@ -1038,12 +1105,15 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    */
   async handle(
     runtime: ServerRuntime,
-    toolArguments: z.infer<typeof consumeKafkaMessagesArgs>,
+    toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const parsed = consumeKafkaMessagesArgs.parse(toolArguments);
     const { maxMessages, timeoutMs, valueFormat, keyFormat } = parsed;
 
-    const { connId, conn, clientManager } = this.resolveSoleConnection(runtime);
+    const { connId, conn, clientManager } = this.resolveConnection(
+      runtime,
+      toolArguments,
+    );
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
     // Auto-decode when SR is reachable on this connection (OAuth always; direct

@@ -1,10 +1,8 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
-  BaseToolHandler,
   READ_ONLY,
   ToolCategory,
   ToolConfig,
-  ToolHandler,
 } from "@src/confluent/tools/base-tools.js";
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
 import {
@@ -13,6 +11,7 @@ import {
   disabledToolGroupKey,
   type ToolGatingReport,
 } from "@src/confluent/tools/tool-availability.js";
+import { ToolMetadataHandler } from "@src/confluent/tools/tool-metadata-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
@@ -34,53 +33,32 @@ const explainDisabledToolsArguments = z.object({
  * absence — which config piece is missing, and which tools each gap would
  * unlock. This handler returns that view.
  *
- * v1 scope (today's release): the server enforces a single configured
- * connection (see `enforceSingleConnectionOnly()` in
- * `src/config/models.ts`), so the output is a flat list of disabled tools
- * grouped by the missing config piece (kafka block, flink block, schema
- * registry block, …). Tools enabled on the active connection are
- * intentionally absent — `tools/list` already advertises them.
+ * Current shape: a flat list of disabled tools grouped by the missing config
+ * piece (kafka block, flink block, schema registry block, …), or by
+ * `NoConnectionsConfigured` when the config has no connections at all. Tools
+ * enabled on any connection are intentionally absent — `tools/list` already
+ * advertises them.
  *
- * v2 plan (when multi-connection support lands — issue #151's follow-ups):
- * regrow output around connections. The text body becomes one block per
- * connection (header + per-connection gaps) plus a `Cross-connection
- * deltas` section that surfaces tools enabled on some connections but not
- * others — the canonical "what does connection B need to reach parity with
- * connection A?" view. The structured `_meta` shape mirrors that change;
- * see the {@linkcode ToolGatingReport} JSDoc in `tool-availability.ts` for
- * the exact target type.
+ * The flatten is *lossy* on a multi-connection config: a tool enabled on at
+ * least one connection is reported as enabled (and omitted from
+ * `disabledGroups` entirely), and a tool disabled on several connections with
+ * different reasons is bucketed under the first disabled verdict its iteration
+ * produces — the cross-connection asymmetry vanishes from the output.
  *
- * Until v2 lands, the helper accepts a multi-connection runtime without
- * crashing, but the v1 flatten is *lossy*: a tool whose predicate is
- * enabled on at least one configured connection is reported as enabled
- * (and therefore omitted from `disabledGroups` entirely), and a tool
- * disabled on multiple connections with different reasons is bucketed
- * under the first disabled verdict its iteration produces — the
- * cross-connection asymmetry vanishes from the output. Today's
- * single-connection invariant means neither lossy case can fire in
- * production; this paragraph exists so a future reader does not mistake
- * defensive iteration for parity reporting.
+ * #559 regrows the output around connections: one block per connection
+ * (header + per-connection gaps) plus a `Cross-connection deltas` section
+ * surfacing tools enabled on some connections but not others — the canonical
+ * "what does connection B need to reach parity with connection A?" view. The
+ * structured `_meta` shape mirrors that change; see the
+ * {@linkcode ToolGatingReport} JSDoc in `tool-availability.ts`.
  *
  * Always enabled (predicate is `alwaysEnabled`) so an operator can call it
  * to diagnose a config that left every other tool disabled.
  *
- * The handlers iterable is supplied at construction time via a thunk so
- * this module does not need to import `ToolHandlerRegistry`. Importing the
- * registry from a registered handler would create an ESM cycle, leaving
- * the registry's static initializer running before this class's binding
- * is set. The thunk is invoked at request time, after every module is
- * fully loaded, sidestepping the cycle entirely.
+ * The tool catalog is supplied through the thunk that {@link
+ * ToolMetadataHandler} owns, for the ESM-cycle reason documented there.
  */
-export class ExplainDisabledToolsHandler extends BaseToolHandler {
-  private readonly listHandlers: () => Iterable<
-    readonly [ToolName, ToolHandler]
-  >;
-
-  constructor(listHandlers: () => Iterable<readonly [ToolName, ToolHandler]>) {
-    super();
-    this.listHandlers = listHandlers;
-  }
-
+export class ExplainDisabledToolsHandler extends ToolMetadataHandler {
   handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -89,7 +67,7 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
       toolArguments ?? {},
     );
     const report = buildToolGatingReport(
-      this.listHandlers(),
+      this.getToolNamesAndHandlers(),
       runtime,
       group_by,
     );
@@ -138,9 +116,9 @@ export class ExplainDisabledToolsHandler extends BaseToolHandler {
  *
  * Two-space indent on the bucket header, four-space indent on the bullets.
  *
- * v2 (multi-connection): grow a connection header per per-connection
- * section and an optional `Cross-connection deltas` section. See the
- * handler's class JSDoc for the migration sketch.
+ * v2 (#559, multi-connection): grow a per-connection section (header +
+ * per-connection gaps) plus an optional `Cross-connection deltas` section.
+ * See the handler's class JSDoc for the migration sketch.
  */
 function renderReport(report: ToolGatingReport): string {
   const total = report.enabledCount + report.disabledCount;

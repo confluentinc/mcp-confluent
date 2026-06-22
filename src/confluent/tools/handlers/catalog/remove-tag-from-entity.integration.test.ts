@@ -5,12 +5,16 @@ import {
   getTestClusterId,
   withSharedAdminClient,
 } from "@tests/harness/kafka-admin.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import {
+  integrationConnection,
+  integrationDirectConnection,
+} from "@tests/harness/runtime.js";
 import {
   TEST_AVRO_SCHEMA,
   withSharedCatalogTagsClient,
   withSharedSrClient,
 } from "@tests/harness/schema-registry.js";
+import { skipIfDisabled } from "@tests/harness/skip-gate.js";
 import {
   startServer,
   type StartedServer,
@@ -23,7 +27,6 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const handler = new RemoveTagFromEntityHandler();
-const runtime = integrationRuntime();
 
 describe(
   "remove-tag-from-entity-handler",
@@ -36,13 +39,12 @@ describe(
     ],
   },
   () => {
-    if (handler.enabledConnectionIds(runtime).length === 0) {
-      it.skip("requires schema_registry.endpoint + schema_registry.auth (api_key) config", () => {});
+    if (skipIfDisabled(handler, integrationConnection())) {
       return;
     }
     // test-side deps beyond the handler predicate (kafka admin + SR cluster id discovery); gating
     // here keeps a missing field as a skip rather than a beforeAll throw that fails the suite
-    const conn = runtime.config.getSoleDirectConnection();
+    const conn = integrationDirectConnection();
     if (!conn.confluent_cloud) {
       it.skip("requires confluent_cloud config for SR cluster id discovery", () => {});
       return;

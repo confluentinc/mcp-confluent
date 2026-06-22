@@ -4,45 +4,70 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Removed
+
+- The deprecated `FLINK_ENV_NAME` environment variable. Use `FLINK_CATALOG_NAME` (or a connection's `flink.catalog_name` in YAML) instead.
+
+### Fixed
+
+- `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.
+
+### Changed
+
+- **Configuration**: _A YAML config may now define multiple connections — or none._ Point a single `config.yaml` at several clusters at once — for example a local Apache Kafka broker alongside Confluent Cloud — or run with no connection at all (documentation search and server-diagnostic tools still work). At most one of those connections may use OAuth to Confluent Cloud. See [CONFIGURATION.md → Multiple connections (and zero connections)](CONFIGURATION.md#multiple-connections-and-zero-connections).
+  - When multiple connections are enabled, all connection-oriented tools will be driven with the connection id the tool should be invoked against, even if said tool was only invokable against a single connection to improve clarity and consistency (such as would be the case for a mutating tool invocation when one connection is marked read_only and the other allows writes).
+
+#### Added
+
+- **Configuration**: _Per-connection `description` field._ Optional free-text label on any connection, echoed back by `list-configured-connections`.
+- **Configuration**: _Per-connection `read_only` flag._ Set `read_only: true` on a connection to auto-disable every state-mutating tool for it, leaving only read-only tools enabled. **Defaults to `false`** --- resources reachable by a connection may be mutated or deleted from. The `list-configured-connections` tool reports each connection's read-onlyness.
+
+#### New Tools / Tool Features
+
+- **`create-schema` tool.** Registers a schema (or a new version) under a subject in the Schema Registry, peer to `list-schemas` and `delete-schema`.
+- **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.
+- **`describe-configured-connection` tool.** Read-only, always-enabled discovery tool that, given one connection id, reports its non-secret config (never credentials), read-only-ness, and the tools enabled on it alongside the reason each disabled tool is gated off.
+- **`produce-message` improvements:**
+  - **Record-level `partition`, `timestamp`, and `headers`.** Three optional arguments for faithfully reproducing a record on another cluster: `partition` (non-negative integer) pins the target partition; `timestamp` accepts a `Date.parse`-able date-time string (ISO 8601 recommended) or a non-negative integer ms-since-epoch number (an unparseable value returns an error instead of silently stamping wall-clock time); `headers` maps a header name to a string or array of strings (multi-valued), carried as raw Kafka headers independent of Schema Registry serialization.
+  - **Support for schema-id-in-headers**: The tool can be asked to encode the schema GUID(s) (UUIDs) in the Kafka message headers. By default, however, schema IDs are encoded in the payload's magic-byte prefix (the standard Confluent wire format).
+- **`consume-messages` tool** now also supports deserializing records based on schema GUIDs encoded in the message headers (`__value_schema_id` / `__key_schema_id`), and surfaces those header-located schema GUIDs in the returned headers so callers can see which schema each record used.
+
+## 1.4.0
+
 ### Added
 
 #### New Tools / Tool Features
 
-- **`consume-messages` per-topic partition + starting-position controls.** Each `topics[]` entry on the consume tool now accepts an optional `partition` (restrict consumption to a single 0-indexed partition; the other assigned partitions are paused after the first poll so the consumer only delivers records from the requested one) and an optional `start` tagged-union field for picking where to begin: `"earliest"` (partition low watermark, the entire retained history), `"latest"` (high watermark, only newly-produced messages), `{offset: "N"}` (absolute partition offset as a digit-only string so int64 values past JS's 2^53 safe-integer range stay precise; requires `partition`), `{timestamp: ...}` (ISO 8601 string or ms-since-epoch number, broker-resolved per-partition via `admin.fetchTopicOffsetsByTimestamp`), or `{tail: N}` (the N most recent already-written messages on the partition — the handler seeks server-side to `max(lowWatermark, highWatermark - N)` and returns immediately without waiting for new traffic; empty partitions return zero messages without error; requires `partition`). Examples:
+- **`consume-messages` per-topic `partition` and `start` controls.** Each `topics[]` entry now accepts an optional `partition` (consume a single partition) and an optional `start` position (default `"earliest"`): `"earliest"`, `"latest"`, `{offset: "N"}` (requires `partition`), `{timestamp: ...}` (ISO 8601 or ms-since-epoch), or `{tail: N}` (the N most recent existing messages, returned without waiting for new traffic; requires `partition`). Examples:
   - `{name: "orders", partition: 0, start: {offset: "42"}}` — read partition 0 starting at offset 42.
   - `{name: "orders", start: {timestamp: "2026-05-14T17:00:00Z"}}` — every partition seeks to the broker-resolved offset for that timestamp.
   - `{name: "orders", partition: 0, start: {tail: 50}}` — the last 50 messages already on partition 0, returned without blocking for new writes.
   - `{name: "A", start: "earliest"}, {name: "B", start: "latest"}` — mixed-direction call: topic A replays its history while topic B parks at its high watermark.
-- **`get-partition-offsets` tool.** Read-only per-partition watermark lookup for a Kafka topic. Returns `{topicName, partitions: [{partition, lowWatermark, highWatermark, messageCount}]}` with `lowWatermark` / `highWatermark` as strings (int64 precision past JS's 2^53 safe-integer boundary) and `messageCount` as a server-side `BigInt(high) - BigInt(low)` narrowed to `Number`. Optional `partition` arg restricts the response to a single partition; non-existent topic and out-of-range partition both surface clean tool-level errors rather than leaking librdkafka text.
-- **`list-consumer-groups` tool.** Read-only enumeration of consumer groups on a Kafka cluster, wrapping the broker's native `listGroups` admin call. Optional `matchStates` (array of TitleCase state names — `Stable`, `Empty`, etc.) and `matchType` (scalar `Classic` | `Consumer`) filter server-side so callers can ask "show me only Stable groups" or "only the orphaned ones" without a second round trip. Per-broker partial failures surface verbatim through the response's `errors` array; total failures (no groups at all) become a tool-level error citing the first broker message.
-- **`describe-consumer-group` tool.** Read-only single-group inspector, wrapping the broker's `describeGroups` admin call for one group ID. Returns the group's state, type, protocol, partition assignor, coordinator, and per-member assignment as a flat array of `{topic, partition}` pairs (the raw librdkafka `memberAssignment` / `memberMetadata` Buffers are deliberately dropped — they're protocol-level encoded bytes useless to an LLM, and the per-pair upstream `error` / `leaderEpoch` fields are stripped too). `groupInstanceId` is surfaced only when the member is using static membership; `coordinator.rack` is surfaced only when the broker reports it. Unknown group IDs collapse into the same caller-friendly tool-level error `Consumer group "<id>" not found on this cluster.` across all three broker shapes the handler has observed: a top-level `ERR_GROUP_ID_NOT_FOUND` rejection, a per-group `GroupDescription.error` with that code, and (the path Confluent Cloud actually takes) a successful-shaped tombstone with `state: "Dead"`, no members, and empty `protocol`/`partitionAssignor` strings.
-- **`get-consumer-group-lag` tool.** Read-only live offset-lag computation for a single Kafka consumer group, combining `admin.fetchOffsets({groupId})` (committed offsets) with the shared partition-watermark helper (high watermarks) and BigInt-subtracting per partition.
-- **Connector inspection tools: four new READ_ONLY views.** `get-connector-config` (flat config map), `get-connector-offsets` (per-task offsets), `get-connector-status` (state + per-task health), and `get-connector-tasks` (per-task configs).
-  Three of these expose data the prior `read-connector` tool didn't return at all — offsets, runtime status, and per-task configs — and the model can fetch just the view it needs without paying for fields irrelevant to the question.
-  `get-connector-status` also surfaces the connector's resource ID (`lcc-...`) as a top-level `lccId` by requesting `?expand=id`, so downstream "by connectorId" tools (metrics, logs) don't need a separate lookup.
-- **Connector lifecycle tools: four new CREATE_UPDATE actions.** `pause-connector` (`PUT /connectors/{name}/pause` — idempotent), `resume-connector` (`PUT /connectors/{name}/resume` — idempotent), `restart-connector` (`POST /connectors/{name}/restart` — asynchronous; CCloud's managed Connect does not expose the upstream Apache Kafka `includeTasks` / `onlyFailed` query flags, so the tool restarts the connector and its tasks as a single unit), and `update-connector-config` (`PUT /connectors/{name}/config` — **full-replace semantics: omitted keys are removed**, and the supplied map must include every key the connector class requires or CCloud will reject it).
-- **Connector error-diagnostics tools: three new READ_ONLY views for troubleshooting FAILED connectors.** `get-connector-error-summary` (projects Cloud's `/status` diagnostic extras — `error_summary`, `validation_errors`, `errors_from_trace`, `override_message`, `plugin_lifecycle`, per-task trace heads — into a compact form, parsing the `field: message` shape of validation errors; healthy connectors short-circuit to a one-liner), `get-connector-error-recommendations` (thin projection over Cloud's `/error-recommendations` endpoint, returning Cloud-generated remediation strings plus `eventId` for support cross-reference; the 400 "no stack trace yet" response becomes a friendly fallback rather than a tool error), and `get-connector-logs` (retrieves recent log entries from `api.logging.confluent.cloud` via a two-step token exchange — `POST /api/access_tokens` for a data-plane bearer token, then `POST /logs/v1/search` — with optional level / time-window / pagination controls and CRN construction from the resolved `confluent_cloud.organization_id` or an auto-resolution lookup against `/org/v2/organizations`).
+- **`get-partition-offsets` tool.** Read-only per-partition low/high watermark and message-count lookup for a Kafka topic; optional `partition` narrows the response.
+- **`list-consumer-groups` tool.** Read-only enumeration of a Kafka cluster's consumer groups, with optional server-side `matchStates` / `matchType` filters.
+- **`describe-consumer-group` tool.** Read-only inspector for a single group: state, type, protocol, partition assignor, coordinator, and per-member topic/partition assignment.
+- **`get-consumer-group-lag` tool.** Read-only per-partition offset lag for a single consumer group (committed offset vs. high watermark).
+- **Connector inspection tools (4, read-only):** `get-connector-config`, `get-connector-offsets`, `get-connector-status` (also surfaces the connector's `lcc-...` resource ID as `lccId`), and `get-connector-tasks`.
+- **Connector lifecycle tools (4):** `pause-connector`, `resume-connector`, `restart-connector`, and `update-connector-config` (full-replace semantics — omitted keys are removed).
+- **Connector error-diagnostics tools (3, read-only):** `get-connector-error-summary`, `get-connector-error-recommendations`, and `get-connector-logs` — for troubleshooting FAILED connectors.
 
 #### New Internals
 
-- **`BaseToolHandler.createStructuredResponse(text, structured)`.** Additive helper that surfaces a tool's machine-readable payload via MCP's [`structuredContent` channel](https://modelcontextprotocol.io/specification/2025-11-25/server/tools), with the text content keeping its human-readable summary role. First adopter is `list-consumer-groups`; the broader migration across paginated list handlers is tracked in #435.
-- **Tool category taxonomy.** Each tool is now classified into one of 11 `ToolCategory` values (`kafka`, `flink`, ...) — an operator-facing "what kind of tool is this?" axis, orthogonal to the existing "is this tool enabled?" gating. The category surfaces in three places:
-  - As `_meta.category` on every `tools/list` advertisement, so MCP clients (Claude, the inspector, etc.) can group or filter the catalog by functional area.
-  - In the `--list-tools` CLI output, which now buckets tools under one section header per category instead of printing them in registry-declaration order.
-  - On the `explain-disabled-tools` tool, which gains an optional `group_by: "reason" | "category"` argument (default `"reason"`). Pass `group_by: "category"` to regroup the same diagnostic data by functional area when the operator's question is "what's offline in my Flink setup?" rather than "what config piece is missing?".
+- **`BaseToolHandler.createStructuredResponse(text, structured)`.** Surfaces a tool's machine-readable payload via MCP's `structuredContent` channel while the text content keeps its human-readable role. First adopter is `list-consumer-groups`; broader migration tracked in #435.
+- **Tool category taxonomy.** Each tool is classified into one of 11 `ToolCategory` values, surfaced as `_meta.category` on `tools/list`, as section headers in `--list-tools` output, and via a new optional `group_by: "reason" | "category"` argument on `explain-disabled-tools`.
 
 ### Changed
 
 - **`read-flink-statement` tool renamed to `get-flink-statement-results`.** The old name read as a peer to `read-connector` / `read-environment` (fetch the resource), but the tool actually returns a statement's _result rows_, not the statement definition. The new name matches the `get-…` verb the rest of the surface uses for result/data reads. Inputs, output shape, and behavior are unchanged; update any client config that pins the tool by name.
-- **`consume-messages` tool: breaking shape changes alongside the new controls above.**
-  - **Top-level `offsetReset` field removed.** Position control is consolidated into the per-topic `start` tagged union (see Added); the consumer-level `auto.offset.reset` is derived from the call. The consolidation enables mixed-direction calls the prior consumer-wide `offsetReset` couldn't express ("topic A from earliest, topic B from latest" in one call now works). The starting-position default stays at `"earliest"` (no behavior change for bare-name calls); pass `start: "latest"` on the topic entries that should read only newly-produced messages.
-  - **`value` / `key` deserialization options renamed to `valueFormat` / `keyFormat`.** The old names read as data peers to `topics` (especially `value`, which looks like "the value to produce"); the new names describe what the fields do — the format/encoding of the bytes. Both are also now omit-by-default, so the simple consume call no longer needs `value: {}` filler.
-  - **`topicNames: string[]` removed in favor of the richer `topics[]` shape.** The single required field is now `topics`, an array of per-topic option objects. The minimal call is `{topics: [{name: "orders"}]}`; the same array carries optional `partition` and `start` controls on the entries that need them.
-  - **Schema Registry decoding now defaults on; opt out per side with `disableSchemaRegistry: true`.** The old useSchemaRegistry: true opt-in is gone; SR decoding now happens automatically by default. Opt out per side with `disableSchemaRegistry: true` on valueFormat / keyFormat.
+- **`consume-messages`: breaking input-shape changes** alongside the new controls above.
+  - `topicNames: string[]` replaced by `topics[]`, an array of per-topic option objects. Minimal call: `{topics: [{name: "orders"}]}`.
+  - Top-level `offsetReset` removed; starting position is now per-topic via `start` (default remains `"earliest"`).
+  - `value` / `key` deserialization options renamed to `valueFormat` / `keyFormat`, both omit-by-default.
+  - Schema Registry decoding is now enabled by default; opt out per side with `disableSchemaRegistry: true` on `valueFormat` / `keyFormat`.
 
 ### Removed
 
-- **`read-connector` tool.** Returned `{name, config, tasks: [id-refs], type}` from `GET /connect/v1/.../connectors/{name}`. Its content is now covered by the more granular tools listed under Added: the config map by `get-connector-config`, the per-task identifiers (and the connector type, derivable from `connector.class`) by `get-connector-tasks`. Callers that previously read the whole blob to pick one field can now ask for just that field.
+- **`read-connector` tool.** Its content is now covered by `get-connector-config` (config map) and `get-connector-tasks` (per-task configs and connector type).
 
 ## 1.3.0
 

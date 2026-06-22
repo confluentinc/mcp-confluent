@@ -2,8 +2,16 @@ import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { GetPartitionOffsetsHandler } from "@src/confluent/tools/handlers/kafka/get-partition-offsets-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
-import { kafkaRuntime } from "@tests/factories/runtime.js";
-import { getMockedClientManager } from "@tests/stubs/index.js";
+import {
+  DEFAULT_CONNECTION_ID,
+  kafkaRuntime,
+  runtimeWithDecoy,
+} from "@tests/factories/runtime.js";
+import {
+  assertHandleCase,
+  getMockedClientManager,
+  type MockedClientManager,
+} from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
 describe("get-partition-offsets-handler.ts", () => {
@@ -26,6 +34,18 @@ describe("get-partition-offsets-handler.ts", () => {
   describe("handle()", () => {
     const handler = new GetPartitionOffsetsHandler();
 
+    // Connection-reaching behaviour cases run through assertHandleCase against a
+    // decoy runtime: the harness injects connectionId for the real connection and
+    // asserts the decoy's manager stays untouched, so routing is exercised on
+    // every such path. (The Zod-boundary cases below throw before connection
+    // resolution, so they stay as direct handle() calls — see their note.)
+    const decoyRuntime = (clientManager: MockedClientManager) =>
+      runtimeWithDecoy(
+        { kafka: { bootstrap_servers: "broker:9092" } },
+        DEFAULT_CONNECTION_ID,
+        clientManager,
+      );
+
     it("should return a structured payload with low/highWatermark as strings and computed messageCount for every partition", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
@@ -35,15 +55,20 @@ describe("get-partition-offsets-handler.ts", () => {
         { partition: 2, low: "0", high: "0", offset: "0" },
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "orders",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "orders" },
+        outcome: {
+          resolves: 'Partition offsets for "orders" (3 partition(s))',
+          isError: false,
+        },
+        clientManager,
       });
 
       expect(admin.fetchTopicOffsets).toHaveBeenCalledOnce();
       expect(admin.fetchTopicOffsets).toHaveBeenCalledWith("orders");
-
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({
+      expect(result!.structuredContent).toEqual({
         topicName: "orders",
         partitions: [
           {
@@ -66,9 +91,6 @@ describe("get-partition-offsets-handler.ts", () => {
           },
         ],
       });
-      expect(textOf(result)).toContain(
-        'Partition offsets for "orders" (3 partition(s))',
-      );
     });
 
     it("should restrict the response to a single partition when the `partition` arg is supplied", async () => {
@@ -80,13 +102,18 @@ describe("get-partition-offsets-handler.ts", () => {
         { partition: 2, low: "10", high: "20", offset: "20" },
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "orders",
-        partition: 1,
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "orders", partition: 1 },
+        outcome: {
+          resolves: 'Partition offsets for "orders" (1 partition(s))',
+          isError: false,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({
+      expect(result!.structuredContent).toEqual({
         topicName: "orders",
         partitions: [
           {
@@ -97,9 +124,6 @@ describe("get-partition-offsets-handler.ts", () => {
           },
         ],
       });
-      expect(textOf(result)).toContain(
-        'Partition offsets for "orders" (1 partition(s))',
-      );
     });
 
     it("should return messageCount: 0 for an empty partition (low === high) without any special-case branch", async () => {
@@ -109,12 +133,18 @@ describe("get-partition-offsets-handler.ts", () => {
         { partition: 0, low: "42", high: "42", offset: "42" },
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "empty-topic",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "empty-topic" },
+        outcome: {
+          resolves: 'Partition offsets for "empty-topic"',
+          isError: false,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({
+      expect(result!.structuredContent).toEqual({
         topicName: "empty-topic",
         partitions: [
           {
@@ -142,12 +172,18 @@ describe("get-partition-offsets-handler.ts", () => {
         },
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "bigint-topic",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "bigint-topic" },
+        outcome: {
+          resolves: 'Partition offsets for "bigint-topic"',
+          isError: false,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(false);
-      expect(result.structuredContent).toEqual({
+      expect(result!.structuredContent).toEqual({
         topicName: "bigint-topic",
         partitions: [
           {
@@ -165,14 +201,16 @@ describe("get-partition-offsets-handler.ts", () => {
       const admin = await clientManager.getAdminClient();
       admin.fetchTopicOffsets.mockResolvedValue([]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "no-such-topic",
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "no-such-topic" },
+        outcome: {
+          resolves: 'Topic "no-such-topic" not found on this cluster',
+          isError: true,
+        },
+        clientManager,
       });
-
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toContain(
-        'Topic "no-such-topic" not found on this cluster',
-      );
     });
 
     it("should surface a clean 'topic not found' error for a KafkaJSError carrying ERR_UNKNOWN_TOPIC_OR_PART (broker-issued unknown-topic code)", async () => {
@@ -184,17 +222,20 @@ describe("get-partition-offsets-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "no-such-topic",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "no-such-topic" },
+        outcome: {
+          resolves: 'Topic "no-such-topic" not found on this cluster',
+          isError: true,
+        },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toContain(
-        'Topic "no-such-topic" not found on this cluster',
-      );
       // The friendly path replaces the librdkafka text entirely; the broker
       // wording must not leak through as the headline.
-      expect(textOf(result)).not.toContain(
+      expect(textOf(result!)).not.toContain(
         "Broker: Unknown topic or partition",
       );
     });
@@ -213,14 +254,16 @@ describe("get-partition-offsets-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "no-such-topic",
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "no-such-topic" },
+        outcome: {
+          resolves: 'Topic "no-such-topic" not found on this cluster',
+          isError: true,
+        },
+        clientManager,
       });
-
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toContain(
-        'Topic "no-such-topic" not found on this cluster',
-      );
     });
 
     it("should surface the real Kafka error (NOT 'topic not found') when fetchTopicOffsets rejects with a connection/auth/timeout failure", async () => {
@@ -238,13 +281,15 @@ describe("get-partition-offsets-handler.ts", () => {
         }),
       );
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "orders",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "orders" },
+        outcome: { resolves: "broker unreachable: ETIMEDOUT", isError: true },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toContain("broker unreachable: ETIMEDOUT");
-      expect(textOf(result)).not.toContain("not found on this cluster");
+      expect(textOf(result!)).not.toContain("not found on this cluster");
     });
 
     it("should surface the underlying message (NOT 'topic not found') when fetchTopicOffsets rejects with a non-Kafka error shape", async () => {
@@ -259,13 +304,15 @@ describe("get-partition-offsets-handler.ts", () => {
         new Error("unexpected library failure"),
       );
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "orders",
+      const result = await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "orders" },
+        outcome: { resolves: "unexpected library failure", isError: true },
+        clientManager,
       });
 
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toContain("unexpected library failure");
-      expect(textOf(result)).not.toContain("not found on this cluster");
+      expect(textOf(result!)).not.toContain("not found on this cluster");
     });
 
     it("should surface a clean out-of-range error citing the actual partition span when a `partition` arg is past the topic's range", async () => {
@@ -277,15 +324,17 @@ describe("get-partition-offsets-handler.ts", () => {
         { partition: 2, low: "0", high: "30", offset: "30" },
       ]);
 
-      const result = await handler.handle(kafkaRuntime(clientManager), {
-        topicName: "orders",
-        partition: 5,
+      await assertHandleCase({
+        handler,
+        runtime: decoyRuntime(clientManager),
+        args: { topicName: "orders", partition: 5 },
+        outcome: {
+          resolves:
+            'Topic "orders" has 3 partition(s) (0..2); requested partition 5 is out of range',
+          isError: true,
+        },
+        clientManager,
       });
-
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toContain(
-        'Topic "orders" has 3 partition(s) (0..2); requested partition 5 is out of range',
-      );
     });
 
     it("should reject a missing topicName at the Zod boundary", async () => {

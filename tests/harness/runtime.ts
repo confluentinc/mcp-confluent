@@ -1,5 +1,9 @@
 import { loadConfigFromYaml } from "@src/config/index.js";
-import { MCPServerConfiguration } from "@src/config/models.js";
+import {
+  type ConnectionConfig,
+  type DirectConnectionConfig,
+  MCPServerConfiguration,
+} from "@src/config/models.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -42,11 +46,13 @@ export interface SpawnConfigOptions {
  * injection, which gating doesn't depend on), so the test's view of
  * "configured" matches the server's by construction.
  *
- * Tests use this to gate via {@linkcode ToolHandler.enabledConnectionIds}
- * (the same predicate the server itself uses to decide whether to register
- * a tool). If the YAML fails to load (any required `${VAR}` missing), we
- * return an empty runtime so handlers' gates yield a clean skip with the
- * tool's `requiredConnectionPath` as the reason.
+ * Used by the seeding harness helpers (kafka-admin, schema-registry, flink,
+ * connect, confluent-cloud) that need per-connection config to build their own
+ * api-key-authed clients. Per-handler skip gating moved to
+ * {@linkcode integrationConnection} — a single connection is the right-sized
+ * input for a {@linkcode ConnectionPredicate}, with no ServerRuntime to build.
+ * If the YAML fails to load (any required `${VAR}` missing), returns an empty
+ * runtime.
  */
 export function integrationRuntime(
   options: { oauth?: boolean } = {},
@@ -60,6 +66,117 @@ export function integrationRuntime(
       new MCPServerConfiguration({ connections: {} }),
       {},
     );
+  }
+}
+
+/**
+ * The {@link ConnectionConfig} the spawned MCP server would see, looked up by
+ * the fixture's connection id (see {@linkcode FIXTURE_CONNECTION_ID}) in the
+ * same fixture {@linkcode integrationRuntime} loads. Integration fixtures hold
+ * exactly one connection, so this single connection is the right-sized input for
+ * a {@linkcode ConnectionPredicate} gate: `handler.predicate(integrationConnection())`
+ * answers "is this tool enabled?" without constructing a whole ServerRuntime.
+ *
+ * Resolves by id via {@linkcode MCPServerConfiguration.getConnectionConfig}: a
+ * configured connection is addressed by its id, never by a count-dependent
+ * "sole" lookup, so this stays correct for the multi-connection fixtures #543
+ * introduces.
+ *
+ * On load failure (a required `${VAR}` missing — creds absent) returns an empty
+ * `direct` connection, so every block-based predicate yields a clean disabled
+ * verdict and the gate skips. A fixture that loads but lacks the expected
+ * connection id is fixture drift, not a creds-skip — {@linkcode MCPServerConfiguration.getConnectionConfig}
+ * throws loudly rather than letting the whole suite silently skip.
+ */
+export function integrationConnection(
+  options: { oauth?: boolean } = {},
+): ConnectionConfig {
+  const config = tryLoadIntegrationConfig(options);
+  // Fixture failed to load (a required `${VAR}` missing — i.e. creds absent):
+  // an empty direct connection yields a clean disabled verdict, so the gate skips.
+  if (config === undefined) return { type: "direct" };
+  // Fixture loaded: resolve the expected connection by id. A miss here is
+  // fixture drift (renamed/removed connection), not a credential-skip case, so
+  // let getConnectionConfig throw loudly rather than silently skipping the whole suite.
+  return config.getConnectionConfig(
+    FIXTURE_CONNECTION_ID[options.oauth ? "oauth" : "direct"],
+  );
+}
+
+/**
+ * {@linkcode integrationConnection} narrowed to {@link DirectConnectionConfig},
+ * throwing if the fixture connection is OAuth-typed. The seeding helpers
+ * (kafka-admin, schema-registry, flink, connect, confluent-cloud) build their
+ * own api-key-authed clients from direct-only fields (`kafka.env_id`,
+ * `confluent_cloud.auth`, …), so they need the narrowing the union doesn't give.
+ */
+export function integrationDirectConnection(): DirectConnectionConfig {
+  const conn = integrationConnection();
+  if (conn.type !== "direct") {
+    throw new Error(
+      `Expected the integration fixture connection to be direct; got type "${conn.type}"`,
+    );
+  }
+  return conn;
+}
+
+/**
+ * The fixture connection's id — its key in the `connections` map, which is
+ * also the value a test passes as the `connectionId` argument to a
+ * connection-addressed tool (e.g. `describe-configured-connection`); the map key
+ * and the routing id are one and the same. A constant rather than a
+ * count-dependent "sole" lookup so it stays correct for the
+ * multi-connection fixtures #543 introduces, and so a fixture rename surfaces
+ * here rather than as a mysterious "unknown connection id" at call time.
+ */
+export function integrationConnectionId(
+  options: { oauth?: boolean } = {},
+): string {
+  return FIXTURE_CONNECTION_ID[options.oauth ? "oauth" : "direct"];
+}
+
+/**
+ * Whether the integration fixture loaded at least one connection. The transport
+ * smoke tests gate on this instead of a per-handler predicate: they need any
+ * connection to exist (so the spawned server boots), not a specific service block.
+ *
+ * Counts connections rather than resolving the sole one, so it stays correct for
+ * the multi-connection fixtures #543 introduces: a count answers "did anything
+ * load?", whereas a sole-connection lookup would throw (and wrongly read as "not
+ * loaded") on more than one.
+ */
+export function integrationConnectionLoaded(
+  options: { oauth?: boolean } = {},
+): boolean {
+  const config = tryLoadIntegrationConfig(options);
+  return config !== undefined && hasIntegrationConnection(config);
+}
+
+/**
+ * True when `config` carries at least one connection. Split out so the
+ * multi-connection-safe existence check behind {@linkcode integrationConnectionLoaded}
+ * is unit-testable against a directly-constructed multi-connection config.
+ */
+export function hasIntegrationConnection(
+  config: MCPServerConfiguration,
+): boolean {
+  return Object.keys(config.connections).length > 0;
+}
+
+/**
+ * Loads the chosen integration fixture into an {@link MCPServerConfiguration},
+ * or `undefined` when the YAML fails to load (a required `${VAR}` missing). The
+ * seam both {@linkcode integrationConnection} and {@linkcode integrationConnectionLoaded}
+ * build on.
+ */
+function tryLoadIntegrationConfig(options: {
+  oauth?: boolean;
+}): MCPServerConfiguration | undefined {
+  const fixturePath = options.oauth ? OAUTH_FIXTURE_PATH : BASE_FIXTURE_PATH;
+  try {
+    return loadConfigFromYaml(fixturePath, process.env);
+  } catch {
+    return undefined;
   }
 }
 
@@ -114,3 +231,14 @@ const OAUTH_FIXTURE_PATH = resolve(
   process.cwd(),
   "test-fixtures/yaml_configs/integration-oauth.yaml",
 );
+
+/**
+ * The connection id each integration fixture gives its single connection.
+ * {@linkcode integrationConnection} looks the connection up by this key rather
+ * than by a count-dependent "sole" lookup, which would encode the
+ * single-connection assumption and break once a fixture defines two.
+ */
+const FIXTURE_CONNECTION_ID: Record<"direct" | "oauth", string> = {
+  direct: "integration",
+  oauth: "integration-oauth",
+};

@@ -236,7 +236,15 @@ export interface ProcessedMessage {
    */
   timestamp: string;
   offset: string;
-  headers?: Record<string, string>;
+  /**
+   * Record headers echoed back to the caller. Kafka headers are an ordered
+   * list whose keys may repeat, so a repeated key is preserved as a
+   * `string[]` (multiplicity intact) while a single-occurrence key stays a
+   * scalar `string` — mirroring the per-key shape the underlying client
+   * surfaces. The schema-id headers decode to their GUID; every other value
+   * is stringified element-wise (see {@link echoHeaderValue}).
+   */
+  headers?: Record<string, string | string[]>;
   topic: string;
   partition: number;
 }
@@ -262,16 +270,34 @@ const SCHEMA_ID_HEADER_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Render a record header for the echoed consume response. The schema-id
- * headers (__value_schema_id / __key_schema_id) carry the schema GUID as raw
- * bytes; decode them to the canonical GUID string so callers see the same
- * schema identifier the CCloud UI and VS Code extension surface. Every other
- * header — and any schema-id header whose bytes don't decode to a GUID — is
- * stringified as-is.
+ * Render a record header for the echoed consume response, preserving
+ * multiplicity: a repeated-key header (surfaced by the client as an array)
+ * maps element-wise to a `string[]`, while a single-occurrence header stays a
+ * scalar `string`. Joining the array via `Array.prototype.toString` would
+ * collapse `["a", "b"]` to the lossy `"a,b"` — indistinguishable from a
+ * single value literally containing a comma (#597).
  */
 function echoHeaderValue(
   key: string,
   value: Buffer | string | (Buffer | string)[] | undefined,
+): string | string[] {
+  if (Array.isArray(value)) {
+    return value.map((element) => echoSingleHeaderValue(key, element));
+  }
+  return echoSingleHeaderValue(key, value);
+}
+
+/**
+ * Stringify one header occurrence. The schema-id headers
+ * (__value_schema_id / __key_schema_id) carry the schema GUID as raw bytes;
+ * decode them to the canonical GUID string so callers see the same schema
+ * identifier the CCloud UI and VS Code extension surface. Every other
+ * value — and any schema-id header whose bytes don't decode to a GUID — is
+ * stringified as-is.
+ */
+function echoSingleHeaderValue(
+  key: string,
+  value: Buffer | string | undefined,
 ): string {
   if (SCHEMA_ID_HEADER_KEYS.has(key) && Buffer.isBuffer(value)) {
     const guid = schemaRegistryHelper.decodeSchemaGuidHeader(value);

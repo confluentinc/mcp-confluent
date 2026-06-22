@@ -1680,6 +1680,54 @@ describe("consume-kafka-messages-handler.ts", () => {
         });
       });
 
+      it("should preserve a repeated-key header as a string array rather than comma-joining it", async () => {
+        // Kafka headers are an ordered list where keys may repeat, so the
+        // client surfaces a repeated key as an array. Stringifying the whole
+        // array (Array.prototype.toString) would collapse ["x", "y"] to the
+        // lossy "x,y" — indistinguishable from a single value containing a
+        // comma. Map per element so multiplicity survives (#597).
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage({ headers: { trace: ["x", "y"] } }),
+          undefined,
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
+        );
+        expect(result.headers).toEqual({ trace: ["x", "y"] });
+      });
+
+      it("should stringify each Buffer element of a repeated-key header independently", async () => {
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage({
+            headers: { trace: [Buffer.from("x"), Buffer.from("y")] },
+          }),
+          undefined,
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
+        );
+        expect(result.headers).toEqual({ trace: ["x", "y"] });
+      });
+
+      it("should keep scalar headers scalar while preserving sibling array headers", async () => {
+        const result = await handler.processMessage(
+          "topic-x",
+          0,
+          fakeMessage({
+            headers: { source: Buffer.from("clusterA"), trace: ["x", "y"] },
+          }),
+          undefined,
+          { disableSchemaRegistry: true },
+          { disableSchemaRegistry: true },
+        );
+        expect(result.headers).toEqual({
+          source: "clusterA",
+          trace: ["x", "y"],
+        });
+      });
+
       describe("schema-id header echo (always kept, decoded to GUID)", () => {
         // Per Stefan's #607 review: the __value_schema_id / __key_schema_id
         // headers identify the key/value schema by GUID, mirroring the CCloud

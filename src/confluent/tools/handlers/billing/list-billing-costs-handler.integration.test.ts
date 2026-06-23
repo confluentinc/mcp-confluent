@@ -21,7 +21,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -110,37 +113,40 @@ describe(
           return;
         }
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          it("should expose list-billing-costs in tools/list", async () => {
-            const { tools } = await server.client.listTools();
-            expect(
-              tools.find((t) => t.name === ToolName.LIST_BILLING_COSTS),
-            ).toBeDefined();
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should return billing costs for a 1-day window", async () => {
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.LIST_BILLING_COSTS,
-              arguments: { startDate, endDate },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            expect(result.isError).not.toBe(true);
-            expect(textContent(result)).toMatch(
-              /^Successfully retrieved billing costs:/,
-            );
-          });
-        });
+            it("should expose list-billing-costs in tools/list", async () => {
+              const { tools } = await server.client.listTools();
+              expect(
+                tools.find((t) => t.name === ToolName.LIST_BILLING_COSTS),
+              ).toBeDefined();
+            });
+
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should return billing costs for a 1-day window", async () => {
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.LIST_BILLING_COSTS,
+                arguments: { startDate, endDate },
+              });
+
+              expect(result.isError).not.toBe(true);
+              expect(textContent(result)).toMatch(
+                /^Successfully retrieved billing costs:/,
+              );
+            });
+          },
+        );
       },
     );
   },

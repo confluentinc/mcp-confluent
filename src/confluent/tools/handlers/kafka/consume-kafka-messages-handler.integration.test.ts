@@ -29,7 +29,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -482,38 +485,41 @@ describe(
           });
         });
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should consume the seeded messages from the topic", async () => {
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.CONSUME_MESSAGES,
-              arguments: {
-                topics: [{ name: topic, start: "earliest" }],
-                maxMessages: seededValues.length,
-                timeoutMs: 15_000,
-                valueFormat: { disableSchemaRegistry: true },
-                cluster_id: clusterId,
-                environment_id: environmentId,
-              },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            const text = textContent(result);
-            expect(text).toMatch(/^Consumed \d+ messages/);
-            for (const value of seededValues) {
-              expect(text).toContain(value);
-            }
-          });
-        });
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should consume the seeded messages from the topic", async () => {
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.CONSUME_MESSAGES,
+                arguments: {
+                  topics: [{ name: topic, start: "earliest" }],
+                  maxMessages: seededValues.length,
+                  timeoutMs: 15_000,
+                  valueFormat: { disableSchemaRegistry: true },
+                  cluster_id: clusterId,
+                  environment_id: environmentId,
+                },
+              });
+
+              const text = textContent(result);
+              expect(text).toMatch(/^Consumed \d+ messages/);
+              for (const value of seededValues) {
+                expect(text).toContain(value);
+              }
+            });
+          },
+        );
       },
     );
   },

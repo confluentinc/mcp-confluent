@@ -27,7 +27,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -139,45 +142,48 @@ describe(
         // we're exercising via the DELETE_SCHEMA call below
         const { client, createdSubjects } = withSharedSrClient();
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should soft-delete a registered subject", async () => {
-            const subject = uniqueName(`delete-oauth-${transport}`);
-            createdSubjects.push(subject);
-            await client().register(subject, { schema: TEST_AVRO_SCHEMA });
-            await expect
-              .poll(() => client().getAllSubjects(), {
-                timeout: 15_000,
-                interval: 500,
-              })
-              .toContain(subject);
-
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.DELETE_SCHEMA,
-              arguments: { subject, environment_id: environmentId },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            expect(textContent(result)).toContain(
-              `Successfully deleted subject "${subject}"`,
-            );
-            await expect
-              .poll(() => client().getAllSubjects(), {
-                timeout: 15_000,
-                interval: 500,
-              })
-              .not.toContain(subject);
-          });
-        });
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should soft-delete a registered subject", async () => {
+              const subject = uniqueName(`delete-oauth-${transport}`);
+              createdSubjects.push(subject);
+              await client().register(subject, { schema: TEST_AVRO_SCHEMA });
+              await expect
+                .poll(() => client().getAllSubjects(), {
+                  timeout: 15_000,
+                  interval: 500,
+                })
+                .toContain(subject);
+
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.DELETE_SCHEMA,
+                arguments: { subject, environment_id: environmentId },
+              });
+
+              expect(textContent(result)).toContain(
+                `Successfully deleted subject "${subject}"`,
+              );
+              await expect
+                .poll(() => client().getAllSubjects(), {
+                  timeout: 15_000,
+                  interval: 500,
+                })
+                .not.toContain(subject);
+            });
+          },
+        );
       },
     );
   },

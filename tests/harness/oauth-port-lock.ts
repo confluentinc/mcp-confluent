@@ -29,8 +29,15 @@ const POLL_INTERVAL_MS = 500;
 /**
  * Block until OAUTH_CALLBACK_PORT is free, then claim it by writing `process.pid` into the lock
  * file. Stale locks (holder PID no longer alive) are reclaimed automatically.
+ *
+ * The default timeout is deliberately **below** the OAuth `beforeAll` hook timeout (180_000ms in
+ * the dual-mode tests): if a holder genuinely wedges, this throws a descriptive
+ * "lock not released within … (holder PID=…)" before vitest kills the hook with an opaque
+ * "Hook timed out in 180000ms" — so the failure names the culprit. With the OAuth lane now running
+ * sequentially (`--no-file-parallelism`), acquisition is normally uncontended and instant; a real
+ * wait here means a stuck/crashed holder, which the shorter window surfaces faster.
  */
-export async function acquireOAuthPortLock(timeoutMs = 300_000): Promise<void> {
+export async function acquireOAuthPortLock(timeoutMs = 150_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (tryAcquire()) return;

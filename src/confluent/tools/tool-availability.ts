@@ -53,13 +53,23 @@ export interface ConnectionGatingSection {
  * `groupBy` records which axis the section buckets carry so consumers
  * (renderer, MCP-client UIs) can pick the right framing.
  *
+ * `operatorBlocked` is the server-wide allow/block-list verdict, held apart
+ * from the per-connection sections because the operator filter is the
+ * outermost gate: it excludes a tool from every connection at once and owes
+ * nothing to any connection's config. A blocked tool appears here and in no
+ * section's buckets, and is subtracted from each section's `enabledCount`.
+ *
  * The top-level `enabledCount` / `disabledCount` are whole-server rollups: a
- * tool counts as enabled if it is connection-independent or enabled on at
- * least one connection, and disabled only when it is connection-dependent and
- * dark on every connection (or there are no connections at all).
+ * tool counts as enabled if it survives the operator filter AND is
+ * connection-independent or enabled on at least one connection; it counts as
+ * disabled when the operator filter excludes it, or when it is
+ * connection-dependent and dark on every connection (or there are no
+ * connections at all).
  */
 export interface ToolGatingReport {
   readonly groupBy: "reason" | "category";
+  /** Tools the operator's allow/block-list excluded server-wide, in handler iteration order. */
+  readonly operatorBlocked: readonly ToolName[];
   /** One section per configured connection, lex-sorted by id; empty iff no connections are configured. */
   readonly connections: readonly ConnectionGatingSection[];
   readonly enabledCount: number;
@@ -130,6 +140,10 @@ export function groupDisabledToolsByReason(
  * handler set against the configured connections.
  *
  * One pass over the handlers:
+ * - a tool the operator's allow/block-list excludes (`!isToolAllowed`) is
+ *   recorded in `operatorBlocked` and counts as disabled, ahead of and
+ *   independent of its predicate verdict — the filter is the outermost gate,
+ *   so it never reaches a connection section;
  * - connection-independent tools count as enabled and appear in no section
  *   (they are enabled on every connection);
  * - a connection-dependent tool on a zero-connection config counts as disabled
@@ -140,8 +154,8 @@ export function groupDisabledToolsByReason(
  *   one connection enables it.
  *
  * Sections are lex-sorted by `connectionId` and buckets lex by
- * {@linkcode disabledToolGroupKey}. Tools within a bucket follow handler
- * iteration order.
+ * {@linkcode disabledToolGroupKey}. Tools within a bucket — and within
+ * `operatorBlocked` — follow handler iteration order.
  */
 export function buildToolGatingReport(
   handlers: Iterable<readonly [ToolName, ToolHandler]>,
@@ -155,10 +169,16 @@ export function buildToolGatingReport(
   const sectionBuckets: SectionBuckets = new Map(
     connectionIds.map((id) => [id, new Map<string, ToolName[]>()]),
   );
+  const operatorBlocked: ToolName[] = [];
   let enabledCount = 0;
   let disabledCount = 0;
 
   for (const [toolName, handler] of handlers) {
+    if (!runtime.isToolAllowed(toolName)) {
+      operatorBlocked.push(toolName);
+      disabledCount += 1;
+      continue;
+    }
     if (
       classifyAndBucketHandler(
         toolName,
@@ -177,12 +197,19 @@ export function buildToolGatingReport(
   const totalRegistered = enabledCount + disabledCount;
   const connections = connectionIds
     .map((id) =>
-      buildSection(id, sectionBuckets.get(id)!, groupBy, totalRegistered),
+      buildSection(
+        id,
+        sectionBuckets.get(id)!,
+        groupBy,
+        totalRegistered,
+        operatorBlocked.length,
+      ),
     )
     .sort((a, b) => a.connectionId.localeCompare(b.connectionId));
 
   return {
     groupBy,
+    operatorBlocked,
     connections,
     enabledCount,
     disabledCount,
@@ -241,15 +268,18 @@ function pushToBucket(
 
 /**
  * Assemble one connection's {@linkcode ConnectionGatingSection} from its bucket
- * accumulator. `enabledCount` is the complement of this connection's disabled
- * tally against the whole registered set, so connection-independent tools count
- * as enabled here.
+ * accumulator. `enabledCount` is what remains advertisable on this connection
+ * once both the operator-blocked tools (excluded server-wide, never in this
+ * section's buckets) and this connection's own predicate-disabled tools are
+ * removed from the whole registered set — so connection-independent tools count
+ * as enabled here, but operator-blocked ones never do.
  */
 function buildSection(
   connectionId: string,
   buckets: Map<string, ToolName[]>,
   groupBy: "reason" | "category",
   totalRegistered: number,
+  operatorBlockedCount: number,
 ): ConnectionGatingSection {
   const disabledGroups = bucketsToGroups(buckets, groupBy);
   const sectionDisabled = disabledGroups.reduce(
@@ -259,7 +289,7 @@ function buildSection(
   return {
     connectionId,
     disabledGroups,
-    enabledCount: totalRegistered - sectionDisabled,
+    enabledCount: totalRegistered - operatorBlockedCount - sectionDisabled,
     disabledCount: sectionDisabled,
   };
 }

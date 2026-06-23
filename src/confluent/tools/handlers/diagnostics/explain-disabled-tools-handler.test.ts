@@ -251,9 +251,9 @@ describe("explain-disabled-tools-handler.ts", () => {
         );
       });
 
-      it("should render a single 'all tools enabled' summary when nothing is disabled", () => {
+      it("should render a single 'all tools advertised' summary when nothing is disabled", () => {
         // A no-tool registry-thunk makes every tool trivially absent from the
-        // disabled set; the all-enabled branch fires even though the runtime
+        // disabled set; the all-advertised branch fires even though the runtime
         // has a connection.
         const empty = new ExplainDisabledToolsHandler(() => []);
         const text = getText(empty.handle(bareRuntime(), undefined));
@@ -262,7 +262,7 @@ describe("explain-disabled-tools-handler.ts", () => {
         );
       });
 
-      it("should render the 'all tools enabled' summary on a zero-connection config when nothing is disabled", () => {
+      it("should render the 'all tools advertised' summary on a zero-connection config when nothing is disabled", () => {
         // No connections AND no disabled tools (empty registry) takes the
         // all-advertised branch ahead of the no-connections summary — there is
         // genuinely nothing connection-gated to report.

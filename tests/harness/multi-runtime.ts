@@ -63,16 +63,32 @@ export function multiIntegrationConnectionsLoaded(): boolean {
 
 /**
  * Loads the multi fixture into an {@link MCPServerConfiguration}, or `undefined`
- * when the YAML fails to load (a required `${VAR}` missing). The seam both
- * {@linkcode multiIntegrationConnection} and {@linkcode multiIntegrationConnectionsLoaded}
- * build on.
+ * only when a required `${VAR}` is absent (creds not configured) — the clean
+ * skip case. A malformed or schema-invalid fixture is a real regression and
+ * propagates so CI fails loudly instead of green-skipping the suite. The seam
+ * both {@linkcode multiIntegrationConnection} and
+ * {@linkcode multiIntegrationConnectionsLoaded} build on.
  */
 function tryLoadMultiConfig(): MCPServerConfiguration | undefined {
   try {
     return loadConfigFromYaml(MULTI_FIXTURE_PATH, process.env);
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (isMissingInterpolationVar(error)) return undefined;
+    throw error;
   }
+}
+
+/**
+ * True when `error` is {@linkcode loadConfigFromYaml}'s "a required `${VAR}` is
+ * absent from env" failure — the expected creds-absent case the `@multi` gate
+ * skips on. Every other load failure (malformed YAML, schema-invalid fixture)
+ * is a regression that must propagate. Exported for the colocated unit test.
+ */
+export function isMissingInterpolationVar(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("Environment variable not found")
+  );
 }
 
 export interface MultiSpawnConfigOptions {

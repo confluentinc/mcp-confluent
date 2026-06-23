@@ -1,5 +1,11 @@
 import { loadConfigFromYaml } from "@src/config/index.js";
-import { isMissingInterpolationVar } from "@tests/harness/multi-runtime.js";
+import { MCPServerConfiguration } from "@src/config/models.js";
+import {
+  assertExpectedConnections,
+  CCLOUD_CONNECTION_ID,
+  CP_CONNECTION_ID,
+  isMissingInterpolationVar,
+} from "@tests/harness/multi-runtime.js";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -62,5 +68,36 @@ describe("isMissingInterpolationVar", () => {
   it("should not classify a non-Error value as skip-eligible", () => {
     expect(isMissingInterpolationVar("some string")).toBe(false);
     expect(isMissingInterpolationVar(undefined)).toBe(false);
+  });
+});
+
+/** Builds a config holding exactly the given connection ids (minimal direct connections). */
+function configWith(ids: string[]): MCPServerConfiguration {
+  return new MCPServerConfiguration({
+    connections: Object.fromEntries(ids.map((id) => [id, { type: "direct" }])),
+  });
+}
+
+describe("assertExpectedConnections", () => {
+  it("should pass when both ccloud and cp are present", () => {
+    expect(() =>
+      assertExpectedConnections(
+        configWith([CCLOUD_CONNECTION_ID, CP_CONNECTION_ID]),
+      ),
+    ).not.toThrow();
+  });
+
+  // A loaded fixture missing an expected id is drift, not a creds-skip: it must
+  // throw loudly rather than green-skip the suite.
+  it("should throw naming the missing cp connection (fixture drift)", () => {
+    expect(() =>
+      assertExpectedConnections(configWith([CCLOUD_CONNECTION_ID])),
+    ).toThrow(/"cp".*drift|drift.*"cp"|missing connection id "cp"/i);
+  });
+
+  it("should throw naming the missing ccloud connection (fixture drift)", () => {
+    expect(() =>
+      assertExpectedConnections(configWith([CP_CONNECTION_ID])),
+    ).toThrow(/ccloud/);
   });
 });

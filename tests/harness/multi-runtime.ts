@@ -49,16 +49,40 @@ export function multiIntegrationConnection(connId: string): ConnectionConfig {
 }
 
 /**
- * Whether the multi fixture loaded with **both** the `ccloud` and `cp`
- * connections present. The suite gates on this so an environment missing either
- * cluster's creds (no CCloud Vault secrets, or the CP broker creds absent) skips
- * cleanly rather than spawning a half-configured server.
+ * Whether the multi fixture loaded — gating the suite on creds presence. Returns
+ * `false` only when the YAML failed to load (a required `${VAR}` absent — creds
+ * not configured), so a credential-less environment skips cleanly. A fixture
+ * that loads but lacks an expected connection id is drift, not a creds-skip:
+ * {@linkcode assertExpectedConnections} throws loudly rather than letting the
+ * suite green-skip.
  */
 export function multiIntegrationConnectionsLoaded(): boolean {
   const config = tryLoadMultiConfig();
   if (config === undefined) return false;
+  assertExpectedConnections(config);
+  return true;
+}
+
+/**
+ * Asserts the loaded `config` holds both expected connection ids. A missing one
+ * means the fixture drifted (a connection renamed or removed) — a real
+ * regression that must fail loudly, never a silent skip. Split out (mirroring
+ * `hasIntegrationConnection` in runtime.ts) so the drift check is unit-testable
+ * against a directly-constructed config.
+ */
+export function assertExpectedConnections(
+  config: MCPServerConfiguration,
+): void {
   const ids = config.getConnectionIds();
-  return ids.includes(CCLOUD_CONNECTION_ID) && ids.includes(CP_CONNECTION_ID);
+  for (const required of [CCLOUD_CONNECTION_ID, CP_CONNECTION_ID]) {
+    if (!ids.includes(required)) {
+      throw new Error(
+        `Multi-connection fixture loaded but missing connection id "${required}" ` +
+          `(have: ${ids.join(", ") || "none"}). This is fixture drift in ` +
+          `integration.multi.yaml, not a creds-skip.`,
+      );
+    }
+  }
 }
 
 /**

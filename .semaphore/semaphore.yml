@@ -273,7 +273,7 @@ blocks:
   - name: "Integration Tests: multi"
     dependencies: ["Build & Test"]
     run:
-      when: "change_in(['/src/confluent/tools/multi-connection.integration.test.ts', '/tests/harness/multi-runtime.ts', '/tests/harness/multi-start-server.ts', '/tests/harness/multi-kafka-admin.ts', '/test-fixtures/yaml_configs/integration.multi.yaml', '/docker-compose.cp-test.yml'], { default_branch: 'main' })"
+      when: "change_in(['/src/confluent/tools/multi-connection.integration.test.ts', '/tests/harness/multi-runtime.ts', '/tests/harness/multi-start-server.ts', '/tests/harness/multi-kafka-admin.ts', '/test-fixtures/yaml_configs/integration.multi.yaml', '/docker-compose.cp-test.yml', '/tests/tags.ts'], { default_branch: 'main' })"
     task:
       env_vars:
         # Static, non-secret CP broker creds (match docker-compose.cp-test.yml's

@@ -24,7 +24,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -119,38 +122,41 @@ describe(
         const clusterId = getTestClusterId();
         const environmentId = getTestEnvironmentId();
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          it("should expose list-consumer-groups in tools/list", async () => {
-            const { tools } = await server.client.listTools();
-            const listConsumerGroups = tools.find(
-              (t) => t.name === ToolName.LIST_CONSUMER_GROUPS,
-            );
-            expect(listConsumerGroups).toBeDefined();
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should return the consumer groups from the configured Kafka cluster", async () => {
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.LIST_CONSUMER_GROUPS,
-              arguments: {
-                cluster_id: clusterId,
-                environment_id: environmentId,
-              },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            expect(textContent(result)).toMatch(/^Found \d+ consumer group/);
-          });
-        });
+            it("should expose list-consumer-groups in tools/list", async () => {
+              const { tools } = await server.client.listTools();
+              const listConsumerGroups = tools.find(
+                (t) => t.name === ToolName.LIST_CONSUMER_GROUPS,
+              );
+              expect(listConsumerGroups).toBeDefined();
+            });
+
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should return the consumer groups from the configured Kafka cluster", async () => {
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.LIST_CONSUMER_GROUPS,
+                arguments: {
+                  cluster_id: clusterId,
+                  environment_id: environmentId,
+                },
+              });
+
+              expect(textContent(result)).toMatch(/^Found \d+ consumer group/);
+            });
+          },
+        );
       },
     );
   },

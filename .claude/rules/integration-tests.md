@@ -448,13 +448,19 @@ describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
       return;
     }
 
-    describe.each(activeTransports)("via %s transport", (transport) => {
+    describe.each(activeOAuthTransports)("via %s transport", (transport) => {
       // oauth-only beforeAll (startOAuthServer + 180_000 timeout) / afterAll (stopOAuthServer)
       // tool calls dispatch via callToolWithOAuthFlow(server, credentials, ...)
     });
   });
 });
 ```
+
+**Every OAuth describe iterates `activeOAuthTransports` (stdio only), not `activeTransports`** — the direct describe keeps `activeTransports` (all three).
+The Auth0/PKCE sign-in is transport-agnostic, so running it on every transport adds no coverage the direct describes and the smoke suite don't already provide; it only multiplies work.
+And that work is serialized: every OAuth describe blocks on a single hard-coded callback port (`acquireOAuthPortLock`), so ×3 transports triples the serialized lock-holds — enough, in the OAuth-heavy `@kafka` job, to push queued `beforeAll`s past their 180s hook timeout.
+The OAuth-flow smoke test (`ccloud-oauth.integration.test.ts`) is stdio-only for the same reason.
+CI additionally runs the OAuth lane sequentially; see the CI Matrix section.
 
 Tags are **additive down the describe tree**: the outer describe carries the group tag (`Tag.<GROUP>`), the inner `oauth` describe adds `Tag.OAUTH`, the inner `direct` describe adds nothing.
 A test inside `direct` therefore runs under `[Tag.<GROUP>]`; a test inside `oauth` runs under `[Tag.<GROUP>, Tag.OAUTH]`.
@@ -523,6 +529,9 @@ The CI surface has two shapes; they share the harness and the Makefile but diffe
 One block per tool group (12 of them) plus a smoke block, each gated by `run.when: change_in('/src/confluent/tools/handlers/<dir>/', { default_branch: 'main' })`.
 Only the blocks whose handler dirs the PR touched actually run; everything else stays gray.
 Within a block, a single job exercises both connection types sequentially via the harness's `activeConnectionTypes` default; transport (stdio/http/sse) and connection type (direct/oauth) are deliberately NOT Semaphore axes, since splitting them would multiply agent count without unique coverage.
+The **kafka block is the exception**: it splits into two jobs, `@kafka direct` (forwards `INTEGRATION_TEST_CONNECTION_TYPE=direct`, runs parallel) and `@kafka oauth` (forwards `=oauth`, runs sequentially via the Makefile's `--no-file-parallelism`).
+Kafka has 11 OAuth describes — enough that running them across parallel forks piled them into the callback-port lock queue and overran the 180s `beforeAll` hook timeout; isolating the OAuth lane onto its own sequential agent removes the contention while the direct lane keeps its parallelism.
+Other tool groups have few enough OAuth describes that the single-job default doesn't pile up, so they stay unsplit.
 The smoke block fires on any change under `src/` (excluding `*.test.ts`) so transport-layer regressions (auth middleware, multi-client wiring, OAuth flow) trigger regardless of which handler dir the PR touched.
 
 ### Scheduled / manual full (`.semaphore/integration.yml`)

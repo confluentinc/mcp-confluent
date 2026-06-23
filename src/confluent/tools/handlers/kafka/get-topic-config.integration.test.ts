@@ -27,7 +27,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -130,40 +133,43 @@ describe(
         // seed via the api-key-authed admin client; GET_TOPIC_CONFIG goes via OAuth
         const { admin, createdTopics } = withSharedAdminClient();
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should return the topic configuration for an existing topic", async () => {
-            const topic = uniqueName(`get-config-oauth-${transport}`);
-            createdTopics.push(topic);
-            await admin().createTopics({
-              topics: [{ topic, numPartitions: 1 }],
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.GET_TOPIC_CONFIG,
-              arguments: {
-                clusterId,
-                environmentId,
-                topicName: topic,
-              },
-            });
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should return the topic configuration for an existing topic", async () => {
+              const topic = uniqueName(`get-config-oauth-${transport}`);
+              createdTopics.push(topic);
+              await admin().createTopics({
+                topics: [{ topic, numPartitions: 1 }],
+              });
 
-            const text = textContent(result);
-            expect(text).toContain(`Topic configuration for '${topic}'`);
-            expect(text).toContain("topicDetails");
-            expect(text).toContain("topicConfig");
-          });
-        });
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.GET_TOPIC_CONFIG,
+                arguments: {
+                  clusterId,
+                  environmentId,
+                  topicName: topic,
+                },
+              });
+
+              const text = textContent(result);
+              expect(text).toContain(`Topic configuration for '${topic}'`);
+              expect(text).toContain("topicDetails");
+              expect(text).toContain("topicConfig");
+            });
+          },
+        );
       },
     );
   },

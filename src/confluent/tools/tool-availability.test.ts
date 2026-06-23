@@ -187,6 +187,7 @@ describe("tool-availability.ts", () => {
       const report = buildToolGatingReport([], runtimeWith({}, "default"));
       expect(report).toEqual({
         groupBy: "reason",
+        operatorBlocked: [],
         connections: [
           {
             connectionId: "default",
@@ -208,6 +209,7 @@ describe("tool-availability.ts", () => {
       );
       expect(report).toEqual({
         groupBy: "reason",
+        operatorBlocked: [],
         connections: [
           {
             connectionId: "default",
@@ -235,6 +237,7 @@ describe("tool-availability.ts", () => {
       );
       expect(report).toEqual({
         groupBy: "reason",
+        operatorBlocked: [],
         connections: [
           {
             connectionId: "default",
@@ -276,6 +279,7 @@ describe("tool-availability.ts", () => {
 
       expect(report).toEqual({
         groupBy: "reason",
+        operatorBlocked: [],
         connections: [
           {
             connectionId: "with-kafka",
@@ -311,6 +315,7 @@ describe("tool-availability.ts", () => {
 
       expect(report).toEqual({
         groupBy: "reason",
+        operatorBlocked: [],
         connections: [
           {
             connectionId: "alpha",
@@ -369,6 +374,7 @@ describe("tool-availability.ts", () => {
       );
       expect(report).toEqual({
         groupBy: "reason",
+        operatorBlocked: [],
         connections: [
           {
             connectionId: "default",
@@ -395,6 +401,7 @@ describe("tool-availability.ts", () => {
       );
       expect(report).toEqual({
         groupBy: "reason",
+        operatorBlocked: [],
         connections: [],
         enabledCount: 0,
         disabledCount: 1,
@@ -409,6 +416,7 @@ describe("tool-availability.ts", () => {
       );
       expect(report).toEqual({
         groupBy: "reason",
+        operatorBlocked: [],
         connections: [],
         enabledCount: 1,
         disabledCount: 0,
@@ -443,6 +451,162 @@ describe("tool-availability.ts", () => {
       ]);
     });
 
+    describe("operator allow/block-list (isToolAllowed)", () => {
+      // An allow-list that admits only LIST_FLINK_STATEMENTS — every other
+      // tool reads as operator-blocked through runtime.isToolAllowed.
+      const onlyFlinkAllowed: ReadonlySet<ToolName> = new Set([
+        ToolName.LIST_FLINK_STATEMENTS,
+      ]);
+
+      it("should report an operator-blocked tool whose predicate would pass as blocked, not enabled", () => {
+        // The contradiction-with-tools/list bug: hasKafka passes on a kafka
+        // connection, so pre-#558 this counted as enabled even though the
+        // operator dropped it from the advertised set. It must land in
+        // operatorBlocked and count as disabled.
+        const handler = stubWithPredicate(hasKafka);
+        const report = buildToolGatingReport(
+          [[ToolName.LIST_TOPICS, handler]],
+          runtimeWith(KAFKA_CONN, "default", undefined, onlyFlinkAllowed),
+        );
+        expect(report).toEqual({
+          groupBy: "reason",
+          operatorBlocked: [ToolName.LIST_TOPICS],
+          connections: [
+            {
+              connectionId: "default",
+              disabledGroups: [],
+              enabledCount: 0,
+              disabledCount: 0,
+            },
+          ],
+          enabledCount: 0,
+          disabledCount: 1,
+        });
+      });
+
+      it("should not blame a config reason for an operator-blocked tool whose predicate also fails", () => {
+        // hasKafka fails on a kafka-less connection, but the operator block is
+        // the real story — the tool must appear in operatorBlocked and NOT in
+        // the connection's MissingKafkaBlock bucket.
+        const handler = stubWithPredicate(hasKafka);
+        const report = buildToolGatingReport(
+          [[ToolName.LIST_TOPICS, handler]],
+          runtimeWith({}, "default", undefined, onlyFlinkAllowed),
+        );
+        expect(report).toEqual({
+          groupBy: "reason",
+          operatorBlocked: [ToolName.LIST_TOPICS],
+          connections: [
+            {
+              connectionId: "default",
+              disabledGroups: [],
+              enabledCount: 0,
+              disabledCount: 0,
+            },
+          ],
+          enabledCount: 0,
+          disabledCount: 1,
+        });
+      });
+
+      it("should block even a connection-independent tool when the operator excludes it", () => {
+        // alwaysEnabled would otherwise advertise this everywhere; the operator
+        // block is the outermost gate and overrides connection-independence.
+        const handler = stubWithPredicate(alwaysEnabled);
+        const report = buildToolGatingReport(
+          [[ToolName.SEARCH_PRODUCT_DOCS, handler]],
+          runtimeWith(KAFKA_CONN, "default", undefined, onlyFlinkAllowed),
+        );
+        expect(report).toEqual({
+          groupBy: "reason",
+          operatorBlocked: [ToolName.SEARCH_PRODUCT_DOCS],
+          connections: [
+            {
+              connectionId: "default",
+              disabledGroups: [],
+              enabledCount: 0,
+              disabledCount: 0,
+            },
+          ],
+          enabledCount: 0,
+          disabledCount: 1,
+        });
+      });
+
+      it("should subtract operator-blocked tools from each connection section's enabledCount", () => {
+        // One allowed+enabled tool, one operator-blocked tool. The section's
+        // enabledCount must count only the allowed one (1), never claiming the
+        // blocked tool as enabled-on-this-connection.
+        const allowedHandler = stubWithPredicate(hasKafka);
+        const blockedHandler = stubWithPredicate(hasKafka);
+        const report = buildToolGatingReport(
+          [
+            [ToolName.LIST_FLINK_STATEMENTS, allowedHandler],
+            [ToolName.LIST_TOPICS, blockedHandler],
+          ],
+          runtimeWith(KAFKA_CONN, "default", undefined, onlyFlinkAllowed),
+        );
+        expect(report).toEqual({
+          groupBy: "reason",
+          operatorBlocked: [ToolName.LIST_TOPICS],
+          connections: [
+            {
+              connectionId: "default",
+              disabledGroups: [],
+              enabledCount: 1,
+              disabledCount: 0,
+            },
+          ],
+          enabledCount: 1,
+          disabledCount: 1,
+        });
+      });
+
+      it("should leave operatorBlocked unchanged under groupBy=category", () => {
+        // The operator block is axis-independent: the same server-wide list
+        // appears whether bucketing by reason or by functional category.
+        const handler = stubWithPredicate(hasKafka);
+        const report = buildToolGatingReport(
+          [[ToolName.LIST_TOPICS, handler]],
+          runtimeWith({}, "default", undefined, onlyFlinkAllowed),
+          "category",
+        );
+        expect(report).toEqual({
+          groupBy: "category",
+          operatorBlocked: [ToolName.LIST_TOPICS],
+          connections: [
+            {
+              connectionId: "default",
+              disabledGroups: [],
+              enabledCount: 0,
+              disabledCount: 0,
+            },
+          ],
+          enabledCount: 0,
+          disabledCount: 1,
+        });
+      });
+
+      it("should preserve handler iteration order within operatorBlocked", () => {
+        const a = stubWithPredicate(hasKafka);
+        const b = stubWithPredicate(hasKafka);
+        const c = stubWithPredicate(hasKafka);
+        const report = buildToolGatingReport(
+          [
+            [ToolName.PRODUCE_MESSAGE, a],
+            [ToolName.LIST_TOPICS, b],
+            [ToolName.CREATE_TOPICS, c],
+          ],
+          runtimeWith(KAFKA_CONN, "default", undefined, new Set()),
+        );
+        expect(report.operatorBlocked).toEqual([
+          ToolName.PRODUCE_MESSAGE,
+          ToolName.LIST_TOPICS,
+          ToolName.CREATE_TOPICS,
+        ]);
+      });
+    });
+
     describe('groupBy: "category"', () => {
       // Both stubs land in ToolCategory.Kafka, but their predicates fail
       // for different reasons (MissingKafkaBlock vs MissingFlinkBlock).
@@ -462,6 +626,7 @@ describe("tool-availability.ts", () => {
         );
         expect(report).toEqual({
           groupBy: "category",
+          operatorBlocked: [],
           connections: [
             {
               connectionId: "default",

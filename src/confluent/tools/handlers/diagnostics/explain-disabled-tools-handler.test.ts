@@ -338,6 +338,37 @@ describe("explain-disabled-tools-handler.ts", () => {
           expect(text).toContain("\n  - list-topics");
           expect(text).not.toContain("registered tools are advertised");
         });
+
+        it("should exclude operator-blocked tools from per-connection section denominators", () => {
+          // Allow only create-topics (kafka tool) and list-flink-statements
+          // (flink tool), operator-blocking all others. On a kafka-only
+          // connection, create-topics is enabled and list-flink-statements is
+          // disabled. The per-connection header should say "1 of 2" (not "1 of
+          // ${totalRegistered}"), since only 2 tools survive the operator filter
+          // to be connection-routable.
+          const allowTwoTools: ReadonlySet<ToolName> = new Set([
+            ToolName.CREATE_TOPICS,
+            ToolName.LIST_FLINK_STATEMENTS,
+          ]);
+
+          const text = getText(
+            handler.handle(
+              runtimeWith(KAFKA_CONN, "default", undefined, allowTwoTools),
+              undefined,
+            ),
+          );
+
+          // Most tools are in the operator block (totalRegistered - 2).
+          const operatorBlockedCount = totalRegistered - 2;
+          expect(text).toContain(
+            `${ToolDisabledReason.OperatorBlocked} (${operatorBlockedCount}):`,
+          );
+          // Per-connection section header: 1 disabled out of 2 connection-routable
+          // tools (create-topics + list-flink-statements), not totalRegistered.
+          expect(text).toContain(
+            "Connection 'default' — 1 of 2 tools disabled:",
+          );
+        });
       });
 
       describe('group_by: "category"', () => {

@@ -161,9 +161,15 @@ function renderConnectionPart(
   );
   if (gappedSections.length === 0) return undefined;
 
+  // Per-connection section denominators exclude operator-blocked tools so the
+  // "X of Y" counts are self-consistent with what each section represents.
+  const connectionRoutableTotal = total - report.operatorBlocked.length;
+
   return [
     `Per-connection tool gating (by ${report.groupBy}):`,
-    ...gappedSections.map((section) => renderConnectionSection(section, total)),
+    ...gappedSections.map((section) =>
+      renderConnectionSection(section, connectionRoutableTotal),
+    ),
     `${report.enabledCount} tools advertised via tools/list.`,
   ].join("\n\n");
 }

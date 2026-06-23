@@ -29,7 +29,9 @@ export enum Tag {
   // broker), proving per-connection routing against live infra. Cross-cutting
   // (spans kafka + flink + diagnostics), so it's neither a tool-group nor a
   // service-config tag. Stood up in CI by its own block, which boots the CP
-  // docker stack (see .semaphore/integration.yml).
+  // docker stack — currently the per-PR `Integration Tests: multi` block in
+  // .semaphore/semaphore.yml; a follow-up moves it to the scheduled
+  // .semaphore/integration.yml pipeline.
   MULTI = "@multi",
 
   // Tool-group axis: matches handler directories

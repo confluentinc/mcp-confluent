@@ -567,7 +567,7 @@ describe("tool-registry.ts", () => {
       [ToolName.GET_PRODUCT_DOC_PAGE]: { outcome: { throws: "ZodError" } },
       // Diagnostics — no client calls; the handler walks the registry's
       // own predicate map. Against `allServicesRuntime` every gate passes
-      // and the handler emits its all-enabled summary.
+      // and the handler emits its all-advertised summary.
       [ToolName.EXPLAIN_DISABLED_TOOLS]: {
         outcome: { resolves: "registered tools are advertised via tools/list" },
         bypassesClientLayer: true,

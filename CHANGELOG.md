@@ -25,6 +25,7 @@ All notable changes to this MCP server will be documented in this file.
 #### New Tools / Tool Features
 
 - **`create-schema` tool.** Registers a schema (or a new version) under a subject in the Schema Registry, peer to `list-schemas` and `delete-schema`.
+- **`explain-disabled-tools` now reports per connection.** The "why is this tool missing?" report is split into one section per configured connection, each with its own disabled-tool buckets and counts — so a tool live on one connection and dark on another surfaces under exactly the connection that gates it, rather than being flattened to a single server-wide verdict.
 - **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.
 - **`describe-configured-connection` tool.** Read-only, always-enabled discovery tool that, given one connection id, reports its non-secret config (never credentials), read-only-ness, and the tools enabled on it alongside the reason each disabled tool is gated off.
 - **`produce-message` improvements:**

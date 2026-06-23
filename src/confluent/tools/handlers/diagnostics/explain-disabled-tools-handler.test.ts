@@ -275,6 +275,71 @@ describe("explain-disabled-tools-handler.ts", () => {
         );
       });
 
+      describe("operator allow/block-list", () => {
+        // Allow only a flink tool: it stays predicate-disabled on a kafka-only
+        // connection (a MissingFlinkBlock gap), while every other tool —
+        // including list-topics, which the kafka block would otherwise enable —
+        // is operator-blocked.
+        const onlyFlinkAllowed: ReadonlySet<ToolName> = new Set([
+          ToolName.LIST_FLINK_STATEMENTS,
+        ]);
+
+        it("should list an operator-blocked tool in operatorBlocked and in no connection section", () => {
+          const report = getReport(
+            handler.handle(
+              runtimeWith(KAFKA_CONN, "default", undefined, onlyFlinkAllowed),
+              undefined,
+            ),
+          );
+
+          expect(report.operatorBlocked).toContain(ToolName.LIST_TOPICS);
+          const allSectionTools = report.connections.flatMap((s) =>
+            s.disabledGroups.flatMap((g) => g.tools),
+          );
+          expect(allSectionTools).not.toContain(ToolName.LIST_TOPICS);
+        });
+
+        it("should render the operator-block as a server-wide block above the per-connection sections", () => {
+          const text = getText(
+            handler.handle(
+              runtimeWith(KAFKA_CONN, "default", undefined, onlyFlinkAllowed),
+              undefined,
+            ),
+          );
+
+          const blockHeader = `${ToolDisabledReason.OperatorBlocked} (`;
+          expect(text).toContain(blockHeader);
+          // Operator-blocked bullets sit two spaces in (top-level), distinct
+          // from the six-space per-connection section bullets.
+          expect(text).toContain("\n  - list-topics");
+          // The server-wide block precedes the per-connection heading.
+          expect(text.indexOf(blockHeader)).toBeLessThan(
+            text.indexOf("Per-connection tool gating (by reason):"),
+          );
+        });
+
+        it("should surface the operator-block instead of the all-advertised summary when no connection has a predicate gap", () => {
+          // Allow only a connection-independent tool: every connection-dependent
+          // tool is operator-blocked, so no section carries a predicate gap. The
+          // report must still report the blocked tools, never claim all advertised.
+          const text = getText(
+            handler.handle(
+              runtimeWith(
+                KAFKA_CONN,
+                "default",
+                undefined,
+                new Set([ToolName.SEARCH_PRODUCT_DOCS]),
+              ),
+              undefined,
+            ),
+          );
+
+          expect(text).toContain(`${ToolDisabledReason.OperatorBlocked} (`);
+          expect(text).toContain("\n  - list-topics");
+          expect(text).not.toContain("registered tools are advertised");
+        });
+      });
+
       describe('group_by: "category"', () => {
         it('should bucket disabled tools by handler.category within each section and tag the report with groupBy="category"', () => {
           const report = getReport(

@@ -11,6 +11,7 @@ All notable changes to this MCP server will be documented in this file.
 ### Fixed
 
 - `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.
+- `explain-disabled-tools` now accounts for tools the operator excluded via `--allow-tools` / `--block-tools`; previously (since v1.3.0) such tools were ignored by the diagnostic, which either counted them as enabled — contradicting `tools/list` — or blamed a missing config block. They now appear in a dedicated server-wide block.
 
 ### Changed
 

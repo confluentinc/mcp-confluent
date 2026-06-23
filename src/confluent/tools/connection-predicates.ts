@@ -316,13 +316,16 @@ export const flinkWithTelemetry: ConnectionPredicate = allOf(
  * missing from the connection config, or the policy it violates (not which
  * predicate or overlay emitted it — multiple sites may share a reason). Write
  * the value as a declarative phrase a misconfigured user could act on. Most
- * reasons originate in a predicate body; two are exceptions, produced outside
- * any predicate because they describe a condition no per-connection check can
- * see: {@linkcode ReadOnlyConnection} (the read-only verdict overlay in
+ * reasons originate in a predicate body; three are exceptions, produced
+ * outside any predicate because they describe a condition no per-connection
+ * check can see: {@linkcode ReadOnlyConnection} (the read-only verdict overlay in
  * `BaseToolHandler`, composing a tool's mutation posture with the connection's
- * `read_only` flag) and {@linkcode NoConnectionsConfigured} (assigned by
+ * `read_only` flag), {@linkcode NoConnectionsConfigured} (assigned by
  * `buildToolGatingReport` when there are no connections at all, so no
- * connection-dependent tool has any verdict to report).
+ * connection-dependent tool has any verdict to report), and
+ * {@linkcode OperatorBlocked} (assigned by `buildToolGatingReport` when the
+ * operator's server-wide allow/block-list excludes a tool, ahead of and
+ * independent of any per-connection check).
  */
 export enum ToolDisabledReason {
   MissingKafkaBlock = "no 'kafka' block in connection config",
@@ -339,4 +342,5 @@ export enum ToolDisabledReason {
   OAuthNotDirectCapable = "OAuth connection cannot satisfy a direct-only requirement",
   ReadOnlyConnection = "connection is marked read_only; tools that mutate state are disabled",
   NoConnectionsConfigured = "no connections are configured",
+  OperatorBlocked = "excluded by the operator's allow/block-list",
 }

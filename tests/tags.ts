@@ -14,7 +14,8 @@
  *
  * Cross-cutting tags: {@link Tag.SMOKE} marks transport-layer tests that
  * don't belong to any tool group; {@link Tag.OAUTH} marks tests that exercise
- * the OAuth flow.
+ * the OAuth flow; {@link Tag.MULTI} marks the multi-connection suite that boots
+ * a server holding two connections at once.
  *
  * {@see https://vitest.dev/guide/test-tags}
  */
@@ -23,6 +24,13 @@ export enum Tag {
 
   // Tests that work with an OAuth connection
   OAUTH = "@oauth",
+
+  // Multi-connection suite: one server, two connections (CCloud + local CP
+  // broker), proving per-connection routing against live infra. Cross-cutting
+  // (spans kafka + flink + diagnostics), so it's neither a tool-group nor a
+  // service-config tag. Stood up in CI by its own block, which boots the CP
+  // docker stack (see .semaphore/integration.yml).
+  MULTI = "@multi",
 
   // Tool-group axis: matches handler directories
   BILLING = "@billing",

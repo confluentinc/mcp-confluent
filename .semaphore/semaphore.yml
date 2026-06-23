@@ -257,6 +257,53 @@ blocks:
             - pnpm run test:harness
             - make test-integration TAGS=@smoke
 
+  # Multi-connection block (#543): boots a server holding two connections —
+  # `ccloud` (CCloud) and `cp` (the local Confluent Platform broker) — and
+  # proves per-connection routing against live infra. The ONLY block that stands
+  # up the docker-compose CP stack, so it carries a bespoke prologue/epilogue for
+  # that lifecycle rather than the shared *integration-prologue anchor (it also
+  # skips that anchor's chromium install, which only @oauth tests need — this
+  # suite is direct-only). Fires whenever the multi-connection fixture, harness,
+  # test, or the CP compose file changes.
+  #
+  # TEMPORARY per-PR placement: this lives here only to prove the suite green on
+  # the PR that introduces it. A follow-up moves it to the scheduled/manual
+  # integration.yml pipeline (gated on a @multi SERVICE_CONFIGS sentinel) and
+  # deletes this block, so the docker + two-cluster cost stays off every PR.
+  - name: "Integration Tests: multi"
+    dependencies: ["Build & Test"]
+    run:
+      when: "change_in(['/src/confluent/tools/multi-connection.integration.test.ts', '/tests/harness/multi-runtime.ts', '/tests/harness/multi-start-server.ts', '/tests/harness/multi-kafka-admin.ts', '/test-fixtures/yaml_configs/integration.multi.yaml', '/docker-compose.cp-test.yml'], { default_branch: 'main' })"
+    task:
+      env_vars:
+        # Static, non-secret CP broker creds (match docker-compose.cp-test.yml's
+        # JAAS user_mcp). `make setup-test-env` only writes Vault-backed secrets,
+        # so the `cp` connection's ${CP_KAFKA_*} interpolation is sourced here.
+        - name: CP_KAFKA_USERNAME
+          value: "mcp"
+        - name: CP_KAFKA_PASSWORD
+          value: "mcp-secret"
+      prologue:
+        commands:
+          - . vault-setup --version v3 --role mcp-confluent
+          - make setup-test-env
+          - pnpm run build
+          # amd64 agents ship docker-compose v1.29.2 (hyphenated, no `--wait`),
+          # so block on the broker + SR ports with dockerize.
+          - docker-compose -f docker-compose.cp-test.yml up -d
+          - dockerize -wait tcp://localhost:9092 -wait tcp://localhost:8081 -timeout 120s
+      epilogue:
+        always:
+          commands:
+            - docker-compose -f docker-compose.cp-test.yml down -v
+            - make remove-test-env
+            - test-results publish TEST-integration.xml --name "Integration (${SEMAPHORE_JOB_NAME})" --force || true
+      jobs:
+        - name: "@multi"
+          commands:
+            - pnpm run test:harness
+            - make test-integration TAGS=@multi
+
 after_pipeline:
   task:
     jobs:

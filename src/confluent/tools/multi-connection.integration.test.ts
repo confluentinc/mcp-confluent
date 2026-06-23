@@ -126,7 +126,10 @@ describe("multi-connection routing", { tags: [Tag.MULTI] }, () => {
       name: ToolName,
       args: Record<string, unknown>,
     ): Promise<string> {
-      let result;
+      // Typed (not bare `let result`, which would be implicit any). The expect
+      // stays *outside* the try so a wrongly-successful call fails the test
+      // rather than having its AssertionError caught and returned as a string.
+      let result: Awaited<ReturnType<typeof server.client.callTool>>;
       try {
         result = await server.client.callTool({ name, arguments: args });
       } catch (error) {

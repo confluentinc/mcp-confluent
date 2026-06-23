@@ -92,8 +92,7 @@ connections:
       extra_properties:
         security.protocol: "SASL_PLAINTEXT"
         sasl.mechanisms: "PLAIN"
-
-    # --- @cp (Schema Registry) ---
-    # The local SR runs unauthenticated; no auth block is needed.
-    schema_registry:
-      endpoint: "http://localhost:8081"
+    # No schema_registry / flink / etc. block: `cp` is deliberately kafka-only,
+    # so it's the non-Flink connection in the routing assertions. (The docker
+    # stack still runs a local SR for the @cp suite; this fixture just doesn't
+    # wire `cp` to it.)

@@ -289,9 +289,10 @@ blocks:
           - make setup-test-env
           - pnpm run build
           # amd64 agents ship docker-compose v1.29.2 (hyphenated, no `--wait`),
-          # so block on the broker + SR ports with dockerize.
+          # so block on the broker port with dockerize. Only the `cp` broker is
+          # used (the suite wires no connection to the stack's local SR).
           - docker-compose -f docker-compose.cp-test.yml up -d
-          - dockerize -wait tcp://localhost:9092 -wait tcp://localhost:8081 -timeout 120s
+          - dockerize -wait tcp://localhost:9092 -timeout 120s
       epilogue:
         always:
           commands:

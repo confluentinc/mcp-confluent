@@ -4,7 +4,10 @@ import {
   ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
+import {
+  alwaysEnabled,
+  ToolDisabledReason,
+} from "@src/confluent/tools/connection-predicates.js";
 import {
   buildToolGatingReport,
   type ConnectionGatingSection,
@@ -85,11 +88,23 @@ export class ExplainDisabledToolsHandler extends ToolMetadataHandler {
  * the tool's response. Format is stable — handler tests pin specific
  * substrings so the AI/script-facing structure does not drift silently.
  *
- * Three shapes:
- *   - nothing disabled anywhere → a one-line "all advertised" summary;
- *   - no connections configured → a one-line no-connections summary;
- *   - otherwise → a `Per-connection tool gating (by {axis}):` heading, one
- *     section per connection that has gaps, and a closing advertised-count line.
+ * Two orthogonal parts, each present only when it has something to say, joined
+ * by a blank line:
+ *   - the server-wide operator allow/block-list block, when any tool was
+ *     excluded by it (rendered first, since the operator filter is the
+ *     outermost gate);
+ *   - the connection-shaped part: a no-connections summary, or a
+ *     `Per-connection tool gating (by {axis}):` heading with one section per
+ *     gapped connection and a closing advertised-count line.
+ *
+ * When neither part has anything to report, a one-line "all advertised"
+ * summary stands in.
+ *
+ * Operator block (top-level header, two-space bullets):
+ *
+ *   excluded by the operator's allow/block-list (2):
+ *     - list-topics
+ *     - create-topics
  *
  * Section layout (two-space connection header, four-space bucket header,
  * six-space bullets):
@@ -106,28 +121,68 @@ export class ExplainDisabledToolsHandler extends ToolMetadataHandler {
 function renderReport(report: ToolGatingReport): string {
   const total = report.enabledCount + report.disabledCount;
 
+  const operatorBlock =
+    report.operatorBlocked.length > 0
+      ? renderOperatorBlock(report.operatorBlocked)
+      : undefined;
+  const connectionPart = renderConnectionPart(report, total);
+
+  if (operatorBlock === undefined && connectionPart === undefined) {
+    return `All ${total} registered tools are advertised via tools/list.`;
+  }
+
+  // Blank line between the two parts so they stay visually separate.
+  return [operatorBlock, connectionPart]
+    .filter((part): part is string => part !== undefined)
+    .join("\n\n");
+}
+
+/**
+ * The connection-shaped portion of the report, or `undefined` when there is
+ * nothing connection-side to say (a zero-connection config whose only disabled
+ * tools are operator-blocked, or a populated config with every
+ * connection-dependent tool advertised). The operator-blocked tally is
+ * excluded from the no-connections "connection-gated" count — those tools are
+ * already accounted for in the operator block.
+ */
+function renderConnectionPart(
+  report: ToolGatingReport,
+  total: number,
+): string | undefined {
   if (report.connections.length === 0) {
-    if (report.disabledCount === 0) {
-      return `All ${total} registered tools are advertised via tools/list.`;
-    }
-    return `No connections are configured — ${report.disabledCount} of ${total} tools are connection-gated and unavailable; ${report.enabledCount} connection-independent tools remain available.`;
+    const connectionGated =
+      report.disabledCount - report.operatorBlocked.length;
+    if (connectionGated === 0) return undefined;
+    return `No connections are configured — ${connectionGated} of ${total} tools are connection-gated and unavailable; ${report.enabledCount} connection-independent tools remain available.`;
   }
 
   const gappedSections = report.connections.filter(
     (section) => section.disabledCount > 0,
   );
-  if (gappedSections.length === 0) {
-    return `All ${total} registered tools are advertised via tools/list.`;
-  }
+  if (gappedSections.length === 0) return undefined;
 
-  // Blocks are joined with a blank line so adjacent sections and the footer
-  // stay visually separate.
-  const blocks: string[] = [
+  // Per-connection section denominators exclude operator-blocked tools so the
+  // "X of Y" counts are self-consistent with what each section represents.
+  const connectionRoutableTotal = total - report.operatorBlocked.length;
+
+  return [
     `Per-connection tool gating (by ${report.groupBy}):`,
-    ...gappedSections.map((section) => renderConnectionSection(section, total)),
+    ...gappedSections.map((section) =>
+      renderConnectionSection(section, connectionRoutableTotal),
+    ),
     `${report.enabledCount} tools advertised via tools/list.`,
-  ];
-  return blocks.join("\n\n");
+  ].join("\n\n");
+}
+
+/**
+ * Render the server-wide operator allow/block-list block: a header naming the
+ * reason and count, then one two-space bullet per excluded tool in handler
+ * iteration order.
+ */
+function renderOperatorBlock(blocked: readonly ToolName[]): string {
+  const header = `${ToolDisabledReason.OperatorBlocked} (${blocked.length}):`;
+  const bullets = blocked.map((tool) => `  - ${tool}`);
+  return [header, ...bullets].join("\n");
 }
 
 function renderConnectionSection(

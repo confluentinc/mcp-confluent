@@ -27,7 +27,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -136,50 +139,53 @@ describe(
         // seed + verify via the api-key-authed admin client; only the DELETE_TOPICS call goes via OAuth
         const { admin, createdTopics } = withSharedAdminClient();
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should delete the requested Kafka topic", async () => {
-            const topic = uniqueName(`delete-oauth-${transport}`);
-            createdTopics.push(topic);
-            await admin().createTopics({
-              topics: [{ topic, numPartitions: 1 }],
-            });
-            await expect
-              .poll(() => admin().listTopics(), {
-                timeout: 15_000,
-                interval: 500,
-              })
-              .toContain(topic);
-
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.DELETE_TOPICS,
-              arguments: {
-                topicNames: [topic],
-                cluster_id: clusterId,
-                environment_id: environmentId,
-              },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            expect(result.isError, textContent(result)).not.toBe(true);
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should delete the requested Kafka topic", async () => {
+              const topic = uniqueName(`delete-oauth-${transport}`);
+              createdTopics.push(topic);
+              await admin().createTopics({
+                topics: [{ topic, numPartitions: 1 }],
+              });
+              await expect
+                .poll(() => admin().listTopics(), {
+                  timeout: 15_000,
+                  interval: 500,
+                })
+                .toContain(topic);
 
-            await expect
-              .poll(() => admin().listTopics(), {
-                timeout: 15_000,
-                interval: 500,
-              })
-              .not.toContain(topic);
-          });
-        });
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.DELETE_TOPICS,
+                arguments: {
+                  topicNames: [topic],
+                  cluster_id: clusterId,
+                  environment_id: environmentId,
+                },
+              });
+
+              expect(result.isError, textContent(result)).not.toBe(true);
+
+              await expect
+                .poll(() => admin().listTopics(), {
+                  timeout: 15_000,
+                  interval: 500,
+                })
+                .not.toContain(topic);
+            });
+          },
+        );
       },
     );
   },

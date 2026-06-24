@@ -175,6 +175,15 @@ blocks:
             - pnpm run test:harness
             - make test-integration TAGS=@flink
 
+  # Kafka splits direct and oauth into two parallel jobs (separate agents) so the
+  # oauth lane can run sequentially without slowing the direct lane. The oauth
+  # describes serialize on a single hard-coded callback port; running them across
+  # parallel forks piled them into a lock queue that overran the 180s beforeAll
+  # hook timeout (flaky "Hook timed out … startOAuthServer"). The oauth job's
+  # `INTEGRATION_TEST_CONNECTION_TYPE=oauth` makes the Makefile add
+  # `--no-file-parallelism`, so each oauth file acquires the free lock instantly;
+  # the direct job stays fully parallel. Separate agents also mean each lane
+  # publishes its own TEST-integration.xml.
   - name: "Integration Tests: kafka"
     dependencies: ["Build & Test"]
     run:
@@ -183,10 +192,14 @@ blocks:
       prologue: *integration-prologue
       epilogue: *integration-epilogue
       jobs:
-        - name: "@kafka"
+        - name: "@kafka direct"
           commands:
             - pnpm run test:harness
-            - make test-integration TAGS=@kafka
+            - INTEGRATION_TEST_CONNECTION_TYPE=direct make test-integration TAGS=@kafka
+        - name: "@kafka oauth"
+          commands:
+            - pnpm run test:harness
+            - INTEGRATION_TEST_CONNECTION_TYPE=oauth make test-integration TAGS=@kafka
 
   - name: "Integration Tests: metrics"
     dependencies: ["Build & Test"]

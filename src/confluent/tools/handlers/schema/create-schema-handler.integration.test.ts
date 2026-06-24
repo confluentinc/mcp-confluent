@@ -27,7 +27,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -133,43 +136,46 @@ describe(
         // the api-key SR client verifies (and cleans up) what the server-side OAuth path created
         const { client, createdSubjects } = withSharedSrClient();
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should register a new subject via the tool", async () => {
-            const subject = uniqueName(`create-oauth-${transport}`);
-            createdSubjects.push(subject);
-
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.CREATE_SCHEMA,
-              arguments: {
-                subject,
-                schema: TEST_AVRO_SCHEMA,
-                schemaType: "AVRO",
-                environment_id: environmentId,
-              },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            expect(textContent(result)).toContain(
-              `Successfully registered schema for subject "${subject}"`,
-            );
-            await expect
-              .poll(() => client().getAllSubjects(), {
-                timeout: 15_000,
-                interval: 500,
-              })
-              .toContain(subject);
-          });
-        });
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should register a new subject via the tool", async () => {
+              const subject = uniqueName(`create-oauth-${transport}`);
+              createdSubjects.push(subject);
+
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.CREATE_SCHEMA,
+                arguments: {
+                  subject,
+                  schema: TEST_AVRO_SCHEMA,
+                  schemaType: "AVRO",
+                  environment_id: environmentId,
+                },
+              });
+
+              expect(textContent(result)).toContain(
+                `Successfully registered schema for subject "${subject}"`,
+              );
+              await expect
+                .poll(() => client().getAllSubjects(), {
+                  timeout: 15_000,
+                  interval: 500,
+                })
+                .toContain(subject);
+            });
+          },
+        );
       },
     );
   },

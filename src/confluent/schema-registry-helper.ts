@@ -587,6 +587,14 @@ async function serializeProtobufMessage(
     );
   }
 
+  // TODO: support header mode for PROTOBUF
+  // refer to https://github.com/confluentinc/mcp-confluent/pull/607
+  if (options.schemaIdLocation === "header") {
+    throw new Error(
+      "schemaIdLocation 'header' is not supported for PROTOBUF yet; use the default payload format.",
+    );
+  }
+
   let protobufRegistry: MutableRegistry;
   let serializerConfig: SerializerConfig;
   if (options.schema) {

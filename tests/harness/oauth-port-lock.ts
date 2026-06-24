@@ -72,7 +72,8 @@ function concurrentRunBalk(): Error {
     `OAuth callback-port lock at ${LOCK_PATH} is held by a live process (PID=${holderPid() ?? "unknown"}). ` +
       `OAuth integration tests must run sequentially — a concurrent OAuth test session is a ` +
       `broken setup. Run with --no-file-parallelism (the Makefile adds it for any run that ` +
-      `isn't direct-only — the oauth lane and the combined all/unset default).`,
+      `isn't direct-only — the oauth lane and the combined all/unset default). ` +
+      `If no OAuth tests are running, that PID was reused by an unrelated process — delete ${LOCK_PATH} and retry.`,
   );
 }
 

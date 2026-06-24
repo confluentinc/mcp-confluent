@@ -587,8 +587,11 @@ async function serializeProtobufMessage(
     );
   }
 
-  // TODO: support header mode for PROTOBUF
-  // refer to https://github.com/confluentinc/mcp-confluent/pull/607
+  // Header schema-id mode isn't supported for PROTOBUF yet, so reject it
+  // explicitly: otherwise the produce would silently fall back to the payload
+  // wire format and write a message that doesn't match what the caller asked
+  // for. Header support for AVRO/JSON landed in #607; protobuf parity is a
+  // separate follow-up.
   if (options.schemaIdLocation === "header") {
     throw new Error(
       "schemaIdLocation 'header' is not supported for PROTOBUF yet; use the default payload format.",

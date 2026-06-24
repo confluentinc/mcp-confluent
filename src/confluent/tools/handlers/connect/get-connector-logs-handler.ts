@@ -235,8 +235,14 @@ async function resolveOrganizationId(
   }
   const first = data?.data?.[0]?.id;
   if (!first) {
+    // The config-fallback hint only applies to direct connections — an OAuth
+    // connection has no `confluent_cloud` block to set `organization_id` on.
+    const fallbackHint =
+      conn.type === "direct"
+        ? "Pass organizationId or set confluent_cloud.organization_id in the connection config."
+        : "Pass organizationId.";
     throw new Error(
-      "Failed to auto-resolve organization ID: GET /org/v2/organizations returned no organizations. Pass organizationId or set confluent_cloud.organization_id in the connection config.",
+      `Failed to auto-resolve organization ID: GET /org/v2/organizations returned no organizations. ${fallbackHint}`,
     );
   }
   return first;

@@ -1,4 +1,5 @@
 import { ListTablesHandler } from "@src/confluent/tools/handlers/flink/catalog/list-tables-handler.js";
+import { textOf } from "@tests/call-tool-result.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -79,6 +80,34 @@ describe("list-tables-handler.ts", () => {
         expect(result._meta?.flinkStatementsCreated).toEqual([
           expect.stringMatching(/^mcp-query-/),
         ]);
+      });
+
+      it("should return a config error when the environment_id is not an env-* catalog", async () => {
+        const conn = {
+          flink: { ...FLINK_CONN.flink, environment_id: "friendly-env" },
+        };
+        const result = await handler.handle(
+          runtimeWith(conn, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toBe(
+          "Catalog name could not be resolved. Pass catalogName or environmentId as env-xxxxx, or set flink.environment_id in config.",
+        );
+      });
+
+      it("should report no tables in the named catalog when the query returns zero rows", async () => {
+        flinkRest.GET.mockResolvedValue({
+          data: { ...SQL_RESPONSE, results: { data: [] } },
+        });
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+        expect(result.isError).not.toBe(true);
+        expect(textOf(result)).toBe(
+          `No tables found in catalog '${FLINK_CONN.flink.environment_id}'.`,
+        );
       });
 
       it("should still surface the statement name via _meta on the error path", async () => {

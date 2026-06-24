@@ -17,12 +17,17 @@ import {
   outputApiKey,
   outputInitConfig,
   outputToolList,
+  performCleanup,
   resolveAllowedToolNames,
   resolveTelemetryWriteKey,
 } from "@src/index.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { ccloudOAuthRuntime, runtimeWith } from "@tests/factories/runtime.js";
+import {
+  ccloudOAuthRuntime,
+  runtimeWith,
+  runtimeWithConnections,
+} from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import {
   createFsWrappers,
@@ -213,7 +218,7 @@ describe("index.ts", () => {
       expect(() =>
         getToolHandlersToRegister(runtimeAllowing(ToolName.LIST_TOPICS)),
       ).toThrow(
-        "Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
+        "Wacky -- Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
       );
     });
 
@@ -234,6 +239,17 @@ describe("index.ts", () => {
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
       expect(result.has(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+
+    it("should register the connection-independent tools on a zero-connection config", () => {
+      const result = getToolHandlersToRegister(runtimeWithConnections({}));
+
+      expect(result.has(ToolName.SEARCH_PRODUCT_DOCS)).toBe(true);
+      expect(result.has(ToolName.GET_PRODUCT_DOC_PAGE)).toBe(true);
+      expect(result.has(ToolName.LIST_CONFIGURED_CONNECTIONS)).toBe(true);
+      expect(result.has(ToolName.EXPLAIN_DISABLED_TOOLS)).toBe(true);
+      // A connection-dependent tool has no connection to enable it.
+      expect(result.has(ToolName.LIST_TOPICS)).toBe(false);
     });
 
     it("should emit one grouped warn per (connectionId, reason) for fully-disabled tools", () => {
@@ -295,8 +311,10 @@ describe("index.ts", () => {
         ToolName.LIST_CLUSTERS,
         ToolName.EXPLAIN_DISABLED_TOOLS,
         ToolName.LIST_CONFIGURED_CONNECTIONS,
+        ToolName.DESCRIBE_CONFIGURED_CONNECTION,
         // Schema Registry (hasSchemaRegistryOrOAuth)
         ToolName.LIST_SCHEMAS,
+        ToolName.CREATE_SCHEMA,
         ToolName.DELETE_SCHEMA,
       ];
 
@@ -304,7 +322,7 @@ describe("index.ts", () => {
         // Flink (hasFlink — needs the flink service block)
         ToolName.LIST_FLINK_STATEMENTS,
         ToolName.CREATE_FLINK_STATEMENT,
-        ToolName.READ_FLINK_STATEMENT,
+        ToolName.GET_FLINK_STATEMENT_RESULTS,
         ToolName.DELETE_FLINK_STATEMENTS,
         ToolName.GET_FLINK_STATEMENT_EXCEPTIONS,
         ToolName.LIST_FLINK_CATALOGS,
@@ -817,6 +835,43 @@ describe("index.ts", () => {
       // "no key supplied" so the caller routes through TelemetryService's
       // falsy-writeKey disabled path rather than passing "" to Segment.
       expect(result).toBeFalsy();
+    });
+  });
+
+  describe("performCleanup()", () => {
+    function cleanupDeps() {
+      return {
+        telemetry: { shutdown: vi.fn().mockResolvedValue(undefined) },
+        transportManager: { stop: vi.fn().mockResolvedValue(undefined) },
+        runtime: { oauthHolder: undefined, disconnectAll: vi.fn() },
+      };
+    }
+
+    it("should run every shutdown step then exit 0", async () => {
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockResolvedValue(undefined);
+      const exit = vi.fn();
+
+      await performCleanup(deps, exit);
+
+      expect(deps.telemetry.shutdown).toHaveBeenCalledOnce();
+      expect(deps.transportManager.stop).toHaveBeenCalledOnce();
+      expect(deps.runtime.disconnectAll).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(0);
+    });
+
+    it("should still exit 0 when a shutdown step rejects", async () => {
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockRejectedValue(
+        new Error("disconnect boom"),
+      );
+      const exit = vi.fn();
+
+      await performCleanup(deps, exit);
+
+      expect(exit).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(0);
     });
   });
 });

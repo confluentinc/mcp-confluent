@@ -1,6 +1,7 @@
 import { loadConfigFromYaml } from "@src/config/index.js";
 import {
   type ConnectionConfig,
+  type DirectConnectionConfig,
   MCPServerConfiguration,
 } from "@src/config/models.js";
 import { TransportType } from "@src/mcp/transports/types.js";
@@ -70,20 +71,21 @@ export function integrationRuntime(
 
 /**
  * The {@link ConnectionConfig} the spawned MCP server would see, looked up by
- * the fixture's connection name (see {@linkcode FIXTURE_CONNECTION_NAME}) in the
+ * the fixture's connection id (see {@linkcode FIXTURE_CONNECTION_ID}) in the
  * same fixture {@linkcode integrationRuntime} loads. Integration fixtures hold
  * exactly one connection, so this single connection is the right-sized input for
  * a {@linkcode ConnectionPredicate} gate: `handler.predicate(integrationConnection())`
  * answers "is this tool enabled?" without constructing a whole ServerRuntime.
  *
- * Resolves by id via {@linkcode MCPServerConfiguration.getConnectionConfig} rather than
- * `getSoleConnection()` — the #532 epic is removing the sole-connection accessors
- * repo-wide (see #541's completion bar), so new code must not depend on them.
+ * Resolves by id via {@linkcode MCPServerConfiguration.getConnectionConfig}: a
+ * configured connection is addressed by its id, never by a count-dependent
+ * "sole" lookup, so this stays correct for the multi-connection fixtures #543
+ * introduces.
  *
  * On load failure (a required `${VAR}` missing — creds absent) returns an empty
  * `direct` connection, so every block-based predicate yields a clean disabled
  * verdict and the gate skips. A fixture that loads but lacks the expected
- * connection name is fixture drift, not a creds-skip — {@linkcode MCPServerConfiguration.getConnectionConfig}
+ * connection id is fixture drift, not a creds-skip — {@linkcode MCPServerConfiguration.getConnectionConfig}
  * throws loudly rather than letting the whole suite silently skip.
  */
 export function integrationConnection(
@@ -93,12 +95,44 @@ export function integrationConnection(
   // Fixture failed to load (a required `${VAR}` missing — i.e. creds absent):
   // an empty direct connection yields a clean disabled verdict, so the gate skips.
   if (config === undefined) return { type: "direct" };
-  // Fixture loaded: resolve the expected connection by name. A miss here is
+  // Fixture loaded: resolve the expected connection by id. A miss here is
   // fixture drift (renamed/removed connection), not a credential-skip case, so
   // let getConnectionConfig throw loudly rather than silently skipping the whole suite.
   return config.getConnectionConfig(
-    FIXTURE_CONNECTION_NAME[options.oauth ? "oauth" : "direct"],
+    FIXTURE_CONNECTION_ID[options.oauth ? "oauth" : "direct"],
   );
+}
+
+/**
+ * {@linkcode integrationConnection} narrowed to {@link DirectConnectionConfig},
+ * throwing if the fixture connection is OAuth-typed. The seeding helpers
+ * (kafka-admin, schema-registry, flink, connect, confluent-cloud) build their
+ * own api-key-authed clients from direct-only fields (`kafka.env_id`,
+ * `confluent_cloud.auth`, …), so they need the narrowing the union doesn't give.
+ */
+export function integrationDirectConnection(): DirectConnectionConfig {
+  const conn = integrationConnection();
+  if (conn.type !== "direct") {
+    throw new Error(
+      `Expected the integration fixture connection to be direct; got type "${conn.type}"`,
+    );
+  }
+  return conn;
+}
+
+/**
+ * The fixture connection's id — its key in the `connections` map, which is
+ * also the value a test passes as the `connectionId` argument to a
+ * connection-addressed tool (e.g. `describe-configured-connection`); the map key
+ * and the routing id are one and the same. A constant rather than a
+ * count-dependent "sole" lookup so it stays correct for the
+ * multi-connection fixtures #543 introduces, and so a fixture rename surfaces
+ * here rather than as a mysterious "unknown connection id" at call time.
+ */
+export function integrationConnectionId(
+  options: { oauth?: boolean } = {},
+): string {
+  return FIXTURE_CONNECTION_ID[options.oauth ? "oauth" : "direct"];
 }
 
 /**
@@ -108,7 +142,7 @@ export function integrationConnection(
  *
  * Counts connections rather than resolving the sole one, so it stays correct for
  * the multi-connection fixtures #543 introduces: a count answers "did anything
- * load?", whereas `getSoleConnection()` throws (and would wrongly read as "not
+ * load?", whereas a sole-connection lookup would throw (and wrongly read as "not
  * loaded") on more than one.
  */
 export function integrationConnectionLoaded(
@@ -199,12 +233,12 @@ const OAUTH_FIXTURE_PATH = resolve(
 );
 
 /**
- * The connection name each integration fixture gives its single connection.
+ * The connection id each integration fixture gives its single connection.
  * {@linkcode integrationConnection} looks the connection up by this key rather
- * than via `getSoleConnection()`, which the #532 epic is removing repo-wide
- * (it encodes the single-connection assumption and throws once two exist).
+ * than by a count-dependent "sole" lookup, which would encode the
+ * single-connection assumption and break once a fixture defines two.
  */
-const FIXTURE_CONNECTION_NAME: Record<"direct" | "oauth", string> = {
+const FIXTURE_CONNECTION_ID: Record<"direct" | "oauth", string> = {
   direct: "integration",
   oauth: "integration-oauth",
 };

@@ -92,6 +92,23 @@ describe(
           const parsed = JSON.parse(textContent(result));
           expect(parsed).toHaveProperty(subject);
         });
+
+        it("should return an array of every version for the subject when latestOnly is false", async () => {
+          const result = await server.client.callTool({
+            name: ToolName.LIST_SCHEMAS,
+            arguments: { subjectPrefix: subject, latestOnly: false },
+          });
+
+          expect(result.isError, textContent(result)).not.toBe(true);
+          // with latestOnly:false the handler walks getAllVersions + getSchemaMetadata per
+          // version, so each subject maps to an array rather than a single metadata object
+          const parsed = JSON.parse(textContent(result));
+          expect(Array.isArray(parsed[subject])).toBe(true);
+          // the seeded subject has exactly one registered version; SR numbers versions from 1
+          expect(parsed[subject]).toHaveLength(1);
+          expect(parsed[subject][0].version).toBe(1);
+          expect(typeof parsed[subject][0].id).toBe("number");
+        });
       });
     });
 

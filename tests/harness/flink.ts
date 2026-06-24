@@ -1,7 +1,7 @@
 import type { paths } from "@src/confluent/openapi-schema.js";
 import type { FlinkStatementMeta } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { createRetryOn429Middleware } from "@tests/harness/retry-on-429.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationDirectConnection } from "@tests/harness/runtime.js";
 import type { CallToolResponse } from "@tests/harness/tool-results.js";
 import { setTimeout as sleep } from "node:timers/promises";
 import createClient, { type Client } from "openapi-fetch";
@@ -34,7 +34,7 @@ interface FlinkScope {
 }
 
 function getFlinkScope(): FlinkScope {
-  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const conn = integrationDirectConnection();
   if (!conn.flink) {
     throw new Error(
       "test-side flink helpers require flink config in test-fixtures/yaml_configs/integration.yaml",

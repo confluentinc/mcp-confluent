@@ -66,16 +66,21 @@ export function getToolHandlersToRegister(
     candidates.push([toolName, ToolHandlerRegistry.getToolHandler(toolName)]);
   }
 
-  // Pass 2: register tools that are enabled on at least one connection.
+  // Pass 2: register tools that are enabled on at least one connection, plus
+  // connection-independent tools (docs, diagnostics), which carry no per-connection
+  // verdict and so stay available even on a zero-connection config.
   for (const [toolName, handler] of candidates) {
     const enabledIds = handler.enabledConnectionIds(runtime);
+    // Unreachable: enabledConnectionIds() is derived by iterating
+    // runtime.config.connections, so every id it yields is already a known key.
+    // A non-empty unknownIds means that derivation has broken.
     const unknownIds = enabledIds.filter((id) => !knownIds.has(id));
     if (unknownIds.length > 0) {
       throw new Error(
-        `Tool ${toolName}: enabledConnectionIds() returned unknown connection ID(s): ${unknownIds.join(", ")}`,
+        `Wacky -- Tool ${toolName}: enabledConnectionIds() returned unknown connection ID(s): ${unknownIds.join(", ")}`,
       );
     }
-    if (enabledIds.length > 0) {
+    if (enabledIds.length > 0 || handler.isConnectionIndependent) {
       toolHandlersToRegister.set(toolName, handler);
       logger.info(`Tool ${toolName} enabled`);
     }
@@ -322,6 +327,35 @@ function runOutputInitConfig(oauth: boolean): EarlyExitResult {
   }
 }
 
+/**
+ * Tear the server down on a shutdown signal, then exit. Every step runs inside
+ * a try/finally so a rejection from any one — most plausibly a client manager
+ * failing to disconnect — is logged but never strands the process: the exit
+ * always fires. `exit` is injected (defaulting to `process.exit`) so this
+ * guarantee is unit-testable without stubbing the global.
+ */
+export async function performCleanup(
+  deps: {
+    telemetry: Pick<TelemetryService, "shutdown">;
+    transportManager: Pick<TransportManager, "stop">;
+    runtime: Pick<ServerRuntime, "oauthHolder" | "disconnectAll">;
+  },
+  exit: (code: number) => void = (code) => process.exit(code),
+): Promise<void> {
+  logger.info("Shutting down...");
+  try {
+    await deps.telemetry.shutdown();
+    await deps.transportManager.stop();
+    // shutdown() is race-safe with an in-flight bootstrap.
+    deps.runtime.oauthHolder?.shutdown();
+    await deps.runtime.disconnectAll();
+  } catch (error) {
+    logger.error({ err: error }, "Error during shutdown");
+  } finally {
+    exit(0);
+  }
+}
+
 async function main() {
   try {
     // Parse command line arguments.(NO LONGER LOADS ENV VARS FROM -e file!)
@@ -378,7 +412,7 @@ async function main() {
     const telemetry = TelemetryService.getInstance();
 
     logger.info(
-      `${mcpConfig.getConnectionNames().length} connections loaded successfully`,
+      `${mcpConfig.getConnectionIds().length} connections loaded successfully`,
     );
 
     const runtime = ServerRuntime.fromConfig(mcpConfig, allowedToolNames);
@@ -442,20 +476,13 @@ async function main() {
     });
 
     // Set up cleanup handlers
-    const performCleanup = async () => {
-      logger.info("Shutting down...");
-      await telemetry.shutdown();
-      await transportManager.stop();
-      // shutdown() is race-safe with an in-flight bootstrap.
-      runtime.oauthHolder?.shutdown();
-      await runtime.clientManager.disconnect();
-      process.exit(0);
-    };
+    const cleanup = () =>
+      performCleanup({ telemetry, transportManager, runtime });
 
-    process.on("SIGINT", performCleanup);
-    process.on("SIGTERM", performCleanup);
-    process.on("SIGQUIT", performCleanup);
-    process.on("SIGUSR2", performCleanup);
+    process.on("SIGINT", cleanup);
+    process.on("SIGTERM", cleanup);
+    process.on("SIGQUIT", cleanup);
+    process.on("SIGUSR2", cleanup);
   } catch (error) {
     if (error instanceof DisplayedCommandLineUsageError) {
       process.exit(0);

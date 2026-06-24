@@ -205,7 +205,7 @@ describe("tool-registry.ts", () => {
         // Flink
         [ToolName.LIST_FLINK_STATEMENTS]: hasFlink,
         [ToolName.CREATE_FLINK_STATEMENT]: hasFlink,
-        [ToolName.READ_FLINK_STATEMENT]: hasFlink,
+        [ToolName.GET_FLINK_STATEMENT_RESULTS]: hasFlink,
         [ToolName.DELETE_FLINK_STATEMENTS]: hasFlink,
         [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: hasFlink,
         [ToolName.LIST_FLINK_CATALOGS]: hasFlink,
@@ -248,6 +248,7 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
         // Schema Registry
         [ToolName.LIST_SCHEMAS]: hasSchemaRegistryOrOAuth,
+        [ToolName.CREATE_SCHEMA]: hasSchemaRegistryOrOAuth,
         [ToolName.DELETE_SCHEMA]: hasSchemaRegistryOrOAuth,
         // Tableflow
         [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
@@ -270,6 +271,7 @@ describe("tool-registry.ts", () => {
         // Diagnostics (no service-block requirement)
         [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
         [ToolName.LIST_CONFIGURED_CONNECTIONS]: alwaysEnabled,
+        [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: alwaysEnabled,
       };
 
       it.each(
@@ -410,6 +412,7 @@ describe("tool-registry.ts", () => {
           cm.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
         },
       },
+      [ToolName.CREATE_SCHEMA]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_SCHEMA]: { outcome: { throws: "ZodError" } },
       // Flink
       [ToolName.LIST_FLINK_STATEMENTS]: {
@@ -421,7 +424,9 @@ describe("tool-registry.ts", () => {
         },
       },
       [ToolName.CREATE_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
-      [ToolName.READ_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_FLINK_STATEMENT_RESULTS]: {
+        outcome: { throws: "ZodError" },
+      },
       [ToolName.DELETE_FLINK_STATEMENTS]: { outcome: { throws: "ZodError" } },
       [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: {
         outcome: { throws: "ZodError" },
@@ -562,7 +567,7 @@ describe("tool-registry.ts", () => {
       [ToolName.GET_PRODUCT_DOC_PAGE]: { outcome: { throws: "ZodError" } },
       // Diagnostics — no client calls; the handler walks the registry's
       // own predicate map. Against `allServicesRuntime` every gate passes
-      // and the handler emits its all-enabled summary.
+      // and the handler emits its all-advertised summary.
       [ToolName.EXPLAIN_DISABLED_TOOLS]: {
         outcome: { resolves: "registered tools are advertised via tools/list" },
         bypassesClientLayer: true,
@@ -572,6 +577,12 @@ describe("tool-registry.ts", () => {
       // connection-count header.
       [ToolName.LIST_CONFIGURED_CONNECTIONS]: {
         outcome: { resolves: "1 connection configured:" },
+        bypassesClientLayer: true,
+      },
+      // describe-configured-connection requires a connectionId argument, so the
+      // zero-arg smoke call trips its Zod schema before touching any client.
+      [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: {
+        outcome: { throws: "ZodError" },
         bypassesClientLayer: true,
       },
       // Organizations

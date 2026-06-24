@@ -1,10 +1,10 @@
 import type { paths } from "@src/confluent/openapi-schema.js";
 import { createRetryOn429Middleware } from "@tests/harness/retry-on-429.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationDirectConnection } from "@tests/harness/runtime.js";
 import createClient, { type Client } from "openapi-fetch";
 
 export function newTestCloudClient(): Client<paths> {
-  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const conn = integrationDirectConnection();
   if (!conn.confluent_cloud) {
     throw new Error(
       "test-side ccloud client requires confluent_cloud config in test-fixtures/yaml_configs/integration.yaml",
@@ -33,7 +33,7 @@ export function newTestCloudClient(): Client<paths> {
  * confusing downstream error.
  */
 export function getTestEnvironmentId(): string {
-  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const conn = integrationDirectConnection();
   if (!conn.kafka?.env_id) {
     throw new Error(
       "test-side env id requires kafka.env_id in test-fixtures/yaml_configs/integration.yaml",
@@ -49,7 +49,7 @@ export function getTestEnvironmentId(): string {
  * the same SR cluster the spawned MCP server is talking to.
  */
 export async function getSchemaRegistryClusterId(): Promise<string> {
-  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const conn = integrationDirectConnection();
   const envId = conn.kafka?.env_id;
   if (!envId) {
     throw new Error(

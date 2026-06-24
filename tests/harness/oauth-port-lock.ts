@@ -17,43 +17,55 @@ import { join } from "node:path";
 
 // `os.tmpdir()` works regardless of whether `node_modules` exists or is
 // writable. The cwd-hash namespace prevents collisions between multiple
-// mcp-confluent worktrees running OAuth tests on the same host.
-const LOCK_PATH = join(tmpdir(), `mcp-oauth-port-26640-${cwdNamespace()}.lock`);
+// mcp-confluent worktrees running OAuth tests on the same host. Exported so the
+// colocated unit test can plant/inspect the lock file.
+export const LOCK_PATH = join(
+  tmpdir(),
+  `mcp-oauth-port-26640-${cwdNamespace()}.lock`,
+);
 
 function cwdNamespace(): string {
   return createHash("sha256").update(process.cwd()).digest("hex").slice(0, 12);
 }
 
-const POLL_INTERVAL_MS = 500;
-
 /**
- * Block until OAUTH_CALLBACK_PORT is free, then claim it by writing `process.pid` into the lock
- * file. Stale locks (holder PID no longer alive) are reclaimed automatically.
+ * Claim OAUTH_CALLBACK_PORT by writing `process.pid` into the lock file, or balk loudly.
  *
- * The default timeout is deliberately **below** the OAuth `beforeAll` hook timeout (180_000ms in
- * the dual-mode tests): if a holder genuinely wedges, this throws a descriptive
- * "lock not released within … (holder PID=…)" before vitest kills the hook with an opaque
- * "Hook timed out in 180000ms" — so the failure names the culprit. With the OAuth lane now running
- * sequentially (`--no-file-parallelism`), acquisition is normally uncontended and instant; a real
- * wait here means a stuck/crashed holder, which the shorter window surfaces faster.
+ * OAuth integration tests **must run sequentially** — they all bind the one hard-coded callback
+ * port — so under correct setup (`--no-file-parallelism`, see the OAuth lane in the Makefile /
+ * `.semaphore`) the lock is always free when a file's `beforeAll` reaches here. Therefore:
+ *
+ * - **Free** → claim it.
+ * - **Held by a live foreign process** → another OAuth test is running concurrently. That can only
+ *   happen if the OAuth lane is (mis)configured to run in parallel — a broken setup — so we throw
+ *   immediately and name the holder rather than queueing on it (the old behavior, which merely hid
+ *   the misconfiguration behind a slow serialize-or-timeout).
+ * - **Held by a dead PID** → a prior run crashed before `afterAll` released it; reclaim and take it.
+ *
+ * Synchronous: with no queueing left there is nothing to await.
  */
-export async function acquireOAuthPortLock(timeoutMs = 150_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (tryAcquire()) return;
-    if (existsSync(LOCK_PATH) && !holderAlive()) {
-      // ignore: a peer fork may unlink first; the next loop iteration retries cleanly
-      try {
-        unlinkSync(LOCK_PATH);
-      } catch {
-        // intentional
-      }
-      continue;
-    }
-    await sleep(POLL_INTERVAL_MS);
+export function acquireOAuthPortLock(): void {
+  if (tryAcquire()) return;
+
+  if (holderAlive()) {
+    throw new Error(
+      `OAuth callback-port lock at ${LOCK_PATH} is held by a live process (PID=${holderPid()}). ` +
+        `OAuth integration tests must run sequentially — a concurrent OAuth test session is a ` +
+        `broken setup. Run with --no-file-parallelism (the Makefile adds it for any run that ` +
+        `isn't direct-only — the oauth lane and the combined all/unset default).`,
+    );
   }
+
+  // Stale lock: the holder PID is gone (a prior run crashed before releasing). Reclaim it.
+  try {
+    unlinkSync(LOCK_PATH);
+  } catch {
+    // a peer may have unlinked first; fall through to the retry
+  }
+  if (tryAcquire()) return;
   throw new Error(
-    `OAuth port lock at ${LOCK_PATH} not released within ${timeoutMs}ms (holder PID=${holderPid() ?? "unknown"})`,
+    `Failed to acquire OAuth callback-port lock at ${LOCK_PATH} after reclaiming a stale lock ` +
+      `(holder PID=${holderPid() ?? "unknown"}).`,
   );
 }
 
@@ -96,8 +108,4 @@ function holderAlive(): boolean {
   } catch {
     return false;
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -26,7 +26,7 @@ export class UpdateConnectorConfigHandler extends ConnectToolHandler {
     const { clusterId, environmentId, connectorName, connectorConfig } =
       updateConnectorConfigArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

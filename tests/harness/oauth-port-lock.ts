@@ -41,20 +41,15 @@ function cwdNamespace(): string {
  *   immediately and name the holder rather than queueing on it (the old behavior, which merely hid
  *   the misconfiguration behind a slow serialize-or-timeout).
  * - **Held by a dead PID** → a prior run crashed before `afterAll` released it; reclaim and take it.
+ *   If a concurrent process recreates the lock between our unlink and re-acquire, that lost race is
+ *   itself a concurrent OAuth run, so it surfaces the same broken-setup balk.
  *
  * Synchronous: with no queueing left there is nothing to await.
  */
 export function acquireOAuthPortLock(): void {
   if (tryAcquire()) return;
 
-  if (holderAlive()) {
-    throw new Error(
-      `OAuth callback-port lock at ${LOCK_PATH} is held by a live process (PID=${holderPid()}). ` +
-        `OAuth integration tests must run sequentially — a concurrent OAuth test session is a ` +
-        `broken setup. Run with --no-file-parallelism (the Makefile adds it for any run that ` +
-        `isn't direct-only — the oauth lane and the combined all/unset default).`,
-    );
-  }
+  if (holderAlive()) throw concurrentRunBalk();
 
   // Stale lock: the holder PID is gone (a prior run crashed before releasing). Reclaim it.
   try {
@@ -62,10 +57,22 @@ export function acquireOAuthPortLock(): void {
   } catch {
     // a peer may have unlinked first; fall through to the retry
   }
+  // A failed re-acquire here means a concurrent process won the race and recreated the lock — the
+  // same broken-setup case as a live holder, so emit the same balk rather than a generic error.
   if (tryAcquire()) return;
-  throw new Error(
-    `Failed to acquire OAuth callback-port lock at ${LOCK_PATH} after reclaiming a stale lock ` +
-      `(holder PID=${holderPid() ?? "unknown"}).`,
+  throw concurrentRunBalk();
+}
+
+/**
+ * The balk raised when the callback-port lock is contended by a live process — i.e. OAuth tests are
+ * running concurrently, which (post `--no-file-parallelism`) is always a broken setup.
+ */
+function concurrentRunBalk(): Error {
+  return new Error(
+    `OAuth callback-port lock at ${LOCK_PATH} is held by a live process (PID=${holderPid() ?? "unknown"}). ` +
+      `OAuth integration tests must run sequentially — a concurrent OAuth test session is a ` +
+      `broken setup. Run with --no-file-parallelism (the Makefile adds it for any run that ` +
+      `isn't direct-only — the oauth lane and the combined all/unset default).`,
   );
 }
 

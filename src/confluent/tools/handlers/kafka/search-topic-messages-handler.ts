@@ -237,7 +237,6 @@ export class SearchTopicMessagesHandler extends BaseToolHandler {
   ): Promise<CallToolResult> {
     const parsed = searchTopicMessagesArgs.parse(toolArguments);
     const {
-      topicNames,
       query,
       queryMode,
       searchIn,
@@ -247,6 +246,9 @@ export class SearchTopicMessagesHandler extends BaseToolHandler {
       valueFormat,
       keyFormat,
     } = parsed;
+    // Deduplicate before subscribing — a repeated topic name would otherwise
+    // create redundant subscription entries. Mirrors `consume-messages`.
+    const topicNames = [...new Set(parsed.topicNames)];
 
     // Reject an invalid regex up front so we never build a consumer just to
     // crash on the first record.

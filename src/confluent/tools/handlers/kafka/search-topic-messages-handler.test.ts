@@ -281,6 +281,22 @@ describe("search-topic-messages-handler.ts", () => {
         expect(consumer.disconnect).toHaveBeenCalledOnce();
       });
 
+      it("should deduplicate repeated topic names before subscribing", async () => {
+        const each = captureEachMessage();
+        const handlePromise = handler.handle(runtime(), {
+          topicNames: ["orders", "orders", "audit"],
+          query: "needle",
+          maxScanned: 1,
+        });
+        await new Promise<void>((r) => setImmediate(r));
+        await deliver(each.get(), "needle");
+        await handlePromise;
+
+        expect(consumer.subscribe).toHaveBeenCalledWith({
+          topics: ["orders", "audit"],
+        });
+      });
+
       it("should return only matching messages and a Found/scanned summary", async () => {
         const each = captureEachMessage();
         const handlePromise = handler.handle(runtime(), {

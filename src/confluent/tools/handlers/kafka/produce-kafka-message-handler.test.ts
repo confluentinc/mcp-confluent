@@ -155,6 +155,31 @@ describe("produce-kafka-message-handler.ts", () => {
         });
       });
 
+      it("should throw a ZodError when a PROTOBUF value omits messageName", async () => {
+        // The valueOptions superRefine requires messageName for PROTOBUF
+        // produces that use schema registry; without it the schema rejects
+        // before the handler touches the client.
+        const clientManager = getMockedClientManager();
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topicName: "smoke",
+            value: {
+              message: { user_id: "USR-001" },
+              useSchemaRegistry: true,
+              schemaType: "PROTOBUF",
+            },
+          },
+          outcome: { throws: "ZodError" },
+          clientManager,
+        });
+      });
+
       it("should serialize a numeric Avro value and send the buffer to the producer", async () => {
         const clientManager = getMockedClientManager();
         const producer = await clientManager.getProducer();

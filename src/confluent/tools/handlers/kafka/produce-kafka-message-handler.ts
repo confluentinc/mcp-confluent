@@ -50,6 +50,12 @@ const messageOptions = z.object({
     .describe(
       "Schema definition to register (as JSON string for AVRO/JSON, or .proto for PROTOBUF). If omitted, uses latest registered schema.",
     ),
+  messageName: z
+    .string()
+    .optional()
+    .describe(
+      "Fully-qualified Protobuf message type to encode the payload as (e.g. com.example.User). Required when schemaType is PROTOBUF; ignored otherwise. Payload keys may use either the proto field name (e.g. user_id) or its camelCase JSON name (e.g. userId).",
+    ),
   subject: z
     .string()
     .optional()
@@ -66,8 +72,38 @@ const messageOptions = z.object({
     ),
 });
 
-const valueOptions = z.object({}).extend(messageOptions.shape);
-const keyOptions = z.object({}).extend(messageOptions.shape);
+// PROTOBUF serialization needs a fully-qualified message type to encode the
+// payload as; AVRO/JSON do not. Surface the requirement in the schema so the
+// contract is visible to callers rather than only failing at serialize time.
+// Only enforce when schema registry is actually in use: with useSchemaRegistry
+// false, schemaType is ignored and the payload is sent raw, so messageName is
+// irrelevant and requiring it would reject otherwise-valid raw produces.
+const requireMessageNameForProtobuf = (
+  opts: z.infer<typeof messageOptions>,
+  ctx: z.RefinementCtx,
+): void => {
+  if (
+    opts.useSchemaRegistry &&
+    opts.schemaType === "PROTOBUF" &&
+    !opts.messageName
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "messageName is required when schemaType is PROTOBUF (e.g. com.example.User).",
+      path: ["messageName"],
+    });
+  }
+};
+
+const valueOptions = z
+  .object({})
+  .extend(messageOptions.shape)
+  .superRefine(requireMessageNameForProtobuf);
+const keyOptions = z
+  .object({})
+  .extend(messageOptions.shape)
+  .superRefine(requireMessageNameForProtobuf);
 
 const produceKafkaMessageArguments = z.object({
   topicName: z

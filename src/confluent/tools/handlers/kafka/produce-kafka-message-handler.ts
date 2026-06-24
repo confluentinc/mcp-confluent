@@ -54,7 +54,7 @@ const messageOptions = z.object({
     .string()
     .optional()
     .describe(
-      "Fully-qualified Protobuf message type to encode the payload as (e.g. com.example.User). Required when schemaType is PROTOBUF; ignored otherwise. Note: payload keys must match the proto field names exactly (e.g. user_id, not userId).",
+      "Fully-qualified Protobuf message type to encode the payload as (e.g. com.example.User). Required when schemaType is PROTOBUF; ignored otherwise. Payload keys may use either the proto field name (e.g. user_id) or its camelCase JSON name (e.g. userId).",
     ),
   subject: z
     .string()

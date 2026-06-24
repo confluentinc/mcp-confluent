@@ -21,6 +21,9 @@ importers:
 
   .:
     dependencies:
+      '@bufbuild/protobuf':
+        specifier: ^2.12.0
+        version: 2.12.1
       '@commander-js/extra-typings':
         specifier: ^14.0.0
         version: 14.0.0(commander@14.0.3)
@@ -69,6 +72,9 @@ importers:
       properties-file:
         specifier: ^3.5.12
         version: 3.7.0
+      protobufjs:
+        specifier: ^8.6.3
+        version: 8.6.3
       turndown:
         specifier: ^7.2.4
         version: 7.2.4
@@ -389,8 +395,8 @@ packages:
     peerDependencies:
       '@bufbuild/protobuf': ^2.6.2
 
-  '@bufbuild/protobuf@2.11.0':
-    resolution: {integrity: sha512-sBXGT13cpmPR5BMgHE6UEEfEaShh5Ror6rfN3yEK5si7QVrtZg8LEPQb0VVhiLRUslD2yLnXtnRzG035J/mZXQ==}
+  '@bufbuild/protobuf@2.12.1':
+    resolution: {integrity: sha512-BvAMfS6LrgZiryOAZ4pBYucu4wG/Ei/9o9DZ9akbREnMLbPJiom2i8b9C8IsKErQoiKqVhrerzt3kOT/RrzLHg==}
 
   '@commander-js/extra-typings@14.0.0':
     resolution: {integrity: sha512-hIn0ncNaJRLkZrxBIp5AsW/eXEHNKYQBh0aPdoUqNgD+Io3NIykQqpKFyKcuasZhicGaEZJX/JBSIkZ4e5x8Dg==}
@@ -3648,16 +3654,16 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@bufbuild/cel-spec@0.3.0(@bufbuild/protobuf@2.11.0)':
+  '@bufbuild/cel-spec@0.3.0(@bufbuild/protobuf@2.12.1)':
     dependencies:
-      '@bufbuild/protobuf': 2.11.0
+      '@bufbuild/protobuf': 2.12.1
 
-  '@bufbuild/cel@0.3.0(@bufbuild/protobuf@2.11.0)':
+  '@bufbuild/cel@0.3.0(@bufbuild/protobuf@2.12.1)':
     dependencies:
-      '@bufbuild/cel-spec': 0.3.0(@bufbuild/protobuf@2.11.0)
-      '@bufbuild/protobuf': 2.11.0
+      '@bufbuild/cel-spec': 0.3.0(@bufbuild/protobuf@2.12.1)
+      '@bufbuild/protobuf': 2.12.1
 
-  '@bufbuild/protobuf@2.11.0': {}
+  '@bufbuild/protobuf@2.12.1': {}
 
   '@commander-js/extra-typings@14.0.0(commander@14.0.3)':
     dependencies:
@@ -3678,8 +3684,8 @@ snapshots:
       '@aws-sdk/credential-providers': 3.1028.0
       '@azure/identity': 4.13.1
       '@azure/keyvault-keys': 4.10.0(@azure/core-client@1.10.1)
-      '@bufbuild/cel': 0.3.0(@bufbuild/protobuf@2.11.0)
-      '@bufbuild/protobuf': 2.11.0
+      '@bufbuild/cel': 0.3.0(@bufbuild/protobuf@2.12.1)
+      '@bufbuild/protobuf': 2.12.1
       '@criteria/json-schema': 0.10.0
       '@criteria/json-schema-validation': 0.10.0
       '@google-cloud/kms': 5.4.0

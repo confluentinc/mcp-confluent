@@ -62,8 +62,8 @@ export abstract class ConnectToolHandler extends BaseToolHandler {
       if (!environment_id || !kafka_cluster_id) {
         throw new Error(
           "environmentId and clusterId are required under OAuth connection type. " +
-            "Discover the environment via list-environments, then call list-clusters " +
-            "with environmentId and pass the cluster's `id` and `spec.environment.id`.",
+            "Discover via list-environments, then call list-clusters " +
+            "with environmentId for the clusterId.",
         );
       }
       return { environment_id, kafka_cluster_id };

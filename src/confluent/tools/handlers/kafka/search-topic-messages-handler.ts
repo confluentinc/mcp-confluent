@@ -37,7 +37,8 @@ export const searchTopicMessagesArgs = z.object({
     .describe(
       "The search term to look for. Interpreted as a case-insensitive " +
         "substring by default, or as a regular expression when " +
-        "`queryMode` is 'regex'.",
+        "`queryMode` is 'regex' (e.g. 'checkout.*failed' or the " +
+        "regex-literal form '/checkout.*failed/i' to pass flags).",
     ),
   queryMode: z
     .enum(["substring", "regex"])
@@ -46,7 +47,9 @@ export const searchTopicMessagesArgs = z.object({
     .describe(
       "How to interpret `query`. 'substring' (default) does a " +
         "case-insensitive substring match; 'regex' compiles `query` as a " +
-        "JavaScript RegExp (invalid patterns are rejected up front).",
+        "JavaScript RegExp — either a bare pattern ('checkout.*failed') or " +
+        "regex-literal syntax with flags ('/checkout.*failed/i'). Invalid " +
+        "patterns are rejected up front.",
     ),
   searchIn: z
     .array(z.enum(["key", "value", "headers"]))
@@ -119,18 +122,33 @@ type SearchIn = z.infer<typeof searchTopicMessagesArgs>["searchIn"][number];
 type Matcher = (text: string) => boolean;
 
 /**
+ * Matches a regex-literal-shaped query: `/pattern/flags` (flags optional).
+ * Capture 1 is the pattern body, capture 2 the flag string. The pattern
+ * body is non-greedy-anchored to the final `/` so an embedded `/` inside
+ * the pattern (e.g. `/a\/b/i`) keeps the trailing `/flags` boundary.
+ */
+const REGEX_LITERAL = /^\/(.+)\/([a-z]*)$/;
+
+/**
  * Compile the caller's `query`/`queryMode` into a {@link Matcher}. Regex
- * mode throws on an invalid pattern so the handler can reject up front with
- * a clear error rather than crashing mid-consume.
+ * mode accepts either a bare pattern (`checkout.*failed`) or JavaScript
+ * regex-literal syntax with flags (`/checkout.*failed/i`) — the latter is
+ * how the issue's examples are written and is the only way to pass flags
+ * such as case-insensitivity. An invalid pattern throws here so the handler
+ * can reject up front with a clear error rather than crashing mid-consume.
  */
 export function buildMatcher(
   query: string,
   queryMode: "substring" | "regex",
 ): Matcher {
   if (queryMode === "regex") {
-    // Let an invalid pattern throw here; the handler surfaces it as a
-    // tool-error response before any consumer is built.
-    const re = new RegExp(query);
+    const literal = REGEX_LITERAL.exec(query);
+    // When `literal` matches, group 1 (the pattern body) is always present;
+    // `?? query` only satisfies type narrowing. Group 2 (flags) may be an
+    // empty string, which `RegExp` accepts.
+    const re = literal
+      ? new RegExp(literal[1] ?? query, literal[2])
+      : new RegExp(query);
     return (text) => re.test(text);
   }
   const needle = query.toLowerCase();
@@ -202,7 +220,7 @@ export function messageMatches(
  */
 export class SearchTopicMessagesHandler extends BaseToolHandler {
   /**
-   * Search one or more Kafka topics. Resolves when one of three exit
+   * Search one or more Kafka topics. Resolves when one of four exit
    * conditions wins a `Promise.race`: `maxMatches` matches collected,
    * `maxScanned` messages scanned, the `timeoutMs` budget elapses, or
    * `consumer.run()` rejects. On the bounded-exit paths the matches found

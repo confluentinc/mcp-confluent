@@ -108,14 +108,36 @@ describe("search-topic-messages-handler.ts", () => {
       expect(matcher("granted")).toBe(false);
     });
 
-    it("should compile a regex in regex mode", () => {
+    it("should compile a bare regex pattern in regex mode", () => {
       const matcher = buildMatcher("checkout.*failed", "regex");
       expect(matcher("checkout step failed")).toBe(true);
       expect(matcher("checkout succeeded")).toBe(false);
     });
 
-    it("should throw on an invalid regex pattern", () => {
+    it("should honor flags in regex-literal syntax (/pattern/flags)", () => {
+      const matcher = buildMatcher("/checkout.*failed/i", "regex");
+      // The `i` flag makes the uppercase input match where a bare,
+      // flagless pattern would not.
+      expect(matcher("CHECKOUT STEP FAILED")).toBe(true);
+    });
+
+    it("should treat a flagless bare pattern as case-sensitive in regex mode", () => {
+      const matcher = buildMatcher("checkout.*failed", "regex");
+      expect(matcher("CHECKOUT STEP FAILED")).toBe(false);
+    });
+
+    it("should keep a trailing-slash-free pattern as a literal pattern body", () => {
+      // No regex-literal wrapper, so `/` is part of the pattern.
+      const matcher = buildMatcher("a/b", "regex");
+      expect(matcher("x a/b y")).toBe(true);
+    });
+
+    it("should throw on an invalid bare regex pattern", () => {
       expect(() => buildMatcher("(", "regex")).toThrow();
+    });
+
+    it("should throw on an invalid flag in regex-literal syntax", () => {
+      expect(() => buildMatcher("/abc/q", "regex")).toThrow();
     });
   });
 

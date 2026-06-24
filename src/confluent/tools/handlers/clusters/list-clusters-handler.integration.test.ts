@@ -23,7 +23,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -114,36 +117,39 @@ describe(
         // env id is read from the direct YAML; the OAuth-mode handler itself talks to CCloud via OAuth
         const environmentId = getTestEnvironmentId();
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          it("should expose list-clusters in tools/list", async () => {
-            const { tools } = await server.client.listTools();
-            expect(
-              tools.find((t) => t.name === ToolName.LIST_CLUSTERS),
-            ).toBeDefined();
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should return clusters for the resolved environment id", async () => {
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.LIST_CLUSTERS,
-              arguments: { environmentId },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            expect(textContent(result)).toMatch(
-              /^Successfully retrieved [1-9]\d* clusters:/,
-            );
-          });
-        });
+            it("should expose list-clusters in tools/list", async () => {
+              const { tools } = await server.client.listTools();
+              expect(
+                tools.find((t) => t.name === ToolName.LIST_CLUSTERS),
+              ).toBeDefined();
+            });
+
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should return clusters for the resolved environment id", async () => {
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.LIST_CLUSTERS,
+                arguments: { environmentId },
+              });
+
+              expect(textContent(result)).toMatch(
+                /^Successfully retrieved [1-9]\d* clusters:/,
+              );
+            });
+          },
+        );
       },
     );
   },

@@ -2,7 +2,7 @@
 // drives the sign-in page via headless chromium, lets the server's OAuth callback resolve naturally.
 
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { TransportType } from "@src/mcp/transports/types.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 import {
   acquireOAuthPortLock,
   releaseOAuthPortLock,
@@ -50,13 +50,27 @@ export function getOAuthCredentialsFromEnv():
 /**
  * Acquires the OAuth callback-port lock, then spawns the server with
  * `oauth: true`. Pair with {@linkcode stopOAuthServer} in `afterAll`.
+ *
+ * Asserts stdio before any side effect: the CCloud OAuth flow is
+ * transport-agnostic and is pinned to stdio (see {@linkcode activeOAuthTransports}
+ * in transports.ts) so it serializes on one callback port. A non-stdio call means
+ * an OAuth describe is iterating `activeTransports` instead of
+ * `activeOAuthTransports` — a wiring mistake we want to fail loudly and
+ * instantly, not as a downstream lock/port collision.
  */
 export async function startOAuthServer({
   transport,
 }: {
   transport: TransportType;
 }): Promise<StartedServer> {
-  await acquireOAuthPortLock();
+  if (transport !== TransportType.STDIO) {
+    throw new Error(
+      `OAuth tests are stdio-only — iterate activeOAuthTransports, not activeTransports ` +
+        `(got transport "${transport}"). The OAuth flow is transport-agnostic and serializes ` +
+        `on a single callback port; see tests/harness/transports.ts.`,
+    );
+  }
+  acquireOAuthPortLock();
   return await startServer({ transport, oauth: true });
 }
 

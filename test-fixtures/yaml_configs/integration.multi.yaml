@@ -1,0 +1,98 @@
+# Two-connection integration fixture for the #543 multi-connection suite.
+#
+# Boots one MCP server holding two `direct` connections to two different Kafka
+# clusters, only one of which carries a `flink:` block:
+#
+#   - `ccloud` — the CCloud cluster (mirrors integration.yaml): kafka + flink +
+#     schema_registry + confluent_cloud + telemetry + tableflow. The sole
+#     Flink-capable connection.
+#   - `cp`     — the local Confluent Platform broker (mirrors integration.cp.yaml):
+#     kafka only, SASL_PLAINTEXT. No flink, so Flink tools enable on `ccloud` only.
+#
+# The `cp` connection requires the docker-compose.cp-test.yml stack running:
+#   docker compose -f docker-compose.cp-test.yml up -d
+#
+# Secrets are `${VAR}` interpolation from .env.integration (CCloud secrets via
+# `make setup-test-env`; the static CP creds CP_KAFKA_USERNAME/CP_KAFKA_PASSWORD
+# are documented in .env.integration.example). A missing secret env var throws at
+# YAML load time; tests/harness/multi-runtime.ts catches it and the suite skips.
+server:
+  log_level: error
+
+connections:
+  ccloud:
+    type: direct
+
+    # --- @kafka (admin client + REST proxy) ---
+    kafka:
+      auth:
+        type: api_key
+        key: "${KAFKA_API_KEY}"
+        secret: "${KAFKA_API_SECRET}"
+      bootstrap_servers: "pkc-921jm.us-east-2.aws.confluent.cloud:9092"
+      cluster_id: "lkc-dm5vyd"
+      env_id: "env-rw7g8k"
+      rest_endpoint: "https://pkc-921jm.us-east-2.aws.confluent.cloud:443"
+
+    # --- @schema (Schema Registry) ---
+    schema_registry:
+      auth:
+        type: api_key
+        key: "${SCHEMA_REGISTRY_API_KEY}"
+        secret: "${SCHEMA_REGISTRY_API_SECRET}"
+      endpoint: "https://psrc-4xmdo33.us-east-2.aws.confluent.cloud"
+
+    # --- @clusters / @environments / @connect / @catalog / @search / @billing (CCloud control plane) ---
+    confluent_cloud:
+      auth:
+        type: api_key
+        key: "${CONFLUENT_CLOUD_API_KEY}"
+        secret: "${CONFLUENT_CLOUD_API_SECRET}"
+
+    # --- @metrics (Telemetry API) ---
+    telemetry:
+      auth:
+        type: api_key
+        key: "${TELEMETRY_API_KEY}"
+        secret: "${TELEMETRY_API_SECRET}"
+
+    # --- @flink (Flink SQL + catalog/diagnostics) ---
+    flink:
+      auth:
+        type: api_key
+        key: "${FLINK_API_KEY}"
+        secret: "${FLINK_API_SECRET}"
+      # any future updates to the configured Flink compute pool must ensure the associated cloud
+      # provider/region pair matches the cluster in the `kafka` block
+      compute_pool_id: "lfcp-1gv99z"
+      endpoint: "https://flink.us-east-2.aws.confluent.cloud"
+      environment_id: "env-rw7g8k"
+      organization_id: "683187f4-4132-484a-adf7-0553cea0a5e4"
+
+    # --- @tableflow ---
+    tableflow:
+      auth:
+        type: api_key
+        key: "${TABLEFLOW_API_KEY}"
+        secret: "${TABLEFLOW_API_SECRET}"
+
+  cp:
+    type: direct
+
+    # --- @cp (Kafka) ---
+    # SASL_PLAINTEXT is used instead of SASL_SSL to avoid cert setup.
+    # The extra_properties block overrides the default security.protocol
+    # from SASL_SSL to SASL_PLAINTEXT for the local CP stack.
+    kafka:
+      bootstrap_servers: "localhost:9092"
+      auth:
+        type: api_key
+        key: "${CP_KAFKA_USERNAME}"
+        secret: "${CP_KAFKA_PASSWORD}"
+      extra_properties:
+        security.protocol: "SASL_PLAINTEXT"
+        sasl.mechanisms: "PLAIN"
+    # No schema_registry / flink / etc. block: `cp` is deliberately kafka-only,
+    # so it's the non-Flink connection in the routing assertions. (The docker
+    # stack still runs a local SR for the @cp suite; this fixture just doesn't
+    # wire `cp` to it.)

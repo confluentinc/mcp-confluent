@@ -32,7 +32,17 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: "SASL_PLAINTEXT"
       KAFKA_SASL_ENABLED_MECHANISMS: "PLAIN"
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "PLAIN"
-      KAFKA_LISTENER_NAME_SASL_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG: >-
+      # cp-kafka's `configure` step runs `dub ensure KAFKA_OPTS` whenever SASL
+      # appears in the advertised listeners and aborts startup if it is unset.
+      # The JAAS login is supplied per-listener below, so this only needs to be
+      # a harmless non-empty JVM flag to satisfy that guard.
+      KAFKA_OPTS: "-Dmcp.cp.test=1"
+      # cp-docker translates env-var keys to properties with `_` -> `.` and
+      # `__` -> `_`. The listener is named SASL_PLAINTEXT (literal underscore),
+      # so its per-listener JAAS key must double the underscore between SASL and
+      # PLAINTEXT; a single underscore yields `listener.name.sasl.plaintext...`,
+      # which Kafka ignores, dropping back to a missing global JAAS file.
+      KAFKA_LISTENER_NAME_SASL__PLAINTEXT_PLAIN_SASL_JAAS_CONFIG: >-
         org.apache.kafka.common.security.plain.PlainLoginModule required
         username="admin" password="admin-secret"
         user_admin="admin-secret"

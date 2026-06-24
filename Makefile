@@ -84,14 +84,16 @@ remove-test-env:
 #    skips every direct-only test and only exercises the PKCE-flow paths.
 # Unset (local dev) skips the clause entirely; vitest collects everything.
 #
-# The `oauth` lane also appends `--no-file-parallelism`: every oauth describe
-# self-serializes on the single hard-coded OAuth callback port (see
-# tests/harness/oauth-port-lock.ts), so running oauth files across parallel
-# forks only piles them into a lock queue whose wait can exceed the 180s
-# `beforeAll` hook timeout. Running the oauth lane sequentially removes the
-# queue entirely — each file acquires the free lock immediately. Wall clock is
-# unaffected: the lock already serialized this work; the direct lane (a
-# separate, parallel invocation) keeps its parallelism.
+# Any run that isn't direct-only also appends `--no-file-parallelism`: that's
+# the `oauth` lane AND the combined `all`/unset default (which still collects
+# the oauth describes). Every oauth describe binds the single hard-coded OAuth
+# callback port, and the lock now *balks* on a live concurrent holder (see
+# tests/harness/oauth-port-lock.ts), so oauth describes must never run across
+# parallel forks. Serializing the files removes the contention — each oauth file
+# acquires the free lock immediately. Only the explicit `direct` lane stays
+# parallel; its describes never touch the port. This is what keeps the
+# combined-mode scheduled run (`.semaphore/integration.yml`, CONNECTION_TYPE=all)
+# green without splitting its per-service-config cells.
 #
 # The `!= "SERVICE_CONFIG"` / `!= "TOOL_GROUP"` / `!= "TRANSPORT"` guards
 # catch a Semaphore misconfiguration where a matrix env-var name leaks
@@ -142,7 +144,7 @@ test-integration:
 			set -- "$$@" "src/confluent/tools/handlers/$$TAG_SUFFIX"; \
 		fi; \
 	fi; \
-	if [ "$$INTEGRATION_TEST_CONNECTION_TYPE" = "oauth" ]; then \
+	if [ "$$INTEGRATION_TEST_CONNECTION_TYPE" != "direct" ]; then \
 		set -- "$$@" "--no-file-parallelism"; \
 	fi; \
 	if [ ! -f dist/index.js ]; then pnpm run build; fi && \

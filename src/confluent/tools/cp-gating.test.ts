@@ -46,7 +46,7 @@ describe("Confluent Platform tool gating", () => {
     // Native Kafka producer/consumer
     ToolName.PRODUCE_MESSAGE,
     ToolName.CONSUME_MESSAGES,
-    ToolName.SEARCH_TOPIC_MESSAGES,
+    ToolName.SEARCH_MESSAGES,
     // Native Kafka consumer-group / partition admin
     ToolName.LIST_CONSUMER_GROUPS,
     ToolName.DESCRIBE_CONSUMER_GROUP,

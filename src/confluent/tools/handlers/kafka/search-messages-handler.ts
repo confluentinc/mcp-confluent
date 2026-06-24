@@ -26,7 +26,7 @@ import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
-export const searchTopicMessagesArgs = z.object({
+export const searchMessagesArgs = z.object({
   topicNames: z
     .array(z.string().min(1))
     .nonempty()
@@ -111,7 +111,7 @@ export const searchTopicMessagesArgs = z.object({
     ),
 });
 
-type SearchIn = z.infer<typeof searchTopicMessagesArgs>["searchIn"][number];
+type SearchIn = z.infer<typeof searchMessagesArgs>["searchIn"][number];
 
 /**
  * A predicate that tests a single string against the caller's `query`.
@@ -218,7 +218,7 @@ export function messageMatches(
  * `consume-messages` (see {@link processMessage}) so matching runs against
  * the decoded representation, not raw bytes.
  */
-export class SearchTopicMessagesHandler extends BaseToolHandler {
+export class SearchMessagesHandler extends BaseToolHandler {
   /**
    * Search one or more Kafka topics. Resolves when one of four exit
    * conditions wins a `Promise.race`: `maxMatches` matches collected,
@@ -228,14 +228,14 @@ export class SearchTopicMessagesHandler extends BaseToolHandler {
    *
    * @param runtime - The {@link ServerRuntime} supplied by the dispatcher.
    * @param toolArguments - Raw tool arguments; parsed with
-   *   `searchTopicMessagesArgs` to apply defaults. `resolveConnection`
+   *   `searchMessagesArgs` to apply defaults. `resolveConnection`
    *   reads `connectionId` off this unparsed object.
    */
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const parsed = searchTopicMessagesArgs.parse(toolArguments);
+    const parsed = searchMessagesArgs.parse(toolArguments);
     const {
       query,
       queryMode,
@@ -390,7 +390,7 @@ export class SearchTopicMessagesHandler extends BaseToolHandler {
 
   getToolConfig(): ToolConfig {
     return {
-      name: ToolName.SEARCH_TOPIC_MESSAGES,
+      name: ToolName.SEARCH_MESSAGES,
       description:
         "Full-text search across the messages of one or more Kafka topics. " +
         "Scans up to `maxScanned` messages from earliest across every " +
@@ -399,7 +399,7 @@ export class SearchTopicMessagesHandler extends BaseToolHandler {
         "Auto-deserializes Schema Registry messages (AVRO/JSON/PROTOBUF) " +
         "when SR is configured; matching runs against the decoded form. " +
         "Use this instead of repeatedly calling consume-messages + scanning.",
-      inputSchema: searchTopicMessagesArgs.shape,
+      inputSchema: searchMessagesArgs.shape,
       annotations: READ_ONLY,
     };
   }

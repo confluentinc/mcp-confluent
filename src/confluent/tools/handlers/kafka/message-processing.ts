@@ -12,7 +12,7 @@ import { z } from "zod";
 /**
  * Shared message-deserialization plumbing for the Kafka consume/search tools.
  *
- * `consume-messages` and `search-topic-messages` both need to turn raw
+ * `consume-messages` and `search-messages` both need to turn raw
  * `KafkaMessage` records into the same decoded {@link ProcessedMessage} shape
  * (Schema Registry AVRO/JSON/PROTOBUF decode with raw-bytes fallback, header
  * echoing, timestamp normalization). This module owns that path so neither

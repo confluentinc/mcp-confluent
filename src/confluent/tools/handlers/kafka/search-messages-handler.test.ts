@@ -7,9 +7,9 @@ import type { ProcessedMessage } from "@src/confluent/tools/handlers/kafka/messa
 import {
   buildMatcher,
   messageMatches,
-  searchTopicMessagesArgs,
-  SearchTopicMessagesHandler,
-} from "@src/confluent/tools/handlers/kafka/search-topic-messages-handler.js";
+  searchMessagesArgs,
+  SearchMessagesHandler,
+} from "@src/confluent/tools/handlers/kafka/search-messages-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   DEFAULT_CONNECTION_ID,
@@ -53,10 +53,10 @@ function makeProcessed(over: Partial<ProcessedMessage> = {}): ProcessedMessage {
   };
 }
 
-describe("search-topic-messages-handler.ts", () => {
-  describe("searchTopicMessagesArgs (schema defaults & validation)", () => {
+describe("search-messages-handler.ts", () => {
+  describe("searchMessagesArgs (schema defaults & validation)", () => {
     it("should apply documented defaults when only the required fields are given", () => {
-      const parsed = searchTopicMessagesArgs.parse({
+      const parsed = searchMessagesArgs.parse({
         topicNames: ["orders"],
         query: "cust-42",
       });
@@ -68,7 +68,7 @@ describe("search-topic-messages-handler.ts", () => {
     });
 
     it("should reject an empty topicNames array", () => {
-      const result = searchTopicMessagesArgs.safeParse({
+      const result = searchMessagesArgs.safeParse({
         topicNames: [],
         query: "x",
       });
@@ -76,14 +76,14 @@ describe("search-topic-messages-handler.ts", () => {
     });
 
     it("should reject a missing query", () => {
-      const result = searchTopicMessagesArgs.safeParse({
+      const result = searchMessagesArgs.safeParse({
         topicNames: ["orders"],
       });
       expect(result.success).toBe(false);
     });
 
     it("should reject an unknown queryMode", () => {
-      const result = searchTopicMessagesArgs.safeParse({
+      const result = searchMessagesArgs.safeParse({
         topicNames: ["orders"],
         query: "x",
         queryMode: "fuzzy",
@@ -92,7 +92,7 @@ describe("search-topic-messages-handler.ts", () => {
     });
 
     it("should reject an unknown searchIn member", () => {
-      const result = searchTopicMessagesArgs.safeParse({
+      const result = searchMessagesArgs.safeParse({
         topicNames: ["orders"],
         query: "x",
         searchIn: ["payload"],
@@ -172,22 +172,22 @@ describe("search-topic-messages-handler.ts", () => {
     });
   });
 
-  describe("SearchTopicMessagesHandler", () => {
-    const handler = new SearchTopicMessagesHandler();
+  describe("SearchMessagesHandler", () => {
+    const handler = new SearchMessagesHandler();
 
     describe("getToolConfig()", () => {
       const config = handler.getToolConfig();
 
-      it("should advertise the search-topic-messages tool name", () => {
-        expect(config.name).toBe(ToolName.SEARCH_TOPIC_MESSAGES);
+      it("should advertise the search-messages tool name", () => {
+        expect(config.name).toBe(ToolName.SEARCH_MESSAGES);
       });
 
       it("should be a read-only tool", () => {
         expect(config.annotations).toBe(READ_ONLY);
       });
 
-      it("should expose the searchTopicMessagesArgs shape as its input schema", () => {
-        expect(config.inputSchema).toBe(searchTopicMessagesArgs.shape);
+      it("should expose the searchMessagesArgs shape as its input schema", () => {
+        expect(config.inputSchema).toBe(searchMessagesArgs.shape);
       });
     });
 

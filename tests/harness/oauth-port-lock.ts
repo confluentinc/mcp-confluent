@@ -51,8 +51,8 @@ export function acquireOAuthPortLock(): void {
     throw new Error(
       `OAuth callback-port lock at ${LOCK_PATH} is held by a live process (PID=${holderPid()}). ` +
         `OAuth integration tests must run sequentially — a concurrent OAuth test session is a ` +
-        `broken setup. Run the OAuth lane with --no-file-parallelism (the Makefile adds it when ` +
-        `INTEGRATION_TEST_CONNECTION_TYPE=oauth).`,
+        `broken setup. Run with --no-file-parallelism (the Makefile adds it for any run that ` +
+        `isn't direct-only — the oauth lane and the combined all/unset default).`,
     );
   }
 

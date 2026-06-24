@@ -1,9 +1,9 @@
-import { DirectConnectionConfig } from "@src/config/models.js";
+import { ConnectionConfig } from "@src/config/models.js";
 import {
   BaseToolHandler,
   ToolCategory,
 } from "@src/confluent/tools/base-tools.js";
-import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { z } from "zod";
 
 /**
@@ -34,23 +34,40 @@ export const connectorByNameArguments = z.object({
 
 /**
  * Intermediate base class for all Connect tool handlers.
- * Gates enablement on `hasConfluentCloud` and exposes
+ * Gates enablement on `hasConfluentCloudOrOAuth` and exposes
  * `resolveConnectEnvAndClusterId` for consistent env/cluster resolution.
  */
 export abstract class ConnectToolHandler extends BaseToolHandler {
   readonly category = ToolCategory.Connect;
-  readonly predicate = hasConfluentCloud;
+  readonly predicate = hasConfluentCloudOrOAuth;
 
   /**
-   * Resolves environment and Kafka cluster IDs from explicit tool args,
-   * falling back to the connection's `kafka.env_id` / `kafka.cluster_id`.
-   * Throws if either value is absent from both sources.
+   * Resolves environment and Kafka cluster IDs for a Connect REST call.
+   *
+   * - Direct: explicit tool args win, falling back to the connection's
+   *   `kafka.env_id` / `kafka.cluster_id`. Throws if either value is absent from
+   *   both sources.
+   * - OAuth: both args are required (an OAuth connection carries no `kafka`
+   *   block to fall back to). Throws a discovery hint pointing at
+   *   `list-environments` / `list-clusters` when either is missing.
    */
   protected resolveConnectEnvAndClusterId(
-    conn: DirectConnectionConfig,
+    conn: ConnectionConfig,
     envIdArg: string | undefined,
     clusterIdArg: string | undefined,
   ): { environment_id: string; kafka_cluster_id: string } {
+    if (conn.type === "oauth") {
+      const environment_id = envIdArg?.trim();
+      const kafka_cluster_id = clusterIdArg?.trim();
+      if (!environment_id || !kafka_cluster_id) {
+        throw new Error(
+          "environmentId and clusterId are required under OAuth connection type. " +
+            "Discover via list-environments, then call list-clusters " +
+            "with environmentId for the clusterId.",
+        );
+      }
+      return { environment_id, kafka_cluster_id };
+    }
     return {
       environment_id: this.resolveParam(
         envIdArg,

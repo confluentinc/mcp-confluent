@@ -1,3 +1,4 @@
+import type { OAuthConnectionConfig } from "@src/config/models.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
@@ -5,6 +6,11 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { directConnectionOf } from "@tests/factories/config.js";
 import { runtimeWith } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
+
+const OAUTH_CONN: OAuthConnectionConfig = {
+  type: "oauth",
+  ccloud_env: "devel",
+};
 
 const CONNECT_CONN = {
   kafka: {
@@ -85,6 +91,38 @@ describe("connect-tool-handler.ts", () => {
         expect(() =>
           resolveConnectEnvAndClusterId(conn, "env-from-arg", undefined),
         ).toThrow("Kafka Cluster ID is required");
+      });
+
+      describe("under an OAuth connection", () => {
+        it("should use both args when present (no config fallback exists)", () => {
+          const result = resolveConnectEnvAndClusterId(
+            OAUTH_CONN,
+            "env-from-arg",
+            "lkc-from-arg",
+          );
+          expect(result.environment_id).toBe("env-from-arg");
+          expect(result.kafka_cluster_id).toBe("lkc-from-arg");
+        });
+
+        it("should throw a discovery hint when environmentId is omitted", () => {
+          expect(() =>
+            resolveConnectEnvAndClusterId(
+              OAUTH_CONN,
+              undefined,
+              "lkc-from-arg",
+            ),
+          ).toThrow("required under OAuth connection type");
+        });
+
+        it("should throw a discovery hint when clusterId is omitted", () => {
+          expect(() =>
+            resolveConnectEnvAndClusterId(
+              OAUTH_CONN,
+              "env-from-arg",
+              undefined,
+            ),
+          ).toThrow("required under OAuth connection type");
+        });
       });
     });
   });

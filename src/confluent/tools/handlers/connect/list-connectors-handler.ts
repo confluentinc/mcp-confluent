@@ -30,7 +30,7 @@ export class ListConnectorsHandler extends ConnectToolHandler {
     const { clusterId, environmentId } =
       listConnectorArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

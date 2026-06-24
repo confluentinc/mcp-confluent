@@ -102,10 +102,14 @@ function holderAlive(): boolean {
   const pid = holderPid();
   if (pid === undefined) return false;
   try {
-    // signal 0 probes existence without delivering a signal; throws ESRCH if the pid is gone
+    // signal 0 probes existence without delivering a signal
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    // EPERM means the process exists but the current user can't signal it — still ALIVE, so we
+    // must not reclaim its lock. Only ESRCH (no such process) means dead/stale. Treat any other
+    // errno as alive too: misclassifying a live holder as stale (and unlinking its lock) is the
+    // dangerous direction; a false "alive" at worst balks an already-broken concurrent run.
+    return (err as NodeJS.ErrnoException).code !== "ESRCH";
   }
 }

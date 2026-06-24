@@ -448,7 +448,7 @@ describe("<handler>", { tags: [Tag.<GROUP>] }, () => {
       return;
     }
 
-     describe.each(activeOAuthTransports)("via %s transport", (transport) => {
+    describe.each(activeOAuthTransports)("via %s transport", (transport) => {
       // oauth-only beforeAll (startOAuthServer + 180_000 timeout) / afterAll (stopOAuthServer)
       // tool calls dispatch via callToolWithOAuthFlow(server, credentials, ...)
     });

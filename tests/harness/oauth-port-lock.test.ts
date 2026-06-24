@@ -44,6 +44,15 @@ describe("acquireOAuthPortLock", () => {
     expect(Number(readFileSync(LOCK_PATH, "utf-8"))).toBe(process.ppid);
   });
 
+  // A live-but-unsignalable holder (EPERM from process.kill, not ESRCH) must
+  // count as alive so we don't unlink its lock. PID 1 (init/launchd) is always
+  // alive and unsignalable by a non-root user, so it exercises the EPERM path.
+  it("should treat a live-but-unsignalable holder (pid 1) as alive and balk", () => {
+    writeFileSync(LOCK_PATH, "1");
+    expect(() => acquireOAuthPortLock()).toThrow(/held by a live process/);
+    expect(Number(readFileSync(LOCK_PATH, "utf-8"))).toBe(1); // not reclaimed
+  });
+
   it("should reclaim a stale lock held by a dead pid and then acquire", () => {
     writeFileSync(LOCK_PATH, String(deadPid()));
     acquireOAuthPortLock();

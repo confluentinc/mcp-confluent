@@ -22,7 +22,7 @@ export class GetConnectorErrorRecommendationsHandler extends ConnectToolHandler 
     const { clusterId, environmentId, connectorName } =
       connectorByNameArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

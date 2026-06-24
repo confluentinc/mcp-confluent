@@ -4,6 +4,7 @@ export enum ToolName {
   DELETE_TOPICS = "delete-topics",
   PRODUCE_MESSAGE = "produce-message",
   CONSUME_MESSAGES = "consume-messages",
+  SEARCH_TOPIC_MESSAGES = "search-topic-messages",
   GET_PARTITION_OFFSETS = "get-partition-offsets",
   LIST_CONSUMER_GROUPS = "list-consumer-groups",
   DESCRIBE_CONSUMER_GROUP = "describe-consumer-group",

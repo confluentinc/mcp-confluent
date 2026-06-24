@@ -51,6 +51,7 @@ import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-t
 import { ListConsumerGroupsHandler } from "@src/confluent/tools/handlers/kafka/list-consumer-groups-handler.js";
 import { ListTopicsHandler } from "@src/confluent/tools/handlers/kafka/list-topics-handler.js";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
+import { SearchTopicMessagesHandler } from "@src/confluent/tools/handlers/kafka/search-topic-messages-handler.js";
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
 import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organizations/list-organizations-handler.js";
@@ -135,6 +136,7 @@ export class ToolHandlerRegistry {
     [ToolName.CREATE_SCHEMA, new CreateSchemaHandler()],
     [ToolName.DELETE_SCHEMA, new DeleteSchemaHandler()],
     [ToolName.CONSUME_MESSAGES, new ConsumeKafkaMessagesHandler()],
+    [ToolName.SEARCH_TOPIC_MESSAGES, new SearchTopicMessagesHandler()],
     [ToolName.GET_PARTITION_OFFSETS, new GetPartitionOffsetsHandler()],
     [ToolName.LIST_CONSUMER_GROUPS, new ListConsumerGroupsHandler()],
     [ToolName.DESCRIBE_CONSUMER_GROUP, new DescribeConsumerGroupHandler()],

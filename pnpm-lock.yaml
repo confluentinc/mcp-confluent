@@ -73,7 +73,7 @@ importers:
         specifier: ^3.5.12
         version: 3.7.0
       protobufjs:
-        specifier: '>=7.6.3'
+        specifier: ^8.6.3
         version: 8.6.3
       turndown:
         specifier: ^7.2.4

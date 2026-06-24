@@ -19,6 +19,7 @@ import {
 import {
   type ProcessedMessage,
   processMessage,
+  type SchemaLookupCache,
   schemaRegistryOptions,
 } from "@src/confluent/tools/handlers/kafka/message-processing.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -123,9 +124,10 @@ type Matcher = (text: string) => boolean;
 
 /**
  * Matches a regex-literal-shaped query: `/pattern/flags` (flags optional).
- * Capture 1 is the pattern body, capture 2 the flag string. The pattern
- * body is non-greedy-anchored to the final `/` so an embedded `/` inside
- * the pattern (e.g. `/a\/b/i`) keeps the trailing `/flags` boundary.
+ * Capture 1 is the pattern body, capture 2 the flag string. The body uses
+ * a greedy `.+`, so it extends to the LAST `/` (backtracking from the end);
+ * that lets an embedded `/` inside the pattern (e.g. `/a\/b/i`) stay part of
+ * the body while the final `/flags` segment remains the boundary.
  */
 const REGEX_LITERAL = /^\/(.+)\/([a-z]*)$/;
 
@@ -165,7 +167,17 @@ export function buildMatcher(
 function stringifyForSearch(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value === "string") return value;
-  return JSON.stringify(value);
+  // Decoded values are arbitrary (AVRO/JSON/PROTOBUF objects, numbers,
+  // booleans). `JSON.stringify` throws on a BigInt and on a cyclic structure;
+  // an uncaught throw here would reject the whole `eachMessage` callback and
+  // fail the entire search. Fall back to `String(value)` so one degenerate
+  // record can't sink the call (BigInt stringifies cleanly; a cyclic object
+  // degrades to `"[object Object]"`).
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 /**
@@ -301,6 +313,12 @@ export class SearchMessagesHandler extends BaseToolHandler {
     // check it on arrival rather than await.
     let accepting = true;
     let consumer: KafkaJS.Consumer | undefined;
+    // Memoize the per-subject latest-schema lookup for the life of this
+    // search. Without it, scanning up to `maxScanned` (default 1000) records
+    // would issue a `getLatestSchemaMetadata` round-trip per record per side;
+    // the schema is stable over the scan window, so one lookup per subject
+    // suffices. Scoped to this call so a later search re-checks the schema.
+    const schemaCache: SchemaLookupCache = new Map();
 
     try {
       consumer = await clientManager.buildKafkaConsumer({
@@ -337,6 +355,7 @@ export class SearchMessagesHandler extends BaseToolHandler {
           registry,
           valueFormat,
           keyFormat,
+          schemaCache,
         );
         if (messageMatches(processed, matcher, searchIn)) {
           matches.push(processed);

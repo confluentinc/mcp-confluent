@@ -170,6 +170,17 @@ describe("search-messages-handler.ts", () => {
       const processed = makeProcessed({ value: undefined });
       expect(messageMatches(processed, substring, ["value"])).toBe(false);
     });
+
+    it("should not throw on a value JSON.stringify can't serialize (BigInt) and fall back to String()", () => {
+      // A decoded long can surface as a BigInt; JSON.stringify throws on it.
+      // The guard must coerce via String() instead of rejecting eachMessage.
+      const bigintMatcher = buildMatcher("42", "substring");
+      const processed = makeProcessed({ value: 42n });
+      expect(() =>
+        messageMatches(processed, bigintMatcher, ["value"]),
+      ).not.toThrow();
+      expect(messageMatches(processed, bigintMatcher, ["value"])).toBe(true);
+    });
   });
 
   describe("SearchMessagesHandler", () => {

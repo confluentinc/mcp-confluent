@@ -53,6 +53,21 @@ export const schemaRegistryOptions = z
 export type ValueOptions = z.infer<typeof schemaRegistryOptions>;
 export type KeyOptions = z.infer<typeof schemaRegistryOptions>;
 
+/**
+ * Per-invocation memo of `subject` → latest-schema lookup result (a hit, or
+ * `null` for a subject with no registered schema). The latest schema for a
+ * subject is effectively stable over a single consume/search window, so a
+ * caller that processes many records can pass one of these into
+ * {@link processMessage} to collapse what would otherwise be one
+ * `getLatestSchemaMetadata` REST round-trip *per message per side* into one
+ * lookup per subject. Scope it to a single `handle()` call (do not share
+ * across calls) so a schema change between invocations is always picked up.
+ */
+export type SchemaLookupCache = Map<
+  string,
+  Awaited<ReturnType<typeof schemaRegistryHelper.getLatestSchemaIfExists>>
+>;
+
 export interface ProcessedMessage {
   key: unknown;
   value: unknown;
@@ -154,6 +169,11 @@ function echoSingleHeaderValue(
  * @param registry - Optional Schema Registry client for deserialization
  * @param valueOptions - Options for value-side deserialization
  * @param keyOptions - Options for key-side deserialization
+ * @param schemaCache - Optional per-invocation {@link SchemaLookupCache}. When
+ *   supplied, the latest-schema lookup for a subject is memoized for the life
+ *   of the cache, so processing N records costs one `getLatestSchemaMetadata`
+ *   round-trip per subject rather than per record. Omit it to look up every
+ *   time (the prior behavior).
  * @returns A processed message with deserialized key and value
  */
 export async function processMessage(
@@ -163,6 +183,7 @@ export async function processMessage(
   registry: SchemaRegistryClient | undefined,
   valueOptions: ValueOptions,
   keyOptions: KeyOptions,
+  schemaCache?: SchemaLookupCache,
 ): Promise<ProcessedMessage> {
   let processedKey: unknown = message.key?.toString();
   let processedValue: unknown = message.value?.toString();
@@ -185,10 +206,20 @@ export async function processMessage(
     const subject =
       options.subject ||
       `${topic}-${serdeType === SerdeType.KEY ? "key" : "value"}`;
-    const schema = await schemaRegistryHelper.getLatestSchemaIfExists(
-      registry,
-      subject,
-    );
+    // `registry` is non-null here (guarded above); the assertion only
+    // satisfies the closure, which can't see the narrowing.
+    const lookupLatestSchema = async () => {
+      if (schemaCache?.has(subject)) {
+        return schemaCache.get(subject)!;
+      }
+      const result = await schemaRegistryHelper.getLatestSchemaIfExists(
+        registry!,
+        subject,
+      );
+      schemaCache?.set(subject, result);
+      return result;
+    };
+    const schema = await lookupLatestSchema();
     if (!schema || !schema.schemaType) {
       return buffer.toString();
     }

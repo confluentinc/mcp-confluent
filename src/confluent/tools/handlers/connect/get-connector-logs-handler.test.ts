@@ -1,7 +1,9 @@
+import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { GetConnectorLogsHandler } from "@src/confluent/tools/handlers/connect/get-connector-logs-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
+  ccloudOAuthRuntime,
   CONNECT_CONN,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
@@ -9,6 +11,7 @@ import {
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
+  createMockInstance,
   getMockedClientManager,
   mockFetch,
   type MockedClientManager,
@@ -94,6 +97,60 @@ describe("get-connector-logs-handler.ts", () => {
     });
 
     describe("handle()", () => {
+      it("should use the OAuth data-plane token (from the holder) as Bearer and skip the API-key exchange", async () => {
+        const holder = createMockInstance(OAuthHolder);
+        holder.getDataPlaneToken.mockReturnValue("dpat-oauth");
+        fetchSpy.mockResolvedValueOnce(
+          jsonResponse({
+            data: [
+              {
+                level: "ERROR",
+                task_id: "task-0",
+                message: "boom",
+                timestamp: "2026-04-29T04:47:22.097Z",
+              },
+            ],
+          }),
+        );
+
+        const result = await handler.handle(ccloudOAuthRuntime(holder), {
+          environmentId: "env-63yg9q",
+          clusterId: "lkc-6p56yj",
+          organizationId: "6bb93e12-57c1-4ae6-9ae0-f677d83a6bf7",
+          connectorName: "cypher-source",
+          startTime: "2026-04-29T03:50:13Z",
+          endTime: "2026-04-29T04:50:13Z",
+        });
+
+        expect(result.isError).toBeFalsy();
+        // Only the logs search is fetched — OAuth skips the API-key token exchange.
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        const [logsUrl, logsInit] = fetchSpy.mock.calls[0]!;
+        expect(String(logsUrl)).toBe(
+          "https://api.logging.confluent.cloud/logs/v1/search?page_size=100",
+        );
+        const logsHeaders = logsInit?.headers as Record<string, string>;
+        expect(logsHeaders["Authorization"]).toBe("Bearer dpat-oauth");
+      });
+
+      it("should surface an error when no OAuth data-plane token is available", async () => {
+        const holder = createMockInstance(OAuthHolder);
+        holder.getDataPlaneToken.mockReturnValue(undefined);
+
+        const result = await handler.handle(ccloudOAuthRuntime(holder), {
+          environmentId: "env-63yg9q",
+          clusterId: "lkc-6p56yj",
+          organizationId: "6bb93e12-57c1-4ae6-9ae0-f677d83a6bf7",
+          connectorName: "cypher-source",
+        });
+
+        expect(result.isError).toBe(true);
+        const text = (result.content[0] as { text: string }).text;
+        expect(text).toContain("Failed to fetch logs");
+        expect(text).toContain("data-plane token");
+        expect(fetchSpy).not.toHaveBeenCalled();
+      });
+
       it("should route only to its resolved connection in a multi-connection config", async () => {
         // Omit organizationId from args and config so the handler must resolve
         // it via the REST client — the only routing-observable client-manager

@@ -123,6 +123,7 @@ describe("tool-registry.ts", () => {
           "detect",
           "query",
           "consume",
+          "config",
         ]);
         const createUpdatePrefixes = new Set([
           "create",
@@ -272,6 +273,7 @@ describe("tool-registry.ts", () => {
         // Diagnostics (no service-block requirement)
         [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
         [ToolName.LIST_CONFIGURED_CONNECTIONS]: alwaysEnabled,
+        [ToolName.CONFIG_HELP]: alwaysEnabled,
         [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: alwaysEnabled,
       };
 
@@ -578,6 +580,12 @@ describe("tool-registry.ts", () => {
       // connection-count header.
       [ToolName.LIST_CONFIGURED_CONNECTIONS]: {
         outcome: { resolves: "1 connection configured:" },
+        bypassesClientLayer: true,
+      },
+      // config-help requires a `tool` arg; zero args fails Zod parse before
+      // it ever reaches the registry walk or any client.
+      [ToolName.CONFIG_HELP]: {
+        outcome: { throws: "ZodError" },
         bypassesClientLayer: true,
       },
       // describe-configured-connection requires a connectionId argument, so the

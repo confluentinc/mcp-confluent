@@ -174,22 +174,19 @@ function wrap(connId: string, blockBody: string): string {
 }
 
 /**
- * Map a {@link ToolDisabledReason} to the config change that resolves it. Most
- * reasons are a missing direct-connection block or field, and each maps to a
- * copy-pasteable YAML snippet mirroring the canonical shape in
- * `config.example.yaml`. The reasons that aren't a block-shaped gap carry no
- * YAML and surface as a `note` instead:
- *   - OAuth reasons — OAuth connections hold no service blocks, so the fix is a
+ * Map a {@link ToolDisabledReason} to the config change that resolves it. A
+ * block- or field-shaped gap maps to a paste-ready YAML snippet mirroring
+ * `config.example.yaml`. The non-block reasons carry a `note` instead:
+ *   - OAuth reasons — OAuth connections have no service blocks; the fix is a
  *     different connection type, not a block to add.
- *   - {@link ToolDisabledReason.ReadOnlyConnection} — the connection already
- *     reaches the service; it's the `read_only` overlay blocking a mutating
- *     tool, so the fix is removing `read_only: true`, not adding a block.
+ *   - {@link ToolDisabledReason.ReadOnlyConnection} — the service is reachable;
+ *     `read_only` is what blocks a mutating tool, so the fix is removing
+ *     `read_only: true`.
  *   - {@link ToolDisabledReason.NoConnectionsConfigured} and
- *     {@link ToolDisabledReason.OperatorBlocked} — produced by
- *     `buildToolGatingReport`, not by the per-connection verdict map this
- *     handler walks, so they cannot reach here in practice. They get a `note`
- *     anyway to keep the switch exhaustive and to stay useful if a future
- *     caller does route them through.
+ *     {@link ToolDisabledReason.OperatorBlocked} — emitted by
+ *     `buildToolGatingReport`, not the per-connection verdict map this handler
+ *     walks, so they can't reach here; they get a `note` only to keep the
+ *     switch exhaustive.
  *
  * Exhaustive over `ToolDisabledReason`: every arm returns, and the `default`
  * arm pins `reason` to `never`, so a new reason added to the enum fails
@@ -329,7 +326,7 @@ function adviceForReason(
       };
     case ToolDisabledReason.ReadOnlyConnection:
       return {
-        note: `Connection "${connId}" reaches the service this tool needs, but it is marked read_only, which disables tools that mutate state. Remove "read_only: true" from this connection (or set it to false) to enable it.`,
+        note: `Connection "${connId}" reaches this tool's service but is marked read_only, which blocks state-mutating tools. Remove "read_only: true" to enable it.`,
       };
     case ToolDisabledReason.NoConnectionsConfigured:
       return {

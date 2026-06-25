@@ -12,6 +12,7 @@ All notable changes to this MCP server will be documented in this file.
 
 - `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.
 - `explain-disabled-tools` now accounts for tools the operator excluded via `--allow-tools` / `--block-tools`; previously (since v1.3.0) such tools were ignored by the diagnostic, which either counted them as enabled — contradicting `tools/list` — or blamed a missing config block. They now appear in a dedicated server-wide block.
+- Introduced new optional tool argument `messageName` to `produce-message` tool to fix producing messages using PROTOBUF as format ([#127](https://github.com/confluentinc/mcp-confluent/issues/127))
 
 ### Changed
 
@@ -71,10 +72,6 @@ All notable changes to this MCP server will be documented in this file.
 ### Removed
 
 - **`read-connector` tool.** Its content is now covered by `get-connector-config` (config map) and `get-connector-tasks` (per-task configs and connector type).
-
-### Fixed
-
-- Introduced new optional tool argument `messageName` to`produce-message` tool to fix producing messages using PROTOBUF as format ([#127](https://github.com/confluentinc/mcp-confluent/issues/127))
 
 ## 1.3.0
 

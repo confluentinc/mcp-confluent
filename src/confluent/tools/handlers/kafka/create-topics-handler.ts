@@ -28,6 +28,16 @@ const createTopicArgs = z.object({
           .describe(
             "Number of partitions for the topic. If not specified, the broker default is used.",
           ),
+        replicationFactor: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            "Replication factor for the topic. If not specified, the broker default is used. " +
+              "Confluent Cloud clusters only ever support a value of 3 (or omit this to take the default); " +
+              "Confluent Platform or other clusters may accept other values.",
+          ),
       }),
     )
     .nonempty(),
@@ -67,10 +77,13 @@ export class CreateTopicsHandler extends BaseToolHandler {
         // 30s timeout — the broker confirms topic creation within this window.
         success = await admin.createTopics({
           timeout: 30_000,
-          topics: parsed.topics.map(({ topic, numPartitions }) => ({
-            topic,
-            numPartitions,
-          })),
+          topics: parsed.topics.map(
+            ({ topic, numPartitions, replicationFactor }) => ({
+              topic,
+              numPartitions,
+              replicationFactor,
+            }),
+          ),
         });
       } catch (err) {
         return this.createResponse(
@@ -94,7 +107,7 @@ export class CreateTopicsHandler extends BaseToolHandler {
     return {
       name: ToolName.CREATE_TOPICS,
       description:
-        "Create one or more Kafka topics with an optional partition count.",
+        "Create one or more Kafka topics with an optional partition count and replication factor.",
       inputSchema: createTopicArgs.shape,
       annotations: CREATE_UPDATE,
     };

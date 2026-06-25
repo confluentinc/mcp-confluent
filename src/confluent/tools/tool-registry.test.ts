@@ -10,7 +10,6 @@ import {
   type ConnectionPredicate,
   flinkWithTelemetry,
   hasCCloudCatalogSupport,
-  hasConfluentCloud,
   hasConfluentCloudOrOAuth,
   hasFlink,
   hasSchemaRegistryOrOAuth,
@@ -78,6 +77,25 @@ describe("tool-registry.ts", () => {
             isValidAnnotation,
             `Tool ${name} must use one of: READ_ONLY, CREATE_UPDATE, or DESTRUCTIVE`,
           ).toBe(true);
+        }
+      });
+
+      it("should annotate every connection-agnostic (alwaysEnabled) tool as READ_ONLY so the read-only overlay is a no-op for them", () => {
+        // The read-only verdict overlay disables a tool on a read_only
+        // connection only when its readOnlyHint !== true. Connection-agnostic
+        // tools take no connectionId and so should never be suppressed by a
+        // connection's read_only flag; this holds for free precisely because
+        // every alwaysEnabled tool is READ_ONLY. Pinning it here means the
+        // overlay needs no special-case for the alwaysEnabled set — if a future
+        // mutating tool is wired to alwaysEnabled, this fails instead.
+        for (const name of ALL_TOOL_NAMES) {
+          const handler = ToolHandlerRegistry.getToolHandler(name);
+          if (handler.predicate !== alwaysEnabled) continue;
+          const config = handler.getRegisteredToolConfig(runtimeWith());
+          expect(
+            config.annotations,
+            `Connection-agnostic tool ${name} must be READ_ONLY`,
+          ).toBe(READ_ONLY);
         }
       });
 
@@ -187,7 +205,7 @@ describe("tool-registry.ts", () => {
         // Flink
         [ToolName.LIST_FLINK_STATEMENTS]: hasFlink,
         [ToolName.CREATE_FLINK_STATEMENT]: hasFlink,
-        [ToolName.READ_FLINK_STATEMENT]: hasFlink,
+        [ToolName.GET_FLINK_STATEMENT_RESULTS]: hasFlink,
         [ToolName.DELETE_FLINK_STATEMENTS]: hasFlink,
         [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: hasFlink,
         [ToolName.LIST_FLINK_CATALOGS]: hasFlink,
@@ -198,21 +216,23 @@ describe("tool-registry.ts", () => {
         [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlink,
         [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
         [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
-        // Connect
-        [ToolName.LIST_CONNECTORS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_CONFIG]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_OFFSETS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_STATUS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloud,
+        // Connect — OAuth-capable (ride the cloud REST client); create-connector
+        // stays direct-only (embeds a Kafka API key/secret in the connector spec).
+        [ToolName.LIST_CONNECTORS]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_CONFIG]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_OFFSETS]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_STATUS]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloudOrOAuth,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
-        [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_LOGS]: hasConfluentCloud,
-        [ToolName.PAUSE_CONNECTOR]: hasConfluentCloud,
-        [ToolName.RESUME_CONNECTOR]: hasConfluentCloud,
-        [ToolName.RESTART_CONNECTOR]: hasConfluentCloud,
-        [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloud,
+        [ToolName.DELETE_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]:
+          hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_LOGS]: hasConfluentCloudOrOAuth,
+        [ToolName.PAUSE_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.RESUME_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.RESTART_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloudOrOAuth,
         // Catalog + search (CCloud catalog support)
         [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
         [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
@@ -230,6 +250,7 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_ORGANIZATIONS]: hasConfluentCloudOrOAuth,
         // Schema Registry
         [ToolName.LIST_SCHEMAS]: hasSchemaRegistryOrOAuth,
+        [ToolName.CREATE_SCHEMA]: hasSchemaRegistryOrOAuth,
         [ToolName.DELETE_SCHEMA]: hasSchemaRegistryOrOAuth,
         // Tableflow
         [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
@@ -253,6 +274,7 @@ describe("tool-registry.ts", () => {
         [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
         [ToolName.LIST_CONFIGURED_CONNECTIONS]: alwaysEnabled,
         [ToolName.CONFIG_HELP]: alwaysEnabled,
+        [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: alwaysEnabled,
       };
 
       it.each(
@@ -393,6 +415,7 @@ describe("tool-registry.ts", () => {
           cm.getSchemaRegistryClient().getAllSubjects.mockResolvedValue([]);
         },
       },
+      [ToolName.CREATE_SCHEMA]: { outcome: { throws: "ZodError" } },
       [ToolName.DELETE_SCHEMA]: { outcome: { throws: "ZodError" } },
       // Flink
       [ToolName.LIST_FLINK_STATEMENTS]: {
@@ -404,7 +427,9 @@ describe("tool-registry.ts", () => {
         },
       },
       [ToolName.CREATE_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
-      [ToolName.READ_FLINK_STATEMENT]: { outcome: { throws: "ZodError" } },
+      [ToolName.GET_FLINK_STATEMENT_RESULTS]: {
+        outcome: { throws: "ZodError" },
+      },
       [ToolName.DELETE_FLINK_STATEMENTS]: { outcome: { throws: "ZodError" } },
       [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: {
         outcome: { throws: "ZodError" },
@@ -545,7 +570,7 @@ describe("tool-registry.ts", () => {
       [ToolName.GET_PRODUCT_DOC_PAGE]: { outcome: { throws: "ZodError" } },
       // Diagnostics — no client calls; the handler walks the registry's
       // own predicate map. Against `allServicesRuntime` every gate passes
-      // and the handler emits its all-enabled summary.
+      // and the handler emits its all-advertised summary.
       [ToolName.EXPLAIN_DISABLED_TOOLS]: {
         outcome: { resolves: "registered tools are advertised via tools/list" },
         bypassesClientLayer: true,
@@ -560,6 +585,12 @@ describe("tool-registry.ts", () => {
       // config-help requires a `tool` arg; zero args fails Zod parse before
       // it ever reaches the registry walk or any client.
       [ToolName.CONFIG_HELP]: {
+        outcome: { throws: "ZodError" },
+        bypassesClientLayer: true,
+      },
+      // describe-configured-connection requires a connectionId argument, so the
+      // zero-arg smoke call trips its Zod schema before touching any client.
+      [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: {
         outcome: { throws: "ZodError" },
         bypassesClientLayer: true,
       },

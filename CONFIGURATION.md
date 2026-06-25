@@ -8,13 +8,13 @@ It covers the YAML config file (`-c config.yaml`), the legacy env-var path (`-e 
 - [Two paths, one configuration](#two-paths-one-configuration)
 - [Quick start (YAML)](#quick-start-yaml)
 - [Anatomy of a YAML config](#anatomy-of-a-yaml-config)
+- [Multiple connections (and zero connections)](#multiple-connections-and-zero-connections)
 - [`${VAR}` interpolation](#var-interpolation)
 - [How env vars and `.env` files fit into the YAML world](#how-env-vars-and-env-files-fit-into-the-yaml-world)
 - [Authentication modes](#authentication-modes)
 - [HTTP/SSE transport security](#httpsse-transport-security)
 - [Tool enablement: which block lights up what](#tool-enablement-which-block-lights-up-what)
 - [Legacy env-var configuration (deprecated)](#legacy-env-var-configuration-deprecated)
-- [Future plans](#future-plans)
 - [Troubleshooting](#troubleshooting)
 
 ## Two paths, one configuration
@@ -54,7 +54,8 @@ The two flags are mutually exclusive.
 
 ## Anatomy of a YAML config
 
-A config picks one of two connection flavors — OAuth or direct — and optionally adds a top-level `server:` block for transport/security/logging settings.
+A config is a `connections:` map plus an optional top-level `server:` block for transport/security/logging settings.
+Each connection block is one of two types — OAuth or direct — taken in turn below; a single configuragion may hold several connections and mix their types (see [Multiple connections (and zero connections)](#multiple-connections-and-zero-connections)).
 The fully annotated reference is [`config.example.yaml`](config.example.yaml); per-field comments live there rather than being duplicated here.
 Compact examples for common local-Docker setups live in [`sample_configs/`](sample_configs/).
 
@@ -101,9 +102,15 @@ connections:
     telemetry: { ... }
 ```
 
-The connection name (`staging` above) is freeform.
+The connection id (`staging` above) is freeform.
 Either connection flavor also accepts an optional `description` — a free-text label echoed back by the `list-configured-connections` tool so an agent can tell your connections apart.
 A blank or whitespace-only `description` is treated as no description.
+
+Either connection flavor also accepts an optional `read_only` flag (default `false`).
+When set to `read_only: true`, every tool that mutates state is automatically disabled for that connection, leaving only the read-only tools enabled.
+A tool's mutation posture comes from its `readOnlyHint` annotation, so there is nothing to configure per-tool: reads stay available while writes — produce, create/alter/delete, and the like — can never fire against that connection.
+This is the recommended posture for handing an agent a staging or production connection while keeping full read/write on a throwaway dev cluster.
+The `list-configured-connections` tool reports each connection's read-onlyness, so an agent can see at a glance which connections are read-only or write-enabled.
 
 #### Service blocks
 
@@ -118,9 +125,9 @@ A blank or whitespace-only `description` is treated as no description.
 
 Field-level details, defaults, and which CLI/env-var each field replaces are in [`config.example.yaml`](config.example.yaml).
 
-### The common `server:` block
+### The top-level `server:` block
 
-Both connection flavors above accept the same top-level `server:` block.
+The top-level `server:` block sits beside `connections:` and applies to the whole config, regardless of which connection flavors you defined.
 It is entirely optional — omit it to accept the same defaults today's env-var users get.
 The fully annotated example is in [`config.example.yaml`](config.example.yaml); when present, it replaces these env vars:
 
@@ -139,6 +146,20 @@ The fully annotated example is in [`config.example.yaml`](config.example.yaml); 
 | `server.auth.disabled`             | `MCP_AUTH_DISABLED` / `--disable-auth`                                |
 
 `server.transports` and the `--transport` CLI flag are mutually exclusive — declare transports in YAML or on the command line, not both.
+
+## Multiple connections (and zero connections)
+
+A single `config.yaml` may define several named entries under `connections:` — for example a Confluent Cloud connection alongside a local Apache Kafka broker — and each tool call routes to the connection you address by id.
+There is no fixed ceiling on the number of connections.
+Ready-to-use two-connection starters pairing a read/write local-Docker connection with a read-only Cloud or Confluent Platform connection — across OAuth, API-key, and CP auth — live in [`sample_configs/`](sample_configs/).
+
+One rule constrains the mix: you may pair as many `type: direct` connections as you like, but **at most one** may be `type: oauth`.
+The shared Confluent Cloud sign-in owns a single browser session and identity, so a second OAuth connection is rejected at startup with `Multiple OAuth connections defined in configuration; only one is supported`.
+
+A config may also define **no connections at all**.
+The five connection-independent tools — `search-product-docs`, `get-product-doc-page`, `explain-disabled-tools`, `list-configured-connections`, and `describe-configured-connection` — stay enabled regardless, so an empty config still gives you documentation search plus the server-diagnostic tools.
+
+This capability is YAML-only — the legacy env-var path can express only a single connection.
 
 ## `${VAR}` interpolation
 
@@ -220,18 +241,19 @@ connections:
 
 OAuth connections carry no service blocks.
 Resource IDs (cluster_id, environment_id, ...) that direct-mode connections pin in YAML instead flow in as tool arguments at call time.
+A server may define at most one OAuth connection, alongside any number of `type: direct` connections — see [Multiple connections (and zero connections)](#multiple-connections-and-zero-connections).
 Get a starter file via `--init-oauth-config`.
 
 **OAuth-eligible tools.** Not every tool has been migrated to OAuth yet — REST-only categories (Connect, Tableflow, Flink, Metrics, Catalog & Tags) still require `type: direct`.
 The currently-supported list:
 
-| Category                               | Tools                                                                                  | Notes                                                                                                                                                                                                                                                                                             |
-| -------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Kafka (native)                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Pass `cluster_id` + `environment_id` as arguments. Schema Registry serialization works on produce/consume for `AVRO` and `JSON`; `PROTOBUF` is currently broken across the board ([issue #127](https://github.com/confluentinc/mcp-confluent/issues/127)) and will not be fixed for this release. |
-| Kafka REST                             | `get-topic-config`, `alter-topic-config`                                               | Pass `clusterId` + `environmentId` as arguments.                                                                                                                                                                                                                                                  |
-| Schema Registry                        | `list-schemas`, `delete-schema`                                                        | Pass `environment_id`; the SR cluster and endpoint are auto-resolved.                                                                                                                                                                                                                             |
-| Organizations, Environments & Clusters | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         | —                                                                                                                                                                                                                                                                                                 |
-| Billing                                | `list-billing-costs`                                                                   | —                                                                                                                                                                                                                                                                                                 |
+| Category                               | Tools                                                                                  | Notes                                                                                                                                         |
+| -------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kafka (native)                         | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages` | Pass `cluster_id` + `environment_id` as arguments. Schema Registry serialization works on produce/consume for `AVRO`, `JSON`, and `PROTOBUF`. |
+| Kafka REST                             | `get-topic-config`, `alter-topic-config`                                               | Pass `clusterId` + `environmentId` as arguments.                                                                                              |
+| Schema Registry                        | `list-schemas`, `create-schema`, `delete-schema`                                       | Pass `environment_id`; the SR cluster and endpoint are auto-resolved.                                                                         |
+| Organizations, Environments & Clusters | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         | —                                                                                                                                             |
+| Billing                                | `list-billing-costs`                                                                   | —                                                                                                                                             |
 
 ## HTTP/SSE transport security
 
@@ -288,11 +310,11 @@ Run `--list-tools` to see the live set for your config, or use the `explain-disa
 
 | Block(s) required                                        | Tools enabled                                                                                                                                                                                                                                                                                                                                                |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| (always on)                                              | `search-product-docs`, `get-product-doc-page`, `explain-disabled-tools`, `list-configured-connections`, `config-help`                                                                                                                                                                                                                                        |
+| (always on)                                              | `search-product-docs`, `get-product-doc-page`, `explain-disabled-tools`, `list-configured-connections`, `config-help`, `describe-configured-connection`                                                                                                                                                                                                      |
 | `kafka` with `bootstrap_servers` _or_ `type: oauth`      | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`                                                                                                                                                                                                                                                                       |
 | `kafka` with `rest_endpoint` + `auth` _or_ `type: oauth` | `get-topic-config`, `alter-topic-config`                                                                                                                                                                                                                                                                                                                     |
-| `schema_registry` _or_ `type: oauth`                     | `list-schemas`, `delete-schema`                                                                                                                                                                                                                                                                                                                              |
-| `flink`                                                  | `create-flink-statement`, `list-flink-statements`, `read-flink-statement`, `delete-flink-statements`, `get-flink-statement-exceptions`, `check-flink-statement-health`, `detect-flink-statement-issues`, `list-flink-catalogs`, `list-flink-databases`, `list-flink-tables`, `describe-flink-table`, `get-flink-table-info`                                  |
+| `schema_registry` _or_ `type: oauth`                     | `list-schemas`, `create-schema`, `delete-schema`                                                                                                                                                                                                                                                                                                             |
+| `flink`                                                  | `create-flink-statement`, `list-flink-statements`, `get-flink-statement-results`, `delete-flink-statements`, `get-flink-statement-exceptions`, `check-flink-statement-health`, `detect-flink-statement-issues`, `list-flink-catalogs`, `list-flink-databases`, `list-flink-tables`, `describe-flink-table`, `get-flink-table-info`                           |
 | `flink` + `telemetry`                                    | `get-flink-statement-profile`                                                                                                                                                                                                                                                                                                                                |
 | `tableflow`                                              | `create-tableflow-topic`, `list-tableflow-topics`, `read-tableflow-topic`, `update-tableflow-topic`, `delete-tableflow-topic`, `list-tableflow-regions`, `create-tableflow-catalog-integration`, `list-tableflow-catalog-integrations`, `read-tableflow-catalog-integration`, `update-tableflow-catalog-integration`, `delete-tableflow-catalog-integration` |
 | `confluent_cloud` _or_ `type: oauth`                     | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`, `list-billing-costs`                                                                                                                                                                                                                                                         |
@@ -334,7 +356,6 @@ Run the server without `-c` and these variables, read either from the parent she
 | FLINK_COMPUTE_POOL_ID         | Flink compute pool ID; must start with `lfcp-`.                                                                                                                                                                                 |                                         | For Flink tools                      |
 | FLINK_DATABASE_NAME           | Default Flink database, used as `sql.current-database`.                                                                                                                                                                         |                                         | No                                   |
 | FLINK_ENV_ID                  | Flink environment ID; must start with `env-`.                                                                                                                                                                                   |                                         | For Flink tools                      |
-| FLINK_ENV_NAME                | **Deprecated** (removed in v1.4.0). Use `FLINK_CATALOG_NAME` instead.                                                                                                                                                           |                                         | No                                   |
 | FLINK_ORG_ID                  | Confluent Cloud organization ID.                                                                                                                                                                                                |                                         | For Flink tools                      |
 | FLINK_REST_ENDPOINT           | Base URL for Confluent Cloud's Flink REST API.                                                                                                                                                                                  |                                         | For Flink tools                      |
 | KAFKA_API_KEY                 | Kafka SASL username.                                                                                                                                                                                                            |                                         | For authenticated Kafka              |
@@ -357,12 +378,6 @@ Run the server without `-c` and these variables, read either from the parent she
 To migrate, run `--init-config`, then translate each variable you currently set into the matching block from [`config.example.yaml`](config.example.yaml).
 For a side-by-side, every `${VAR:-...}` placeholder in `config.example.yaml` names the env var that field used to come from.
 You can keep secrets in your existing `.env` and reference them via `${VAR}` from the YAML — that is job 1 above, and is the recommended migration target.
-
-## Future plans
-
-The configuration schema accepts multiple named entries under `connections:` and the YAML parser validates them, but today the server expects exactly one.
-Once the rest of the runtime catches up, a single `config.yaml` will be able to point at several Confluent Cloud or local clusters at the same time; you will not need to restructure existing configs for that to work.
-This capability will be YAML-only — the legacy env-var path has no way to express it.
 
 ## Troubleshooting
 

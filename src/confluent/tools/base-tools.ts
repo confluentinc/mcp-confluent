@@ -8,10 +8,13 @@ import { CallToolResult } from "@src/confluent/schema.js";
 import {
   alwaysEnabled,
   ConnectionPredicate,
+  ENABLED,
   PredicateResult,
+  ToolDisabledReason,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
+import { quoteJoinIds } from "@src/utils/quote-join-ids.js";
 import { z, ZodRawShape } from "zod";
 
 /**
@@ -34,7 +37,8 @@ export const DESTRUCTIVE: ToolAnnotations = {
 
 /**
  * Opening clause of the injected `connectionId` parameter description, before the
- * comma-separated list of viable connection ids is appended.
+ * quoted, comma-separated list of viable connection ids (see
+ * {@linkcode quoteJoinIds}) is appended.
  */
 export const CONNECTION_ID_DESCRIPTION_PREFIX =
   "Which configured connection to target. One of: ";
@@ -76,15 +80,15 @@ export interface ToolHandler {
   ): Promise<CallToolResult> | CallToolResult;
 
   /**
-   * Produce the actual config registered with MCP for this tool, potentially
-   * injecting a required `connectionId` parameter when the tool can target more
-   * than one connection. See the method body for the rules.
+   * Produce the actual config registered with MCP for this tool, injecting a
+   * required `connectionId` parameter when the server holds more than one
+   * connection. See {@linkcode BaseToolHandler.getRegisteredToolConfig} for the
+   * rules.
    *
    * This method is called when setting up the MCP server, and we ourselves make
    * the downcall to the handler-authored `getToolConfig()`.
-   * {@linkcode BaseToolHandler.getRegisteredToolConfig} for the rules.
    */
-  getRegisteredToolConfig(runtime: ServerRuntime): ToolConfig;
+  getRegisteredToolConfig(runtime: ServerRuntime): RegisteredToolConfig;
 
   /**
    * The connection predicate that gates this tool's enablement. Lifted onto
@@ -121,6 +125,21 @@ export interface ToolHandler {
    * `describe-tool-availability` diagnostic tool.
    */
   connectionVerdicts(runtime: ServerRuntime): Map<string, PredicateResult>;
+
+  /**
+   * Whether this tool is enabled irrespective of the configured connections.
+   * See {@linkcode BaseToolHandler.isConnectionIndependent}.
+   */
+  readonly isConnectionIndependent: boolean;
+
+  /**
+   * The connection id this invocation routes to, or `undefined` when it routes
+   * to none. See {@linkcode BaseToolHandler.resolvedTargetConnectionId}.
+   */
+  resolvedTargetConnectionId(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): string | undefined;
 }
 
 export interface ToolConfig {
@@ -128,6 +147,18 @@ export interface ToolConfig {
   description: string;
   inputSchema: ZodRawShape;
   annotations: ToolAnnotations;
+}
+
+/**
+ * The config actually registered with MCP, produced by
+ * {@linkcode BaseToolHandler.getRegisteredToolConfig}. Differs from the
+ * handler-authored {@linkcode ToolConfig} in that `inputSchema` is a resolved,
+ * strict Zod object rather than a bare shape: strict so unknown parameters are
+ * rejected (not silently stripped) before `handle()` runs, and resolved because
+ * a multi-connection server injects the required `connectionId` enum into it.
+ */
+export interface RegisteredToolConfig extends Omit<ToolConfig, "inputSchema"> {
+  inputSchema: z.ZodObject;
 }
 
 /**
@@ -164,59 +195,83 @@ export abstract class BaseToolHandler implements ToolHandler {
   protected abstract getToolConfig(): ToolConfig;
 
   /**
-   * Produce the actual config registered with MCP for this tool, potentially
-   * injecting a required `connectionId` parameter when the tool can target more
-   * than one connection. See the method body for the rules.
+   * Produce the actual config registered with MCP for this tool.
    *
-   * This method is called when setting up the MCP server, and we ourselves make
-   * the downcall to the handler-authored `getToolConfig()`.
+   *   * If the tool is connection-oriented and the server is configured
+   *    with multiple connections, injects a required `connectionId` parameter
+   *    indicating which connection the tool call should route to.
+   *    See {@linkcode registeredInputShape} for more details.
+   *
+   *   * Wrap the input schema in `z.object(...).strict()` to uniformly reject
+   *     unknown parameters before `handle()` runs.
+   *
+   * This method is called for each active tool when setting up the MCP server.
    *
    * @final — concrete on `BaseToolHandler`; subclasses must not override.
    */
-  getRegisteredToolConfig(runtime: ServerRuntime): ToolConfig {
+  getRegisteredToolConfig(runtime: ServerRuntime): RegisteredToolConfig {
     const config = this.getToolConfig();
+    return {
+      ...config,
+      inputSchema: z
+        .object(this.registeredInputShape(config, runtime))
+        .strict(),
+    };
+  }
 
-    // alwaysEnabled is an identity-checked sentinel, so bail before the
-    // per-connection scan below: connection-agnostic tools (docs, diagnostics)
-    // never route to a connection and so never need a connectionId parameter.
-    if (this.predicate === alwaysEnabled) return config;
+  /**
+   * The input shape to register, before strict-wrapping: the authored shape,
+   * plus a required `connectionId` enum when the server holds more than one
+   * connection AND this tool is connection-oriented. A single-element enum (when
+   * only one connection is viable) is still injected on a multi-connection server,
+   * so that an explicit request for a non-viable connection (e.g. to a disabled
+   * tool because it is read_only) is rejected by the enum rather than silently
+   * auto-routed.
+   */
+  private registeredInputShape(
+    config: ToolConfig,
+    runtime: ServerRuntime,
+  ): ZodRawShape {
+    // Connection-independent tools (docs, diagnostics) never route to a
+    // connection and so never need a connectionId parameter.
+    if (this.isConnectionIndependent) return config.inputSchema;
+
+    // A single-connection (or zero-connection) server has no ambiguity as to
+    // which connection a call routes to, so the call auto-routes with no extra
+    // argument. The zero-connection case also covers the `--list-tools` runtime,
+    // which wants the unaugmented view.
+    if (runtime.config.getConnectionIds().length <= 1)
+      return config.inputSchema;
 
     const ids = this.enabledConnectionIds(runtime);
 
-    // A tool viable on a single connection has no ambiguity as to which
-    // connection it routes to, so return the tool's authored config verbatim.
-
-    // (We might find that in multi-connection configurations, we might
-    //  want to surface the `connectionId` parameter regardless but then
-    //  lock it to a single value with `z.enum([theSoleEnabledId])`. Will
-    //  have to get farther along epic #532 before we can make that
-    //  determination, though. We have enough information in serverRuntime
-    //  to be able to migrate, though, so is not a blocker at this time.)
-    if (ids.length <= 1) return config;
-
-    // Otherwise, inject a required connectionId parameter into the Zod
-    // inputSchema with an enum of the enabled connection IDs.
+    // A tool viable on no connection is never registered (the enablement filter
+    // in index.ts drops it), so this method is never called for one. Reaching
+    // here means the wiring is broken; bail loudly rather than build an illegal
+    // `z.enum([])`.
+    if (ids.length === 0) {
+      throw new Error(
+        `Wacky -- tool ${config.name} resolved to zero enabled connections on a multi-connection server; it should never have been registered`,
+      );
+    }
 
     // Point the agent at list-configured-connections so it can learn which
     // tools each connection supports — but only when that tool is itself
     // reachable; naming a tool the operator blocked would send the agent
-    // chasing a ghost. The joining space is added here so the blocked case
-    // (empty pointer) leaves no dangling trailing space on the description.
+    // chasing a ghost. The leading space rides with the pointer (not the
+    // template) so the blocked, empty-pointer case ends cleanly at the period.
     const listConfiguredConnectionsPointer = runtime.isToolAllowed(
       ToolName.LIST_CONFIGURED_CONNECTIONS,
     )
       ? ` ${LIST_CONFIGURED_CONNECTIONS_POINTER}`
       : "";
     return {
-      ...config,
-      inputSchema: {
-        ...config.inputSchema,
-        connectionId: z
-          .enum(ids as [string, ...string[]])
-          .describe(
-            `${CONNECTION_ID_DESCRIPTION_PREFIX}${ids.join(", ")}.${listConfiguredConnectionsPointer}`,
-          ),
-      },
+      ...config.inputSchema,
+      connectionId: z
+        .enum(ids as [string, ...string[]])
+        .describe(
+          `${CONNECTION_ID_DESCRIPTION_PREFIX}${quoteJoinIds(ids)}.${listConfiguredConnectionsPointer}`,
+        ),
     };
   }
 
@@ -261,8 +316,10 @@ export abstract class BaseToolHandler implements ToolHandler {
   abstract readonly category: ToolCategory;
 
   /**
-   * IDs of connections that satisfy this tool's {@linkcode predicate}. A
-   * non-empty result enables the tool; an empty result disables it.
+   * IDs of connections that satisfy this tool's {@linkcode predicate} and are
+   * not blocked by the read-only overlay. A non-empty result enables the tool;
+   * an empty result disables it. Derived from {@linkcode connectionVerdicts} so
+   * the two stay in lockstep.
    *
    * Customize tool gating by declaring {@linkcode predicate}, never by
    * replacing this derivation.
@@ -270,15 +327,56 @@ export abstract class BaseToolHandler implements ToolHandler {
    * @final — concrete on `BaseToolHandler`; subclasses must not override.
    */
   enabledConnectionIds(runtime: ServerRuntime): string[] {
-    return Object.entries(runtime.config.connections)
-      .filter(([, conn]) => this.predicate(conn).enabled)
+    return [...this.connectionVerdicts(runtime)]
+      .filter(([, verdict]) => verdict.enabled)
       .map(([id]) => id);
   }
 
   /**
-   * Per-connection verdict map for this tool, derived from
-   * {@linkcode predicate}. Powers grouped startup logging and
-   * the diagnostic-tool surface.
+   * Whether this tool is enabled regardless of the configured connections —
+   * true exactly when its {@linkcode predicate} is `alwaysEnabled`, the only
+   * predicate that returns enabled without inspecting a connection. Such tools
+   * (docs lookup, server diagnostics) never route to a connection, so they
+   * register even on a zero-connection config, where the per-connection verdict
+   * map driving {@linkcode enabledConnectionIds} is empty.
+   */
+  get isConnectionIndependent(): boolean {
+    return this.predicate === alwaysEnabled;
+  }
+
+  /**
+   * The connection id this invocation routes to — the OAuth-login gate uses it
+   * to launch the browser flow only when a call actually targets the OAuth
+   * connection, not merely because one exists somewhere in the config.
+   *
+   * Returns `undefined` for a connection-independent tool — it routes to no
+   * connection, so there is nothing to pre-launch a login for.
+   *
+   * Otherwise delegates to {@linkcode resolveConnection} so routing is decided
+   * in one place rather than duplicated in the gate, and propagates its throw.
+   * Every throw path there is a `"Wacky --"` invariant violation: the injected
+   * schema (see {@linkcode getRegisteredToolConfig}) makes `connectionId`
+   * required for multi-connection tools and strips it for single-connection
+   * ones, so a call that can't resolve means that contract broke. Surfacing the
+   * error rather than swallowing it to `undefined` lets the broken invariant
+   * reach the caller instead of being silently re-discovered inside `handle()`.
+   *
+   * @final — concrete on `BaseToolHandler`; subclasses must not override.
+   */
+  resolvedTargetConnectionId(
+    runtime: ServerRuntime,
+    toolArguments: Record<string, unknown> | undefined,
+  ): string | undefined {
+    if (this.isConnectionIndependent) return undefined;
+    return this.resolveConnection(runtime, toolArguments).connId;
+  }
+
+  /**
+   * Per-connection verdict map for this tool — the single source of truth for
+   * enablement. Each verdict composes the {@linkcode predicate} with the
+   * read-only overlay (see {@linkcode connectionVerdict}). Powers grouped
+   * startup logging, the diagnostic-tool surface, and
+   * {@linkcode enabledConnectionIds}.
    *
    * Customize tool gating by declaring {@linkcode predicate}, never by
    * replacing this derivation.
@@ -289,28 +387,31 @@ export abstract class BaseToolHandler implements ToolHandler {
     return new Map(
       Object.entries(runtime.config.connections).map(([id, conn]) => [
         id,
-        this.predicate(conn),
+        this.connectionVerdict(conn),
       ]),
     );
   }
 
   /**
-   * Resolves the single connection enabled for this tool, returning the
-   * connection id, its config, and the matching client manager. Designed
-   * for handlers that look up `runtime.clientManagers[connId]` (multi-
-   * connection-ready shape).
+   * Single-connection verdict composing the two gating layers: the
+   * {@linkcode predicate} (service reachability) and the read-only overlay.
    *
-   * Selects `enabledConnectionIds(runtime)[0]` — current runtime is single-
-   * connection, so this is unambiguous; if multi-connection support lands
-   * later, handlers can switch to iterating ids.
+   * A connection the predicate already disables keeps that verdict unchanged —
+   * service reachability is the more fundamental reason and wins, so a
+   * connection missing the service block is never reported as "read-only
+   * blocked". Otherwise, a `read_only` connection disables any tool that
+   * mutates state (`annotations.readOnlyHint !== true`).
    */
-  protected resolveSoleConnection(runtime: ServerRuntime): ResolvedConnection {
-    const connId = this.enabledConnectionIds(runtime)[0]!;
-    return {
-      connId,
-      conn: runtime.config.connections[connId]!,
-      clientManager: runtime.clientManagers[connId]!,
-    };
+  private connectionVerdict(conn: ConnectionConfig): PredicateResult {
+    const verdict = this.predicate(conn);
+    if (!verdict.enabled) return verdict;
+    if (
+      conn.read_only === true &&
+      this.getToolConfig().annotations.readOnlyHint !== true
+    ) {
+      return { enabled: false, reason: ToolDisabledReason.ReadOnlyConnection };
+    }
+    return ENABLED;
   }
 
   /**
@@ -356,9 +457,9 @@ export abstract class BaseToolHandler implements ToolHandler {
       // Unreachable in normal operation: Zod has already validated `args`
       // against the registered schema before `handle()` runs, and that schema
       // either declares `connectionId` as a string enum (multi-connection
-      // tools — a non-string fails parsing) or omits it entirely (single-
-      // connection tools — an unknown key is stripped). Either way a non-string
-      // can't survive to reach this branch. It exists purely as a symmetric
+      // servers — a non-string fails parsing) or omits it entirely (single-
+      // connection servers — the strict schema rejects the unknown key). Either
+      // way a non-string can't survive to reach this branch. It exists purely as a symmetric
       // peer to the two backstops below, so a malformed value can never quietly
       // masquerade as an omission and auto-route.
       throw new Error(

@@ -1,0 +1,50 @@
+# Example MCP Confluent Server configuration — two connections.
+#
+# A read/write local (Docker) Kafka + Schema Registry connection paired with a
+# read-only Confluent Cloud connection authenticated by API keys.
+#
+# Local Docker: the Confluent for VS Code extension makes spinning up and
+# managing the local Kafka and Schema Registry Docker containers simple. Your
+# local Docker Kafka bootstrap server string and Schema Registry URL will vary —
+# adjust the localhost:9092 / http://localhost:8081 values below to match your
+# containers.
+
+connections:
+  # Read/write local development cluster (Docker).
+  local:
+    type: "direct"
+    description: "Local Docker Kafka + Schema Registry (read/write)"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+    schema_registry:
+      endpoint: "http://localhost:8081"
+
+  # Read-only Confluent Cloud via API keys. Secrets come from the environment
+  # through ${VAR} interpolation; the pkc-/psrc-/lkc-/env- hostnames and ids
+  # below are placeholders — replace them with your cluster's values.
+  # `read_only: true` auto-disables every mutating tool for this connection.
+  ccloud:
+    type: "direct"
+    description: "Confluent Cloud (API keys, read-only)"
+    read_only: true
+    kafka:
+      bootstrap_servers: "${CCLOUD_KAFKA_BOOTSTRAP_SERVERS:-pkc-xxxxx.us-east-1.aws.confluent.cloud:9092}"
+      auth:
+        type: "api_key"
+        key: "${CCLOUD_KAFKA_API_KEY}"
+        secret: "${CCLOUD_KAFKA_API_SECRET}"
+      rest_endpoint: "${CCLOUD_KAFKA_REST_ENDPOINT:-https://pkc-xxxxx.us-east-1.aws.confluent.cloud:443}"
+      cluster_id: "${CCLOUD_KAFKA_CLUSTER_ID:-lkc-xxxxx}"
+      env_id: "${CCLOUD_KAFKA_ENV_ID:-env-xxxxx}"
+    schema_registry:
+      endpoint: "${CCLOUD_SCHEMA_REGISTRY_ENDPOINT:-https://psrc-xxxxx.us-east-2.aws.confluent.cloud}"
+      auth:
+        type: "api_key"
+        key: "${CCLOUD_SCHEMA_REGISTRY_API_KEY}"
+        secret: "${CCLOUD_SCHEMA_REGISTRY_API_SECRET}"
+    confluent_cloud:
+      endpoint: "${CONFLUENT_CLOUD_REST_ENDPOINT:-https://api.confluent.cloud}"
+      auth:
+        type: "api_key"
+        key: "${CONFLUENT_CLOUD_API_KEY}"
+        secret: "${CONFLUENT_CLOUD_API_SECRET}"

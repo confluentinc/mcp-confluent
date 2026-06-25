@@ -4,15 +4,36 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
-### Added
+### Removed
+
+- The deprecated `FLINK_ENV_NAME` environment variable. Use `FLINK_CATALOG_NAME` (or a connection's `flink.catalog_name` in YAML) instead.
+
+### Fixed
+
+- `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.
+- `explain-disabled-tools` now accounts for tools the operator excluded via `--allow-tools` / `--block-tools`; previously (since v1.3.0) such tools were ignored by the diagnostic, which either counted them as enabled — contradicting `tools/list` — or blamed a missing config block. They now appear in a dedicated server-wide block.
+
+### Changed
+
+- **Configuration**: _A YAML config may now define multiple connections — or none._ Point a single `config.yaml` at several clusters at once — for example a local Apache Kafka broker alongside Confluent Cloud — or run with no connection at all (documentation search and server-diagnostic tools still work). At most one of those connections may use OAuth to Confluent Cloud. See [CONFIGURATION.md → Multiple connections (and zero connections)](CONFIGURATION.md#multiple-connections-and-zero-connections).
+  - When multiple connections are enabled, all connection-oriented tools will be driven with the connection id the tool should be invoked against, even if said tool was only invokable against a single connection to improve clarity and consistency (such as would be the case for a mutating tool invocation when one connection is marked read_only and the other allows writes).
+
+#### Added
+
+- **Configuration**: _Per-connection `description` field._ Optional free-text label on any connection, echoed back by `list-configured-connections`.
+- **Configuration**: _Per-connection `read_only` flag._ Set `read_only: true` on a connection to auto-disable every state-mutating tool for it, leaving only read-only tools enabled. **Defaults to `false`** --- resources reachable by a connection may be mutated or deleted from. The `list-configured-connections` tool reports each connection's read-onlyness.
 
 #### New Tools / Tool Features
 
-- **`list-configured-connections` tool.** Read-only, always-enabled discovery tool mapping each configured connection id to the connection-routable tools enabled on it.
-
-#### Configuration
-
-- **Per-connection `description` field.** Optional free-text label on any connection, echoed back by `list-configured-connections`.
+- **`create-schema` tool.** Registers a schema (or a new version) under a subject in the Schema Registry, peer to `list-schemas` and `delete-schema`.
+- **`explain-disabled-tools` now reports per connection.** The "why is this tool missing?" report is split into one section per configured connection, each with its own disabled-tool buckets and counts — so a tool live on one connection and dark on another surfaces under exactly the connection that gates it, rather than being flattened to a single server-wide verdict.
+- **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.
+- **`describe-configured-connection` tool.** Read-only, always-enabled discovery tool that, given one connection id, reports its non-secret config (never credentials), read-only-ness, and the tools enabled on it alongside the reason each disabled tool is gated off.
+- **`produce-message` improvements:**
+  - **Record-level `partition`, `timestamp`, and `headers`.** Three optional arguments for faithfully reproducing a record on another cluster: `partition` (non-negative integer) pins the target partition; `timestamp` accepts a `Date.parse`-able date-time string (ISO 8601 recommended) or a non-negative integer ms-since-epoch number (an unparseable value returns an error instead of silently stamping wall-clock time); `headers` maps a header name to a string or array of strings (multi-valued), carried as raw Kafka headers independent of Schema Registry serialization.
+  - **Support for schema-id-in-headers**: The tool can be asked to encode the schema GUID(s) (UUIDs) in the Kafka message headers. By default, however, schema IDs are encoded in the payload's magic-byte prefix (the standard Confluent wire format).
+- **`consume-messages` tool** now also supports deserializing records based on schema GUIDs encoded in the message headers (`__value_schema_id` / `__key_schema_id`), and surfaces those header-located schema GUIDs in the returned headers so callers can see which schema each record used.
+- **Connector tools now work under OAuth.** All Connector tools except `create-connector` (which stays `direct`-only) are enabled for OAuth connections.
 
 ## 1.4.0
 
@@ -40,6 +61,7 @@ All notable changes to this MCP server will be documented in this file.
 
 ### Changed
 
+- **`read-flink-statement` tool renamed to `get-flink-statement-results`.** The old name read as a peer to `read-connector` / `read-environment` (fetch the resource), but the tool actually returns a statement's _result rows_, not the statement definition. The new name matches the `get-…` verb the rest of the surface uses for result/data reads. Inputs, output shape, and behavior are unchanged; update any client config that pins the tool by name.
 - **`consume-messages`: breaking input-shape changes** alongside the new controls above.
   - `topicNames: string[]` replaced by `topics[]`, an array of per-topic option objects. Minimal call: `{topics: [{name: "orders"}]}`.
   - Top-level `offsetReset` removed; starting position is now per-topic via `start` (default remains `"earliest"`).
@@ -49,6 +71,10 @@ All notable changes to this MCP server will be documented in this file.
 ### Removed
 
 - **`read-connector` tool.** Its content is now covered by `get-connector-config` (config map) and `get-connector-tasks` (per-task configs and connector type).
+
+### Fixed
+
+- Introduced new optional tool argument `messageName` to`produce-message` tool to fix producing messages using PROTOBUF as format ([#127](https://github.com/confluentinc/mcp-confluent/issues/127))
 
 ## 1.3.0
 

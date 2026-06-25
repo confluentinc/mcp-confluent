@@ -32,7 +32,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -248,40 +251,43 @@ describe(
           });
         });
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should return every partition with messageCount totaling the seeded writes", async () => {
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.GET_PARTITION_OFFSETS,
-              arguments: {
-                topicName: topic,
-                cluster_id: clusterId,
-                environment_id: environmentId,
-              },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            expect(result.isError, textContent(result)).not.toBe(true);
-            const payload =
-              result.structuredContent as GetPartitionOffsetsResponse;
-            expect(payload.topicName).toBe(topic);
-            expect(payload.partitions).toHaveLength(NUM_PARTITIONS);
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should return every partition with messageCount totaling the seeded writes", async () => {
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.GET_PARTITION_OFFSETS,
+                arguments: {
+                  topicName: topic,
+                  cluster_id: clusterId,
+                  environment_id: environmentId,
+                },
+              });
 
-            const partition0 = payload.partitions.find(
-              (p) => p.partition === 0,
-            );
-            expect(partition0?.messageCount).toBe(SEEDED_VALUES.length);
-          });
-        });
+              expect(result.isError, textContent(result)).not.toBe(true);
+              const payload =
+                result.structuredContent as GetPartitionOffsetsResponse;
+              expect(payload.topicName).toBe(topic);
+              expect(payload.partitions).toHaveLength(NUM_PARTITIONS);
+
+              const partition0 = payload.partitions.find(
+                (p) => p.partition === 0,
+              );
+              expect(partition0?.messageCount).toBe(SEEDED_VALUES.length);
+            });
+          },
+        );
       },
     );
   },

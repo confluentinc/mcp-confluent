@@ -1,0 +1,32 @@
+# Example MCP Confluent Server configuration — two connections.
+#
+# A read/write local (Docker) Kafka + Schema Registry connection paired with a
+# read-only Confluent Cloud connection authenticated by OAuth: a browser PKCE
+# sign-in, with no API keys to provision.
+#
+# Local Docker: the Confluent for VS Code extension makes spinning up and
+# managing the local Kafka and Schema Registry Docker containers simple. Your
+# local Docker Kafka bootstrap server string and Schema Registry URL will vary —
+# adjust the localhost:9092 / http://localhost:8081 values below to match your
+# containers.
+
+connections:
+  # Read/write local development cluster (Docker).
+  local:
+    type: "direct"
+    description: "Local Docker Kafka + Schema Registry (read/write)"
+    kafka:
+      bootstrap_servers: "localhost:9092"
+    schema_registry:
+      endpoint: "http://localhost:8081"
+
+  # Read-only Confluent Cloud via OAuth. The browser sign-in (PKCE) opens on the
+  # first tool call that needs Cloud access; the resulting session is reused for
+  # the rest of the process. OAuth connections carry no service blocks —
+  # resource IDs (cluster_id, env_id, ...) are passed as tool arguments at call
+  # time. `read_only: true` auto-disables every mutating tool for this
+  # connection, leaving only read-only tools enabled.
+  ccloud:
+    type: "oauth"
+    description: "Confluent Cloud (OAuth login, read-only)"
+    read_only: true

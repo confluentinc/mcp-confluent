@@ -18,5 +18,17 @@ describe("env-schema.ts", () => {
 
       expect(result.success).toBe(true);
     });
+
+    it("should not recognize the removed FLINK_ENV_NAME variable", () => {
+      const result = combinedSchema.safeParse({ FLINK_ENV_NAME: "legacy" });
+
+      if (!result.success) {
+        throw new Error(
+          `Expected parse to succeed but it failed: ${result.error.message}`,
+        );
+      }
+
+      expect(result.data).not.toHaveProperty("FLINK_ENV_NAME");
+    });
   });
 });

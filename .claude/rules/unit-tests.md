@@ -9,7 +9,7 @@ paths:
 ## Framework & Location
 
 - Co-located `.test.ts` files alongside source code using Vitest
-- Run with `npm run test:unit` (single run) or `npm run test:unit:watch` (watch mode). `npm run test` runs both unit and integration; reach for it only when you want the full sweep.
+- Run with `pnpm run test:unit` (single run) or `pnpm run test:unit:watch` (watch mode). `pnpm run test` runs both unit and integration; reach for it only when you want the full sweep.
 - Config in `vitest.config.ts`; `@src/*` aliases resolved via `resolve.tsconfigPaths`
 - `restoreMocks: true` is set project-wide, so every `vi.spyOn` call is automatically restored
   after each test - no per-test restore hooks needed
@@ -378,16 +378,22 @@ object. **Do not reach for `vi.mock`** - if a new dependency seems to require it
 A handler that resolves its connection via `resolveConnection(runtime, toolArguments)` (or `resolveDirectConnection`) must route to the caller-addressed `connectionId`, not unconditionally to `enabledConnectionIds[0]`.
 `runtimeWithDecoy` (in `tests/factories/runtime.ts`) is a drop-in replacement for `runtimeWith` that proves this: it plants a "decoy" connection — same service blocks, enabled for the same tools, its own auto-minted client manager — inserted _before_ the real one, so a handler that still grabs the first enabled connection lands on the decoy.
 `assertHandleCase` recognizes a decoy-bearing runtime (by the reserved `DECOY_CONNECTION_ID`), auto-injects `connectionId` for the real connection when the caller omitted it, and asserts the decoy's client manager was never touched.
+It returns the resolved `CallToolResult` (`undefined` if the handler threw), so a case that pins an exact `structuredContent` shape or an exact/regex `textOf` — beyond the `resolves` substring — can capture the return and assert after the harness call.
 
-There are two ways to get this coverage, and which one a suite uses depends on how its `handle()` tests are already written:
+To get routing coverage, run a suite's `handle()` cases through `assertHandleCase` with a `runtimeWithDecoy` runtime.
+That turns every case into a routing test — no `connectionId` in the args (the harness injects it), and no bespoke routing test body.
+The `it.each` suites need the edit only in the loop's runtime expression; the per-`it()` suites build each case's runtime with `runtimeWithDecoy`.
+The consumer-group and offsets suites (`list-consumer-groups`, `describe-consumer-group`, `get-consumer-group-lag`, `get-partition-offsets`) follow this shape — their behaviour cases all run through the harness, capturing the returned result for the shape/`textOf` assertions the substring check can't express.
 
-- **Suites whose `handle()` tests run through `assertHandleCase`** (the `it.each` suites and the per-`it()` `assertHandleCase` suites): swap the suite's `runtimeWith` for `runtimeWithDecoy`.
-  That one-word change turns every existing success case into a routing test — no new test body, and no `connectionId` in the args (the harness injects it).
-  The `it.each` suites need the edit only in the loop's runtime expression; the per-`it()` suites swap each `handle()` runtime.
-- **Suites whose main `handle()` tests call `handler.handle(...)` directly** (not through the harness — e.g. the consumer-group / offsets suites that need bespoke `mockResolvedValueOnce` sequencing): the auto-route and auto-assert fire only inside `assertHandleCase`, so a direct call sees no decoy handling.
-  Add one dedicated routing test that calls `assertHandleCase` with a `runtimeWithDecoy` runtime, alongside the suite's direct-call tests.
+A few case kinds legitimately stay as direct `handler.handle(...)` calls rather than routing through the harness, because the harness's outcome assertions can't express what they pin:
 
-A reverted handler (one that goes back to `resolveSoleConnection()`) trips the decoy's untouched assertion on every converted case, so the coverage is not vacuous.
+- **Thrown-error field shape.** A case asserting `code` / `errno` / `origin` on a thrown librdkafka error via `.rejects.toMatchObject({ ... })` — the harness's `{ throws }` matcher only sees the message (via `classifyThrown`), so it can't pin those fields.
+- **Zod-boundary rejections.** A case pinning `issues[].path` / `issues[].code` on a `ZodError` — `classifyThrown` collapses every `ZodError` to the string `"ZodError"`, so `{ throws: "ZodError" }` would discard the field-path specificity.
+  These also throw before connection resolution, so they exercise no routing worth covering.
+
+Such cases don't carry decoy coverage; the suite's other (harness-routed) cases provide it.
+
+A handler that resolves by grabbing `enabledConnectionIds[0]` instead of the caller's `connectionId` trips the decoy's untouched assertion on every routed case, so the coverage is not vacuous.
 
 ## Test Server & Runtime Fixtures
 

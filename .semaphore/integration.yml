@@ -20,8 +20,13 @@ global_job_config:
     commands:
       - sem-version node 22
       - checkout
-      - cache restore npm-cache-
-      - npm ci --prefer-offline --include=dev
+      # Install any recent pnpm after checkout so the repo's `.npmrc` governs the
+      # install; pnpm reads package.json's `packageManager` field and self-switches
+      # to the pinned version (no version pin or Corepack needed).
+      - npm install --global pnpm
+      - pnpm config set store-dir ~/.pnpm-store
+      - cache restore pnpm-store-$(checksum pnpm-lock.yaml),pnpm-store-
+      - pnpm install --frozen-lockfile
       # chromium is needed for any @oauth-tagged tests as well as the OAuth smoke test
       - |
         PLAYWRIGHT_VERSION=$(node -p "require('playwright-core/package.json').version")
@@ -30,11 +35,12 @@ global_job_config:
           cache store "playwright-chromium-${PLAYWRIGHT_VERSION}" ~/.cache/ms-playwright
       - . vault-setup --version v3 --role mcp-confluent
       - make setup-test-env
-      - npm run build
+      - pnpm run build
   epilogue:
     always:
       commands:
         - make remove-test-env
+        - cache store pnpm-store-$(checksum pnpm-lock.yaml) ~/.pnpm-store
 
 # Service-config-organized blocks. This pipeline is the scheduled-daily and
 # manual full-run shape; per-PR work lives in semaphore.yml's
@@ -75,7 +81,7 @@ blocks:
       jobs:
         - name: "Integration tests"
           commands: &service-config-job-commands
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration SERVICE_CONFIG="$SERVICE_CONFIG" TAGS="$TOOL_GROUP"
           matrix:
             - env_var: TOOL_GROUP
@@ -204,7 +210,7 @@ blocks:
       jobs:
         - name: "Integration tests"
           commands:
-            - npm run test:harness
+            - pnpm run test:harness
             - make test-integration TAGS="@smoke"
 
 after_pipeline:

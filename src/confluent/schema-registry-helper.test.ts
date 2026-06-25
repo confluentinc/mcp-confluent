@@ -1,7 +1,67 @@
-import { SerdeType } from "@confluentinc/schemaregistry";
-import { checkSchemaNeeded } from "@src/confluent/schema-registry-helper.js";
+import { MutableRegistry } from "@bufbuild/protobuf";
+import { IHeaders } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import {
+  KEY_SCHEMA_ID_HEADER,
+  SchemaId,
+  SchemaRegistryClient,
+  SerdeType,
+  VALUE_SCHEMA_ID_HEADER,
+} from "@confluentinc/schemaregistry";
+import {
+  checkSchemaNeeded,
+  decodeSchemaGuidHeader,
+  deserializeMessage,
+  getDeserializer,
+  getLatestSchemaIfExists,
+  getLatestSchemaOfTypeOrThrow,
+  getSerializer,
+  protobufMessageFrom,
+  protobufRegistryFromProto,
+  protobufRegistryFromSerialized,
+  serializeMessage,
+} from "@src/confluent/schema-registry-helper.js";
 import { getMockedSchemaRegistry } from "@tests/stubs/index.js";
 import { beforeEach, describe, expect, it } from "vitest";
+
+const PROTO_USER = `syntax = "proto3";
+package com.example;
+
+message User {
+  string user_id = 1;
+  string name = 2;
+  string email = 3;
+  int32 age = 4;
+}`;
+
+const MAGIC_BYTE_V1 = 1;
+const TEST_GUID = "89e3a8f1-1111-2222-3333-444455556666";
+
+/**
+ * Bridges a raw `.proto` schema string and a plain JS payload into the form the
+ * `@confluentinc/schemaregistry` {@link ProtobufSerializer} requires: a typed
+ * message object (carrying `$typeName`) plus the descriptor registry describing
+ * it. A plain object from tool input has neither, which is why it otherwise
+ * fails with "message type name is empty". Convenience wrapper around
+ * {@link protobufRegistryFromProto} + {@link protobufMessageFrom}.
+ *
+ * @param protoText - The `.proto` schema definition (proto3)
+ * @param messageName - Fully-qualified message type name (e.g. `com.example.User`)
+ * @param payload - The payload to encode. Keys may use either the proto field
+ *   name (`user_id`) or its camelCase JSON name (`userId`) — see
+ *   {@link protobufMessageFrom}.
+ * @returns The typed protobuf message and the registry describing it
+ * @throws Error if the `.proto` text cannot be parsed, or if `messageName` does
+ *   not match a message in the schema
+ */
+export function buildProtobufMessage(
+  protoText: string,
+  messageName: string,
+  payload: object,
+): { message: object; registry: MutableRegistry } {
+  const registry = protobufRegistryFromProto(protoText);
+  const message = protobufMessageFrom(registry, messageName, payload);
+  return { message, registry };
+}
 
 describe("schema-registry-helper.ts", () => {
   describe("checkSchemaNeeded()", () => {
@@ -98,5 +158,670 @@ describe("schema-registry-helper.ts", () => {
         expect(result).toEqual({ type: "no-schema", subject: expected });
       },
     );
+  });
+
+  describe("buildProtobufMessage()", () => {
+    it("builds a typed message (with $typeName) from snake_case payload keys", () => {
+      const { message } = buildProtobufMessage(PROTO_USER, "com.example.User", {
+        user_id: "USR-001",
+        name: "Alice",
+        age: 30,
+      });
+      const fields = message as Record<string, unknown>;
+      expect(fields.$typeName).toBe("com.example.User");
+      expect(fields.userId).toBe("USR-001");
+      expect(fields.name).toBe("Alice");
+      expect(fields.age).toBe(30);
+    });
+
+    it("also accepts camelCase payload keys (proto json_name)", () => {
+      // protobufjs is parsed with keepCase, but each field still carries its
+      // auto-generated camelCase JSON name, so `fromJson` accepts either the
+      // proto field name (`user_id`) or its JSON name (`userId`) and maps both
+      // onto the same field.
+      const { message } = buildProtobufMessage(PROTO_USER, "com.example.User", {
+        userId: "USR-002",
+        name: "Bob",
+      });
+      const fields = message as Record<string, unknown>;
+      expect(fields.$typeName).toBe("com.example.User");
+      expect(fields.userId).toBe("USR-002");
+      expect(fields.name).toBe("Bob");
+    });
+
+    it("throws listing available message types when messageName is unknown", () => {
+      expect(() =>
+        buildProtobufMessage(PROTO_USER, "com.example.Missing", {}),
+      ).toThrow(/Available message types: com\.example\.User/);
+    });
+
+    it("throws a parse error for malformed .proto text", () => {
+      expect(() =>
+        buildProtobufMessage("this is not protobuf", "com.example.User", {}),
+      ).toThrow(/Failed to parse Protobuf schema/);
+    });
+  });
+
+  describe("serializeMessage() with PROTOBUF", () => {
+    // A real mock:// Schema Registry client serializes/deserializes entirely
+    // in-memory (no network), so the round-trip proves the produced bytes are
+    // valid Protobuf tagged with the right schema id.
+    const newRegistry = (): SchemaRegistryClient =>
+      SchemaRegistryClient.newClient({
+        baseURLs: ["mock://"],
+      }) as SchemaRegistryClient;
+
+    it("registers the schema and serializes a payload that round-trips", async () => {
+      const registry = newRegistry();
+      const topic = "proto-roundtrip";
+      const bytes = await serializeMessage(
+        topic,
+        {
+          message: {
+            user_id: "USR-001",
+            name: "Alice",
+            email: "alice@example.com",
+            age: 30,
+          },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          schema: PROTO_USER,
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+      expect(Buffer.isBuffer(bytes)).toBe(true);
+
+      const decoded = await deserializeMessage(
+        topic,
+        bytes as Buffer,
+        "PROTOBUF",
+        registry,
+        SerdeType.VALUE,
+      );
+      expect(decoded).toEqual({
+        $typeName: "com.example.User",
+        userId: "USR-001",
+        name: "Alice",
+        email: "alice@example.com",
+        age: 30,
+      });
+    });
+
+    it("uses the latest registered schema when no schema is supplied", async () => {
+      const registry = newRegistry();
+      const topic = "proto-latest";
+      // First produce WITH the schema so the serializer registers it in the
+      // serialized (base64 FileDescriptorProto) format the SDK expects, mimicking
+      // a prior produce. A subsequent produce then exercises the use-latest path.
+      await serializeMessage(
+        topic,
+        {
+          message: { user_id: "USR-000", name: "Seed" },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          schema: PROTO_USER,
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      const bytes = await serializeMessage(
+        topic,
+        {
+          message: { user_id: "USR-009", name: "Bob" },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      const decoded = await deserializeMessage(
+        topic,
+        bytes as Buffer,
+        "PROTOBUF",
+        registry,
+        SerdeType.VALUE,
+      );
+      expect(decoded).toEqual({
+        $typeName: "com.example.User",
+        userId: "USR-009",
+        name: "Bob",
+        email: "",
+        age: 0,
+      });
+    });
+
+    it("throws an actionable error when the registered schema is not PROTOBUF (use-latest path)", async () => {
+      const registry = newRegistry();
+      const topic = "proto-mismatch";
+      // Seed the subject with an AVRO schema, then attempt a PROTOBUF produce
+      // without supplying a schema (use-latest). The mismatch must surface as a
+      // clear error rather than a confusing base64 decode failure.
+      await serializeMessage(
+        topic,
+        {
+          message: { x: 1 },
+          useSchemaRegistry: true,
+          schemaType: "AVRO",
+          schema:
+            '{"type":"record","name":"X","fields":[{"name":"x","type":"int"}]}',
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      await expect(
+        serializeMessage(
+          topic,
+          {
+            message: { user_id: "USR-001" },
+            useSchemaRegistry: true,
+            schemaType: "PROTOBUF",
+            messageName: "com.example.User",
+          },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(
+        /is registered as AVRO, but the requested schemaType is PROTOBUF/,
+      );
+    });
+
+    it("throws when messageName is missing for PROTOBUF", async () => {
+      const registry = newRegistry();
+      await expect(
+        serializeMessage(
+          "proto-missing",
+          {
+            message: { user_id: "USR-001" },
+            useSchemaRegistry: true,
+            schemaType: "PROTOBUF",
+            schema: PROTO_USER,
+          },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(/messageName is required/);
+    });
+  });
+
+  describe("serializeMessage() use-latest schema-type validation", () => {
+    const newRegistry = (): SchemaRegistryClient =>
+      SchemaRegistryClient.newClient({
+        baseURLs: ["mock://"],
+      }) as SchemaRegistryClient;
+
+    it("throws when the requested schemaType differs from the registered one (AVRO subject, JSON request)", async () => {
+      const registry = newRegistry();
+      const topic = "type-mismatch";
+      // Register an AVRO schema, then attempt a use-latest produce asking for
+      // JSON. Without the upfront check this fails as an opaque serializer error.
+      await serializeMessage(
+        topic,
+        {
+          message: { x: 1 },
+          useSchemaRegistry: true,
+          schemaType: "AVRO",
+          schema:
+            '{"type":"record","name":"X","fields":[{"name":"x","type":"int"}]}',
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      await expect(
+        serializeMessage(
+          topic,
+          { message: { x: 1 }, useSchemaRegistry: true, schemaType: "JSON" },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(
+        /is registered as AVRO, but the requested schemaType is JSON/,
+      );
+    });
+  });
+
+  describe("getSerializer()", () => {
+    it.each(["AVRO", "JSON", "PROTOBUF"] as const)(
+      "should return a serializer for %s",
+      (schemaType) => {
+        const registry = getMockedSchemaRegistry();
+        expect(
+          getSerializer(schemaType, registry, SerdeType.VALUE, {
+            useLatestVersion: true,
+          }),
+        ).toBeDefined();
+      },
+    );
+
+    it("should throw for an unknown schema type", () => {
+      const registry = getMockedSchemaRegistry();
+      expect(() =>
+        getSerializer("XML" as unknown as "AVRO", registry, SerdeType.VALUE, {
+          useLatestVersion: true,
+        }),
+      ).toThrow(/Unknown schemaType: XML/);
+    });
+
+    it("should throw when the schema type is undefined", () => {
+      const registry = getMockedSchemaRegistry();
+      expect(() =>
+        getSerializer(undefined, registry, SerdeType.VALUE, {
+          useLatestVersion: true,
+        }),
+      ).toThrow(/Unknown schemaType/);
+    });
+  });
+
+  describe("getDeserializer()", () => {
+    it.each(["AVRO", "JSON", "PROTOBUF"] as const)(
+      "should return a deserializer for %s",
+      (schemaType) => {
+        const registry = getMockedSchemaRegistry();
+        expect(
+          getDeserializer(schemaType, registry, SerdeType.VALUE),
+        ).toBeDefined();
+      },
+    );
+
+    it("should throw for an unknown schema type", () => {
+      const registry = getMockedSchemaRegistry();
+      expect(() =>
+        getDeserializer("XML" as unknown as "AVRO", registry, SerdeType.VALUE),
+      ).toThrow(/Unknown schemaType: XML/);
+    });
+  });
+
+  describe("getLatestSchemaIfExists()", () => {
+    it("should return null when the subject is not found (404)", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.getLatestSchemaMetadata.mockRejectedValue({ status: 404 });
+      expect(await getLatestSchemaIfExists(registry, "missing")).toBeNull();
+    });
+
+    it("should rethrow non-404 errors", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.getLatestSchemaMetadata.mockRejectedValue({ status: 500 });
+      await expect(getLatestSchemaIfExists(registry, "boom")).rejects.toEqual({
+        status: 500,
+      });
+    });
+
+    it("should default the schema type to AVRO when none is reported", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.getLatestSchemaMetadata.mockResolvedValue({
+        id: 1,
+        version: 1,
+        subject: "orders-value",
+        schema: '{"type":"record","name":"X","fields":[]}',
+      });
+      expect(await getLatestSchemaIfExists(registry, "orders-value")).toEqual({
+        schema: '{"type":"record","name":"X","fields":[]}',
+        schemaType: "AVRO",
+      });
+    });
+  });
+
+  describe("getLatestSchemaOfTypeOrThrow()", () => {
+    it("should throw when no schema is registered for the subject", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.getLatestSchemaMetadata.mockRejectedValue({ status: 404 });
+      await expect(
+        getLatestSchemaOfTypeOrThrow(registry, "orders-value", "AVRO"),
+      ).rejects.toThrow(/No AVRO schema registered for subject 'orders-value'/);
+    });
+  });
+
+  describe("protobufRegistryFromSerialized()", () => {
+    it("should throw an actionable error when the stored schema cannot be decoded", () => {
+      expect(() =>
+        protobufRegistryFromSerialized("not-valid-base64$$"),
+      ).toThrow(/Failed to decode registered Protobuf schema/);
+    });
+  });
+
+  describe("serializeMessage() guards", () => {
+    it("should stringify a non-string payload when schema registry is disabled", async () => {
+      const registry = getMockedSchemaRegistry();
+      const result = await serializeMessage(
+        "orders",
+        { message: { x: 1 }, useSchemaRegistry: false },
+        SerdeType.VALUE,
+        registry,
+      );
+      expect(result).toBe('{"x":1}');
+    });
+
+    it("should throw when schemaType is missing and useSchemaRegistry is true", async () => {
+      const registry = getMockedSchemaRegistry();
+      await expect(
+        serializeMessage(
+          "orders",
+          { message: { x: 1 }, useSchemaRegistry: true },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(
+        /schemaType is required when useSchemaRegistry is true/,
+      );
+    });
+
+    it("should throw when the registry client is missing", async () => {
+      await expect(
+        serializeMessage(
+          "orders",
+          { message: { x: 1 }, useSchemaRegistry: true, schemaType: "AVRO" },
+          SerdeType.VALUE,
+          undefined,
+        ),
+      ).rejects.toThrow(/Schema Registry client is required/);
+    });
+
+    it("should wrap a registration failure with an actionable message", async () => {
+      const registry = getMockedSchemaRegistry();
+      registry.register.mockRejectedValue(new Error("conflict"));
+      await expect(
+        serializeMessage(
+          "orders",
+          {
+            message: { x: 1 },
+            useSchemaRegistry: true,
+            schemaType: "AVRO",
+            schema: '{"type":"record","name":"X","fields":[]}',
+          },
+          SerdeType.VALUE,
+          registry,
+        ),
+      ).rejects.toThrow(/Failed to register schema for subject 'orders-value'/);
+    });
+  });
+
+  describe("deserializeMessage() failure", () => {
+    it("should wrap deserialization errors", async () => {
+      const registry = getMockedSchemaRegistry();
+      await expect(
+        deserializeMessage(
+          "orders",
+          Buffer.from([0, 1, 2, 3]),
+          "AVRO",
+          registry,
+          SerdeType.VALUE,
+        ),
+      ).rejects.toThrow(/Failed to deserialize message/);
+    });
+  });
+
+  describe("serializeMessage()", () => {
+    let registry: ReturnType<typeof getMockedSchemaRegistry>;
+
+    beforeEach(() => {
+      registry = getMockedSchemaRegistry();
+    });
+
+    describe("without schema registry", () => {
+      it("should pass a string payload through unchanged", async () => {
+        const result = await serializeMessage(
+          "orders",
+          { message: "raw", useSchemaRegistry: false },
+          SerdeType.VALUE,
+          undefined,
+        );
+        expect(result).toBe("raw");
+      });
+
+      it.each([
+        { name: "number", message: 123, expected: "123" },
+        { name: "boolean", message: true, expected: "true" },
+        { name: "object", message: { x: 1 }, expected: '{"x":1}' },
+      ])(
+        "should JSON-encode a $name payload",
+        async ({ message, expected }) => {
+          const result = await serializeMessage(
+            "orders",
+            { message, useSchemaRegistry: false },
+            SerdeType.VALUE,
+            undefined,
+          );
+          expect(result).toBe(expected);
+        },
+      );
+    });
+
+    describe("with schema registry and a primitive top-level schema", () => {
+      it.each([
+        { name: "Avro long", message: 123, schema: '"long"' },
+        { name: "Avro boolean", message: true, schema: '"boolean"' },
+        { name: "Avro string", message: "hello", schema: '"string"' },
+      ])(
+        "should serialize a $name primitive and round-trip it back to the value",
+        async ({ message, schema }) => {
+          // No subject association registered → the serializer falls back to
+          // the {topic}-value naming strategy rather than throwing.
+          registry.getAssociationsByResourceName.mockResolvedValue([]);
+          // The latest-registered schema drives serialization; the same schema,
+          // resolved by id, drives the deserialize round-trip.
+          registry.getLatestSchemaMetadata.mockResolvedValue({
+            id: 1,
+            version: 1,
+            subject: "orders-value",
+            schema,
+            schemaType: "AVRO",
+          });
+          registry.getBySubjectAndId.mockResolvedValue({
+            schema,
+            schemaType: "AVRO",
+          });
+
+          const serialized = await serializeMessage(
+            "orders",
+            { message, useSchemaRegistry: true, schemaType: "AVRO" },
+            SerdeType.VALUE,
+            registry,
+          );
+
+          expect(Buffer.isBuffer(serialized)).toBe(true);
+          const roundTripped = await deserializeMessage(
+            "orders",
+            serialized as Buffer,
+            "AVRO",
+            registry,
+            SerdeType.VALUE,
+          );
+          expect(roundTripped).toBe(message);
+        },
+      );
+
+      it("should reject a null payload with a non-null-required message", async () => {
+        await expect(
+          serializeMessage(
+            "orders",
+            {
+              message: null as unknown as object,
+              useSchemaRegistry: true,
+              schemaType: "AVRO",
+            },
+            SerdeType.VALUE,
+            registry,
+          ),
+        ).rejects.toThrow(
+          "When using schema registry, a non-null message payload is required.",
+        );
+      });
+    });
+
+    describe("schemaIdLocation (header vs payload wire format)", () => {
+      // The header serializer encodes the schema GUID (MAGIC_BYTE_V1 + 16-byte
+      // UUID), not the int id, so the registry stub must surface a guid for the
+      // serialize step and resolve it back by guid for the deserialize step.
+      function stubRegistryForGuid(schema: string): void {
+        registry.getAssociationsByResourceName.mockResolvedValue([]);
+        registry.getLatestSchemaMetadata.mockResolvedValue({
+          id: 1,
+          guid: TEST_GUID,
+          version: 1,
+          subject: "orders-value",
+          schema,
+          schemaType: "AVRO",
+        });
+        registry.getByGuid.mockResolvedValue({ schema, schemaType: "AVRO" });
+      }
+
+      it("should write the schema GUID to the value header, leave the payload prefix-free, and round-trip via the header", async () => {
+        stubRegistryForGuid('"string"');
+        const recordHeaders: IHeaders = {};
+
+        const serialized = await serializeMessage(
+          "orders",
+          {
+            message: "hello",
+            useSchemaRegistry: true,
+            schemaType: "AVRO",
+            schemaIdLocation: "header",
+          },
+          SerdeType.VALUE,
+          registry,
+          recordHeaders,
+        );
+
+        const idHeader = recordHeaders[VALUE_SCHEMA_ID_HEADER];
+        expect(Buffer.isBuffer(idHeader)).toBe(true);
+        expect((idHeader as Buffer).length).toBe(17);
+        expect((idHeader as Buffer)[0]).toBe(MAGIC_BYTE_V1);
+        // Bare Avro string "hello": zigzag length 0x0a then the bytes — no
+        // leading magic byte 0 + 4-byte id that the prefix format prepends.
+        expect((serialized as Buffer)[0]).not.toBe(0);
+
+        const roundTripped = await deserializeMessage(
+          "orders",
+          serialized as Buffer,
+          "AVRO",
+          registry,
+          SerdeType.VALUE,
+          recordHeaders,
+        );
+        expect(roundTripped).toBe("hello");
+      });
+
+      it("should write the __key_schema_id header for SerdeType.KEY in header mode", async () => {
+        stubRegistryForGuid('"string"');
+        const recordHeaders: IHeaders = {};
+
+        await serializeMessage(
+          "orders",
+          {
+            message: "k1",
+            useSchemaRegistry: true,
+            schemaType: "AVRO",
+            schemaIdLocation: "header",
+          },
+          SerdeType.KEY,
+          registry,
+          recordHeaders,
+        );
+
+        expect(Buffer.isBuffer(recordHeaders[KEY_SCHEMA_ID_HEADER])).toBe(true);
+        expect(recordHeaders[VALUE_SCHEMA_ID_HEADER]).toBeUndefined();
+      });
+
+      it("should leave the headers accumulator untouched and prepend the magic-byte prefix in payload mode (default)", async () => {
+        stubRegistryForGuid('"string"');
+        const recordHeaders: IHeaders = {};
+
+        const serialized = await serializeMessage(
+          "orders",
+          {
+            message: "hello",
+            useSchemaRegistry: true,
+            schemaType: "AVRO",
+            schemaIdLocation: "payload",
+          },
+          SerdeType.VALUE,
+          registry,
+          recordHeaders,
+        );
+
+        expect(recordHeaders[VALUE_SCHEMA_ID_HEADER]).toBeUndefined();
+        expect((serialized as Buffer)[0]).toBe(0);
+      });
+
+      it("should throw an actionable error when header mode is selected without a record-header accumulator", async () => {
+        stubRegistryForGuid('"string"');
+
+        await expect(
+          serializeMessage(
+            "orders",
+            {
+              message: "hello",
+              useSchemaRegistry: true,
+              schemaType: "AVRO",
+              schemaIdLocation: "header",
+            },
+            SerdeType.VALUE,
+            registry,
+            undefined,
+          ),
+        ).rejects.toThrow(
+          /schemaIdLocation.*header.*record-header accumulator/i,
+        );
+      });
+
+      it("should throw a subject-scoped error when the registry returns no guid for header mode", async () => {
+        registry.getAssociationsByResourceName.mockResolvedValue([]);
+        registry.getLatestSchemaMetadata.mockResolvedValue({
+          id: 1,
+          version: 1,
+          subject: "orders-value",
+          schema: '"string"',
+          schemaType: "AVRO",
+        });
+
+        await expect(
+          serializeMessage(
+            "orders",
+            {
+              message: "hello",
+              useSchemaRegistry: true,
+              schemaType: "AVRO",
+              schemaIdLocation: "header",
+            },
+            SerdeType.VALUE,
+            registry,
+            {},
+          ),
+        ).rejects.toThrow(/orders-value.*guid/i);
+      });
+    });
+  });
+
+  describe("decodeSchemaGuidHeader()", () => {
+    it("should decode a MAGIC_BYTE_V1 GUID header back to its canonical UUID string", () => {
+      const headerBytes = new SchemaId(
+        "AVRO",
+        undefined,
+        TEST_GUID,
+      ).guidToBytes();
+
+      expect(decodeSchemaGuidHeader(headerBytes)).toBe(TEST_GUID);
+    });
+
+    it("should return null for a payload-format value (magic byte 0, not a GUID header)", () => {
+      // The payload wire format never rides in a header; a magic-byte-0 buffer
+      // is a payload prefix, not a GUID, and must not be mistaken for one.
+      const payloadPrefix = Buffer.from([0, 0, 0, 0, 1]);
+
+      expect(decodeSchemaGuidHeader(payloadPrefix)).toBeNull();
+    });
+
+    it("should return null for bytes that aren't a recognizable schema-id header", () => {
+      const garbage = Buffer.from([0xff, 0xfe, 0xfd]);
+
+      expect(decodeSchemaGuidHeader(garbage)).toBeNull();
+    });
   });
 });

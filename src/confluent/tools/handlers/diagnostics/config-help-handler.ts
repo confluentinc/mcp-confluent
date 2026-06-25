@@ -174,11 +174,22 @@ function wrap(connId: string, blockBody: string): string {
 }
 
 /**
- * Map a {@link ToolDisabledReason} to the config change that resolves it. Each
- * snippet mirrors the canonical shape in `config.example.yaml`. Reasons that
- * stem from an OAuth connection carry no YAML — OAuth connections hold no
- * service blocks, so the fix is a different connection type, surfaced as a
- * `note` instead.
+ * Map a {@link ToolDisabledReason} to the config change that resolves it. Most
+ * reasons are a missing direct-connection block or field, and each maps to a
+ * copy-pasteable YAML snippet mirroring the canonical shape in
+ * `config.example.yaml`. The reasons that aren't a block-shaped gap carry no
+ * YAML and surface as a `note` instead:
+ *   - OAuth reasons — OAuth connections hold no service blocks, so the fix is a
+ *     different connection type, not a block to add.
+ *   - {@link ToolDisabledReason.ReadOnlyConnection} — the connection already
+ *     reaches the service; it's the `read_only` overlay blocking a mutating
+ *     tool, so the fix is removing `read_only: true`, not adding a block.
+ *   - {@link ToolDisabledReason.NoConnectionsConfigured} and
+ *     {@link ToolDisabledReason.OperatorBlocked} — produced by
+ *     `buildToolGatingReport`, not by the per-connection verdict map this
+ *     handler walks, so they cannot reach here in practice. They get a `note`
+ *     anyway to keep the switch exhaustive and to stay useful if a future
+ *     caller does route them through.
  *
  * Exhaustive over `ToolDisabledReason`: every arm returns, and the `default`
  * arm pins `reason` to `never`, so a new reason added to the enum fails
@@ -316,6 +327,18 @@ function adviceForReason(
       return {
         note: `Connection "${connId}" is an OAuth connection. This tool requires a direct (api_key) connection and cannot run against OAuth — switch to a direct connection carrying the required block.`,
       };
+    case ToolDisabledReason.ReadOnlyConnection:
+      return {
+        note: `Connection "${connId}" reaches the service this tool needs, but it is marked read_only, which disables tools that mutate state. Remove "read_only: true" from this connection (or set it to false) to enable it.`,
+      };
+    case ToolDisabledReason.NoConnectionsConfigured:
+      return {
+        note: `No connections are configured, so there is nothing to enable this tool against. Add a connection to your config first.`,
+      };
+    case ToolDisabledReason.OperatorBlocked:
+      return {
+        note: `This tool is excluded by the operator's allow/block-list, which is set at server launch rather than in connection config. Ask whoever runs the MCP server to adjust the tool allow/block-list.`,
+      };
     default: {
       const exhaustive: never = reason;
       throw new Error(`Unmapped ToolDisabledReason: ${String(exhaustive)}`);
@@ -329,22 +352,26 @@ function adviceForReason(
  * already-enabled and per-connection headers so the format stays stable.
  */
 function renderAdvice(payload: ConfigHelpPayload): string {
-  const { tool, alreadyEnabled, connections } = payload;
+  const { tool, connections } = payload;
   const entries = Object.entries(connections);
 
   if (entries.length === 0) {
     return `No connections are configured, so there is nothing to enable "${tool}" against. Add a connection to your config first.`;
   }
 
-  if (alreadyEnabled) {
-    const enabledIds = entries
-      .filter(([, advice]) => advice.enabled)
-      .map(([id]) => id)
-      .sort((a, b) => a.localeCompare(b));
+  const enabledIds = entries
+    .filter(([, advice]) => advice.enabled)
+    .map(([id]) => id)
+    .sort((a, b) => a.localeCompare(b));
+  const disabledEntries = entries.filter(([, advice]) => !advice.enabled);
+
+  // Fully enabled: every connection already runs the tool, so there's
+  // genuinely nothing to change.
+  if (disabledEntries.length === 0) {
     return `Tool "${tool}" is already enabled on connection(s): ${enabledIds.join(", ")}. No config change needed.`;
   }
 
-  const blocks = entries.map(([connId, advice]) => {
+  const blocks = disabledEntries.map(([connId, advice]) => {
     const header = `  connection "${connId}" — ${advice.currentState ?? "disabled"}`;
     if (advice.suggestedYaml !== undefined) {
       // Indent the YAML two spaces so it reads as a nested block under the
@@ -358,6 +385,18 @@ function renderAdvice(payload: ConfigHelpPayload): string {
     return `${header}\n  ${advice.note ?? ""}`;
   });
 
+  // Partially enabled: enabled on some connections but still missing config on
+  // others. Don't claim "no config change needed" — name the enabled ones, then
+  // give the YAML for the connections that still need it.
+  if (enabledIds.length > 0) {
+    return [
+      `Tool "${tool}" is already enabled on connection(s): ${enabledIds.join(", ")}, but still disabled on ${disabledEntries.length} other connection(s). To enable it there too:`,
+      "",
+      blocks.join("\n\n"),
+    ].join("\n");
+  }
+
+  // Disabled everywhere.
   return [
     `Tool "${tool}" is disabled on all ${entries.length} configured connection(s). To enable it:`,
     "",

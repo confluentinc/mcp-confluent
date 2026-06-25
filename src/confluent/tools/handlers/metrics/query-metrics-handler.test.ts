@@ -11,6 +11,7 @@ import {
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   runtimeWith,
+  runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,
@@ -262,7 +263,7 @@ describe("query-metrics-handler.ts", () => {
 
           await assertHandleCase({
             handler,
-            runtime: runtimeWith(
+            runtime: runtimeWithDecoy(
               connectionConfig,
               DEFAULT_CONNECTION_ID,
               clientManager,
@@ -303,7 +304,7 @@ describe("query-metrics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -326,7 +327,7 @@ describe("query-metrics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,
@@ -348,7 +349,7 @@ describe("query-metrics-handler.ts", () => {
 
         await assertHandleCase({
           handler,
-          runtime: runtimeWith(
+          runtime: runtimeWithDecoy(
             TELEMETRY_CONN,
             DEFAULT_CONNECTION_ID,
             clientManager,

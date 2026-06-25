@@ -10,7 +10,7 @@ export enum ToolName {
   GET_CONSUMER_GROUP_LAG = "get-consumer-group-lag",
   LIST_FLINK_STATEMENTS = "list-flink-statements",
   CREATE_FLINK_STATEMENT = "create-flink-statement",
-  READ_FLINK_STATEMENT = "read-flink-statement",
+  GET_FLINK_STATEMENT_RESULTS = "get-flink-statement-results",
   DELETE_FLINK_STATEMENTS = "delete-flink-statements",
   GET_FLINK_STATEMENT_EXCEPTIONS = "get-flink-statement-exceptions",
   LIST_FLINK_CATALOGS = "list-flink-catalogs",
@@ -47,6 +47,7 @@ export enum ToolName {
   LIST_ENVIRONMENTS = "list-environments",
   READ_ENVIRONMENT = "read-environment",
   LIST_SCHEMAS = "list-schemas",
+  CREATE_SCHEMA = "create-schema",
   DELETE_SCHEMA = "delete-schema",
   GET_TOPIC_CONFIG = "get-topic-config",
   CREATE_TABLEFLOW_TOPIC = "create-tableflow-topic",
@@ -69,4 +70,5 @@ export enum ToolName {
   EXPLAIN_DISABLED_TOOLS = "explain-disabled-tools",
   LIST_CONFIGURED_CONNECTIONS = "list-configured-connections",
   CONFIG_HELP = "config-help",
+  DESCRIBE_CONFIGURED_CONNECTION = "describe-configured-connection",
 }

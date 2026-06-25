@@ -16,7 +16,13 @@ import {
 import { fileURLToPath } from "node:url";
 import type { Mocked } from "vitest";
 
-/** Connection ID used by the named runtime factories and their default single-connection runtimes. */
+/**
+ * Connection id used by the named runtime factories and their default
+ * single-connection runtimes. An arbitrary fixture id — distinct from the
+ * production env-var synthesis constant of the same name (`"_default"`,
+ * exported from `@src/config/env-config.js`); the differing values are
+ * intentional.
+ */
 export const DEFAULT_CONNECTION_ID = "default";
 
 const CCLOUD_OAUTH_FIXTURE = fileURLToPath(
@@ -85,9 +91,9 @@ export function runtimeWith(
  * tools, with its own auto-minted client manager that correct routing must
  * never touch.
  *
- * The decoy is inserted FIRST, so a handler resolving via the legacy
- * sole-connection accessor (which grabs `enabledConnectionIds[0]`) routes to
- * the decoy and trips the test. {@link assertHandleCase} recognizes the decoy
+ * The decoy is inserted FIRST, so a handler that resolves by grabbing
+ * `enabledConnectionIds[0]` instead of routing by the caller's `connectionId`
+ * lands on the decoy and trips the test. {@link assertHandleCase} recognizes the decoy
  * (by {@link DECOY_CONNECTION_ID}) and, for any handle() test built on this
  * runtime, auto-routes to the real connection and asserts the decoy stayed
  * untouched — so swapping a suite's `runtimeWith` for this turns every existing
@@ -142,6 +148,20 @@ export function kafkaRuntime(
 export const CCLOUD_CONN = {
   confluent_cloud: {
     endpoint: "https://api.confluent.cloud",
+    auth: { type: "api_key" as const, key: "k", secret: "s" },
+  },
+};
+
+/**
+ * Catalog/search connection fixture. `hasCCloudCatalogSupport` enables a
+ * connection only when it carries a `confluent_cloud` block and a
+ * `schema_registry` block with api_key auth — so a bare schema-registry
+ * connection is not a valid route for these tools.
+ */
+export const CATALOG_CONN = {
+  ...CCLOUD_CONN,
+  schema_registry: {
+    endpoint: "https://sr.example.com",
     auth: { type: "api_key" as const, key: "k", secret: "s" },
   },
 };
@@ -279,6 +299,30 @@ export function ccloudOAuthRuntime(holder?: OAuthHolder): ServerRuntime {
   return new ServerRuntime(
     config,
     { [DEFAULT_CONNECTION_ID]: createMockInstance(OAuthClientManager) },
+    holder,
+  );
+}
+
+/**
+ * Mixed runtime: a `local` direct connection (kafka block) alongside a
+ * `ccloud-oauth` OAuth connection, with a stub `OAuthClientManager` and a
+ * caller-supplied {@link OAuthHolder}. The shape the OAuth-login gate tests
+ * use to prove a local-routed call doesn't trigger the browser bounce while an
+ * OAuth-routed one does.
+ */
+export function localPlusOAuthRuntime(holder?: OAuthHolder): ServerRuntime {
+  const config = new MCPServerConfiguration({
+    connections: {
+      local: { type: "direct", kafka: { bootstrap_servers: "localhost:9092" } },
+      "ccloud-oauth": { type: "oauth", ccloud_env: "devel" },
+    },
+  });
+  return new ServerRuntime(
+    config,
+    {
+      local: createMockInstance(DirectClientManager),
+      "ccloud-oauth": createMockInstance(OAuthClientManager),
+    },
     holder,
   );
 }

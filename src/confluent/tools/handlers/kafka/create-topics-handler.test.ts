@@ -8,7 +8,7 @@ import {
   assertHandleCase,
   getMockedClientManager,
 } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 describe("create-topics-handler.ts", () => {
   describe("CreateTopicsHandler", () => {
@@ -30,6 +30,56 @@ describe("create-topics-handler.ts", () => {
           args: { topics: [{ topic: "smoke", numPartitions: 1 }] },
           outcome: { resolves: "Created Kafka topics: smoke" },
           clientManager,
+        });
+      });
+
+      it("should forward replicationFactor to admin.createTopics when provided", async () => {
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.createTopics.mockResolvedValue(true);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            topics: [
+              { topic: "smoke", numPartitions: 1, replicationFactor: 3 },
+            ],
+          },
+          outcome: { resolves: "Created Kafka topics: smoke" },
+          clientManager,
+        });
+
+        expect(admin.createTopics).toHaveBeenCalledWith({
+          timeout: 30_000,
+          topics: [{ topic: "smoke", numPartitions: 1, replicationFactor: 3 }],
+        });
+      });
+
+      it("should omit replicationFactor when not provided so the broker default applies", async () => {
+        const clientManager = getMockedClientManager();
+        const admin = await clientManager.getAdminClient();
+        admin.createTopics.mockResolvedValue(true);
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            { kafka: { bootstrap_servers: "broker:9092" } },
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { topics: [{ topic: "smoke", numPartitions: 1 }] },
+          outcome: { resolves: "Created Kafka topics: smoke" },
+          clientManager,
+        });
+
+        expect(admin.createTopics).toHaveBeenCalledWith({
+          timeout: 30_000,
+          topics: [{ topic: "smoke", numPartitions: 1 }],
         });
       });
 

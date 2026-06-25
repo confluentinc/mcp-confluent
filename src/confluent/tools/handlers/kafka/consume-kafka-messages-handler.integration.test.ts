@@ -29,7 +29,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -355,6 +358,62 @@ describe(
             });
           }
         });
+
+        it("should preserve a repeated-key header through the broker as a string array, not a comma-joined scalar", async () => {
+          // The bug behind #597: a record carrying the same header key twice
+          // (`trace: ["x", "y"]`) used to come back comma-joined as the
+          // scalar `"x,y"`, losing multiplicity. Seed such a record, consume
+          // it through the tool, and assert the array survives in the echoed
+          // JSON — the round-trip the produce suite's raw-consumer read-back
+          // can't prove, because only this tool does the header echoing.
+          const headerTopic = uniqueName("consume-mvh");
+          const markerValue = `mvh-${transport}`;
+          await admin.createTopics({
+            topics: [{ topic: headerTopic, numPartitions: 1 }],
+          });
+          try {
+            await producer.send({
+              topic: headerTopic,
+              messages: [
+                {
+                  value: markerValue,
+                  headers: { trace: ["x", "y"], source: "clusterA" },
+                },
+              ],
+            });
+
+            const result = await server.client.callTool({
+              name: ToolName.CONSUME_MESSAGES,
+              arguments: {
+                topics: [{ name: headerTopic }],
+                maxMessages: 1,
+                timeoutMs: 15_000,
+                valueFormat: { disableSchemaRegistry: true },
+              },
+            });
+
+            const text = textContent(result);
+            // Guard against the regression directly: the lossy form would
+            // surface the joined scalar in the echoed JSON.
+            expect(text).not.toContain('"trace": "x,y"');
+
+            const consumed = JSON.parse(text.slice(text.indexOf("["))) as {
+              value: string;
+              headers?: Record<string, unknown>;
+            }[];
+            const record = consumed.find((m) => m.value === markerValue);
+            expect(record, text).toBeDefined();
+            expect(record!.headers).toEqual({
+              trace: ["x", "y"],
+              source: "clusterA",
+            });
+          } finally {
+            await admin.deleteTopics({ topics: [headerTopic] }).catch(() => {
+              // teardown-only; a cleanup failure shouldn't fail an
+              // already-asserted test
+            });
+          }
+        });
       });
     });
 
@@ -426,38 +485,41 @@ describe(
           });
         });
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should consume the seeded messages from the topic", async () => {
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.CONSUME_MESSAGES,
-              arguments: {
-                topics: [{ name: topic, start: "earliest" }],
-                maxMessages: seededValues.length,
-                timeoutMs: 15_000,
-                valueFormat: { disableSchemaRegistry: true },
-                cluster_id: clusterId,
-                environment_id: environmentId,
-              },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            const text = textContent(result);
-            expect(text).toMatch(/^Consumed \d+ messages/);
-            for (const value of seededValues) {
-              expect(text).toContain(value);
-            }
-          });
-        });
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should consume the seeded messages from the topic", async () => {
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.CONSUME_MESSAGES,
+                arguments: {
+                  topics: [{ name: topic, start: "earliest" }],
+                  maxMessages: seededValues.length,
+                  timeoutMs: 15_000,
+                  valueFormat: { disableSchemaRegistry: true },
+                  cluster_id: clusterId,
+                  environment_id: environmentId,
+                },
+              });
+
+              const text = textContent(result);
+              expect(text).toMatch(/^Consumed \d+ messages/);
+              for (const value of seededValues) {
+                expect(text).toContain(value);
+              }
+            });
+          },
+        );
       },
     );
   },

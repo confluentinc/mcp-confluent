@@ -1,5 +1,5 @@
 import { newTestCloudClient } from "@tests/harness/confluent-cloud.js";
-import { integrationRuntime } from "@tests/harness/runtime.js";
+import { integrationDirectConnection } from "@tests/harness/runtime.js";
 import { afterAll } from "vitest";
 
 interface ConnectScope {
@@ -10,7 +10,7 @@ interface ConnectScope {
 }
 
 function getConnectScope(): ConnectScope {
-  const conn = integrationRuntime().config.getSoleDirectConnection();
+  const conn = integrationDirectConnection();
   if (!conn.kafka?.env_id || !conn.kafka.cluster_id || !conn.kafka.auth) {
     throw new Error(
       "test-side connect helpers require kafka.env_id + kafka.cluster_id + kafka.auth in test-fixtures/yaml_configs/integration.yaml",

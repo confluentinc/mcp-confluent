@@ -31,8 +31,11 @@ export class CreateTopicTagsHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { tags } = createTagsArguments.parse(toolArguments);
+    const { clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudSchemaRegistryRestClient(),

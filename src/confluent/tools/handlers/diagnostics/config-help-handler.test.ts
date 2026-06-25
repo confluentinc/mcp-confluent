@@ -1,6 +1,10 @@
 import { DirectConnectionConfig } from "@src/config/models.js";
 import { CallToolResult } from "@src/confluent/schema.js";
-import { READ_ONLY, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import {
+  CREATE_UPDATE,
+  READ_ONLY,
+  ToolHandler,
+} from "@src/confluent/tools/base-tools.js";
 import {
   alwaysEnabled,
   ConnectionPredicate,
@@ -328,6 +332,80 @@ describe("ConfigHelpHandler", () => {
         }
       ).connections.default!;
       expect(advice.suggestedYaml).toContain("connections:\n  default:\n");
+    });
+
+    it("should emit a note (and not throw) when a mutating tool is blocked by a read_only connection", () => {
+      // The connection reaches the tableflow service, so the predicate passes;
+      // it's the read_only overlay that disables a mutating tool. The advice is
+      // a note to drop read_only, not a block-shaped YAML suggestion.
+      const runtime = runtimeWithConnections({
+        default: {
+          tableflow: { auth: { type: "api_key", key: "k", secret: "s" } },
+          read_only: true,
+        },
+      });
+
+      const result = handlerWith([
+        [
+          ToolName.CREATE_TABLEFLOW_TOPIC,
+          new StubHandler({
+            predicate: hasTableflow,
+            annotations: CREATE_UPDATE,
+          }),
+        ],
+      ]).handle(runtime, { tool: ToolName.CREATE_TABLEFLOW_TOPIC });
+
+      const advice = (
+        result.structuredContent as {
+          connections: Record<
+            string,
+            { enabled: boolean; note?: string; suggestedYaml?: string }
+          >;
+        }
+      ).connections.default!;
+      expect(advice.enabled).toBe(false);
+      expect(advice).not.toHaveProperty("suggestedYaml");
+      expect(advice.note).toContain("read_only");
+      expect(result.isError).toBe(false);
+      expect(textOf(result)).toContain("read_only");
+    });
+
+    it("should still suggest YAML for disabled connections when the tool is enabled on others", () => {
+      // Partially-enabled: enabled on one connection, missing config on another.
+      // The message must not claim "No config change needed" and must carry the
+      // gap connection's YAML.
+      const enabledTableflow = {
+        tableflow: {
+          auth: { type: "api_key" as const, key: "k", secret: "s" },
+        },
+      };
+      const runtime = runtimeWithConnections({
+        enabledConn: enabledTableflow,
+        gapConn: {},
+      });
+
+      const result = handlerWith(universe()).handle(runtime, {
+        tool: ToolName.LIST_TABLEFLOW_TOPICS,
+      });
+
+      const text = textOf(result);
+      expect(text).toContain("already enabled on connection(s): enabledConn");
+      expect(text).not.toContain("No config change needed");
+      expect(text).toContain('connection "gapConn"');
+      expect(text).toContain("tableflow:");
+
+      const structured = result.structuredContent as {
+        alreadyEnabled: boolean;
+        connections: Record<
+          string,
+          { enabled: boolean; suggestedYaml?: string }
+        >;
+      };
+      expect(structured.alreadyEnabled).toBe(true);
+      expect(structured.connections.enabledConn!.enabled).toBe(true);
+      expect(structured.connections.gapConn!.suggestedYaml).toContain(
+        "tableflow:",
+      );
     });
 
     it("should explain when no connections are configured", () => {

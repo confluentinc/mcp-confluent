@@ -7,12 +7,17 @@ import {
   MCPServerConfiguration,
 } from "@src/config/models.js";
 import type { Environment } from "@src/env.js";
-import { logger } from "@src/logger.js";
 import { type KeyValuePairObject } from "properties-file";
 
 /**
- * Connection name synthesized by the env-var path. Chosen as `"_default"` so
- * the YAML loader can reuse the same name as the zero-config fallback.
+ * Connection id synthesized by the env-var path. The leading underscore marks
+ * it as machine-synthesized rather than user-chosen; it is the canonical
+ * zero-config id the YAML loader must adopt when the env-var path is retired.
+ *
+ * Distinct from the test factories' {@link DEFAULT_CONNECTION_ID} (`"default"`,
+ * exported from `tests/factories/runtime.ts`): same constant name, different
+ * value, different world. This one is the production env-var synthesis; that
+ * one is an arbitrary fixture id. The values differ on purpose — do not unify.
  *
  * Fallback contract: with no CLI args and no env vars, this module produces
  * `connections: { _default: { type: "direct" } }` alongside the
@@ -20,10 +25,10 @@ import { type KeyValuePairObject } from "properties-file";
  * blocks, so only connection-agnostic tools are enabled. When the env-var
  * path is retired, the YAML loader must preserve this connection shape.
  */
-export const DEFAULT_CONNECTION_NAME = "_default";
+export const DEFAULT_CONNECTION_ID = "_default";
 
 /** The manufactured document path prefix for the single connection configured from env vars. */
-const CONN = `connections.${DEFAULT_CONNECTION_NAME}`;
+const CONN = `connections.${DEFAULT_CONNECTION_ID}`;
 
 /**
  * Maps each environment variable in type Environment (and handled by buildConfigFromEnvAndCli)
@@ -56,10 +61,7 @@ const ENV_VAR_TO_ZPATH = {
   FLINK_ENV_ID: `${CONN}.flink.environment_id`,
   FLINK_ORG_ID: `${CONN}.flink.organization_id`,
   FLINK_COMPUTE_POOL_ID: `${CONN}.flink.compute_pool_id`,
-  // FLINK_CATALOG_NAME comes before FLINK_ENV_NAME so error-message humanization
-  // (which iterates this map in insertion order) surfaces the preferred name.
   FLINK_CATALOG_NAME: `${CONN}.flink.catalog_name`,
-  FLINK_ENV_NAME: `${CONN}.flink.catalog_name`,
   FLINK_DATABASE_NAME: `${CONN}.flink.database_name`,
   // Telemetry parameters
   TELEMETRY_ENDPOINT: `${CONN}.telemetry.endpoint`,
@@ -104,7 +106,7 @@ function buildConfigFromEnv(
   if (oauth) {
     const rawDocument: Record<string, unknown> = {
       connections: {
-        [DEFAULT_CONNECTION_NAME]: {
+        [DEFAULT_CONNECTION_ID]: {
           type: "oauth",
           ...(oauth.ccloudEnv && {
             ccloud_env: oauth.ccloudEnv,
@@ -160,7 +162,7 @@ function buildConfigFromEnv(
   // authOverrides are folded in here so Zod validates the final combined state,
   // including the disabled+api_key mutual exclusion refine.
   const rawDocument: Record<string, unknown> = {
-    connections: { [DEFAULT_CONNECTION_NAME]: connection },
+    connections: { [DEFAULT_CONNECTION_ID]: connection },
     ...buildServerBlock(env, authOverrides),
   };
 
@@ -421,11 +423,9 @@ function buildFlinkBlock(env: Environment): {
     !env.FLINK_ORG_ID &&
     !env.FLINK_COMPUTE_POOL_ID &&
     !env.FLINK_CATALOG_NAME &&
-    !env.FLINK_ENV_NAME &&
     !env.FLINK_DATABASE_NAME
   )
     return null;
-  const catalogName = resolveFlinkCatalogName(env);
   return {
     flink: {
       ...(env.FLINK_REST_ENDPOINT && { endpoint: env.FLINK_REST_ENDPOINT }),
@@ -435,37 +435,14 @@ function buildFlinkBlock(env: Environment): {
       ...(env.FLINK_COMPUTE_POOL_ID && {
         compute_pool_id: env.FLINK_COMPUTE_POOL_ID,
       }),
-      ...(catalogName && { catalog_name: catalogName }),
+      ...(env.FLINK_CATALOG_NAME && {
+        catalog_name: env.FLINK_CATALOG_NAME,
+      }),
       ...(env.FLINK_DATABASE_NAME && {
         database_name: env.FLINK_DATABASE_NAME,
       }),
     },
   };
-}
-
-/**
- * Resolves the Flink catalog name from env vars, accepting either the preferred
- * `FLINK_CATALOG_NAME` or the deprecated `FLINK_ENV_NAME`. Throws when both are
- * set (unambiguous conflict — user must remove the legacy one). Emits a single
- * `logger.warn` when only the legacy var is set so the deprecation lands in
- * server logs at startup.
- *
- * TODO: Remove FLINK_ENV_NAME support in v1.4.0. See issue #209.
- */
-function resolveFlinkCatalogName(env: Environment): string | undefined {
-  if (env.FLINK_CATALOG_NAME && env.FLINK_ENV_NAME) {
-    throw new Error(
-      "Both FLINK_CATALOG_NAME and the deprecated FLINK_ENV_NAME are set; remove FLINK_ENV_NAME.",
-    );
-  }
-  if (env.FLINK_CATALOG_NAME) return env.FLINK_CATALOG_NAME;
-  if (env.FLINK_ENV_NAME) {
-    logger.warn(
-      "FLINK_ENV_NAME is deprecated and will be removed in v1.4.0; rename to FLINK_CATALOG_NAME.",
-    );
-    return env.FLINK_ENV_NAME;
-  }
-  return undefined;
 }
 
 /**

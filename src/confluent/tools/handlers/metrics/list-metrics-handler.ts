@@ -145,8 +145,11 @@ export class ListMetricsHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const clientManager = runtime.clientManager;
     const { resource_type } = listMetricsArguments.parse(toolArguments);
+    const { clientManager } = this.resolveDirectConnection(
+      runtime,
+      toolArguments,
+    );
 
     try {
       const telemetryClient =

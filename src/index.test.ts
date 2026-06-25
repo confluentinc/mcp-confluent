@@ -17,12 +17,17 @@ import {
   outputApiKey,
   outputInitConfig,
   outputToolList,
+  performCleanup,
   resolveAllowedToolNames,
   resolveTelemetryWriteKey,
 } from "@src/index.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
-import { ccloudOAuthRuntime, runtimeWith } from "@tests/factories/runtime.js";
+import {
+  ccloudOAuthRuntime,
+  runtimeWith,
+  runtimeWithConnections,
+} from "@tests/factories/runtime.js";
 import { StubHandler } from "@tests/stubs/index.js";
 import {
   createFsWrappers,
@@ -213,7 +218,7 @@ describe("index.ts", () => {
       expect(() =>
         getToolHandlersToRegister(runtimeAllowing(ToolName.LIST_TOPICS)),
       ).toThrow(
-        "Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
+        "Wacky -- Tool list-topics: enabledConnectionIds() returned unknown connection ID(s): nonexistent-connection",
       );
     });
 
@@ -234,6 +239,17 @@ describe("index.ts", () => {
 
       expect(result.has(ToolName.LIST_TOPICS)).toBe(true);
       expect(result.has(ToolName.CREATE_TOPICS)).toBe(false);
+    });
+
+    it("should register the connection-independent tools on a zero-connection config", () => {
+      const result = getToolHandlersToRegister(runtimeWithConnections({}));
+
+      expect(result.has(ToolName.SEARCH_PRODUCT_DOCS)).toBe(true);
+      expect(result.has(ToolName.GET_PRODUCT_DOC_PAGE)).toBe(true);
+      expect(result.has(ToolName.LIST_CONFIGURED_CONNECTIONS)).toBe(true);
+      expect(result.has(ToolName.EXPLAIN_DISABLED_TOOLS)).toBe(true);
+      // A connection-dependent tool has no connection to enable it.
+      expect(result.has(ToolName.LIST_TOPICS)).toBe(false);
     });
 
     it("should emit one grouped warn per (connectionId, reason) for fully-disabled tools", () => {
@@ -296,16 +312,34 @@ describe("index.ts", () => {
         ToolName.EXPLAIN_DISABLED_TOOLS,
         ToolName.LIST_CONFIGURED_CONNECTIONS,
         ToolName.CONFIG_HELP,
+        ToolName.DESCRIBE_CONFIGURED_CONNECTION,
         // Schema Registry (hasSchemaRegistryOrOAuth)
         ToolName.LIST_SCHEMAS,
+        ToolName.CREATE_SCHEMA,
         ToolName.DELETE_SCHEMA,
+        // Connect (hasConfluentCloudOrOAuth — ride the cloud REST client).
+        // create-connector is excluded: it embeds a Kafka API key/secret in the
+        // connector spec, which an OAuth connection cannot supply.
+        ToolName.LIST_CONNECTORS,
+        ToolName.GET_CONNECTOR_CONFIG,
+        ToolName.GET_CONNECTOR_OFFSETS,
+        ToolName.GET_CONNECTOR_STATUS,
+        ToolName.GET_CONNECTOR_TASKS,
+        ToolName.DELETE_CONNECTOR,
+        ToolName.GET_CONNECTOR_ERROR_SUMMARY,
+        ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
+        ToolName.GET_CONNECTOR_LOGS,
+        ToolName.PAUSE_CONNECTOR,
+        ToolName.RESUME_CONNECTOR,
+        ToolName.RESTART_CONNECTOR,
+        ToolName.UPDATE_CONNECTOR_CONFIG,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
         // Flink (hasFlink — needs the flink service block)
         ToolName.LIST_FLINK_STATEMENTS,
         ToolName.CREATE_FLINK_STATEMENT,
-        ToolName.READ_FLINK_STATEMENT,
+        ToolName.GET_FLINK_STATEMENT_RESULTS,
         ToolName.DELETE_FLINK_STATEMENTS,
         ToolName.GET_FLINK_STATEMENT_EXCEPTIONS,
         ToolName.LIST_FLINK_CATALOGS,
@@ -316,21 +350,9 @@ describe("index.ts", () => {
         ToolName.CHECK_FLINK_STATEMENT_HEALTH,
         ToolName.DETECT_FLINK_STATEMENT_ISSUES,
         ToolName.GET_FLINK_STATEMENT_PROFILE,
-        // Connect (hasKafkaRestWithAuth / hasKafkaAuth — needs the kafka block)
-        ToolName.LIST_CONNECTORS,
-        ToolName.GET_CONNECTOR_CONFIG,
-        ToolName.GET_CONNECTOR_OFFSETS,
-        ToolName.GET_CONNECTOR_STATUS,
-        ToolName.GET_CONNECTOR_TASKS,
+        // Connect — only create-connector stays disabled (canCreateDirectConnector
+        // is direct-only: it embeds a Kafka API key/secret in the connector spec).
         ToolName.CREATE_CONNECTOR,
-        ToolName.DELETE_CONNECTOR,
-        ToolName.GET_CONNECTOR_ERROR_SUMMARY,
-        ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
-        ToolName.GET_CONNECTOR_LOGS,
-        ToolName.PAUSE_CONNECTOR,
-        ToolName.RESUME_CONNECTOR,
-        ToolName.RESTART_CONNECTOR,
-        ToolName.UPDATE_CONNECTOR_CONFIG,
         // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)
         ToolName.SEARCH_TOPICS_BY_TAG,
         ToolName.SEARCH_TOPICS_BY_NAME,
@@ -818,6 +840,43 @@ describe("index.ts", () => {
       // "no key supplied" so the caller routes through TelemetryService's
       // falsy-writeKey disabled path rather than passing "" to Segment.
       expect(result).toBeFalsy();
+    });
+  });
+
+  describe("performCleanup()", () => {
+    function cleanupDeps() {
+      return {
+        telemetry: { shutdown: vi.fn().mockResolvedValue(undefined) },
+        transportManager: { stop: vi.fn().mockResolvedValue(undefined) },
+        runtime: { oauthHolder: undefined, disconnectAll: vi.fn() },
+      };
+    }
+
+    it("should run every shutdown step then exit 0", async () => {
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockResolvedValue(undefined);
+      const exit = vi.fn();
+
+      await performCleanup(deps, exit);
+
+      expect(deps.telemetry.shutdown).toHaveBeenCalledOnce();
+      expect(deps.transportManager.stop).toHaveBeenCalledOnce();
+      expect(deps.runtime.disconnectAll).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(0);
+    });
+
+    it("should still exit 0 when a shutdown step rejects", async () => {
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockRejectedValue(
+        new Error("disconnect boom"),
+      );
+      const exit = vi.fn();
+
+      await performCleanup(deps, exit);
+
+      expect(exit).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(0);
     });
   });
 });

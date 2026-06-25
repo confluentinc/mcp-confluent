@@ -1,9 +1,10 @@
 import { loadConfigFromYaml } from "@src/config/index.js";
 import { combinedSchema } from "@src/env-schema.js";
-import { readFileSync } from "node:fs";
+import { directConnectionOf } from "@tests/factories/config.js";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 const FIXTURES_DIR = fileURLToPath(
   new URL("../../test-fixtures/yaml_configs", import.meta.url),
@@ -22,8 +23,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-only.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
-      expect(conn.type).toBe("direct");
+      const conn = directConnectionOf(config);
       expect(conn.description).toBe("Local dev broker");
       expect(conn.kafka?.bootstrap_servers).toBe("localhost:9092");
       expect(conn.kafka?.auth).toBeUndefined();
@@ -35,8 +35,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/sr-only.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
-      expect(conn.type).toBe("direct");
+      const conn = directConnectionOf(config);
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
       expect(conn.schema_registry?.auth).toBeUndefined();
       expect(conn.kafka).toBeUndefined();
@@ -47,7 +46,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-and-sr.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.kafka?.bootstrap_servers).toBe("localhost:9092");
       expect(conn.kafka?.auth).toBeUndefined();
       expect(conn.schema_registry?.endpoint).toBe("http://localhost:8081");
@@ -59,7 +58,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.kafka?.auth).toEqual({
         type: "api_key",
         key: "mykafkakey",
@@ -73,7 +72,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/sr-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.schema_registry?.auth).toEqual({
         type: "api_key",
         key: "mysrkey",
@@ -87,7 +86,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-and-sr-both-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.kafka?.auth).toEqual({
         type: "api_key",
         key: "mykafkakey",
@@ -105,7 +104,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-with-interpolated-auth.yaml"),
         { KAFKA_API_KEY: "envkey", KAFKA_API_SECRET: "envsecret" },
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.kafka?.auth).toEqual({
         type: "api_key",
         key: "envkey",
@@ -120,7 +119,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/ccloud-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.confluent_cloud?.auth).toEqual({
         type: "api_key",
         key: "mycloudkey",
@@ -139,7 +138,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/ccloud-with-endpoint-and-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.confluent_cloud?.endpoint).toBe(
         "https://custom.confluent.cloud",
       );
@@ -155,7 +154,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/tableflow-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.tableflow?.auth).toEqual({
         type: "api_key",
         key: "mytableflowkey",
@@ -171,7 +170,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/ccloud-and-tableflow-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.confluent_cloud?.endpoint).toBe(
         "https://api.confluent.cloud",
       );
@@ -194,7 +193,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/ccloud-oauth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleConnection();
+      const conn = config.getConnectionConfig("default");
       expect(conn.type).toBe("oauth");
       // Narrow off the discriminant before reading ccloud_env so the assertion
       // also serves as a compile-time check on the OAuth arm of ConnectionConfig.
@@ -211,7 +210,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-with-extra-properties.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.kafka?.bootstrap_servers).toBe("broker.confluent.cloud:9092");
       expect(conn.kafka?.extra_properties).toEqual({
         "socket.timeout.ms": "30000",
@@ -227,7 +226,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/kafka-with-rest-metadata.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.kafka?.bootstrap_servers).toBe("broker.confluent.cloud:9092");
       expect(conn.kafka?.rest_endpoint).toBe(
         "https://pkc-abc123.us-east-1.aws.confluent.cloud:443",
@@ -243,7 +242,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/flink-with-required-fields.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.flink?.auth).toEqual({
         type: "api_key",
         key: "myflinkkey",
@@ -268,7 +267,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/flink-with-all-fields.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.flink?.endpoint).toBe("https://flink.confluent.cloud");
       expect(conn.flink?.auth).toEqual({
         type: "api_key",
@@ -287,7 +286,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/ccloud-and-flink-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.confluent_cloud?.auth).toEqual({
         type: "api_key",
         key: "mycloudkey",
@@ -308,7 +307,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/telemetry-with-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.telemetry).toEqual({
         endpoint: "https://api.telemetry.confluent.cloud",
         auth: {
@@ -326,7 +325,7 @@ describe("config/yaml-fixtures.test.ts", () => {
         fixtureFile("valid/telemetry-with-endpoint-and-auth.yaml"),
         NO_ENV,
       );
-      const conn = config.getSoleDirectConnection();
+      const conn = directConnectionOf(config);
       expect(conn.telemetry?.endpoint).toBe(
         "https://api.telemetry.confluent.cloud",
       );
@@ -443,6 +442,42 @@ describe("config/yaml-fixtures.test.ts", () => {
       const knownKeys = new Set(Object.keys(combinedSchema.shape));
       const unknown = [...found].filter((name) => !knownKeys.has(name));
       expect(unknown).toEqual([]);
+    });
+  });
+
+  describe("sample_configs starters", () => {
+    // Every shipped sample_configs/*.yaml must still parse as the schema
+    // evolves — a starter that silently stops loading is worse than none.
+    // Discover the files at runtime so a newly added sample is covered without
+    // touching this test. Same rationale as the config.example.yaml test above.
+    const SAMPLE_DIR = fileURLToPath(
+      new URL("../../sample_configs", import.meta.url),
+    );
+
+    let sampleFiles: string[];
+
+    beforeEach(() => {
+      sampleFiles = readdirSync(SAMPLE_DIR).filter((name) =>
+        /\.ya?ml$/.test(name),
+      );
+    });
+
+    it("should parse every sample without throwing", () => {
+      expect(sampleFiles.length).toBeGreaterThan(0);
+      for (const name of sampleFiles) {
+        const filePath = path.join(SAMPLE_DIR, name);
+        // Feed a dummy value for each no-default ${VAR} placeholder so
+        // interpolation succeeds. Placeholders carrying a :-default are left to
+        // resolve their default — those defaults are crafted to satisfy
+        // field-shape constraints (e.g. the env- prefix on env_id) that a blind
+        // "dummy" would violate.
+        const raw = readFileSync(filePath, "utf-8");
+        const env: Record<string, string> = {};
+        for (const match of raw.matchAll(/\$\{([A-Za-z_]\w*)\}/g)) {
+          env[match[1]!] = "dummy";
+        }
+        expect(() => loadConfigFromYaml(filePath, env), name).not.toThrow();
+      }
     });
   });
 

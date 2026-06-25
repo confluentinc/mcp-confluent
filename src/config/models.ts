@@ -1,6 +1,7 @@
 import { validateBootstrapServers } from "@src/config/validation.js";
 import { logLevels } from "@src/logger.js";
 import { TransportType } from "@src/mcp/transports/types.js";
+import { quoteJoinIds } from "@src/utils/quote-join-ids.js";
 import { z } from "zod";
 
 // The following interfaces and types define subcomponents of class MCPServerConfiguration, which represents our entire server configuration.
@@ -20,6 +21,7 @@ import { z } from "zod";
 export interface DirectConnectionConfig {
   readonly type: "direct";
   readonly description?: string;
+  readonly read_only?: boolean;
   readonly kafka?: KafkaDirectConfig;
   readonly schema_registry?: SchemaRegistryDirectConfig;
   readonly confluent_cloud?: ConfluentCloudDirectConfig;
@@ -46,6 +48,7 @@ export interface DirectConnectionConfig {
 export interface OAuthConnectionConfig {
   readonly type: "oauth";
   readonly description?: string;
+  readonly read_only?: boolean;
   readonly ccloud_env: "devel" | "stag" | "prod";
   readonly kafka_debug?: string;
 }
@@ -203,43 +206,6 @@ export class MCPServerConfiguration {
   }
 
   /**
-   * Returns the single defined connection in the configuration.
-   *
-   * @returns the single defined connection
-   * @throws Error if 0 or more than 1 connection is defined.
-   */
-  getSoleConnection(): ConnectionConfig {
-    const connectionNames = Object.keys(this.connections);
-    if (connectionNames.length === 0) {
-      throw new Error("No connections defined in configuration");
-    }
-    if (connectionNames.length > 1) {
-      throw new Error(
-        "Multiple connections defined in configuration; only one is supported currently",
-      );
-    }
-
-    // must be exactly one connection at this point, so return it.
-    return this.connections[connectionNames[0]!]!;
-  }
-
-  /**
-   * Returns the sole connection narrowed to {@link DirectConnectionConfig}, throwing
-   * if it is OAuth-typed. Use from callers that need to read service-block fields
-   * (e.g., `kafka.cluster_id`, `flink.environment_id`) — the throw replaces what
-   * would otherwise be a `conn.type === "direct"` guard at every read site.
-   */
-  getSoleDirectConnection(): DirectConnectionConfig {
-    const conn = this.getSoleConnection();
-    if (conn.type !== "direct") {
-      throw new Error(
-        `Expected sole connection to be a direct connection; got type "${conn.type}"`,
-      );
-    }
-    return conn;
-  }
-
-  /**
    * Returns the {@link ConnectionConfig} registered under `connectionId`,
    * throwing if no such connection is defined. The by-id accessor for the
    * multi-connection world: callers route to a known connection (a tool's
@@ -252,14 +218,14 @@ export class MCPServerConfiguration {
     if (conn === undefined) {
       throw new Error(
         `Unknown connection id "${connectionId}"; defined connections: ${
-          this.getConnectionNames().join(", ") || "none"
+          quoteJoinIds(this.getConnectionIds()) || "none"
         }`,
       );
     }
     return conn;
   }
 
-  getConnectionNames(): string[] {
+  getConnectionIds(): string[] {
     return Object.keys(this.connections).sort((a, b) => a.localeCompare(b));
   }
 }
@@ -319,11 +285,27 @@ const connectionDescriptionSchema = z
   .transform((s) => (s.length === 0 ? undefined : s))
   .optional();
 
-/** Zod schema for direct connection type */
-const directConnectionSchema = z
+/**
+ * Opt-in read-only policy for a connection, shared by both connection arms.
+ * When `true`, tools whose `annotations.readOnlyHint !== true` are disabled for
+ * this connection — see the verdict overlay in `BaseToolHandler`. Defaults to
+ * `false` so an omitted flag leaves a connection fully read/write.
+ */
+const connectionReadOnlySchema = z.boolean().default(false);
+
+/**
+ * Zod schema for direct connection type.
+ *
+ * Exported so the `describe-configured-connection` field-visibility drift test
+ * can read each block's `.shape` keys and assert they match the visibility
+ * allow-list in `describe-fields.ts` — the runtime belt to that file's
+ * compile-time `Record<keyof …>` exhaustiveness. See `describe-fields.ts`.
+ */
+export const directConnectionSchema = z
   .object({
     type: z.literal("direct"),
     description: connectionDescriptionSchema,
+    read_only: connectionReadOnlySchema,
     confluent_cloud: z
       .object({
         endpoint: z
@@ -469,11 +451,15 @@ const directConnectionSchema = z
 export const CONFLUENT_CLOUD_DEFAULT_ENDPOINT = "https://api.confluent.cloud";
 const TELEMETRY_DEFAULT_ENDPOINT = "https://api.telemetry.confluent.cloud";
 
-/** Zod schema for the OAuth (PKCE) connection arm. */
-const oauthConnectionSchema = z
+/**
+ * Zod schema for the OAuth (PKCE) connection arm. Exported alongside
+ * {@link directConnectionSchema} for the field-visibility drift test.
+ */
+export const oauthConnectionSchema = z
   .object({
     type: z.literal("oauth"),
     description: connectionDescriptionSchema,
+    read_only: connectionReadOnlySchema,
     ccloud_env: z.enum(["devel", "stag", "prod"]).default("prod"),
     kafka_debug: z
       .string()
@@ -656,15 +642,10 @@ export const DEFAULT_SERVER_CONFIG = serverConfigSchema.parse({});
 
 export const mcpConfigSchema = z
   .object({
-    connections: z
-      .record(
-        z.string().trim().min(1, "Connection name cannot be empty"),
-        connectionConfigSchema,
-      )
-      .refine(
-        enforceSingleConnectionOnly,
-        "Exactly one connection must be defined (multiple connections not yet supported)",
-      ),
+    connections: z.record(
+      z.string().trim().min(1, "Connection id cannot be empty"),
+      connectionConfigSchema,
+    ),
     server: serverConfigSchema.default(() => DEFAULT_SERVER_CONFIG),
   })
   .strict();
@@ -677,11 +658,4 @@ export function formatZodIssues(issues: z.ZodError["issues"]): string {
       return path ? `  - ${path}: ${issue.message}` : `  - ${issue.message}`;
     })
     .join("\n");
-}
-
-// Temporary guard: remove when multi-connection support (#151) lands.
-function enforceSingleConnectionOnly(
-  connections: Record<string, unknown>,
-): boolean {
-  return Object.keys(connections).length === 1;
 }

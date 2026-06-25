@@ -30,7 +30,13 @@ export default defineConfig({
       reporter: coverageReporters,
       reportsDirectory: "coverage",
       include: ["src/**/*.ts"],
-      exclude: ["src/**/*.test.ts", "src/**/*.d.ts"],
+      exclude: [
+        "src/**/*.test.ts",
+        "src/**/*.d.ts",
+        // Build-time README doc generator, not shipped server code: a top-level
+        // console.log over the legacy env-var schema, never imported at runtime.
+        "src/print-md-schema.ts",
+      ],
     },
     // Pre-declare every handler-subdirectory tag so follow-up PRs can add integration
     // tests without touching this config. Values come from `tests/tags.ts` (the single

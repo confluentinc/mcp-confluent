@@ -1,4 +1,4 @@
-import { ReadFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/read-flink-statement-handler.js";
+import { GetFlinkStatementResultsHandler } from "@src/confluent/tools/handlers/flink/get-flink-statement-results-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   provisionTestFlinkStatement,
@@ -16,10 +16,10 @@ import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const handler = new ReadFlinkStatementHandler();
+const handler = new GetFlinkStatementResultsHandler();
 
 describe(
-  "read-flink-statement-handler",
+  "get-flink-statement-results-handler",
   {
     tags: [
       Tag.FLINK,
@@ -34,7 +34,7 @@ describe(
 
     // installs afterAll at this describe scope (cleans up the seeded statement)
     const { createdStatements } = withSharedFlinkStatementCleanup();
-    const statementName = uniqueName("read-stmt");
+    const statementName = uniqueName("get-stmt-results");
 
     beforeAll(async () => {
       await provisionTestFlinkStatement(statementName);
@@ -52,22 +52,22 @@ describe(
         await server?.stop();
       });
 
-      it("should expose read-flink-statement in tools/list", async () => {
+      it("should expose get-flink-statement-results in tools/list", async () => {
         const { tools } = await server.client.listTools();
 
         expect(
-          tools.find((t) => t.name === ToolName.READ_FLINK_STATEMENT),
+          tools.find((t) => t.name === ToolName.GET_FLINK_STATEMENT_RESULTS),
         ).toBeDefined();
       });
 
-      it("should read the seeded statement and return a results header", async () => {
+      it("should fetch the seeded statement results and return a results header", async () => {
         // CCloud briefly returns 409 "Results not ready" between statement creation time and the time
         // results are available
         await expect
           .poll(
             async () => {
               const result = await server.client.callTool({
-                name: ToolName.READ_FLINK_STATEMENT,
+                name: ToolName.GET_FLINK_STATEMENT_RESULTS,
                 arguments: { statementName, timeoutInMilliseconds: 5000 },
               });
               return textContent(result);

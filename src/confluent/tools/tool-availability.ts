@@ -1,8 +1,5 @@
 import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
-import {
-  PredicateResult,
-  ToolDisabledReason,
-} from "@src/confluent/tools/connection-predicates.js";
+import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 
@@ -28,24 +25,53 @@ export function disabledToolGroupKey(group: DisabledToolGroup): string {
 }
 
 /**
+ * One configured connection's view of the gating report: the tools disabled
+ * *on this connection*, bucketed by the report's chosen axis, plus the
+ * connection's own enabled/disabled tallies. A tool enabled on this connection
+ * never appears in `disabledGroups` here; a tool enabled on a sibling
+ * connection but disabled on this one shows up in this section's buckets, so
+ * the cross-connection asymmetry is readable by comparing sections.
+ */
+export interface ConnectionGatingSection {
+  readonly connectionId: string;
+  readonly disabledGroups: readonly DisabledToolGroup[];
+  /** Tools advertisable on this connection: `totalRegistered - disabledCount`. */
+  readonly enabledCount: number;
+  /** Tools disabled on this connection: the sum of `disabledGroups[].tools.length`. */
+  readonly disabledCount: number;
+}
+
+/**
  * Output of {@linkcode buildToolGatingReport}; drives the
- * `explain-disabled-tools` diagnostic tool. Tools advertised via
- * `tools/list` are intentionally absent — the report carries the
- * negative signal only.
+ * `explain-disabled-tools` diagnostic tool.
  *
- * `groupBy` records which axis the bucket discriminators carry so
- * consumers (renderer, MCP-client UIs) can pick the right framing.
+ * The report is connection-shaped: one {@linkcode ConnectionGatingSection} per
+ * configured connection, each carrying that connection's disabled-tool buckets.
+ * A single-connection config yields exactly one section — there is one shape
+ * regardless of connection count.
  *
- * Single-connection scope today (the server enforces one connection; see
- * `enforceSingleConnectionOnly()` in `src/config/models.ts`). When
- * multi-connection support lands as part of issue #151's follow-ups the
- * shape regrows around connections — per-connection sections plus a
- * cross-connection-deltas section calling out tools enabled on some
- * connections but not others.
+ * `groupBy` records which axis the section buckets carry so consumers
+ * (renderer, MCP-client UIs) can pick the right framing.
+ *
+ * `operatorBlocked` is the server-wide allow/block-list verdict, held apart
+ * from the per-connection sections because the operator filter is the
+ * outermost gate: it excludes a tool from every connection at once and owes
+ * nothing to any connection's config. A blocked tool appears here and in no
+ * section's buckets, and is subtracted from each section's `enabledCount`.
+ *
+ * The top-level `enabledCount` / `disabledCount` are whole-server rollups: a
+ * tool counts as enabled if it survives the operator filter AND is
+ * connection-independent or enabled on at least one connection; it counts as
+ * disabled when the operator filter excludes it, or when it is
+ * connection-dependent and dark on every connection (or there are no
+ * connections at all).
  */
 export interface ToolGatingReport {
   readonly groupBy: "reason" | "category";
-  readonly disabledGroups: readonly DisabledToolGroup[];
+  /** Tools the operator's allow/block-list excluded server-wide, in handler iteration order. */
+  readonly operatorBlocked: readonly ToolName[];
+  /** One section per configured connection, lex-sorted by id; empty iff no connections are configured. */
+  readonly connections: readonly ConnectionGatingSection[];
   readonly enabledCount: number;
   readonly disabledCount: number;
 }
@@ -110,52 +136,173 @@ export function groupDisabledToolsByReason(
 }
 
 /**
- * Assemble a {@linkcode ToolGatingReport} for the given handler set against
- * the configured connection.
+ * Assemble a connection-shaped {@linkcode ToolGatingReport} for the given
+ * handler set against the configured connections.
  *
- * v1 (single-connection scope):
- * - `disabledGroups` is sorted lex by reason; tools within a group follow
- *   handler iteration order.
- * - Each tool contributes once to `enabledCount` *or* `disabledCount`:
- *   a tool whose predicate produces an `enabled: true` verdict on at
- *   least one configured connection counts as enabled (and is omitted
- *   from `disabledGroups`); otherwise it counts as disabled and lands
- *   under the first disabled verdict's reason. This flatten is lossy
- *   on a multi-connection runtime — see the handler module-doc for
- *   the consequences and the v2 (multi-connection) shape on
- *   {@linkcode ToolGatingReport}.
- * - Throws `Wacky -- ...` if any handler returns an empty verdict map
- *   (a runtime-shaped invariant violation rather than a tool-state
- *   condition; see `classifyTool` for the rationale).
+ * One pass over the handlers:
+ * - a tool the operator's allow/block-list excludes (`!isToolAllowed`) is
+ *   recorded in `operatorBlocked` and counts as disabled, ahead of and
+ *   independent of its predicate verdict — the filter is the outermost gate,
+ *   so it never reaches a connection section;
+ * - connection-independent tools count as enabled and appear in no section
+ *   (they are enabled on every connection);
+ * - a connection-dependent tool on a zero-connection config counts as disabled
+ *   with no section to attribute it to;
+ * - otherwise each connection that disables it gets the tool added to its
+ *   section bucket (keyed by reason, or by {@linkcode ToolHandler.category}
+ *   under `groupBy: "category"`), and the tool counts as enabled iff at least
+ *   one connection enables it.
+ *
+ * Sections are lex-sorted by `connectionId` and buckets lex by
+ * {@linkcode disabledToolGroupKey}. Tools within a bucket — and within
+ * `operatorBlocked` — follow handler iteration order.
  */
 export function buildToolGatingReport(
   handlers: Iterable<readonly [ToolName, ToolHandler]>,
   runtime: ServerRuntime,
   groupBy: "reason" | "category" = "reason",
 ): ToolGatingReport {
-  // Both axes' keys (ToolDisabledReason values, ToolCategory values) are
-  // string enums at runtime, so a single string-keyed Map drives both code
-  // paths. The discriminator on the emitted DisabledToolGroup is what
-  // tells the consumer which axis it's reading.
-  const groups = new Map<string, ToolName[]>();
+  const connectionIds = runtime.config.getConnectionIds();
+  // Per-connection accumulator: connectionId -> (bucketKey -> tools). Both
+  // axes' keys (ToolDisabledReason / ToolCategory values) are string enums at
+  // runtime, so a single string-keyed inner Map drives both code paths.
+  const sectionBuckets: SectionBuckets = new Map(
+    connectionIds.map((id) => [id, new Map<string, ToolName[]>()]),
+  );
+  const operatorBlocked: ToolName[] = [];
   let enabledCount = 0;
   let disabledCount = 0;
 
   for (const [toolName, handler] of handlers) {
-    const classification = classifyTool(handler.connectionVerdicts(runtime));
-    if (classification.kind === "enabled") {
-      enabledCount += 1;
+    if (!runtime.isToolAllowed(toolName)) {
+      operatorBlocked.push(toolName);
+      disabledCount += 1;
       continue;
     }
-    disabledCount += 1;
-    const key = groupBy === "reason" ? classification.reason : handler.category;
-    let bucket = groups.get(key);
-    bucket ??= [];
-    groups.set(key, bucket);
-    bucket.push(toolName);
+    if (
+      classifyAndBucketHandler(
+        toolName,
+        handler,
+        runtime,
+        groupBy,
+        sectionBuckets,
+      )
+    ) {
+      enabledCount += 1;
+    } else {
+      disabledCount += 1;
+    }
   }
 
-  const disabledGroups: DisabledToolGroup[] = Array.from(groups.entries())
+  const totalRegistered = enabledCount + disabledCount;
+  const connections = connectionIds
+    .map((id) =>
+      buildSection(
+        id,
+        sectionBuckets.get(id)!,
+        groupBy,
+        totalRegistered,
+        operatorBlocked.length,
+      ),
+    )
+    .sort((a, b) => a.connectionId.localeCompare(b.connectionId));
+
+  return {
+    groupBy,
+    operatorBlocked,
+    connections,
+    enabledCount,
+    disabledCount,
+  };
+}
+
+/**
+ * Per-connection bucket accumulator: connectionId → (bucketKey → tools), where
+ * the bucket key is a {@linkcode ToolDisabledReason} or {@linkcode ToolCategory}
+ * string value depending on the report's axis.
+ */
+type SectionBuckets = Map<string, Map<string, ToolName[]>>;
+
+/**
+ * Classify one handler for the report and, as a side effect, bucket its tool
+ * into the section of every connection that disables it. Returns `true` when
+ * the tool is advertised (connection-independent, or enabled on at least one
+ * connection) — i.e. when it counts toward `enabledCount` rather than
+ * `disabledCount`. A connection-dependent tool on a zero-connection config is
+ * dark with no section to attribute it to.
+ */
+function classifyAndBucketHandler(
+  toolName: ToolName,
+  handler: ToolHandler,
+  runtime: ServerRuntime,
+  groupBy: "reason" | "category",
+  sectionBuckets: SectionBuckets,
+): boolean {
+  if (handler.isConnectionIndependent) return true;
+  const verdicts = handler.connectionVerdicts(runtime);
+  if (verdicts.size === 0) return false;
+
+  let anyEnabled = false;
+  for (const [connectionId, verdict] of verdicts) {
+    if (verdict.enabled) {
+      anyEnabled = true;
+      continue;
+    }
+    const key = groupBy === "reason" ? verdict.reason : handler.category;
+    pushToBucket(sectionBuckets.get(connectionId)!, key, toolName);
+  }
+  return anyEnabled;
+}
+
+/** Append `toolName` to `buckets[key]`, creating the bucket array on first use. */
+function pushToBucket(
+  buckets: Map<string, ToolName[]>,
+  key: string,
+  toolName: ToolName,
+): void {
+  let bucket = buckets.get(key);
+  bucket ??= [];
+  buckets.set(key, bucket);
+  bucket.push(toolName);
+}
+
+/**
+ * Assemble one connection's {@linkcode ConnectionGatingSection} from its bucket
+ * accumulator. `enabledCount` is what remains advertisable on this connection
+ * once both the operator-blocked tools (excluded server-wide, never in this
+ * section's buckets) and this connection's own predicate-disabled tools are
+ * removed from the whole registered set — so connection-independent tools count
+ * as enabled here, but operator-blocked ones never do.
+ */
+function buildSection(
+  connectionId: string,
+  buckets: Map<string, ToolName[]>,
+  groupBy: "reason" | "category",
+  totalRegistered: number,
+  operatorBlockedCount: number,
+): ConnectionGatingSection {
+  const disabledGroups = bucketsToGroups(buckets, groupBy);
+  const sectionDisabled = disabledGroups.reduce(
+    (sum, group) => sum + group.tools.length,
+    0,
+  );
+  return {
+    connectionId,
+    disabledGroups,
+    enabledCount: totalRegistered - operatorBlockedCount - sectionDisabled,
+    disabledCount: sectionDisabled,
+  };
+}
+
+/**
+ * Project one connection's `(bucketKey -> tools)` accumulator into the
+ * discriminated {@linkcode DisabledToolGroup} array, lex-sorted by bucket key.
+ */
+function bucketsToGroups(
+  buckets: Map<string, ToolName[]>,
+  groupBy: "reason" | "category",
+): DisabledToolGroup[] {
+  return Array.from(buckets.entries())
     .map(
       ([key, tools]): DisabledToolGroup =>
         groupBy === "reason"
@@ -165,48 +312,4 @@ export function buildToolGatingReport(
     .sort((a, b) =>
       disabledToolGroupKey(a).localeCompare(disabledToolGroupKey(b)),
     );
-
-  return { groupBy, disabledGroups, enabledCount, disabledCount };
-}
-
-/**
- * Reduce a tool's per-connection verdict map to a single classification for
- * the v1 flat report. Under the single-connection invariant the verdict map
- * has exactly one entry, so this is a pass-through; the implementation
- * tolerates multi-entry maps (test fixtures synthesise them) by treating
- * "enabled on at least one connection" as enabled and otherwise reporting
- * the first disabled verdict's reason.
- *
- * v2 multi-connection: drop this helper. The aggregation moves into the
- * caller, which builds per-connection rows and cross-connection deltas
- * directly from the verdict map.
- */
-function classifyTool(
-  verdicts: Map<string, PredicateResult>,
-): { kind: "enabled" } | { kind: "disabled"; reason: ToolDisabledReason } {
-  let firstDisabledReason: ToolDisabledReason | undefined;
-  for (const verdict of verdicts.values()) {
-    if (verdict.enabled) return { kind: "enabled" };
-    if (firstDisabledReason === undefined) {
-      firstDisabledReason = verdict.reason;
-    }
-  }
-  if (firstDisabledReason === undefined) {
-    // Wacky -- handler returned an empty verdict map. BaseToolHandler builds
-    // verdicts directly from `runtime.config.connections`, so an empty map
-    // means there are zero configured connections, which
-    // `enforceSingleConnectionOnly()` in `src/config/models.ts` should have
-    // prevented at bootstrap. Fail loudly rather than fabricate a
-    // misleading `ToolDisabledReason` and ship it in the operator-facing
-    // report — a wrong-by-name reason is harder to diagnose than a stack
-    // trace.
-    throw new Error(
-      "Wacky -- classifyTool received an empty verdict map: a handler's " +
-        "connectionVerdicts() returned no entries. BaseToolHandler derives " +
-        "verdicts from runtime.config.connections; an empty map implies zero " +
-        "configured connections, which enforceSingleConnectionOnly() in " +
-        "src/config/models.ts should have rejected at bootstrap.",
-    );
-  }
-  return { kind: "disabled", reason: firstDisabledReason };
 }

@@ -84,6 +84,15 @@ remove-test-env:
 #    skips every direct-only test and only exercises the PKCE-flow paths.
 # Unset (local dev) skips the clause entirely; vitest collects everything.
 #
+# The `oauth` lane also appends `--no-file-parallelism`: every oauth describe
+# self-serializes on the single hard-coded OAuth callback port (see
+# tests/harness/oauth-port-lock.ts), so running oauth files across parallel
+# forks only piles them into a lock queue whose wait can exceed the 180s
+# `beforeAll` hook timeout. Running the oauth lane sequentially removes the
+# queue entirely — each file acquires the free lock immediately. Wall clock is
+# unaffected: the lock already serialized this work; the direct lane (a
+# separate, parallel invocation) keeps its parallelism.
+#
 # The `!= "SERVICE_CONFIG"` / `!= "TOOL_GROUP"` / `!= "TRANSPORT"` guards
 # catch a Semaphore misconfiguration where a matrix env-var name leaks
 # through uninterpolated (e.g. `make test-integration TAGS=TOOL_GROUP` if
@@ -133,12 +142,15 @@ test-integration:
 			set -- "$$@" "src/confluent/tools/handlers/$$TAG_SUFFIX"; \
 		fi; \
 	fi; \
-	if [ ! -f dist/index.js ]; then npm run build; fi && \
-	INTEGRATION_TEST_TRANSPORT="$$TRANSPORT_VAL" npx vitest run \
+	if [ "$$INTEGRATION_TEST_CONNECTION_TYPE" = "oauth" ]; then \
+		set -- "$$@" "--no-file-parallelism"; \
+	fi; \
+	if [ ! -f dist/index.js ]; then pnpm run build; fi && \
+	INTEGRATION_TEST_TRANSPORT="$$TRANSPORT_VAL" pnpm exec vitest run \
 		--project integration \
 		--outputFile.junit=TEST-integration.xml \
 		"$$@"
-# ^ `npm run build` is skipped when `dist/index.js` already exists. CI's
+# ^ `pnpm run build` is skipped when `dist/index.js` already exists. CI's
 # integration prologue builds before invoking `make test-integration`, so
 # this avoids the double build per matrix cell. Local devs running cold
 # (no `dist/`) still get an automatic build; for staleness control,

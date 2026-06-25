@@ -1,9 +1,9 @@
+import { DirectConnectionConfig } from "@src/config/models.js";
 import {
   BaseToolHandler,
   ToolCategory,
 } from "@src/confluent/tools/base-tools.js";
 import { hasTableflow } from "@src/confluent/tools/connection-predicates.js";
-import { ServerRuntime } from "@src/server-runtime.js";
 
 /**
  * Base for all Tableflow handlers. Requires only a tableflow auth block.
@@ -24,11 +24,10 @@ export abstract class TableflowToolHandler extends BaseToolHandler {
    * preferring explicit tool arguments over connection config fallbacks.
    */
   protected resolveTableflowEnvAndClusterId(
-    runtime: ServerRuntime,
+    conn: DirectConnectionConfig,
     envIdArg: string | undefined,
     clusterIdArg: string | undefined,
   ): { environment_id: string; kafka_cluster_id: string } {
-    const conn = runtime.config.getSoleDirectConnection();
     return {
       environment_id: this.resolveParam(
         envIdArg,

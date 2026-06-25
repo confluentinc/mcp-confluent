@@ -58,22 +58,25 @@ export class ServerRuntime {
   }
 
   /**
-   * Convenience accessor for the single-connection period.
-   * Remove (or make multi-connection-aware) when issue #151 lands.
+   * Disconnect every per-connection client manager — the teardown counterpart
+   * to the per-connection construction in {@link fromConfig}.
    */
-  get clientManager(): BaseClientManager {
-    const managers = Object.values(this.clientManagers);
-    if (managers.length === 0) {
-      throw new Error("ServerRuntime has no client managers");
-    }
-    if (managers.length > 1) {
-      // enforceSingleConnectionOnly() in config/models.ts should prevent this at parse time;
-      // this guard is the runtime mirror of that constraint.
-      throw new Error(
-        "ServerRuntime has multiple client managers; use clientManagers[id] directly",
+  async disconnectAll(): Promise<void> {
+    // allSettled, not all: a single manager's disconnect() rejection must not
+    // abandon its siblings mid-shutdown. Wait for every disconnect, then raise
+    // an AggregateError carrying all failures so no error is silently dropped.
+    const results = await Promise.allSettled(
+      Object.values(this.clientManagers).map((manager) => manager.disconnect()),
+    );
+    const failures = results
+      .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+      .map((r) => r.reason);
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures,
+        `Failed to disconnect ${failures.length} of ${results.length} client manager(s)`,
       );
     }
-    return managers[0]!;
   }
 
   static fromConfig(
@@ -84,9 +87,9 @@ export class ServerRuntime {
       (c): c is OAuthConnectionConfig => c.type === "oauth",
     );
     if (oauthConns.length > 1) {
-      // `enforceSingleConnectionOnly()` already prevents this today; keep the
-      // defensive check so that when multi-connection support lands (#151),
-      // multi-OAuth is rejected explicitly rather than silently picking one.
+      // Only one OAuth connection is supported (the shared OAuthHolder owns a
+      // single CCloud identity). Reject multi-OAuth explicitly rather than
+      // silently picking one.
       throw new Error(
         `Multiple OAuth connections defined in configuration; only one is supported`,
       );
@@ -96,27 +99,27 @@ export class ServerRuntime {
       ? new OAuthHolder(oauthConn.ccloud_env)
       : undefined;
 
-    // Construct a client manager for each connection in the config.
-    // (although currently there will only be one, see `enforceSingleConnectionOnly()`)
-    // When OAuth is in play, every connection's manager is bearer-auth-backed by
-    // the shared holder; otherwise, fall back to the per-connection direct factory.
+    // Construct a client manager per connection, keyed on the connection's own
+    // type — a direct connection always gets a DirectClientManager even when a
+    // sibling OAuth connection exists, so the epic's "OAuth Confluent Cloud +
+    // local Apache Kafka broker side by side" config wires each connection to a
+    // manager that can actually reach it.
     const clientManagers = Object.fromEntries(
       Object.entries(config.connections).map(([id, conn]) => {
-        if (oauthHolder && oauthConn) {
+        if (conn.type === "oauth") {
+          if (!oauthHolder) {
+            throw new Error(
+              `Wacky -- connection ${id} is oauth but no OAuthHolder was constructed`,
+            );
+          }
           return [
             id,
             new OAuthClientManager(
               oauthHolder,
-              oauthConn.ccloud_env,
-              oauthConn.kafka_debug,
+              conn.ccloud_env,
+              conn.kafka_debug,
             ),
           ] as const;
-        }
-        // No OAuth connection found, so every connection is direct.
-        if (conn.type !== "direct") {
-          throw new Error(
-            `Internal error: connection ${id} is not direct but no OAuth holder was constructed`,
-          );
         }
         return [id, constructDirectClientManager(conn)] as const;
       }),

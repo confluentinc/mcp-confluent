@@ -7,6 +7,12 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
+# Foreign package-manager lockfiles. This repo is pnpm-only (pnpm-lock.yaml);
+# ignore npm/yarn lockfiles so a contributor who accidentally runs `npm install`
+# or `yarn` cannot commit a divergent lockfile.
+package-lock.json
+yarn.lock
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
@@ -87,6 +93,8 @@ web_modules/
 /*.yml
 !/config.example.yaml
 !/config.oauth.example.yaml
+!/pnpm-lock.yaml
+!/pnpm-workspace.yaml
 !/docker-compose.yml
 !/service.yml
 

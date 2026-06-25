@@ -56,10 +56,10 @@ npx -y @confluentinc/mcp-confluent --list-tools
 
 These tools need no service blocks or authentication — they're enabled even on a bare config, regardless of which deployment the rest of your config targets.
 
-| Category          | Tools                                                                  | Description                                                                                                                             |
-| ----------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Documentation** | `search-product-docs`, `get-product-doc-page`                          | Search Confluent product docs and fetch full page content                                                                               |
-| **Diagnostics**   | `explain-disabled-tools`, `list-configured-connections`, `config-help` | Explain why tools are absent, list configured connections and the tools enabled on each, and suggest the YAML to enable a specific tool |
+| Category          | Tools                                                                                                    | Description                                                                                                                                                                                     |
+| ----------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Documentation** | `search-product-docs`, `get-product-doc-page`                                                            | Search Confluent product docs and fetch full page content                                                                                                                                       |
+| **Diagnostics**   | `explain-disabled-tools`, `list-configured-connections`, `config-help`, `describe-configured-connection` | Explain why tools are absent, list configured connections and the tools enabled on each, suggest the YAML to enable a specific tool, and describe one connection's config and tool availability |
 
 ### Available Tools for Confluent Cloud
 
@@ -67,23 +67,25 @@ These tools require endpoints and authentication against specific Confluent Clou
 Refer to [`config.example.yaml`](config.example.yaml) for the full set of configuration variables.
 Categories marked with ¹ also work with [OAuth authentication](#oauth-authentication-for-confluent-cloud) — sign in via your browser instead of provisioning API keys.
 
-| Category                                     | Tools                                                                                                                                                                                                                                                                                                                                        | Description                                                                                |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Kafka** ¹                                  | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `list-consumer-groups`, `describe-consumer-group`, `get-consumer-group-lag`, `alter-topic-config`, `get-topic-config`                                                                                                                                | Manage topics, produce/consume messages, inspect consumer groups, configure topic settings |
-| **Flink SQL**                                | `create-flink-statement`, `list-flink-statements`, `read-flink-statement`, `delete-flink-statements`, `get-flink-statement-exceptions`                                                                                                                                                                                                       | Create and manage Flink SQL statements                                                     |
-| **Flink Catalog**                            | `list-flink-catalogs`, `list-flink-databases`, `list-flink-tables`, `describe-flink-table`, `get-flink-table-info`                                                                                                                                                                                                                           | Explore Flink catalogs, databases, and table schemas                                       |
-| **Flink Diagnostics**                        | `check-flink-statement-health`, `detect-flink-statement-issues`, `get-flink-statement-profile`                                                                                                                                                                                                                                               | Health checks, issue detection, and query profiling                                        |
-| **Connectors**                               | `list-connectors`, `get-connector-config`, `get-connector-offsets`, `get-connector-status`, `get-connector-tasks`, `get-connector-error-summary`, `get-connector-error-recommendations`, `get-connector-logs`, `create-connector`, `delete-connector`, `pause-connector`, `resume-connector`, `restart-connector`, `update-connector-config` | Inspect and manage Kafka Connect connectors                                                |
-| **Schema Registry** ¹                        | `list-schemas`, `delete-schema`                                                                                                                                                                                                                                                                                                              | List, inspect, and delete data schemas                                                     |
-| **Catalog & Tags**                           | `search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`                                                                                                                                                                                               | Organize and search topics using tags                                                      |
-| **Organizations, Environments & Clusters** ¹ | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`                                                                                                                                                                                                                                                               | Discover Confluent Cloud resources                                                         |
-| **Tableflow**                                | `create-tableflow-topic`, `list-tableflow-topics`, `read-tableflow-topic`, `update-tableflow-topic`, `delete-tableflow-topic`, `list-tableflow-regions`                                                                                                                                                                                      | Manage Tableflow-enabled topics                                                            |
-| **Tableflow Catalog**                        | `create-tableflow-catalog-integration`, `list-tableflow-catalog-integrations`, `read-tableflow-catalog-integration`, `update-tableflow-catalog-integration`, `delete-tableflow-catalog-integration`                                                                                                                                          | Manage Tableflow catalog integrations (e.g., AWS Glue)                                     |
-| **Metrics**                                  | `list-available-metrics`, `query-metrics`                                                                                                                                                                                                                                                                                                    | Discover and query Confluent Cloud operational metrics                                     |
-| **Billing** ¹                                | `list-billing-costs`                                                                                                                                                                                                                                                                                                                         | Query billing and cost data                                                                |
+| Category                                     | Tools                                                                                                                                                                                                                                                                                                                                          | Description                                                                                |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **Kafka** ¹                                  | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `list-consumer-groups`, `describe-consumer-group`, `get-consumer-group-lag`, `alter-topic-config`, `get-topic-config`                                                                                                                                  | Manage topics, produce/consume messages, inspect consumer groups, configure topic settings |
+| **Flink SQL**                                | `create-flink-statement`, `list-flink-statements`, `get-flink-statement-results`, `delete-flink-statements`, `get-flink-statement-exceptions`                                                                                                                                                                                                  | Create and manage Flink SQL statements                                                     |
+| **Flink Catalog**                            | `list-flink-catalogs`, `list-flink-databases`, `list-flink-tables`, `describe-flink-table`, `get-flink-table-info`                                                                                                                                                                                                                             | Explore Flink catalogs, databases, and table schemas                                       |
+| **Flink Diagnostics**                        | `check-flink-statement-health`, `detect-flink-statement-issues`, `get-flink-statement-profile`                                                                                                                                                                                                                                                 | Health checks, issue detection, and query profiling                                        |
+| **Connectors** ¹                             | `list-connectors`, `get-connector-config`, `get-connector-offsets`, `get-connector-status`, `get-connector-tasks`, `get-connector-error-summary`, `get-connector-error-recommendations`, `get-connector-logs`, `create-connector` ², `delete-connector`, `pause-connector`, `resume-connector`, `restart-connector`, `update-connector-config` | Inspect and manage Kafka Connect connectors                                                |
+| **Schema Registry** ¹                        | `list-schemas`, `create-schema`, `delete-schema`                                                                                                                                                                                                                                                                                               | List, inspect, create, and delete data schemas                                             |
+| **Catalog & Tags**                           | `search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`                                                                                                                                                                                                 | Organize and search topics using tags                                                      |
+| **Organizations, Environments & Clusters** ¹ | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`                                                                                                                                                                                                                                                                 | Discover Confluent Cloud resources                                                         |
+| **Tableflow**                                | `create-tableflow-topic`, `list-tableflow-topics`, `read-tableflow-topic`, `update-tableflow-topic`, `delete-tableflow-topic`, `list-tableflow-regions`                                                                                                                                                                                        | Manage Tableflow-enabled topics                                                            |
+| **Tableflow Catalog**                        | `create-tableflow-catalog-integration`, `list-tableflow-catalog-integrations`, `read-tableflow-catalog-integration`, `update-tableflow-catalog-integration`, `delete-tableflow-catalog-integration`                                                                                                                                            | Manage Tableflow catalog integrations (e.g., AWS Glue)                                     |
+| **Metrics**                                  | `list-available-metrics`, `query-metrics`                                                                                                                                                                                                                                                                                                      | Discover and query Confluent Cloud operational metrics                                     |
+| **Billing** ¹                                | `list-billing-costs`                                                                                                                                                                                                                                                                                                                           | Query billing and cost data                                                                |
 
 ¹ Also available under OAuth — see [OAuth Authentication for Confluent Cloud](#oauth-authentication-for-confluent-cloud) for setup and caveats.
 Categories not marked currently require a `direct` connection with static API keys; OAuth migration is in progress.
+
+² Individual tool not available under OAuth; requires a `direct` connection with static API keys.
 
 ### Available Tools for local deployments
 
@@ -106,7 +108,7 @@ Ready-to-use variants live in [`sample_configs/`](sample_configs/).
 | Category            | Tools                                                                                                                                                               | Description                                                      |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | **Kafka**           | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `list-consumer-groups`, `describe-consumer-group`, `get-consumer-group-lag` | Manage topics, produce/consume messages, inspect consumer groups |
-| **Schema Registry** | `list-schemas`, `delete-schema`                                                                                                                                     | List, inspect, and delete data schemas                           |
+| **Schema Registry** | `list-schemas`, `create-schema`, `delete-schema`                                                                                                                    | List, inspect, create, and delete data schemas                   |
 
 ## Using with Confluent Platform
 
@@ -128,7 +130,7 @@ CP clusters frequently sit behind an internal CA.
 If you see TLS handshake failures against the broker or Schema Registry, point Node at your CA bundle when starting the server:
 
 ```bash
-NODE_EXTRA_CA_CERTS=/path/to/internal-ca.pem npm run start -- --config path/to/config.yaml
+NODE_EXTRA_CA_CERTS=/path/to/internal-ca.pem pnpm run start -- --config path/to/config.yaml
 ```
 
 ### End-to-end smoke test
@@ -140,11 +142,11 @@ The matching integration tests are tagged `@cp` and live next to their handlers 
 docker compose -f docker-compose.cp-test.yml up -d
 # Wait ~30s for Kafka + SR to become ready, then:
 CP_KAFKA_USERNAME=mcp CP_KAFKA_PASSWORD=mcp-secret \
-  npm run test:integration -- --tags-filter=@cp
+  pnpm run test:integration -- --tags-filter=@cp
 docker compose -f docker-compose.cp-test.yml down -v
 ```
 
-The tests skip cleanly when those env vars are unset, so `npm run test:unit` and a default `npm run test:integration` against your real Confluent Cloud account are unaffected if you don't have the docker stack running.
+The tests skip cleanly when those env vars are unset, so `pnpm run test:unit` and a default `pnpm run test:integration` against your real Confluent Cloud account are unaffected if you don't have the docker stack running.
 
 ## Getting Started
 
@@ -155,6 +157,15 @@ The tests skip cleanly when those env vars are unset, so `npm run test:unit` and
   nvm install 22
   nvm use 22
   ```
+- **[pnpm](https://pnpm.io/installation)** -- only needed to build from source (the `npx` quick start above does not require it).
+  On macOS the simplest install is Homebrew; `npm` works cross-platform:
+  ```bash
+  brew install pnpm        # macOS
+  # or, cross-platform:
+  npm install -g pnpm
+  ```
+  See pnpm's [installation guide](https://pnpm.io/installation) for other options.
+  The exact pnpm version is pinned in the `packageManager` field of `package.json`, and pnpm automatically runs that pinned version (via its built-in package-manager version management), so a recent pnpm install is all you need -- no separate Corepack setup required.
 - A local environment with Kafka or Schema Registry running, or a **Confluent Cloud** account with appropriate API keys or login credentials if [using OAuth to authenticate](#oauth-authentication-for-confluent-cloud).
 
 ### General Setup Steps
@@ -180,8 +191,8 @@ npx @confluentinc/mcp-confluent --init-config
 3. **Start the Server:** You can run the MCP server in one of two ways:
    - **From source:** Follow the instructions in the [Contributing Guide](CONTRIBUTING.md) to build and run the server from source.
      This typically involves:
-     - Installing dependencies (`npm install`)
-     - Building the project (`npm run build` or `npm run dev`)
+     - Installing dependencies (`pnpm install`)
+     - Building the project (`pnpm run build` or `pnpm run dev`)
    - **With npx:** You can start the server directly using npx, no build required:
 
      ```bash
@@ -204,8 +215,8 @@ The full configuration reference — YAML schema, every service block, env-var i
 
 > **Compatibility note.** This release ships full parity between YAML (`-c config.yaml`) and the legacy env-var path (`-e config.env`) for a single connection.
 > The env-var-only path will emit a startup warning in a near-future release and be removed a release or two later.
-> Multi-connection support (next release) will be YAML-only.
-> See [CONFIGURATION.md → Two paths, one configuration](CONFIGURATION.md#two-paths-one-configuration).
+> Defining multiple connections (or none) is YAML-only — the env-var path can express only a single connection.
+> See [CONFIGURATION.md → Two paths, one configuration](CONFIGURATION.md#two-paths-one-configuration) and [CONFIGURATION.md → Multiple connections (and zero connections)](CONFIGURATION.md#multiple-connections-and-zero-connections).
 
 ### Prerequisites & setup for Tableflow commands
 
@@ -383,17 +394,17 @@ flink:
   detect-flink-statement-issues: Detect issues for a Flink SQL statement by analyzing status, exceptions, and performance metrics. Identifies problems...
   get-flink-statement-exceptions: Retrieve the 10 most recent exceptions for a Flink SQL statement. Useful for diagnosing failed or failing statements.
   get-flink-statement-profile: Get Query Profiler data for a Flink SQL statement. Returns the task graph with human-readable task/operator names, pe...
+  get-flink-statement-results: Fetch the result rows produced by a Flink SQL statement.
   get-flink-table-info: Get table metadata via INFORMATION_SCHEMA.TABLES. Returns watermark configuration, distribution info, and table type.
   list-flink-catalogs: List all catalogs available in the Flink environment via INFORMATION_SCHEMA.CATALOGS.
   list-flink-databases: List all databases (schemas) in a Flink catalog via INFORMATION_SCHEMA.SCHEMATA. Returns catalog and database names.
   list-flink-statements: Retrieve a sorted, filtered, paginated list of all statements.
   list-flink-tables: List all tables in a Flink database via INFORMATION_SCHEMA.TABLES. Returns table names and types.
-  read-flink-statement: Make a request to read a statement and its results
 
 kafka:
   alter-topic-config: Alter topic configuration in Confluent Cloud.
   consume-messages: Consume messages from Kafka topics. Optionally restrict to a partition, start from an offset, timestamp, earliest, la...
-  create-topics: Create one or more Kafka topics with an optional partition count.
+  create-topics: Create one or more Kafka topics with an optional partition count and replication factor.
   delete-topics: Delete the topic with the given names.
   describe-consumer-group: Describe a single consumer group on a Kafka cluster. Returns the group's state, type, protocol, partition assignor, c...
   get-consumer-group-lag: Compute live offset lag for a single Kafka consumer group. Returns per-(topic, partition) {committedOffset, highWater...
@@ -413,6 +424,7 @@ metrics:
   query-metrics: Query Confluent Cloud metrics from the Telemetry API. IMPORTANT: Use the list-available-metrics tool first to discove...
 
 schema-registry:
+  create-schema: Register a new schema (or a new version of an existing schema) under a subject in the Schema Registry.
   delete-schema: Delete a schema subject or a specific version from the Schema Registry. If version is omitted, all versions of the su...
   list-schemas: List all schemas in the Schema Registry.
 

@@ -33,7 +33,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -330,35 +333,38 @@ describe(
           });
         });
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should return the deterministic lag for the seeded group on the seeded topic", async () => {
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.GET_CONSUMER_GROUP_LAG,
-              arguments: {
-                groupId,
-                cluster_id: clusterId,
-                environment_id: environmentId,
-              },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            expect(result.isError, textContent(result)).not.toBe(true);
-            const payload =
-              result.structuredContent as GetConsumerGroupLagResponse;
-            expect(payload.groupId).toBe(groupId);
-            expect(payload.totalLag).toBe(EXPECTED_LAG);
-          });
-        });
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should return the deterministic lag for the seeded group on the seeded topic", async () => {
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.GET_CONSUMER_GROUP_LAG,
+                arguments: {
+                  groupId,
+                  cluster_id: clusterId,
+                  environment_id: environmentId,
+                },
+              });
+
+              expect(result.isError, textContent(result)).not.toBe(true);
+              const payload =
+                result.structuredContent as GetConsumerGroupLagResponse;
+              expect(payload.groupId).toBe(groupId);
+              expect(payload.totalLag).toBe(EXPECTED_LAG);
+            });
+          },
+        );
       },
     );
   },

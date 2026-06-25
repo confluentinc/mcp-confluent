@@ -1,4 +1,5 @@
 import { GetTableInfoHandler } from "@src/confluent/tools/handlers/flink/catalog/get-table-info-handler.js";
+import { textOf } from "@tests/call-tool-result.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
@@ -103,6 +104,48 @@ describe("get-table-info-handler.ts", () => {
         expect(result._meta?.flinkStatementsCreated).toEqual([
           expect.stringMatching(/^mcp-query-/),
         ]);
+      });
+
+      it("should return a config error when the environment_id is not an env-* catalog", async () => {
+        const conn = {
+          flink: { ...FLINK_CONN.flink, environment_id: "friendly-env" },
+        };
+        const result = await handler.handle(
+          runtimeWith(conn, DEFAULT_CONNECTION_ID, clientManager),
+          { tableName: TABLE_NAME },
+        );
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toBe(
+          "Catalog name could not be resolved. Pass catalogName or environmentId as env-xxxxx, or set flink.environment_id in config.",
+        );
+      });
+
+      it("should report a not-found error qualified by the database when one is resolved", async () => {
+        flinkRest.GET.mockResolvedValue({
+          data: { ...SQL_RESPONSE, results: { data: [] } },
+        });
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { tableName: TABLE_NAME, databaseName: "mydb" },
+        );
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toBe(
+          `Table '${FLINK_CONN.flink.environment_id}.mydb.${TABLE_NAME}' not found.`,
+        );
+      });
+
+      it("should report a catalog-scoped not-found error when no database is resolved", async () => {
+        flinkRest.GET.mockResolvedValue({
+          data: { ...SQL_RESPONSE, results: { data: [] } },
+        });
+        const result = await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { tableName: TABLE_NAME },
+        );
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toBe(
+          `Table '${TABLE_NAME}' in catalog '${FLINK_CONN.flink.environment_id}' not found.`,
+        );
       });
 
       it("should surface BOTH statement names when an lkc-* databaseName triggers the resolver lookup", async () => {

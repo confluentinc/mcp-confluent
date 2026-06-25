@@ -21,6 +21,7 @@ import { RestartConnectorHandler } from "@src/confluent/tools/handlers/connect/r
 import { ResumeConnectorHandler } from "@src/confluent/tools/handlers/connect/resume-connector-handler.js";
 import { UpdateConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/update-connector-config-handler.js";
 import { ConfigHelpHandler } from "@src/confluent/tools/handlers/diagnostics/config-help-handler.js";
+import { DescribeConfiguredConnectionHandler } from "@src/confluent/tools/handlers/diagnostics/describe-configured-connection-handler.js";
 import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
 import { ListConfiguredConnectionsHandler } from "@src/confluent/tools/handlers/diagnostics/list-configured-connections-handler.js";
 import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
@@ -38,8 +39,8 @@ import { CheckHealthHandler } from "@src/confluent/tools/handlers/flink/diagnost
 import { DetectIssuesHandler } from "@src/confluent/tools/handlers/flink/diagnostics/detect-issues-handler.js";
 import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
 import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
+import { GetFlinkStatementResultsHandler } from "@src/confluent/tools/handlers/flink/get-flink-statement-results-handler.js";
 import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
-import { ReadFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/read-flink-statement-handler.js";
 import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alter-topic-config.js";
 import { ConsumeKafkaMessagesHandler } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
 import { CreateTopicsHandler } from "@src/confluent/tools/handlers/kafka/create-topics-handler.js";
@@ -54,6 +55,7 @@ import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
 import { QueryMetricsHandler } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ListOrganizationsHandler } from "@src/confluent/tools/handlers/organizations/list-organizations-handler.js";
+import { CreateSchemaHandler } from "@src/confluent/tools/handlers/schema/create-schema-handler.js";
 import { DeleteSchemaHandler } from "@src/confluent/tools/handlers/schema/delete-schema-handler.js";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { SearchTopicsByTagHandler } from "@src/confluent/tools/handlers/search/search-topic-by-tag-handler.js";
@@ -85,7 +87,10 @@ export class ToolHandlerRegistry {
     [ToolName.PRODUCE_MESSAGE, new ProduceKafkaMessageHandler()],
     [ToolName.LIST_FLINK_STATEMENTS, new ListFlinkStatementsHandler()],
     [ToolName.CREATE_FLINK_STATEMENT, new CreateFlinkStatementHandler()],
-    [ToolName.READ_FLINK_STATEMENT, new ReadFlinkStatementHandler()],
+    [
+      ToolName.GET_FLINK_STATEMENT_RESULTS,
+      new GetFlinkStatementResultsHandler(),
+    ],
     [ToolName.DELETE_FLINK_STATEMENTS, new DeleteFlinkStatementHandler()],
     [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS, new GetFlinkExceptionsHandler()],
     [ToolName.LIST_FLINK_CATALOGS, new ListCatalogsHandler()],
@@ -128,6 +133,7 @@ export class ToolHandlerRegistry {
     [ToolName.LIST_ENVIRONMENTS, new ListEnvironmentsHandler()],
     [ToolName.READ_ENVIRONMENT, new ReadEnvironmentHandler()],
     [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],
+    [ToolName.CREATE_SCHEMA, new CreateSchemaHandler()],
     [ToolName.DELETE_SCHEMA, new DeleteSchemaHandler()],
     [ToolName.CONSUME_MESSAGES, new ConsumeKafkaMessagesHandler()],
     [ToolName.GET_PARTITION_OFFSETS, new GetPartitionOffsetsHandler()],
@@ -180,6 +186,12 @@ export class ToolHandlerRegistry {
     [
       ToolName.CONFIG_HELP,
       new ConfigHelpHandler(() => ToolHandlerRegistry.allHandlers()),
+    ],
+    [
+      ToolName.DESCRIBE_CONFIGURED_CONNECTION,
+      new DescribeConfiguredConnectionHandler(() =>
+        ToolHandlerRegistry.allHandlers(),
+      ),
     ],
   ]);
 

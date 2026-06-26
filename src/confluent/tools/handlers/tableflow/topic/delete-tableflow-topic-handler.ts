@@ -30,7 +30,7 @@ export class DeleteTableFlowTopicHandler extends TableflowToolHandler {
     const { display_name, environmentId, clusterId } =
       deleteTableflowTopicArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

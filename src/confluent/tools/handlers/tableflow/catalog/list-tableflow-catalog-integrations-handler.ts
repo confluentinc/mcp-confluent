@@ -41,7 +41,7 @@ export class ListTableFlowCatalogIntegrationsHandler extends TableflowToolHandle
     const { clusterId, environmentId } =
       listTableFlowCatalogIntegrationsArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

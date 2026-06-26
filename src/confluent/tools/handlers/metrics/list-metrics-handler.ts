@@ -5,7 +5,7 @@ import {
   ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasTelemetry } from "@src/confluent/tools/connection-predicates.js";
+import { hasTelemetryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -146,10 +146,7 @@ export class ListMetricsHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const { resource_type } = listMetricsArguments.parse(toolArguments);
-    const { clientManager } = this.resolveDirectConnection(
-      runtime,
-      toolArguments,
-    );
+    const { clientManager } = this.resolveConnection(runtime, toolArguments);
 
     try {
       const telemetryClient =
@@ -266,5 +263,5 @@ export class ListMetricsHandler extends BaseToolHandler {
     };
   }
   readonly category = ToolCategory.Metrics;
-  readonly predicate = hasTelemetry;
+  readonly predicate = hasTelemetryOrOAuth;
 }

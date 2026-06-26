@@ -1,3 +1,4 @@
+import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import {
   buildEffectiveFilter,
@@ -8,6 +9,7 @@ import {
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
 import {
+  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   HandleCaseWithConn,
   runtimeWith,
@@ -16,8 +18,17 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  getMockedRestClient,
 } from "@tests/stubs/index.js";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mocked,
+  vi,
+} from "vitest";
 
 const KAFKA_SERVER_METRIC = "io.confluent.kafka.server/received_bytes";
 
@@ -449,6 +460,34 @@ describe("query-metrics-handler.ts", () => {
         expect(text).toContain("2024-06-01T12:01:00.000Z: N/A");
         expect(text).toContain("Group: metric.topic=shipments");
         expect(text).toContain("(no data points)");
+      });
+    });
+
+    describe("handle() under OAuth", () => {
+      it("should query without auto-injecting a kafka cluster id (OAuth carries no kafka block)", async () => {
+        const runtime = ccloudOAuthRuntime();
+        const clientManager = runtime.clientManagers[
+          DEFAULT_CONNECTION_ID
+        ] as Mocked<OAuthClientManager>;
+        const telemetryRest = getMockedRestClient();
+        telemetryRest.POST.mockResolvedValue({ data: {} });
+        clientManager.getConfluentCloudTelemetryRestClient.mockReturnValue(
+          telemetryRest,
+        );
+
+        // A direct connection would auto-inject resource.kafka.id from
+        // kafka.cluster_id; OAuth has no kafka block, so no filter is sent.
+        await handler.handle(runtime, { metric: KAFKA_SERVER_METRIC });
+
+        expect(
+          clientManager.getConfluentCloudTelemetryRestClient,
+        ).toHaveBeenCalled();
+        expect(telemetryRest.POST).toHaveBeenCalledWith(
+          "/v2/metrics/{dataset}/query",
+          expect.objectContaining({
+            body: expect.not.objectContaining({ filter: expect.anything() }),
+          }),
+        );
       });
     });
   });

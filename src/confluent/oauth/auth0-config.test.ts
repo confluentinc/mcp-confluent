@@ -2,6 +2,7 @@ import {
   getApiUrlForEnv,
   getAuth0Config,
   getCloudRestUrlForEnv,
+  getTelemetryRestUrlForEnv,
   OAUTH_CALLBACK_PATH,
   OAUTH_CALLBACK_PORT,
 } from "@src/confluent/oauth/auth0-config.js";
@@ -77,6 +78,26 @@ describe("oauth/auth0-config.ts", () => {
 
     it("should return https://api.confluent.cloud for prod", () => {
       expect(getCloudRestUrlForEnv("prod")).toBe("https://api.confluent.cloud");
+    });
+  });
+
+  describe("getTelemetryRestUrlForEnv", () => {
+    it("should return https://api.telemetry.devel.cpdev.cloud for devel", () => {
+      expect(getTelemetryRestUrlForEnv("devel")).toBe(
+        "https://api.telemetry.devel.cpdev.cloud",
+      );
+    });
+
+    it("should return https://api.telemetry.stag.cpdev.cloud for stag", () => {
+      expect(getTelemetryRestUrlForEnv("stag")).toBe(
+        "https://api.telemetry.stag.cpdev.cloud",
+      );
+    });
+
+    it("should return https://api.telemetry.confluent.cloud for prod", () => {
+      expect(getTelemetryRestUrlForEnv("prod")).toBe(
+        "https://api.telemetry.confluent.cloud",
+      );
     });
   });
 

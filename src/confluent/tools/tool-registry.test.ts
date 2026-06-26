@@ -14,7 +14,7 @@ import {
   hasFlink,
   hasSchemaRegistryOrOAuth,
   hasTableflow,
-  hasTelemetry,
+  hasTelemetryOrOAuth,
   kafkaBootstrapOrOAuth,
   kafkaRestWithAuthOrOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
@@ -266,8 +266,8 @@ describe("tool-registry.ts", () => {
         [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
         [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
         // Metrics (Telemetry API)
-        [ToolName.QUERY_METRICS]: hasTelemetry,
-        [ToolName.LIST_METRICS]: hasTelemetry,
+        [ToolName.QUERY_METRICS]: hasTelemetryOrOAuth,
+        [ToolName.LIST_METRICS]: hasTelemetryOrOAuth,
         // Documentation (no service-block requirement)
         [ToolName.SEARCH_PRODUCT_DOCS]: alwaysEnabled,
         [ToolName.GET_PRODUCT_DOC_PAGE]: alwaysEnabled,

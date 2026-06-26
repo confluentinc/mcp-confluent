@@ -9,7 +9,7 @@ import {
   canCreateDirectConnector,
   type ConnectionPredicate,
   flinkWithTelemetry,
-  hasCCloudCatalogSupport,
+  hasCCloudCatalogOrOAuth,
   hasConfluentCloudOrOAuth,
   hasFlink,
   hasSchemaRegistryOrOAuth,
@@ -28,6 +28,7 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  getMockedRestClient,
   type HandleOutcome,
   type MockedClientManager,
 } from "@tests/stubs/index.js";
@@ -233,14 +234,14 @@ describe("tool-registry.ts", () => {
         [ToolName.RESUME_CONNECTOR]: hasConfluentCloudOrOAuth,
         [ToolName.RESTART_CONNECTOR]: hasConfluentCloudOrOAuth,
         [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloudOrOAuth,
-        // Catalog + search (CCloud catalog support)
-        [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
-        [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
-        [ToolName.CREATE_TOPIC_TAGS]: hasCCloudCatalogSupport,
-        [ToolName.DELETE_TAG]: hasCCloudCatalogSupport,
-        [ToolName.REMOVE_TAG_FROM_ENTITY]: hasCCloudCatalogSupport,
-        [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupport,
-        [ToolName.LIST_TAGS]: hasCCloudCatalogSupport,
+        // Catalog + search (CCloud catalog support, widened for OAuth)
+        [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogOrOAuth,
+        [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogOrOAuth,
+        [ToolName.CREATE_TOPIC_TAGS]: hasCCloudCatalogOrOAuth,
+        [ToolName.DELETE_TAG]: hasCCloudCatalogOrOAuth,
+        [ToolName.REMOVE_TAG_FROM_ENTITY]: hasCCloudCatalogOrOAuth,
+        [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogOrOAuth,
+        [ToolName.LIST_TAGS]: hasCCloudCatalogOrOAuth,
         // Clusters
         [ToolName.LIST_CLUSTERS]: hasConfluentCloudOrOAuth,
         // Environments + billing + organizations (Confluent Cloud control plane)
@@ -486,18 +487,18 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_TAGS]: {
         outcome: { resolves: "Successfully retrieved tags" },
         setup: (cm) => {
-          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
-            data: [],
-          });
+          const sr = getMockedRestClient();
+          sr.GET.mockResolvedValue({ data: [] });
+          cm.getSchemaRegistryRestClient.mockResolvedValue(sr);
         },
       },
       // Search
       [ToolName.SEARCH_TOPICS_BY_TAG]: {
         outcome: { resolves: "{}" },
         setup: (cm) => {
-          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
-            data: {},
-          });
+          const sr = getMockedRestClient();
+          sr.GET.mockResolvedValue({ data: {} });
+          cm.getSchemaRegistryRestClient.mockResolvedValue(sr);
         },
       },
       [ToolName.SEARCH_TOPICS_BY_NAME]: { outcome: { throws: "ZodError" } },

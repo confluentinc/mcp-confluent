@@ -5,7 +5,7 @@ import {
   ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasCCloudCatalogSupport } from "@src/confluent/tools/connection-predicates.js";
+import { hasCCloudCatalogOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -13,6 +13,12 @@ import { z } from "zod";
 
 const searchTopicsByNameArguments = z.object({
   topicName: z.string().describe("The topic name to search for"),
+  environment_id: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Schema Registry. Discover via list-environments.",
+    ),
 });
 
 export class SearchTopicsByNameHandler extends BaseToolHandler {
@@ -20,13 +26,11 @@ export class SearchTopicsByNameHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
-    const { topicName } = searchTopicsByNameArguments.parse(toolArguments);
-    const { clientManager } = this.resolveDirectConnection(
-      runtime,
-      toolArguments,
-    );
+    const { topicName, environment_id } =
+      searchTopicsByNameArguments.parse(toolArguments);
+    const { clientManager } = this.resolveConnection(runtime, toolArguments);
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudSchemaRegistryRestClient(),
+      await clientManager.getSchemaRegistryRestClient(environment_id),
     );
     const { data: response, error } = await pathBasedClient[
       "/catalog/v1/search/basic?types=kafka_topic&query={topicName}"
@@ -60,5 +64,5 @@ export class SearchTopicsByNameHandler extends BaseToolHandler {
     };
   }
   readonly category = ToolCategory.Catalog;
-  readonly predicate = hasCCloudCatalogSupport;
+  readonly predicate = hasCCloudCatalogOrOAuth;
 }

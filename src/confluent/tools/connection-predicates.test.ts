@@ -7,6 +7,7 @@ import {
   allOf,
   canCreateDirectConnector,
   flinkWithTelemetry,
+  hasCCloudCatalogOrOAuth,
   hasCCloudCatalogSupport,
   hasConfluentCloud,
   hasConfluentCloudOrOAuth,
@@ -496,6 +497,28 @@ describe("connection-predicates.ts", () => {
 
     it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
       expect(hasSchemaRegistryOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
+    });
+  });
+
+  describe("hasCCloudCatalogOrOAuth", () => {
+    it("should return ENABLED for a direct CCloud-hosted Schema Registry connection", () => {
+      expect(hasCCloudCatalogOrOAuth(CCLOUD_SR_CONN)).toEqual(ENABLED);
+    });
+
+    it("should report MissingSchemaRegistryBlock for a direct connection without a schema_registry block", () => {
+      expect(hasCCloudCatalogOrOAuth(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingSchemaRegistryBlock),
+      );
+    });
+
+    it("should report MissingConfluentCloudBlock for a direct CP connection with auth-protected SR but no confluent_cloud block", () => {
+      expect(hasCCloudCatalogOrOAuth(CP_AUTH_SR_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingConfluentCloudBlock),
+      );
+    });
+
+    it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
+      expect(hasCCloudCatalogOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
     });
   });
 

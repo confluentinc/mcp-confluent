@@ -333,6 +333,15 @@ describe("index.ts", () => {
         ToolName.RESUME_CONNECTOR,
         ToolName.RESTART_CONNECTOR,
         ToolName.UPDATE_CONNECTOR_CONFIG,
+        // Catalog + search (hasCCloudCatalogOrOAuth — ride the SR REST client,
+        // which auto-resolves the SR cluster + endpoint from environment_id).
+        ToolName.SEARCH_TOPICS_BY_TAG,
+        ToolName.SEARCH_TOPICS_BY_NAME,
+        ToolName.CREATE_TOPIC_TAGS,
+        ToolName.DELETE_TAG,
+        ToolName.REMOVE_TAG_FROM_ENTITY,
+        ToolName.ADD_TAGS_TO_TOPIC,
+        ToolName.LIST_TAGS,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
@@ -353,14 +362,6 @@ describe("index.ts", () => {
         // Connect — only create-connector stays disabled (canCreateDirectConnector
         // is direct-only: it embeds a Kafka API key/secret in the connector spec).
         ToolName.CREATE_CONNECTOR,
-        // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)
-        ToolName.SEARCH_TOPICS_BY_TAG,
-        ToolName.SEARCH_TOPICS_BY_NAME,
-        ToolName.CREATE_TOPIC_TAGS,
-        ToolName.DELETE_TAG,
-        ToolName.REMOVE_TAG_FROM_ENTITY,
-        ToolName.ADD_TAGS_TO_TOPIC,
-        ToolName.LIST_TAGS,
         // Tableflow (hasTableflow — needs the tableflow service block)
         ToolName.CREATE_TABLEFLOW_TOPIC,
         ToolName.LIST_TABLEFLOW_REGIONS,

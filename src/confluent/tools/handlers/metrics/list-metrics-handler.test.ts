@@ -1,8 +1,10 @@
+import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
 import {
+  ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
   runtimeWith,
   runtimeWithDecoy,
@@ -10,9 +12,10 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  getMockedRestClient,
   type MockedRestClient,
 } from "@tests/stubs/index.js";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, type Mocked } from "vitest";
 
 const TELEMETRY_CONN = {
   telemetry: {
@@ -233,6 +236,29 @@ describe("list-metrics-handler.ts", () => {
           },
           clientManager,
         });
+      });
+    });
+
+    describe("handle() under OAuth", () => {
+      it("should resolve the telemetry client from an OAuth connection (OAuth wiring)", async () => {
+        const runtime = ccloudOAuthRuntime();
+        const clientManager = runtime.clientManagers[
+          DEFAULT_CONNECTION_ID
+        ] as Mocked<OAuthClientManager>;
+        const telemetryRest = getMockedRestClient();
+        stubDescriptors(telemetryRest, [FLINK_METRIC_DESCRIPTOR], []);
+        clientManager.getConfluentCloudTelemetryRestClient.mockReturnValue(
+          telemetryRest,
+        );
+
+        const result = await handler.handle(runtime, {
+          resource_type: "flink_statement",
+        });
+
+        expect(
+          clientManager.getConfluentCloudTelemetryRestClient,
+        ).toHaveBeenCalled();
+        expect(textOf(result)).toContain("io.confluent.flink/num_records_in");
       });
     });
   });

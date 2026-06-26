@@ -5,7 +5,7 @@ import {
   ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { hasTelemetry } from "@src/confluent/tools/connection-predicates.js";
+import { hasTelemetryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -74,7 +74,7 @@ export class QueryMetricsHandler extends BaseToolHandler {
     toolArguments: Record<string, unknown>,
   ): Promise<CallToolResult> {
     const args = queryMetricsArguments.parse(toolArguments);
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
@@ -93,7 +93,10 @@ export class QueryMetricsHandler extends BaseToolHandler {
     try {
       const telemetryClient =
         clientManager.getConfluentCloudTelemetryRestClient();
-      const connKafkaClusterId = conn.kafka?.cluster_id;
+      // OAuth connections carry no kafka block; the caller supplies
+      // `resource.kafka.id` in `filter` instead of the config fallback.
+      const connKafkaClusterId =
+        conn.type === "direct" ? conn.kafka?.cluster_id : undefined;
       const effectiveFilter = buildEffectiveFilter(
         filter,
         metric,
@@ -179,7 +182,7 @@ export class QueryMetricsHandler extends BaseToolHandler {
     };
   }
   readonly category = ToolCategory.Metrics;
-  readonly predicate = hasTelemetry;
+  readonly predicate = hasTelemetryOrOAuth;
 }
 
 /**

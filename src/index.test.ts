@@ -342,6 +342,11 @@ describe("index.ts", () => {
         ToolName.REMOVE_TAG_FROM_ENTITY,
         ToolName.ADD_TAGS_TO_TOPIC,
         ToolName.LIST_TAGS,
+        // Telemetry / Metrics (hasTelemetryOrOAuth — the Telemetry REST base
+        // URL is derived from the Auth0 environment and the surface is
+        // cloud-wide, so no per-cluster/per-env routing is needed).
+        ToolName.QUERY_METRICS,
+        ToolName.LIST_METRICS,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
@@ -374,9 +379,6 @@ describe("index.ts", () => {
         ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
         ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION,
         ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
-        // Telemetry (hasTelemetry — needs the telemetry service block)
-        ToolName.QUERY_METRICS,
-        ToolName.LIST_METRICS,
       ];
 
       it("should partition every ToolName into exactly one of EXPECTED_OAUTH_ENABLED or EXPECTED_OAUTH_DISABLED", () => {

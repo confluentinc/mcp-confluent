@@ -7,8 +7,9 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  getMockedRestClient,
 } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // Each case runs against runtimeWithDecoy, so assertHandleCase routes to the
 // real connection and asserts the decoy's client manager stays untouched.
@@ -19,13 +20,13 @@ describe("search-topics-by-name-handler.ts", () => {
     describe("handle()", () => {
       it("should resolve with matching qualified names on success", async () => {
         const clientManager = getMockedClientManager();
-        clientManager
-          .getConfluentCloudSchemaRegistryRestClient()
-          .GET.mockResolvedValue({
-            data: {
-              entities: [{ attributes: { qualifiedName: "lsrc:lkc:orders" } }],
-            },
-          });
+        const sr = getMockedRestClient();
+        sr.GET.mockResolvedValue({
+          data: {
+            entities: [{ attributes: { qualifiedName: "lsrc:lkc:orders" } }],
+          },
+        });
+        clientManager.getSchemaRegistryRestClient.mockResolvedValue(sr);
         await assertHandleCase({
           handler,
           runtime: runtimeWithDecoy(
@@ -41,9 +42,9 @@ describe("search-topics-by-name-handler.ts", () => {
 
       it("should resolve with an error response when the API returns an error", async () => {
         const clientManager = getMockedClientManager();
-        clientManager
-          .getConfluentCloudSchemaRegistryRestClient()
-          .GET.mockResolvedValue({ error: { message: "boom" } });
+        const sr = getMockedRestClient();
+        sr.GET.mockResolvedValue({ error: { message: "boom" } });
+        clientManager.getSchemaRegistryRestClient.mockResolvedValue(sr);
         await assertHandleCase({
           handler,
           runtime: runtimeWithDecoy(
@@ -71,6 +72,32 @@ describe("search-topics-by-name-handler.ts", () => {
           args: {},
           outcome: { throws: "ZodError" },
         });
+      });
+
+      it("should pass environment_id through to getSchemaRegistryRestClient (OAuth wiring)", async () => {
+        const clientManager = getMockedClientManager();
+        const sr = getMockedRestClient();
+        sr.GET.mockResolvedValue({
+          data: {
+            entities: [{ attributes: { qualifiedName: "lsrc:lkc:orders" } }],
+          },
+        });
+        clientManager.getSchemaRegistryRestClient.mockResolvedValue(sr);
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CATALOG_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { topicName: "orders", environment_id: "env-42" },
+          outcome: { resolves: "lsrc:lkc:orders" },
+          clientManager,
+        });
+
+        expect(clientManager.getSchemaRegistryRestClient).toHaveBeenCalledWith(
+          "env-42",
+        );
       });
     });
   });

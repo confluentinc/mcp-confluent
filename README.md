@@ -6,6 +6,12 @@
 An open-source [MCP server](https://modelcontextprotocol.io/) that enables AI assistants to interact with Confluent Cloud, Confluent Platform, and standalone Apache Kafka deployments through natural language.
 It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tableflow, and more -- usable from any MCP-compatible client including Claude Desktop, Claude Code, Cursor, VS Code, Goose, and Gemini CLI.
 
+> [!TIP]
+> **Already a Confluent Cloud customer?**
+> Confluent offers a [fully managed MCP server](https://docs.confluent.io/cloud/current/ai/ai-tools/managed-mcp-server.html) with no local server to run and no dependencies to install.
+> It provides access to your Confluent Cloud resources with AI-powered connector diagnostics, governed by your existing RBAC permissions.
+> Use this open-source server if you need Confluent Platform / self-managed Kafka support, or want to customize and extend the toolset.
+
 ## Quick Start
 
 > **Prerequisites:** [Node.js 22+](https://nodejs.org/).

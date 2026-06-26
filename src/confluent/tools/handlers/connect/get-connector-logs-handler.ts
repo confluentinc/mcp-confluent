@@ -1,6 +1,7 @@
-import { DirectConnectionConfig } from "@src/config/models.js";
+import { ConnectionConfig } from "@src/config/models.js";
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { nodeFetch } from "@src/confluent/node-deps.js";
+import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
@@ -178,13 +179,47 @@ async function exchangeForDataPlaneToken(
   return json.token;
 }
 
+/**
+ * Resolves the bearer token for the connector logging API.
+ *
+ * - OAuth: the data-plane token read straight from the {@link OAuthHolder} (the
+ *   server's token authority — kept separate from the client manager, which only
+ *   hands out clients). The logging API is a data-plane surface and rejects the
+ *   control-plane token with a 401; the data-plane token is the audience it
+ *   accepts. Throws if none is available.
+ * - Direct: exchanges the connection's `confluent_cloud` API key/secret for a
+ *   short-lived data-plane token via `/api/access_tokens`.
+ */
+async function resolveLogsBearerToken(
+  conn: ConnectionConfig,
+  oauthHolder: OAuthHolder | undefined,
+): Promise<string> {
+  if (conn.type === "oauth") {
+    const token = oauthHolder?.getDataPlaneToken();
+    if (!token) {
+      throw new Error(
+        "No OAuth data-plane token available to authenticate against the logging API.",
+      );
+    }
+    return token;
+  }
+  const ccAuth = conn.confluent_cloud?.auth;
+  if (!ccAuth) {
+    throw new Error(
+      "confluent_cloud.auth is required to authenticate against the logging API.",
+    );
+  }
+  return exchangeForDataPlaneToken(ccAuth.key, ccAuth.secret);
+}
+
 async function resolveOrganizationId(
   clientManager: BaseClientManager,
-  conn: DirectConnectionConfig,
+  conn: ConnectionConfig,
   argOrgId: string | undefined,
 ): Promise<string> {
   if (argOrgId) return argOrgId;
-  const configOrgId = conn.confluent_cloud?.organization_id;
+  const configOrgId =
+    conn.type === "direct" ? conn.confluent_cloud?.organization_id : undefined;
   if (configOrgId) return configOrgId;
 
   const pathBasedClient = wrapAsPathBasedClient(
@@ -200,8 +235,14 @@ async function resolveOrganizationId(
   }
   const first = data?.data?.[0]?.id;
   if (!first) {
+    // The config-fallback hint only applies to direct connections — an OAuth
+    // connection has no `confluent_cloud` block to set `organization_id` on.
+    const fallbackHint =
+      conn.type === "direct"
+        ? "Pass organizationId or set confluent_cloud.organization_id in the connection config."
+        : "Pass organizationId.";
     throw new Error(
-      "Failed to auto-resolve organization ID: GET /org/v2/organizations returned no organizations. Pass organizationId or set confluent_cloud.organization_id in the connection config.",
+      `Failed to auto-resolve organization ID: GET /org/v2/organizations returned no organizations. ${fallbackHint}`,
     );
   }
   return first;
@@ -214,7 +255,7 @@ export class GetConnectorLogsHandler extends ConnectToolHandler {
   ): Promise<CallToolResult> {
     const args = getConnectorLogsArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
@@ -225,12 +266,6 @@ export class GetConnectorLogsHandler extends ConnectToolHandler {
         args.clusterId,
       );
 
-    const ccAuth = conn.confluent_cloud?.auth;
-    if (!ccAuth) {
-      throw new Error(
-        "confluent_cloud.auth is required to authenticate against the logging API.",
-      );
-    }
     const organization_id = await resolveOrganizationId(
       clientManager,
       conn,
@@ -263,12 +298,9 @@ export class GetConnectorLogsHandler extends ConnectToolHandler {
       end_time: endTime,
     };
 
-    let dataPlaneToken: string;
+    let bearerToken: string;
     try {
-      dataPlaneToken = await exchangeForDataPlaneToken(
-        ccAuth.key,
-        ccAuth.secret,
-      );
+      bearerToken = await resolveLogsBearerToken(conn, runtime.oauthHolder);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return this.createResponse(
@@ -282,7 +314,7 @@ export class GetConnectorLogsHandler extends ConnectToolHandler {
       queryParams.set("page_token", args.pageToken);
     }
     const url = `${LOGGING_API_BASE}/logs/v1/search?${queryParams.toString()}`;
-    const authHeader = `Bearer ${dataPlaneToken}`;
+    const authHeader = `Bearer ${bearerToken}`;
 
     let response: Response;
     try {

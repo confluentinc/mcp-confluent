@@ -10,7 +10,6 @@ import {
   type ConnectionPredicate,
   flinkWithTelemetry,
   hasCCloudCatalogSupport,
-  hasConfluentCloud,
   hasConfluentCloudOrOAuth,
   hasFlink,
   hasSchemaRegistryOrOAuth,
@@ -124,6 +123,7 @@ describe("tool-registry.ts", () => {
           "detect",
           "query",
           "consume",
+          "config",
         ]);
         const createUpdatePrefixes = new Set([
           "create",
@@ -217,21 +217,23 @@ describe("tool-registry.ts", () => {
         [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlink,
         [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
         [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
-        // Connect
-        [ToolName.LIST_CONNECTORS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_CONFIG]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_OFFSETS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_STATUS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloud,
+        // Connect — OAuth-capable (ride the cloud REST client); create-connector
+        // stays direct-only (embeds a Kafka API key/secret in the connector spec).
+        [ToolName.LIST_CONNECTORS]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_CONFIG]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_OFFSETS]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_STATUS]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloudOrOAuth,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
-        [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_LOGS]: hasConfluentCloud,
-        [ToolName.PAUSE_CONNECTOR]: hasConfluentCloud,
-        [ToolName.RESUME_CONNECTOR]: hasConfluentCloud,
-        [ToolName.RESTART_CONNECTOR]: hasConfluentCloud,
-        [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloud,
+        [ToolName.DELETE_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]:
+          hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_LOGS]: hasConfluentCloudOrOAuth,
+        [ToolName.PAUSE_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.RESUME_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.RESTART_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloudOrOAuth,
         // Catalog + search (CCloud catalog support)
         [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
         [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
@@ -272,6 +274,7 @@ describe("tool-registry.ts", () => {
         // Diagnostics (no service-block requirement)
         [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
         [ToolName.LIST_CONFIGURED_CONNECTIONS]: alwaysEnabled,
+        [ToolName.CONFIG_HELP]: alwaysEnabled,
         [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: alwaysEnabled,
       };
 
@@ -569,7 +572,7 @@ describe("tool-registry.ts", () => {
       [ToolName.GET_PRODUCT_DOC_PAGE]: { outcome: { throws: "ZodError" } },
       // Diagnostics — no client calls; the handler walks the registry's
       // own predicate map. Against `allServicesRuntime` every gate passes
-      // and the handler emits its all-enabled summary.
+      // and the handler emits its all-advertised summary.
       [ToolName.EXPLAIN_DISABLED_TOOLS]: {
         outcome: { resolves: "registered tools are advertised via tools/list" },
         bypassesClientLayer: true,
@@ -579,6 +582,12 @@ describe("tool-registry.ts", () => {
       // connection-count header.
       [ToolName.LIST_CONFIGURED_CONNECTIONS]: {
         outcome: { resolves: "1 connection configured:" },
+        bypassesClientLayer: true,
+      },
+      // config-help requires a `tool` arg; zero args fails Zod parse before
+      // it ever reaches the registry walk or any client.
+      [ToolName.CONFIG_HELP]: {
+        outcome: { throws: "ZodError" },
         bypassesClientLayer: true,
       },
       // describe-configured-connection requires a connectionId argument, so the

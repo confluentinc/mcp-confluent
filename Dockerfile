@@ -24,7 +24,10 @@ RUN pnpm run build
 # remove dev dependencies, keeping compiled native modules intact. pnpm uses
 # relative symlinks with the .pnpm store nested under node_modules, so the
 # pruned node_modules copies cleanly into the production stage below.
-RUN pnpm prune --prod
+# --ignore-scripts skips the `prepare` lifecycle (husky), which pnpm runs after
+# pruning; husky is a devDependency that prune just removed, so without this the
+# step dies on `sh: husky: not found`
+RUN pnpm prune --prod --ignore-scripts
 
 # Production stage
 FROM ${NODE_IMAGE}

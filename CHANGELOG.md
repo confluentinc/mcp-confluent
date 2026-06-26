@@ -11,6 +11,8 @@ All notable changes to this MCP server will be documented in this file.
 ### Fixed
 
 - `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.
+- `explain-disabled-tools` now accounts for tools the operator excluded via `--allow-tools` / `--block-tools`; previously (since v1.3.0) such tools were ignored by the diagnostic, which either counted them as enabled — contradicting `tools/list` — or blamed a missing config block. They now appear in a dedicated server-wide block.
+- Introduced new optional tool argument `messageName` to `produce-message` tool to fix producing messages using PROTOBUF as format ([#127](https://github.com/confluentinc/mcp-confluent/issues/127))
 
 ### Changed
 
@@ -25,13 +27,16 @@ All notable changes to this MCP server will be documented in this file.
 #### New Tools / Tool Features
 
 - **`create-schema` tool.** Registers a schema (or a new version) under a subject in the Schema Registry, peer to `list-schemas` and `delete-schema`.
+- **`explain-disabled-tools` now reports per connection.** The "why is this tool missing?" report is split into one section per configured connection, each with its own disabled-tool buckets and counts — so a tool live on one connection and dark on another surfaces under exactly the connection that gates it, rather than being flattened to a single server-wide verdict.
 - **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.
 - **`describe-configured-connection` tool.** Read-only, always-enabled discovery tool that, given one connection id, reports its non-secret config (never credentials), read-only-ness, and the tools enabled on it alongside the reason each disabled tool is gated off.
+- **`config-help` tool.** Read-only, always-enabled tool that, given a target tool name, reports per connection the config gap keeping that tool disabled and returns a paste-ready YAML snippet to close it — or a note when the fix isn't a block to add (an OAuth or `read_only` connection). Suggests only; it never edits the config file.
 - **`produce-message` improvements:**
   - **Record-level `partition`, `timestamp`, and `headers`.** Three optional arguments for faithfully reproducing a record on another cluster: `partition` (non-negative integer) pins the target partition; `timestamp` accepts a `Date.parse`-able date-time string (ISO 8601 recommended) or a non-negative integer ms-since-epoch number (an unparseable value returns an error instead of silently stamping wall-clock time); `headers` maps a header name to a string or array of strings (multi-valued), carried as raw Kafka headers independent of Schema Registry serialization.
   - **Support for schema-id-in-headers**: The tool can be asked to encode the schema GUID(s) (UUIDs) in the Kafka message headers. By default, however, schema IDs are encoded in the payload's magic-byte prefix (the standard Confluent wire format).
 - **`consume-messages` tool** now also supports deserializing records based on schema GUIDs encoded in the message headers (`__value_schema_id` / `__key_schema_id`), and surfaces those header-located schema GUIDs in the returned headers so callers can see which schema each record used.
 - **`search-messages` tool.** Read-only full-text search across the messages of one or more Kafka topics. Scans up to `maxScanned` messages from earliest across every partition and returns only the (up to `maxMatches`) records whose decoded key/value/headers match `query` — a case-insensitive substring by default, or a regular expression (`queryMode: "regex"`, accepting both bare patterns and `/pattern/flags` regex-literal syntax). Matching runs after Schema Registry deserialization so callers search the decoded representation, not raw bytes. Shares the deserialization path with `consume-messages`.
+- **Connector tools now work under OAuth.** All Connector tools except `create-connector` (which stays `direct`-only) are enabled for OAuth connections.
 
 ## 1.4.0
 

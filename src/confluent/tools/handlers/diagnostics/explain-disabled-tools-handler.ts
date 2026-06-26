@@ -4,9 +4,13 @@ import {
   ToolCategory,
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
-import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
+import {
+  alwaysEnabled,
+  ToolDisabledReason,
+} from "@src/confluent/tools/connection-predicates.js";
 import {
   buildToolGatingReport,
+  type ConnectionGatingSection,
   type DisabledToolGroup,
   disabledToolGroupKey,
   type ToolGatingReport,
@@ -21,35 +25,26 @@ const explainDisabledToolsArguments = z.object({
     .enum(["reason", "category"])
     .default("reason")
     .describe(
-      'Axis to bucket disabled tools by. "reason" (default) answers "what config piece would unlock these?" — each bucket is a ToolDisabledReason (MissingKafkaBlock, MissingFlinkBlock, …). "category" answers "which functional area is offline?" — each bucket is a ToolCategory (kafka, flink, schema-registry, …). Flip to "category" when triaging a misconfigured connection by functional area instead of by missing config piece.',
+      'Axis to bucket each connection\'s disabled tools by. "reason" (default) answers "what config piece would unlock these?" — each bucket is a ToolDisabledReason (MissingKafkaBlock, MissingFlinkBlock, …). "category" answers "which functional area is offline?" — each bucket is a ToolCategory (kafka, flink, schema-registry, …). Flip to "category" when triaging a misconfigured connection by functional area instead of by missing config piece.',
     ),
 });
 
 /**
- * Diagnostic tool that surfaces *why* tools are absent from `tools/list`.
+ * Diagnostic tool that surfaces *why* tools are absent from `tools/list` or
+ * unavailable on a given connection.
  *
- * The MCP protocol already advertises the enabled tool set via `tools/list`;
- * what it does not surface is the predicate-driven decision behind every
- * absence — which config piece is missing, and which tools each gap would
- * unlock. This handler returns that view.
+ * `tools/list` advertises the enabled tool set but not the predicate-driven
+ * decision behind every absence. This handler returns that view, shaped around
+ * connections: one section per configured connection listing the tools
+ * disabled on it (bucketed by the missing config piece, or by functional area
+ * under `group_by="category"`). A tool enabled on one connection and disabled
+ * on another shows up in the latter's section, so the cross-connection
+ * asymmetry is readable by comparing sections. A zero-connection config
+ * collapses to a dedicated summary; a single-connection config is simply one
+ * section. Connection-independent tools are advertised everywhere and never
+ * appear in a section.
  *
- * Current shape: a flat list of disabled tools grouped by the missing config
- * piece (kafka block, flink block, schema registry block, …), or by
- * `NoConnectionsConfigured` when the config has no connections at all. Tools
- * enabled on any connection are intentionally absent — `tools/list` already
- * advertises them.
- *
- * The flatten is *lossy* on a multi-connection config: a tool enabled on at
- * least one connection is reported as enabled (and omitted from
- * `disabledGroups` entirely), and a tool disabled on several connections with
- * different reasons is bucketed under the first disabled verdict its iteration
- * produces — the cross-connection asymmetry vanishes from the output.
- *
- * #559 regrows the output around connections: one block per connection
- * (header + per-connection gaps) plus a `Cross-connection deltas` section
- * surfacing tools enabled on some connections but not others — the canonical
- * "what does connection B need to reach parity with connection A?" view. The
- * structured `_meta` shape mirrors that change; see the
+ * The structured `_meta` mirrors the rendered text; see the
  * {@linkcode ToolGatingReport} JSDoc in `tool-availability.ts`.
  *
  * Always enabled (predicate is `alwaysEnabled`) so an operator can call it
@@ -78,7 +73,7 @@ export class ExplainDisabledToolsHandler extends ToolMetadataHandler {
     return {
       name: ToolName.EXPLAIN_DISABLED_TOOLS,
       description:
-        'Call when the user asks why a tool is missing or unavailable (e.g., "why can\'t I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools grouped by the config gap each one is waiting on, so you can tell the user the exact YAML block or field to add. Pass group_by="category" to regroup by functional area (kafka, flink, schema-registry, …) when the user\'s question is framed by what\'s offline rather than by what\'s missing from config. Prefer this over guessing about credentials, network, or auth.',
+        'Call when the user asks why a tool is missing or unavailable (e.g., "why can\'t I list Kafka topics?", "where are the Flink tools?"). Returns disabled tools organized per connection — each connection\'s gaps bucketed by the config piece each tool is waiting on, so you can tell the user the exact YAML block or field to add (and, with more than one connection, which connection needs it). Pass group_by="category" to bucket each connection\'s gaps by functional area (kafka, flink, schema-registry, …) instead of by missing config piece. Prefer this over guessing about credentials, network, or auth.',
       inputSchema: explainDisabledToolsArguments.shape,
       annotations: READ_ONLY,
     };
@@ -93,58 +88,113 @@ export class ExplainDisabledToolsHandler extends ToolMetadataHandler {
  * the tool's response. Format is stable — handler tests pin specific
  * substrings so the AI/script-facing structure does not drift silently.
  *
- * The heading line varies by `report.groupBy`:
+ * Two orthogonal parts, each present only when it has something to say, joined
+ * by a blank line:
+ *   - the server-wide operator allow/block-list block, when any tool was
+ *     excluded by it (rendered first, since the operator filter is the
+ *     outermost gate);
+ *   - the connection-shaped part: a no-connections summary, or a
+ *     `Per-connection tool gating (by {axis}):` heading with one section per
+ *     gapped connection and a closing advertised-count line.
  *
- *   - `"reason"`: "{disabled} of {total} tools disabled for the following reasons:"
- *   - `"category"`: "{disabled} of {total} tools disabled across the following categories:"
+ * When neither part has anything to report, a one-line "all advertised"
+ * summary stands in.
  *
- * Body shape is identical for both axes — one header line per bucket
- * followed by indented `- {tool}` bullets, separated by a blank line:
+ * Operator block (top-level header, two-space bullets):
  *
- *   {disabled} of {total} tools disabled for the following reasons:
+ *   excluded by the operator's allow/block-list (2):
+ *     - list-topics
+ *     - create-topics
  *
- *     {reason or category} ({n}):
- *       - {tool}
- *       - {tool}
- *       …
+ * Section layout (two-space connection header, four-space bucket header,
+ * six-space bullets):
  *
- *     {next bucket} ({n}):
- *       - {tool}
- *       …
+ *   Per-connection tool gating (by reason):
+ *
+ *     Connection 'local-kafka' — 3 of 40 tools disabled:
+ *       {reason or category} ({n}):
+ *         - {tool}
+ *         …
  *
  *   {enabled} tools advertised via tools/list.
- *
- * Two-space indent on the bucket header, four-space indent on the bullets.
- *
- * v2 (#559, multi-connection): grow a per-connection section (header +
- * per-connection gaps) plus an optional `Cross-connection deltas` section.
- * See the handler's class JSDoc for the migration sketch.
  */
 function renderReport(report: ToolGatingReport): string {
   const total = report.enabledCount + report.disabledCount;
-  if (report.disabledCount === 0) {
+
+  const operatorBlock =
+    report.operatorBlocked.length > 0
+      ? renderOperatorBlock(report.operatorBlocked)
+      : undefined;
+  const connectionPart = renderConnectionPart(report, total);
+
+  if (operatorBlock === undefined && connectionPart === undefined) {
     return `All ${total} registered tools are advertised via tools/list.`;
   }
 
-  const headingTail =
-    report.groupBy === "reason"
-      ? "for the following reasons"
-      : "across the following categories";
+  // Blank line between the two parts so they stay visually separate.
+  return [operatorBlock, connectionPart]
+    .filter((part): part is string => part !== undefined)
+    .join("\n\n");
+}
 
-  // Each group's render contains its own header line + indented bullets;
-  // joining with a blank line separates groups visually so long bullet
-  // lists from one group don't bleed into the next.
+/**
+ * The connection-shaped portion of the report, or `undefined` when there is
+ * nothing connection-side to say (a zero-connection config whose only disabled
+ * tools are operator-blocked, or a populated config with every
+ * connection-dependent tool advertised). The operator-blocked tally is
+ * excluded from the no-connections "connection-gated" count — those tools are
+ * already accounted for in the operator block.
+ */
+function renderConnectionPart(
+  report: ToolGatingReport,
+  total: number,
+): string | undefined {
+  if (report.connections.length === 0) {
+    const connectionGated =
+      report.disabledCount - report.operatorBlocked.length;
+    if (connectionGated === 0) return undefined;
+    return `No connections are configured — ${connectionGated} of ${total} tools are connection-gated and unavailable; ${report.enabledCount} connection-independent tools remain available.`;
+  }
+
+  const gappedSections = report.connections.filter(
+    (section) => section.disabledCount > 0,
+  );
+  if (gappedSections.length === 0) return undefined;
+
+  // Per-connection section denominators exclude operator-blocked tools so the
+  // "X of Y" counts are self-consistent with what each section represents.
+  const connectionRoutableTotal = total - report.operatorBlocked.length;
+
   return [
-    `${report.disabledCount} of ${total} tools disabled ${headingTail}:`,
-    "",
-    report.disabledGroups.map(renderGroup).join("\n\n"),
-    "",
+    `Per-connection tool gating (by ${report.groupBy}):`,
+    ...gappedSections.map((section) =>
+      renderConnectionSection(section, connectionRoutableTotal),
+    ),
     `${report.enabledCount} tools advertised via tools/list.`,
-  ].join("\n");
+  ].join("\n\n");
+}
+
+/**
+ * Render the server-wide operator allow/block-list block: a header naming the
+ * reason and count, then one two-space bullet per excluded tool in handler
+ * iteration order.
+ */
+function renderOperatorBlock(blocked: readonly ToolName[]): string {
+  const header = `${ToolDisabledReason.OperatorBlocked} (${blocked.length}):`;
+  const bullets = blocked.map((tool) => `  - ${tool}`);
+  return [header, ...bullets].join("\n");
+}
+
+function renderConnectionSection(
+  section: ConnectionGatingSection,
+  total: number,
+): string {
+  const header = `  Connection '${section.connectionId}' — ${section.disabledCount} of ${total} tools disabled:`;
+  return [header, ...section.disabledGroups.map(renderGroup)].join("\n");
 }
 
 function renderGroup(group: DisabledToolGroup): string {
-  const header = `  ${disabledToolGroupKey(group)} (${group.tools.length}):`;
-  const bullets = group.tools.map((tool) => `    - ${tool}`);
+  const header = `    ${disabledToolGroupKey(group)} (${group.tools.length}):`;
+  const bullets = group.tools.map((tool) => `      - ${tool}`);
   return [header, ...bullets].join("\n");
 }

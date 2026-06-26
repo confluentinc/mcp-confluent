@@ -1,4 +1,5 @@
 import {
+  getApiUrlForEnv,
   getAuth0Config,
   getCloudRestUrlForEnv,
   OAUTH_CALLBACK_PATH,
@@ -44,6 +45,20 @@ describe("oauth/auth0-config.ts", () => {
 
       expect(new Set(callbacks).size).toBe(1);
       expect(callbacks[0]).toContain("127.0.0.1:26640");
+    });
+  });
+
+  describe("getApiUrlForEnv", () => {
+    it("should return https://devel.cpdev.cloud for devel", () => {
+      expect(getApiUrlForEnv("devel")).toBe("https://devel.cpdev.cloud");
+    });
+
+    it("should return https://stag.cpdev.cloud for stag", () => {
+      expect(getApiUrlForEnv("stag")).toBe("https://stag.cpdev.cloud");
+    });
+
+    it("should return https://confluent.cloud for prod", () => {
+      expect(getApiUrlForEnv("prod")).toBe("https://confluent.cloud");
     });
   });
 

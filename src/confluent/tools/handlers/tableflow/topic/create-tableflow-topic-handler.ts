@@ -73,7 +73,7 @@ export class CreateTableFlowTopicHandler extends TableflowToolHandler {
     const { environmentId, clusterId, tableflowTopicConfig } =
       createTableflowTopicArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

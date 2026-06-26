@@ -52,7 +52,7 @@ export class CreateTableFlowCatalogIntegrationHandler extends TableflowToolHandl
     const { environmentId, clusterId, tableflowCatalogIntegrationConfig } =
       createTableflowCatalogIntegrationArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

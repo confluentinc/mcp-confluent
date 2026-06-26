@@ -1,4 +1,5 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
+import type { OAuthConnectionConfig } from "@src/config/models.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import { TableflowToolHandler } from "@src/confluent/tools/handlers/tableflow/tableflow-tool-handler.js";
@@ -127,6 +128,46 @@ describe("tableflow-tool-handler.ts", () => {
             undefined,
           ),
         ).toThrow("Kafka Cluster ID is required");
+      });
+
+      describe("under an OAuth connection", () => {
+        const oauthConn: OAuthConnectionConfig = {
+          type: "oauth",
+          ccloud_env: "devel",
+        };
+
+        it("should use both args when present (no config fallback exists)", () => {
+          expect(
+            handler["resolveTableflowEnvAndClusterId"](
+              oauthConn,
+              "env-from-arg",
+              "lkc-from-arg",
+            ),
+          ).toEqual({
+            environment_id: "env-from-arg",
+            kafka_cluster_id: "lkc-from-arg",
+          });
+        });
+
+        it("should throw a discovery hint when environmentId is omitted", () => {
+          expect(() =>
+            handler["resolveTableflowEnvAndClusterId"](
+              oauthConn,
+              undefined,
+              "lkc-from-arg",
+            ),
+          ).toThrow("required under OAuth connection type");
+        });
+
+        it("should throw a discovery hint when clusterId is omitted", () => {
+          expect(() =>
+            handler["resolveTableflowEnvAndClusterId"](
+              oauthConn,
+              "env-from-arg",
+              undefined,
+            ),
+          ).toThrow("required under OAuth connection type");
+        });
       });
     });
   });

@@ -30,7 +30,7 @@ export class ReadTableFlowTopicHandler extends TableflowToolHandler {
     const { display_name, environmentId, clusterId } =
       readTableflowTopicArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

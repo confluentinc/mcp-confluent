@@ -400,6 +400,24 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
+    describe("control-plane REST surfaces", () => {
+      it("should build the telemetry REST client without throwing 'endpoint not configured'", () => {
+        const manager = buildManager();
+        // Telemetry's base URL is derived from the Auth0 environment
+        expect(() =>
+          manager.getConfluentCloudTelemetryRestClient(),
+        ).not.toThrow();
+      });
+
+      it("should build the tableflow REST client without throwing 'endpoint not configured'", () => {
+        const manager = buildManager();
+        // Tableflow re-uses the cloud base URL, which is always populated under OAuth
+        expect(() =>
+          manager.getConfluentCloudTableflowRestClient(),
+        ).not.toThrow();
+      });
+    });
+
     describe("disconnect()", () => {
       it("should be a no-op (no caches to drain — clients are caller-owned)", async () => {
         const manager = buildManager();

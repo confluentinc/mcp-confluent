@@ -3,9 +3,8 @@ export type Auth0Environment = "devel" | "stag" | "prod";
 export interface Auth0Config {
   clientId: string;
   domain: string;
+  /** Confluent Cloud session/login API base URL (no `api.` prefix, e.g. https://confluent.cloud for prod). Used by the token-exchange chain. */
   apiUrl: string;
-  /** Confluent Cloud REST API base URL for this environment (e.g. https://api.confluent.cloud for prod). */
-  cloudRestUrl: string;
   callbackUrl: string;
   scopes: string;
 }

@@ -20,6 +20,7 @@ import {
   hasSchemaRegistryOrOAuth,
   hasTableflow,
   hasTelemetry,
+  hasTelemetryOrOAuth,
   kafkaBootstrapOrOAuth,
   kafkaRestWithAuthOrOAuth,
   widenForOAuth,
@@ -497,6 +498,22 @@ describe("connection-predicates.ts", () => {
 
     it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
       expect(hasSchemaRegistryOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
+    });
+  });
+
+  describe("hasTelemetryOrOAuth", () => {
+    it("should return ENABLED for a direct connection with a telemetry block", () => {
+      expect(hasTelemetryOrOAuth(TELEMETRY_CONN)).toEqual(ENABLED);
+    });
+
+    it("should report MissingTelemetryBlock for a direct connection without a telemetry block", () => {
+      expect(hasTelemetryOrOAuth(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingTelemetryBlock),
+      );
+    });
+
+    it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
+      expect(hasTelemetryOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
     });
   });
 

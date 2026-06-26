@@ -66,6 +66,18 @@ export function getCloudRestUrlForEnv(environment: Auth0Environment): string {
   return `https://api.${CCLOUD_DOMAINS[environment]}`;
 }
 
+/**
+ * Returns the Confluent Cloud Telemetry REST API base URL
+ * (`api.telemetry.` prefix) for the given Auth0 environment. Used by
+ * {@link OAuthClientManager} to point the telemetry/metrics surface at the
+ * right host under OAuth.
+ */
+export function getTelemetryRestUrlForEnv(
+  environment: Auth0Environment,
+): string {
+  return `https://api.telemetry.${CCLOUD_DOMAINS[environment]}`;
+}
+
 export function getAuth0Config(environment: Auth0Environment): Auth0Config {
   return {
     ...AUTH0_CLIENTS[environment],

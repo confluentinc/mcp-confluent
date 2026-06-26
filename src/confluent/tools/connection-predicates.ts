@@ -298,6 +298,17 @@ export const hasCCloudCatalogOrOAuth: ConnectionPredicate = widenForOAuth(
 );
 
 /**
+ * The Telemetry gate, widened to admit OAuth. Direct connections still need a
+ * `telemetry` block; OAuth connections satisfy it unconditionally — the
+ * Telemetry REST base URL is derived from the Auth0 environment
+ * (`getTelemetryRestUrlForEnv`) and the surface is cloud-wide (no per-cluster
+ * or per-environment routing). Use on the metrics handlers (`query-metrics`,
+ * `list-metrics`).
+ */
+export const hasTelemetryOrOAuth: ConnectionPredicate =
+  widenForOAuth(hasTelemetry);
+
+/**
  * Gate for tools that create connectors against the direct Confluent Cloud
  * REST surface: requires both a `confluent_cloud` block (the `/connect/v1`
  * endpoint) and `kafka.auth` (the connector spec carries kafka API

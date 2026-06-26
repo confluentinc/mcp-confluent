@@ -37,7 +37,10 @@ import {
   resolveSchemaRegistryClusterId,
   resolveSchemaRegistryEndpoint,
 } from "@src/confluent/oauth-resource-resolvers.js";
-import { getCloudRestUrlForEnv } from "@src/confluent/oauth/auth0-config.js";
+import {
+  getCloudRestUrlForEnv,
+  getTelemetryRestUrlForEnv,
+} from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
 import type { paths } from "@src/confluent/openapi-schema.js";
@@ -62,9 +65,9 @@ type PostProcessTokenRefresh = (
 
 /**
  * Bearer-auth client manager. Wires every REST surface to the OAuth holder's
- * tokens — control plane (cloud / tableflow / telemetry) reads
+ * tokens — control plane (cloud / tableflow) reads
  * {@link OAuthHolder.getControlPlaneToken}; data plane (flink / schema-registry
- * REST / kafka REST) reads {@link OAuthHolder.getDataPlaneToken}. Cloud REST URL
+ * REST / kafka REST / telemetry) reads {@link OAuthHolder.getDataPlaneToken}. Cloud REST URL
  * is auto-derived from the CCloud env. Native Kafka clients (admin, producer,
  * consumer) are built fresh per call against bootstrap endpoints resolved
  * via the cmk REST API; SASL/OAUTHBEARER is configured via librdkafka's
@@ -91,12 +94,12 @@ export class OAuthClientManager extends BaseClientManager {
         flink: undefined,
         schemaRegistry: undefined,
         kafka: undefined,
-        telemetry: undefined,
+        telemetry: getTelemetryRestUrlForEnv(env),
       },
       auth: {
         cloud: { type: "oauth", getToken: cpToken },
         tableflow: { type: "oauth", getToken: cpToken },
-        telemetry: { type: "oauth", getToken: cpToken },
+        telemetry: { type: "oauth", getToken: dpToken },
         flink: { type: "oauth", getToken: dpToken },
         schemaRegistry: { type: "oauth", getToken: dpToken },
         kafka: { type: "oauth", getToken: dpToken },

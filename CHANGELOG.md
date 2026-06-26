@@ -26,6 +26,10 @@ All notable changes to this MCP server will be documented in this file.
 
 #### New Tools / Tool Features
 
+- **More tool families now work under OAuth.** Additional Confluent Cloud tool families are now usable from an OAuth (PKCE) connection, not just `direct` connections with static API keys.
+  - **Connectors.** All 13 tools except `create-connector` (which stays `direct`-only, since its spec embeds a Kafka API key/secret).
+  - **Catalog & Tags.** All 7 tools (`search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`); pass `environment_id` to target the Schema Registry.
+  - **Metrics.** Both tools (`list-available-metrics`, `query-metrics`)
 - **`create-schema` tool.** Registers a schema (or a new version) under a subject in the Schema Registry, peer to `list-schemas` and `delete-schema`.
 - **`explain-disabled-tools` now reports per connection.** The "why is this tool missing?" report is split into one section per configured connection, each with its own disabled-tool buckets and counts — so a tool live on one connection and dark on another surfaces under exactly the connection that gates it, rather than being flattened to a single server-wide verdict.
 - **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.
@@ -35,8 +39,6 @@ All notable changes to this MCP server will be documented in this file.
   - **Record-level `partition`, `timestamp`, and `headers`.** Three optional arguments for faithfully reproducing a record on another cluster: `partition` (non-negative integer) pins the target partition; `timestamp` accepts a `Date.parse`-able date-time string (ISO 8601 recommended) or a non-negative integer ms-since-epoch number (an unparseable value returns an error instead of silently stamping wall-clock time); `headers` maps a header name to a string or array of strings (multi-valued), carried as raw Kafka headers independent of Schema Registry serialization.
   - **Support for schema-id-in-headers**: The tool can be asked to encode the schema GUID(s) (UUIDs) in the Kafka message headers. By default, however, schema IDs are encoded in the payload's magic-byte prefix (the standard Confluent wire format).
 - **`consume-messages` tool** now also supports deserializing records based on schema GUIDs encoded in the message headers (`__value_schema_id` / `__key_schema_id`), and surfaces those header-located schema GUIDs in the returned headers so callers can see which schema each record used.
-- **Connector tools now work under OAuth.** All Connector tools except `create-connector` (which stays `direct`-only) are enabled for OAuth connections.
-- **Catalog & tag tools now work under OAuth.** All 7 Catalog & Tags tools (`search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`) are enabled for OAuth connections; pass `environment_id` to target the Schema Registry.
 
 ## 1.4.0
 

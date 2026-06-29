@@ -5,7 +5,10 @@ import {
 } from "@src/config/models.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
+import {
+  FlinkRoutingArgs,
+  FlinkToolHandler,
+} from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { FLINK_CONN } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
@@ -123,23 +126,35 @@ describe("flink-tool-handler.ts", () => {
         });
       });
 
-      it("should throw a discovery hint under OAuth when computePoolId is omitted", () => {
-        expect(() =>
-          handler["resolveFlinkRouting"](oauthConn, {
-            organizationId: "org-arg",
-            environmentId: "env-arg",
-          }),
-        ).toThrow("required under OAuth connection type");
-      });
+      // Each row drops exactly one of the three required ids so every conjunct
+      // of the OAuth guard (!organization_id || !environment_id ||
+      // !compute_pool_id) is pinned independently.
+      const oauthMissingCases: Array<{
+        omitted: string;
+        args: FlinkRoutingArgs;
+      }> = [
+        {
+          omitted: "organizationId",
+          args: { environmentId: "env-arg", computePoolId: "lfcp-arg" },
+        },
+        {
+          omitted: "environmentId",
+          args: { organizationId: "org-arg", computePoolId: "lfcp-arg" },
+        },
+        {
+          omitted: "computePoolId",
+          args: { organizationId: "org-arg", environmentId: "env-arg" },
+        },
+      ];
 
-      it("should throw a discovery hint under OAuth when organizationId is omitted", () => {
-        expect(() =>
-          handler["resolveFlinkRouting"](oauthConn, {
-            environmentId: "env-arg",
-            computePoolId: "lfcp-arg",
-          }),
-        ).toThrow("required under OAuth connection type");
-      });
+      it.each(oauthMissingCases)(
+        "should throw a discovery hint under OAuth when $omitted is omitted",
+        ({ args }) => {
+          expect(() => handler["resolveFlinkRouting"](oauthConn, args)).toThrow(
+            "required under OAuth connection type",
+          );
+        },
+      );
     });
   });
 });

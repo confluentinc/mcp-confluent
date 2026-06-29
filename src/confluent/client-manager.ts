@@ -42,8 +42,9 @@ export interface ConfluentCloudRestClientManager {
   getConfluentCloudFlinkRestClient(): ConfluentRestClient;
   /**
    * Env- and compute-pool-aware REST client for Confluent Cloud Flink
-   * operations. Use from handlers that need OAuth support; the sync getter
-   * above stays in use by direct-only call sites and is unaffected.
+   * operations. This is the accessor Flink handlers call on both connection
+   * types; the sync getter above is retained only as the base-class default
+   * that this method delegates to on direct connections.
    *
    * Under direct, the args are ignored and a client is built against the
    * `flink.endpoint` from the connection config (the base URL is already

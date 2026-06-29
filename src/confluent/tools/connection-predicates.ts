@@ -327,8 +327,9 @@ export const hasTableflowOrOAuth: ConnectionPredicate =
  * `cloud`/`region` (`getFlinkRestClient`), and the surface rides the
  * data-plane token. The organization/environment/compute-pool IDs a Flink call
  * needs are supplied as explicit tool arguments under OAuth (an OAuth
- * connection carries no `flink` block to fall back to). Use on the Flink
- * statement and catalog handlers.
+ * connection carries no `flink` block to fall back to). Used as the
+ * `FlinkToolHandler` domain-base predicate, so it gates every Flink handler —
+ * statement, catalog, and diagnostics.
  */
 export const hasFlinkOrOAuth: ConnectionPredicate = widenForOAuth(hasFlink);
 

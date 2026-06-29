@@ -85,7 +85,10 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
         environmentId,
         computePoolId,
       });
-    const flink = conn.type === "direct" ? conn.flink : undefined;
+    // resolveFlinkRouting already asserted the flink block on direct, so
+    // getFlinkDirectConfig keeps that invariant explicit here.
+    const flink =
+      conn.type === "direct" ? this.getFlinkDirectConfig(conn) : undefined;
     const resolvedCatalogName = this.resolveOptionalParam(
       catalogName,
       flink?.catalog_name,

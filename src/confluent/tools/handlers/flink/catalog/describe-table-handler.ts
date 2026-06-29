@@ -65,22 +65,26 @@ export class DescribeTableHandler extends FlinkCatalogToolHandler {
       tableName,
     } = describeTableArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
-      organizationId,
-      environmentId,
-    );
-    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    const { organization_id, environment_id, compute_pool_id } =
+      this.resolveFlinkRouting(conn, {
+        organizationId,
+        environmentId,
+        computePoolId,
+      });
     const catalog = this.resolveCatalogNameOrError(catalogName, environment_id);
     if (!catalog.ok) return catalog.error;
     const catalog_name = catalog.name;
-    // Database name is optional - if provided, resolve it to friendly SCHEMA_NAME
-    const database_input = resolveDatabaseName(databaseName, conn);
+    // Database name is optional - if provided, resolve it to friendly SCHEMA_NAME.
+    // The config fallback (kafka.cluster_id) only exists on direct connections;
+    // under OAuth callers supply databaseName explicitly.
+    const database_input = resolveDatabaseName(
+      databaseName,
+      conn.type === "direct" ? conn : undefined,
+    );
 
     const statementsCreated: string[] = [];
 

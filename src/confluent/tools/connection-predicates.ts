@@ -321,6 +321,18 @@ export const hasTableflowOrOAuth: ConnectionPredicate =
   widenForOAuth(hasTableflow);
 
 /**
+ * The Flink gate, widened to admit OAuth. Direct connections still need a
+ * `flink` block; OAuth connections satisfy it unconditionally — the Flink REST
+ * host is regional and resolved at call time from the compute pool's
+ * `cloud`/`region` (`getFlinkRestClient`), and the surface rides the
+ * data-plane token. The organization/environment/compute-pool IDs a Flink call
+ * needs are supplied as explicit tool arguments under OAuth (an OAuth
+ * connection carries no `flink` block to fall back to). Use on the Flink
+ * statement and catalog handlers.
+ */
+export const hasFlinkOrOAuth: ConnectionPredicate = widenForOAuth(hasFlink);
+
+/**
  * Gate for tools that create connectors against the direct Confluent Cloud
  * REST surface: requires both a `confluent_cloud` block (the `/connect/v1`
  * endpoint) and `kafka.auth` (the connector spec carries kafka API
@@ -341,6 +353,17 @@ export const flinkWithTelemetry: ConnectionPredicate = allOf(
   hasFlink,
   hasTelemetry,
 );
+
+/**
+ * The Flink-statement-profiling gate ({@linkcode flinkWithTelemetry}), widened
+ * to admit OAuth. Direct connections still need both the `flink` and
+ * `telemetry` blocks; OAuth connections satisfy it unconditionally — the Flink
+ * REST surface resolves its regional host at call time and the telemetry
+ * surface is already OAuth-wired (cloud-wide, data-plane token). Use on
+ * `get-flink-statement-profile`.
+ */
+export const flinkWithTelemetryOrOAuth: ConnectionPredicate =
+  widenForOAuth(flinkWithTelemetry);
 
 /**
  * Every reason a {@linkcode ConnectionPredicate} can return `enabled: false`.

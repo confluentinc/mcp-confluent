@@ -71,28 +71,28 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
       environmentId,
       organizationId,
     } = createFlinkStatementArguments.parse(toolArguments);
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
-      organizationId,
-      environmentId,
-    );
-    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    const { organization_id, environment_id, compute_pool_id } =
+      this.resolveFlinkRouting(conn, {
+        organizationId,
+        environmentId,
+        computePoolId,
+      });
+    const flink = conn.type === "direct" ? conn.flink : undefined;
     const resolvedCatalogName = this.resolveOptionalParam(
       catalogName,
-      flink.catalog_name,
+      flink?.catalog_name,
     );
     const resolvedDatabaseName = this.resolveOptionalParam(
       databaseName,
-      flink.database_name,
+      flink?.database_name,
     );
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudFlinkRestClient(),
+      await clientManager.getFlinkRestClient(compute_pool_id, environment_id),
     );
     const { data: response, error } = await pathBasedClient[
       "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements"

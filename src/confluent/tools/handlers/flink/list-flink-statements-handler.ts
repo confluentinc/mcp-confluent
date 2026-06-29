@@ -58,23 +58,25 @@ export class ListFlinkStatementsHandler extends FlinkToolHandler {
       pageToken,
       statusPhase,
     } = listFlinkStatementsArguments.parse(toolArguments);
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
+    const {
+      organization_id,
+      environment_id,
+      compute_pool_id: resolvedComputePoolId,
+    } = this.resolveFlinkRouting(conn, {
       organizationId,
       environmentId,
-    );
-    const resolvedComputePoolId = this.resolveOptionalComputePoolId(
-      flink,
       computePoolId,
-    );
+    });
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudFlinkRestClient(),
+      await clientManager.getFlinkRestClient(
+        resolvedComputePoolId,
+        environment_id,
+      ),
     );
     const { data: response, error } = await pathBasedClient[
       "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements"

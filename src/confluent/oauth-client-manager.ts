@@ -32,6 +32,7 @@ import {
 } from "@src/confluent/middleware.js";
 import { kafkaDeps } from "@src/confluent/node-deps.js";
 import {
+  resolveFlinkComputePoolRegion,
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
   resolveSchemaRegistryClusterId,
@@ -39,6 +40,7 @@ import {
 } from "@src/confluent/oauth-resource-resolvers.js";
 import {
   getCloudRestUrlForEnv,
+  getFlinkRestUrlForRegion,
   getTelemetryRestUrlForEnv,
 } from "@src/confluent/oauth/auth0-config.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
@@ -77,6 +79,7 @@ type PostProcessTokenRefresh = (
 export class OAuthClientManager extends BaseClientManager {
   private readonly holder: OAuthHolder;
   private readonly kafkaDebug: string | undefined;
+  private readonly env: Auth0Environment;
 
   /**
    * @param kafkaDebug Optional librdkafka `debug` contexts string, threaded
@@ -108,6 +111,7 @@ export class OAuthClientManager extends BaseClientManager {
 
     this.holder = holder;
     this.kafkaDebug = kafkaDebug;
+    this.env = env;
 
     // Eager construction: surface the cloud REST client at startup so a bad
     // endpoint or middleware wiring fails fast rather than at first tool call.
@@ -158,6 +162,36 @@ export class OAuthClientManager extends BaseClientManager {
       clusterId!,
       envId!,
     );
+    const auth: ConfluentAuth = {
+      type: "oauth",
+      getToken: () => this.holder.getDataPlaneToken(),
+    };
+    const client = createClient<paths>({ baseUrl });
+    client.use(createAuthMiddleware(auth));
+    return client;
+  }
+
+  /** @inheritdoc */
+  async getFlinkRestClient(
+    computePoolId?: string,
+    envId?: string,
+  ): Promise<ConfluentRestClient> {
+    this.requireDataPlaneToken();
+    if (!computePoolId || !envId) {
+      throw new Error(
+        "computePoolId and environmentId are required under OAuth for Flink access. " +
+          "Discover the environment via list-environments; the compute pool id " +
+          "(lfcp-...) comes from the Confluent Cloud console or the Flink compute pools API.",
+      );
+    }
+    // The Flink REST host is regional, so resolve the compute pool's cloud +
+    // region and derive the per-call base URL from the Auth0 env's base domain.
+    const { cloud, region } = await resolveFlinkComputePoolRegion(
+      this.getConfluentCloudRestClient(),
+      computePoolId,
+      envId,
+    );
+    const baseUrl = getFlinkRestUrlForRegion(this.env, cloud, region);
     const auth: ConfluentAuth = {
       type: "oauth",
       getToken: () => this.holder.getDataPlaneToken(),

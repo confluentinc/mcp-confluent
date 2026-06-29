@@ -20,6 +20,20 @@ const listComputePoolsArguments = z.object({
     .describe(
       "Confluent Cloud environment ID (env-...) that owns the compute pools. Discover via list-environments",
     ),
+  pageSize: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      "Maximum compute pools to return in this response. Server-side default applies if omitted.",
+    ),
+  pageToken: z
+    .string()
+    .optional()
+    .describe(
+      "Opaque pagination token from a previous response's _meta.nextPageToken. Omit on first request.",
+    ),
 });
 
 /**
@@ -43,9 +57,8 @@ export class ListComputePoolsHandler extends BaseToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { environmentId } = listComputePoolsArguments.parse(
-      toolArguments ?? {},
-    );
+    const { environmentId, pageSize, pageToken } =
+      listComputePoolsArguments.parse(toolArguments ?? {});
     const { connId, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
@@ -63,7 +76,8 @@ export class ListComputePoolsHandler extends BaseToolHandler {
         params: {
           query: {
             environment: resolvedEnv,
-            page_size: 100,
+            page_size: pageSize,
+            page_token: pageToken,
           },
         },
       });
@@ -113,6 +127,14 @@ export class ListComputePoolsHandler extends BaseToolHandler {
         }
       });
 
+      // The FCPM compute-pool list API is paginated and populates only
+      // `metadata.next` (a full URL to the next page); extract its page_token so
+      // callers can fetch subsequent pages via the pageToken arg.
+      const nextPageToken = response.metadata?.next
+        ? (new URL(response.metadata.next).searchParams.get("page_token") ??
+          undefined)
+        : undefined;
+
       const poolDetails = computePools
         .map(
           (pool) => `
@@ -124,11 +146,17 @@ Compute Pool: ${pool.name}
         )
         .join("\n");
 
-      return this.createResponse(
-        `Successfully retrieved ${computePools.length} compute pools:\n${poolDetails}`,
-        false,
-        { computePools, total: response.metadata?.total_size },
-      );
+      const summary = `Successfully retrieved ${computePools.length} compute pools${
+        nextPageToken
+          ? " (more pages available — pass nextPageToken back as pageToken to fetch the next page)"
+          : ""
+      }:`;
+
+      return this.createResponse(`${summary}\n${poolDetails}`, false, {
+        computePools,
+        nextPageToken,
+        total: response.metadata?.total_size,
+      });
     } catch (error) {
       logger.error({ error }, "Error in ListComputePoolsHandler");
       return this.createResponse(
@@ -143,7 +171,7 @@ Compute Pool: ${pool.name}
     return {
       name: ToolName.LIST_COMPUTE_POOLS,
       description:
-        "Get all Flink compute pools in the Confluent Cloud environment",
+        "Get the Flink compute pools in the Confluent Cloud environment. Paginated; if the response includes a nextPageToken, pass it back as pageToken to fetch additional pages.",
       inputSchema: listComputePoolsArguments.shape,
       annotations: READ_ONLY,
     };

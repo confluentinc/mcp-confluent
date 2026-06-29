@@ -52,14 +52,18 @@ describe("list-compute-pools-handler.ts", () => {
     const handler = new ListComputePoolsHandler();
 
     describe("getToolConfig()", () => {
-      it("should be a read-only tool named LIST_COMPUTE_POOLS exposing only environmentId", () => {
+      it("should be a read-only tool named LIST_COMPUTE_POOLS exposing environmentId + pagination args", () => {
         const config = handler.getToolConfig();
 
         expect(config.name).toBe(ToolName.LIST_COMPUTE_POOLS);
         expect(config.description).toBe(
-          "Get all Flink compute pools in the Confluent Cloud environment",
+          "Get the Flink compute pools in the Confluent Cloud environment. Paginated; if the response includes a nextPageToken, pass it back as pageToken to fetch additional pages.",
         );
-        expect(Object.keys(config.inputSchema)).toEqual(["environmentId"]);
+        expect(Object.keys(config.inputSchema)).toEqual([
+          "environmentId",
+          "pageSize",
+          "pageToken",
+        ]);
         expect(config.annotations).toBe(READ_ONLY);
       });
     });
@@ -113,7 +117,11 @@ describe("list-compute-pools-handler.ts", () => {
           expect(cloudRest.GET).toHaveBeenCalledOnce();
           expect(cloudRest.GET).toHaveBeenCalledWith("/fcpm/v2/compute-pools", {
             params: {
-              query: { environment: expectedEnvId, page_size: 100 },
+              query: {
+                environment: expectedEnvId,
+                page_size: undefined,
+                page_token: undefined,
+              },
             },
           });
         },
@@ -242,6 +250,7 @@ describe("list-compute-pools-handler.ts", () => {
 
         const meta = result?._meta as {
           computePools: MappedComputePool[];
+          nextPageToken: string | undefined;
           total: number;
         };
         expect(meta.computePools).toEqual([
@@ -253,12 +262,73 @@ describe("list-compute-pools-handler.ts", () => {
           },
         ]);
         expect(meta.total).toBe(1);
+        expect(meta.nextPageToken).toBeUndefined();
 
         const text = result!.content
           .map((c) => ("text" in c ? c.text : ""))
           .join("");
         expect(text).toContain("Compute Pool: prod-pool");
         expect(text).toContain("ID: lfcp-abc123");
+      });
+
+      it("should forward pageSize and pageToken to the FCPM query when supplied", async () => {
+        const clientManager = getMockedClientManager();
+        const cloudRest = clientManager.getConfluentCloudRestClient();
+        cloudRest.GET.mockResolvedValue({ data: { data: [] } });
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CCLOUD_WITH_KAFKA_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { pageSize: 25, pageToken: "tok-abc" },
+          outcome: { resolves: "Successfully retrieved 0 compute pools" },
+          clientManager,
+        });
+
+        expect(cloudRest.GET).toHaveBeenCalledWith("/fcpm/v2/compute-pools", {
+          params: {
+            query: {
+              environment: "env-from-config",
+              page_size: 25,
+              page_token: "tok-abc",
+            },
+          },
+        });
+      });
+
+      it("should extract nextPageToken from metadata.next and flag more pages available", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
+          data: {
+            data: [makeComputePool()],
+            metadata: {
+              next: "https://api.confluent.cloud/fcpm/v2/compute-pools?environment=env-from-config&page_token=tok-next",
+            },
+          },
+        });
+
+        const result = await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CCLOUD_WITH_KAFKA_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: { resolves: "Successfully retrieved 1 compute pools" },
+          clientManager,
+        });
+
+        const meta = result?._meta as { nextPageToken: string | undefined };
+        expect(meta.nextPageToken).toBe("tok-next");
+
+        const text = result!.content
+          .map((c) => ("text" in c ? c.text : ""))
+          .join("");
+        expect(text).toContain("more pages available");
       });
 
       it("should return an error response when a returned compute pool fails schema validation", async () => {

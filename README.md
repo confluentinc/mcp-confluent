@@ -402,7 +402,7 @@ flink:
   get-flink-statement-profile: Get Query Profiler data for a Flink SQL statement. Returns the task graph with human-readable task/operator names, pe...
   get-flink-statement-results: Fetch the result rows produced by a Flink SQL statement.
   get-flink-table-info: Get table metadata via INFORMATION_SCHEMA.TABLES. Returns watermark configuration, distribution info, and table type.
-  list-compute-pools: Get all Flink compute pools in the Confluent Cloud environment
+  list-compute-pools: Get the Flink compute pools in the Confluent Cloud environment. Paginated; if the response includes a nextPageToken, pas...
   list-flink-catalogs: List all catalogs available in the Flink environment via INFORMATION_SCHEMA.CATALOGS.
   list-flink-databases: List all databases (schemas) in a Flink catalog via INFORMATION_SCHEMA.SCHEMATA. Returns catalog and database names.
   list-flink-statements: Retrieve a sorted, filtered, paginated list of all statements.

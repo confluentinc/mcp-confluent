@@ -401,19 +401,18 @@ describe("oauth-client-manager.ts", () => {
     });
 
     describe("getFlinkRestClient()", () => {
-      it("should reject when computePoolId is omitted under OAuth", async () => {
-        const manager = buildManager();
-        await expect(
-          manager.getFlinkRestClient(undefined, "env-1"),
-        ).rejects.toThrow("required under OAuth for Flink access");
-      });
-
-      it("should reject when environmentId is omitted under OAuth", async () => {
-        const manager = buildManager();
-        await expect(
-          manager.getFlinkRestClient("lfcp-1", undefined),
-        ).rejects.toThrow("required under OAuth for Flink access");
-      });
+      it.each([
+        { omitted: "computePoolId", computePoolId: undefined, envId: "env-1" },
+        { omitted: "environmentId", computePoolId: "lfcp-1", envId: undefined },
+      ])(
+        "should reject when $omitted is omitted under OAuth",
+        async ({ computePoolId, envId }) => {
+          const manager = buildManager();
+          await expect(
+            manager.getFlinkRestClient(computePoolId, envId),
+          ).rejects.toThrow("required under OAuth for Flink access");
+        },
+      );
 
       it("should build a fresh REST client per call against the resolved regional Flink host", async () => {
         vi.spyOn(resolvers, "resolveFlinkComputePoolRegion").mockResolvedValue({

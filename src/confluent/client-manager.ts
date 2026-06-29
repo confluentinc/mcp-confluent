@@ -50,7 +50,7 @@ export interface ConfluentCloudRestClientManager {
    * regional there). Under OAuth, both `computePoolId` and `envId` are
    * required: the Flink REST host is regional, so a fresh client is built per
    * call against `https://flink.<region>.<cloud>.<domain>` after resolving the
-   * compute pool's `cloud` + `region` from the cmk REST API.
+   * compute pool's `cloud` + `region` from the Confluent Cloud REST API.
    */
   getFlinkRestClient(
     computePoolId?: string,

@@ -180,8 +180,8 @@ export class OAuthClientManager extends BaseClientManager {
     if (!computePoolId || !envId) {
       throw new Error(
         "computePoolId and environmentId are required under OAuth for Flink access. " +
-          "Discover the environment via list-environments; the compute pool id " +
-          "(lfcp-...) comes from the Confluent Cloud console or the Flink compute pools API.",
+          "Discover the environment via list-environments, then call list-compute-pools " +
+          "with environmentId to discover the compute pool id (lfcp-...).",
       );
     }
     // The Flink REST host is regional, so resolve the compute pool's cloud +

@@ -309,6 +309,7 @@ describe("index.ts", () => {
         ToolName.ALTER_TOPIC_CONFIG,
         ToolName.GET_TOPIC_CONFIG,
         ToolName.LIST_CLUSTERS,
+        ToolName.LIST_COMPUTE_POOLS,
         ToolName.EXPLAIN_DISABLED_TOOLS,
         ToolName.LIST_CONFIGURED_CONNECTIONS,
         ToolName.CONFIG_HELP,

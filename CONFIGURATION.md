@@ -131,19 +131,19 @@ The top-level `server:` block sits beside `connections:` and applies to the whol
 It is entirely optional — omit it to accept the same defaults today's env-var users get.
 The fully annotated example is in [`config.example.yaml`](config.example.yaml); when present, it replaces these env vars:
 
-| Field                              | Replaces env var                                                      |
-| ---------------------------------- | --------------------------------------------------------------------- |
-| `server.transports`                | `--transport` CLI flag                                                |
-| `server.log_level`                 | `LOG_LEVEL`                                                           |
-| `server.do_not_track`              | `DO_NOT_TRACK` (env wins as the floor; see [Telemetry](telemetry.md)) |
-| `server.http.port`                 | `HTTP_PORT`                                                           |
-| `server.http.host`                 | `HTTP_HOST`                                                           |
-| `server.http.mcp_endpoint`         | `HTTP_MCP_ENDPOINT_PATH`                                              |
-| `server.http.sse_endpoint`         | `SSE_MCP_ENDPOINT_PATH`                                               |
-| `server.http.sse_message_endpoint` | `SSE_MCP_MESSAGE_ENDPOINT_PATH`                                       |
-| `server.auth.api_key`              | `MCP_API_KEY`                                                         |
-| `server.auth.allowed_hosts`        | `MCP_ALLOWED_HOSTS`                                                   |
-| `server.auth.disabled`             | `MCP_AUTH_DISABLED` / `--disable-auth`                                |
+| Field                              | Replaces env var                                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `server.transports`                | `--transport` CLI flag                                                                                                         |
+| `server.log_level`                 | `LOG_LEVEL`                                                                                                                    |
+| `server.do_not_track`              | `DO_NOT_TRACK` (env wins as the floor; disables usage analytics **and** Sentry error reporting; see [Telemetry](telemetry.md)) |
+| `server.http.port`                 | `HTTP_PORT`                                                                                                                    |
+| `server.http.host`                 | `HTTP_HOST`                                                                                                                    |
+| `server.http.mcp_endpoint`         | `HTTP_MCP_ENDPOINT_PATH`                                                                                                       |
+| `server.http.sse_endpoint`         | `SSE_MCP_ENDPOINT_PATH`                                                                                                        |
+| `server.http.sse_message_endpoint` | `SSE_MCP_MESSAGE_ENDPOINT_PATH`                                                                                                |
+| `server.auth.api_key`              | `MCP_API_KEY`                                                                                                                  |
+| `server.auth.allowed_hosts`        | `MCP_ALLOWED_HOSTS`                                                                                                            |
+| `server.auth.disabled`             | `MCP_AUTH_DISABLED` / `--disable-auth`                                                                                         |
 
 `server.transports` and the `--transport` CLI flag are mutually exclusive — declare transports in YAML or on the command line, not both.
 
@@ -371,7 +371,7 @@ Run the server without `-c` and these variables, read either from the parent she
 | TELEMETRY_ENDPOINT            | Base URL for the Confluent Cloud Telemetry (Metrics) API.                                                                                                                                                                       | `https://api.telemetry.confluent.cloud` | No                                   |
 | TELEMETRY_API_KEY             | Telemetry API key; falls back to `CONFLUENT_CLOUD_API_KEY` if unset. See the [Metrics API auth docs](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#create-an-api-key-to-authenticate-to-the-metrics-api). |                                         | No                                   |
 | TELEMETRY_API_SECRET          | Telemetry API secret; falls back to `CONFLUENT_CLOUD_API_SECRET` if unset.                                                                                                                                                      |                                         | No                                   |
-| DO_NOT_TRACK                  | Set to `true` to opt out of anonymous telemetry. See [Telemetry](telemetry.md). Wins over `server.do_not_track` in YAML.                                                                                                        |                                         | No                                   |
+| DO_NOT_TRACK                  | Set to `true` to opt out of anonymous telemetry and Sentry error reporting. See [Telemetry](telemetry.md). Wins over `server.do_not_track` in YAML.                                                                             |                                         | No                                   |
 
 </details>
 

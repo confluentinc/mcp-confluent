@@ -5,6 +5,7 @@ import {
 } from "@src/config/models.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
+import { initSentry } from "@src/confluent/sentry.js";
 import {
   ToolCategory,
   type ToolConfig,
@@ -882,6 +883,28 @@ describe("index.ts", () => {
 
       expect(exit).toHaveBeenCalledOnce();
       expect(exit).toHaveBeenCalledWith(0);
+    });
+
+    it("should flush Sentry during shutdown", async () => {
+      // Initialize Sentry so closeSentry() reaches the (spied) transport close;
+      // init is stubbed so no real DSN is registered.
+      vi.spyOn(nodeDeps.sentry, "init").mockImplementation(() => undefined);
+      const closeStub = vi
+        .spyOn(nodeDeps.sentry, "close")
+        .mockResolvedValue(true);
+      initSentry({
+        doNotTrack: false,
+        dsn: "https://abc@o0.ingest.sentry.io/1",
+        release: "0.0.0-test",
+        transports: ["stdio"],
+      });
+
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockResolvedValue(undefined);
+
+      await performCleanup(deps, vi.fn());
+
+      expect(closeStub).toHaveBeenCalled();
     });
   });
 });

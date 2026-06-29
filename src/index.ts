@@ -15,6 +15,12 @@ import {
 } from "@src/config/index.js";
 import { buildConfigTelemetry } from "@src/confluent/config-telemetry.js";
 import { buildConfig, fs, path } from "@src/confluent/node-deps.js";
+import {
+  captureException,
+  closeSentry,
+  initSentry,
+  resolveSentryDsn,
+} from "@src/confluent/sentry.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
 import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { groupDisabledToolsByReason } from "@src/confluent/tools/tool-availability.js";
@@ -345,6 +351,7 @@ export async function performCleanup(
   logger.info("Shutting down...");
   try {
     await deps.telemetry.shutdown();
+    await closeSentry();
     await deps.transportManager.stop();
     // shutdown() is race-safe with an in-flight bootstrap.
     deps.runtime.oauthHolder?.shutdown();
@@ -409,6 +416,16 @@ async function main() {
       doNotTrack: mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
       writeKey: resolveTelemetryWriteKey(mcpConfig),
     });
+
+    // Crash reporting shares the single DO_NOT_TRACK consent switch with usage
+    // analytics. Initialized here — once config + log level resolve so consent
+    // is known — to catch tool-handler, transport, and shutdown errors.
+    initSentry({
+      doNotTrack: mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
+      dsn: resolveSentryDsn(),
+      release: getPackageVersion(),
+      transports,
+    });
     const telemetry = TelemetryService.getInstance();
 
     logger.info(
@@ -450,6 +467,8 @@ async function main() {
         telemetry.track(TelemetryEvent.TOOL_CALL, {
           ...props,
         }),
+      captureError: (error, toolName) =>
+        captureException(error, { tags: { toolName } }),
     };
 
     // Start all transports with a single call
@@ -487,6 +506,7 @@ async function main() {
     if (error instanceof DisplayedCommandLineUsageError) {
       process.exit(0);
     }
+    captureException(error);
     logger.error({ err: error }, "Error starting server");
     process.exit(1);
   }

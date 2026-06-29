@@ -62,7 +62,7 @@ export async function executeFlinkSql(
 
   const statementName = generateStatementName();
   const pathBasedClient = wrapAsPathBasedClient(
-    clientManager.getConfluentCloudFlinkRestClient(),
+    await clientManager.getFlinkRestClient(computePoolId, environmentId),
   );
 
   // Create the statement

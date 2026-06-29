@@ -66,6 +66,41 @@ export async function resolveSchemaRegistryEndpoint(
   return httpEndpoint;
 }
 
+/**
+ * Resolves the cloud provider + region of a Flink compute pool, used to derive
+ * the regional Flink REST host under OAuth. The Flink REST URL is regional
+ * (`https://flink.<region>.<cloud>.<base-domain>`), so unlike the cloud/
+ * telemetry surfaces it can't be wired once at construction — it has to be
+ * resolved per call from the compute pool the agent is targeting.
+ */
+export async function resolveFlinkComputePoolRegion(
+  cloudClient: ConfluentRestClient,
+  computePoolId: string,
+  envId: string,
+): Promise<{ cloud: string; region: string }> {
+  const { data, error } = await cloudClient.GET("/fcpm/v2/compute-pools/{id}", {
+    params: { path: { id: computePoolId }, query: { environment: envId } },
+  });
+  if (error !== undefined) {
+    throw new Error(
+      `Failed to read Flink compute pool ${computePoolId} in environment ${envId}: ${JSON.stringify(error)}`,
+    );
+  }
+  const cloud = data?.spec?.cloud;
+  const region = data?.spec?.region;
+  if (
+    typeof cloud !== "string" ||
+    cloud.length === 0 ||
+    typeof region !== "string" ||
+    region.length === 0
+  ) {
+    throw new Error(
+      `Compute pool ${computePoolId} in environment ${envId} has no cloud/region in its spec`,
+    );
+  }
+  return { cloud, region };
+}
+
 export async function resolveSchemaRegistryClusterId(
   cloudClient: ConfluentRestClient,
   envId: string,

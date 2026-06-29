@@ -129,6 +129,19 @@ describe("list-catalogs-handler.ts", () => {
         ]);
       });
 
+      it("should thread the resolved compute pool + environment into the async getFlinkRestClient", async () => {
+        await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+        // executeFlinkSql resolves the regional Flink client from the compute
+        // pool + environment; under OAuth those ids derive the regional host.
+        expect(clientManager.getFlinkRestClient).toHaveBeenCalledWith(
+          FLINK_CONN.flink.compute_pool_id,
+          FLINK_CONN.flink.environment_id,
+        );
+      });
+
       it("should embed config environment_id as catalog name in the POST SQL statement", async () => {
         await assertHandleCase({
           handler,

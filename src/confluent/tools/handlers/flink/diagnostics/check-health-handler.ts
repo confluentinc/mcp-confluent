@@ -17,6 +17,13 @@ const checkHealthArguments = z.object({
     .trim()
     .optional()
     .describe("The unique identifier for the environment."),
+  computePoolId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "The compute pool ID (lfcp-...). Required under OAuth to resolve the regional Flink endpoint.",
+    ),
   statementName: z
     .string()
     .regex(
@@ -47,22 +54,22 @@ export class CheckHealthHandler extends FlinkToolHandler {
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { statementName, environmentId, organizationId } =
+    const { statementName, environmentId, organizationId, computePoolId } =
       checkHealthArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
-      organizationId,
-      environmentId,
-    );
+    const { organization_id, environment_id, compute_pool_id } =
+      this.resolveFlinkRouting(conn, {
+        organizationId,
+        environmentId,
+        computePoolId,
+      });
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudFlinkRestClient(),
+      await clientManager.getFlinkRestClient(compute_pool_id, environment_id),
     );
 
     // Get statement status

@@ -347,6 +347,20 @@ describe("index.ts", () => {
         // cloud-wide, so no per-cluster/per-env routing is needed).
         ToolName.QUERY_METRICS,
         ToolName.LIST_METRICS,
+        // Tableflow (hasTableflowOrOAuth — the Tableflow REST surface rides the
+        // cloud control-plane URL/token; environment/cluster IDs are supplied as
+        // explicit tool arguments under OAuth).
+        ToolName.CREATE_TABLEFLOW_TOPIC,
+        ToolName.LIST_TABLEFLOW_REGIONS,
+        ToolName.LIST_TABLEFLOW_TOPICS,
+        ToolName.READ_TABLEFLOW_TOPIC,
+        ToolName.UPDATE_TABLEFLOW_TOPIC,
+        ToolName.DELETE_TABLEFLOW_TOPIC,
+        ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION,
+        ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS,
+        ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
+        ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION,
+        ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
@@ -367,18 +381,6 @@ describe("index.ts", () => {
         // Connect — only create-connector stays disabled (canCreateDirectConnector
         // is direct-only: it embeds a Kafka API key/secret in the connector spec).
         ToolName.CREATE_CONNECTOR,
-        // Tableflow (hasTableflow — needs the tableflow service block)
-        ToolName.CREATE_TABLEFLOW_TOPIC,
-        ToolName.LIST_TABLEFLOW_REGIONS,
-        ToolName.LIST_TABLEFLOW_TOPICS,
-        ToolName.READ_TABLEFLOW_TOPIC,
-        ToolName.UPDATE_TABLEFLOW_TOPIC,
-        ToolName.DELETE_TABLEFLOW_TOPIC,
-        ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION,
-        ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS,
-        ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
-        ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION,
-        ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
       ];
 
       it("should partition every ToolName into exactly one of EXPECTED_OAUTH_ENABLED or EXPECTED_OAUTH_DISABLED", () => {

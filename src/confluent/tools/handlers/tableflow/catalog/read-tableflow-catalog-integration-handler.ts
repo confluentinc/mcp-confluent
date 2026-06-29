@@ -28,7 +28,7 @@ export class ReadTableFlowCatalogIntegrationHandler extends TableflowToolHandler
     const { id, environmentId, clusterId } =
       readTableflowCatalogIntegrationArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

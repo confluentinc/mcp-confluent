@@ -361,10 +361,9 @@ describe("index.ts", () => {
         ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
         ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION,
         ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
-      ];
-
-      const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
-        // Flink (hasFlink — needs the flink service block)
+        // Flink (hasFlinkOrOAuth / flinkWithTelemetryOrOAuth — the Flink REST host
+        // is regional and resolved per call from the compute pool; org/env/
+        // compute-pool IDs are supplied as explicit tool arguments under OAuth).
         ToolName.LIST_FLINK_STATEMENTS,
         ToolName.CREATE_FLINK_STATEMENT,
         ToolName.GET_FLINK_STATEMENT_RESULTS,
@@ -378,6 +377,9 @@ describe("index.ts", () => {
         ToolName.CHECK_FLINK_STATEMENT_HEALTH,
         ToolName.DETECT_FLINK_STATEMENT_ISSUES,
         ToolName.GET_FLINK_STATEMENT_PROFILE,
+      ];
+
+      const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
         // Connect — only create-connector stays disabled (canCreateDirectConnector
         // is direct-only: it embeds a Kafka API key/secret in the connector spec).
         ToolName.CREATE_CONNECTOR,

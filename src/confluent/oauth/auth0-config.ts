@@ -78,6 +78,21 @@ export function getTelemetryRestUrlForEnv(
   return `https://api.telemetry.${CCLOUD_DOMAINS[environment]}`;
 }
 
+/**
+ * Returns the regional Confluent Cloud Flink REST API base URL
+ * (`flink.<region>.<cloud>.` prefix) for the given Auth0 environment. Unlike
+ * the cloud/telemetry surfaces, the Flink host is regional, so {@link
+ * OAuthClientManager} can only build this per call once it has resolved the
+ * compute pool's `cloud` + `region` (via `GET /fcpm/v2/compute-pools/{id}`).
+ */
+export function getFlinkRestUrlForRegion(
+  environment: Auth0Environment,
+  cloud: string,
+  region: string,
+): string {
+  return `https://flink.${region}.${cloud.toLowerCase()}.${CCLOUD_DOMAINS[environment]}`;
+}
+
 export function getAuth0Config(environment: Auth0Environment): Auth0Config {
   return {
     ...AUTH0_CLIENTS[environment],

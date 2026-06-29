@@ -176,6 +176,9 @@ export interface MockedClientManager extends Mocked<DirectClientManager> {
     (opts?: ConsumerBuildOptions) => Promise<Mocked<KafkaJS.Consumer>>
   >;
   getConfluentCloudFlinkRestClient: Mock<() => MockedRestClient>;
+  getFlinkRestClient: Mock<
+    (computePoolId?: string, envId?: string) => Promise<MockedRestClient>
+  >;
   getConfluentCloudRestClient: Mock<() => MockedRestClient>;
   getConfluentCloudTableflowRestClient: Mock<() => MockedRestClient>;
   getConfluentCloudSchemaRegistryRestClient: Mock<() => MockedRestClient>;
@@ -223,6 +226,13 @@ export function getMockedClientManager(): MockedClientManager {
   const cm = createMockInstance(DirectClientManager) as MockedClientManager;
 
   cm.getConfluentCloudFlinkRestClient.mockReturnValue(getMockedRestClient());
+  // The compute-pool/env-aware Flink getter delegates to the sync getter on
+  // direct (matching DirectClientManager); tests that configure
+  // getConfluentCloudFlinkRestClient() keep working when the handler calls
+  // the async getter.
+  cm.getFlinkRestClient.mockImplementation(async () =>
+    cm.getConfluentCloudFlinkRestClient(),
+  );
   cm.getConfluentCloudRestClient.mockReturnValue(getMockedRestClient());
   cm.getConfluentCloudTableflowRestClient.mockReturnValue(
     getMockedRestClient(),

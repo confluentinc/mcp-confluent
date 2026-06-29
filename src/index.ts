@@ -132,6 +132,18 @@ export function resolveTelemetryWriteKey(
   );
 }
 
+/**
+ * One opt-out for usage analytics and error reporting: either the
+ * `DO_NOT_TRACK` env var (consoledonottrack.com) or the YAML
+ * `server.do_not_track` field disables tracking.
+ */
+export function resolveDoNotTrack(
+  serverDoNotTrack: boolean,
+  envDoNotTrack: boolean,
+): boolean {
+  return serverDoNotTrack || envDoNotTrack;
+}
+
 export function outputApiKey(): void {
   const apiKey = generateApiKey();
   console.log("\nGenerated MCP API Key:");
@@ -410,21 +422,31 @@ async function main() {
       ? mcpConfig.server.transports
       : cliOptions.transports;
 
-    // DO_NOT_TRACK is a cross-tool user preference (consoledonottrack.com);
-    // the env var acts as a floor so it is honored even when --config is used.
+    // One consent switch gates usage analytics and error reporting alike.
+    const doNotTrack = resolveDoNotTrack(
+      mcpConfig.server.do_not_track,
+      env.DO_NOT_TRACK,
+    );
+
     TelemetryService.initialize({
-      doNotTrack: mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
+      doNotTrack,
       writeKey: resolveTelemetryWriteKey(mcpConfig),
     });
 
-    // Crash reporting shares the single DO_NOT_TRACK consent switch with usage
-    // analytics. Initialized here — once config + log level resolve so consent
-    // is known — to catch tool-handler, transport, and shutdown errors.
+    // Distinct connection auth types (no ids/secrets) help triage which config
+    // path an error came from — e.g. a bug seen only on oauth connections.
+    const connectionTypes = [
+      ...new Set(Object.values(mcpConfig.connections).map((c) => c.type)),
+    ];
+
+    // Initialized here — once config + log level resolve so consent is known —
+    // to catch tool-handler, transport, and shutdown errors.
     initSentry({
-      doNotTrack: mcpConfig.server.do_not_track || env.DO_NOT_TRACK,
+      doNotTrack,
       dsn: resolveSentryDsn(),
       release: getPackageVersion(),
       transports,
+      connectionTypes,
     });
     const telemetry = TelemetryService.getInstance();
 

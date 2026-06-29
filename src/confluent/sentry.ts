@@ -14,6 +14,14 @@ export interface InitSentryOptions {
   readonly dsn: string | undefined;
   readonly release: string;
   readonly transports: readonly string[];
+  /** Distinct connection auth types (e.g. ["direct", "oauth"]); no ids/secrets. */
+  readonly connectionTypes: readonly string[];
+}
+
+function joinSorted(values: readonly string[]): string {
+  return values.length
+    ? [...values].sort((a, b) => a.localeCompare(b)).join(",")
+    : "none";
 }
 
 /**
@@ -24,7 +32,7 @@ export interface InitSentryOptions {
  */
 export function initSentry(opts: InitSentryOptions): void {
   if (opts.doNotTrack || !opts.dsn) {
-    logger.info("Crash reporting disabled");
+    logger.info("Error reporting disabled");
     return;
   }
   sentry.init({
@@ -43,9 +51,8 @@ export function initSentry(opts: InitSentryOptions): void {
     },
     initialScope: {
       tags: {
-        transport: [...opts.transports]
-          .sort((a, b) => a.localeCompare(b))
-          .join(","),
+        transport: joinSorted(opts.transports),
+        connections: joinSorted(opts.connectionTypes),
       },
     },
     integrations: (defaults) => [
@@ -55,7 +62,7 @@ export function initSentry(opts: InitSentryOptions): void {
     beforeSend: (event) => redactEvent(event),
   });
   initialized = true;
-  logger.info("Crash reporting enabled");
+  logger.info("Error reporting enabled");
 }
 
 /** Report an error. No-op until {@link initSentry} has registered a client. */

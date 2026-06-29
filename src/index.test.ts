@@ -20,6 +20,7 @@ import {
   outputToolList,
   performCleanup,
   resolveAllowedToolNames,
+  resolveDoNotTrack,
   resolveTelemetryWriteKey,
 } from "@src/index.js";
 import { logger } from "@src/logger.js";
@@ -849,6 +850,19 @@ describe("index.ts", () => {
     });
   });
 
+  describe("resolveDoNotTrack()", () => {
+    // Each opt-out method (YAML server.do_not_track, env DO_NOT_TRACK) must
+    // independently disable tracking; only when both are false is it on.
+    it.each([
+      ["YAML only", true, false, true],
+      ["env only", false, true, true],
+      ["both", true, true, true],
+      ["neither", false, false, false],
+    ])("via %s -> %s || %s = %s", (_method, serverFlag, envFlag, expected) => {
+      expect(resolveDoNotTrack(serverFlag, envFlag)).toBe(expected);
+    });
+  });
+
   describe("performCleanup()", () => {
     function cleanupDeps() {
       return {
@@ -897,6 +911,7 @@ describe("index.ts", () => {
         dsn: "https://abc@o0.ingest.sentry.io/1",
         release: "0.0.0-test",
         transports: ["stdio"],
+        connectionTypes: ["direct"],
       });
 
       const deps = cleanupDeps();

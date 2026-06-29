@@ -4,6 +4,10 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Error reporting (Sentry).** Uncaught exceptions, unhandled rejections, and tool-handler errors are now reported to [Sentry](https://sentry.io) with the server version, transport, and tool name. Enabled by default in published builds and governed by the **same `DO_NOT_TRACK` switch** as usage analytics (`DO_NOT_TRACK=true` or `server.do_not_track: true` disables both). Credentials are never sent: a redaction step scrubs authorization headers, API-key/secret shapes, SASL passwords, and secrets in YAML payloads, and HTTP bodies / local variables are not collected. See [telemetry.md](telemetry.md).
+
 ### Removed
 
 - The deprecated `FLINK_ENV_NAME` environment variable. Use `FLINK_CATALOG_NAME` (or a connection's `flink.catalog_name` in YAML) instead.

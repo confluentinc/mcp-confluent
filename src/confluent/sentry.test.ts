@@ -31,7 +31,18 @@ describe("Sentry integration", () => {
     dsn: "https://abc@o0.ingest.sentry.io/1",
     release: "1.0.0",
     transports: ["stdio"] as const,
+    connectionTypes: ["oauth", "direct"] as const,
   };
+
+  it("resolveSentryDsn returns undefined for an unbaked (dev) build", () => {
+    expect(nodeDeps.buildConfig.SENTRY_DSN).toBe("");
+    expect(mod.resolveSentryDsn()).toBeUndefined();
+  });
+
+  it("resolveSentryDsn returns the baked DSN when present", () => {
+    nodeDeps.buildConfig.SENTRY_DSN = "https://baked@o0.ingest.sentry.io/9";
+    expect(mod.resolveSentryDsn()).toBe("https://baked@o0.ingest.sentry.io/9");
+  });
 
   it("does not init when doNotTrack is true (zero outbound events)", () => {
     mod.initSentry({ ...opts, doNotTrack: true });
@@ -60,6 +71,11 @@ describe("Sentry integration", () => {
       dataCollection: { userInfo: false, httpBodies: [] },
     });
     expect(typeof cfg.beforeSend).toBe("function");
+    // Context tags are sorted and carry no ids/secrets.
+    expect(cfg.initialScope.tags).toEqual({
+      transport: "stdio",
+      connections: "direct,oauth",
+    });
 
     mod.captureException(new Error("boom"), {
       tags: { toolName: "list-topics" },

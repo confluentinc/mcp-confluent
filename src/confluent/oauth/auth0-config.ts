@@ -84,8 +84,6 @@ export function getTelemetryRestUrlForEnv(
  * the cloud/telemetry surfaces, the Flink host is regional, so {@link
  * OAuthClientManager} can only build this per call once it has resolved the
  * compute pool's `cloud` + `region` (via `GET /fcpm/v2/compute-pools/{id}`).
- * `cloud` arrives from the API as an upper-case provider name (`AWS`); the
- * hostname uses the lower-case form (`flink.us-east-1.aws.confluent.cloud`).
  */
 export function getFlinkRestUrlForRegion(
   environment: Auth0Environment,

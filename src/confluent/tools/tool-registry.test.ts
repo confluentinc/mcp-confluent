@@ -244,6 +244,8 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_TAGS]: hasCCloudCatalogOrOAuth,
         // Clusters
         [ToolName.LIST_CLUSTERS]: hasConfluentCloudOrOAuth,
+        // Compute pools
+        [ToolName.LIST_COMPUTE_POOLS]: hasConfluentCloudOrOAuth,
         // Environments + billing + organizations (Confluent Cloud control plane)
         [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloudOrOAuth,
         [ToolName.READ_ENVIRONMENT]: hasConfluentCloudOrOAuth,
@@ -521,6 +523,11 @@ describe("tool-registry.ts", () => {
         // resolveEnvArg throws under direct when neither environmentId arg
         // nor conn.kafka.env_id supplies a value — `allServicesRuntime`
         // omits kafka.env_id, so this is the expected smoke-test path.
+        outcome: { throws: "environmentId is required" },
+      },
+      [ToolName.LIST_COMPUTE_POOLS]: {
+        // Same resolveEnvArg path as LIST_CLUSTERS: throws under direct when
+        // neither environmentId arg nor conn.kafka.env_id supplies a value.
         outcome: { throws: "environmentId is required" },
       },
       // Tableflow

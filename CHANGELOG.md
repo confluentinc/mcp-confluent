@@ -4,6 +4,10 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- `list-compute-pools` tool: a read-only discovery tool that lists the Flink compute pools in an environment (id, display name, cloud, region).
+
 ### Removed
 
 - The deprecated `FLINK_ENV_NAME` environment variable. Use `FLINK_CATALOG_NAME` (or a connection's `flink.catalog_name` in YAML) instead.

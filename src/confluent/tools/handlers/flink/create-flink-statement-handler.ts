@@ -7,21 +7,6 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const createFlinkStatementArguments = z.object({
-  organizationId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the organization."),
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the environment."),
-  computePoolId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The id associated with the compute pool in context."),
   statement: z
     .string()
     .nonempty()
@@ -55,6 +40,25 @@ const createFlinkStatementArguments = z.object({
     .describe(
       "The database name to be used for the statement. Typically the Kafka cluster name.",
     ),
+  organizationId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
+  computePoolId: z
+    .string()
+    .trim()
+    .optional()
+    .describe("Confluent Cloud Flink compute pool ID (lfcp-...)."),
 });
 
 export class CreateFlinkStatementHandler extends FlinkToolHandler {
@@ -71,28 +75,28 @@ export class CreateFlinkStatementHandler extends FlinkToolHandler {
       environmentId,
       organizationId,
     } = createFlinkStatementArguments.parse(toolArguments);
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
-      organizationId,
-      environmentId,
-    );
-    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    const { organization_id, environment_id, compute_pool_id } =
+      this.resolveFlinkRouting(conn, {
+        organizationId,
+        environmentId,
+        computePoolId,
+      });
+    const flink = conn.type === "direct" ? conn.flink : undefined;
     const resolvedCatalogName = this.resolveOptionalParam(
       catalogName,
-      flink.catalog_name,
+      flink?.catalog_name,
     );
     const resolvedDatabaseName = this.resolveOptionalParam(
       databaseName,
-      flink.database_name,
+      flink?.database_name,
     );
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudFlinkRestClient(),
+      await clientManager.getFlinkRestClient(compute_pool_id, environment_id),
     );
     const { data: response, error } = await pathBasedClient[
       "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements"

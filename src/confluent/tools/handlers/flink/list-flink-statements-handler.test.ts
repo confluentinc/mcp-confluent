@@ -3,6 +3,7 @@ import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
   FlinkGetCase,
+  runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
@@ -80,6 +81,25 @@ describe("list-flink-statements-handler.ts", () => {
           });
         },
       );
+
+      it("should thread the resolved compute pool + environment into the async getFlinkRestClient", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudFlinkRestClient()
+          .GET.mockResolvedValue({ data: {} });
+
+        await handler.handle(
+          runtimeWith(FLINK_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+
+        // Under OAuth these ids derive the regional Flink host; on direct they
+        // come from the flink config block.
+        expect(clientManager.getFlinkRestClient).toHaveBeenCalledWith(
+          FLINK_CONN.flink.compute_pool_id,
+          FLINK_CONN.flink.environment_id,
+        );
+      });
 
       it("should fall back to config computePoolId when arg is whitespace-only", async () => {
         const clientManager = getMockedClientManager();

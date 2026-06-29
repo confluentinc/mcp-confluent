@@ -40,6 +40,22 @@ export interface KafkaClientManager {
 export interface ConfluentCloudRestClientManager {
   /** Gets a configured REST client for Confluent Cloud Flink operations */
   getConfluentCloudFlinkRestClient(): ConfluentRestClient;
+  /**
+   * Env- and compute-pool-aware REST client for Confluent Cloud Flink
+   * operations. Use from handlers that need OAuth support; the sync getter
+   * above stays in use by direct-only call sites and is unaffected.
+   *
+   * Under direct, the args are ignored and a client is built against the
+   * `flink.endpoint` from the connection config (the base URL is already
+   * regional there). Under OAuth, both `computePoolId` and `envId` are
+   * required: the Flink REST host is regional, so a fresh client is built per
+   * call against `https://flink.<region>.<cloud>.<domain>` after resolving the
+   * compute pool's `cloud` + `region` from the Confluent Cloud REST API.
+   */
+  getFlinkRestClient(
+    computePoolId?: string,
+    envId?: string,
+  ): Promise<ConfluentRestClient>;
   /** Gets a configured REST client for general Confluent Cloud operations */
   getConfluentCloudRestClient(): ConfluentRestClient;
   /** Gets a configured REST client for Tableflow operations */

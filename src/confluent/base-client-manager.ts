@@ -202,6 +202,14 @@ export abstract class BaseClientManager
   }
 
   /** @inheritdoc */
+  async getFlinkRestClient(
+    _computePoolId?: string,
+    _envId?: string,
+  ): Promise<ConfluentRestClient> {
+    return this.confluentCloudFlinkRestClient.get();
+  }
+
+  /** @inheritdoc */
   getConfluentCloudRestClient(): ConfluentRestClient {
     return this.confluentCloudRestClient.get();
   }

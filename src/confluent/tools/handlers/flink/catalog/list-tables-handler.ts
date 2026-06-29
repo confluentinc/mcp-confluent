@@ -35,7 +35,9 @@ const listTablesArguments = z.object({
     .string()
     .trim()
     .optional()
-    .describe("Confluent Cloud Flink compute pool ID (lfcp-...)."),
+    .describe(
+      "Confluent Cloud Flink compute pool ID (lfcp-...). Discover via list-compute-pools.",
+    ),
 });
 
 export class ListTablesHandler extends FlinkCatalogToolHandler {

@@ -1,9 +1,10 @@
-import { DirectConnectionConfig } from "@src/config/models.js";
+import { ConnectionConfig } from "@src/config/models.js";
 import {
   BaseToolHandler,
   ToolCategory,
 } from "@src/confluent/tools/base-tools.js";
-import { hasConfluentCloud } from "@src/confluent/tools/connection-predicates.js";
+import { resolveEnvAndClusterArgs } from "@src/confluent/tools/cluster-arg-resolvers.js";
+import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { z } from "zod";
 
 /**
@@ -34,34 +35,24 @@ export const connectorByNameArguments = z.object({
 
 /**
  * Intermediate base class for all Connect tool handlers.
- * Gates enablement on `hasConfluentCloud` and exposes
+ * Gates enablement on `hasConfluentCloudOrOAuth` and exposes
  * `resolveConnectEnvAndClusterId` for consistent env/cluster resolution.
  */
 export abstract class ConnectToolHandler extends BaseToolHandler {
   readonly category = ToolCategory.Connect;
-  readonly predicate = hasConfluentCloud;
+  readonly predicate = hasConfluentCloudOrOAuth;
 
   /**
-   * Resolves environment and Kafka cluster IDs from explicit tool args,
-   * falling back to the connection's `kafka.env_id` / `kafka.cluster_id`.
-   * Throws if either value is absent from both sources.
+   * Resolves environment and Kafka cluster IDs for a Connect REST call.
+   * Delegates to the shared {@link resolveEnvAndClusterArgs} (direct: args win,
+   * falling back to `kafka.env_id`/`kafka.cluster_id`; OAuth: both args
+   * required with a discovery hint).
    */
   protected resolveConnectEnvAndClusterId(
-    conn: DirectConnectionConfig,
+    conn: ConnectionConfig,
     envIdArg: string | undefined,
     clusterIdArg: string | undefined,
   ): { environment_id: string; kafka_cluster_id: string } {
-    return {
-      environment_id: this.resolveParam(
-        envIdArg,
-        conn.kafka?.env_id,
-        "Environment ID",
-      ),
-      kafka_cluster_id: this.resolveParam(
-        clusterIdArg,
-        conn.kafka?.cluster_id,
-        "Kafka Cluster ID",
-      ),
-    };
+    return resolveEnvAndClusterArgs(conn, envIdArg, clusterIdArg);
   }
 }

@@ -50,10 +50,7 @@ export class UpdateTableFlowCatalogIntegrationHandler extends TableflowToolHandl
     const { tableflowCatalogIntegrationConfig } =
       updateTableflowCatalogIntegrationArguments.parse(toolArguments);
 
-    const { clientManager } = this.resolveDirectConnection(
-      runtime,
-      toolArguments,
-    );
+    const { clientManager } = this.resolveConnection(runtime, toolArguments);
 
     const pathBasedClient = wrapAsPathBasedClient(
       clientManager.getConfluentCloudTableflowRestClient(),

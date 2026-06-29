@@ -311,11 +311,56 @@ describe("index.ts", () => {
         ToolName.LIST_CLUSTERS,
         ToolName.EXPLAIN_DISABLED_TOOLS,
         ToolName.LIST_CONFIGURED_CONNECTIONS,
+        ToolName.CONFIG_HELP,
         ToolName.DESCRIBE_CONFIGURED_CONNECTION,
         // Schema Registry (hasSchemaRegistryOrOAuth)
         ToolName.LIST_SCHEMAS,
         ToolName.CREATE_SCHEMA,
         ToolName.DELETE_SCHEMA,
+        // Connect (hasConfluentCloudOrOAuth — ride the cloud REST client).
+        // create-connector is excluded: it embeds a Kafka API key/secret in the
+        // connector spec, which an OAuth connection cannot supply.
+        ToolName.LIST_CONNECTORS,
+        ToolName.GET_CONNECTOR_CONFIG,
+        ToolName.GET_CONNECTOR_OFFSETS,
+        ToolName.GET_CONNECTOR_STATUS,
+        ToolName.GET_CONNECTOR_TASKS,
+        ToolName.DELETE_CONNECTOR,
+        ToolName.GET_CONNECTOR_ERROR_SUMMARY,
+        ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
+        ToolName.GET_CONNECTOR_LOGS,
+        ToolName.PAUSE_CONNECTOR,
+        ToolName.RESUME_CONNECTOR,
+        ToolName.RESTART_CONNECTOR,
+        ToolName.UPDATE_CONNECTOR_CONFIG,
+        // Catalog + search (hasCCloudCatalogOrOAuth — ride the SR REST client,
+        // which auto-resolves the SR cluster + endpoint from environment_id).
+        ToolName.SEARCH_TOPICS_BY_TAG,
+        ToolName.SEARCH_TOPICS_BY_NAME,
+        ToolName.CREATE_TOPIC_TAGS,
+        ToolName.DELETE_TAG,
+        ToolName.REMOVE_TAG_FROM_ENTITY,
+        ToolName.ADD_TAGS_TO_TOPIC,
+        ToolName.LIST_TAGS,
+        // Telemetry / Metrics (hasTelemetryOrOAuth — the Telemetry REST base
+        // URL is derived from the Auth0 environment and the surface is
+        // cloud-wide, so no per-cluster/per-env routing is needed).
+        ToolName.QUERY_METRICS,
+        ToolName.LIST_METRICS,
+        // Tableflow (hasTableflowOrOAuth — the Tableflow REST surface rides the
+        // cloud control-plane URL/token; environment/cluster IDs are supplied as
+        // explicit tool arguments under OAuth).
+        ToolName.CREATE_TABLEFLOW_TOPIC,
+        ToolName.LIST_TABLEFLOW_REGIONS,
+        ToolName.LIST_TABLEFLOW_TOPICS,
+        ToolName.READ_TABLEFLOW_TOPIC,
+        ToolName.UPDATE_TABLEFLOW_TOPIC,
+        ToolName.DELETE_TABLEFLOW_TOPIC,
+        ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION,
+        ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS,
+        ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
+        ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION,
+        ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
       ];
 
       const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
@@ -333,44 +378,9 @@ describe("index.ts", () => {
         ToolName.CHECK_FLINK_STATEMENT_HEALTH,
         ToolName.DETECT_FLINK_STATEMENT_ISSUES,
         ToolName.GET_FLINK_STATEMENT_PROFILE,
-        // Connect (hasKafkaRestWithAuth / hasKafkaAuth — needs the kafka block)
-        ToolName.LIST_CONNECTORS,
-        ToolName.GET_CONNECTOR_CONFIG,
-        ToolName.GET_CONNECTOR_OFFSETS,
-        ToolName.GET_CONNECTOR_STATUS,
-        ToolName.GET_CONNECTOR_TASKS,
+        // Connect — only create-connector stays disabled (canCreateDirectConnector
+        // is direct-only: it embeds a Kafka API key/secret in the connector spec).
         ToolName.CREATE_CONNECTOR,
-        ToolName.DELETE_CONNECTOR,
-        ToolName.GET_CONNECTOR_ERROR_SUMMARY,
-        ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
-        ToolName.GET_CONNECTOR_LOGS,
-        ToolName.PAUSE_CONNECTOR,
-        ToolName.RESUME_CONNECTOR,
-        ToolName.RESTART_CONNECTOR,
-        ToolName.UPDATE_CONNECTOR_CONFIG,
-        // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)
-        ToolName.SEARCH_TOPICS_BY_TAG,
-        ToolName.SEARCH_TOPICS_BY_NAME,
-        ToolName.CREATE_TOPIC_TAGS,
-        ToolName.DELETE_TAG,
-        ToolName.REMOVE_TAG_FROM_ENTITY,
-        ToolName.ADD_TAGS_TO_TOPIC,
-        ToolName.LIST_TAGS,
-        // Tableflow (hasTableflow — needs the tableflow service block)
-        ToolName.CREATE_TABLEFLOW_TOPIC,
-        ToolName.LIST_TABLEFLOW_REGIONS,
-        ToolName.LIST_TABLEFLOW_TOPICS,
-        ToolName.READ_TABLEFLOW_TOPIC,
-        ToolName.UPDATE_TABLEFLOW_TOPIC,
-        ToolName.DELETE_TABLEFLOW_TOPIC,
-        ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION,
-        ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS,
-        ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
-        ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION,
-        ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
-        // Telemetry (hasTelemetry — needs the telemetry service block)
-        ToolName.QUERY_METRICS,
-        ToolName.LIST_METRICS,
       ];
 
       it("should partition every ToolName into exactly one of EXPECTED_OAUTH_ENABLED or EXPECTED_OAUTH_DISABLED", () => {

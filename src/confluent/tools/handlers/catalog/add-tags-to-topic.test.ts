@@ -7,8 +7,9 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  getMockedRestClient,
 } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 const VALID_ARGS = {
   tagAssignments: [{ entityName: "lsrc:lkc:orders", typeName: "PII" }],
@@ -23,11 +24,11 @@ describe("add-tags-to-topic.ts", () => {
     describe("handle()", () => {
       it("should resolve with a success message when the tag is assigned", async () => {
         const clientManager = getMockedClientManager();
-        clientManager
-          .getConfluentCloudSchemaRegistryRestClient()
-          .POST.mockResolvedValue({
-            data: [{ entityName: "lsrc:lkc:orders" }],
-          });
+        const sr = getMockedRestClient();
+        sr.POST.mockResolvedValue({
+          data: [{ entityName: "lsrc:lkc:orders" }],
+        });
+        clientManager.getSchemaRegistryRestClient.mockResolvedValue(sr);
         await assertHandleCase({
           handler,
           runtime: runtimeWithDecoy(
@@ -43,9 +44,9 @@ describe("add-tags-to-topic.ts", () => {
 
       it("should resolve with an error response when the API returns an error", async () => {
         const clientManager = getMockedClientManager();
-        clientManager
-          .getConfluentCloudSchemaRegistryRestClient()
-          .POST.mockResolvedValue({ error: { message: "boom" } });
+        const sr = getMockedRestClient();
+        sr.POST.mockResolvedValue({ error: { message: "boom" } });
+        clientManager.getSchemaRegistryRestClient.mockResolvedValue(sr);
         await assertHandleCase({
           handler,
           runtime: runtimeWithDecoy(
@@ -70,6 +71,30 @@ describe("add-tags-to-topic.ts", () => {
           args: {},
           outcome: { throws: "ZodError" },
         });
+      });
+
+      it("should pass environment_id through to getSchemaRegistryRestClient (OAuth wiring)", async () => {
+        const clientManager = getMockedClientManager();
+        const sr = getMockedRestClient();
+        sr.POST.mockResolvedValue({
+          data: [{ entityName: "lsrc:lkc:orders" }],
+        });
+        clientManager.getSchemaRegistryRestClient.mockResolvedValue(sr);
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CATALOG_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { ...VALID_ARGS, environment_id: "env-42" },
+          outcome: { resolves: "Successfully assigned tag" },
+          clientManager,
+        });
+
+        expect(clientManager.getSchemaRegistryRestClient).toHaveBeenCalledWith(
+          "env-42",
+        );
       });
     });
   });

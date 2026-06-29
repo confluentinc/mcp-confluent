@@ -400,6 +400,39 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
+    describe("getConfluentCloudTelemetryRestClient()", () => {
+      it("should build the telemetry client without throwing (endpoint derived from the Auth0 env)", () => {
+        const manager = buildManager();
+        // The telemetry base URL is derived from the env, so the Lazy
+        // resolves rather than throwing "endpoint not configured".
+        expect(() =>
+          manager.getConfluentCloudTelemetryRestClient(),
+        ).not.toThrow();
+      });
+
+      it("should authenticate telemetry requests with the data-plane token, not the control-plane token", async () => {
+        const holder = createMockInstance(OAuthHolder);
+        holder.getDataPlaneToken.mockReturnValue("dpat");
+        holder.getControlPlaneToken.mockReturnValue("cpat");
+        const manager = new OAuthClientManager(holder, "devel");
+
+        const fetchSpy = vi
+          .spyOn(globalThis, "fetch")
+          .mockResolvedValue(new Response("{}", { status: 200 }));
+
+        const client = manager.getConfluentCloudTelemetryRestClient();
+        await client.GET(
+          "/v2/metrics/{dataset}/descriptors/metrics" as never,
+          { params: { path: { dataset: "cloud" } } } as never,
+        );
+
+        expect(holder.getDataPlaneToken).toHaveBeenCalled();
+        expect(holder.getControlPlaneToken).not.toHaveBeenCalled();
+        const request = fetchSpy.mock.calls[0]![0] as Request;
+        expect(request.headers.get("Authorization")).toBe("Bearer dpat");
+      });
+    });
+
     describe("disconnect()", () => {
       it("should be a no-op (no caches to drain — clients are caller-owned)", async () => {
         const manager = buildManager();

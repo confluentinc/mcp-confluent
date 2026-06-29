@@ -12,6 +12,7 @@ All notable changes to this MCP server will be documented in this file.
 
 - `produce-message` can now produce primitive key and value payloads (numbers, booleans, strings) against top-level primitive Schema Registry schemas such as Avro `long`; previously the serializer rejected anything but an object.
 - `explain-disabled-tools` now accounts for tools the operator excluded via `--allow-tools` / `--block-tools`; previously (since v1.3.0) such tools were ignored by the diagnostic, which either counted them as enabled — contradicting `tools/list` — or blamed a missing config block. They now appear in a dedicated server-wide block.
+- Introduced new optional tool argument `messageName` to `produce-message` tool to fix producing messages using PROTOBUF as format ([#127](https://github.com/confluentinc/mcp-confluent/issues/127))
 
 ### Changed
 
@@ -25,10 +26,16 @@ All notable changes to this MCP server will be documented in this file.
 
 #### New Tools / Tool Features
 
+- **More tool families now work under OAuth.** Additional Confluent Cloud tool families are now usable from an OAuth (PKCE) connection, not just `direct` connections with static API keys.
+  - **Connectors.** All 13 tools except `create-connector` (which stays `direct`-only, since its spec embeds a Kafka API key/secret).
+  - **Catalog & Tags.** All 7 tools (`search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`).
+  - **Metrics.** Both tools (`list-available-metrics`, `query-metrics`).
+  - **Tableflow.** All 11 tools (the 6 topic/region tools and the 5 catalog-integration tools).
 - **`create-schema` tool.** Registers a schema (or a new version) under a subject in the Schema Registry, peer to `list-schemas` and `delete-schema`.
 - **`explain-disabled-tools` now reports per connection.** The "why is this tool missing?" report is split into one section per configured connection, each with its own disabled-tool buckets and counts — so a tool live on one connection and dark on another surfaces under exactly the connection that gates it, rather than being flattened to a single server-wide verdict.
 - **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.
 - **`describe-configured-connection` tool.** Read-only, always-enabled discovery tool that, given one connection id, reports its non-secret config (never credentials), read-only-ness, and the tools enabled on it alongside the reason each disabled tool is gated off.
+- **`config-help` tool.** Read-only, always-enabled tool that, given a target tool name, reports per connection the config gap keeping that tool disabled and returns a paste-ready YAML snippet to close it — or a note when the fix isn't a block to add (an OAuth or `read_only` connection). Suggests only; it never edits the config file.
 - **`produce-message` improvements:**
   - **Record-level `partition`, `timestamp`, and `headers`.** Three optional arguments for faithfully reproducing a record on another cluster: `partition` (non-negative integer) pins the target partition; `timestamp` accepts a `Date.parse`-able date-time string (ISO 8601 recommended) or a non-negative integer ms-since-epoch number (an unparseable value returns an error instead of silently stamping wall-clock time); `headers` maps a header name to a string or array of strings (multi-valued), carried as raw Kafka headers independent of Schema Registry serialization.
   - **Support for schema-id-in-headers**: The tool can be asked to encode the schema GUID(s) (UUIDs) in the Kafka message headers. By default, however, schema IDs are encoded in the payload's magic-byte prefix (the standard Confluent wire format).

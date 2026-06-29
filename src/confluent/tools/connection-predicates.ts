@@ -285,6 +285,42 @@ export const hasSchemaRegistryOrOAuth: ConnectionPredicate =
   widenForOAuth(hasSchemaRegistry);
 
 /**
+ * The Stream Catalog gate, widened to admit OAuth. Direct connections still
+ * need a CCloud-hosted Schema Registry (the `schema_registry` block with
+ * `api_key` auth plus a `confluent_cloud` block — see
+ * {@linkcode hasCCloudCatalogSupport}); OAuth connections satisfy it
+ * unconditionally because under OAuth the Schema Registry is always
+ * CCloud-hosted and the SR cluster + endpoint are auto-resolved at call time
+ * from `environment_id`. Use on the catalog/tag/search handlers.
+ */
+export const hasCCloudCatalogOrOAuth: ConnectionPredicate = widenForOAuth(
+  hasCCloudCatalogSupport,
+);
+
+/**
+ * The Telemetry gate, widened to admit OAuth. Direct connections still need a
+ * `telemetry` block; OAuth connections satisfy it unconditionally — the
+ * Telemetry REST base URL is derived from the Auth0 environment
+ * (`getTelemetryRestUrlForEnv`) and the surface is cloud-wide (no per-cluster
+ * or per-environment routing). Use on the metrics handlers (`query-metrics`,
+ * `list-metrics`).
+ */
+export const hasTelemetryOrOAuth: ConnectionPredicate =
+  widenForOAuth(hasTelemetry);
+
+/**
+ * The Tableflow gate, widened to admit OAuth. Direct connections still need a
+ * `tableflow` block; OAuth connections satisfy it unconditionally — the
+ * Tableflow REST base URL reuses the cloud control-plane URL derived from the
+ * Auth0 environment, and the surface rides the control-plane token. The
+ * environment/cluster IDs a Tableflow call needs are supplied as explicit tool
+ * arguments under OAuth (an OAuth connection carries no `kafka` block to fall
+ * back to). Use on the Tableflow topic/catalog/region handlers.
+ */
+export const hasTableflowOrOAuth: ConnectionPredicate =
+  widenForOAuth(hasTableflow);
+
+/**
  * Gate for tools that create connectors against the direct Confluent Cloud
  * REST surface: requires both a `confluent_cloud` block (the `/connect/v1`
  * endpoint) and `kafka.auth` (the connector spec carries kafka API

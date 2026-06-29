@@ -9,13 +9,12 @@ import {
   canCreateDirectConnector,
   type ConnectionPredicate,
   flinkWithTelemetry,
-  hasCCloudCatalogSupport,
-  hasConfluentCloud,
+  hasCCloudCatalogOrOAuth,
   hasConfluentCloudOrOAuth,
   hasFlink,
   hasSchemaRegistryOrOAuth,
-  hasTableflow,
-  hasTelemetry,
+  hasTableflowOrOAuth,
+  hasTelemetryOrOAuth,
   kafkaBootstrapOrOAuth,
   kafkaRestWithAuthOrOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
@@ -29,6 +28,7 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  getMockedRestClient,
   type HandleOutcome,
   type MockedClientManager,
 } from "@tests/stubs/index.js";
@@ -124,6 +124,7 @@ describe("tool-registry.ts", () => {
           "detect",
           "query",
           "consume",
+          "config",
         ]);
         const createUpdatePrefixes = new Set([
           "create",
@@ -216,29 +217,31 @@ describe("tool-registry.ts", () => {
         [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlink,
         [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
         [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
-        // Connect
-        [ToolName.LIST_CONNECTORS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_CONFIG]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_OFFSETS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_STATUS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloud,
+        // Connect — OAuth-capable (ride the cloud REST client); create-connector
+        // stays direct-only (embeds a Kafka API key/secret in the connector spec).
+        [ToolName.LIST_CONNECTORS]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_CONFIG]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_OFFSETS]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_STATUS]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloudOrOAuth,
         [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
-        [ToolName.DELETE_CONNECTOR]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]: hasConfluentCloud,
-        [ToolName.GET_CONNECTOR_LOGS]: hasConfluentCloud,
-        [ToolName.PAUSE_CONNECTOR]: hasConfluentCloud,
-        [ToolName.RESUME_CONNECTOR]: hasConfluentCloud,
-        [ToolName.RESTART_CONNECTOR]: hasConfluentCloud,
-        [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloud,
-        // Catalog + search (CCloud catalog support)
-        [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogSupport,
-        [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogSupport,
-        [ToolName.CREATE_TOPIC_TAGS]: hasCCloudCatalogSupport,
-        [ToolName.DELETE_TAG]: hasCCloudCatalogSupport,
-        [ToolName.REMOVE_TAG_FROM_ENTITY]: hasCCloudCatalogSupport,
-        [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogSupport,
-        [ToolName.LIST_TAGS]: hasCCloudCatalogSupport,
+        [ToolName.DELETE_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]:
+          hasConfluentCloudOrOAuth,
+        [ToolName.GET_CONNECTOR_LOGS]: hasConfluentCloudOrOAuth,
+        [ToolName.PAUSE_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.RESUME_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.RESTART_CONNECTOR]: hasConfluentCloudOrOAuth,
+        [ToolName.UPDATE_CONNECTOR_CONFIG]: hasConfluentCloudOrOAuth,
+        // Catalog + search (CCloud catalog support, widened for OAuth)
+        [ToolName.SEARCH_TOPICS_BY_TAG]: hasCCloudCatalogOrOAuth,
+        [ToolName.SEARCH_TOPICS_BY_NAME]: hasCCloudCatalogOrOAuth,
+        [ToolName.CREATE_TOPIC_TAGS]: hasCCloudCatalogOrOAuth,
+        [ToolName.DELETE_TAG]: hasCCloudCatalogOrOAuth,
+        [ToolName.REMOVE_TAG_FROM_ENTITY]: hasCCloudCatalogOrOAuth,
+        [ToolName.ADD_TAGS_TO_TOPIC]: hasCCloudCatalogOrOAuth,
+        [ToolName.LIST_TAGS]: hasCCloudCatalogOrOAuth,
         // Clusters
         [ToolName.LIST_CLUSTERS]: hasConfluentCloudOrOAuth,
         // Environments + billing + organizations (Confluent Cloud control plane)
@@ -251,26 +254,27 @@ describe("tool-registry.ts", () => {
         [ToolName.CREATE_SCHEMA]: hasSchemaRegistryOrOAuth,
         [ToolName.DELETE_SCHEMA]: hasSchemaRegistryOrOAuth,
         // Tableflow
-        [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflow,
-        [ToolName.LIST_TABLEFLOW_REGIONS]: hasTableflow,
-        [ToolName.LIST_TABLEFLOW_TOPICS]: hasTableflow,
-        [ToolName.READ_TABLEFLOW_TOPIC]: hasTableflow,
-        [ToolName.UPDATE_TABLEFLOW_TOPIC]: hasTableflow,
-        [ToolName.DELETE_TABLEFLOW_TOPIC]: hasTableflow,
-        [ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
-        [ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS]: hasTableflow,
-        [ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
-        [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
-        [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflow,
+        [ToolName.CREATE_TABLEFLOW_TOPIC]: hasTableflowOrOAuth,
+        [ToolName.LIST_TABLEFLOW_REGIONS]: hasTableflowOrOAuth,
+        [ToolName.LIST_TABLEFLOW_TOPICS]: hasTableflowOrOAuth,
+        [ToolName.READ_TABLEFLOW_TOPIC]: hasTableflowOrOAuth,
+        [ToolName.UPDATE_TABLEFLOW_TOPIC]: hasTableflowOrOAuth,
+        [ToolName.DELETE_TABLEFLOW_TOPIC]: hasTableflowOrOAuth,
+        [ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflowOrOAuth,
+        [ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS]: hasTableflowOrOAuth,
+        [ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflowOrOAuth,
+        [ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflowOrOAuth,
+        [ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION]: hasTableflowOrOAuth,
         // Metrics (Telemetry API)
-        [ToolName.QUERY_METRICS]: hasTelemetry,
-        [ToolName.LIST_METRICS]: hasTelemetry,
+        [ToolName.QUERY_METRICS]: hasTelemetryOrOAuth,
+        [ToolName.LIST_METRICS]: hasTelemetryOrOAuth,
         // Documentation (no service-block requirement)
         [ToolName.SEARCH_PRODUCT_DOCS]: alwaysEnabled,
         [ToolName.GET_PRODUCT_DOC_PAGE]: alwaysEnabled,
         // Diagnostics (no service-block requirement)
         [ToolName.EXPLAIN_DISABLED_TOOLS]: alwaysEnabled,
         [ToolName.LIST_CONFIGURED_CONNECTIONS]: alwaysEnabled,
+        [ToolName.CONFIG_HELP]: alwaysEnabled,
         [ToolName.DESCRIBE_CONFIGURED_CONNECTION]: alwaysEnabled,
       };
 
@@ -483,18 +487,18 @@ describe("tool-registry.ts", () => {
       [ToolName.LIST_TAGS]: {
         outcome: { resolves: "Successfully retrieved tags" },
         setup: (cm) => {
-          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
-            data: [],
-          });
+          const sr = getMockedRestClient();
+          sr.GET.mockResolvedValue({ data: [] });
+          cm.getSchemaRegistryRestClient.mockResolvedValue(sr);
         },
       },
       // Search
       [ToolName.SEARCH_TOPICS_BY_TAG]: {
         outcome: { resolves: "{}" },
         setup: (cm) => {
-          cm.getConfluentCloudSchemaRegistryRestClient().GET.mockResolvedValue({
-            data: {},
-          });
+          const sr = getMockedRestClient();
+          sr.GET.mockResolvedValue({ data: {} });
+          cm.getSchemaRegistryRestClient.mockResolvedValue(sr);
         },
       },
       [ToolName.SEARCH_TOPICS_BY_NAME]: { outcome: { throws: "ZodError" } },
@@ -577,6 +581,12 @@ describe("tool-registry.ts", () => {
       // connection-count header.
       [ToolName.LIST_CONFIGURED_CONNECTIONS]: {
         outcome: { resolves: "1 connection configured:" },
+        bypassesClientLayer: true,
+      },
+      // config-help requires a `tool` arg; zero args fails Zod parse before
+      // it ever reaches the registry walk or any client.
+      [ToolName.CONFIG_HELP]: {
+        outcome: { throws: "ZodError" },
         bypassesClientLayer: true,
       },
       // describe-configured-connection requires a connectionId argument, so the

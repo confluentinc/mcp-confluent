@@ -32,7 +32,7 @@ export class DeleteConnectorHandler extends ConnectToolHandler {
     const { clusterId, environmentId, connectorName } =
       deleteConnectorArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

@@ -1,5 +1,6 @@
 import type { ConfluentRestClient } from "@src/confluent/client-manager.js";
 import {
+  resolveFlinkComputePoolRegion,
   resolveKafkaBootstrap,
   resolveKafkaRestEndpoint,
   resolveSchemaRegistryClusterId,
@@ -139,6 +140,41 @@ describe("resolveKafkaRestEndpoint", () => {
     await expect(
       resolveKafkaRestEndpoint(client, "lkc-no-http", "env-1"),
     ).rejects.toThrow(/http_endpoint/);
+  });
+});
+
+describe("resolveFlinkComputePoolRegion", () => {
+  it("returns spec.cloud + spec.region on success", async () => {
+    const client = makeStubClient({
+      "/fcpm/v2/compute-pools/{id}:lfcp-abc": {
+        data: { spec: { cloud: "AWS", region: "us-east-1" } },
+      },
+    });
+    expect(
+      await resolveFlinkComputePoolRegion(client, "lfcp-abc", "env-1"),
+    ).toEqual({ cloud: "AWS", region: "us-east-1" });
+  });
+
+  it("throws with compute pool + env in message on 404", async () => {
+    const client = makeStubClient({
+      "/fcpm/v2/compute-pools/{id}:lfcp-x": {
+        error: { message: "not found", status: 404 },
+      },
+    });
+    await expect(
+      resolveFlinkComputePoolRegion(client, "lfcp-x", "env-9"),
+    ).rejects.toThrow(/lfcp-x.*env-9/);
+  });
+
+  it("throws when the spec is missing cloud or region", async () => {
+    const client = makeStubClient({
+      "/fcpm/v2/compute-pools/{id}:lfcp-no-region": {
+        data: { spec: { cloud: "AWS" } },
+      },
+    });
+    await expect(
+      resolveFlinkComputePoolRegion(client, "lfcp-no-region", "env-1"),
+    ).rejects.toThrow(/no cloud\/region/);
   });
 });
 

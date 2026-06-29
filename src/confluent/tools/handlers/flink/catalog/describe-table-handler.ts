@@ -15,21 +15,11 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const describeTableArguments = z.object({
-  organizationId: z
+  tableName: z
     .string()
     .trim()
-    .optional()
-    .describe("The unique identifier for the organization."),
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the environment."),
-  computePoolId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The id associated with the compute pool in context."),
+    .nonempty()
+    .describe("The name of the table to describe."),
   catalogName: z
     .string()
     .trim()
@@ -44,11 +34,25 @@ const describeTableArguments = z.object({
     .describe(
       "The database/schema name. Can be cluster ID (lkc-xxxxx) or friendly name. Optional.",
     ),
-  tableName: z
+  organizationId: z
     .string()
     .trim()
-    .nonempty()
-    .describe("The name of the table to describe."),
+    .optional()
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
+  computePoolId: z
+    .string()
+    .trim()
+    .optional()
+    .describe("Confluent Cloud Flink compute pool ID (lfcp-...)."),
 });
 
 export class DescribeTableHandler extends FlinkCatalogToolHandler {

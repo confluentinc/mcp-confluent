@@ -7,18 +7,6 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const listFlinkStatementsArguments = z.object({
-  organizationId: z
-    .string()
-    .optional()
-    .describe("The unique identifier for the organization."),
-  environmentId: z
-    .string()
-    .optional()
-    .describe("The unique identifier for the environment."),
-  computePoolId: z
-    .string()
-    .optional()
-    .describe("Filter the results by exact match for compute_pool."),
   pageSize: z
     .number()
     .int()
@@ -42,6 +30,22 @@ const listFlinkStatementsArguments = z.object({
     .describe(
       "Filter by status phase: PENDING, RUNNING, COMPLETED, FAILED, STOPPED, etc.",
     ),
+  organizationId: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
+  environmentId: z
+    .string()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
+  computePoolId: z
+    .string()
+    .optional()
+    .describe("Confluent Cloud Flink compute pool ID (lfcp-...)."),
 });
 
 export class ListFlinkStatementsHandler extends FlinkToolHandler {

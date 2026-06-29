@@ -31,7 +31,7 @@ All notable changes to this MCP server will be documented in this file.
   - **Catalog & Tags.** All 7 tools (`search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`).
   - **Metrics.** Both tools (`list-available-metrics`, `query-metrics`).
   - **Tableflow.** All 11 tools (the 6 topic/region tools and the 5 catalog-integration tools).
-  - **Flink.** All 13 tools (the 5 statement tools, the 5 catalog tools, and the 3 diagnostics tools). The Flink REST host is regional, so under OAuth the `organizationId`, `environmentId`, and `computePoolId` are required as tool arguments — the per-call client resolves the compute pool's cloud + region to build the regional endpoint. With this, every Confluent Cloud tool family except `create-connector` works under OAuth.
+  - **Flink.** All 13 tools (the 5 statement tools, the 5 catalog tools, and the 3 diagnostics tools).
 - **`create-schema` tool.** Registers a schema (or a new version) under a subject in the Schema Registry, peer to `list-schemas` and `delete-schema`.
 - **`explain-disabled-tools` now reports per connection.** The "why is this tool missing?" report is split into one section per configured connection, each with its own disabled-tool buckets and counts — so a tool live on one connection and dark on another surfaces under exactly the connection that gates it, rather than being flattened to a single server-wide verdict.
 - **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.

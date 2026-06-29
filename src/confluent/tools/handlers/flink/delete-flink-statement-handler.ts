@@ -7,23 +7,6 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const deleteFlinkStatementArguments = z.object({
-  organizationId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the organization."),
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the environment."),
-  computePoolId: z
-    .string()
-    .trim()
-    .optional()
-    .describe(
-      "The compute pool ID (lfcp-...). Required under OAuth to resolve the regional Flink endpoint.",
-    ),
   statementName: z
     .string()
     .regex(
@@ -36,6 +19,25 @@ const deleteFlinkStatementArguments = z.object({
     .describe(
       "The user provided name of the resource, unique within this environment.",
     ),
+  organizationId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
+  computePoolId: z
+    .string()
+    .trim()
+    .optional()
+    .describe("Confluent Cloud Flink compute pool ID (lfcp-...)."),
 });
 
 export class DeleteFlinkStatementHandler extends FlinkToolHandler {

@@ -14,17 +14,21 @@ const listCatalogsArguments = z.object({
     .string()
     .trim()
     .optional()
-    .describe("The unique identifier for the organization."),
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
   environmentId: z
     .string()
     .trim()
     .optional()
-    .describe("The unique identifier for the environment."),
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
   computePoolId: z
     .string()
     .trim()
     .optional()
-    .describe("The id associated with the compute pool in context."),
+    .describe("Confluent Cloud Flink compute pool ID (lfcp-...)."),
 });
 
 export class ListCatalogsHandler extends FlinkCatalogToolHandler {

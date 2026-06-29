@@ -25,7 +25,7 @@ const detectIssuesArguments = z.object({
     .boolean()
     .default(true)
     .describe(
-      "Include performance metrics analysis (backpressure, lag, etc.). Requires CONFLUENT_CLOUD_API_KEY.",
+      "Include performance metrics analysis (backpressure, lag, etc.) from the Telemetry API.",
     ),
   organizationId: z
     .string()

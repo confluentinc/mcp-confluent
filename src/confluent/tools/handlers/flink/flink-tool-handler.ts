@@ -95,8 +95,8 @@ export abstract class FlinkToolHandler extends BaseToolHandler {
       if (!organization_id || !environment_id || !compute_pool_id) {
         throw new Error(
           "organizationId, environmentId, and computePoolId are required under OAuth connection type. " +
-            "Discover the environment via list-environments; the compute pool id (lfcp-...) and its " +
-            "region come from the Confluent Cloud console or the Flink compute pools API.",
+            "Discover the organization via list-organizations and the environment via list-environments; " +
+            "the compute pool id (lfcp-...) comes from the Confluent Cloud Console (Flink → Compute pools).",
         );
       }
       return { organization_id, environment_id, compute_pool_id };

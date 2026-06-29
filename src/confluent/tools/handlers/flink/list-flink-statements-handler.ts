@@ -45,7 +45,9 @@ const listFlinkStatementsArguments = z.object({
   computePoolId: z
     .string()
     .optional()
-    .describe("Confluent Cloud Flink compute pool ID (lfcp-...)."),
+    .describe(
+      "Confluent Cloud Flink compute pool ID (lfcp-...). Discover via list-compute-pools.",
+    ),
 });
 
 export class ListFlinkStatementsHandler extends FlinkToolHandler {

@@ -49,9 +49,13 @@ describe("base-client-manager.ts", () => {
     // synchronous parameterized loop's getter union.
     // getSchemaRegistryRestClient is the async env-aware parallel of
     // getConfluentCloudSchemaRegistryRestClient; same exclusion reason.
+    // getFlinkRestClient is the async compute-pool-aware parallel of
+    // getConfluentCloudFlinkRestClient; same exclusion reason.
     type RestGetterKey = Exclude<
       keyof ConfluentCloudRestClientManager,
-      "getConfluentCloudKafkaRestClient" | "getSchemaRegistryRestClient"
+      | "getConfluentCloudKafkaRestClient"
+      | "getSchemaRegistryRestClient"
+      | "getFlinkRestClient"
     >;
 
     const restCases: Array<{
@@ -155,6 +159,35 @@ describe("base-client-manager.ts", () => {
         const cm = new DirectClientManager(buildConfig());
         await expect(cm.getSchemaRegistryRestClient()).rejects.toThrow(
           "Confluent Cloud Schema Registry REST endpoint not configured",
+        );
+      });
+    });
+
+    // getFlinkRestClient is async + compute-pool-aware to make room for OAuth
+    // overrides (the regional Flink host is resolved per call there); under
+    // direct it delegates to the same Lazy backing the sync getter, so the
+    // compute-pool/env args are ignored and a usable client comes back either
+    // way.
+    describe("getFlinkRestClient()", () => {
+      const url = "https://flink.us-east-1.aws.confluent.cloud";
+
+      it("should return a client when the endpoint is configured, ignoring the args", async () => {
+        const cm = new DirectClientManager(
+          buildConfig({ endpoints: { flink: url } }),
+        );
+        const client1 = await cm.getFlinkRestClient();
+        const client2 = await cm.getFlinkRestClient(
+          "lfcp-ignored",
+          "env-ignored",
+        );
+        expect(typeof client1.GET).toBe("function");
+        expect(typeof client2.GET).toBe("function");
+      });
+
+      it("should reject when the endpoint is not configured", async () => {
+        const cm = new DirectClientManager(buildConfig());
+        await expect(cm.getFlinkRestClient()).rejects.toThrow(
+          "Confluent Cloud Flink REST endpoint not configured",
         );
       });
     });

@@ -400,6 +400,76 @@ describe("oauth-client-manager.ts", () => {
       });
     });
 
+    describe("getFlinkRestClient()", () => {
+      it("should reject when computePoolId is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getFlinkRestClient(undefined, "env-1"),
+        ).rejects.toThrow("required under OAuth for Flink access");
+      });
+
+      it("should reject when environmentId is omitted under OAuth", async () => {
+        const manager = buildManager();
+        await expect(
+          manager.getFlinkRestClient("lfcp-1", undefined),
+        ).rejects.toThrow("required under OAuth for Flink access");
+      });
+
+      it("should build a fresh REST client per call against the resolved regional Flink host", async () => {
+        vi.spyOn(resolvers, "resolveFlinkComputePoolRegion").mockResolvedValue({
+          cloud: "AWS",
+          region: "us-east-1",
+        });
+
+        const manager = buildManager();
+        const c1 = await manager.getFlinkRestClient("lfcp-1", "env-1");
+        const c2 = await manager.getFlinkRestClient("lfcp-1", "env-1");
+
+        expect(c1).toBeDefined();
+        expect(c2).toBeDefined();
+        expect(c1).not.toBe(c2);
+        expect(resolvers.resolveFlinkComputePoolRegion).toHaveBeenCalledTimes(
+          2,
+        );
+        expect(resolvers.resolveFlinkComputePoolRegion).toHaveBeenCalledWith(
+          expect.anything(),
+          "lfcp-1",
+          "env-1",
+        );
+      });
+
+      it("should authenticate Flink requests with the data-plane token, not the control-plane token", async () => {
+        vi.spyOn(resolvers, "resolveFlinkComputePoolRegion").mockResolvedValue({
+          cloud: "AWS",
+          region: "us-east-1",
+        });
+        const holder = createMockInstance(OAuthHolder);
+        holder.getDataPlaneToken.mockReturnValue("dpat");
+        holder.getControlPlaneToken.mockReturnValue("cpat");
+        const manager = new OAuthClientManager(holder, "devel");
+
+        const fetchSpy = vi
+          .spyOn(globalThis, "fetch")
+          .mockResolvedValue(new Response("{}", { status: 200 }));
+
+        const client = await manager.getFlinkRestClient("lfcp-1", "env-1");
+        await client.GET(
+          "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements" as never,
+          {
+            params: {
+              path: { organization_id: "org-1", environment_id: "env-1" },
+            },
+          } as never,
+        );
+
+        const request = fetchSpy.mock.calls[0]![0] as Request;
+        expect(request.headers.get("Authorization")).toBe("Bearer dpat");
+        // The host is the regional Flink endpoint derived from the resolved
+        // cloud + region against the devel base domain.
+        expect(request.url).toContain("flink.us-east-1.aws.devel.cpdev.cloud");
+      });
+    });
+
     describe("getConfluentCloudTelemetryRestClient()", () => {
       it("should build the telemetry client without throwing (endpoint derived from the Auth0 env)", () => {
         const manager = buildManager();

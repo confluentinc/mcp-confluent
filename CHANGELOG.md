@@ -14,7 +14,7 @@ All notable changes to this MCP server will be documented in this file.
 - **`describe-configured-connection` tool.** Read-only, always-enabled discovery tool that, given one connection id, reports its non-secret config (never credentials), read-only-ness, and the tools enabled on it alongside the reason each disabled tool is gated off.
 - **`config-help` tool.** Read-only, always-enabled tool that, given a target tool name, reports per connection the config gap keeping that tool disabled and returns a paste-ready YAML snippet to close it — or a note when the fix isn't a block to add (an OAuth or `read_only` connection). Suggests only; it never edits the config file.
 - **More tool families now work under OAuth.** Additional Confluent Cloud tool families are now usable from an OAuth (PKCE) connection, not just `direct` connections with static API keys.
-  - **Connectors.** All 13 tools except `create-connector` (which stays `direct`-only, since its spec embeds a Kafka API key/secret).
+  - **Connectors.** All 14 tools.
   - **Catalog & Tags.** All 7 tools (`search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`).
   - **Metrics.** Both tools (`list-available-metrics`, `query-metrics`).
   - **Tableflow.** All 11 tools (the 6 topic/region tools and the 5 catalog-integration tools).

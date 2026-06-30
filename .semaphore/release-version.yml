@@ -142,7 +142,6 @@ blocks:
               pnpm exec sentry-cli releases new "$VERSION"
               pnpm exec sentry-cli sourcemaps upload --release "$VERSION" --url-prefix '~/dist' dist
               pnpm exec sentry-cli releases finalize "$VERSION"
-            # SENTRY_DSN is exported above so prepack's inject-build-config bakes it in.
             - pnpm pack
             - TGZ_FILE=$(ls *.tgz)
             - artifact push workflow ${TGZ_FILE} --destination release-assets/${TGZ_FILE} --force

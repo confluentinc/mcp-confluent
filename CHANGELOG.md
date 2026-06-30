@@ -6,6 +6,7 @@ All notable changes to this MCP server will be documented in this file.
 
 ### Added
 
+- Error reporting (Sentry): runtime errors are reported to [Sentry](https://sentry.io) (credentials redacted), on by default and disabled by the same `DO_NOT_TRACK` switch as usage analytics. See [telemetry.md](telemetry.md).
 - `list-compute-pools` tool: a read-only discovery tool that lists the Flink compute pools in an environment (id, display name, cloud, region).
 
 ### Removed

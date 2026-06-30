@@ -128,18 +128,15 @@ blocks:
             - pnpm run build
             - |
               if [ "$IS_PRERELEASE" = "false" ]; then
-                TELEMETRY_FIELD=TELEMETRY_WRITE_KEY
+                VAULT_FIELD=TELEMETRY_WRITE_KEY
               else
-                TELEMETRY_FIELD=TELEMETRY_WRITE_KEY_DEV
+                VAULT_FIELD=TELEMETRY_WRITE_KEY_DEV
               fi
-              . vault-get-secret --vault-role=mcp-confluent --secret-key="$TELEMETRY_FIELD" --export-as=TELEMETRY_WRITE_KEY mcpconfluent/telemetry
-              # Single Sentry DSN for all release channels (no separate dev project).
+              . vault-get-secret --vault-role=mcp-confluent --secret-key="$VAULT_FIELD" --export-as=TELEMETRY_WRITE_KEY mcpconfluent/telemetry
+              # One Sentry DSN for all release channels (no separate dev project).
               . vault-get-secret --vault-role=mcp-confluent --secret-key=SENTRY_DSN --export-as=SENTRY_DSN mcpconfluent/telemetry
-            # Upload source maps so stack traces resolve to original TypeScript.
-            # Release + path-based association (not debug-id injection): `pnpm pack`
-            # re-runs `prepack` which rebuilds dist, so any in-file debug ids would
-            # be wiped. tsc output is deterministic, so the maps uploaded from this
-            # build match the dist that prepack rebuilds for the tarball.
+            # Upload source maps (release/path-based, not debug-id: `pnpm pack` rebuilds
+            # dist via prepack, which would wipe injected ids; tsc output is deterministic).
             - . vault-get-secret --vault-role=mcp-confluent --secret-key=SENTRY_AUTH_TOKEN --export-as=SENTRY_AUTH_TOKEN mcpconfluent/telemetry
             - export SENTRY_ORG=confluent
             - export SENTRY_PROJECT=mcp-confluent

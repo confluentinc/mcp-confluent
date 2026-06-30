@@ -433,8 +433,8 @@ async function main() {
       writeKey: resolveTelemetryWriteKey(mcpConfig),
     });
 
-    // Distinct connection auth types (no ids/secrets) help triage which config
-    // path an error came from — e.g. a bug seen only on oauth connections.
+    // Distinct connection auth types (no ids/secrets) — helps triage which
+    // config path an error came from (e.g. oauth-only bugs).
     const connectionTypes = [
       ...new Set(Object.values(mcpConfig.connections).map((c) => c.type)),
     ];

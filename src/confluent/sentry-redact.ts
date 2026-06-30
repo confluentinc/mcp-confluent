@@ -30,7 +30,7 @@ const TEXT_PATTERNS: ReadonlyArray<[RegExp, string]> = [
   [/\b(Bearer|Basic)\s+[\w\-.~+/]+=*/gi, `$1 ${REDACTED}`],
   // sensitive key in `key: value` or `key=value` form (YAML + query/SASL).
   [
-    /\b(password|secret|token|api[_-]?(?:key|secret)|sasl[._-]?password)\b(["']?\s*[:=]\s*["']?)([^\s"',}]+)/gi,
+    /\b(password|secret|token|api[_-]?(?:key|secret)|sasl[._-]?password)\b(\s*[:=]\s*["']?)([^\s"',}]+)/gi,
     `$1$2${REDACTED}`,
   ],
   // High-entropy standalone token (Confluent secret shape: >=40 base64 chars).

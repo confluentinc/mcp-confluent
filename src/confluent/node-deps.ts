@@ -31,9 +31,6 @@ export const fs = {
 export const os = { homedir, platform, release, arch };
 export const path = { join, resolve, dirname, basename };
 export const segment = { Analytics };
-// Explicit `typeof` annotations keep the inferred type anchored to the
-// `@sentry/node` namespace import — without them tsc tries to name transitive
-// `@sentry/core` types via a non-portable pnpm path (TS2742/TS4023).
 export const sentry: {
   init: typeof Sentry.init;
   captureException: typeof Sentry.captureException;

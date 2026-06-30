@@ -5,6 +5,7 @@ import {
   SerdeType,
   VALUE_SCHEMA_ID_HEADER,
 } from "@confluentinc/schemaregistry";
+import type { DeserializerCache } from "@src/confluent/schema-registry-helper.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import { logger } from "@src/logger.js";
 import { z } from "zod";
@@ -174,6 +175,12 @@ function echoSingleHeaderValue(
  *   of the cache, so processing N records costs one `getLatestSchemaMetadata`
  *   round-trip per subject rather than per record. Omit it to look up every
  *   time (the prior behavior).
+ * @param deserializerCache - Optional per-invocation
+ *   {@link DeserializerCache}. When supplied, the deserializer for each
+ *   `(schemaType, serdeType)` is built once and reused so its parsed-schema
+ *   cache stays warm across messages, instead of being reconstructed (and the
+ *   schema re-compiled) per record. Omit it to build a fresh deserializer
+ *   each time (the prior behavior).
  * @returns A processed message with deserialized key and value
  */
 export async function processMessage(
@@ -184,6 +191,7 @@ export async function processMessage(
   valueOptions: ValueOptions,
   keyOptions: KeyOptions,
   schemaCache?: SchemaLookupCache,
+  deserializerCache?: DeserializerCache,
 ): Promise<ProcessedMessage> {
   let processedKey: unknown = message.key?.toString();
   let processedValue: unknown = message.value?.toString();
@@ -231,6 +239,7 @@ export async function processMessage(
         registry,
         serdeType,
         message.headers,
+        deserializerCache,
       );
     } catch (err) {
       logger.error(

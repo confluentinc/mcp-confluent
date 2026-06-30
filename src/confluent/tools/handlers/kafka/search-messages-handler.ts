@@ -1,6 +1,9 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { EachBatchPayload } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
+import type { DeserializerCache } from "@src/confluent/schema-registry-helper.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -9,6 +12,7 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
+  disposeIfOAuth,
   formatKafkaError,
   resolveKafkaClusterArgs,
 } from "@src/confluent/tools/cluster-arg-resolvers.js";
@@ -22,10 +26,27 @@ import {
   type SchemaLookupCache,
   schemaRegistryOptions,
 } from "@src/confluent/tools/handlers/kafka/message-processing.js";
+import { fetchPartitionWatermarks } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
+
+/**
+ * Default number of partitions scanned in parallel. The underlying client
+ * defaults to 1 (fully serial); a search "scans every partition" and each
+ * record's cost is dominated by Schema Registry decode latency, so scanning a
+ * handful of partitions concurrently overlaps that latency for a meaningful
+ * speedup on wide topics without an unbounded fan-out of in-flight decodes.
+ */
+const DEFAULT_PARTITION_CONCURRENCY = 4;
+
+/**
+ * Upper bound on `partitionConcurrency`. Caps in-flight work (each concurrent
+ * partition worker holds its own fetched batch) so a pathological argument
+ * can't balloon memory or schema-lookup pressure on a high-partition topic.
+ */
+const MAX_PARTITION_CONCURRENCY = 32;
 
 export const searchMessagesArgs = z.object({
   topicNames: z
@@ -87,6 +108,21 @@ export const searchMessagesArgs = z.object({
     .default(10000)
     .describe(
       "Maximum time in milliseconds to spend scanning before stopping.",
+    ),
+  partitionConcurrency: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_PARTITION_CONCURRENCY)
+    .optional()
+    .default(DEFAULT_PARTITION_CONCURRENCY)
+    .describe(
+      "How many partitions to scan in parallel. Because a topic's partitions " +
+        "are scanned independently and the per-message cost is dominated by " +
+        "Schema Registry decode latency, raising this overlaps that latency " +
+        "across partitions and speeds up wide-topic searches. Defaults to " +
+        `${DEFAULT_PARTITION_CONCURRENCY}; capped at ${MAX_PARTITION_CONCURRENCY}. ` +
+        "Values above the topic's partition count have no extra effect.",
     ),
   valueFormat: schemaRegistryOptions.describe(
     "VALUE format. Default: auto-decode via Schema Registry when configured. " +
@@ -169,7 +205,7 @@ function stringifyForSearch(value: unknown): string | undefined {
   if (typeof value === "string") return value;
   // Decoded values are arbitrary (AVRO/JSON/PROTOBUF objects, numbers,
   // booleans). `JSON.stringify` throws on a BigInt and on a cyclic structure;
-  // an uncaught throw here would reject the whole `eachMessage` callback and
+  // an uncaught throw here would reject the whole `eachBatch` callback and
   // fail the entire search. Fall back to `String(value)` so one degenerate
   // record can't sink the call (BigInt stringifies cleanly; a cyclic object
   // degrades to `"[object Object]"`).
@@ -232,11 +268,25 @@ export function messageMatches(
  */
 export class SearchMessagesHandler extends BaseToolHandler {
   /**
-   * Search one or more Kafka topics. Resolves when one of four exit
+   * Search one or more Kafka topics. Resolves when one of five exit
    * conditions wins a `Promise.race`: `maxMatches` matches collected,
-   * `maxScanned` messages scanned, the `timeoutMs` budget elapses, or
-   * `consumer.run()` rejects. On the bounded-exit paths the matches found
-   * so far are returned (success-shaped response).
+   * `maxScanned` messages scanned, every partition drained to its
+   * start-of-search high-water mark (end-of-log), the `timeoutMs` budget
+   * elapses, or `consumer.run()` rejects. On every bounded-exit path the
+   * matches found so far are returned (success-shaped response).
+   *
+   * Messages are delivered in batches (`eachBatch`) rather than one at a
+   * time (`eachMessage`): the underlying client fetches and hands off up to
+   * its max-batch-size per worker iteration, so the per-message handoff
+   * overhead — the dominant cost on a fresh earliest consumer group — is
+   * amortized across the batch instead of paid per record. Partitions are
+   * still scanned concurrently (`partitionConcurrency`); the response trims
+   * to `maxMatches` since concurrent workers can collect a few past the
+   * bound before `accepting` flips.
+   *
+   * The end-of-log exit means a search no longer waits out the full
+   * `timeoutMs` on a topic it has already scanned to the end (the prior
+   * behavior burned the whole budget idling once the log was exhausted).
    *
    * @param runtime - The {@link ServerRuntime} supplied by the dispatcher.
    * @param toolArguments - Raw tool arguments; parsed with
@@ -255,6 +305,7 @@ export class SearchMessagesHandler extends BaseToolHandler {
       maxMatches,
       maxScanned,
       timeoutMs,
+      partitionConcurrency,
       valueFormat,
       keyFormat,
     } = parsed;
@@ -309,8 +360,8 @@ export class SearchMessagesHandler extends BaseToolHandler {
     const matches: ProcessedMessage[] = [];
     let scanned = 0;
     // Synchronous gate that suppresses further processing once any terminal
-    // condition fires; a boolean (not a Promise) because eachMessage must
-    // check it on arrival rather than await.
+    // condition fires; a boolean (not a Promise) because the eachBatch loop
+    // must check it on arrival rather than await.
     let accepting = true;
     let consumer: KafkaJS.Consumer | undefined;
     // Memoize the per-subject latest-schema lookup for the life of this
@@ -319,6 +370,26 @@ export class SearchMessagesHandler extends BaseToolHandler {
     // the schema is stable over the scan window, so one lookup per subject
     // suffices. Scoped to this call so a later search re-checks the schema.
     const schemaCache: SchemaLookupCache = new Map();
+    // Memoize the deserializer per (schemaType, serdeType) for the life of
+    // this search. A fresh deserializer per record (the prior behavior) threw
+    // away its parsed-schema cache every message, re-compiling the writer
+    // schema each time. See {@link DeserializerCache}.
+    const deserializerCache: DeserializerCache = new Map();
+
+    // End-of-log targets: `${topic}:${partition}` → the last offset that
+    // existed when the search began (high watermark - 1), for every partition
+    // that holds at least one message. Reaching all of them means we've
+    // scanned everything that existed at start, so the search can finish
+    // without waiting out `timeoutMs`. Best-effort: when the watermark fetch
+    // fails (or a topic is missing) this is `undefined`, and the search falls
+    // back to the maxScanned/timeout bounds with no early exit.
+    const endOfLogTargets = await this.fetchEndOfLogTargets(
+      runtime,
+      connId,
+      clientManager,
+      resolved,
+      topicNames,
+    );
 
     try {
       consumer = await clientManager.buildKafkaConsumer({
@@ -335,34 +406,57 @@ export class SearchMessagesHandler extends BaseToolHandler {
 
       const bounded = Promise.withResolvers<void>();
       const timedOut = Promise.withResolvers<void>();
+      // Resolves once every non-empty partition has been scanned to its
+      // start-of-search high-water mark. `remaining` is mutated synchronously
+      // inside `eachBatch` (no await between read and delete), so concurrent
+      // batch callbacks can't race it.
+      const drained = Promise.withResolvers<void>();
+      const remaining = endOfLogTargets;
+      // Nothing to scan (all target partitions empty, or a single empty
+      // topic): we're already at end-of-log.
+      if (remaining && remaining.size === 0) {
+        drained.resolve();
+      }
       const consumerActive = consumer;
 
-      const eachMessage = async ({
-        topic,
-        partition,
-        message,
-      }: {
-        topic: string;
-        partition: number;
-        message: Parameters<typeof processMessage>[2];
-      }): Promise<void> => {
+      const eachBatch = async ({ batch }: EachBatchPayload): Promise<void> => {
         if (!accepting) return;
-        scanned++;
-        const processed = await processMessage(
-          topic,
-          partition,
-          message,
-          registry,
-          valueFormat,
-          keyFormat,
-          schemaCache,
-        );
-        if (messageMatches(processed, matcher, searchIn)) {
-          matches.push(processed);
+        for (const message of batch.messages) {
+          if (!accepting) break;
+          scanned++;
+          const processed = await processMessage(
+            batch.topic,
+            batch.partition,
+            message,
+            registry,
+            valueFormat,
+            keyFormat,
+            schemaCache,
+            deserializerCache,
+          );
+          if (messageMatches(processed, matcher, searchIn)) {
+            matches.push(processed);
+          }
+          if (matches.length >= maxMatches || scanned >= maxScanned) {
+            accepting = false;
+            bounded.resolve();
+            break;
+          }
         }
-        if (matches.length >= maxMatches || scanned >= maxScanned) {
-          accepting = false;
-          bounded.resolve();
+        // End-of-log bookkeeping: a partition is drained once this batch has
+        // reached the high-water snapshot taken at search start. `lastOffset`
+        // is the offset of the final record in the batch; batches arrive in
+        // offset order per partition.
+        if (remaining) {
+          const key = `${batch.topic}:${batch.partition}`;
+          const target = remaining.get(key);
+          if (target !== undefined && BigInt(batch.lastOffset()) >= target) {
+            remaining.delete(key);
+            if (remaining.size === 0) {
+              accepting = false;
+              drained.resolve();
+            }
+          }
         }
       };
 
@@ -371,12 +465,22 @@ export class SearchMessagesHandler extends BaseToolHandler {
         timedOut.resolve();
       }, timeoutMs);
 
-      const runPromise = consumerActive.run({ eachMessage });
+      const runPromise = consumerActive.run({
+        eachBatch,
+        // Scan partitions concurrently so the per-record Schema Registry
+        // decode latency overlaps across partitions. The `accepting` gate
+        // stays correct under concurrency: it's a synchronous boolean each
+        // callback reads on arrival, and the bounded/timeout/drained
+        // resolvers are idempotent. Concurrent in-flight callbacks can push
+        // past the exact bound, so the response trims to `maxMatches`.
+        partitionsConsumedConcurrently: partitionConcurrency,
+      });
 
       try {
         await Promise.race([
           bounded.promise,
           timedOut.promise,
+          drained.promise,
           // Success of `run` means "engine still running" — only its
           // rejection is a terminal condition for the race.
           runPromise.then(() => new Promise<never>(() => {})),
@@ -386,9 +490,13 @@ export class SearchMessagesHandler extends BaseToolHandler {
         accepting = false;
       }
 
+      // Concurrent partition workers can each clear the bound check before
+      // any of them flips `accepting`, so `matches` may hold a few past
+      // `maxMatches`. Trim to honor the documented cap exactly.
+      const reported = matches.slice(0, maxMatches);
       return this.createResponse(
-        `Found ${matches.length} matches in ${scanned} scanned messages from topics ${topicNames.join(", ")}.\n` +
-          `Matches: ${JSON.stringify(matches, null, 2)}`,
+        `Found ${reported.length} matches in ${scanned} scanned messages from topics ${topicNames.join(", ")}.\n` +
+          `Matches: ${JSON.stringify(reported, null, 2)}`,
         false,
       );
     } catch (error: unknown) {
@@ -403,6 +511,62 @@ export class SearchMessagesHandler extends BaseToolHandler {
         } catch (error) {
           logger.error({ error }, "Error cleaning up consumer");
         }
+      }
+    }
+  }
+
+  /**
+   * Fetch the per-partition end-of-log targets used for the search's
+   * early-exit: a map of `${topic}:${partition}` → the last offset that
+   * existed when the search began (high watermark - 1), restricted to
+   * partitions that hold at least one message. Empty partitions are omitted
+   * — there's nothing to scan, so the search must not wait on them.
+   *
+   * Best-effort: any failure (admin error, a missing topic) returns
+   * `undefined`, which disables the early exit so the search still completes
+   * under the `maxScanned` / `timeoutMs` bounds. A partial result would be
+   * worse than none — if one topic's watermarks are missing, the
+   * remaining-set could reach zero while that topic still has unread records,
+   * exiting early on an incomplete scan — so a single failure disables the
+   * optimization wholesale rather than per topic.
+   *
+   * The admin client is OAuth-disposed in `finally` so this transient
+   * metadata fetch doesn't leak a broker connection.
+   */
+  private async fetchEndOfLogTargets(
+    runtime: ServerRuntime,
+    connId: string,
+    clientManager: BaseClientManager,
+    resolved: { clusterId: string | undefined; envId: string | undefined },
+    topicNames: string[],
+  ): Promise<Map<string, bigint> | undefined> {
+    let admin: KafkaJS.Admin | undefined;
+    try {
+      admin = await clientManager.getKafkaAdminClient(
+        resolved.clusterId,
+        resolved.envId,
+      );
+      const targets = new Map<string, bigint>();
+      for (const topic of topicNames) {
+        const watermarks = await fetchPartitionWatermarks(admin, topic);
+        for (const { partition, low, high } of watermarks) {
+          const highOffset = BigInt(high);
+          if (highOffset > BigInt(low)) {
+            targets.set(`${topic}:${partition}`, highOffset - 1n);
+          }
+        }
+      }
+      return targets;
+    } catch (error: unknown) {
+      logger.warn(
+        { error, connId, topicNames },
+        "Could not fetch partition watermarks; search will run without the " +
+          "end-of-log early exit (bounded by maxScanned/timeout instead).",
+      );
+      return undefined;
+    } finally {
+      if (admin) {
+        await disposeIfOAuth(runtime, connId, admin);
       }
     }
   }

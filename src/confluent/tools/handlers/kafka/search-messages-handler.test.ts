@@ -1,5 +1,5 @@
 import type {
-  EachMessagePayload,
+  EachBatchPayload,
   KafkaMessage,
 } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
@@ -16,6 +16,7 @@ import {
   runtimeWith,
 } from "@tests/factories/runtime.js";
 import {
+  getMockedAdmin,
   getMockedClientManager,
   getMockedConsumer,
 } from "@tests/stubs/index.js";
@@ -65,6 +66,16 @@ describe("search-messages-handler.ts", () => {
       expect(parsed.maxMatches).toBe(10);
       expect(parsed.maxScanned).toBe(1000);
       expect(parsed.timeoutMs).toBe(10000);
+      expect(parsed.partitionConcurrency).toBe(4);
+    });
+
+    it("should reject a partitionConcurrency above the cap", () => {
+      const result = searchMessagesArgs.safeParse({
+        topicNames: ["orders"],
+        query: "x",
+        partitionConcurrency: 33,
+      });
+      expect(result.success).toBe(false);
     });
 
     it("should reject an empty topicNames array", () => {
@@ -205,6 +216,7 @@ describe("search-messages-handler.ts", () => {
     describe("handle()", () => {
       let clientManager: ReturnType<typeof getMockedClientManager>;
       let consumer: ReturnType<typeof getMockedConsumer>;
+      let admin: ReturnType<typeof getMockedAdmin>;
 
       beforeEach(async () => {
         clientManager = getMockedClientManager();
@@ -212,27 +224,36 @@ describe("search-messages-handler.ts", () => {
         consumer.connect.mockResolvedValue(undefined);
         consumer.subscribe.mockResolvedValue(undefined);
         consumer.disconnect.mockResolvedValue(undefined);
+        admin = await clientManager.getAdminClient();
+        // Default watermarks: one partition with an end-of-log far beyond any
+        // offset the tests deliver, so the end-of-log early-exit never fires
+        // and these cases exit purely via maxMatches/maxScanned/timeout (the
+        // behavior they assert). The dedicated end-of-log tests below override
+        // this with reachable watermarks.
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "0", high: "1000000", offset: "0" },
+        ] as unknown as Awaited<ReturnType<typeof admin.fetchTopicOffsets>>);
       });
 
       /**
-       * Capture the handler's `eachMessage` callback so the test can drive
+       * Capture the handler's `eachBatch` callback so the test can drive
        * deliveries deterministically. `consumer.run` returns a
        * never-settling promise so the orchestrator's race only finishes via
-       * the bounded (maxMatches/maxScanned) or timeout arms.
+       * the bounded (maxMatches/maxScanned), end-of-log, or timeout arms.
        */
-      function captureEachMessage(): {
-        get: () => (payload: EachMessagePayload) => Promise<void>;
+      function captureEachBatch(): {
+        get: () => (payload: EachBatchPayload) => Promise<void>;
       } {
         let captured:
-          | ((payload: EachMessagePayload) => Promise<void>)
+          | ((payload: EachBatchPayload) => Promise<void>)
           | undefined;
         consumer.run.mockImplementation((opts) => {
-          captured = opts?.eachMessage;
+          captured = opts?.eachBatch;
           return new Promise<void>(() => {});
         });
         return {
           get: () => {
-            if (!captured) throw new Error("eachMessage not captured yet");
+            if (!captured) throw new Error("eachBatch not captured yet");
             return captured;
           },
         };
@@ -246,15 +267,50 @@ describe("search-messages-handler.ts", () => {
         );
       }
 
+      /**
+       * Deliver a single-message batch on `orders`/partition 0. `lastOffset`
+       * stays at the fake message's offset (42) — well below the default
+       * 1,000,000 high-water mark — so a plain `deliver` never trips the
+       * end-of-log exit. Tests that want that exit pass an explicit batch via
+       * {@link deliverBatch}.
+       */
       function deliver(
-        each: (payload: EachMessagePayload) => Promise<void>,
+        each: (payload: EachBatchPayload) => Promise<void>,
         value: string,
       ): Promise<void> {
+        return deliverBatch(each, { values: [value] });
+      }
+
+      /**
+       * Deliver a batch with full control over topic/partition/offsets, for
+       * the end-of-log cases. `lastOffset()` reports `lastOffset` (default:
+       * the last message's offset) so the handler can compare it to the
+       * partition's high-water target.
+       */
+      function deliverBatch(
+        each: (payload: EachBatchPayload) => Promise<void>,
+        opts: {
+          topic?: string;
+          partition?: number;
+          values: string[];
+          lastOffset?: string;
+          highWatermark?: string;
+        },
+      ): Promise<void> {
+        const messages = opts.values.map((value) =>
+          fakeMessage({ value: Buffer.from(value) }),
+        );
+        const lastOffset =
+          opts.lastOffset ?? messages[messages.length - 1]!.offset;
         return each({
-          topic: "orders",
-          partition: 0,
-          message: fakeMessage({ value: Buffer.from(value) }),
-        } as unknown as EachMessagePayload);
+          batch: {
+            topic: opts.topic ?? "orders",
+            partition: opts.partition ?? 0,
+            highWatermark: opts.highWatermark ?? "1000000",
+            messages,
+            lastOffset: () => lastOffset,
+          },
+        } as unknown as EachBatchPayload);
       }
 
       it("should reject an invalid regex up front without building a consumer", async () => {
@@ -272,7 +328,7 @@ describe("search-messages-handler.ts", () => {
       });
 
       it("should subscribe from earliest with a per-call group id", async () => {
-        const each = captureEachMessage();
+        const each = captureEachBatch();
         const handlePromise = handler.handle(runtime(), {
           topicNames: ["orders"],
           query: "needle",
@@ -292,8 +348,62 @@ describe("search-messages-handler.ts", () => {
         expect(consumer.disconnect).toHaveBeenCalledOnce();
       });
 
+      it("should scan partitions concurrently, defaulting to 4 and honoring an explicit value", async () => {
+        const each = captureEachBatch();
+        const handlePromise = handler.handle(runtime(), {
+          topicNames: ["orders"],
+          query: "needle",
+          maxScanned: 1,
+        });
+        await new Promise<void>((r) => setImmediate(r));
+        await deliver(each.get(), "needle");
+        await handlePromise;
+        expect(consumer.run).toHaveBeenCalledWith(
+          expect.objectContaining({ partitionsConsumedConcurrently: 4 }),
+        );
+
+        const explicit = captureEachBatch();
+        const explicitPromise = handler.handle(runtime(), {
+          topicNames: ["orders"],
+          query: "needle",
+          maxScanned: 1,
+          partitionConcurrency: 12,
+        });
+        await new Promise<void>((r) => setImmediate(r));
+        await deliver(explicit.get(), "needle");
+        await explicitPromise;
+        expect(consumer.run).toHaveBeenLastCalledWith(
+          expect.objectContaining({ partitionsConsumedConcurrently: 12 }),
+        );
+      });
+
+      it("should trim matches to maxMatches even if concurrent workers overshoot", async () => {
+        const each = captureEachBatch();
+        const handlePromise = handler.handle(runtime(), {
+          topicNames: ["orders"],
+          query: "hit",
+          maxMatches: 1,
+          maxScanned: 3,
+        });
+        await new Promise<void>((r) => setImmediate(r));
+        const fn = each.get();
+        // Two matching deliveries race in before `accepting` flips; the
+        // response must still report exactly maxMatches (1).
+        await Promise.all([
+          deliver(fn, "hit one"),
+          deliver(fn, "hit two"),
+          deliver(fn, "hit three"),
+        ]);
+        const result = await handlePromise;
+
+        const text = result.content
+          .map((c) => ("text" in c ? c.text : ""))
+          .join("");
+        expect(text).toContain("Found 1 matches in");
+      });
+
       it("should deduplicate repeated topic names before subscribing", async () => {
-        const each = captureEachMessage();
+        const each = captureEachBatch();
         const handlePromise = handler.handle(runtime(), {
           topicNames: ["orders", "orders", "audit"],
           query: "needle",
@@ -309,7 +419,7 @@ describe("search-messages-handler.ts", () => {
       });
 
       it("should return only matching messages and a Found/scanned summary", async () => {
-        const each = captureEachMessage();
+        const each = captureEachBatch();
         const handlePromise = handler.handle(runtime(), {
           topicNames: ["orders"],
           query: "cust-42",
@@ -338,7 +448,7 @@ describe("search-messages-handler.ts", () => {
       });
 
       it("should stop once maxMatches matches are found and suppress later deliveries", async () => {
-        const each = captureEachMessage();
+        const each = captureEachBatch();
         const handlePromise = handler.handle(runtime(), {
           topicNames: ["orders"],
           query: "hit",
@@ -363,7 +473,7 @@ describe("search-messages-handler.ts", () => {
       });
 
       it("should stop scanning at maxScanned even with no matches", async () => {
-        const each = captureEachMessage();
+        const each = captureEachBatch();
         const handlePromise = handler.handle(runtime(), {
           topicNames: ["orders"],
           query: "never-present",
@@ -396,6 +506,82 @@ describe("search-messages-handler.ts", () => {
         expect(result.isError).toBe(true);
         expect(text).toContain("Failed to search messages");
         expect(consumer.disconnect).toHaveBeenCalledOnce();
+      });
+
+      it("should stop at end-of-log once every partition reaches its start-of-search high-water mark, without waiting out the timeout", async () => {
+        // High-water mark 50 → last existing offset is 49. A batch whose
+        // lastOffset reaches 49 drains the only partition, so the search must
+        // resolve via the end-of-log arm even though maxScanned (1000) and
+        // the 10s default timeout are nowhere near.
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "0", high: "50", offset: "0" },
+        ] as unknown as Awaited<ReturnType<typeof admin.fetchTopicOffsets>>);
+        const each = captureEachBatch();
+        const handlePromise = handler.handle(runtime(), {
+          topicNames: ["orders"],
+          query: "never-present",
+        });
+        await new Promise<void>((r) => setImmediate(r));
+        await deliverBatch(each.get(), {
+          values: ["alpha", "beta"],
+          lastOffset: "49",
+        });
+        const result = await handlePromise;
+
+        const text = result.content
+          .map((c) => ("text" in c ? c.text : ""))
+          .join("");
+        expect(result.isError).toBe(false);
+        // Both records in the batch were scanned before the partition drained.
+        expect(text).toContain(
+          "Found 0 matches in 2 scanned messages from topics orders",
+        );
+        expect(consumer.disconnect).toHaveBeenCalledOnce();
+      });
+
+      it("should finish immediately when every target partition is empty (nothing to scan)", async () => {
+        // low === high on every partition → no records exist, so the search is
+        // already at end-of-log and resolves without any delivery.
+        admin.fetchTopicOffsets.mockResolvedValue([
+          { partition: 0, low: "0", high: "0", offset: "0" },
+        ] as unknown as Awaited<ReturnType<typeof admin.fetchTopicOffsets>>);
+        captureEachBatch();
+        const result = await handler.handle(runtime(), {
+          topicNames: ["orders"],
+          query: "anything",
+        });
+        const text = result.content
+          .map((c) => ("text" in c ? c.text : ""))
+          .join("");
+        expect(result.isError).toBe(false);
+        expect(text).toContain(
+          "Found 0 matches in 0 scanned messages from topics orders",
+        );
+      });
+
+      it("should still search (bounded by maxScanned) when the watermark fetch fails, dropping only the early exit", async () => {
+        // Best-effort: an admin failure disables end-of-log but must not fail
+        // the search — it falls back to the maxScanned/timeout bounds.
+        admin.fetchTopicOffsets.mockRejectedValue(new Error("broker timeout"));
+        const each = captureEachBatch();
+        const handlePromise = handler.handle(runtime(), {
+          topicNames: ["orders"],
+          query: "hit",
+          maxScanned: 2,
+        });
+        await new Promise<void>((r) => setImmediate(r));
+        const fn = each.get();
+        await deliver(fn, "hit one");
+        await deliver(fn, "hit two");
+        const result = await handlePromise;
+
+        const text = result.content
+          .map((c) => ("text" in c ? c.text : ""))
+          .join("");
+        expect(result.isError).toBe(false);
+        expect(text).toContain(
+          "Found 2 matches in 2 scanned messages from topics orders",
+        );
       });
     });
   });

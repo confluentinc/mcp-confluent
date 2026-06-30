@@ -319,13 +319,12 @@ describe("index.ts", () => {
         ToolName.CREATE_SCHEMA,
         ToolName.DELETE_SCHEMA,
         // Connect (hasConfluentCloudOrOAuth — ride the cloud REST client).
-        // create-connector is excluded: it embeds a Kafka API key/secret in the
-        // connector spec, which an OAuth connection cannot supply.
         ToolName.LIST_CONNECTORS,
         ToolName.GET_CONNECTOR_CONFIG,
         ToolName.GET_CONNECTOR_OFFSETS,
         ToolName.GET_CONNECTOR_STATUS,
         ToolName.GET_CONNECTOR_TASKS,
+        ToolName.CREATE_CONNECTOR,
         ToolName.DELETE_CONNECTOR,
         ToolName.GET_CONNECTOR_ERROR_SUMMARY,
         ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS,
@@ -380,11 +379,10 @@ describe("index.ts", () => {
         ToolName.GET_FLINK_STATEMENT_PROFILE,
       ];
 
-      const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
-        // Connect — only create-connector stays disabled (canCreateDirectConnector
-        // is direct-only: it embeds a Kafka API key/secret in the connector spec).
-        ToolName.CREATE_CONNECTOR,
-      ];
+      // No tool is OAuth-disabled today: every handler either rides the cloud
+      // REST client or accepts the values it needs as explicit tool arguments
+      // under OAuth. New tools that can't operate under OAuth go here.
+      const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [];
 
       it("should partition every ToolName into exactly one of EXPECTED_OAUTH_ENABLED or EXPECTED_OAUTH_DISABLED", () => {
         const enabled = new Set(EXPECTED_OAUTH_ENABLED);

@@ -334,18 +334,6 @@ export const hasTableflowOrOAuth: ConnectionPredicate =
 export const hasFlinkOrOAuth: ConnectionPredicate = widenForOAuth(hasFlink);
 
 /**
- * Gate for tools that create connectors against the direct Confluent Cloud
- * REST surface: requires both a `confluent_cloud` block (the `/connect/v1`
- * endpoint) and `kafka.auth` (the connector spec carries kafka API
- * credentials). Strict-direct — OAuth connections answer `OAuthNotDirectCapable`
- * because the handler calls `resolveDirectConnection()`.
- */
-export const canCreateDirectConnector: ConnectionPredicate = allOf(
-  hasConfluentCloud,
-  hasKafkaAuth,
-);
-
-/**
  * Gate for tools that read telemetry metrics about Flink statements:
  * requires both the `flink` block (to address a statement) and the
  * `telemetry` block (to query the metrics API).

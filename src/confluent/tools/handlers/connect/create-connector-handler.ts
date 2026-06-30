@@ -1,6 +1,5 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { canCreateDirectConnector } from "@src/confluent/tools/connection-predicates.js";
 import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -18,6 +17,18 @@ const createConnectorArguments = z.object({
     .string()
     .optional()
     .describe("The unique identifier for the Kafka cluster."),
+  kafkaApiKey: z
+    .string()
+    .optional()
+    .describe(
+      "Kafka API key embedded in the connector spec to configure it at runtime. Required when targeting an OAuth connection.",
+    ),
+  kafkaApiSecret: z
+    .string()
+    .optional()
+    .describe(
+      "Kafka API secret embedded in the connector spec to configure it at runtime. Required when targeting an OAuth connection.",
+    ),
   connectorName: z
     .string()
     .nonempty()
@@ -65,32 +76,43 @@ const createConnectorArguments = z.object({
 
 /**
  * Creates a new Confluent Cloud connector.
- * Requires `kafka.auth` in the connection config to supply the Kafka API
- * credentials embedded in the connector body.
+ * The connector spec embeds a Kafka API key/secret that configures the
+ * connector at runtime (this is not the credential for the REST call, which
+ * rides the OAuth bearer / direct middleware like every other Connect tool).
+ * Direct connections fall back to `kafka.auth`; OAuth connections must supply
+ * the keypair via the `kafkaApiKey` / `kafkaApiSecret` tool arguments.
  */
 export class CreateConnectorHandler extends ConnectToolHandler {
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
   ): Promise<CallToolResult> {
-    const { clusterId, environmentId, connectorName, connectorConfig } =
-      createConnectorArguments.parse(toolArguments);
+    const {
+      clusterId,
+      environmentId,
+      connectorName,
+      connectorConfig,
+      kafkaApiKey: kafkaApiKeyArg,
+      kafkaApiSecret: kafkaApiSecretArg,
+    } = createConnectorArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
     const { environment_id, kafka_cluster_id } =
       this.resolveConnectEnvAndClusterId(conn, environmentId, clusterId);
-    // The canCreateDirectConnector predicate guarantees kafka.auth is present.
+    // The embedded keypair: explicit args win; on direct connections fall back
+    // to kafka.auth. OAuth connections carry no kafka block, so the args are
+    // required (resolveParam throws when neither source supplies a value).
     const kafkaApiKey = this.resolveParam(
-      undefined,
-      conn.kafka?.auth?.key,
+      kafkaApiKeyArg,
+      conn.type === "direct" ? conn.kafka?.auth?.key : undefined,
       "Kafka API Key",
     );
     const kafkaApiSecret = this.resolveParam(
-      undefined,
-      conn.kafka?.auth?.secret,
+      kafkaApiSecretArg,
+      conn.type === "direct" ? conn.kafka?.auth?.secret : undefined,
       "Kafka API Secret",
     );
 
@@ -136,6 +158,4 @@ export class CreateConnectorHandler extends ConnectToolHandler {
       annotations: CREATE_UPDATE,
     };
   }
-
-  override readonly predicate = canCreateDirectConnector;
 }

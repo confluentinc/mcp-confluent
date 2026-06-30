@@ -41,7 +41,7 @@ const listComputePoolsArguments = z.object({
  * Only the fields the regional Flink URL resolver consumes are pinned; the rest
  * of the FCPM payload is ignored.
  */
-export const computePoolSchema = z.object({
+const computePoolSchema = z.object({
   id: z.string(),
   spec: z.object({
     display_name: z.string(),
@@ -49,8 +49,6 @@ export const computePoolSchema = z.object({
     region: z.string(),
   }),
 });
-
-export type ComputePool = z.infer<typeof computePoolSchema>;
 
 export class ListComputePoolsHandler extends BaseToolHandler {
   async handle(
@@ -109,7 +107,7 @@ export class ListComputePoolsHandler extends BaseToolHandler {
 
       const computePools = response.data.map((pool: unknown) => {
         try {
-          const validatedPool = computePoolSchema.parse(pool) as ComputePool;
+          const validatedPool = computePoolSchema.parse(pool);
           return {
             id: validatedPool.id,
             name: validatedPool.spec.display_name,

@@ -5,6 +5,7 @@ import {
 } from "@src/config/models.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
+import { initSentry } from "@src/confluent/sentry.js";
 import {
   ToolCategory,
   type ToolConfig,
@@ -19,6 +20,7 @@ import {
   outputToolList,
   performCleanup,
   resolveAllowedToolNames,
+  resolveDoNotTrack,
   resolveTelemetryWriteKey,
 } from "@src/index.js";
 import { logger } from "@src/logger.js";
@@ -850,6 +852,19 @@ describe("index.ts", () => {
     });
   });
 
+  describe("resolveDoNotTrack()", () => {
+    // Each opt-out method (YAML server.do_not_track, env DO_NOT_TRACK) must
+    // independently disable tracking; only when both are false is it on.
+    it.each([
+      ["YAML only", true, false, true],
+      ["env only", false, true, true],
+      ["both", true, true, true],
+      ["neither", false, false, false],
+    ])("via %s -> %s || %s = %s", (_method, serverFlag, envFlag, expected) => {
+      expect(resolveDoNotTrack(serverFlag, envFlag)).toBe(expected);
+    });
+  });
+
   describe("performCleanup()", () => {
     function cleanupDeps() {
       return {
@@ -884,6 +899,29 @@ describe("index.ts", () => {
 
       expect(exit).toHaveBeenCalledOnce();
       expect(exit).toHaveBeenCalledWith(0);
+    });
+
+    it("should flush Sentry during shutdown", async () => {
+      // Initialize Sentry so closeSentry() reaches the (spied) transport close;
+      // init is stubbed so no real DSN is registered.
+      vi.spyOn(nodeDeps.sentry, "init").mockImplementation(() => undefined);
+      const closeStub = vi
+        .spyOn(nodeDeps.sentry, "close")
+        .mockResolvedValue(true);
+      initSentry({
+        doNotTrack: false,
+        dsn: "https://abc@o0.ingest.sentry.io/1",
+        release: "0.0.0-test",
+        transports: ["stdio"],
+        connectionTypes: ["direct"],
+      });
+
+      const deps = cleanupDeps();
+      deps.runtime.disconnectAll.mockResolvedValue(undefined);
+
+      await performCleanup(deps, vi.fn());
+
+      expect(closeStub).toHaveBeenCalled();
     });
   });
 });

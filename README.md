@@ -468,9 +468,9 @@ Please refer to the following guides for step-by-step instructions on setting up
 
 ## Telemetry
 
-This MCP server collects usage data to help make improvements.
-You can opt out by setting `DO_NOT_TRACK=true` in your environment.
-See [telemetry.md](telemetry.md) for full details on what is collected.
+This MCP server collects usage data and reports server-side runtime errors (via [Sentry](https://sentry.io)) to help make improvements.
+You can opt out of both by setting `DO_NOT_TRACK=true` in your environment (or `server.do_not_track: true` in YAML).
+See [telemetry.md](telemetry.md) for full details on what is collected and what is never sent.
 
 ## Troubleshooting
 

@@ -35,7 +35,10 @@ import {
 } from "@confluentinc/schemaregistry";
 import { logger } from "@src/logger.js";
 import protobuf from "protobufjs";
-import descriptor from "protobufjs/ext/descriptor/index.js";
+import descriptor, {
+  IDescriptorProto,
+  IFileDescriptorSet,
+} from "protobufjs/ext/descriptor/index.js";
 
 /**
  * Where the Schema Registry schema ID rides on the wire. "payload" embeds it as
@@ -273,6 +276,29 @@ export async function getLatestSchemaOfTypeOrThrow(
 }
 
 /**
+ * Sets each field's `jsonName` to the standard lowerCamelCase form of its
+ * (possibly snake_case) name, recursing into nested message types.
+ *
+ * protobufjs's `Field#toDescriptor` never populates `jsonName` (see its
+ * "Not supported" doc comment), so a descriptor built from `.proto` text always
+ * has it unset. `@bufbuild/protobuf` takes `jsonName` as authoritative — it
+ * does not fall back to deriving it from `name` — so without this, `fromJson`
+ * only accepts the literal proto field name and rejects the camelCase JSON
+ * name a real protoc-generated descriptor would also accept.
+ */
+function applyJsonNames(messageTypes: IDescriptorProto[] | undefined): void {
+  for (const messageType of messageTypes ?? []) {
+    for (const field of messageType.field ?? []) {
+      // protobufjs's reflection Message getter returns "" (the proto3 string
+      // default) rather than undefined for an unset jsonName, so `||=` (not
+      // `??=`) is required to detect "not set".
+      field.jsonName ||= protobuf.util.camelCase(field.name ?? "");
+    }
+    applyJsonNames(messageType.nestedType);
+  }
+}
+
+/**
  * Builds a `@bufbuild/protobuf` descriptor registry from raw `.proto` schema text.
  *
  * The `@confluentinc/schemaregistry` ProtobufSerializer encodes locally against
@@ -295,18 +321,19 @@ export function protobufRegistryFromProto(protoText: string): MutableRegistry {
     const FileDescriptorSet = (
       descriptor as unknown as {
         FileDescriptorSet: {
-          encode(message: object): { finish(): Uint8Array };
+          encode(message: IFileDescriptorSet): { finish(): Uint8Array };
         };
       }
     ).FileDescriptorSet;
     const toDescriptor = (
       root as unknown as {
-        toDescriptor(
-          syntax?: string,
-        ): Parameters<typeof FileDescriptorSet.encode>[0];
+        toDescriptor(syntax?: string): IFileDescriptorSet;
       }
     ).toDescriptor;
     const fileDescriptorSet = toDescriptor.call(root, "proto3");
+    for (const file of fileDescriptorSet.file) {
+      applyJsonNames(file.messageType);
+    }
     const bytes = FileDescriptorSet.encode(fileDescriptorSet).finish();
     return createMutableRegistry(
       createFileRegistry(fromBinary(FileDescriptorSetSchema, bytes)),

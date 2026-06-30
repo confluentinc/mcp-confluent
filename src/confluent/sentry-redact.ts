@@ -2,17 +2,35 @@ import type { ErrorEvent } from "@sentry/node";
 
 export const REDACTED = "[REDACTED]";
 
-/** Object keys whose entire value is replaced, regardless of contents. */
-const SENSITIVE_KEY =
-  /^(authorization|cookie|set-cookie|x-api-key|api[_-]?key|api[_-]?secret|password|sasl[._-]?password|secret|token|bearer|access[_-]?token|refresh[_-]?token)$/i;
+// Object keys whose entire value is replaced. Compared after lowercasing and
+// stripping `-`/`_`/`.`, so `x-api-key`, `api_key`, `sasl.password`, etc. match.
+const SENSITIVE_KEYS = new Set([
+  "authorization",
+  "cookie",
+  "setcookie",
+  "xapikey",
+  "apikey",
+  "apisecret",
+  "password",
+  "saslpassword",
+  "secret",
+  "token",
+  "bearer",
+  "accesstoken",
+  "refreshtoken",
+]);
+
+function isSensitiveKey(key: string): boolean {
+  return SENSITIVE_KEYS.has(key.toLowerCase().replace(/[-_.]/g, ""));
+}
 
 /** Free-text patterns scrubbed inside any string value (error messages, YAML blobs). */
 const TEXT_PATTERNS: ReadonlyArray<[RegExp, string]> = [
   // Authorization scheme + credential.
-  [/\b(Bearer|Basic)\s+[\w\-._~+/]+=*/gi, `$1 ${REDACTED}`],
-  // key/secret/password/token in `key: value` or `key=value` form (YAML + query/SASL).
+  [/\b(Bearer|Basic)\s+[\w\-.~+/]+=*/gi, `$1 ${REDACTED}`],
+  // sensitive key in `key: value` or `key=value` form (YAML + query/SASL).
   [
-    /\b(password|secret|token|api[_-]?key|api[_-]?secret|sasl[._-]?password|authorization|bearer)\b(["']?\s*[:=]\s*["']?)([^\s"',}]+)/gi,
+    /\b(password|secret|token|api[_-]?(?:key|secret)|sasl[._-]?password)\b(["']?\s*[:=]\s*["']?)([^\s"',}]+)/gi,
     `$1$2${REDACTED}`,
   ],
   // High-entropy standalone token (Confluent secret shape: >=40 base64 chars).
@@ -30,8 +48,8 @@ function scrubString(value: string): string {
 function scrub(value: unknown, seen: WeakSet<object>): unknown {
   if (typeof value === "string") return scrubString(value);
   if (value === null || typeof value !== "object") return value;
-  if (seen.has(value as object)) return value;
-  seen.add(value as object);
+  if (seen.has(value)) return value;
+  seen.add(value);
 
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) value[i] = scrub(value[i], seen);
@@ -40,7 +58,7 @@ function scrub(value: unknown, seen: WeakSet<object>): unknown {
 
   const record = value as Record<string, unknown>;
   for (const key of Object.keys(record)) {
-    record[key] = SENSITIVE_KEY.test(key) ? REDACTED : scrub(record[key], seen);
+    record[key] = isSensitiveKey(key) ? REDACTED : scrub(record[key], seen);
   }
   return record;
 }

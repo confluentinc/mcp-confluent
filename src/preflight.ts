@@ -26,7 +26,7 @@ export function nodeVersionError(
   currentVersion: string,
   minimumMajor: number,
 ): string | undefined {
-  const major = parseInt(currentVersion.replace(/^v/, ""), 10);
+  const major = Number.parseInt(currentVersion.replace(/^v/, ""), 10);
   if (Number.isNaN(major) || major < minimumMajor) {
     return (
       `mcp-confluent requires Node.js ${minimumMajor} or newer, ` +

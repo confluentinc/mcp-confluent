@@ -6,7 +6,8 @@ All notable changes to this MCP server will be documented in this file.
 
 ### Added
 
-- **Error reporting (Sentry).** Uncaught exceptions, unhandled rejections, and tool-handler errors are now reported to [Sentry](https://sentry.io) with the server version, transport, and tool name. Enabled by default in published builds and governed by the **same `DO_NOT_TRACK` switch** as usage analytics (`DO_NOT_TRACK=true` or `server.do_not_track: true` disables both). Credentials are never sent: a redaction step scrubs authorization headers, API-key/secret shapes, SASL passwords, and secrets in YAML payloads, and HTTP bodies / local variables are not collected. See [telemetry.md](telemetry.md).
+- Error reporting (Sentry): runtime errors are reported to [Sentry](https://sentry.io) (credentials redacted), on by default and disabled by the same `DO_NOT_TRACK` switch as usage analytics. See [telemetry.md](telemetry.md).
+- `list-compute-pools` tool: a read-only discovery tool that lists the Flink compute pools in an environment (id, display name, cloud, region).
 
 ### Removed
 
@@ -35,6 +36,7 @@ All notable changes to this MCP server will be documented in this file.
   - **Catalog & Tags.** All 7 tools (`search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`).
   - **Metrics.** Both tools (`list-available-metrics`, `query-metrics`).
   - **Tableflow.** All 11 tools (the 6 topic/region tools and the 5 catalog-integration tools).
+  - **Flink.** All 13 tools (the 5 statement tools, the 5 catalog tools, and the 3 diagnostics tools).
 - **`create-schema` tool.** Registers a schema (or a new version) under a subject in the Schema Registry, peer to `list-schemas` and `delete-schema`.
 - **`explain-disabled-tools` now reports per connection.** The "why is this tool missing?" report is split into one section per configured connection, each with its own disabled-tool buckets and counts — so a tool live on one connection and dark on another surfaces under exactly the connection that gates it, rather than being flattened to a single server-wide verdict.
 - **`list-configured-connections` tool.** Read-only, always-enabled discovery tool describing configured connections (including read-only-ness) and the connection-routable tools and enabled for each.

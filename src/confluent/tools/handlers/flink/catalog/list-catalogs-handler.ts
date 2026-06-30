@@ -14,17 +14,23 @@ const listCatalogsArguments = z.object({
     .string()
     .trim()
     .optional()
-    .describe("The unique identifier for the organization."),
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
   environmentId: z
     .string()
     .trim()
     .optional()
-    .describe("The unique identifier for the environment."),
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
   computePoolId: z
     .string()
     .trim()
     .optional()
-    .describe("The id associated with the compute pool in context."),
+    .describe(
+      "Confluent Cloud Flink compute pool ID (lfcp-...). Discover via list-compute-pools.",
+    ),
 });
 
 export class ListCatalogsHandler extends FlinkCatalogToolHandler {
@@ -35,17 +41,16 @@ export class ListCatalogsHandler extends FlinkCatalogToolHandler {
     const { organizationId, environmentId, computePoolId } =
       listCatalogsArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
-      organizationId,
-      environmentId,
-    );
-    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    const { organization_id, environment_id, compute_pool_id } =
+      this.resolveFlinkRouting(conn, {
+        organizationId,
+        environmentId,
+        computePoolId,
+      });
     const catalog = this.resolveCatalogNameOrError(undefined, environment_id);
     if (!catalog.ok) return catalog.error;
     const catalog_name = catalog.name;

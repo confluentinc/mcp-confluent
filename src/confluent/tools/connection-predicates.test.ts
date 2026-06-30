@@ -7,11 +7,13 @@ import {
   allOf,
   canCreateDirectConnector,
   flinkWithTelemetry,
+  flinkWithTelemetryOrOAuth,
   hasCCloudCatalogOrOAuth,
   hasCCloudCatalogSupport,
   hasConfluentCloud,
   hasConfluentCloudOrOAuth,
   hasFlink,
+  hasFlinkOrOAuth,
   hasKafka,
   hasKafkaAuth,
   hasKafkaBootstrap,
@@ -534,6 +536,22 @@ describe("connection-predicates.ts", () => {
     });
   });
 
+  describe("hasFlinkOrOAuth", () => {
+    it("should return ENABLED for a direct connection with a flink block", () => {
+      expect(hasFlinkOrOAuth(FLINK_CONN)).toEqual(ENABLED);
+    });
+
+    it("should report MissingFlinkBlock for a direct connection without a flink block", () => {
+      expect(hasFlinkOrOAuth(KAFKA_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingFlinkBlock),
+      );
+    });
+
+    it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
+      expect(hasFlinkOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
+    });
+  });
+
   describe("hasCCloudCatalogOrOAuth", () => {
     it("should return ENABLED for a direct CCloud-hosted Schema Registry connection", () => {
       expect(hasCCloudCatalogOrOAuth(CCLOUD_SR_CONN)).toEqual(ENABLED);
@@ -607,6 +625,30 @@ describe("connection-predicates.ts", () => {
       expect(flinkWithTelemetry(OAUTH_CONN)).toEqual(
         disabledFor(ToolDisabledReason.OAuthNoServiceBlocks),
       );
+    });
+  });
+
+  describe("flinkWithTelemetryOrOAuth", () => {
+    it("should return ENABLED for a direct connection with both flink and telemetry blocks", () => {
+      expect(flinkWithTelemetryOrOAuth(FLINK_AND_TELEMETRY_CONN)).toEqual(
+        ENABLED,
+      );
+    });
+
+    it("should report MissingFlinkBlock when only the telemetry block is present", () => {
+      expect(flinkWithTelemetryOrOAuth(TELEMETRY_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingFlinkBlock),
+      );
+    });
+
+    it("should report MissingTelemetryBlock when only the flink block is present", () => {
+      expect(flinkWithTelemetryOrOAuth(FLINK_CONN)).toEqual(
+        disabledFor(ToolDisabledReason.MissingTelemetryBlock),
+      );
+    });
+
+    it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
+      expect(flinkWithTelemetryOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
     });
   });
 });

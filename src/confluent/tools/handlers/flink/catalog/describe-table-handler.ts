@@ -15,21 +15,11 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const describeTableArguments = z.object({
-  organizationId: z
+  tableName: z
     .string()
     .trim()
-    .optional()
-    .describe("The unique identifier for the organization."),
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the environment."),
-  computePoolId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The id associated with the compute pool in context."),
+    .nonempty()
+    .describe("The name of the table to describe."),
   catalogName: z
     .string()
     .trim()
@@ -44,11 +34,27 @@ const describeTableArguments = z.object({
     .describe(
       "The database/schema name. Can be cluster ID (lkc-xxxxx) or friendly name. Optional.",
     ),
-  tableName: z
+  organizationId: z
     .string()
     .trim()
-    .nonempty()
-    .describe("The name of the table to describe."),
+    .optional()
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
+  computePoolId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud Flink compute pool ID (lfcp-...). Discover via list-compute-pools.",
+    ),
 });
 
 export class DescribeTableHandler extends FlinkCatalogToolHandler {
@@ -65,22 +71,26 @@ export class DescribeTableHandler extends FlinkCatalogToolHandler {
       tableName,
     } = describeTableArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
-      organizationId,
-      environmentId,
-    );
-    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    const { organization_id, environment_id, compute_pool_id } =
+      this.resolveFlinkRouting(conn, {
+        organizationId,
+        environmentId,
+        computePoolId,
+      });
     const catalog = this.resolveCatalogNameOrError(catalogName, environment_id);
     if (!catalog.ok) return catalog.error;
     const catalog_name = catalog.name;
-    // Database name is optional - if provided, resolve it to friendly SCHEMA_NAME
-    const database_input = resolveDatabaseName(databaseName, conn);
+    // Database name is optional - if provided, resolve it to friendly SCHEMA_NAME.
+    // The config fallback (kafka.cluster_id) only exists on direct connections;
+    // under OAuth callers supply databaseName explicitly.
+    const database_input = resolveDatabaseName(
+      databaseName,
+      conn.type === "direct" ? conn : undefined,
+    );
 
     const statementsCreated: string[] = [];
 

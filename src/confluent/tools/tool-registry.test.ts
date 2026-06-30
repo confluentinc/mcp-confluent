@@ -8,10 +8,10 @@ import {
   alwaysEnabled,
   canCreateDirectConnector,
   type ConnectionPredicate,
-  flinkWithTelemetry,
+  flinkWithTelemetryOrOAuth,
   hasCCloudCatalogOrOAuth,
   hasConfluentCloudOrOAuth,
-  hasFlink,
+  hasFlinkOrOAuth,
   hasSchemaRegistryOrOAuth,
   hasTableflowOrOAuth,
   hasTelemetryOrOAuth,
@@ -204,19 +204,19 @@ describe("tool-registry.ts", () => {
         [ToolName.ALTER_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         [ToolName.GET_TOPIC_CONFIG]: kafkaRestWithAuthOrOAuth,
         // Flink
-        [ToolName.LIST_FLINK_STATEMENTS]: hasFlink,
-        [ToolName.CREATE_FLINK_STATEMENT]: hasFlink,
-        [ToolName.GET_FLINK_STATEMENT_RESULTS]: hasFlink,
-        [ToolName.DELETE_FLINK_STATEMENTS]: hasFlink,
-        [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: hasFlink,
-        [ToolName.LIST_FLINK_CATALOGS]: hasFlink,
-        [ToolName.LIST_FLINK_DATABASES]: hasFlink,
-        [ToolName.LIST_FLINK_TABLES]: hasFlink,
-        [ToolName.DESCRIBE_FLINK_TABLE]: hasFlink,
-        [ToolName.GET_FLINK_TABLE_INFO]: hasFlink,
-        [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlink,
-        [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlink,
-        [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetry,
+        [ToolName.LIST_FLINK_STATEMENTS]: hasFlinkOrOAuth,
+        [ToolName.CREATE_FLINK_STATEMENT]: hasFlinkOrOAuth,
+        [ToolName.GET_FLINK_STATEMENT_RESULTS]: hasFlinkOrOAuth,
+        [ToolName.DELETE_FLINK_STATEMENTS]: hasFlinkOrOAuth,
+        [ToolName.GET_FLINK_STATEMENT_EXCEPTIONS]: hasFlinkOrOAuth,
+        [ToolName.LIST_FLINK_CATALOGS]: hasFlinkOrOAuth,
+        [ToolName.LIST_FLINK_DATABASES]: hasFlinkOrOAuth,
+        [ToolName.LIST_FLINK_TABLES]: hasFlinkOrOAuth,
+        [ToolName.DESCRIBE_FLINK_TABLE]: hasFlinkOrOAuth,
+        [ToolName.GET_FLINK_TABLE_INFO]: hasFlinkOrOAuth,
+        [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlinkOrOAuth,
+        [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlinkOrOAuth,
+        [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetryOrOAuth,
         // Connect — OAuth-capable (ride the cloud REST client); create-connector
         // stays direct-only (embeds a Kafka API key/secret in the connector spec).
         [ToolName.LIST_CONNECTORS]: hasConfluentCloudOrOAuth,
@@ -244,6 +244,8 @@ describe("tool-registry.ts", () => {
         [ToolName.LIST_TAGS]: hasCCloudCatalogOrOAuth,
         // Clusters
         [ToolName.LIST_CLUSTERS]: hasConfluentCloudOrOAuth,
+        // Compute pools
+        [ToolName.LIST_COMPUTE_POOLS]: hasConfluentCloudOrOAuth,
         // Environments + billing + organizations (Confluent Cloud control plane)
         [ToolName.LIST_ENVIRONMENTS]: hasConfluentCloudOrOAuth,
         [ToolName.READ_ENVIRONMENT]: hasConfluentCloudOrOAuth,
@@ -521,6 +523,11 @@ describe("tool-registry.ts", () => {
         // resolveEnvArg throws under direct when neither environmentId arg
         // nor conn.kafka.env_id supplies a value — `allServicesRuntime`
         // omits kafka.env_id, so this is the expected smoke-test path.
+        outcome: { throws: "environmentId is required" },
+      },
+      [ToolName.LIST_COMPUTE_POOLS]: {
+        // Same resolveEnvArg path as LIST_CLUSTERS: throws under direct when
+        // neither environmentId arg nor conn.kafka.env_id supplies a value.
         outcome: { throws: "environmentId is required" },
       },
       // Tableflow

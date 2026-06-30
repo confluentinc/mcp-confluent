@@ -7,16 +7,6 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const getFlinkStatementResultsArguments = z.object({
-  organizationId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the organization."),
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the environment."),
   statementName: z
     .string()
     .regex(
@@ -36,6 +26,27 @@ const getFlinkStatementResultsArguments = z.object({
     .describe(
       "The function implements pagination. It will continue to fetch results using the next page token until either there are no more results or the timeout is reached. Tables backed by kafka topics can be thought of as never-ending streams as data could be continuously produced in near real-time. Therefore, if you wish to sample values from a stream, you may want to set a timeout. If you are reading a statement after creating it, you may need to retry a couple times to ensure that the statement is ready and receiving data.",
     ),
+  organizationId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
+  computePoolId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud Flink compute pool ID (lfcp-...). Discover via list-compute-pools.",
+    ),
 });
 
 export class GetFlinkStatementResultsHandler extends FlinkToolHandler {
@@ -48,20 +59,21 @@ export class GetFlinkStatementResultsHandler extends FlinkToolHandler {
       statementName,
       environmentId,
       organizationId,
+      computePoolId,
     } = getFlinkStatementResultsArguments.parse(toolArguments);
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
-      organizationId,
-      environmentId,
-    );
+    const { organization_id, environment_id, compute_pool_id } =
+      this.resolveFlinkRouting(conn, {
+        organizationId,
+        environmentId,
+        computePoolId,
+      });
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudFlinkRestClient(),
+      await clientManager.getFlinkRestClient(compute_pool_id, environment_id),
     );
     let allResults: unknown[] = [];
     let nextToken: string | undefined = undefined;

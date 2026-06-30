@@ -10,27 +10,33 @@ import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listTablesArguments = z.object({
-  organizationId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the organization."),
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the environment."),
-  computePoolId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The id associated with the compute pool in context."),
   catalogName: z
     .string()
     .trim()
     .optional()
     .describe(
       "The Flink catalog name (environment ID, e.g., env-xxxxx). Omit to use defaults.",
+    ),
+  organizationId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
+  computePoolId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud Flink compute pool ID (lfcp-...). Discover via list-compute-pools.",
     ),
 });
 
@@ -42,17 +48,16 @@ export class ListTablesHandler extends FlinkCatalogToolHandler {
     const { organizationId, environmentId, computePoolId, catalogName } =
       listTablesArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
-      organizationId,
-      environmentId,
-    );
-    const compute_pool_id = this.resolveComputePoolId(flink, computePoolId);
+    const { organization_id, environment_id, compute_pool_id } =
+      this.resolveFlinkRouting(conn, {
+        organizationId,
+        environmentId,
+        computePoolId,
+      });
     const catalog = this.resolveCatalogNameOrError(catalogName, environment_id);
     if (!catalog.ok) return catalog.error;
     const catalog_name = catalog.name;

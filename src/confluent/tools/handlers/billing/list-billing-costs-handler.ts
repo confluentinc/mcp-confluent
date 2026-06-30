@@ -127,6 +127,7 @@ const billingCostsSchema = z.object({
 type BillingCostsList = z.infer<typeof billingCostsSchema>;
 
 export class ListBillingCostsHandler extends BaseToolHandler {
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#657)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,

@@ -103,6 +103,7 @@ const LONG_MIN_VALUE = -9223372036854776000;
  * @param options - Query options
  * @returns Aggregated metrics for the statement
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#661)
 export async function getStatementMetrics(
   clientManager: BaseClientManager,
   options: {
@@ -297,6 +298,7 @@ export async function getStatementMetrics(
 /**
  * Analyze metrics and return diagnostic insights.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#661)
 export function analyzeMetrics(metrics: FlinkStatementMetrics): {
   issues: Array<{
     type: string;
@@ -450,6 +452,7 @@ export function analyzeMetrics(metrics: FlinkStatementMetrics): {
 /**
  * Query per-task metrics breakdown using GROUPED format.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#661)
 async function queryTaskMetrics(
   telemetryClient: ReturnType<
     BaseClientManager["getConfluentCloudTelemetryRestClient"]
@@ -551,6 +554,7 @@ async function queryTaskMetrics(
  * Query per-split metrics breakdown using GROUPED format.
  * Split names are human-readable (e.g., "orders-0" for topic-partition).
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#661)
 async function querySplitMetrics(
   telemetryClient: ReturnType<
     BaseClientManager["getConfluentCloudTelemetryRestClient"]

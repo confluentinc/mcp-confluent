@@ -72,6 +72,7 @@ async function startServerWith(
   toolHandlers: Map<ToolName, ToolHandler>,
   runtime: ServerRuntime,
   track?: (props: ToolCallProps) => void,
+  captureError?: (error: unknown, toolName: ToolName) => void,
 ): Promise<{
   client: Client;
   shutdown: () => Promise<void>;
@@ -82,6 +83,7 @@ async function startServerWith(
     toolHandlers,
     runtime,
     track,
+    captureError,
   });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
@@ -235,6 +237,39 @@ describe("MCP server tool-call gate", () => {
       toolName: ToolName.LIST_TOPICS,
       status: "error",
     });
+  });
+});
+
+describe("createMcpServer error capture", () => {
+  let activeShutdown: (() => Promise<void>) | undefined;
+
+  afterEach(async () => {
+    await activeShutdown?.();
+    activeShutdown = undefined;
+  });
+
+  it("should report a handler throw tagged with the tool name, then surface an error result", async () => {
+    const captureError = vi.fn();
+    const boom = new Error("handler exploded");
+    const handler = new StubHandler({ predicate: hasKafka });
+    vi.spyOn(handler, "handle").mockRejectedValue(boom);
+
+    const { client, shutdown } = await startServerWith(
+      new Map([[ToolName.LIST_TOPICS, handler]]),
+      runtimeWith({ kafka: { bootstrap_servers: "a:9092" } }),
+      undefined,
+      captureError,
+    );
+    activeShutdown = shutdown;
+
+    const result = await client.callTool({
+      name: ToolName.LIST_TOPICS,
+      arguments: {},
+    });
+
+    // MCP SDK converts the rethrown error into an error result.
+    expect(result.isError).toBe(true);
+    expect(captureError).toHaveBeenCalledWith(boom, ToolName.LIST_TOPICS);
   });
 });
 

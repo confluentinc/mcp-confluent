@@ -76,6 +76,7 @@ function formatTableRow(key: string, schema: z.ZodTypeAny): string {
   return `| ${key} | ${description} | ${defaultValue} | ${isRequired ? "Yes" : "No"} |\n`;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#668)
 function getTypeInfo(schema: z.ZodTypeAny): string {
   if (schema instanceof z.ZodString) {
     const constraints = [

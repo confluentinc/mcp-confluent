@@ -1103,6 +1103,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    *   errors) surface via `createResponse(text, true)` with the
    *   formatted Kafka error.
    */
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#664)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,

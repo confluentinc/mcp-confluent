@@ -6,7 +6,6 @@ import {
 } from "@src/confluent/tools/base-tools.js";
 import {
   alwaysEnabled,
-  canCreateDirectConnector,
   type ConnectionPredicate,
   flinkWithTelemetryOrOAuth,
   hasCCloudCatalogOrOAuth,
@@ -217,14 +216,13 @@ describe("tool-registry.ts", () => {
         [ToolName.CHECK_FLINK_STATEMENT_HEALTH]: hasFlinkOrOAuth,
         [ToolName.DETECT_FLINK_STATEMENT_ISSUES]: hasFlinkOrOAuth,
         [ToolName.GET_FLINK_STATEMENT_PROFILE]: flinkWithTelemetryOrOAuth,
-        // Connect — OAuth-capable (ride the cloud REST client); create-connector
-        // stays direct-only (embeds a Kafka API key/secret in the connector spec).
+        // Connect — OAuth-capable (ride the cloud REST client).
         [ToolName.LIST_CONNECTORS]: hasConfluentCloudOrOAuth,
         [ToolName.GET_CONNECTOR_CONFIG]: hasConfluentCloudOrOAuth,
         [ToolName.GET_CONNECTOR_OFFSETS]: hasConfluentCloudOrOAuth,
         [ToolName.GET_CONNECTOR_STATUS]: hasConfluentCloudOrOAuth,
         [ToolName.GET_CONNECTOR_TASKS]: hasConfluentCloudOrOAuth,
-        [ToolName.CREATE_CONNECTOR]: canCreateDirectConnector,
+        [ToolName.CREATE_CONNECTOR]: hasConfluentCloudOrOAuth,
         [ToolName.DELETE_CONNECTOR]: hasConfluentCloudOrOAuth,
         [ToolName.GET_CONNECTOR_ERROR_SUMMARY]: hasConfluentCloudOrOAuth,
         [ToolName.GET_CONNECTOR_ERROR_RECOMMENDATIONS]:

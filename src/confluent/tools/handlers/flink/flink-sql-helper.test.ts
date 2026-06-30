@@ -4,7 +4,7 @@ import {
   type MockedClientManager,
   type MockedRestClient,
 } from "@tests/stubs/index.js";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const STATEMENTS_PATH =
   "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements";
@@ -32,6 +32,10 @@ describe("flink-sql-helper.ts", () => {
       flinkRest.POST.mockResolvedValue({ data: COMPLETED_RESPONSE });
       flinkRest.GET.mockResolvedValue({ data: COMPLETED_RESPONSE });
       flinkRest.DELETE.mockResolvedValue({ data: {} });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
     });
 
     it("should submit internal queries in snapshot mode", async () => {
@@ -96,6 +100,95 @@ describe("flink-sql-helper.ts", () => {
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual([{ CATALOG_NAME: "env-123" }]);
+    });
+
+    it("should fail without polling when statement creation errors", async () => {
+      flinkRest.POST.mockResolvedValue({ error: { message: "boom" } });
+
+      const result = await executeFlinkSql(clientManager, "SELECT 1", OPTIONS);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        'Failed to create statement: {"message":"boom"}',
+      );
+      expect(result.statementName).toMatch(/^mcp-query-/);
+      expect(flinkRest.GET).not.toHaveBeenCalled();
+    });
+
+    it("should fail when the status poll returns an error", async () => {
+      flinkRest.GET.mockResolvedValueOnce({ error: { message: "boom" } });
+
+      const result = await executeFlinkSql(clientManager, "SELECT 1", OPTIONS);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        'Failed to get statement status: {"message":"boom"}',
+      );
+    });
+
+    it.each([
+      { phase: "STOPPED", word: "stopped" },
+      { phase: "DELETED", word: "deleted" },
+    ])(
+      "should fail when the statement reaches a terminal $phase phase",
+      async ({ phase, word }) => {
+        flinkRest.GET.mockResolvedValueOnce({ data: { status: { phase } } });
+
+        const result = await executeFlinkSql(
+          clientManager,
+          "SELECT 1",
+          OPTIONS,
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(`Statement was ${word}`);
+        expect(result.phase).toBe(phase);
+      },
+    );
+
+    it("should fail when reading results errors after completion", async () => {
+      flinkRest.GET.mockResolvedValueOnce({
+        data: COMPLETED_RESPONSE,
+      }).mockResolvedValueOnce({ error: { message: "boom" } });
+
+      const result = await executeFlinkSql(clientManager, "SELECT 1", OPTIONS);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to read results: {"message":"boom"}');
+      expect(result.phase).toBe("COMPLETED");
+    });
+
+    it("should keep polling through a non-terminal phase until COMPLETED", async () => {
+      vi.useFakeTimers();
+      flinkRest.GET.mockResolvedValueOnce({
+        data: { status: { phase: "RUNNING" } },
+      }).mockResolvedValue({ data: COMPLETED_RESPONSE });
+
+      const promise = executeFlinkSql(clientManager, "SELECT 1", OPTIONS);
+      await vi.advanceTimersByTimeAsync(600);
+      const result = await promise;
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual([{ CATALOG_NAME: "env-123" }]);
+      expect(flinkRest.GET).toHaveBeenCalledTimes(3); // RUNNING poll, COMPLETED poll, results
+    });
+
+    it("should time out when the statement never reaches COMPLETED", async () => {
+      vi.useFakeTimers();
+      flinkRest.GET.mockResolvedValue({
+        data: { status: { phase: "RUNNING" } },
+      });
+
+      const promise = executeFlinkSql(clientManager, "SELECT 1", {
+        ...OPTIONS,
+        timeoutMs: 1000,
+      });
+      await vi.advanceTimersByTimeAsync(1500);
+      const result = await promise;
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Statement timed out in RUNNING state");
+      expect(result.phase).toBe("RUNNING");
     });
   });
 });

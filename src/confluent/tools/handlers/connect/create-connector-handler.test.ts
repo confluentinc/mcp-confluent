@@ -1,4 +1,6 @@
+import { MCPServerConfiguration } from "@src/config/models.js";
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
+import { ServerRuntime } from "@src/server-runtime.js";
 import {
   CCLOUD_CONN,
   CONNECT_CONN_WITH_AUTH,
@@ -9,6 +11,7 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  type MockedClientManager,
 } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 
@@ -158,6 +161,119 @@ describe("create-connector-handler.ts", () => {
             }),
           }),
         );
+      });
+
+      it("should prefer explicit kafkaApiKey/kafkaApiSecret args over conn config in the POST body", async () => {
+        const clientManager = getMockedClientManager();
+        const cloudRest = clientManager.getConfluentCloudRestClient();
+        cloudRest.POST.mockResolvedValue({ data: { name: "my-connector" } });
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CONNECT_CONN_WITH_AUTH,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {
+            ...MINIMAL_CONNECTOR_ARGS,
+            kafkaApiKey: "arg-key",
+            kafkaApiSecret: "arg-secret",
+          },
+          outcome: { resolves: "my-connector created" },
+          clientManager,
+        });
+
+        expect(cloudRest.POST).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            body: expect.objectContaining({
+              config: expect.objectContaining({
+                "kafka.api.key": "arg-key",
+                "kafka.api.secret": "arg-secret",
+              }),
+            }),
+          }),
+        );
+      });
+    });
+
+    // Under OAuth there is no kafka block to source the embedded keypair from,
+    // so the tool requires kafkaApiKey/kafkaApiSecret (plus environmentId and
+    // clusterId) as explicit arguments. The REST call itself rides the OAuth
+    // bearer middleware like every other Connect tool.
+    describe("handle() under an OAuth connection", () => {
+      const OAUTH_ARGS = {
+        ...MINIMAL_CONNECTOR_ARGS,
+        environmentId: "env-from-arg",
+        clusterId: "lkc-from-arg",
+        kafkaApiKey: "arg-key",
+        kafkaApiSecret: "arg-secret",
+      };
+
+      function oauthRuntime(clientManager: MockedClientManager): ServerRuntime {
+        return new ServerRuntime(
+          new MCPServerConfiguration({
+            connections: {
+              [DEFAULT_CONNECTION_ID]: { type: "oauth", ccloud_env: "devel" },
+            },
+          }),
+          { [DEFAULT_CONNECTION_ID]: clientManager },
+        );
+      }
+
+      it("should embed the keypair from explicit args in the POST body", async () => {
+        const clientManager = getMockedClientManager();
+        const cloudRest = clientManager.getConfluentCloudRestClient();
+        cloudRest.POST.mockResolvedValue({ data: { name: "my-connector" } });
+
+        const result = await handler.handle(
+          oauthRuntime(clientManager),
+          OAUTH_ARGS,
+        );
+
+        expect(result.isError).toBeFalsy();
+        expect(cloudRest.POST).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            params: expect.objectContaining({
+              path: expect.objectContaining({
+                environment_id: "env-from-arg",
+                kafka_cluster_id: "lkc-from-arg",
+              }),
+            }),
+            body: expect.objectContaining({
+              config: expect.objectContaining({
+                "kafka.api.key": "arg-key",
+                "kafka.api.secret": "arg-secret",
+              }),
+            }),
+          }),
+        );
+      });
+
+      it("should throw when kafkaApiKey is missing", async () => {
+        const clientManager = getMockedClientManager();
+        const { kafkaApiKey: _omitted, ...argsWithoutKey } = OAUTH_ARGS;
+
+        await expect(
+          handler.handle(oauthRuntime(clientManager), argsWithoutKey),
+        ).rejects.toThrow("Kafka API Key is required");
+        expect(
+          clientManager.getConfluentCloudRestClient().POST,
+        ).not.toHaveBeenCalled();
+      });
+
+      it("should throw when kafkaApiSecret is missing", async () => {
+        const clientManager = getMockedClientManager();
+        const { kafkaApiSecret: _omitted, ...argsWithoutSecret } = OAUTH_ARGS;
+
+        await expect(
+          handler.handle(oauthRuntime(clientManager), argsWithoutSecret),
+        ).rejects.toThrow("Kafka API Secret is required");
+        expect(
+          clientManager.getConfluentCloudRestClient().POST,
+        ).not.toHaveBeenCalled();
       });
     });
   });

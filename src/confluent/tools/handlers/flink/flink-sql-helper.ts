@@ -1,4 +1,6 @@
 import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import type { components } from "@src/confluent/openapi-schema.js";
+import { logger } from "@src/logger.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 
 export interface FlinkSqlResult {
@@ -12,7 +14,8 @@ export interface FlinkSqlResult {
 /**
  * `_meta` payload emitted by catalog handlers so integration tests can sweep
  * statements the handler created internally. {@linkcode executeFlinkSql}
- * does not auto-delete (a streaming caller would break under that semantic).
+ * best-effort deletes its own bounded statements once they complete; this
+ * ride-along remains as a backstop for the cases where that delete fails.
  *
  * Declared as `type` rather than `interface` so the shape is assignable to
  * {@link BaseToolHandler.createResponse}'s `_meta: Record<string, unknown>`
@@ -79,10 +82,21 @@ export async function executeFlinkSql(
       name: statementName,
       organization_id: organizationId,
       environment_id: environmentId,
+      // Hidden keeps these service-internal queries out of statement-listing
+      // surfaces (console, monitoring, our own list tool). The generated schema
+      // marks metadata.self required even on create, though self is a
+      // server-set read-only URL the client must not send; cast past it.
+      metadata: {
+        labels: { "user.confluent.io/hidden": "true" },
+      } as unknown as components["schemas"]["sql.v1.Statement"]["metadata"],
       spec: {
         compute_pool_id: computePoolId,
         statement: sql,
         properties: {
+          // snapshot.mode=now declares the bounded, point-in-time intent our
+          // poll-to-COMPLETED loop already depends on, rather than leaning on
+          // CCloud's implicit INFORMATION_SCHEMA special-casing.
+          "sql.snapshot.mode": "now",
           ...(catalogName && { "sql.current-catalog": catalogName }),
           ...(databaseName && { "sql.current-database": databaseName }),
         },
@@ -192,6 +206,34 @@ export async function executeFlinkSql(
     allResults = allResults.concat(response?.results?.data || []);
     nextToken = response?.metadata?.next?.split("page_token=")[1];
   } while (nextToken);
+
+  // Bounded query is drained, so the statement is a spent resource: delete it
+  // to reclaim quota. Best-effort — a failed DELETE must not flip a successful
+  // query to an error, and the hidden label keeps any orphan out of listings.
+  try {
+    const { error: deleteError } = await pathBasedClient[
+      "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements/{statement_name}"
+    ].DELETE({
+      params: {
+        path: {
+          organization_id: organizationId,
+          environment_id: environmentId,
+          statement_name: statementName,
+        },
+      },
+    });
+    if (deleteError) {
+      logger.warn(
+        { deleteError, statementName },
+        "Failed to delete completed internal Flink query statement",
+      );
+    }
+  } catch (err) {
+    logger.warn(
+      { err, statementName },
+      "Failed to delete completed internal Flink query statement",
+    );
+  }
 
   return {
     success: true,

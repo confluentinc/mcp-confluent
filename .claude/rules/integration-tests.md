@@ -90,7 +90,7 @@ server = await startServer({
 
 Three non-obvious things the harness does for you:
 
-1. Forces `NODE_ENV=integration` in the child env. `src/index.ts` guards
+1. Forces `NODE_ENV=integration` in the child env. `src/server-main.ts` guards
    `main()` with `if (process.env.NODE_ENV !== "test")` so the module can be
    imported by unit tests; without the override, vitest's default
    `NODE_ENV=test` would cause the child to exit without starting the server.

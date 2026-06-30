@@ -257,8 +257,8 @@ async function startStdio(options: StartServerOptions): Promise<StartedServer> {
 /**
  * Merges `process.env` with caller overrides into a `Record<string, string>`
  * (`node:child_process` rejects undefined values), forcing
- * `NODE_ENV=integration` so `src/index.ts`'s test-mode guard lets `main()`
- * run. Everything else the spawned server reads (transports, ports, auth,
+ * `NODE_ENV=integration` so `src/server-main.ts`'s test-mode guard lets
+ * `main()` run. Everything else the spawned server reads (transports, ports, auth,
  * log level) lives in the YAML fixture, not in env vars.
  */
 function buildEnv(
@@ -268,7 +268,7 @@ function buildEnv(
   for (const [key, value] of Object.entries(process.env)) {
     if (typeof value === "string") merged[key] = value;
   }
-  // vitest sets NODE_ENV=test which trips src/index.ts's test guard, so override after the copy
+  // vitest sets NODE_ENV=test which trips server-main.ts's test guard, so override after the copy
   merged.NODE_ENV = "integration";
   for (const [key, value] of Object.entries(overrides)) {
     merged[key] = value;

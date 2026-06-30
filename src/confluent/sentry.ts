@@ -77,5 +77,6 @@ export function captureException(
 /** Flush buffered events on shutdown. No-op when uninitialized. */
 export async function closeSentry(timeoutMs = 2000): Promise<boolean> {
   if (!initialized) return true;
+  initialized = false;
   return sentry.close(timeoutMs);
 }

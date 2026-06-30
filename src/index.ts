@@ -363,14 +363,15 @@ export async function performCleanup(
   logger.info("Shutting down...");
   try {
     await deps.telemetry.shutdown();
-    await closeSentry();
     await deps.transportManager.stop();
     // shutdown() is race-safe with an in-flight bootstrap.
     deps.runtime.oauthHolder?.shutdown();
     await deps.runtime.disconnectAll();
   } catch (error) {
+    captureException(error);
     logger.error({ err: error }, "Error during shutdown");
   } finally {
+    await closeSentry();
     exit(0);
   }
 }

@@ -2,7 +2,7 @@
 
 _Last updated: May 2026_
 
-The Confluent MCP Server collects usage data to understand how it is used, and reports client-side errors to [Sentry](https://sentry.io) so we can detect and fix problems you hit while running it.
+The Confluent MCP Server collects usage data to understand how it is used, and reports server-side runtime errors to [Sentry](https://sentry.io) so we can detect and fix problems you hit while running it.
 
 ## How to Control Telemetry
 

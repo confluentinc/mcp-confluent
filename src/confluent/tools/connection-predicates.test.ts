@@ -5,7 +5,6 @@ import {
   type PredicateResult,
   ToolDisabledReason,
   allOf,
-  canCreateDirectConnector,
   flinkWithTelemetry,
   flinkWithTelemetryOrOAuth,
   hasCCloudCatalogOrOAuth,
@@ -96,17 +95,6 @@ const CCLOUD_SR_CONN = directConn({
 const CP_AUTH_SR_CONN = directConn({
   schema_registry: {
     endpoint: "https://cp-sr.internal:8081",
-    auth: { type: "api_key", key: "k", secret: "s" },
-  },
-});
-
-const DIRECT_CCLOUD_KAFKA_AUTH_CONN = directConn({
-  confluent_cloud: {
-    endpoint: "https://api.confluent.cloud",
-    auth: { type: "api_key", key: "k", secret: "s" },
-  },
-  kafka: {
-    bootstrap_servers: "broker:9092",
     auth: { type: "api_key", key: "k", secret: "s" },
   },
 });
@@ -571,36 +559,6 @@ describe("connection-predicates.ts", () => {
 
     it("should return ENABLED for an OAuth connection (the predicate is widened)", () => {
       expect(hasCCloudCatalogOrOAuth(OAUTH_CONN)).toEqual(ENABLED);
-    });
-  });
-
-  describe("canCreateDirectConnector", () => {
-    it("should return ENABLED when both confluent_cloud and kafka.auth are present on a direct connection", () => {
-      expect(canCreateDirectConnector(DIRECT_CCLOUD_KAFKA_AUTH_CONN)).toEqual(
-        ENABLED,
-      );
-    });
-
-    it("should report MissingConfluentCloudBlock when the first conjunct fails (no confluent_cloud block)", () => {
-      // KAFKA_REST_WITH_AUTH_CONN has kafka.auth but no confluent_cloud,
-      // so hasConfluentCloud short-circuits before hasKafkaAuth runs.
-      expect(canCreateDirectConnector(KAFKA_REST_WITH_AUTH_CONN)).toEqual(
-        disabledFor(ToolDisabledReason.MissingConfluentCloudBlock),
-      );
-    });
-
-    it("should report MissingKafkaBlock when the second conjunct fails (confluent_cloud present but no kafka block)", () => {
-      // CONFLUENT_CLOUD_CONN has confluent_cloud but no kafka block;
-      // hasKafkaAuth's first check (kafka block presence) trips first.
-      expect(canCreateDirectConnector(CONFLUENT_CLOUD_CONN)).toEqual(
-        disabledFor(ToolDisabledReason.MissingKafkaBlock),
-      );
-    });
-
-    it("should report OAuthNotDirectCapable for an OAuth connection", () => {
-      expect(canCreateDirectConnector(OAUTH_CONN)).toEqual(
-        disabledFor(ToolDisabledReason.OAuthNotDirectCapable),
-      );
     });
   });
 

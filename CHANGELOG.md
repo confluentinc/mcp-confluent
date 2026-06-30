@@ -31,7 +31,7 @@ All notable changes to this MCP server will be documented in this file.
 #### New Tools / Tool Features
 
 - **More tool families now work under OAuth.** Additional Confluent Cloud tool families are now usable from an OAuth (PKCE) connection, not just `direct` connections with static API keys.
-  - **Connectors.** All 13 tools except `create-connector` (which stays `direct`-only, since its spec embeds a Kafka API key/secret).
+  - **Connectors.** All 14 tools. `create-connector` embeds a Kafka API key/secret in the connector spec; under OAuth that keypair is supplied via the new `kafkaApiKey` / `kafkaApiSecret` tool arguments (on a `direct` connection it still falls back to the connection's `kafka.auth`).
   - **Catalog & Tags.** All 7 tools (`search-topics-by-tag`, `search-topics-by-name`, `create-topic-tags`, `delete-tag`, `remove-tag-from-entity`, `add-tags-to-topic`, `list-tags`).
   - **Metrics.** Both tools (`list-available-metrics`, `query-metrics`).
   - **Tableflow.** All 11 tools (the 6 topic/region tools and the 5 catalog-integration tools).

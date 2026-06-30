@@ -1,6 +1,9 @@
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolCategory } from "@src/confluent/tools/base-tools.js";
-import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
+import {
+  ToolDisabledReason,
+  hasConfluentCloud,
+} from "@src/confluent/tools/connection-predicates.js";
 import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";
 import type {
   ConnectionGatingSection,
@@ -17,6 +20,7 @@ import {
   runtimeWith,
   runtimeWithConnections,
 } from "@tests/factories/runtime.js";
+import { StubHandler } from "@tests/stubs/index.js";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
@@ -131,9 +135,22 @@ describe("explain-disabled-tools-handler.ts", () => {
         expect(flinkGroup!.tools).toContain(ToolName.LIST_FLINK_STATEMENTS);
       });
 
-      it("should report OAuthNoServiceBlocks in the OAuth connection's section for tools that need a service block", () => {
+      it("should bucket a direct-only tool under OAuthNotDirectCapable in an OAuth connection's section", () => {
+        // No real tool is direct-only anymore (create-connector was the last,
+        // now OAuth-capable), so we stand up a synthetic catalog with a single
+        // stub gated on the strict-direct `hasConfluentCloud` predicate to keep
+        // coverage of the OAuthNotDirectCapable bucketing path. The stub's tuple
+        // name is what the report keys on.
+        const handlerWithDirectOnlyStub = new ExplainDisabledToolsHandler(
+          () => [
+            [
+              ToolName.LIST_TOPICS,
+              new StubHandler({ predicate: hasConfluentCloud }),
+            ],
+          ],
+        );
         const report = getReport(
-          handler.handle(ccloudOAuthRuntime(), undefined),
+          handlerWithDirectOnlyStub.handle(ccloudOAuthRuntime(), undefined),
         );
 
         const section = sectionFor(report, "default");
@@ -142,14 +159,21 @@ describe("explain-disabled-tools-handler.ts", () => {
           ToolDisabledReason.OAuthNotDirectCapable,
         );
         expect(directOnlyGroup).toBeDefined();
-        expect(directOnlyGroup!.tools).toContain(ToolName.CREATE_CONNECTOR);
+        expect(directOnlyGroup!.tools).toContain(ToolName.LIST_TOPICS);
+      });
 
-        // Every block-gated tool family (Kafka, Flink, Schema Registry,
-        // Connect, Catalog, Telemetry, Tableflow) is now OAuth-capable, so no
-        // tool surfaces OAuthNoServiceBlocks under an OAuth connection.
-        expect(
-          groupByReason(section, ToolDisabledReason.OAuthNoServiceBlocks),
-        ).toBeUndefined();
+      it("should disable no tools in a full OAuth connection's section now that every real family is OAuth-capable", () => {
+        const report = getReport(
+          handler.handle(ccloudOAuthRuntime(), undefined),
+        );
+
+        // Every block-gated tool family (Kafka, Flink, Schema Registry, Connect
+        // — including create-connector — Catalog, Telemetry, Tableflow) is now
+        // OAuth-capable, so the real registry leaves nothing disabled under an
+        // OAuth connection.
+        const section = sectionFor(report, "default");
+        expect(section.disabledCount).toBe(0);
+        expect(section.disabledGroups).toEqual([]);
       });
 
       it("should split a tool across the per-connection sections of a flink+kafka pair of connections", () => {

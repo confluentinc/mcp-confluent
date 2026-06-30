@@ -30,6 +30,11 @@ All notable changes to this MCP server will be documented in this file.
 - **Per-connection `description` field.** Optional free-text label on any connection, echoed back by `list-configured-connections`.
 - **Per-connection `read_only` flag.** Set `read_only: true` on a connection to auto-disable every state-mutating tool for it, leaving only read-only tools enabled. **Defaults to `false`** --- resources reachable by a connection may be mutated or deleted from. The `list-configured-connections` tool reports each connection's read-onlyness.
 
+#### Observability
+
+- **Error reporting (Sentry):** runtime errors are reported to [Sentry](https://sentry.io) (credentials redacted), on by default and disabled by the same `DO_NOT_TRACK` switch as usage analytics. See [telemetry.md](telemetry.md).
+
+
 ### Changed
 
 - **Configuration**: _A YAML config may now define multiple connections — or none._ Point a single `config.yaml` at several clusters at once — for example a local Apache Kafka broker alongside Confluent Cloud — or run with no connection at all (documentation search and server-diagnostic tools still work). At most one of those connections may use OAuth to Confluent Cloud. See [CONFIGURATION.md → Multiple connections (and zero connections)](CONFIGURATION.md#multiple-connections-and-zero-connections).

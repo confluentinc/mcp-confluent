@@ -100,7 +100,11 @@ export function createMcpServer({
             durationMs: Date.now() - startTime,
             status: "error",
           });
-          captureError(error, name);
+          try {
+            captureError(error, name);
+          } catch {
+            // Ignore crash-reporting failures to avoid masking the original tool error.
+          }
           throw error;
         }
       },

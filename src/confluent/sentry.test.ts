@@ -85,6 +85,12 @@ describe("Sentry integration", () => {
     });
   });
 
+  it("is idempotent — a second initSentry does not re-init", () => {
+    mod.initSentry({ ...opts, doNotTrack: false });
+    mod.initSentry({ ...opts, doNotTrack: false });
+    expect(initStub).toHaveBeenCalledTimes(1);
+  });
+
   it("closeSentry flushes only when initialized", async () => {
     await mod.closeSentry(1000);
     expect(closeStub).not.toHaveBeenCalled();

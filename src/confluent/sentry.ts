@@ -31,6 +31,7 @@ function joinSorted(values: readonly string[]): string {
  * disables both.
  */
 export function initSentry(opts: InitSentryOptions): void {
+  if (initialized) return; // idempotent: never register the client twice
   if (opts.doNotTrack || !opts.dsn) {
     logger.info("Error reporting disabled");
     return;

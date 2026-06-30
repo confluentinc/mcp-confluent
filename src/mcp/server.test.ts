@@ -271,6 +271,33 @@ describe("createMcpServer error capture", () => {
     expect(result.isError).toBe(true);
     expect(captureError).toHaveBeenCalledWith(boom, ToolName.LIST_TOPICS);
   });
+
+  it("should surface the original error even if captureError throws", async () => {
+    const boom = new Error("handler exploded");
+    const handler = new StubHandler({ predicate: hasKafka });
+    vi.spyOn(handler, "handle").mockRejectedValue(boom);
+    const captureError = vi.fn(() => {
+      throw new Error("hook boom");
+    });
+
+    const { client, shutdown } = await startServerWith(
+      new Map([[ToolName.LIST_TOPICS, handler]]),
+      runtimeWith({ kafka: { bootstrap_servers: "a:9092" } }),
+      undefined,
+      captureError,
+    );
+    activeShutdown = shutdown;
+
+    const result = await client.callTool({
+      name: ToolName.LIST_TOPICS,
+      arguments: {},
+    });
+
+    expect(result.isError).toBe(true);
+    // The hook's fault must not replace the original handler error.
+    expect(JSON.stringify(result)).toContain("handler exploded");
+    expect(JSON.stringify(result)).not.toContain("hook boom");
+  });
 });
 
 describe("createMcpServer registered schema", () => {

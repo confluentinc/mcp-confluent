@@ -45,7 +45,7 @@ export default [
       ],
       // Production code reads service config from `ConnectionConfig`, not the
       // process env. The env singleton in `@src/env.js` only legitimately
-      // serves the bootstrap (`initEnv` named export from `src/index.ts`) and
+      // serves the bootstrap (`initEnv`, called from `src/server-main.ts`) and
       // the legacy YAML-vs-env-config bridge (`Environment` type from
       // `src/config/env-config.ts`). The default export was retired in #234;
       // this rule slams the door so any future regression surfaces with a
@@ -68,9 +68,10 @@ export default [
   },
   // Production code reads configuration from `MCPServerConfiguration` /
   // `ConnectionConfig`, never from `process.env`. The bootstrap allowlist
-  // below is the only place that consults it: index.ts orchestrates startup,
-  // cli.ts performs the -e dotenv mutation, env.ts parses the legacy env-var
-  // schema, logger.ts reads LOG_LEVEL/LOG_PRETTY at module-load (before
+  // below is the only place that consults it: index.ts is the preflight shim
+  // (reads NODE_ENV to skip auto-start under test), server-main.ts orchestrates
+  // startup, cli.ts performs the -e dotenv mutation, env.ts parses the legacy
+  // env-var schema, logger.ts reads LOG_LEVEL/LOG_PRETTY at module-load (before
   // main()). The dotenv mutation in cli.ts is intentional — it seeds
   // linked-library env-var consumption (OpenSSL, cyrus-sasl, krb5, undici)
   // outside our control. See #186 for the full rationale.
@@ -78,6 +79,7 @@ export default [
     files: ["src/**/*.ts"],
     ignores: [
       "src/index.ts",
+      "src/server-main.ts",
       "src/cli.ts",
       "src/env.ts",
       "src/logger.ts",
@@ -90,7 +92,7 @@ export default [
           selector:
             "MemberExpression[object.name='process'][property.name='env']",
           message:
-            "process.env may only be read in the bootstrap allowlist (src/index.ts, src/cli.ts, src/env.ts, src/logger.ts). Read from MCPServerConfiguration or ConnectionConfig instead.",
+            "process.env may only be read in the bootstrap allowlist (src/index.ts, src/server-main.ts, src/cli.ts, src/env.ts, src/logger.ts). Read from MCPServerConfiguration or ConnectionConfig instead.",
         },
       ],
     },

@@ -90,10 +90,9 @@ server = await startServer({
 
 Three non-obvious things the harness does for you:
 
-1. Forces `NODE_ENV=integration` in the child env. `src/index.ts` guards
-   `main()` with `if (process.env.NODE_ENV !== "test")` so the module can be
-   imported by unit tests; without the override, vitest's default
-   `NODE_ENV=test` would cause the child to exit without starting the server.
+1. Forces `NODE_ENV=integration` in the child env.
+   The child enters through the preflight shim `src/index.ts`, which only calls `bootstrap()` (and thus imports the server) when `NODE_ENV !== "test"`, and `src/server-main.ts` in turn only runs `main()` under the same guard.
+   Both guards exist so the modules can be imported by unit tests; without the override, vitest's default `NODE_ENV=test` would make the child exit without starting the server.
 2. For HTTP and SSE, writes `server.auth.disabled = true` into the
    per-spawn YAML config (via `spawnConfigPath` in
    `tests/harness/runtime.ts`). Tests run on 127.0.0.1 with DNS rebinding

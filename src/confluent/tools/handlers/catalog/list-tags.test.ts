@@ -7,8 +7,9 @@ import {
 import {
   assertHandleCase,
   getMockedClientManager,
+  getMockedRestClient,
 } from "@tests/stubs/index.js";
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // Each case runs against runtimeWithDecoy, so assertHandleCase routes to the
 // real connection and asserts the decoy's client manager stays untouched.
@@ -19,9 +20,9 @@ describe("list-tags.ts", () => {
     describe("handle()", () => {
       it("should resolve with the tag definitions on success", async () => {
         const clientManager = getMockedClientManager();
-        clientManager
-          .getConfluentCloudSchemaRegistryRestClient()
-          .GET.mockResolvedValue({ data: [{ name: "PII" }] });
+        const sr = getMockedRestClient();
+        sr.GET.mockResolvedValue({ data: [{ name: "PII" }] });
+        clientManager.getSchemaRegistryRestClient.mockResolvedValue(sr);
         await assertHandleCase({
           handler,
           runtime: runtimeWithDecoy(
@@ -37,9 +38,9 @@ describe("list-tags.ts", () => {
 
       it("should resolve with an error response when the API returns an error", async () => {
         const clientManager = getMockedClientManager();
-        clientManager
-          .getConfluentCloudSchemaRegistryRestClient()
-          .GET.mockResolvedValue({ error: { message: "boom" } });
+        const sr = getMockedRestClient();
+        sr.GET.mockResolvedValue({ error: { message: "boom" } });
+        clientManager.getSchemaRegistryRestClient.mockResolvedValue(sr);
         await assertHandleCase({
           handler,
           runtime: runtimeWithDecoy(
@@ -51,6 +52,28 @@ describe("list-tags.ts", () => {
           outcome: { resolves: "Failed to list tags", isError: true },
           clientManager,
         });
+      });
+
+      it("should pass environment_id through to getSchemaRegistryRestClient (OAuth wiring)", async () => {
+        const clientManager = getMockedClientManager();
+        const sr = getMockedRestClient();
+        sr.GET.mockResolvedValue({ data: [] });
+        clientManager.getSchemaRegistryRestClient.mockResolvedValue(sr);
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CATALOG_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { environment_id: "env-42" },
+          outcome: { resolves: "Successfully retrieved tags" },
+          clientManager,
+        });
+
+        expect(clientManager.getSchemaRegistryRestClient).toHaveBeenCalledWith(
+          "env-42",
+        );
       });
     });
   });

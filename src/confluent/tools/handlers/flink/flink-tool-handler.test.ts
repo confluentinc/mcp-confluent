@@ -1,10 +1,14 @@
 import {
   DirectConnectionConfig,
   FlinkDirectConfig,
+  OAuthConnectionConfig,
 } from "@src/config/models.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
+import {
+  FlinkRoutingArgs,
+  FlinkToolHandler,
+} from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { FLINK_CONN } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";
@@ -74,6 +78,83 @@ describe("flink-tool-handler.ts", () => {
           handler["getFlinkDirectConfig"]({ type: "direct" }),
         ).toThrow("Wacky --");
       });
+    });
+
+    const directConn: DirectConnectionConfig = {
+      type: "direct",
+      ...FLINK_CONN,
+    };
+    const oauthConn: OAuthConnectionConfig = {
+      type: "oauth",
+      ccloud_env: "devel",
+    };
+
+    describe("resolveFlinkRouting()", () => {
+      it("should fall back to the flink config block on a direct connection", () => {
+        expect(handler["resolveFlinkRouting"](directConn, {})).toEqual({
+          organization_id: FLINK_CONN.flink.organization_id,
+          environment_id: FLINK_CONN.flink.environment_id,
+          compute_pool_id: FLINK_CONN.flink.compute_pool_id,
+        });
+      });
+
+      it("should prefer explicit args over the config block on a direct connection", () => {
+        expect(
+          handler["resolveFlinkRouting"](directConn, {
+            organizationId: "org-arg",
+            environmentId: "env-arg",
+            computePoolId: "lfcp-arg",
+          }),
+        ).toEqual({
+          organization_id: "org-arg",
+          environment_id: "env-arg",
+          compute_pool_id: "lfcp-arg",
+        });
+      });
+
+      it("should use all three args under OAuth (no config fallback exists)", () => {
+        expect(
+          handler["resolveFlinkRouting"](oauthConn, {
+            organizationId: "org-arg",
+            environmentId: "env-arg",
+            computePoolId: "lfcp-arg",
+          }),
+        ).toEqual({
+          organization_id: "org-arg",
+          environment_id: "env-arg",
+          compute_pool_id: "lfcp-arg",
+        });
+      });
+
+      // Each row drops exactly one of the three required ids so every conjunct
+      // of the OAuth guard (!organization_id || !environment_id ||
+      // !compute_pool_id) is pinned independently.
+      const oauthMissingCases: Array<{
+        omitted: string;
+        args: FlinkRoutingArgs;
+      }> = [
+        {
+          omitted: "organizationId",
+          args: { environmentId: "env-arg", computePoolId: "lfcp-arg" },
+        },
+        {
+          omitted: "environmentId",
+          args: { organizationId: "org-arg", computePoolId: "lfcp-arg" },
+        },
+        {
+          omitted: "computePoolId",
+          args: { organizationId: "org-arg", environmentId: "env-arg" },
+        },
+      ];
+
+      it.each(oauthMissingCases)(
+        "should throw a discovery hint under OAuth when $omitted is omitted",
+        ({ args }) => {
+          expect(() => handler["resolveFlinkRouting"](oauthConn, args)).toThrow(
+            "required under OAuth connection type",
+          );
+        },
+      );
     });
   });
 });

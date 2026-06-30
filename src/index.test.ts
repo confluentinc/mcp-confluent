@@ -334,10 +334,37 @@ describe("index.ts", () => {
         ToolName.RESUME_CONNECTOR,
         ToolName.RESTART_CONNECTOR,
         ToolName.UPDATE_CONNECTOR_CONFIG,
-      ];
-
-      const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
-        // Flink (hasFlink — needs the flink service block)
+        // Catalog + search (hasCCloudCatalogOrOAuth — ride the SR REST client,
+        // which auto-resolves the SR cluster + endpoint from environment_id).
+        ToolName.SEARCH_TOPICS_BY_TAG,
+        ToolName.SEARCH_TOPICS_BY_NAME,
+        ToolName.CREATE_TOPIC_TAGS,
+        ToolName.DELETE_TAG,
+        ToolName.REMOVE_TAG_FROM_ENTITY,
+        ToolName.ADD_TAGS_TO_TOPIC,
+        ToolName.LIST_TAGS,
+        // Telemetry / Metrics (hasTelemetryOrOAuth — the Telemetry REST base
+        // URL is derived from the Auth0 environment and the surface is
+        // cloud-wide, so no per-cluster/per-env routing is needed).
+        ToolName.QUERY_METRICS,
+        ToolName.LIST_METRICS,
+        // Tableflow (hasTableflowOrOAuth — the Tableflow REST surface rides the
+        // cloud control-plane URL/token; environment/cluster IDs are supplied as
+        // explicit tool arguments under OAuth).
+        ToolName.CREATE_TABLEFLOW_TOPIC,
+        ToolName.LIST_TABLEFLOW_REGIONS,
+        ToolName.LIST_TABLEFLOW_TOPICS,
+        ToolName.READ_TABLEFLOW_TOPIC,
+        ToolName.UPDATE_TABLEFLOW_TOPIC,
+        ToolName.DELETE_TABLEFLOW_TOPIC,
+        ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION,
+        ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS,
+        ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
+        ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION,
+        ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
+        // Flink (hasFlinkOrOAuth / flinkWithTelemetryOrOAuth — the Flink REST host
+        // is regional and resolved per call from the compute pool; org/env/
+        // compute-pool IDs are supplied as explicit tool arguments under OAuth).
         ToolName.LIST_FLINK_STATEMENTS,
         ToolName.CREATE_FLINK_STATEMENT,
         ToolName.GET_FLINK_STATEMENT_RESULTS,
@@ -351,32 +378,12 @@ describe("index.ts", () => {
         ToolName.CHECK_FLINK_STATEMENT_HEALTH,
         ToolName.DETECT_FLINK_STATEMENT_ISSUES,
         ToolName.GET_FLINK_STATEMENT_PROFILE,
+      ];
+
+      const EXPECTED_OAUTH_DISABLED: readonly ToolName[] = [
         // Connect — only create-connector stays disabled (canCreateDirectConnector
         // is direct-only: it embeds a Kafka API key/secret in the connector spec).
         ToolName.CREATE_CONNECTOR,
-        // Catalog / search (hasCCloudCatalogSupport — needs the schema_registry block)
-        ToolName.SEARCH_TOPICS_BY_TAG,
-        ToolName.SEARCH_TOPICS_BY_NAME,
-        ToolName.CREATE_TOPIC_TAGS,
-        ToolName.DELETE_TAG,
-        ToolName.REMOVE_TAG_FROM_ENTITY,
-        ToolName.ADD_TAGS_TO_TOPIC,
-        ToolName.LIST_TAGS,
-        // Tableflow (hasTableflow — needs the tableflow service block)
-        ToolName.CREATE_TABLEFLOW_TOPIC,
-        ToolName.LIST_TABLEFLOW_REGIONS,
-        ToolName.LIST_TABLEFLOW_TOPICS,
-        ToolName.READ_TABLEFLOW_TOPIC,
-        ToolName.UPDATE_TABLEFLOW_TOPIC,
-        ToolName.DELETE_TABLEFLOW_TOPIC,
-        ToolName.CREATE_TABLEFLOW_CATALOG_INTEGRATION,
-        ToolName.LIST_TABLEFLOW_CATALOG_INTEGRATIONS,
-        ToolName.READ_TABLEFLOW_CATALOG_INTEGRATION,
-        ToolName.UPDATE_TABLEFLOW_CATALOG_INTEGRATION,
-        ToolName.DELETE_TABLEFLOW_CATALOG_INTEGRATION,
-        // Telemetry (hasTelemetry — needs the telemetry service block)
-        ToolName.QUERY_METRICS,
-        ToolName.LIST_METRICS,
       ];
 
       it("should partition every ToolName into exactly one of EXPECTED_OAUTH_ENABLED or EXPECTED_OAUTH_DISABLED", () => {

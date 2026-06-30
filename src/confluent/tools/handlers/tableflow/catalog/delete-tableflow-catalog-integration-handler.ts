@@ -28,7 +28,7 @@ export class DeleteTableFlowCatalogIntegrationHandler extends TableflowToolHandl
     const { id, environmentId, clusterId } =
       deleteTableflowCatalogIntegrationArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

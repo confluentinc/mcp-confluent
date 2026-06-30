@@ -136,12 +136,20 @@ describe("explain-disabled-tools-handler.ts", () => {
           handler.handle(ccloudOAuthRuntime(), undefined),
         );
 
-        const oauthGroup = groupByReason(
-          sectionFor(report, "default"),
-          ToolDisabledReason.OAuthNoServiceBlocks,
+        const section = sectionFor(report, "default");
+        const directOnlyGroup = groupByReason(
+          section,
+          ToolDisabledReason.OAuthNotDirectCapable,
         );
-        expect(oauthGroup).toBeDefined();
-        expect(oauthGroup!.tools).toContain(ToolName.LIST_FLINK_STATEMENTS);
+        expect(directOnlyGroup).toBeDefined();
+        expect(directOnlyGroup!.tools).toContain(ToolName.CREATE_CONNECTOR);
+
+        // Every block-gated tool family (Kafka, Flink, Schema Registry,
+        // Connect, Catalog, Telemetry, Tableflow) is now OAuth-capable, so no
+        // tool surfaces OAuthNoServiceBlocks under an OAuth connection.
+        expect(
+          groupByReason(section, ToolDisabledReason.OAuthNoServiceBlocks),
+        ).toBeUndefined();
       });
 
       it("should split a tool across the per-connection sections of a flink+kafka pair of connections", () => {

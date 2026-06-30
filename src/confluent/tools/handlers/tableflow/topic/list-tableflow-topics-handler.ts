@@ -41,7 +41,7 @@ export class ListTableFlowTopicsHandler extends TableflowToolHandler {
     const { clusterId, environmentId } =
       listTableFlowTopicArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );

@@ -11,21 +11,6 @@ import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
 const detectIssuesArguments = z.object({
-  organizationId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the organization."),
-  environmentId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The unique identifier for the environment."),
-  computePoolId: z
-    .string()
-    .trim()
-    .optional()
-    .describe("The compute pool ID. Required for metrics analysis."),
   statementName: z
     .string()
     .regex(
@@ -40,8 +25,27 @@ const detectIssuesArguments = z.object({
     .boolean()
     .default(true)
     .describe(
-      "Include performance metrics analysis (backpressure, lag, etc.). Requires CONFLUENT_CLOUD_API_KEY.",
+      "Include performance metrics analysis (backpressure, lag, etc.) from the Telemetry API.",
     ),
+  organizationId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud organization ID. Discover via list-organizations.",
+    ),
+  environmentId: z
+    .string()
+    .trim()
+    .optional()
+    .describe(
+      "Confluent Cloud environment ID (env-...) that owns the Flink compute pool. Discover via list-environments.",
+    ),
+  computePoolId: z
+    .string()
+    .trim()
+    .optional()
+    .describe("Confluent Cloud Flink compute pool ID (lfcp-...)."),
 });
 
 interface DetectedIssue {
@@ -64,23 +68,19 @@ export class DetectIssuesHandler extends FlinkToolHandler {
       includeMetrics,
     } = detectIssuesArguments.parse(toolArguments);
 
-    const { conn, clientManager } = this.resolveDirectConnection(
+    const { conn, clientManager } = this.resolveConnection(
       runtime,
       toolArguments,
     );
-    const flink = this.getFlinkDirectConfig(conn);
-    const { organization_id, environment_id } = this.resolveOrgAndEnvIds(
-      flink,
-      organizationId,
-      environmentId,
-    );
-    const compute_pool_id = this.resolveOptionalComputePoolId(
-      flink,
-      computePoolId,
-    );
+    const { organization_id, environment_id, compute_pool_id } =
+      this.resolveFlinkRouting(conn, {
+        organizationId,
+        environmentId,
+        computePoolId,
+      });
 
     const pathBasedClient = wrapAsPathBasedClient(
-      clientManager.getConfluentCloudFlinkRestClient(),
+      await clientManager.getFlinkRestClient(compute_pool_id, environment_id),
     );
 
     // Get statement status

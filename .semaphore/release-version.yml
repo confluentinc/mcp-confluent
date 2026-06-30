@@ -133,6 +133,19 @@ blocks:
                 VAULT_FIELD=TELEMETRY_WRITE_KEY_DEV
               fi
               . vault-get-secret --vault-role=mcp-confluent --secret-key="$VAULT_FIELD" --export-as=TELEMETRY_WRITE_KEY mcpconfluent/telemetry
+              # One Sentry DSN for all release channels (no separate dev project).
+              . vault-get-secret --vault-role=mcp-confluent --secret-key=SENTRY_DSN --export-as=SENTRY_DSN mcpconfluent/telemetry
+            # Upload source maps (release/path-based, not debug-id: `pnpm pack` rebuilds
+            # dist via prepack, which would wipe injected ids; tsc output is deterministic).
+            - . vault-get-secret --vault-role=mcp-confluent --secret-key=SENTRY_AUTH_TOKEN --export-as=SENTRY_AUTH_TOKEN mcpconfluent/telemetry
+            - export SENTRY_ORG=confluent
+            - export SENTRY_PROJECT=mcp-confluent
+            - |
+              VERSION=$(jq -r '.version' package.json)
+              pnpm exec sentry-cli releases new "$VERSION"
+              pnpm exec sentry-cli sourcemaps upload --release "$VERSION" --url-prefix '~/dist' dist
+              pnpm exec sentry-cli releases finalize "$VERSION"
+            # SENTRY_DSN is exported above so prepack's inject-build-config bakes it in.
             - pnpm pack
             - TGZ_FILE=$(ls *.tgz)
             - artifact push workflow ${TGZ_FILE} --destination release-assets/${TGZ_FILE} --force

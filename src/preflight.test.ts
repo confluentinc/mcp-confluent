@@ -1,9 +1,14 @@
 import { MINIMUM_NODE_MAJOR, nodeVersionError } from "@src/preflight.js";
 import { describe, expect, it } from "vitest";
+import pkg from "../package.json" with { type: "json" };
 
 describe("MINIMUM_NODE_MAJOR", () => {
-  it("should match the engines.node floor declared in package.json", () => {
-    expect(MINIMUM_NODE_MAJOR).toBe(22);
+  it("should equal the major-version floor declared in package.json engines.node", () => {
+    // Read the floor straight from engines.node so a bump there that forgets
+    // to update the constant (or vice-versa) fails this test rather than
+    // letting the two drift silently. ">=22" / ">=22.1.0" → 22.
+    const enginesFloor = Number(pkg.engines.node.match(/\d+/)?.[0]);
+    expect(MINIMUM_NODE_MAJOR).toBe(enginesFloor);
   });
 });
 

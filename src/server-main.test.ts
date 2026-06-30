@@ -67,7 +67,7 @@ function spyOnLoggerWarn(): MockInstance<typeof logger.warn> {
   return vi.spyOn(logger, "warn").mockImplementation((() => {}) as never);
 }
 
-describe("index.ts", () => {
+describe("server-main.ts", () => {
   let consoleLog: MockInstance<typeof console.log>;
 
   beforeEach(() => {

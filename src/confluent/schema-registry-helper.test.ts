@@ -19,6 +19,7 @@ import {
   protobufRegistryFromProto,
   protobufRegistryFromSerialized,
   serializeMessage,
+  type DeserializerCache,
 } from "@src/confluent/schema-registry-helper.js";
 import { getMockedSchemaRegistry } from "@tests/stubs/index.js";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -554,6 +555,122 @@ describe("schema-registry-helper.ts", () => {
           SerdeType.VALUE,
         ),
       ).rejects.toThrow(/Failed to deserialize message/);
+    });
+  });
+
+  describe("deserializeMessage() deserializer cache", () => {
+    const schema = '"string"';
+
+    // Mock the registry so a top-level Avro string round-trips: the latest
+    // schema drives the serialize, and the same schema (resolved by the id in
+    // the payload) drives the decode.
+    function stubAvroStringRoundTrip(
+      registry: ReturnType<typeof getMockedSchemaRegistry>,
+    ): void {
+      registry.getAssociationsByResourceName.mockResolvedValue([]);
+      registry.getLatestSchemaMetadata.mockResolvedValue({
+        id: 1,
+        version: 1,
+        subject: "orders-value",
+        schema,
+        schemaType: "AVRO",
+      });
+      registry.getBySubjectAndId.mockResolvedValue({
+        schema,
+        schemaType: "AVRO",
+      });
+    }
+
+    async function serializeAvroString(
+      registry: ReturnType<typeof getMockedSchemaRegistry>,
+      message: string,
+    ): Promise<Buffer> {
+      return (await serializeMessage(
+        "orders",
+        { message, useSchemaRegistry: true, schemaType: "AVRO" },
+        SerdeType.VALUE,
+        registry,
+      )) as Buffer;
+    }
+
+    it("reuses one deserializer per (schemaType, serdeType) across calls when a cache is supplied", async () => {
+      const registry = getMockedSchemaRegistry();
+      stubAvroStringRoundTrip(registry);
+      const serialized = await serializeAvroString(registry, "hello");
+
+      const cache: DeserializerCache = new Map();
+      const first = await deserializeMessage(
+        "orders",
+        serialized,
+        "AVRO",
+        registry,
+        SerdeType.VALUE,
+        undefined,
+        cache,
+      );
+      expect(first).toBe("hello");
+      expect(cache.size).toBe(1);
+      const cached = cache.get(`AVRO:${SerdeType.VALUE}`);
+      expect(cached).toBeDefined();
+
+      const second = await deserializeMessage(
+        "orders",
+        serialized,
+        "AVRO",
+        registry,
+        SerdeType.VALUE,
+        undefined,
+        cache,
+      );
+      expect(second).toBe("hello");
+      // No second entry and the very same instance — the deserializer (and its
+      // warm parsed-schema cache) was reused rather than reconstructed.
+      expect(cache.size).toBe(1);
+      expect(cache.get(`AVRO:${SerdeType.VALUE}`)).toBe(cached);
+    });
+
+    it("keys the cache by serde side so key and value get distinct deserializers", async () => {
+      const registry = getMockedSchemaRegistry();
+      stubAvroStringRoundTrip(registry);
+      const serialized = await serializeAvroString(registry, "hello");
+
+      const cache: DeserializerCache = new Map();
+      await deserializeMessage(
+        "orders",
+        serialized,
+        "AVRO",
+        registry,
+        SerdeType.VALUE,
+        undefined,
+        cache,
+      );
+      await deserializeMessage(
+        "orders",
+        serialized,
+        "AVRO",
+        registry,
+        SerdeType.KEY,
+        undefined,
+        cache,
+      );
+      expect(cache.size).toBe(2);
+      expect(cache.has(`AVRO:${SerdeType.VALUE}`)).toBe(true);
+      expect(cache.has(`AVRO:${SerdeType.KEY}`)).toBe(true);
+    });
+
+    it("still decodes when no cache is supplied (one-off deserializer, prior behavior)", async () => {
+      const registry = getMockedSchemaRegistry();
+      stubAvroStringRoundTrip(registry);
+      const serialized = await serializeAvroString(registry, "hi");
+
+      const decoded = await deserializeMessage(
+        "orders",
+        serialized,
+        "AVRO",
+        registry,
+        SerdeType.VALUE,
+      );
+      expect(decoded).toBe("hi");
     });
   });
 

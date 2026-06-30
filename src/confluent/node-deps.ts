@@ -4,7 +4,8 @@ import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Analytics } from "@segment/analytics-node";
-import { TELEMETRY_WRITE_KEY } from "@src/build-config.js";
+import * as Sentry from "@sentry/node";
+import { SENTRY_DSN, TELEMETRY_WRITE_KEY } from "@src/build-config.js";
 import * as dotenv from "dotenv";
 import { randomBytes, randomUUID } from "node:crypto";
 import {
@@ -18,7 +19,7 @@ import { createServer as httpCreateServer } from "node:http";
 import { arch, homedir, platform, release } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
-export const buildConfig = { TELEMETRY_WRITE_KEY };
+export const buildConfig = { TELEMETRY_WRITE_KEY, SENTRY_DSN };
 export const dotenvLib = { config: dotenv.config };
 export const fs = {
   existsSync,
@@ -30,6 +31,17 @@ export const fs = {
 export const os = { homedir, platform, release, arch };
 export const path = { join, resolve, dirname, basename };
 export const segment = { Analytics };
+export const sentry: {
+  init: typeof Sentry.init;
+  captureException: typeof Sentry.captureException;
+  close: typeof Sentry.close;
+  rewriteFramesIntegration: typeof Sentry.rewriteFramesIntegration;
+} = {
+  init: Sentry.init,
+  captureException: Sentry.captureException,
+  close: Sentry.close,
+  rewriteFramesIntegration: Sentry.rewriteFramesIntegration,
+};
 export const nodeFetch = { fetch: globalThis.fetch };
 // Wrapped as a single-signature arrow so spies don't have to disambiguate
 // between the sync and callback overloads of the underlying `node:crypto`

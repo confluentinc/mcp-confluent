@@ -12,6 +12,7 @@ import {
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { logger } from "@src/logger.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 import {
   getToolHandlersToRegister,
   handleEarlyExits,
@@ -50,7 +51,7 @@ import {
  */
 function makeCliOptions(overrides: Partial<CLIOptions> = {}): CLIOptions {
   return {
-    transports: [],
+    transports: [TransportType.STDIO],
     listTools: false,
     generateKey: false,
     initConfig: false,

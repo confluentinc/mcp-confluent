@@ -65,7 +65,10 @@ import { MINIMUM_NODE_VERSION, nodeVersionError } from "@src/preflight.js";
 export async function bootstrap({
   currentVersion = process.versions.node,
   exit = (code: number): void => process.exit(code),
-  loadAndRunServer = (): Promise<unknown> => import("@src/server-main.js"),
+  // Relative specifier, not the `@src/*` alias used elsewhere: this is the
+  // published `bin`, and its one runtime handoff shouldn't depend on tsc-alias
+  // having rewritten a *dynamic* `import()` at build time.
+  loadAndRunServer = (): Promise<unknown> => import("./server-main.js"),
 }: {
   currentVersion?: string;
   exit?: (code: number) => void;

@@ -35,10 +35,7 @@ import {
 } from "@confluentinc/schemaregistry";
 import { logger } from "@src/logger.js";
 import protobuf from "protobufjs";
-import descriptor, {
-  IDescriptorProto,
-  IFileDescriptorSet,
-} from "protobufjs/ext/descriptor/index.js";
+import descriptor, { IFileDescriptorSet } from "protobufjs/ext/descriptor.js";
 
 /**
  * Where the Schema Registry schema ID rides on the wire. "payload" embeds it as
@@ -276,17 +273,34 @@ export async function getLatestSchemaOfTypeOrThrow(
 }
 
 /**
+ * Structural subset of both protobufjs's `IDescriptorProto` and
+ * `@bufbuild/protobuf`'s generated `DescriptorProto` — {@link applyJsonNames}
+ * runs against descriptors from either source (a freshly parsed `.proto` via
+ * protobufjs, or one decoded from Schema Registry's stored `FileDescriptorProto`
+ * bytes via `@bufbuild/protobuf`), and only needs `field`/`nestedType`.
+ */
+interface DescriptorWithFields {
+  field?: { name?: string; jsonName?: string }[];
+  nestedType?: DescriptorWithFields[];
+}
+
+/**
  * Sets each field's `jsonName` to the standard lowerCamelCase form of its
  * (possibly snake_case) name, recursing into nested message types.
  *
  * protobufjs's `Field#toDescriptor` never populates `jsonName` (see its
  * "Not supported" doc comment), so a descriptor built from `.proto` text always
- * has it unset. `@bufbuild/protobuf` takes `jsonName` as authoritative — it
- * does not fall back to deriving it from `name` — so without this, `fromJson`
- * only accepts the literal proto field name and rejects the camelCase JSON
- * name a real protoc-generated descriptor would also accept.
+ * has it unset. A descriptor previously stored by this same gap (registered
+ * before this fix, or decoded from Schema Registry on the use-latest produce
+ * path) is missing it too. `@bufbuild/protobuf` takes `jsonName` as
+ * authoritative — it does not fall back to deriving it from `name` — so
+ * without this, `fromJson` only accepts the literal proto field name and
+ * rejects the camelCase JSON name a real protoc-generated descriptor would
+ * also accept.
  */
-function applyJsonNames(messageTypes: IDescriptorProto[] | undefined): void {
+function applyJsonNames(
+  messageTypes: DescriptorWithFields[] | undefined,
+): void {
   for (const messageType of messageTypes ?? []) {
     for (const field of messageType.field ?? []) {
       // protobufjs's reflection Message getter returns "" (the proto3 string
@@ -435,6 +449,10 @@ export function protobufRegistryFromSerialized(
       FileDescriptorProtoSchema,
       Buffer.from(serializedSchema, "base64"),
     );
+    // Schemas registered before jsonName population landed (or by other
+    // producers) may still lack it; normalize the same way as the
+    // from-.proto-text path so use-latest produces accept camelCase keys too.
+    applyJsonNames(fileDescriptorProto.messageType);
     // Single self-contained file: no external dependencies to resolve.
     return createMutableRegistry(
       createFileRegistry(fileDescriptorProto, () => undefined),

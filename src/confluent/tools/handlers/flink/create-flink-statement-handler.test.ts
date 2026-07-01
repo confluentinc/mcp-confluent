@@ -257,6 +257,54 @@ describe("create-flink-statement-handler.ts", () => {
           }),
         );
       });
+
+      it("should not apply the catalog-internal snapshot mode or hidden label to end-user statements", async () => {
+        const clientManager = getMockedClientManager();
+        const flinkRest = clientManager.getConfluentCloudFlinkRestClient();
+        flinkRest.POST.mockResolvedValue({ data: {} });
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { ...REQUIRED_ARGS, ...EXPLICIT_IDS },
+          outcome: { resolves: "{}" },
+          clientManager,
+        });
+
+        expect(flinkRest.POST).toHaveBeenCalledOnce();
+        // Literal body: toEqual semantics forbid an extra top-level `metadata`
+        // key (the hidden label) and an extra `sql.snapshot.mode` in
+        // properties — the two catalog-internal markers must not reach
+        // end-user statements.
+        expect(flinkRest.POST).toHaveBeenCalledWith(
+          "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements",
+          {
+            params: {
+              path: {
+                environment_id: "env-from-args",
+                organization_id: "org-from-args",
+              },
+            },
+            body: {
+              name: "my-statement",
+              organization_id: "org-from-args",
+              environment_id: "env-from-args",
+              spec: {
+                compute_pool_id: "lfcp-from-args",
+                statement: "SELECT 1",
+                properties: {
+                  "sql.current-catalog": "catalog-name-from-config",
+                  "sql.current-database": "db-name-from-config",
+                },
+              },
+            },
+          },
+        );
+      });
     });
   });
 });

@@ -4,6 +4,8 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+## 1.5.0
+
 ### Added
 
 #### New Tools / Tool Features

@@ -18,7 +18,7 @@ queue:
 global_job_config:
   prologue:
     commands:
-      - sem-version node 22
+      - sem-version node 22.22.1
       - checkout
       # Install any recent pnpm after checkout so the repo's `.npmrc` governs the
       # install; pnpm reads package.json's `packageManager` field and self-switches

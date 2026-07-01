@@ -1,13 +1,14 @@
+# pnpm 11 reads project settings (`allowBuilds`, `overrides`) from this file, not
+# the `pnpm` field in package.json. Recent pnpm versions ignore that field (and warn
+# that it "is no longer read"), so keep these settings here. See https://pnpm.io/settings.
+#
+# `allowBuilds` is pnpm 11's explicit trust gate for lifecycle scripts. The older
+# `onlyBuiltDependencies` list is vestigial in pnpm 11 (no code reads it) and has
+# been removed in favour of this map.
 allowBuilds:
   "@confluentinc/kafka-javascript": true
-onlyBuiltDependencies:
-  - "@confluentinc/kafka-javascript"
-  - fsevents
-  - protobufjs
-# pnpm reads project settings like `overrides` and `onlyBuiltDependencies` from
-# this file, not the `pnpm` field in package.json. Recent pnpm versions ignore
-# that field (and warn that it "is no longer read"), so keep these settings here.
-# See https://pnpm.io/settings.
+  fsevents: true
+  protobufjs: true
 overrides:
   form-data@>=4.0.0 <4.0.6: ">=4.0.6"
   hono@<4.12.25: ">=4.12.25"

@@ -1,5 +1,5 @@
 import { bootstrap } from "@src/index.js";
-import { MINIMUM_NODE_MAJOR } from "@src/preflight.js";
+import { MINIMUM_NODE_VERSION } from "@src/preflight.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("bootstrap", () => {
@@ -15,7 +15,7 @@ describe("bootstrap", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await bootstrap({
-      currentVersion: `${MINIMUM_NODE_MAJOR}.3.1`,
+      currentVersion: MINIMUM_NODE_VERSION,
       exit,
       loadAndRunServer,
     });
@@ -37,7 +37,9 @@ describe("bootstrap", () => {
     expect(loadAndRunServer).not.toHaveBeenCalled();
     expect(exit).toHaveBeenCalledExactlyOnceWith(1);
     expect(errorSpy).toHaveBeenCalledOnce();
-    expect(errorSpy.mock.calls[0]?.[0]).toContain("Node.js 22 or newer");
+    expect(errorSpy.mock.calls[0]?.[0]).toContain(
+      `Node.js ${MINIMUM_NODE_VERSION} or newer`,
+    );
     expect(errorSpy.mock.calls[0]?.[0]).toContain("18.20.4");
   });
 });

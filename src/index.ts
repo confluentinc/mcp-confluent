@@ -26,7 +26,7 @@
  * friendly error survives where the server graph cannot.
  *
  * If you're a new dev wondering why this indirection exists at all: it's the
- * difference between a user seeing "mcp-confluent requires Node.js 22 or
+ * difference between a user seeing "mcp-confluent requires Node.js 22.19.0 or
  * newer" and a user seeing a JSON-import-attribute parse error from a file
  * they've never heard of. Don't fold this back into server-main.ts. See issue
  * #455 for the original report.
@@ -39,7 +39,7 @@
  * preflight.ts) out of it.
  */
 
-import { MINIMUM_NODE_MAJOR, nodeVersionError } from "@src/preflight.js";
+import { MINIMUM_NODE_VERSION, nodeVersionError } from "@src/preflight.js";
 
 /**
  * Gate on the Node.js runtime version, then hand off to the real server entry.
@@ -65,7 +65,7 @@ export async function bootstrap({
   exit?: (code: number) => void;
   loadAndRunServer?: () => Promise<unknown>;
 } = {}): Promise<void> {
-  const versionError = nodeVersionError(currentVersion, MINIMUM_NODE_MAJOR);
+  const versionError = nodeVersionError(currentVersion, MINIMUM_NODE_VERSION);
   if (versionError) {
     // Whoops! User is on an old Node. Print the specific version issue message and exit(1).
     console.error(versionError);

@@ -1,12 +1,8 @@
 import { bootstrap } from "@src/index.js";
 import { MINIMUM_NODE_VERSION } from "@src/preflight.js";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 describe("bootstrap", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it("should load the server entry on a supported runtime without exiting", async () => {
     const exit = vi.fn();
     const loadAndRunServer = vi

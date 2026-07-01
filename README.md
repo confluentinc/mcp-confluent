@@ -148,7 +148,7 @@ The matching integration tests are tagged `@cp` and live next to their handlers 
 docker compose -f docker-compose.cp-test.yml up -d
 # Wait ~30s for Kafka + SR to become ready, then:
 CP_KAFKA_USERNAME=mcp CP_KAFKA_PASSWORD=mcp-secret \
-  pnpm run test:integration -- --tags-filter=@cp
+  pnpm run test:integration --tags-filter=@cp
 docker compose -f docker-compose.cp-test.yml down -v
 ```
 

@@ -14,7 +14,7 @@ It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tabl
 
 ## Quick Start
 
-> **Prerequisites:** [Node.js 22+](https://nodejs.org/).
+> **Prerequisites:** [Node.js 22.19.0+](https://nodejs.org/).
 > If you want to interact with [Confluent Cloud](https://confluent.cloud/), you need to create an account first.
 
 1. Generate a quick `config.yaml` file in your project root:
@@ -158,7 +158,7 @@ The tests skip cleanly when those env vars are unset, so `pnpm run test:unit` an
 
 ### Prerequisites
 
-- **Node.js 22 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
+- **Node.js 22.19.0 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
   ```bash
   nvm install 22
   nvm use 22
@@ -475,7 +475,7 @@ See [telemetry.md](telemetry.md) for full details on what is collected.
 
 ## Troubleshooting
 
-**"Node.js version not supported"** -- This project requires Node.js 22 or later.
+**"Node.js version not supported"** -- This project requires Node.js 22.19.0 or later.
 Check your version with `node -v` and upgrade if needed.
 
 **Tools not appearing** -- Each tool requires specific service blocks in your `config.yaml`.

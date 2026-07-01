@@ -249,6 +249,7 @@ async function resolveOrganizationId(
 }
 
 export class GetConnectorLogsHandler extends ConnectToolHandler {
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#658)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,

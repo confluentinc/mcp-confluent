@@ -155,6 +155,7 @@ function assertNoConfigConflicts(
  * @returns Structured CLIOptions object with parsed and validated values.
  * @throws Error if CLI arguments are invalid, if specified files cannot be read, or if file contents are malformed.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#655)
 export function parseCliArgs(argv: string[]): CLIOptions {
   const program = new Command()
     .name("mcp-confluent")
@@ -374,6 +375,7 @@ export function loadDotEnvFile(envFile: string): Record<string, string> {
  *
  * @returns An alphabetically sorted array of enabled ToolNames.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#655)
 export function getFilteredToolNames(
   allowTools: string[],
   blockTools: string[],

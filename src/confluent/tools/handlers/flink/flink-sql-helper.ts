@@ -46,6 +46,7 @@ function generateStatementName(prefix: string = "mcp-query"): string {
  * For bounded queries (like INFORMATION_SCHEMA), waits for statement to complete,
  * then fetches all results.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#663)
 export async function executeFlinkSql(
   clientManager: BaseClientManager,
   sql: string,

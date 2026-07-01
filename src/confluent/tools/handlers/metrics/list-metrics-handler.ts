@@ -141,6 +141,7 @@ const KAFKA_SERVER_METRICS = [
 ];
 
 export class ListMetricsHandler extends BaseToolHandler {
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#665)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,

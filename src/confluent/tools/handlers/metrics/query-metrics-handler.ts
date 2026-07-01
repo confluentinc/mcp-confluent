@@ -282,6 +282,7 @@ export function buildRequestBody(
  * vs. grouped format by inspecting whether the first element has a top-level
  * `timestamp` field (flat) or a nested `points` array (grouped).
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#666)
 function formatMetricsResponse(
   data: Array<Record<string, unknown>>,
   metric: string,

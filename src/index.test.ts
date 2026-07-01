@@ -42,4 +42,28 @@ describe("bootstrap", () => {
     );
     expect(errorSpy.mock.calls[0]?.[0]).toContain("18.20.4");
   });
+
+  it("should print the error and exit(1) when the server entry fails to load, without rejecting", async () => {
+    const exit = vi.fn();
+    const loadError = new Error("boom: server-main import failed");
+    const loadAndRunServer = vi
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValue(loadError);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Must resolve, not reject: the module-level `void bootstrap()` discards the
+    // returned promise, so a rejection here would surface as an unhandled
+    // rejection with nondeterministic exit behavior (PR #675 Copilot finding).
+    await expect(
+      bootstrap({
+        currentVersion: MINIMUM_NODE_VERSION,
+        exit,
+        loadAndRunServer,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(loadAndRunServer).toHaveBeenCalledOnce();
+    expect(exit).toHaveBeenCalledExactlyOnceWith(1);
+    expect(errorSpy).toHaveBeenCalledExactlyOnceWith(loadError);
+  });
 });

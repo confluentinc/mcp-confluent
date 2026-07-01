@@ -55,6 +55,12 @@ import { MINIMUM_NODE_VERSION, nodeVersionError } from "@src/preflight.js";
  * so the dispatch is unit-testable without spawning a subprocess or stubbing
  * `process.exit`. The callback both loads and runs the server because importing
  * `server-main.ts` triggers its top-level `await main()`.
+ *
+ * A failure to load or start the server (a rejected dynamic import, a throw from
+ * `main()`) is caught here and turned into `console.error` + `exit(1)` rather
+ * than allowed to propagate: the module-level trigger discards this promise, so
+ * a rejection would otherwise surface as an unhandled rejection with
+ * nondeterministic exit behavior.
  */
 export async function bootstrap({
   currentVersion = process.versions.node,
@@ -74,16 +80,26 @@ export async function bootstrap({
   }
 
   // All good — load and invoke the real server entry (the module-level await main() over in server-main.ts).
-  await loadAndRunServer();
+  try {
+    await loadAndRunServer();
+  } catch (error) {
+    console.error(error);
+    exit(1);
+  }
 }
 
-// Fire-and-forget with `void`, NOT `await bootstrap()`. Top-level await is
+// Call `bootstrap()` directly, NOT `await bootstrap()`. Top-level await is
 // itself modern syntax that older Node fails to *parse* — using it here would
 // reintroduce the very parse-time crash this shim exists to prevent, defeating
-// the whole point. A `void`-discarded promise keeps the module body
-// syntactically ancient-safe; `bootstrap()` does its own awaiting internally,
-// and once the real server is imported the process stays alive on the
-// transports it starts.
+// the whole point. `bootstrap()` does its own awaiting internally and handles
+// its own failures (see its docstring), then the process stays alive on the
+// transports the server starts. The `.catch` is a final backstop: any
+// unforeseen rejection still exits deterministically rather than becoming an
+// unhandled promise rejection. (`.catch` + arrow parse fine on ancient Node;
+// only top-level await does not.)
 if (process.env.NODE_ENV !== "test") {
-  void bootstrap();
+  bootstrap().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 }

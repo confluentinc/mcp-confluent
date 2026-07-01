@@ -296,6 +296,55 @@ describe("schema-registry-helper.ts", () => {
       });
     });
 
+    it("accepts camelCase payload keys on the use-latest path (proto json_name)", async () => {
+      const registry = newRegistry();
+      const topic = "proto-latest-camelcase";
+      // Seed the subject the same way: the first produce supplies the schema,
+      // registering it as a base64 FileDescriptorProto in Schema Registry.
+      await serializeMessage(
+        topic,
+        {
+          message: { user_id: "USR-000", name: "Seed" },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          schema: PROTO_USER,
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      // Use-latest produce with a camelCase payload key: protobufRegistryFromSerialized
+      // decodes the stored FileDescriptorProto and must populate jsonName itself,
+      // the same way protobufRegistryFromProto does for the from-.proto-text path.
+      const bytes = await serializeMessage(
+        topic,
+        {
+          message: { userId: "USR-010", name: "Carol" },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+
+      const decoded = await deserializeMessage(
+        topic,
+        bytes as Buffer,
+        "PROTOBUF",
+        registry,
+        SerdeType.VALUE,
+      );
+      expect(decoded).toEqual({
+        $typeName: "com.example.User",
+        userId: "USR-010",
+        name: "Carol",
+        email: "",
+        age: 0,
+      });
+    });
+
     it("throws an actionable error when the registered schema is not PROTOBUF (use-latest path)", async () => {
       const registry = newRegistry();
       const topic = "proto-mismatch";

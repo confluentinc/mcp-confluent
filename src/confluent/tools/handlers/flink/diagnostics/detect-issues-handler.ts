@@ -58,6 +58,7 @@ interface DetectedIssue {
 }
 
 export class DetectIssuesHandler extends FlinkToolHandler {
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#660)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,

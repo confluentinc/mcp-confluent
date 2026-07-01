@@ -33,11 +33,61 @@ don't conflict.
 - `pnpm run test:unit` - unit tests only (fast, no build).
 - `pnpm run test:integration` - integration tests only (builds `dist/` then
   runs `--project integration`).
-- `pnpm run test:integration -- --tags-filter=@kafka` - one tool group at a time.
+- `pnpm run test:integration --tags-filter=@kafka` - one tool group at a time.
 
 Set up local creds by copying `.env.integration.example` to `.env.integration`
 and filling in the vars your chosen tests need. `tests/harness/setup.ts` loads
 that file automatically via dotenv.
+
+### Never use `--` to scope a run (it silently runs everything)
+
+Do **not** put a `--` separator between the script and your filter args.
+`pnpm run test:integration -- --tags-filter=@kafka` (or `-- <path>`, or `-- -t "<name>"`) does not do what it looks like.
+
+Two layers conspire (verified against pnpm 10 + vitest 4):
+
+- pnpm preserves the `--`, forwarding `vitest run … -- <your args>` verbatim.
+- vitest 4 treats everything after `--` as non-filter args (they land in `argv['--']`), so the tag filter / file path / `-t` pattern is dropped and the **entire** integration suite runs.
+
+Pass filter args bare — pnpm forwards them to vitest without re-inserting a `--`, and does not intercept `-t` or `--tags-filter` as its own flags:
+
+```bash
+# one tool group (builds dist/ first):
+pnpm run test:integration --tags-filter=@flink
+
+# one file:
+pnpm run test:integration src/confluent/tools/handlers/flink/catalog/list-catalogs-handler.integration.test.ts
+
+# one test by name (and one transport, to skip the stdio/http/sse ×3 fan-out):
+INTEGRATION_TEST_TRANSPORT=stdio pnpm run test:integration \
+  src/confluent/tools/handlers/flink/catalog/describe-table-handler.integration.test.ts \
+  -t "should delete both statements"
+```
+
+`make test-integration TAGS=@kafka` is the equivalent blessed path; it invokes `npx vitest run` directly with the flag as a normal arg, so it never trips this.
+If `dist/` is already current and you want to skip the rebuild, run `pnpm exec vitest run --project integration <path> -t "<name>"` directly (same no-`--` rule).
+
+### Any run that touches OAuth tests needs `--no-file-parallelism`
+
+OAuth integration tests do **not** self-serialize — they fail-fast on contention.
+Every OAuth describe blocks on a single hard-coded callback port via `acquireOAuthPortLock`, and the lock _balks_ (throws, naming the holder PID) the instant it finds the lock held by another live process.
+The integration project runs `pool: "forks"` with vitest's default file parallelism on, so two OAuth test files launched concurrently collide and one dies with `OAuth callback-port lock … is held by a live process`.
+
+So any run that can collect more than one OAuth file must add `--no-file-parallelism`:
+
+```bash
+# the whole OAuth lane, or any broad run that sweeps in OAuth files:
+pnpm exec vitest run --project integration --tags-filter=@oauth --no-file-parallelism
+```
+
+You don't pay this cost when you:
+
+- go through the Makefile — `make test-integration` appends `--no-file-parallelism` for any run that isn't direct-only (the `oauth` lane and the combined `all`/unset default), so only `INTEGRATION_TEST_CONNECTION_TYPE=direct` runs file-parallel;
+- scope to a single file (one fork, no concurrency to contend); or
+- run direct-only (`INTEGRATION_TEST_CONNECTION_TYPE=direct`, which selects `!@oauth`).
+
+The trap is a _broad_ raw `pnpm run test:integration` / `pnpm exec vitest run --project integration` with OAuth creds present: it collects every OAuth file and runs them in parallel.
+A stale lock file after a crash is the one false positive — if no OAuth tests are actually running, the holder PID was reused; delete the named `mcp-oauth-port-*.lock` and retry.
 
 ## Vitest Project Config (`vitest.config.ts`)
 

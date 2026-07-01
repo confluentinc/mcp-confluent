@@ -96,6 +96,49 @@ describe("list-organizations-handler.ts", () => {
           });
         },
       );
+
+      it("should resolve with an isError response carrying the API error body when the REST call returns an error", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
+          error: { status: 403, detail: "Forbidden" },
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CCLOUD_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: {
+            resolves:
+              'Failed to fetch organizations: {"status":403,"detail":"Forbidden"}',
+            isError: true,
+          },
+          clientManager,
+        });
+      });
+
+      it("should resolve with an isError response carrying the thrown error message when the REST call rejects", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudRestClient()
+          .GET.mockRejectedValue(new Error("connection reset by peer"));
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CCLOUD_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: {
+            resolves: "Failed to fetch organizations: connection reset by peer",
+            isError: true,
+          },
+          clientManager,
+        });
+      });
     });
   });
 });

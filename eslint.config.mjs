@@ -1,6 +1,7 @@
 import pluginJs from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
+import sonarjs from "eslint-plugin-sonarjs";
 import unusedImports from "eslint-plugin-unused-imports";
 import globals from "globals";
 import tseslint from "typescript-eslint";
@@ -95,6 +96,21 @@ export default [
             "process.env may only be read in the bootstrap allowlist (src/index.ts, src/server-main.ts, src/cli.ts, src/env.ts, src/logger.ts). Read from MCPServerConfiguration or ConnectionConfig instead.",
         },
       ],
+    },
+  },
+  // Mirror SonarQube's cognitive-complexity quality gate (rule
+  // typescript:S3776, default threshold 15) locally, so `pnpm run lint` and the
+  // pre-push hook flag an over-complex function before it reaches the
+  // SonarCloud gate in CI. Only this one rule is enabled (not sonarjs'
+  // `recommended` set) to avoid a flood of unrelated findings on existing code.
+  // Scoped to non-test src to match `sonar.exclusions` (tests and generated
+  // `.d.ts` are excluded from SonarQube analysis).
+  {
+    files: ["src/**/*.ts"],
+    ignores: ["**/*.test.ts", "**/*.d.ts"],
+    plugins: { sonarjs },
+    rules: {
+      "sonarjs/cognitive-complexity": ["error", 15],
     },
   },
 ];

@@ -60,6 +60,7 @@ export type Environment = z.infer<typeof environmentSchema>;
 export type EnvironmentList = z.infer<typeof environmentListSchema>;
 
 export class ListEnvironmentsHandler extends BaseToolHandler {
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#659)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,

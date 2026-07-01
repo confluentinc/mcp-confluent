@@ -4,6 +4,10 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **Graceful failure on an unsupported Node.js version.** Running the server on a Node.js older than our minimum now prints a clear `mcp-confluent requires Node.js 22.19.0 or newer` message and exits cleanly, instead of dying with an uncontrolled, cryptic crash — previously a raw parser error on modern syntax (issue #455), or a `markAsUncloneable is not a function` failure deep inside our `undici` dependency.
+
 ## 1.5.0
 
 ### Added

@@ -360,5 +360,54 @@ describe("direct-client-manager.ts", () => {
         CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
       );
     });
+
+    it("should return a DirectClientManager instance", () => {
+      const conn: DirectConnectionConfig = {
+        type: "direct",
+        kafka: { bootstrap_servers: "broker:9092" },
+      };
+
+      const cm = constructDirectClientManager(conn);
+
+      expect(cm).toBeInstanceOf(DirectClientManager);
+    });
+
+    it("should omit all kafka properties when there is no kafka block", () => {
+      const conn: DirectConnectionConfig = {
+        type: "direct",
+        confluent_cloud: {
+          endpoint: "https://api.confluent.cloud",
+          auth: { type: "api_key", key: "k", secret: "s" },
+        },
+      };
+
+      const cm = constructDirectClientManager(conn);
+
+      expect(cm["kafkaConfig"]).toEqual({ "client.id": "mcp-confluent" });
+    });
+
+    it("should set confluentCloudTelemetryBaseUrl from the telemetry block", () => {
+      const conn: DirectConnectionConfig = {
+        type: "direct",
+        telemetry: {
+          endpoint: "https://my.telemetry.api",
+          auth: { type: "api_key", key: "k", secret: "s" },
+        },
+      };
+
+      const cm = constructDirectClientManager(conn);
+
+      expect(cm["confluentCloudTelemetryBaseUrl"]).toBe(
+        "https://my.telemetry.api",
+      );
+    });
+
+    it("should leave confluentCloudTelemetryBaseUrl undefined when there is no telemetry block", () => {
+      const conn: DirectConnectionConfig = { type: "direct" };
+
+      const cm = constructDirectClientManager(conn);
+
+      expect(cm["confluentCloudTelemetryBaseUrl"]).toBeUndefined();
+    });
   });
 });

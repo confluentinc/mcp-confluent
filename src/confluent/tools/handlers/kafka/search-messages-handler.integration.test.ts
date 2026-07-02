@@ -29,7 +29,10 @@ import {
   type StartedServer,
 } from "@tests/harness/start-server.js";
 import { textContent } from "@tests/harness/tool-results.js";
-import { activeTransports } from "@tests/harness/transports.js";
+import {
+  activeOAuthTransports,
+  activeTransports,
+} from "@tests/harness/transports.js";
 import { uniqueName } from "@tests/harness/unique-name.js";
 import { Tag } from "@tests/tags.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -352,42 +355,45 @@ describe(
           });
         });
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
-          let server: StartedServer;
+        describe.each(activeOAuthTransports)(
+          "via %s transport",
+          (transport) => {
+            let server: StartedServer;
 
-          beforeAll(async () => {
-            server = await startOAuthServer({ transport });
-          }, 180_000);
+            beforeAll(async () => {
+              server = await startOAuthServer({ transport });
+            }, 180_000);
 
-          afterAll(async () => {
-            await stopOAuthServer(server);
-          });
-
-          // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
-          it("should return only the value-matching messages and a Found/scanned summary", async () => {
-            const result = await callToolWithOAuthFlow(server, credentials, {
-              name: ToolName.SEARCH_MESSAGES,
-              arguments: {
-                topicNames: [topic],
-                query: "needle",
-                maxScanned: seededValues.length,
-                timeoutMs: 15_000,
-                valueFormat: { disableSchemaRegistry: true },
-                keyFormat: { disableSchemaRegistry: true },
-                cluster_id: clusterId,
-                environment_id: environmentId,
-              },
+            afterAll(async () => {
+              await stopOAuthServer(server);
             });
 
-            const text = textContent(result);
-            expect(text).toContain(
-              `Found 2 matches in 3 scanned messages from topics ${topic}.`,
-            );
-            expect(text).toContain('"value": "alpha needle"');
-            expect(text).toContain('"value": "gamma needle"');
-            expect(text).not.toContain('"value": "beta plain"');
-          });
-        });
+            // first auth-required call starts the CCloud OAuth flow; cached tokens reuse for later tests
+            it("should return only the value-matching messages and a Found/scanned summary", async () => {
+              const result = await callToolWithOAuthFlow(server, credentials, {
+                name: ToolName.SEARCH_MESSAGES,
+                arguments: {
+                  topicNames: [topic],
+                  query: "needle",
+                  maxScanned: seededValues.length,
+                  timeoutMs: 15_000,
+                  valueFormat: { disableSchemaRegistry: true },
+                  keyFormat: { disableSchemaRegistry: true },
+                  cluster_id: clusterId,
+                  environment_id: environmentId,
+                },
+              });
+
+              const text = textContent(result);
+              expect(text).toContain(
+                `Found 2 matches in 3 scanned messages from topics ${topic}.`,
+              );
+              expect(text).toContain('"value": "alpha needle"');
+              expect(text).toContain('"value": "gamma needle"');
+              expect(text).not.toContain('"value": "beta plain"');
+            });
+          },
+        );
       },
     );
   },

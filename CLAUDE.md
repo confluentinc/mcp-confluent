@@ -77,6 +77,15 @@ Detailed conventions (handler structure, input schema rules, registration checkl
 3. Implement `getToolConfig()` (name, description, Zod input schema, `annotations`) and `handle()`.
 4. Register the handler in the `ToolHandlerRegistry.handlers` map in `src/confluent/tools/tool-registry.ts`.
 5. If the tool calls a new Confluent Cloud REST endpoint, add it to `openapi.json` and regenerate types with `pnpm run generate:openapi-types`. Commit the updated `src/confluent/openapi-schema.d.ts` alongside the `openapi.json` change.
+6. Add a `CHANGELOG.md` entry under `## Unreleased → #### New Tools / Tool Features` — see [Changelog](#changelog) below.
+
+## Changelog
+
+**Every user-facing change MUST be documented as an entry in `CHANGELOG.md` under the `## Unreleased` section — always, in the same PR that makes the change.** This is not optional and not a release-time afterthought; the release notes are assembled from that section, so an undocumented user-facing change silently disappears from the release.
+
+User-facing means anything an operator or AI-assistant caller can observe: a new or removed tool, a changed tool name/argument/description/response shape, new or changed configuration (env vars, YAML keys, CLI flags), changed defaults, new auth modes, behavioral changes, and user-visible bug fixes. Use the existing subsection headers under `## Unreleased` (`#### New Tools / Tool Features`, `### Changed`, `### Fixed`, `### Removed`, `#### Added`, etc.), matching the phrasing and one-bullet-per-change style already there.
+
+Purely internal changes with no observable effect (refactors, test-only changes, internal-helper renames) don't need an entry — but when in doubt, add one. `CHANGELOG.md` is tooling-generated in part; do not hand-reflow unrelated entries (see `.claude/rules/markdown.md`).
 
 ## Code Conventions
 

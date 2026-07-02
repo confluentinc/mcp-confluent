@@ -231,7 +231,7 @@ async function deleteCompletedStatement(
  * For bounded queries (like INFORMATION_SCHEMA), waits for statement to complete,
  * then fetches all results and deletes the spent statement.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#663)
+
 export async function executeFlinkSql(
   clientManager: BaseClientManager,
   sql: string,

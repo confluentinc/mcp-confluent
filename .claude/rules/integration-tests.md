@@ -33,11 +33,61 @@ don't conflict.
 - `pnpm run test:unit` - unit tests only (fast, no build).
 - `pnpm run test:integration` - integration tests only (builds `dist/` then
   runs `--project integration`).
-- `pnpm run test:integration -- --tags-filter=@kafka` - one tool group at a time.
+- `pnpm run test:integration --tags-filter=@kafka` - one tool group at a time.
 
 Set up local creds by copying `.env.integration.example` to `.env.integration`
 and filling in the vars your chosen tests need. `tests/harness/setup.ts` loads
 that file automatically via dotenv.
+
+### Never use `--` to scope a run (it silently runs everything)
+
+Do **not** put a `--` separator between the script and your filter args.
+`pnpm run test:integration -- --tags-filter=@kafka` (or `-- <path>`, or `-- -t "<name>"`) does not do what it looks like.
+
+Two layers conspire (verified against pnpm 10 + vitest 4):
+
+- pnpm preserves the `--`, forwarding `vitest run … -- <your args>` verbatim.
+- vitest 4 treats everything after `--` as non-filter args (they land in `argv['--']`), so the tag filter / file path / `-t` pattern is dropped and the **entire** integration suite runs.
+
+Pass filter args bare — pnpm forwards them to vitest without re-inserting a `--`, and does not intercept `-t` or `--tags-filter` as its own flags:
+
+```bash
+# one tool group (builds dist/ first):
+pnpm run test:integration --tags-filter=@flink
+
+# one file:
+pnpm run test:integration src/confluent/tools/handlers/flink/catalog/list-catalogs-handler.integration.test.ts
+
+# one test by name (and one transport, to skip the stdio/http/sse ×3 fan-out):
+INTEGRATION_TEST_TRANSPORT=stdio pnpm run test:integration \
+  src/confluent/tools/handlers/flink/catalog/describe-table-handler.integration.test.ts \
+  -t "should delete both statements"
+```
+
+`make test-integration TAGS=@kafka` is the equivalent blessed path; it invokes `npx vitest run` directly with the flag as a normal arg, so it never trips this.
+If `dist/` is already current and you want to skip the rebuild, run `pnpm exec vitest run --project integration <path> -t "<name>"` directly (same no-`--` rule).
+
+### Any run that touches OAuth tests needs `--no-file-parallelism`
+
+OAuth integration tests do **not** self-serialize — they fail-fast on contention.
+Every OAuth describe blocks on a single hard-coded callback port via `acquireOAuthPortLock`, and the lock _balks_ (throws, naming the holder PID) the instant it finds the lock held by another live process.
+The integration project runs `pool: "forks"` with vitest's default file parallelism on, so two OAuth test files launched concurrently collide and one dies with `OAuth callback-port lock … is held by a live process`.
+
+So any run that can collect more than one OAuth file must add `--no-file-parallelism`:
+
+```bash
+# the whole OAuth lane, or any broad run that sweeps in OAuth files:
+pnpm exec vitest run --project integration --tags-filter=@oauth --no-file-parallelism
+```
+
+You don't pay this cost when you:
+
+- go through the Makefile — `make test-integration` appends `--no-file-parallelism` for any run that isn't direct-only (the `oauth` lane and the combined `all`/unset default), so only `INTEGRATION_TEST_CONNECTION_TYPE=direct` runs file-parallel;
+- scope to a single file (one fork, no concurrency to contend); or
+- run direct-only (`INTEGRATION_TEST_CONNECTION_TYPE=direct`, which selects `!@oauth`).
+
+The trap is a _broad_ raw `pnpm run test:integration` / `pnpm exec vitest run --project integration` with OAuth creds present: it collects every OAuth file and runs them in parallel.
+A stale lock file after a crash is the one false positive — if no OAuth tests are actually running, the holder PID was reused; delete the named `mcp-oauth-port-*.lock` and retry.
 
 ## Vitest Project Config (`vitest.config.ts`)
 
@@ -90,10 +140,9 @@ server = await startServer({
 
 Three non-obvious things the harness does for you:
 
-1. Forces `NODE_ENV=integration` in the child env. `src/index.ts` guards
-   `main()` with `if (process.env.NODE_ENV !== "test")` so the module can be
-   imported by unit tests; without the override, vitest's default
-   `NODE_ENV=test` would cause the child to exit without starting the server.
+1. Forces `NODE_ENV=integration` in the child env.
+   The child enters through the preflight shim `src/index.ts`, which only calls `bootstrap()` (and thus imports the server) when `NODE_ENV !== "test"`, and `src/server-main.ts` in turn only runs `main()` under the same guard.
+   Both guards exist so the modules can be imported by unit tests; without the override, vitest's default `NODE_ENV=test` would make the child exit without starting the server.
 2. For HTTP and SSE, writes `server.auth.disabled = true` into the
    per-spawn YAML config (via `spawnConfigPath` in
    `tests/harness/runtime.ts`). Tests run on 127.0.0.1 with DNS rebinding
@@ -462,6 +511,10 @@ And that work is serialized: every OAuth describe blocks on a single hard-coded 
 The OAuth-flow smoke test (`ccloud-oauth.integration.test.ts`) is stdio-only for the same reason.
 CI additionally runs the OAuth lane sequentially; see the CI Matrix section.
 
+Two guardrails make this self-enforcing rather than convention-only.
+`startOAuthServer` asserts stdio and throws a pointed error on any other transport, so a describe that wrongly iterates `activeTransports` fails instantly ("OAuth tests are stdio-only — iterate activeOAuthTransports…") instead of colliding on the callback port downstream.
+And `acquireOAuthPortLock` balks the instant it finds the lock held by a live foreign process — an accidental parallel OAuth run (any job running ≥2 OAuth describes without `--no-file-parallelism`) becomes an immediate, holder-PID-named failure rather than a slow queue that overruns the hook timeout.
+
 Tags are **additive down the describe tree**: the outer describe carries the group tag (`Tag.<GROUP>`), the inner `oauth` describe adds `Tag.OAUTH`, the inner `direct` describe adds nothing.
 A test inside `direct` therefore runs under `[Tag.<GROUP>]`; a test inside `oauth` runs under `[Tag.<GROUP>, Tag.OAUTH]`.
 This matches the project's asymmetric `Tag.OAUTH` rule (direct is the unmarked baseline; OAuth is the marked deviation) without per-describe tag duplication.
@@ -529,9 +582,9 @@ The CI surface has two shapes; they share the harness and the Makefile but diffe
 One block per tool group (12 of them) plus a smoke block, each gated by `run.when: change_in('/src/confluent/tools/handlers/<dir>/', { default_branch: 'main' })`.
 Only the blocks whose handler dirs the PR touched actually run; everything else stays gray.
 Within a block, a single job exercises both connection types sequentially via the harness's `activeConnectionTypes` default; transport (stdio/http/sse) and connection type (direct/oauth) are deliberately NOT Semaphore axes, since splitting them would multiply agent count without unique coverage.
-The **kafka block is the exception**: it splits into two jobs, `@kafka direct` (forwards `INTEGRATION_TEST_CONNECTION_TYPE=direct`, runs parallel) and `@kafka oauth` (forwards `=oauth`, runs sequentially via the Makefile's `--no-file-parallelism`).
-Kafka has 11 OAuth describes — enough that running them across parallel forks piled them into the callback-port lock queue and overran the 180s `beforeAll` hook timeout; isolating the OAuth lane onto its own sequential agent removes the contention while the direct lane keeps its parallelism.
-Other tool groups have few enough OAuth describes that the single-job default doesn't pile up, so they stay unsplit.
+**The exception is any block with ≥2 OAuth describes** (`kafka`, `schema`, `environments`): each splits into two jobs — e.g. `@kafka direct` (forwards `INTEGRATION_TEST_CONNECTION_TYPE=direct`, runs parallel) and `@kafka oauth` (forwards `=oauth`, runs sequentially via the Makefile's `--no-file-parallelism`).
+Two or more OAuth describes in one combined job would run concurrently across parallel forks and trip the callback-port lock's concurrency balk (`acquireOAuthPortLock`); isolating the OAuth lane onto its own sequential agent removes the contention while the direct lane keeps its parallelism.
+Single-OAuth-describe groups (billing, clusters, organizations) and the smoke block (one OAuth file) never self-contend, so they stay unsplit.
 The smoke block fires on any change under `src/` (excluding `*.test.ts`) so transport-layer regressions (auth middleware, multi-client wiring, OAuth flow) trigger regardless of which handler dir the PR touched.
 
 ### Scheduled / manual full (`.semaphore/integration.yml`)
@@ -540,6 +593,7 @@ One block per service config (6 of them: kafka, schema-registry, confluent-cloud
 Each service-config block declares a hard-coded `TOOL_GROUP` matrix of the tool groups whose handlers consume that service config; a tool group with handlers across multiple service configs appears in each matching block (e.g. `@catalog` runs under both `@requires-kafka-config` and `@requires-confluent-cloud-config`).
 The smoke block has no matrix axis and no service-config filter; it just runs `make test-integration TAGS=@smoke`.
 The scheduled task in `service.yml` and the manual `Integration Tests: full (manual)` promotion in `semaphore.yml` both pass two parameters to this pipeline: `SERVICE_CONFIGS` (pipe-separated, controls which blocks run via each block's `skip.when` clause; accepts the six service-config tags plus `@smoke` as a sentinel for the cross-cutting block) and `CONNECTION_TYPE` (one of `all` / `direct` / `oauth`, forwarded as `INTEGRATION_TEST_CONNECTION_TYPE` to both the harness's `activeConnectionTypes` filter and the Makefile's tag-filter composer).
+These cells run combined (`CONNECTION_TYPE=all`) rather than split like the per-PR kafka/schema/environments blocks, so they would collect ≥2 OAuth describes in one job — but the Makefile appends `--no-file-parallelism` to any non-`direct` run (see its `test-integration` target), so a combined cell runs file-sequential and never trips the OAuth callback-port balk. That's why the scheduled pipeline needs no per-cell direct/oauth split.
 
 ### Tuning CI speed without code changes
 

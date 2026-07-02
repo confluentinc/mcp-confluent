@@ -22,6 +22,7 @@ export enum ToolName {
   CHECK_FLINK_STATEMENT_HEALTH = "check-flink-statement-health",
   DETECT_FLINK_STATEMENT_ISSUES = "detect-flink-statement-issues",
   GET_FLINK_STATEMENT_PROFILE = "get-flink-statement-profile",
+  LIST_COMPUTE_POOLS = "list-compute-pools",
   LIST_CONNECTORS = "list-connectors",
   CREATE_CONNECTOR = "create-connector",
   DELETE_CONNECTOR = "delete-connector",

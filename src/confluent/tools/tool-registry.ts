@@ -40,6 +40,7 @@ import { DetectIssuesHandler } from "@src/confluent/tools/handlers/flink/diagnos
 import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
 import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
 import { GetFlinkStatementResultsHandler } from "@src/confluent/tools/handlers/flink/get-flink-statement-results-handler.js";
+import { ListComputePoolsHandler } from "@src/confluent/tools/handlers/flink/list-compute-pools-handler.js";
 import { ListFlinkStatementsHandler } from "@src/confluent/tools/handlers/flink/list-flink-statements-handler.js";
 import { AlterTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/alter-topic-config.js";
 import { ConsumeKafkaMessagesHandler } from "@src/confluent/tools/handlers/kafka/consume-kafka-messages-handler.js";
@@ -131,6 +132,7 @@ export class ToolHandlerRegistry {
     [ToolName.DELETE_CONNECTOR, new DeleteConnectorHandler()],
     [ToolName.SEARCH_TOPICS_BY_NAME, new SearchTopicsByNameHandler()],
     [ToolName.LIST_CLUSTERS, new ListClustersHandler()],
+    [ToolName.LIST_COMPUTE_POOLS, new ListComputePoolsHandler()],
     [ToolName.LIST_ENVIRONMENTS, new ListEnvironmentsHandler()],
     [ToolName.READ_ENVIRONMENT, new ReadEnvironmentHandler()],
     [ToolName.LIST_SCHEMAS, new ListSchemasHandler()],

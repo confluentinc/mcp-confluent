@@ -103,6 +103,7 @@ function buildAuthorizationUrl(
  * code arrives, throws `PkceLoginError("user_aborted", ...)` and the finally
  * block tears down the timer + HTTP server.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#656)
 export async function runPkceLogin(
   auth0Config: Auth0Config,
   signal?: AbortSignal,

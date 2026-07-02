@@ -51,7 +51,9 @@ const queryProfilerArguments = z.object({
     .string()
     .trim()
     .optional()
-    .describe("Confluent Cloud Flink compute pool ID (lfcp-...)."),
+    .describe(
+      "Confluent Cloud Flink compute pool ID (lfcp-...). Discover via list-compute-pools.",
+    ),
 });
 
 interface TaskGraphOperator {
@@ -110,6 +112,7 @@ interface DetectedIssue {
 const LONG_MIN_VALUE = -9223372036854776000;
 
 export class QueryProfilerHandler extends FlinkToolHandler {
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#662)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,

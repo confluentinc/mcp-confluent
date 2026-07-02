@@ -18,7 +18,7 @@ queue:
 global_job_config:
   prologue:
     commands:
-      - sem-version node 22
+      - sem-version node 22.22.1
       - checkout
       # Install any recent pnpm after checkout so the repo's `.npmrc` governs the
       # install; pnpm reads package.json's `packageManager` field and self-switches
@@ -149,6 +149,11 @@ blocks:
             - pnpm run test:harness
             - make test-integration TAGS=@docs
 
+  # Split direct/oauth like kafka: environments has 2 OAuth describes, which
+  # would run concurrently in a single combined job and trip the OAuth
+  # callback-port lock's concurrency balk (acquireOAuthPortLock). The oauth job
+  # runs sequentially via the Makefile's --no-file-parallelism; direct stays
+  # parallel.
   - name: "Integration Tests: environments"
     dependencies: ["Build & Test"]
     run:
@@ -157,10 +162,14 @@ blocks:
       prologue: *integration-prologue
       epilogue: *integration-epilogue
       jobs:
-        - name: "@environments"
+        - name: "@environments direct"
           commands:
             - pnpm run test:harness
-            - make test-integration TAGS=@environments
+            - INTEGRATION_TEST_CONNECTION_TYPE=direct make test-integration TAGS=@environments
+        - name: "@environments oauth"
+          commands:
+            - pnpm run test:harness
+            - INTEGRATION_TEST_CONNECTION_TYPE=oauth make test-integration TAGS=@environments
 
   - name: "Integration Tests: flink"
     dependencies: ["Build & Test"]
@@ -227,6 +236,10 @@ blocks:
             - pnpm run test:harness
             - make test-integration TAGS=@organizations
 
+  # Split direct/oauth like kafka: schema has 3 OAuth describes, which would run
+  # concurrently in a single combined job and trip the OAuth callback-port lock's
+  # concurrency balk (acquireOAuthPortLock). The oauth job runs sequentially via
+  # the Makefile's --no-file-parallelism; direct stays parallel.
   - name: "Integration Tests: schema"
     dependencies: ["Build & Test"]
     run:
@@ -235,10 +248,14 @@ blocks:
       prologue: *integration-prologue
       epilogue: *integration-epilogue
       jobs:
-        - name: "@schema"
+        - name: "@schema direct"
           commands:
             - pnpm run test:harness
-            - make test-integration TAGS=@schema
+            - INTEGRATION_TEST_CONNECTION_TYPE=direct make test-integration TAGS=@schema
+        - name: "@schema oauth"
+          commands:
+            - pnpm run test:harness
+            - INTEGRATION_TEST_CONNECTION_TYPE=oauth make test-integration TAGS=@schema
 
   - name: "Integration Tests: tableflow"
     dependencies: ["Build & Test"]

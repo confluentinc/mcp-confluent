@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MCP (Model Context Protocol) server that exposes Confluent Cloud resources (Kafka, Flink, Schema Registry, Connectors, Tableflow, Billing) as tools for AI assistants. Built with TypeScript, Node.js ≥22, and the `@modelcontextprotocol/sdk`.
+MCP (Model Context Protocol) server that exposes Confluent Cloud resources (Kafka, Flink, Schema Registry, Connectors, Tableflow, Billing) as tools for AI assistants. Built with TypeScript, Node.js ≥22.19.0, and the `@modelcontextprotocol/sdk`.
 
 ## Build & Development Commands
 
@@ -35,7 +35,7 @@ Pre-commit hook runs `pnpm exec prettier` and `pnpm exec eslint` automatically v
 
 ### Entry Point & Startup Flow
 
-`src/index.ts` → `parseCliArgs()` → `initEnv()` → branch on `cliOptions.config`: when `-c <path>` is supplied, `loadConfigFromYaml(path, process.env)` parses + interpolates + validates the YAML; otherwise `buildConfigFromEnvAndCli(env, ...)` synthesizes the same `MCPServerConfiguration` shape from env vars + CLI args. Both branches converge into `ServerRuntime.fromConfig()`, which constructs a `DirectClientManager` per connection → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
+`src/index.ts` is a thin preflight shim: it gates on the Node.js runtime version (via `src/preflight.ts`) and, only once that passes, dynamically imports `src/server-main.ts` — so an unsupported old Node fails with a clear version message instead of a cryptic parse error on our modern imports (issue #455). `src/server-main.ts` is the real entry: `parseCliArgs()` → `initEnv()` → branch on `cliOptions.config`: when `-c <path>` is supplied, `loadConfigFromYaml(path, process.env)` parses + interpolates + validates the YAML; otherwise `buildConfigFromEnvAndCli(env, ...)` synthesizes the same `MCPServerConfiguration` shape from env vars + CLI args. Both branches converge into `ServerRuntime.fromConfig()`, which constructs a `DirectClientManager` per connection → iterates `ToolName` enum to build enabled tool set → registers tools on `McpServer` → starts transports.
 
 YAML is the preferred path; the env-var path is the legacy synthesizer. It still has parity for a single connection, but it's slated for a startup warning in a near-future release and removal a release or two later (issue #151 and follow-ups). Don't write new code that reaches into the legacy synthesizer. The user-facing version of this story lives in `CONFIGURATION.md`.
 
@@ -93,9 +93,10 @@ Purely internal changes with no observable effect (refactors, test-only changes,
 - Prettier + ESLint enforced; pre-commit hook runs both automatically via Husky. `eslint --fix` auto-removes unused imports via `eslint-plugin-unused-imports`, so stale imports left during a migration are cleaned up at commit time without manual intervention. Pre-push hook runs full-repo `lint` + `typecheck` so CI failures on those checks are nearly impossible.
 - `noImplicitAny` is disabled in tsconfig due to OpenAPI type resolution issues.
 - REST API calls use `openapi-fetch` with typed paths from the generated schema — prefer this over raw fetch.
-- Application code reads configuration from `MCPServerConfiguration` / `ConnectionConfig`, never from `process.env`. A `no-restricted-syntax` rule in `eslint.config.mjs` enforces this; the only bootstrap files exempt are `src/index.ts`, `src/cli.ts`, `src/env.ts`, `src/logger.ts`. The `-e` dotenv mutation in `cli.ts` is intentional — it seeds env vars for linked C/Node libraries (OpenSSL, cyrus-sasl, krb5, undici) that read `process.env` outside our control.
+- Application code reads configuration from `MCPServerConfiguration` / `ConnectionConfig`, never from `process.env`. A `no-restricted-syntax` rule in `eslint.config.mjs` enforces this; the only bootstrap files exempt are `src/index.ts`, `src/server-main.ts`, `src/cli.ts`, `src/env.ts`, `src/logger.ts`. The `-e` dotenv mutation in `cli.ts` is intentional — it seeds env vars for linked C/Node libraries (OpenSSL, cyrus-sasl, krb5, undici) that read `process.env` outside our control.
 - When adding or renaming a field on a connection arm or service block in `src/config/models.ts`, classify it in the matching `*_FIELD_VISIBILITY` map in `src/confluent/tools/handlers/diagnostics/describe-fields.ts` — `tsc` and `describe-fields.test.ts` fail until you do. This is what keeps the `describe-configured-connection` card from leaking secrets or silently dropping a new knob. See `.claude/rules/config-fields.md`.
 - Always pass an explicit comparator to `.sort()` / `.toSorted()` — never a bare call. Bare `Array.prototype.sort()` coerces elements to strings (so `[2, 10]` sorts to `[10, 2]`), and SonarQube (which gates CI) flags every comparator-less call as `typescript:S2871`. For strings use `(a, b) => a.localeCompare(b)`; for numbers `(a, b) => a - b`. This holds even when the elements are already strings and the default order happens to be correct — the comparator states the intent and survives a later element-type change.
+- Keep cognitive complexity ≤ 15. A `sonarjs/cognitive-complexity` ESLint rule in `eslint.config.mjs` (scoped to non-test `src`) mirrors SonarQube's `typescript:S3776` gate locally, so `pnpm run lint` and the pre-push hook catch an over-complex function before CI. Prefer refactoring into focused helpers (an orchestrator that reads like a table of contents) over suppressing. A genuinely unavoidable case gets an inline `// eslint-disable-next-line sonarjs/cognitive-complexity -- <reason> (#NNN)` citing a tracking issue; the grandfathered debt baselined at rule introduction is tracked under epic #654.
 
 ## Unit Test Conventions
 
@@ -121,6 +122,7 @@ below affect source-code edits too, so they're called out here:
 Integration tests spawn the real MCP server as a child process and exercise it against a real Confluent Cloud account over both stdio and streamable HTTP transports. Full rule at `.claude/rules/integration-tests.md` (auto-loads when editing `*.integration.test.ts` or `tests/harness/**`).
 
 - Colocate next to the handler: `my-handler.integration.test.ts` alongside `my-handler.ts`; tag with `{ tags: ["@<group>"] }` on the outer describe.
-- Run with `pnpm run test:integration -- --tags-filter=@kafka`. Local creds live in `.env.integration` (gitignored; example in `.env.integration.example`).
+- Run with `pnpm run test:integration --tags-filter=@kafka` (one tool group). Do **not** insert a `--` separator before filter args — pnpm 10 preserves it and vitest 4 then drops the filter and runs the whole suite; pass `--tags-filter` / a file path / `-t "<name>"` bare. Local creds live in `.env.integration` (gitignored; example in `.env.integration.example`).
 - Use the `startServer({ transport, env? })` harness from `@tests/harness/start-server.js`; it handles the `NODE_ENV=test` guard, HTTP auth disable, and free-port allocation.
 - Gate on creds with an early-return inside the describe body (`if (!hasCreds) { it.skip(reason); return; }`), **not** `describe.skipIf` — the latter still runs nested hooks in vitest 4.
+- Any run that can collect more than one OAuth test file needs `--no-file-parallelism`: OAuth describes block on a single hard-coded callback port and _fail-fast_ (lock balks, naming the holder PID) on concurrency rather than queuing. `make test-integration` adds the flag for non-direct runs; a broad raw `pnpm run test:integration` with OAuth creds present does not, so it collides. Scoping to one file or running direct-only also avoids it.

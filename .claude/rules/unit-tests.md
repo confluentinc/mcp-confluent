@@ -10,6 +10,7 @@ paths:
 
 - Co-located `.test.ts` files alongside source code using Vitest
 - Run with `pnpm run test:unit` (single run) or `pnpm run test:unit:watch` (watch mode). `pnpm run test` runs both unit and integration; reach for it only when you want the full sweep.
+- To scope a run to one file or one test, pass the path and/or `-t "<name>"` **bare** — never with a `--` separator (`pnpm run test:unit src/foo/bar.test.ts -t "should ..."`). With `--`, pnpm 10 forwards it to vitest, and vitest 4 then drops the file/`-t` filters and silently runs the whole suite. Same trap, fuller explanation, in [integration-tests.md](./integration-tests.md) under "Never use `--` to scope a run".
 - Config in `vitest.config.ts`; `@src/*` aliases resolved via `resolve.tsconfigPaths`
 - `restoreMocks: true` is set project-wide, so every `vi.spyOn` call is automatically restored
   after each test - no per-test restore hooks needed

@@ -1,7 +1,7 @@
 {
   "name": "@confluentinc/mcp-confluent",
   "description": "Confluent MCP Server",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "author": "Confluent Inc.",
   "license": "MIT",
   "repository": {
@@ -64,6 +64,7 @@
     "eslint": "^9.29.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.5.1",
+    "eslint-plugin-sonarjs": "^4.1.0",
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^16.2.0",
     "husky": "^9.1.7",
@@ -107,6 +108,6 @@
   ],
   "packageManager": "pnpm@10.33.4",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.19.0"
   }
 }

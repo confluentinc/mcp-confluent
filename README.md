@@ -14,7 +14,7 @@ It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tabl
 
 ## Quick Start
 
-> **Prerequisites:** [Node.js 22+](https://nodejs.org/).
+> **Prerequisites:** [Node.js 22.19.0+](https://nodejs.org/).
 > If you want to interact with [Confluent Cloud](https://confluent.cloud/), you need to create an account first.
 
 1. Generate a quick `config.yaml` file in your project root:
@@ -76,7 +76,7 @@ Categories marked with ¹ also work with [OAuth authentication](#oauth-authentic
 | Category                                     | Tools                                                                                                                                                                                                                                                                                                                                          | Description                                                                                |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | **Kafka** ¹                                  | `list-topics`, `create-topics`, `delete-topics`, `produce-message`, `consume-messages`, `search-messages`, `list-consumer-groups`, `describe-consumer-group`, `get-consumer-group-lag`, `alter-topic-config`, `get-topic-config`                                                                                                                                  | Manage topics, produce/consume messages, inspect consumer groups, configure topic settings |
-| **Flink SQL** ¹                              | `create-flink-statement`, `list-flink-statements`, `get-flink-statement-results`, `delete-flink-statements`, `get-flink-statement-exceptions`                                                                                                                                                                                                  | Create and manage Flink SQL statements                                                     |
+| **Flink SQL** ¹                              | `create-flink-statement`, `list-flink-statements`, `get-flink-statement-results`, `delete-flink-statements`, `get-flink-statement-exceptions`, `list-compute-pools`                                                                                                                                                                            | Create and manage Flink SQL statements; discover Flink compute pools                       |
 | **Flink Catalog** ¹                          | `list-flink-catalogs`, `list-flink-databases`, `list-flink-tables`, `describe-flink-table`, `get-flink-table-info`                                                                                                                                                                                                                             | Explore Flink catalogs, databases, and table schemas                                       |
 | **Flink Diagnostics** ¹                      | `check-flink-statement-health`, `detect-flink-statement-issues`, `get-flink-statement-profile`                                                                                                                                                                                                                                                 | Health checks, issue detection, and query profiling                                        |
 | **Connectors** ¹                             | `list-connectors`, `get-connector-config`, `get-connector-offsets`, `get-connector-status`, `get-connector-tasks`, `get-connector-error-summary`, `get-connector-error-recommendations`, `get-connector-logs`, `create-connector` ², `delete-connector`, `pause-connector`, `resume-connector`, `restart-connector`, `update-connector-config` | Inspect and manage Kafka Connect connectors                                                |
@@ -148,7 +148,7 @@ The matching integration tests are tagged `@cp` and live next to their handlers 
 docker compose -f docker-compose.cp-test.yml up -d
 # Wait ~30s for Kafka + SR to become ready, then:
 CP_KAFKA_USERNAME=mcp CP_KAFKA_PASSWORD=mcp-secret \
-  pnpm run test:integration -- --tags-filter=@cp
+  pnpm run test:integration --tags-filter=@cp
 docker compose -f docker-compose.cp-test.yml down -v
 ```
 
@@ -158,7 +158,7 @@ The tests skip cleanly when those env vars are unset, so `pnpm run test:unit` an
 
 ### Prerequisites
 
-- **Node.js 22 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
+- **Node.js 22.19.0 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
   ```bash
   nvm install 22
   nvm use 22
@@ -402,6 +402,7 @@ flink:
   get-flink-statement-profile: Get Query Profiler data for a Flink SQL statement. Returns the task graph with human-readable task/operator names, pe...
   get-flink-statement-results: Fetch the result rows produced by a Flink SQL statement.
   get-flink-table-info: Get table metadata via INFORMATION_SCHEMA.TABLES. Returns watermark configuration, distribution info, and table type.
+  list-compute-pools: Get the Flink compute pools in the Confluent Cloud environment. Paginated; if the response includes a nextPageToken, pas...
   list-flink-catalogs: List all catalogs available in the Flink environment via INFORMATION_SCHEMA.CATALOGS.
   list-flink-databases: List all databases (schemas) in a Flink catalog via INFORMATION_SCHEMA.SCHEMATA. Returns catalog and database names.
   list-flink-statements: Retrieve a sorted, filtered, paginated list of all statements.
@@ -475,7 +476,7 @@ See [telemetry.md](telemetry.md) for full details on what is collected.
 
 ## Troubleshooting
 
-**"Node.js version not supported"** -- This project requires Node.js 22 or later.
+**"Node.js version not supported"** -- This project requires Node.js 22.19.0 or later.
 Check your version with `node -v` and upgrade if needed.
 
 **Tools not appearing** -- Each tool requires specific service blocks in your `config.yaml`.

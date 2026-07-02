@@ -4,6 +4,12 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+#### New Tools / Tool Features
+
+- **`search-messages` tool.** Read-only full-text search across one or more Kafka topics. Scans up to `maxScanned` messages from earliest across every partition and returns only the (up to `maxMatches`) records whose decoded key/value/headers match `query` — a case-insensitive substring by default, or a regex (`queryMode: "regex"`). Matching runs after Schema Registry deserialization, so callers search the decoded representation rather than raw bytes.
+
 ## 1.5.0
 
 ### Added

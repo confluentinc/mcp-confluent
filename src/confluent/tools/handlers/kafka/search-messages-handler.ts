@@ -227,19 +227,31 @@ function collectSearchableStrings(
 ): string[] {
   const strings: string[] = [];
   for (const part of searchIn) {
-    if (part === "value") {
-      const text = stringifyForSearch(processed.value);
+    if (part === "headers") {
+      if (processed.headers) strings.push(...headerStrings(processed.headers));
+    } else {
+      // "value" | "key" — both are `unknown` on ProcessedMessage, so index
+      // directly rather than duplicating the stringify-and-guard branch.
+      const text = stringifyForSearch(processed[part]);
       if (text !== undefined) strings.push(text);
-    } else if (part === "key") {
-      const text = stringifyForSearch(processed.key);
-      if (text !== undefined) strings.push(text);
-    } else if (part === "headers" && processed.headers) {
-      for (const [name, value] of Object.entries(processed.headers)) {
-        strings.push(name);
-        if (Array.isArray(value)) strings.push(...value);
-        else strings.push(value);
-      }
     }
+  }
+  return strings;
+}
+
+/**
+ * Flatten a message's headers into searchable strings: each header name plus
+ * its string-coerced value(s). A repeated header key surfaces as a `string[]`
+ * (multiplicity intact), so its values are spread in individually.
+ */
+function headerStrings(
+  headers: NonNullable<ProcessedMessage["headers"]>,
+): string[] {
+  const strings: string[] = [];
+  for (const [name, value] of Object.entries(headers)) {
+    strings.push(name);
+    if (Array.isArray(value)) strings.push(...value);
+    else strings.push(value);
   }
   return strings;
 }

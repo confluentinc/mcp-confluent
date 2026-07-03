@@ -8,6 +8,7 @@ overrides:
   form-data@>=4.0.0 <4.0.6: '>=4.0.6'
   hono@<4.12.25: '>=4.12.25'
   js-yaml@<=4.1.1: '>=4.2.0'
+  jsonata@<2.2.0: '>=2.2.0'
   protobufjs@<=7.6.0: '>=7.6.1'
   protobufjs@<=7.6.2: '>=7.6.3'
   shell-quote@>=1.1.0 <=1.8.3: '>=1.8.4'
@@ -2046,8 +2047,8 @@ packages:
     resolution: {integrity: sha512-q3PN0lbUdv0pmurkBNdJH3pfFvOTL/Zp0lquqpvcjfKzt6Y0j49EPHAmVHCAS4Ceq/Y+PejWTzyiVpoY71+D6g==}
     engines: {node: '>= 4'}
 
-  jsonata@2.1.0:
-    resolution: {integrity: sha512-OCzaRMK8HobtX8fp37uIVmL8CY1IGc/a6gLsDqz3quExFR09/U78HUzWYr7T31UEB6+Eu0/8dkVD5fFDOl9a8w==}
+  jsonata@2.2.1:
+    resolution: {integrity: sha512-xd1uwUrKeIcJbsWhaoS3qAX4Ea8m0Mw0G5nlnAQvPT7TbZ5qaPdzBVTQia9KfyuyQm+nenfyjvzUDTRYHsC2sw==}
     engines: {node: '>= 8'}
 
   jsonwebtoken@9.0.3:
@@ -3745,7 +3746,7 @@ snapshots:
       axios: 1.16.0(debug@4.4.3)
       axios-retry: 4.5.0(axios@1.16.0)
       json-stringify-deterministic: 1.0.12
-      jsonata: 2.1.0
+      jsonata: 2.2.1
       lru-cache: 10.4.3
       node-vault: 0.10.10
       simple-oauth2: 5.1.0
@@ -5632,7 +5633,7 @@ snapshots:
 
   json-stringify-deterministic@1.0.12: {}
 
-  jsonata@2.1.0: {}
+  jsonata@2.2.1: {}
 
   jsonwebtoken@9.0.3:
     dependencies:

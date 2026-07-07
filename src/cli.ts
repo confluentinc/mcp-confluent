@@ -107,6 +107,65 @@ function readFileLines(filePath: string): string[] {
   return lines;
 }
 
+/**
+ * Enforces the three post-parse mutual-exclusivity rules not already covered by
+ * `assertNoConfigConflicts` (which handles `--config`'s exclusivity with
+ * `--transport`, `--disable-auth`, `--allowed-hosts`, and `--kafka-config-file`).
+ */
+function assertNoMutuallyExclusiveOptions(opts: {
+  ccloudEnv?: "devel" | "stag" | "prod";
+  oauth?: boolean;
+  config?: string;
+  initConfig?: boolean;
+  initOauthConfig?: boolean;
+}): void {
+  if (opts.ccloudEnv && !opts.oauth) {
+    throw new Error("--ccloud-env requires --oauth");
+  }
+  if (opts.oauth && opts.config) {
+    throw new Error(
+      "--oauth and --config cannot be combined: declare OAuth as a connection inside the YAML (type: oauth) instead of passing --oauth",
+    );
+  }
+  if (opts.initConfig && opts.initOauthConfig) {
+    throw new Error(
+      "--init-config and --init-oauth-config are mutually exclusive: pick one template to bootstrap.",
+    );
+  }
+}
+
+/**
+ * Resolves the shared allow/block-list precedence: an inline CLI value wins,
+ * otherwise fall back to reading the file, otherwise undefined.
+ */
+function resolveToolList(
+  inlineValue: string | undefined,
+  fileValue: string | undefined,
+): string[] | undefined {
+  if (inlineValue) {
+    return parseToolList(inlineValue);
+  }
+  if (fileValue) {
+    return readFileLines(fileValue);
+  }
+  return undefined;
+}
+
+/**
+ * Translates a Commander parse failure into `DisplayedCommandLineUsageError`
+ * when Commander already printed help/version text, otherwise rethrows as-is.
+ */
+function rethrowCommanderError(error: unknown): never {
+  if (
+    error instanceof CommanderError &&
+    (error.code === "commander.helpDisplayed" ||
+      error.code === "commander.version")
+  ) {
+    throw new DisplayedCommandLineUsageError();
+  }
+  throw error;
+}
+
 function assertNoConfigConflicts(
   config: string | undefined,
   kafkaConfigFile: string | undefined,
@@ -142,22 +201,12 @@ function assertNoConfigConflicts(
 }
 
 /**
- * Parse command line arguments into a structured CLIOptions object.
- *
- * Only minimally interprets the raw CLI input in order to populate CLIOptions:
- *  1. Will dereference and parse named files for tool allow/block lists.
- *  2. Will parse the kafka config properties file into an object.
- *
- * Does NOT load environment variables from the env file, nor does it load or
- * validate the YAML configuration file.
- *
- * @param argv - Array of command line arguments (e.g., process.argv)
- * @returns Structured CLIOptions object with parsed and validated values.
- * @throws Error if CLI arguments are invalid, if specified files cannot be read, or if file contents are malformed.
+ * Builds the Commander program definition (name, description, all options).
+ * Split out from `parseCliArgs` purely so `ParsedCliOptions` below can be
+ * derived from its return type instead of hand-duplicated.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#655)
-export function parseCliArgs(argv: string[]): CLIOptions {
-  const program = new Command()
+function buildProgram() {
+  return new Command()
     .name("mcp-confluent")
     .description(
       "Confluent MCP Server - Model Context Protocol implementation for Confluent Cloud",
@@ -233,6 +282,56 @@ export function parseCliArgs(argv: string[]): CLIOptions {
     )
     .allowExcessArguments(false)
     .exitOverride();
+}
+
+type ParsedCliOptions = ReturnType<ReturnType<typeof buildProgram>["opts"]>;
+
+/**
+ * Maps Commander's parsed options to the CLIOptions shape returned by
+ * `parseCliArgs`, applying the allow/block tool-list precedence and the
+ * optional-field coercions the CLI contract requires.
+ */
+function optsToCliOptions(opts: ParsedCliOptions): CLIOptions {
+  return {
+    envFile: opts.envFile,
+    config: opts.config,
+    transports: Array.isArray(opts.transport)
+      ? opts.transport
+      : [opts.transport],
+    allowTools: resolveToolList(opts.allowTools, opts.allowToolsFile),
+    blockTools: resolveToolList(opts.blockTools, opts.blockToolsFile),
+    listTools: !!opts.listTools,
+    kafkaConfig: opts.kafkaConfigFile
+      ? parsePropertiesFile(opts.kafkaConfigFile)
+      : undefined,
+    disableAuth: opts.disableAuth ? true : undefined,
+    allowedHosts: opts.allowedHosts
+      ? opts.allowedHosts.split(",").map((h: string) => h.trim().toLowerCase())
+      : undefined,
+    generateKey: !!opts.generateKey,
+    initConfig: !!opts.initConfig,
+    initOauthConfig: !!opts.initOauthConfig,
+    oauth: opts.oauth,
+    ccloudEnv: opts.ccloudEnv,
+  };
+}
+
+/**
+ * Parse command line arguments into a structured CLIOptions object.
+ *
+ * Only minimally interprets the raw CLI input in order to populate CLIOptions:
+ *  1. Will dereference and parse named files for tool allow/block lists.
+ *  2. Will parse the kafka config properties file into an object.
+ *
+ * Does NOT load environment variables from the env file, nor does it load or
+ * validate the YAML configuration file.
+ *
+ * @param argv - Array of command line arguments (e.g., process.argv)
+ * @returns Structured CLIOptions object with parsed and validated values.
+ * @throws Error if CLI arguments are invalid, if specified files cannot be read, or if file contents are malformed.
+ */
+export function parseCliArgs(argv: string[]): CLIOptions {
+  const program = buildProgram();
 
   try {
     const opts = program.parse(argv).opts();
@@ -244,69 +343,11 @@ export function parseCliArgs(argv: string[]): CLIOptions {
       opts.allowedHosts,
       program.getOptionValueSource("transport") === "cli",
     );
+    assertNoMutuallyExclusiveOptions(opts);
 
-    if (opts.ccloudEnv && !opts.oauth) {
-      throw new Error("--ccloud-env requires --oauth");
-    }
-    if (opts.oauth && opts.config) {
-      throw new Error(
-        "--oauth and --config cannot be combined: declare OAuth as a connection inside the YAML (type: oauth) instead of passing --oauth",
-      );
-    }
-    if (opts.initConfig && opts.initOauthConfig) {
-      throw new Error(
-        "--init-config and --init-oauth-config are mutually exclusive: pick one template to bootstrap.",
-      );
-    }
-
-    // Precedence: CLI > file > undefined
-    let allowTools: string[] | undefined = undefined;
-    let blockTools: string[] | undefined = undefined;
-    if (opts.allowTools) {
-      allowTools = parseToolList(opts.allowTools);
-    } else if (opts.allowToolsFile) {
-      allowTools = readFileLines(opts.allowToolsFile);
-    }
-    if (opts.blockTools) {
-      blockTools = parseToolList(opts.blockTools);
-    } else if (opts.blockToolsFile) {
-      blockTools = readFileLines(opts.blockToolsFile);
-    }
-    return {
-      envFile: opts.envFile,
-      config: opts.config,
-      transports: Array.isArray(opts.transport)
-        ? opts.transport
-        : [opts.transport],
-      allowTools,
-      blockTools,
-      listTools: !!opts.listTools,
-      kafkaConfig: opts.kafkaConfigFile
-        ? parsePropertiesFile(opts.kafkaConfigFile)
-        : undefined,
-      disableAuth: opts.disableAuth ? true : undefined,
-      allowedHosts: opts.allowedHosts
-        ? opts.allowedHosts
-            .split(",")
-            .map((h: string) => h.trim().toLowerCase())
-        : undefined,
-      generateKey: !!opts.generateKey,
-      initConfig: !!opts.initConfig,
-      initOauthConfig: !!opts.initOauthConfig,
-      oauth: opts.oauth,
-      ccloudEnv: opts.ccloudEnv,
-    };
+    return optsToCliOptions(opts);
   } catch (error: unknown) {
-    if (
-      error instanceof CommanderError &&
-      (error.code === "commander.helpDisplayed" ||
-        error.code === "commander.version")
-    ) {
-      // Help or version was displayed, signal to main() to exit(0).
-      throw new DisplayedCommandLineUsageError();
-    }
-    // throw anything else as back to main() unchanged.
-    throw error;
+    rethrowCommanderError(error);
   }
 }
 
@@ -375,54 +416,71 @@ export function loadDotEnvFile(envFile: string): Record<string, string> {
  *
  * @returns An alphabetically sorted array of enabled ToolNames.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#655)
 export function getFilteredToolNames(
   allowTools: string[],
   blockTools: string[],
 ): ToolName[] {
-  let filteredToolNames: Set<ToolName> = new Set(Object.values(ToolName));
   const validToolNames = new Set(Object.values(ToolName));
 
-  if (
-    (!allowTools || allowTools.length === 0) &&
-    (!blockTools || blockTools.length === 0)
-  ) {
+  if (allowTools.length === 0 && blockTools.length === 0) {
     logger.info(
       "No allow/block tool lists provided; all tools are enabled by default.",
     );
-  } else {
-    if (allowTools.length > 0) {
-      const valid = allowTools.filter((t) => validToolNames.has(t as ToolName));
-      const invalid = allowTools.filter(
-        (t) => !validToolNames.has(t as ToolName),
-      );
-      if (invalid.length > 0) {
-        logger.warn(
-          `Ignoring invalid tool names in allow list: ${invalid.join(", ")}`,
-        );
-      }
-      filteredToolNames = new Set(valid.map((t) => t as ToolName));
-    }
-    if (blockTools.length > 0) {
-      const validBlock = new Set(
-        blockTools.filter((t) => validToolNames.has(t as ToolName)),
-      );
-      const invalidBlock = blockTools.filter(
-        (t) => !validToolNames.has(t as ToolName),
-      );
-      if (invalidBlock.length > 0) {
-        logger.warn(
-          `Ignoring invalid tool names in block list: ${invalidBlock.join(", ")}`,
-        );
-      }
-      for (const tool of validBlock) {
-        filteredToolNames.delete(tool as ToolName);
-      }
-    }
   }
 
-  // Convert to array, sort, return.
-  return Array.from(filteredToolNames).sort();
+  const filteredToolNames =
+    allowTools.length > 0
+      ? applyAllowList(allowTools, validToolNames)
+      : new Set(validToolNames);
+
+  if (blockTools.length > 0) {
+    applyBlockList(filteredToolNames, blockTools, validToolNames);
+  }
+
+  return Array.from(filteredToolNames).sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Narrows `allowTools` to the set of valid `ToolName`s, warning about any
+ * unrecognized names rather than rejecting the whole list.
+ */
+function applyAllowList(
+  allowTools: string[],
+  validToolNames: Set<ToolName>,
+): Set<ToolName> {
+  const valid = allowTools.filter((t) => validToolNames.has(t as ToolName));
+  const invalid = allowTools.filter((t) => !validToolNames.has(t as ToolName));
+  if (invalid.length > 0) {
+    logger.warn(
+      `Ignoring invalid tool names in allow list: ${invalid.join(", ")}`,
+    );
+  }
+  return new Set(valid.map((t) => t as ToolName));
+}
+
+/**
+ * Removes `blockTools`' valid `ToolName`s from `current` in place, warning
+ * about any unrecognized names rather than rejecting the whole list.
+ */
+function applyBlockList(
+  current: Set<ToolName>,
+  blockTools: string[],
+  validToolNames: Set<ToolName>,
+): void {
+  const validBlock = new Set(
+    blockTools.filter((t) => validToolNames.has(t as ToolName)),
+  );
+  const invalidBlock = blockTools.filter(
+    (t) => !validToolNames.has(t as ToolName),
+  );
+  if (invalidBlock.length > 0) {
+    logger.warn(
+      `Ignoring invalid tool names in block list: ${invalidBlock.join(", ")}`,
+    );
+  }
+  for (const tool of validBlock) {
+    current.delete(tool as ToolName);
+  }
 }
 
 /**

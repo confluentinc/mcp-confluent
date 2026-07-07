@@ -108,8 +108,9 @@ function readFileLines(filePath: string): string[] {
 }
 
 /**
- * Enforces the three post-parse mutual-exclusivity rules that aren't tied to
- * `--config` (see `assertNoConfigConflicts` for the `--config`-specific ones).
+ * Enforces the three post-parse mutual-exclusivity rules not already covered by
+ * `assertNoConfigConflicts` (which handles `--config`'s exclusivity with
+ * `--transport`, `--disable-auth`, `--allowed-hosts`, and `--kafka-config-file`).
  */
 function assertNoMutuallyExclusiveOptions(opts: {
   ccloudEnv?: "devel" | "stag" | "prod";

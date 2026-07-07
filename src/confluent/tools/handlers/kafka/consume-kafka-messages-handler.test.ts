@@ -35,17 +35,13 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Build a fake `admin.fetchTopicMetadata` result that mirrors what the
- * library actually returns at runtime (a bare `Array<ITopicMetadata>`).
- * The published `.d.ts` declares `Promise<{ topics: Array<ITopicMetadata> }>`
- * but the implementation hands back the array directly — see the matching
- * note in {@link consume-kafka-messages-handler.ts}. The cast hides the
- * declared-shape lie from the call site so tests stay readable.
+ * Build a fake `admin.fetchTopicMetadata` result — a bare
+ * `Array<ITopicMetadata>`.
  */
 function fakeFetchTopicMetadataResult(
   topics: Array<{ name: string; numPartitions: number }>,
 ): Awaited<ReturnType<KafkaJS.Admin["fetchTopicMetadata"]>> {
-  const arr = topics.map((t) => ({
+  return topics.map((t) => ({
     name: t.name,
     partitions: Array.from({ length: t.numPartitions }, (_, i) => ({
       partitionId: i,
@@ -58,9 +54,6 @@ function fakeFetchTopicMetadataResult(
       isrNodes: [],
     })),
   }));
-  return arr as unknown as Awaited<
-    ReturnType<KafkaJS.Admin["fetchTopicMetadata"]>
-  >;
 }
 
 /**

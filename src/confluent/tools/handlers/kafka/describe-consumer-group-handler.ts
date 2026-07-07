@@ -24,7 +24,6 @@ import {
   notFoundGroupMessage,
 } from "@src/confluent/tools/handlers/kafka/consumer-group-helpers.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
@@ -191,60 +190,15 @@ function buildMember(member: MemberDescription): DescribeConsumerGroupMember {
 
 /**
  * Cooked partition-list extraction from a {@link MemberDescription}'s
- * `assignment` field, working around an upstream type/runtime mismatch.
- *
- * The kafkajs `.d.ts` declares `assignment: TopicPartition[]` (flat array),
- * but the native C++ binding actually returns `assignment: { topicPartitions:
- * TopicPartition[] }` (wrapped object) — verified in
- * `node_modules/@confluentinc/kafka-javascript/src/common.cc` →
- * `FromMemberDescription`. The wrapped shape is also where the binding
- * exposes an optional `targetAssignment: { topicPartitions: ... }` field
- * the `.d.ts` doesn't acknowledge at all.
- *
- * Handle both shapes defensively: if the binding ever reconciles the
- * mismatch in either direction, the handler keeps working. Anything else
- * gets a "Wacky --" log and falls through to an empty array so a future
- * binding surprise doesn't crash the tool.
- *
- * Map field-by-field rather than passing the upstream array verbatim —
- * the upstream `TopicPartition` carries optional `error` / `leaderEpoch`
- * fields we don't want leaking into the response.
+ * `assignment` field. Maps field-by-field rather than passing the
+ * upstream `topicPartitions` array verbatim — the upstream
+ * `TopicPartition` carries optional `error` / `leaderEpoch` fields we
+ * don't want leaking into the response.
  */
 function buildAssignment(
   member: MemberDescription,
 ): DescribeConsumerGroupMember["assignment"] {
-  const raw = member.assignment as unknown;
-
-  if (Array.isArray(raw)) {
-    return raw.map(toAssignedPartition);
-  }
-
-  if (
-    raw !== null &&
-    typeof raw === "object" &&
-    "topicPartitions" in raw &&
-    Array.isArray((raw as { topicPartitions: unknown }).topicPartitions)
-  ) {
-    return (
-      raw as { topicPartitions: Array<{ topic: string; partition: number }> }
-    ).topicPartitions.map(toAssignedPartition);
-  }
-
-  logger.warn(
-    {
-      memberId: member.memberId,
-      clientId: member.clientId,
-      assignmentType: typeof raw,
-      isBuffer: Buffer.isBuffer(raw),
-      sampleKeys:
-        raw !== null && typeof raw === "object" && !Buffer.isBuffer(raw)
-          ? Object.keys(raw).slice(0, 10)
-          : undefined,
-    },
-    "Wacky -- MemberDescription.assignment is neither a TopicPartition[] " +
-      "nor a {topicPartitions: TopicPartition[]} wrapper; surfacing as empty array.",
-  );
-  return [];
+  return member.assignment.topicPartitions.map(toAssignedPartition);
 }
 
 function toAssignedPartition(tp: {

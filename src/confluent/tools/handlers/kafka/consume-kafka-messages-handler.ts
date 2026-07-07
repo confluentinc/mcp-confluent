@@ -28,7 +28,6 @@ import {
   createWatermarkCache,
   type WatermarkCache,
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
-import { normalizeFetchTopicMetadataResponse } from "@src/confluent/tools/handlers/kafka/topic-metadata.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -470,17 +469,15 @@ function guardScopedStartRequiresPartition(
 /**
  * Fetch partition counts for the supplied topics via
  * `admin.fetchTopicMetadata`. Throws if any requested topic returned no
- * metadata (typically: the topic doesn't exist on this cluster). The
- * upstream type/runtime mismatch on the response shape is handled by
- * {@link normalizeFetchTopicMetadataResponse}.
+ * metadata (typically: the topic doesn't exist on this cluster).
  */
 async function fetchPartitionCounts(
   admin: KafkaJS.Admin,
   topicNames: string[],
 ): Promise<Map<string, number>> {
-  const topicMetadata = normalizeFetchTopicMetadataResponse(
-    await admin.fetchTopicMetadata({ topics: topicNames }),
-  );
+  const topicMetadata = await admin.fetchTopicMetadata({
+    topics: topicNames,
+  });
   const counts = new Map<string, number>();
   for (const t of topicMetadata) {
     counts.set(t.name, t.partitions.length);

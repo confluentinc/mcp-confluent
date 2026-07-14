@@ -160,12 +160,7 @@ async function exchangeForDataPlaneToken(
     body: "{}",
   });
   if (!response.ok) {
-    let detail = "";
-    try {
-      detail = await response.text();
-    } catch {
-      // ignore — surface status alone
-    }
+    const detail = await readBodyTextSafe(response);
     throw new Error(
       `Failed to exchange API key for data-plane token (HTTP ${response.status}): ${detail || response.statusText}`,
     );
@@ -249,7 +244,6 @@ async function resolveOrganizationId(
 }
 
 export class GetConnectorLogsHandler extends ConnectToolHandler {
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#658)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -273,120 +267,41 @@ export class GetConnectorLogsHandler extends ConnectToolHandler {
       args.organizationId,
     );
 
-    const now = new Date();
-    const endTime = args.endTime ?? isoSecondsZ(now);
-    const startTime =
-      args.startTime ??
-      isoSecondsZ(new Date(new Date(endTime).getTime() - 60 * 60 * 1000));
-    const levels = args.levels ?? ["ERROR"];
-    const pageSize = args.pageSize ?? 100;
     const crn = buildCrn(
       organization_id,
       environment_id,
       kafka_cluster_id,
       args.connectorName,
     );
+    const request = buildLogsRequest(args, crn);
 
-    const search: Record<string, unknown> = { level: levels };
-    if (args.connectorId) {
-      search.id = args.connectorId;
-    }
-    const body = {
-      crn,
-      search,
-      sort: "desc",
-      start_time: startTime,
-      end_time: endTime,
-    };
-
-    let bearerToken: string;
-    try {
-      bearerToken = await resolveLogsBearerToken(conn, runtime.oauthHolder);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return this.createResponse(
-        `Failed to fetch logs for connector ${args.connectorName}: ${message}`,
-        true,
-      );
+    const outcome = await fetchConnectorLogs(
+      conn,
+      runtime.oauthHolder,
+      request,
+      args.connectorName,
+    );
+    if (outcome.kind === "error") {
+      return this.createResponse(outcome.message, true);
     }
 
-    const queryParams = new URLSearchParams({ page_size: String(pageSize) });
-    if (args.pageToken) {
-      queryParams.set("page_token", args.pageToken);
-    }
-    const url = `${LOGGING_API_BASE}/logs/v1/search?${queryParams.toString()}`;
-    const authHeader = `Bearer ${bearerToken}`;
-
-    let response: Response;
-    try {
-      response = await nodeFetch.fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: authHeader,
-        },
-        body: JSON.stringify(body),
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return this.createResponse(
-        `Failed to fetch logs for connector ${args.connectorName}: ${message}`,
-        true,
-      );
-    }
-
-    if (!response.ok) {
-      let detail = "";
-      try {
-        detail = await response.text();
-      } catch {
-        // ignore — surface status alone
-      }
-      return this.createResponse(
-        `Logging API returned ${response.status} for connector ${args.connectorName}: ${detail || response.statusText}`,
-        true,
-      );
-    }
-
-    let parsed: LogsResponse;
-    try {
-      parsed = (await response.json()) as LogsResponse;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return this.createResponse(
-        `Failed to parse logs response for connector ${args.connectorName}: ${message}`,
-        true,
-      );
-    }
-
-    const data = parsed.data ?? [];
+    const data = outcome.parsed.data ?? [];
     if (data.length === 0) {
       return this.createResponse(
-        `No log entries for connector ${args.connectorName} in the requested window (${startTime} to ${endTime}, levels=${levels.join(",")}).`,
+        `No log entries for connector ${args.connectorName} in the requested window (${request.startTime} to ${request.endTime}, levels=${request.levels.join(",")}).`,
       );
     }
 
-    const entries = data.map<ProjectedLogEntry>((e) => {
-      const projected: ProjectedLogEntry = {};
-      if (e.timestamp) projected.timestamp = e.timestamp;
-      if (e.level) projected.level = e.level;
-      if (e.task_id) projected.taskId = e.task_id;
-      if (e.message) projected.message = e.message;
-      const stacktraceHead = truncateStacktrace(e.exception?.stacktrace);
-      if (stacktraceHead) projected.stacktraceHead = stacktraceHead;
-      return projected;
-    });
-
+    const entries = data.map(projectLogEntry);
     const projection: LogsProjection = {
       connectorName: args.connectorName,
-      startTime,
-      endTime,
-      levels,
+      startTime: request.startTime,
+      endTime: request.endTime,
+      levels: request.levels,
       totalEntries: entries.length,
       entries,
     };
-    const next = parsed.metadata?.next;
+    const next = outcome.parsed.metadata?.next;
     if (typeof next === "string" && next.length > 0) {
       projection.nextPageToken = next;
     }
@@ -403,6 +318,171 @@ export class GetConnectorLogsHandler extends ConnectToolHandler {
         "Retrieve recent log entries for a Confluent Cloud connector from the Cloud logging API. Defaults to the last hour of ERROR-level entries with truncated stacktraces. Use connectorId (lcc-...) to narrow by resource ID. Organization ID auto-resolves from GET /org/v2/organizations when not provided. Paginated: when the response includes a nextPageToken, call again with pageToken=<that value> to retrieve the next page.",
       inputSchema: getConnectorLogsArguments.shape,
       annotations: READ_ONLY,
+    };
+  }
+}
+
+/**
+ * Extracts a human-readable message from an unknown caught value, since a
+ * `catch` binding is `unknown` and may not be an `Error`.
+ */
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Reads a response body as text, swallowing a decode failure so the caller can
+ * surface the HTTP status alone rather than masking it with a body-read error.
+ */
+async function readBodyTextSafe(response: Response): Promise<string> {
+  try {
+    return await response.text();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The assembled logging-API search call plus the resolved window and levels the
+ * handler echoes back into the projection and the empty-result message — so
+ * those defaults are computed once, in one place, rather than re-derived.
+ */
+interface LogsRequest {
+  url: string;
+  body: {
+    crn: string;
+    search: Record<string, unknown>;
+    sort: string;
+    start_time: string;
+    end_time: string;
+  };
+  startTime: string;
+  endTime: string;
+  levels: string[];
+}
+
+/**
+ * Assembles the logging-API search request from the parsed tool arguments,
+ * applying the defaults (last-hour window, ERROR level, page size 100) and the
+ * optional connector-id / page-token narrowing.
+ */
+function buildLogsRequest(
+  args: z.infer<typeof getConnectorLogsArguments>,
+  crn: string,
+): LogsRequest {
+  const endTime = args.endTime ?? isoSecondsZ(new Date());
+  const startTime =
+    args.startTime ??
+    isoSecondsZ(new Date(new Date(endTime).getTime() - 60 * 60 * 1000));
+  const levels = args.levels ?? ["ERROR"];
+  const pageSize = args.pageSize ?? 100;
+
+  const search: Record<string, unknown> = { level: levels };
+  if (args.connectorId) {
+    search.id = args.connectorId;
+  }
+
+  const queryParams = new URLSearchParams({ page_size: String(pageSize) });
+  if (args.pageToken) {
+    queryParams.set("page_token", args.pageToken);
+  }
+
+  return {
+    url: `${LOGGING_API_BASE}/logs/v1/search?${queryParams.toString()}`,
+    body: {
+      crn,
+      search,
+      sort: "desc",
+      start_time: startTime,
+      end_time: endTime,
+    },
+    startTime,
+    endTime,
+    levels,
+  };
+}
+
+/**
+ * Projects a raw logging-API entry into the trimmed shape returned to the
+ * caller: absent fields are dropped rather than emitted as undefined, and the
+ * stacktrace is truncated to a head snippet.
+ */
+function projectLogEntry(e: LogEntry): ProjectedLogEntry {
+  const projected: ProjectedLogEntry = {};
+  if (e.timestamp) projected.timestamp = e.timestamp;
+  if (e.level) projected.level = e.level;
+  if (e.task_id) projected.taskId = e.task_id;
+  if (e.message) projected.message = e.message;
+  const stacktraceHead = truncateStacktrace(e.exception?.stacktrace);
+  if (stacktraceHead) projected.stacktraceHead = stacktraceHead;
+  return projected;
+}
+
+/**
+ * Outcome of {@link fetchConnectorLogs}: either the parsed payload, or a
+ * ready-to-surface error message covering whichever stage failed. Collapsing
+ * the failure stages into one discriminated result gives the handler a single
+ * branch instead of one per stage.
+ */
+type LogsFetchResult =
+  | { kind: "ok"; parsed: LogsResponse }
+  | { kind: "error"; message: string };
+
+/**
+ * Authenticates against and calls the logging search API, collapsing every
+ * failure stage (token resolution, transport error, non-2xx status, unparseable
+ * body) into a single error-carrying result so the caller has one branch to
+ * handle rather than four try/catch arms. The distinct per-stage messages are
+ * preserved verbatim.
+ */
+async function fetchConnectorLogs(
+  conn: ConnectionConfig,
+  oauthHolder: OAuthHolder | undefined,
+  request: LogsRequest,
+  connectorName: string,
+): Promise<LogsFetchResult> {
+  let bearerToken: string;
+  try {
+    bearerToken = await resolveLogsBearerToken(conn, oauthHolder);
+  } catch (err) {
+    return {
+      kind: "error",
+      message: `Failed to fetch logs for connector ${connectorName}: ${errMessage(err)}`,
+    };
+  }
+
+  let response: Response;
+  try {
+    response = await nodeFetch.fetch(request.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${bearerToken}`,
+      },
+      body: JSON.stringify(request.body),
+    });
+  } catch (err) {
+    return {
+      kind: "error",
+      message: `Failed to fetch logs for connector ${connectorName}: ${errMessage(err)}`,
+    };
+  }
+
+  if (!response.ok) {
+    const detail = await readBodyTextSafe(response);
+    return {
+      kind: "error",
+      message: `Logging API returned ${response.status} for connector ${connectorName}: ${detail || response.statusText}`,
+    };
+  }
+
+  try {
+    return { kind: "ok", parsed: (await response.json()) as LogsResponse };
+  } catch (err) {
+    return {
+      kind: "error",
+      message: `Failed to parse logs response for connector ${connectorName}: ${errMessage(err)}`,
     };
   }
 }

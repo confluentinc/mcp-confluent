@@ -42,12 +42,7 @@ function fakeNotFoundError(
 }
 
 /** Per-partition row in `admin.fetchOffsets`'s response, with sensible
- *  defaults so tests only set the fields they care about. `error` is
- *  typed as `LibrdKafkaError | null | undefined` deliberately: the
- *  upstream `.d.ts` declares it `LibrdKafkaError | undefined`, but at
- *  runtime kafkajs-compat populates `error: null` for successful
- *  partitions. The factory exposes that runtime shape so tests can pin
- *  both the explicit-null path and the real-error path. */
+ *  defaults so tests only set the fields they care about. */
 function fakeFetchedPartition(overrides: {
   partition: number;
   offset?: string;
@@ -59,8 +54,9 @@ function fakeFetchedPartition(overrides: {
     offset: "100",
     metadata: null,
     leaderEpoch: null,
+    error: null,
     ...overrides,
-  } as FetchOffsetsPartition;
+  };
 }
 
 /** Per-partition row in `admin.fetchTopicOffsets`'s response. The native
@@ -258,12 +254,12 @@ describe("get-consumer-group-lag-handler.ts", () => {
       // The filter is forwarded so the broker can server-side-restrict; the
       // handler still verifies the never-committed filter topics exist on
       // the cluster via fetchTopicMetadata.
-      admin.fetchTopicMetadata.mockImplementation(async (options) => ({
-        topics: (options?.topics ?? []).map((name) => ({
+      admin.fetchTopicMetadata.mockImplementation(async (options) =>
+        (options?.topics ?? []).map((name) => ({
           name,
           partitions: [],
         })),
-      }));
+      );
 
       await assertHandleCase({
         handler,
@@ -413,14 +409,10 @@ describe("get-consumer-group-lag-handler.ts", () => {
       expect(payload.totalLag).toBe(50);
     });
 
-    it("should treat a partition whose error field is explicitly null (kafkajs-compat's no-error sentinel) as a successful partition and compute lag normally", async () => {
-      // The kafkajs-compat layer populates `error: null` on the
-      // FetchOffsetsPartition shape for successful partitions, even
-      // though the upstream `.d.ts` declares the field as
-      // `LibrdKafkaError | undefined`. A `!== undefined` check would
-      // see `null` as "error present" and crash dereferencing
-      // `null.code`. The handler uses `!= null` (loose) so both
-      // `undefined` and `null` go through the no-error path.
+    it("should treat a partition whose error field is null (kafkajs-compat's no-error sentinel) as a successful partition and compute lag normally", async () => {
+      // `FetchOffsetsPartition.error` is `LibrdKafkaError | null` —
+      // kafkajs-compat always populates it, using `null` for
+      // successful partitions.
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
       admin.fetchOffsets.mockResolvedValue([
@@ -951,9 +943,9 @@ describe("get-consumer-group-lag-handler.ts", () => {
       // shipments is verified via metadata, not via the watermark fetch
       // — its watermarks are never needed since the group has no commits
       // on it.
-      admin.fetchTopicMetadata.mockResolvedValue({
-        topics: [{ name: "shipments", partitions: [] }],
-      });
+      admin.fetchTopicMetadata.mockResolvedValue([
+        { name: "shipments", partitions: [] },
+      ]);
 
       const result = await assertHandleCase({
         handler,
@@ -974,36 +966,6 @@ describe("get-consumer-group-lag-handler.ts", () => {
       expect(admin.fetchTopicOffsets).toHaveBeenCalledWith("orders");
     });
 
-    it("should normalize the bare-array runtime shape of fetchTopicMetadata's response (the upstream .d.ts declares `{topics: [...]}` but the kafkajs-compat runtime resolves with the bare array)", async () => {
-      // Long-standing upstream type/runtime mismatch tracked at
-      // confluentinc/confluent-kafka-javascript#367. A non-defensive
-      // `metadata.topics.map(...)` crashes against the bare-array
-      // runtime shape with "Cannot read properties of undefined" — the
-      // exact failure mode the live integration test surfaced.
-      const clientManager = getMockedClientManager();
-      const admin = await clientManager.getAdminClient();
-      admin.fetchOffsets.mockResolvedValue([]);
-      admin.describeGroups.mockResolvedValue({
-        groups: [fakeRealGroup("g1")],
-      });
-      // Bare array, NOT wrapped in {topics: [...]} — matches the actual
-      // runtime shape that the .d.ts misrepresents.
-      admin.fetchTopicMetadata.mockResolvedValue([
-        { name: "shipments", partitions: [] },
-      ] as unknown as Awaited<ReturnType<typeof admin.fetchTopicMetadata>>);
-
-      const result = await assertHandleCase({
-        handler,
-        runtime: decoyRuntime(clientManager),
-        args: { groupId: "g1", topics: ["shipments"] },
-        outcome: { resolves: 'Consumer group "g1" has', isError: false },
-        clientManager,
-      });
-
-      const payload = result!.structuredContent as GetConsumerGroupLagResponse;
-      expect(payload.topics).toEqual([{ topic: "shipments", partitions: [] }]);
-    });
-
     it("should batch fetchTopicMetadata into a single call when verifying multiple never-committed filter topics", async () => {
       // Perf invariant: K never-committed filter topics produce ONE
       // metadata round trip, not K. A regression that fanned the
@@ -1015,13 +977,11 @@ describe("get-consumer-group-lag-handler.ts", () => {
       admin.describeGroups.mockResolvedValue({
         groups: [fakeRealGroup("g1")],
       });
-      admin.fetchTopicMetadata.mockResolvedValue({
-        topics: [
-          { name: "alpha", partitions: [] },
-          { name: "bravo", partitions: [] },
-          { name: "charlie", partitions: [] },
-        ],
-      });
+      admin.fetchTopicMetadata.mockResolvedValue([
+        { name: "alpha", partitions: [] },
+        { name: "bravo", partitions: [] },
+        { name: "charlie", partitions: [] },
+      ]);
 
       await assertHandleCase({
         handler,
@@ -1195,7 +1155,7 @@ describe("get-consumer-group-lag-handler.ts", () => {
       admin.describeGroups.mockResolvedValue({
         groups: [fakeRealGroup("g1")],
       });
-      admin.fetchTopicMetadata.mockResolvedValue({ topics: [] });
+      admin.fetchTopicMetadata.mockResolvedValue([]);
 
       const result = await assertHandleCase({
         handler,

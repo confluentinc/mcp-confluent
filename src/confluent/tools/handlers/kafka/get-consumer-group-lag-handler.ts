@@ -23,7 +23,6 @@ import {
   type PartitionWatermark,
   type WatermarkCache,
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
-import { normalizeFetchTopicMetadataResponse } from "@src/confluent/tools/handlers/kafka/topic-metadata.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -278,11 +277,8 @@ function buildLagRow(
   // Broker-reported per-partition error: the offset value isn't
   // meaningful (could be a sentinel, stale, or garbage), so surface the
   // error code and message verbatim and treat the lag as unknown.
-  // Excluded from the cross-partition `totalLag` sum. `!= null` (loose
-  // equality) catches both `undefined` (the TypeScript-declared shape)
-  // and `null` (what kafkajs-compat actually populates for successful
-  // partitions — the upstream type lies about the runtime).
-  if (committed.error != null) {
+  // Excluded from the cross-partition `totalLag` sum.
+  if (committed.error !== null) {
     return {
       row: {
         partition: committed.partition,
@@ -475,9 +471,9 @@ async function resolveNeverCommittedFilterTopics(
     return { kind: "resolved", topics: [] };
   }
 
-  let rawMetadata: Awaited<ReturnType<typeof admin.fetchTopicMetadata>>;
+  let topicMetadata: Awaited<ReturnType<typeof admin.fetchTopicMetadata>>;
   try {
-    rawMetadata = await admin.fetchTopicMetadata({ topics: [...missing] });
+    topicMetadata = await admin.fetchTopicMetadata({ topics: [...missing] });
   } catch (err) {
     if (!isUnknownTopicError(err)) throw err;
     // The batched call rejected with an unknown-topic code but doesn't
@@ -495,9 +491,7 @@ async function resolveNeverCommittedFilterTopics(
   // Defensive against the silently-omits-missing-topic surface shape:
   // locate the first requested topic that didn't come back, in
   // user-supplied order.
-  const returnedNames = new Set(
-    normalizeFetchTopicMetadataResponse(rawMetadata).map((t) => t.name),
-  );
+  const returnedNames = new Set(topicMetadata.map((t) => t.name));
   const firstMissing = missing.find((t) => !returnedNames.has(t));
   if (firstMissing !== undefined) {
     return {

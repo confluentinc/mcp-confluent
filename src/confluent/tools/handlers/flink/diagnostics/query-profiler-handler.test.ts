@@ -158,6 +158,27 @@ describe("query-profiler-handler.ts", () => {
         });
       });
 
+      it("should return an error response when Graph parses but has no tasks array", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudFlinkRestClient()
+          .GET.mockResolvedValue({ data: { Graph: '{"unexpected":true}' } });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: {
+            resolves: "Task graph payload is missing its tasks array",
+            isError: true,
+          },
+          clientManager,
+        });
+      });
+
       it("should detect high backpressure per-task when backpressurePercent exceeds 50%", async () => {
         const cm = getMockedClientManager();
         cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({

@@ -235,11 +235,17 @@ function parseTaskGraph(
         "Task graph not available. The statement may not be running.",
     };
   }
+  let decoded: unknown;
   try {
-    return { tasks: (JSON.parse(graphJson) as TaskGraph).tasks };
+    decoded = JSON.parse(graphJson);
   } catch {
     return { errorMessage: "Failed to parse task graph." };
   }
+  const tasks = (decoded as Partial<TaskGraph>)?.tasks;
+  if (!Array.isArray(tasks)) {
+    return { errorMessage: "Task graph payload is missing its tasks array." };
+  }
+  return { tasks };
 }
 
 /**

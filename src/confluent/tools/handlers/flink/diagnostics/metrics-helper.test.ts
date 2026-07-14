@@ -214,7 +214,7 @@ describe("metrics-helper.ts", () => {
         computePoolId: "pool",
       });
       expect(result.success).toBe(true);
-      // helper queries 13 metrics; first one threw, rest returned empty
+      // helper queries 12 metrics; first one threw, rest returned empty
       expect(calls).toBeGreaterThan(1);
     });
 

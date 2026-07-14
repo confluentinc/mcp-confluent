@@ -103,7 +103,6 @@ const LONG_MIN_VALUE = -9223372036854776000;
  * @param options - Query options
  * @returns Aggregated metrics for the statement
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#661)
 export async function getStatementMetrics(
   clientManager: BaseClientManager,
   options: {
@@ -126,164 +125,28 @@ export async function getStatementMetrics(
     includeSplitBreakdown = false,
   } = options;
 
-  // Calculate time range
   const now = new Date();
   const startTime = new Date(now.getTime() - intervalMinutes * 60 * 1000);
-
-  // Metrics to query - these are the most diagnostic-relevant ones
-  const metricsToQuery = [
-    "io.confluent.flink/num_records_in",
-    "io.confluent.flink/num_records_out",
-    "io.confluent.flink/pending_records",
-    "io.confluent.flink/task/backpressure_time_ms_per_second",
-    "io.confluent.flink/task/busy_time_ms_per_second",
-    "io.confluent.flink/task/idle_time_ms_per_second",
-    "io.confluent.flink/current_input_watermark_milliseconds",
-    "io.confluent.flink/current_output_watermark_milliseconds",
-    "io.confluent.flink/num_late_records_in",
-    "io.confluent.flink/max_input_lateness_milliseconds",
-    "io.confluent.flink/statement_utilization/current_cfus",
-    "io.confluent.flink/operator/state_size_bytes",
-    "io.confluent.flink/statement_status",
-  ];
+  const scope: MetricQueryScope = {
+    statementName,
+    computePoolId,
+    startTime,
+    now,
+  };
 
   try {
     const telemetryClient =
       clientManager.getConfluentCloudTelemetryRestClient();
-    const metrics: FlinkStatementMetrics = {};
+    const metrics = await collectAggregatedMetrics(telemetryClient, scope);
 
-    // Query each metric individually (API only allows one aggregation per request)
-    for (const metric of metricsToQuery) {
-      try {
-        const response = (await telemetryClient.POST(
-          "/v2/metrics/{dataset}/query" as never,
-          {
-            params: { path: { dataset: "cloud" } },
-            body: {
-              aggregations: [{ metric }],
-              filter: {
-                op: "AND",
-                filters: [
-                  {
-                    field: "resource.flink_statement.name",
-                    op: "EQ",
-                    value: statementName,
-                  },
-                  {
-                    field: "resource.compute_pool.id",
-                    op: "EQ",
-                    value: computePoolId,
-                  },
-                ],
-              },
-              granularity: "PT1M",
-              intervals: [`${startTime.toISOString()}/${now.toISOString()}`],
-              limit: 1000,
-              group_by: ["metric.flink_task.id"],
-              format: "GROUPED",
-            },
-          } as never,
-        )) as { data?: GroupedTelemetryResponse; error?: unknown };
-
-        const data = response.data as GroupedTelemetryResponse;
-        if (data?.data && data.data.length > 0) {
-          // Aggregate values across all tasks
-          // Use SUM for counters, MAX for backpressure (bottleneck), AVG for rates
-          let sumValue = 0;
-          let maxValue = 0;
-          let count = 0;
-          for (const item of data.data) {
-            const points = item.points;
-            const pointValue = points?.[points.length - 1]?.value;
-            if (
-              pointValue !== undefined &&
-              pointValue > LONG_MIN_VALUE + 1000000
-            ) {
-              sumValue += pointValue;
-              maxValue = Math.max(maxValue, pointValue);
-              count++;
-            }
-          }
-          if (count > 0) {
-            const avgValue = sumValue / count;
-            // Map metric names to our interface with appropriate aggregation
-            if (
-              metric.includes("num_records_in") &&
-              !metric.includes("from_") &&
-              !metric.includes("late")
-            ) {
-              metrics.numRecordsIn = sumValue; // SUM for counters
-            } else if (
-              metric.includes("num_records_out") &&
-              !metric.includes("task") &&
-              !metric.includes("operator")
-            ) {
-              metrics.numRecordsOut = sumValue;
-            } else if (metric.includes("pending_records")) {
-              metrics.pendingRecords = sumValue;
-            } else if (metric.includes("backpressure_time")) {
-              // Convert ms/second to percentage (1000ms = 100%)
-              metrics.backpressureTimeMsPerSecond = (maxValue / 1000) * 100; // MAX to find bottleneck
-            } else if (metric.includes("busy_time")) {
-              metrics.busyTimeMsPerSecond = (avgValue / 1000) * 100; // AVG as percentage
-            } else if (
-              metric.includes("idle_time") &&
-              metric.includes("task")
-            ) {
-              metrics.idleTimeMsPerSecond = (avgValue / 1000) * 100;
-            } else if (metric.includes("current_input_watermark")) {
-              metrics.currentInputWatermarkMs = maxValue; // MAX for watermarks
-            } else if (metric.includes("current_output_watermark")) {
-              metrics.currentOutputWatermarkMs = maxValue;
-            } else if (metric.includes("num_late_records")) {
-              metrics.numLateRecordsIn = sumValue;
-            } else if (metric.includes("max_input_lateness")) {
-              metrics.maxInputLatenessMs = maxValue; // MAX for lateness
-            } else if (metric.includes("current_cfus")) {
-              metrics.currentCfus = sumValue; // SUM for CFUs
-            } else if (metric.includes("state_size_bytes")) {
-              metrics.stateSizeBytes = sumValue; // SUM for total state
-            }
-          }
-        }
-      } catch {
-        // Continue with other metrics if one fails
-      }
-    }
-
-    // Calculate watermark lag if we have both input and output watermarks
-    if (
-      metrics.currentInputWatermarkMs !== undefined &&
-      metrics.currentOutputWatermarkMs !== undefined
-    ) {
-      metrics.watermarkLagMs =
-        metrics.currentInputWatermarkMs - metrics.currentOutputWatermarkMs;
-    }
-
-    // Query per-task breakdown if requested
     if (includeTaskBreakdown) {
-      const taskMetrics = await queryTaskMetrics(telemetryClient, {
-        statementName,
-        computePoolId,
-        startTime,
-        now,
-      });
-      if (taskMetrics.length > 0) {
-        metrics.byTask = taskMetrics;
-      }
+      const taskMetrics = await queryTaskMetrics(telemetryClient, scope);
+      if (taskMetrics.length > 0) metrics.byTask = taskMetrics;
     }
 
-    // Query per-split breakdown if requested
     if (includeSplitBreakdown) {
-      const splitMetrics = await querySplitMetrics(telemetryClient, {
-        statementName,
-        computePoolId,
-        startTime,
-        now,
-      });
-      if (splitMetrics.length > 0) {
-        metrics.bySplit = splitMetrics;
-      }
+      const splitMetrics = await querySplitMetrics(telemetryClient, scope);
+      if (splitMetrics.length > 0) metrics.bySplit = splitMetrics;
     }
 
     return { success: true, metrics };
@@ -298,126 +161,489 @@ export async function getStatementMetrics(
 /**
  * Analyze metrics and return diagnostic insights.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#661)
 export function analyzeMetrics(metrics: FlinkStatementMetrics): {
-  issues: Array<{
-    type: string;
-    severity: "low" | "medium" | "high" | "critical";
-    description: string;
-    suggestion: string;
-    value?: number;
-  }>;
+  issues: MetricIssue[];
   summary: string;
 } {
-  const issues: Array<{
-    type: string;
-    severity: "low" | "medium" | "high" | "critical";
-    description: string;
-    suggestion: string;
-    value?: number;
-  }> = [];
+  const issues = ISSUE_DETECTORS.map((detect) => detect(metrics)).filter(
+    (issue): issue is MetricIssue => issue !== undefined,
+  );
 
-  // Check backpressure (high backpressure indicates downstream bottleneck)
-  // Values are already in percentage (0-100)
-  if (metrics.backpressureTimeMsPerSecond !== undefined) {
-    const backpressurePercent = metrics.backpressureTimeMsPerSecond;
-    if (backpressurePercent > 50) {
-      issues.push({
-        type: "high_backpressure",
-        severity: "high",
-        description: `High backpressure detected: ${backpressurePercent.toFixed(1)}% of time spent backpressured.`,
-        suggestion:
-          "Downstream operators or sinks are slow. Consider: 1) Increasing sink parallelism, 2) Optimizing sink performance, 3) Checking for slow consumers.",
-        value: backpressurePercent,
-      });
-    } else if (backpressurePercent > 20) {
-      issues.push({
-        type: "moderate_backpressure",
-        severity: "medium",
-        description: `Moderate backpressure: ${backpressurePercent.toFixed(1)}% of time spent backpressured.`,
-        suggestion: "Some downstream slowdown detected. Monitor for increases.",
-        value: backpressurePercent,
-      });
+  return { issues, summary: buildMetricsSummary(metrics) };
+}
+
+/**
+ * Query per-task metrics breakdown using GROUPED format.
+ */
+async function queryTaskMetrics(
+  telemetryClient: TelemetryRestClient,
+  scope: MetricQueryScope,
+): Promise<TaskMetrics[]> {
+  const taskMap = new Map<string, TaskMetrics>();
+
+  for (const metric of Object.keys(TASK_METRIC_FIELDS)) {
+    try {
+      const items = await postGroupedMetric(
+        telemetryClient,
+        metric,
+        scope,
+        "metric.flink_task.id",
+      );
+      for (const item of items) {
+        const taskId = item["metric.flink_task.id"];
+        const value = lastPointValue(item);
+        if (!taskId || value === undefined) continue;
+        const field = TASK_METRIC_FIELDS[metric];
+        if (!field) continue;
+
+        const entry = taskMap.get(taskId) ?? { taskId };
+        entry[field] = value;
+        taskMap.set(taskId, entry);
+      }
+    } catch {
+      // Continue with other metrics if one fails
     }
   }
 
-  // Check pending records (consumer lag)
-  if (metrics.pendingRecords !== undefined && metrics.pendingRecords > 100000) {
-    issues.push({
-      type: "high_lag",
-      severity: metrics.pendingRecords > 1000000 ? "high" : "medium",
-      description: `High consumer lag: ${metrics.pendingRecords.toLocaleString()} pending records.`,
-      suggestion:
-        "Statement is falling behind input rate. Consider: 1) Increasing parallelism, 2) Optimizing query, 3) Adding more CFUs.",
-      value: metrics.pendingRecords,
-    });
+  return Array.from(taskMap.values());
+}
+
+/**
+ * Query per-split metrics breakdown using GROUPED format.
+ * Split names are human-readable (e.g., "orders-0" for topic-partition).
+ */
+async function querySplitMetrics(
+  telemetryClient: TelemetryRestClient,
+  scope: MetricQueryScope,
+): Promise<SplitMetrics[]> {
+  const splitMap = new Map<string, SplitMetrics>();
+
+  for (const metric of Object.keys(SPLIT_METRIC_FIELDS)) {
+    try {
+      const items = await postGroupedMetric(
+        telemetryClient,
+        metric,
+        scope,
+        "metric.flink_split",
+      );
+      for (const item of items) {
+        const splitName = item["metric.flink_split"];
+        const value = lastPointValue(item);
+        if (!splitName || value === undefined) continue;
+        // Skip Long.MIN_VALUE (no watermark set)
+        if (metric.includes("watermark_ms") && value < LONG_MIN_VALUE + 1000000)
+          continue;
+        const field = SPLIT_METRIC_FIELDS[metric];
+        if (!field) continue;
+
+        const entry = splitMap.get(splitName) ?? { splitName };
+        entry[field] = value;
+        splitMap.set(splitName, entry);
+      }
+    } catch {
+      // Continue with other metrics if one fails
+    }
   }
 
-  // Check for late data
-  if (metrics.numLateRecordsIn !== undefined && metrics.numLateRecordsIn > 0) {
-    const severity =
-      metrics.numLateRecordsIn > 10000
-        ? "high"
-        : metrics.numLateRecordsIn > 1000
-          ? "medium"
-          : "low";
-    issues.push({
-      type: "late_data",
-      severity,
-      description: `Late records detected: ${metrics.numLateRecordsIn.toLocaleString()} records arrived after watermark.`,
-      suggestion:
-        "Consider: 1) Increasing watermark delay tolerance, 2) Investigating source timestamp issues, 3) Using allowed lateness in window operations.",
-      value: metrics.numLateRecordsIn,
-    });
+  return Array.from(splitMap.values());
+}
+
+type TelemetryRestClient = ReturnType<
+  BaseClientManager["getConfluentCloudTelemetryRestClient"]
+>;
+
+/**
+ * The statement/compute-pool selectors and time window shared by every
+ * telemetry query a single getStatementMetrics call issues.
+ */
+interface MetricQueryScope {
+  statementName: string;
+  computePoolId: string;
+  startTime: Date;
+  now: Date;
+}
+
+/**
+ * Issue POST to the telemetry query endpoint for one metric grouped by the
+ * given label, returning the GROUPED data rows (empty array when absent).
+ */
+async function postGroupedMetric(
+  telemetryClient: TelemetryRestClient,
+  metric: string,
+  scope: MetricQueryScope,
+  groupBy: string,
+): Promise<NonNullable<GroupedTelemetryResponse["data"]>> {
+  const response = (await telemetryClient.POST(
+    "/v2/metrics/{dataset}/query" as never,
+    {
+      params: { path: { dataset: "cloud" } },
+      body: {
+        aggregations: [{ metric }],
+        filter: {
+          op: "AND",
+          filters: [
+            {
+              field: "resource.flink_statement.name",
+              op: "EQ",
+              value: scope.statementName,
+            },
+            {
+              field: "resource.compute_pool.id",
+              op: "EQ",
+              value: scope.computePoolId,
+            },
+          ],
+        },
+        granularity: "PT1M",
+        intervals: [
+          `${scope.startTime.toISOString()}/${scope.now.toISOString()}`,
+        ],
+        limit: 1000,
+        group_by: [groupBy],
+        format: "GROUPED",
+      },
+    } as never,
+  )) as { data?: GroupedTelemetryResponse; error?: unknown };
+
+  const data = response.data as GroupedTelemetryResponse;
+  return data?.data ?? [];
+}
+
+/**
+ * The value of a GROUPED row's most recent point, or undefined when the row
+ * carries no points.
+ */
+function lastPointValue(item: {
+  points?: Array<{ value?: number }>;
+}): number | undefined {
+  const points = item.points;
+  return points?.[points.length - 1]?.value;
+}
+
+/** SUM / MAX / AVG of one metric's points across all task groups. */
+interface AggregatedValue {
+  sum: number;
+  max: number;
+  avg: number;
+}
+
+/**
+ * Query one statement-level metric and reduce its per-task points into
+ * SUM / MAX / AVG, dropping the Long.MIN_VALUE watermark sentinel. Returns
+ * undefined when no valid points exist or the query fails.
+ */
+async function queryAggregatedStatementMetric(
+  telemetryClient: TelemetryRestClient,
+  metric: string,
+  scope: MetricQueryScope,
+): Promise<AggregatedValue | undefined> {
+  try {
+    const items = await postGroupedMetric(
+      telemetryClient,
+      metric,
+      scope,
+      "metric.flink_task.id",
+    );
+    let sum = 0;
+    let max = 0;
+    let count = 0;
+    for (const item of items) {
+      const value = lastPointValue(item);
+      if (value !== undefined && value > LONG_MIN_VALUE + 1000000) {
+        sum += value;
+        max = Math.max(max, value);
+        count++;
+      }
+    }
+    if (count === 0) return undefined;
+    return { sum, max, avg: sum / count };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Query every statement-level metric individually (the API allows one
+ * aggregation per request), assign each into its target field, and derive
+ * watermark lag when both watermarks are present.
+ */
+async function collectAggregatedMetrics(
+  telemetryClient: TelemetryRestClient,
+  scope: MetricQueryScope,
+): Promise<FlinkStatementMetrics> {
+  const metrics: FlinkStatementMetrics = {};
+
+  for (const metric of Object.keys(STATEMENT_METRIC_MAPPINGS)) {
+    const aggregated = await queryAggregatedStatementMetric(
+      telemetryClient,
+      metric,
+      scope,
+    );
+    if (aggregated === undefined) continue;
+    const mapping = STATEMENT_METRIC_MAPPINGS[metric];
+    if (mapping) metrics[mapping.field] = mapping.aggregate(aggregated);
   }
 
-  // Check max lateness
   if (
-    metrics.maxInputLatenessMs !== undefined &&
-    metrics.maxInputLatenessMs > 60000
+    metrics.currentInputWatermarkMs !== undefined &&
+    metrics.currentOutputWatermarkMs !== undefined
   ) {
-    issues.push({
-      type: "high_lateness",
-      severity: metrics.maxInputLatenessMs > 300000 ? "high" : "medium",
-      description: `High input lateness: max ${(metrics.maxInputLatenessMs / 1000).toFixed(1)}s behind watermark.`,
+    metrics.watermarkLagMs =
+      metrics.currentInputWatermarkMs - metrics.currentOutputWatermarkMs;
+  }
+
+  return metrics;
+}
+
+// Fields of FlinkStatementMetrics that hold a plain number (excludes the
+// string status and the array breakdowns).
+type NumericStatementMetricField = {
+  [K in keyof FlinkStatementMetrics]-?: NonNullable<
+    FlinkStatementMetrics[K]
+  > extends number
+    ? K
+    : never;
+}[keyof FlinkStatementMetrics];
+
+/** How one telemetry metric name maps onto an aggregated statement field. */
+interface StatementMetricMapping {
+  field: NumericStatementMetricField;
+  aggregate: (aggregated: AggregatedValue) => number;
+}
+
+// Statement-level metrics to query, each mapped to its target field and the
+// aggregation appropriate for it: SUM for counters, MAX for bottleneck/
+// watermark gauges, AVG for utilization rates. ms/second rates are scaled to
+// a 0-100 percentage (1000 ms/s = 100%).
+const STATEMENT_METRIC_MAPPINGS: Record<string, StatementMetricMapping> = {
+  "io.confluent.flink/num_records_in": {
+    field: "numRecordsIn",
+    aggregate: (a) => a.sum,
+  },
+  "io.confluent.flink/num_records_out": {
+    field: "numRecordsOut",
+    aggregate: (a) => a.sum,
+  },
+  "io.confluent.flink/pending_records": {
+    field: "pendingRecords",
+    aggregate: (a) => a.sum,
+  },
+  "io.confluent.flink/task/backpressure_time_ms_per_second": {
+    field: "backpressureTimeMsPerSecond",
+    aggregate: (a) => (a.max / 1000) * 100,
+  },
+  "io.confluent.flink/task/busy_time_ms_per_second": {
+    field: "busyTimeMsPerSecond",
+    aggregate: (a) => (a.avg / 1000) * 100,
+  },
+  "io.confluent.flink/task/idle_time_ms_per_second": {
+    field: "idleTimeMsPerSecond",
+    aggregate: (a) => (a.avg / 1000) * 100,
+  },
+  "io.confluent.flink/current_input_watermark_milliseconds": {
+    field: "currentInputWatermarkMs",
+    aggregate: (a) => a.max,
+  },
+  "io.confluent.flink/current_output_watermark_milliseconds": {
+    field: "currentOutputWatermarkMs",
+    aggregate: (a) => a.max,
+  },
+  "io.confluent.flink/num_late_records_in": {
+    field: "numLateRecordsIn",
+    aggregate: (a) => a.sum,
+  },
+  "io.confluent.flink/max_input_lateness_milliseconds": {
+    field: "maxInputLatenessMs",
+    aggregate: (a) => a.max,
+  },
+  "io.confluent.flink/statement_utilization/current_cfus": {
+    field: "currentCfus",
+    aggregate: (a) => a.sum,
+  },
+  "io.confluent.flink/operator/state_size_bytes": {
+    field: "stateSizeBytes",
+    aggregate: (a) => a.sum,
+  },
+};
+
+// Non-label numeric fields of TaskMetrics (everything but the taskId key).
+type NumericTaskMetricField = Exclude<keyof TaskMetrics, "taskId">;
+
+// Per-task metrics to query, mapped to their target TaskMetrics field.
+const TASK_METRIC_FIELDS: Record<string, NumericTaskMetricField> = {
+  "io.confluent.flink/task/num_records_in": "numRecordsIn",
+  "io.confluent.flink/task/num_records_out": "numRecordsOut",
+  "io.confluent.flink/task/num_bytes_in": "numBytesIn",
+  "io.confluent.flink/task/num_bytes_out": "numBytesOut",
+  "io.confluent.flink/task/backpressure_time_ms_per_second":
+    "backpressureTimeMsPerSecond",
+  "io.confluent.flink/task/busy_time_ms_per_second": "busyTimeMsPerSecond",
+  "io.confluent.flink/task/idle_time_ms_per_second": "idleTimeMsPerSecond",
+  "io.confluent.flink/operator/state_size_bytes": "stateSizeBytes",
+};
+
+// Non-label numeric fields of SplitMetrics (everything but the splitName key).
+type NumericSplitMetricField = Exclude<keyof SplitMetrics, "splitName">;
+
+// Per-split metrics to query, mapped to their target SplitMetrics field.
+const SPLIT_METRIC_FIELDS: Record<string, NumericSplitMetricField> = {
+  "io.confluent.flink/split/current_watermark_ms": "currentWatermarkMs",
+  "io.confluent.flink/split/watermark_active_time_ms_per_second":
+    "watermarkActiveTimeMsPerSecond",
+  "io.confluent.flink/split/watermark_paused_time_ms_per_second":
+    "watermarkPausedTimeMsPerSecond",
+  "io.confluent.flink/split/watermark_idle_time_ms_per_second":
+    "watermarkIdleTimeMsPerSecond",
+};
+
+type IssueSeverity = "low" | "medium" | "high" | "critical";
+
+/** A single diagnostic finding derived from a metrics snapshot. */
+interface MetricIssue {
+  type: string;
+  severity: IssueSeverity;
+  description: string;
+  suggestion: string;
+  value?: number;
+}
+
+/**
+ * Ordered issue detectors, each inspecting one metric dimension and returning
+ * a finding or undefined. analyzeMetrics runs them in order and keeps the hits.
+ */
+const ISSUE_DETECTORS: Array<
+  (metrics: FlinkStatementMetrics) => MetricIssue | undefined
+> = [
+  detectBackpressure,
+  detectLag,
+  detectLateData,
+  detectLateness,
+  detectIdle,
+  detectLargeState,
+];
+
+// High backpressure indicates a downstream bottleneck. Values are already a
+// 0-100 percentage.
+function detectBackpressure(
+  metrics: FlinkStatementMetrics,
+): MetricIssue | undefined {
+  const backpressurePercent = metrics.backpressureTimeMsPerSecond;
+  if (backpressurePercent === undefined) return undefined;
+  if (backpressurePercent > 50) {
+    return {
+      type: "high_backpressure",
+      severity: "high",
+      description: `High backpressure detected: ${backpressurePercent.toFixed(1)}% of time spent backpressured.`,
       suggestion:
-        "Some records are arriving significantly late. This may cause data loss in window operations.",
-      value: metrics.maxInputLatenessMs,
-    });
+        "Downstream operators or sinks are slow. Consider: 1) Increasing sink parallelism, 2) Optimizing sink performance, 3) Checking for slow consumers.",
+      value: backpressurePercent,
+    };
   }
-
-  // Check idle time (might indicate waiting for data)
-  // Values are already in percentage (0-100)
-  if (metrics.idleTimeMsPerSecond !== undefined) {
-    const idlePercent = metrics.idleTimeMsPerSecond;
-    if (idlePercent > 90 && metrics.numRecordsIn === 0) {
-      issues.push({
-        type: "no_input_data",
-        severity: "medium",
-        description: `Statement is mostly idle (${idlePercent.toFixed(1)}%) with no input records.`,
-        suggestion:
-          "Check if source topics have data. Verify topic names and connectivity.",
-        value: idlePercent,
-      });
-    }
+  if (backpressurePercent > 20) {
+    return {
+      type: "moderate_backpressure",
+      severity: "medium",
+      description: `Moderate backpressure: ${backpressurePercent.toFixed(1)}% of time spent backpressured.`,
+      suggestion: "Some downstream slowdown detected. Monitor for increases.",
+      value: backpressurePercent,
+    };
   }
+  return undefined;
+}
 
-  // Check state size (large state can cause performance issues)
-  if (metrics.stateSizeBytes !== undefined) {
-    const stateSizeGB = metrics.stateSizeBytes / (1024 * 1024 * 1024);
-    if (stateSizeGB > 10) {
-      issues.push({
-        type: "large_state",
-        severity: "medium",
-        description: `Large state size: ${stateSizeGB.toFixed(2)} GB.`,
-        suggestion:
-          "Consider: 1) Adding TTL to stateful operations, 2) Using incremental checkpoints, 3) Reviewing deduplication windows.",
-        value: metrics.stateSizeBytes,
-      });
-    }
-  }
+// Pending records are the statement's consumer lag.
+function detectLag(metrics: FlinkStatementMetrics): MetricIssue | undefined {
+  if (metrics.pendingRecords === undefined || metrics.pendingRecords <= 100000)
+    return undefined;
+  return {
+    type: "high_lag",
+    severity: metrics.pendingRecords > 1000000 ? "high" : "medium",
+    description: `High consumer lag: ${metrics.pendingRecords.toLocaleString()} pending records.`,
+    suggestion:
+      "Statement is falling behind input rate. Consider: 1) Increasing parallelism, 2) Optimizing query, 3) Adding more CFUs.",
+    value: metrics.pendingRecords,
+  };
+}
 
-  // Build summary
+// Records that arrived after the watermark.
+function detectLateData(
+  metrics: FlinkStatementMetrics,
+): MetricIssue | undefined {
+  if (metrics.numLateRecordsIn === undefined || metrics.numLateRecordsIn <= 0)
+    return undefined;
+  const severity: IssueSeverity =
+    metrics.numLateRecordsIn > 10000
+      ? "high"
+      : metrics.numLateRecordsIn > 1000
+        ? "medium"
+        : "low";
+  return {
+    type: "late_data",
+    severity,
+    description: `Late records detected: ${metrics.numLateRecordsIn.toLocaleString()} records arrived after watermark.`,
+    suggestion:
+      "Consider: 1) Increasing watermark delay tolerance, 2) Investigating source timestamp issues, 3) Using allowed lateness in window operations.",
+    value: metrics.numLateRecordsIn,
+  };
+}
+
+// How far behind the watermark the latest records are.
+function detectLateness(
+  metrics: FlinkStatementMetrics,
+): MetricIssue | undefined {
+  if (
+    metrics.maxInputLatenessMs === undefined ||
+    metrics.maxInputLatenessMs <= 60000
+  )
+    return undefined;
+  return {
+    type: "high_lateness",
+    severity: metrics.maxInputLatenessMs > 300000 ? "high" : "medium",
+    description: `High input lateness: max ${(metrics.maxInputLatenessMs / 1000).toFixed(1)}s behind watermark.`,
+    suggestion:
+      "Some records are arriving significantly late. This may cause data loss in window operations.",
+    value: metrics.maxInputLatenessMs,
+  };
+}
+
+// Mostly-idle with no input often means the source topics are empty. Values
+// are already a 0-100 percentage.
+function detectIdle(metrics: FlinkStatementMetrics): MetricIssue | undefined {
+  const idlePercent = metrics.idleTimeMsPerSecond;
+  if (idlePercent === undefined || idlePercent <= 90) return undefined;
+  if (metrics.numRecordsIn !== 0) return undefined;
+  return {
+    type: "no_input_data",
+    severity: "medium",
+    description: `Statement is mostly idle (${idlePercent.toFixed(1)}%) with no input records.`,
+    suggestion:
+      "Check if source topics have data. Verify topic names and connectivity.",
+    value: idlePercent,
+  };
+}
+
+// Large state can degrade performance.
+function detectLargeState(
+  metrics: FlinkStatementMetrics,
+): MetricIssue | undefined {
+  if (metrics.stateSizeBytes === undefined) return undefined;
+  const stateSizeGB = metrics.stateSizeBytes / (1024 * 1024 * 1024);
+  if (stateSizeGB <= 10) return undefined;
+  return {
+    type: "large_state",
+    severity: "medium",
+    description: `Large state size: ${stateSizeGB.toFixed(2)} GB.`,
+    suggestion:
+      "Consider: 1) Adding TTL to stateful operations, 2) Using incremental checkpoints, 3) Reviewing deduplication windows.",
+    value: metrics.stateSizeBytes,
+  };
+}
+
+/**
+ * A single pipe-delimited line of the headline throughput/utilization figures,
+ * or a placeholder when no metrics are populated.
+ */
+function buildMetricsSummary(metrics: FlinkStatementMetrics): string {
   const parts: string[] = [];
   if (metrics.numRecordsIn !== undefined) {
     parts.push(`Records in: ${metrics.numRecordsIn.toLocaleString()}`);
@@ -443,206 +669,5 @@ export function analyzeMetrics(metrics: FlinkStatementMetrics): {
     parts.push(`CFUs: ${metrics.currentCfus.toFixed(2)}`);
   }
 
-  const summary =
-    parts.length > 0 ? parts.join(" | ") : "No metrics data available";
-
-  return { issues, summary };
-}
-
-/**
- * Query per-task metrics breakdown using GROUPED format.
- */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#661)
-async function queryTaskMetrics(
-  telemetryClient: ReturnType<
-    BaseClientManager["getConfluentCloudTelemetryRestClient"]
-  >,
-  options: {
-    statementName: string;
-    computePoolId: string;
-    startTime: Date;
-    now: Date;
-  },
-): Promise<TaskMetrics[]> {
-  const { statementName, computePoolId, startTime, now } = options;
-
-  // Metrics to query per task
-  const taskMetricsToQuery = [
-    "io.confluent.flink/task/num_records_in",
-    "io.confluent.flink/task/num_records_out",
-    "io.confluent.flink/task/num_bytes_in",
-    "io.confluent.flink/task/num_bytes_out",
-    "io.confluent.flink/task/backpressure_time_ms_per_second",
-    "io.confluent.flink/task/busy_time_ms_per_second",
-    "io.confluent.flink/task/idle_time_ms_per_second",
-    "io.confluent.flink/operator/state_size_bytes",
-  ];
-
-  const taskMap = new Map<string, TaskMetrics>();
-
-  for (const metric of taskMetricsToQuery) {
-    try {
-      const response = (await telemetryClient.POST(
-        "/v2/metrics/{dataset}/query" as never,
-        {
-          params: { path: { dataset: "cloud" } },
-          body: {
-            aggregations: [{ metric }],
-            filter: {
-              op: "AND",
-              filters: [
-                {
-                  field: "resource.flink_statement.name",
-                  op: "EQ",
-                  value: statementName,
-                },
-                {
-                  field: "resource.compute_pool.id",
-                  op: "EQ",
-                  value: computePoolId,
-                },
-              ],
-            },
-            granularity: "PT1M",
-            intervals: [`${startTime.toISOString()}/${now.toISOString()}`],
-            limit: 1000,
-            group_by: ["metric.flink_task.id"],
-            format: "GROUPED",
-          },
-        } as never,
-      )) as { data?: GroupedTelemetryResponse; error?: unknown };
-
-      const data = response.data as GroupedTelemetryResponse;
-      if (data?.data) {
-        for (const item of data.data) {
-          const taskId = item["metric.flink_task.id"];
-          const value = item.points?.[item.points.length - 1]?.value;
-          if (!taskId || value === undefined) continue;
-
-          if (!taskMap.has(taskId)) {
-            taskMap.set(taskId, { taskId });
-          }
-          const taskMetrics = taskMap.get(taskId)!;
-
-          if (metric.includes("num_records_in"))
-            taskMetrics.numRecordsIn = value;
-          else if (metric.includes("num_records_out"))
-            taskMetrics.numRecordsOut = value;
-          else if (metric.includes("num_bytes_in"))
-            taskMetrics.numBytesIn = value;
-          else if (metric.includes("num_bytes_out"))
-            taskMetrics.numBytesOut = value;
-          else if (metric.includes("backpressure"))
-            taskMetrics.backpressureTimeMsPerSecond = value;
-          else if (metric.includes("busy_time"))
-            taskMetrics.busyTimeMsPerSecond = value;
-          else if (metric.includes("idle_time"))
-            taskMetrics.idleTimeMsPerSecond = value;
-          else if (metric.includes("state_size"))
-            taskMetrics.stateSizeBytes = value;
-        }
-      }
-    } catch {
-      // Continue with other metrics if one fails
-    }
-  }
-
-  return Array.from(taskMap.values());
-}
-
-/**
- * Query per-split metrics breakdown using GROUPED format.
- * Split names are human-readable (e.g., "orders-0" for topic-partition).
- */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#661)
-async function querySplitMetrics(
-  telemetryClient: ReturnType<
-    BaseClientManager["getConfluentCloudTelemetryRestClient"]
-  >,
-  options: {
-    statementName: string;
-    computePoolId: string;
-    startTime: Date;
-    now: Date;
-  },
-): Promise<SplitMetrics[]> {
-  const { statementName, computePoolId, startTime, now } = options;
-
-  // Metrics to query per split
-  const splitMetricsToQuery = [
-    "io.confluent.flink/split/current_watermark_ms",
-    "io.confluent.flink/split/watermark_active_time_ms_per_second",
-    "io.confluent.flink/split/watermark_paused_time_ms_per_second",
-    "io.confluent.flink/split/watermark_idle_time_ms_per_second",
-  ];
-
-  const splitMap = new Map<string, SplitMetrics>();
-
-  for (const metric of splitMetricsToQuery) {
-    try {
-      const response = (await telemetryClient.POST(
-        "/v2/metrics/{dataset}/query" as never,
-        {
-          params: { path: { dataset: "cloud" } },
-          body: {
-            aggregations: [{ metric }],
-            filter: {
-              op: "AND",
-              filters: [
-                {
-                  field: "resource.flink_statement.name",
-                  op: "EQ",
-                  value: statementName,
-                },
-                {
-                  field: "resource.compute_pool.id",
-                  op: "EQ",
-                  value: computePoolId,
-                },
-              ],
-            },
-            granularity: "PT1M",
-            intervals: [`${startTime.toISOString()}/${now.toISOString()}`],
-            limit: 1000,
-            group_by: ["metric.flink_split"],
-            format: "GROUPED",
-          },
-        } as never,
-      )) as { data?: GroupedTelemetryResponse; error?: unknown };
-
-      const data = response.data as GroupedTelemetryResponse;
-      if (data?.data) {
-        for (const item of data.data) {
-          const splitName = item["metric.flink_split"];
-          const value = item.points?.[item.points.length - 1]?.value;
-          if (!splitName || value === undefined) continue;
-
-          // Skip Long.MIN_VALUE (no watermark set)
-          if (
-            metric.includes("watermark_ms") &&
-            value < LONG_MIN_VALUE + 1000000
-          )
-            continue;
-
-          if (!splitMap.has(splitName)) {
-            splitMap.set(splitName, { splitName });
-          }
-          const splitMetrics = splitMap.get(splitName)!;
-
-          if (metric.includes("current_watermark_ms"))
-            splitMetrics.currentWatermarkMs = value;
-          else if (metric.includes("active_time"))
-            splitMetrics.watermarkActiveTimeMsPerSecond = value;
-          else if (metric.includes("paused_time"))
-            splitMetrics.watermarkPausedTimeMsPerSecond = value;
-          else if (metric.includes("idle_time"))
-            splitMetrics.watermarkIdleTimeMsPerSecond = value;
-        }
-      }
-    } catch {
-      // Continue with other metrics if one fails
-    }
-  }
-
-  return Array.from(splitMap.values());
+  return parts.length > 0 ? parts.join(" | ") : "No metrics data available";
 }

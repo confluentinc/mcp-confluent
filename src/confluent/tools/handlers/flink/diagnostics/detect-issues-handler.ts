@@ -1,4 +1,4 @@
-import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
@@ -218,14 +218,16 @@ function buildPhaseIssue(
         suggestion:
           "Check the exceptions for root cause. Consider fixing the SQL or configuration and resubmitting.",
       };
-    case "FAILING":
+    case "FAILING": {
+      const detailSuffix = detail ? ` Detail: ${detail}` : "";
       return {
         type: "statement_failing",
         severity: "high",
-        description: `Statement is in a failing state and may stop soon.${detail ? ` Detail: ${detail}` : ""}`,
+        description: `Statement is in a failing state and may stop soon.${detailSuffix}`,
         suggestion:
           "Investigate exceptions immediately. The statement may recover or fail completely.",
       };
+    }
     case "DEGRADED":
       return {
         type: "statement_degraded",

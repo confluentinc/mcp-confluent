@@ -371,6 +371,31 @@ describe("detect-issues-handler.ts", () => {
           clientManager,
         });
       });
+
+      it("should fold a metrics query error into the summary without failing the request", async () => {
+        const clientManager = getMockedClientManager();
+        wireFlinkPair(clientManager, { status: { phase: "RUNNING" } });
+        clientManager.getConfluentCloudTelemetryRestClient.mockImplementation(
+          () => {
+            throw new Error("telemetry unreachable");
+          },
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { statementName: STATEMENT_NAME, includeMetrics: true },
+          outcome: {
+            resolves:
+              "Metrics: Metrics unavailable: Failed to query metrics: telemetry unreachable",
+          },
+          clientManager,
+        });
+      });
     });
   });
 });

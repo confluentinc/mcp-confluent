@@ -491,10 +491,7 @@ async function collectSummaryMetric(
 function lastPointValue(
   points?: Array<{ value?: number }>,
 ): number | undefined {
-  if (!points || points.length === 0) {
-    return undefined;
-  }
-  return points[points.length - 1]?.value;
+  return points?.at(-1)?.value;
 }
 
 /**
@@ -524,9 +521,7 @@ function buildSummaryView(summary: StatementSummary): Record<string, unknown> {
     recordsIn: summary.recordsIn,
     recordsOut: summary.recordsOut,
     stateBytes: summary.stateBytes,
-    stateSizeMB: summary.stateBytes
-      ? (summary.stateBytes / (1024 * 1024)).toFixed(2)
-      : undefined,
+    stateSizeMB: formatStateSizeMB(summary.stateBytes),
     pendingRecords: summary.pendingRecords,
     inputWatermark: epochMsToIso(summary.inputWatermarkMs),
     outputWatermark: epochMsToIso(summary.outputWatermarkMs),
@@ -535,11 +530,24 @@ function buildSummaryView(summary: StatementSummary): Record<string, unknown> {
 }
 
 function formatPercent(value?: number): string | undefined {
-  return value !== undefined ? `${value.toFixed(1)}%` : undefined;
+  if (value === undefined) {
+    return undefined;
+  }
+  return `${value.toFixed(1)}%`;
+}
+
+function formatStateSizeMB(bytes?: number): string | undefined {
+  if (bytes === undefined) {
+    return undefined;
+  }
+  return (bytes / (1024 * 1024)).toFixed(2);
 }
 
 function epochMsToIso(ms?: number): string | undefined {
-  return ms ? new Date(ms).toISOString() : undefined;
+  if (ms === undefined) {
+    return undefined;
+  }
+  return new Date(ms).toISOString();
 }
 
 /** Run every metric-based issue detector and collect the ones that fired. */
@@ -603,15 +611,23 @@ function detectLateData(summary: StatementSummary): DetectedIssue | undefined {
   if (lateRecords === undefined || lateRecords <= 0) {
     return undefined;
   }
-  const severity =
-    lateRecords > 10000 ? "high" : lateRecords > 1000 ? "medium" : "low";
   return {
     type: "late_data",
-    severity,
+    severity: lateDataSeverity(lateRecords),
     description: `${lateRecords.toLocaleString()} late records detected (arrived after watermark).`,
     suggestion:
       "Consider increasing watermark delay tolerance or investigating source timestamp issues.",
   };
+}
+
+function lateDataSeverity(lateRecords: number): DetectedIssue["severity"] {
+  if (lateRecords > 10000) {
+    return "high";
+  }
+  if (lateRecords > 1000) {
+    return "medium";
+  }
+  return "low";
 }
 
 function detectLargeState(

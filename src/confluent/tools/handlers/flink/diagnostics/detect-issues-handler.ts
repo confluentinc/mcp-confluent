@@ -1,3 +1,4 @@
+import { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
@@ -58,7 +59,6 @@ interface DetectedIssue {
 }
 
 export class DetectIssuesHandler extends FlinkToolHandler {
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#660)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown> | undefined,
@@ -122,177 +122,20 @@ export class DetectIssuesHandler extends FlinkToolHandler {
     const phase = statementData?.status?.phase || "UNKNOWN";
     const detail = statementData?.status?.detail || "";
     const exceptions = exceptionsData?.data || [];
-    const issues: DetectedIssue[] = [];
 
-    // Detect issues based on state
-    if (phase === "FAILED") {
-      issues.push({
-        type: "statement_failed",
-        severity: "critical",
-        description: `Statement has failed: ${detail}`,
-        suggestion:
-          "Check the exceptions for root cause. Consider fixing the SQL or configuration and resubmitting.",
-      });
-    }
+    const issues: DetectedIssue[] = [
+      ...detectStatusIssues(phase, detail),
+      ...detectExceptionIssues(exceptions),
+    ];
 
-    if (phase === "FAILING") {
-      issues.push({
-        type: "statement_failing",
-        severity: "high",
-        description: `Statement is in a failing state and may stop soon.${detail ? ` Detail: ${detail}` : ""}`,
-        suggestion:
-          "Investigate exceptions immediately. The statement may recover or fail completely.",
-      });
-    }
-
-    if (phase === "DEGRADED") {
-      issues.push({
-        type: "statement_degraded",
-        severity: "high",
-        description: `Statement is in a degraded state: ${detail || "Performance may be impacted."}`,
-        suggestion:
-          "This typically indicates an internal system issue. Contact Confluent support if the issue persists.",
-      });
-    }
-
-    if (phase === "STOPPED") {
-      issues.push({
-        type: "statement_stopped",
-        severity: "medium",
-        description: "Statement has been stopped.",
-        suggestion: "Resume the statement if processing should continue.",
-      });
-    }
-
-    // Check for error details even when phase is RUNNING or other states
-    if (
-      detail &&
-      phase !== "FAILED" &&
-      phase !== "DEGRADED" &&
-      phase !== "FAILING"
-    ) {
-      // Only report if detail contains error-like keywords
-      const errorKeywords = [
-        "error",
-        "fail",
-        "issue",
-        "problem",
-        "attention",
-        "contact support",
-      ];
-      const hasErrorKeyword = errorKeywords.some((keyword) =>
-        detail.toLowerCase().includes(keyword),
-      );
-      if (hasErrorKeyword) {
-        issues.push({
-          type: "status_warning",
-          severity: "medium",
-          description: `Status detail: ${detail}`,
-          suggestion: "Review the status message for potential issues.",
-        });
-      }
-    }
-
-    // Analyze exceptions for patterns
-    for (const exception of exceptions) {
-      const message = exception.message || "";
-      const name = exception.name || "";
-
-      // Common error patterns
-      if (
-        message.includes("OutOfMemory") ||
-        name.includes("OutOfMemoryError")
-      ) {
-        issues.push({
-          type: "memory_issue",
-          severity: "high",
-          description: "Out of memory error detected.",
-          suggestion:
-            "Consider increasing compute pool resources or optimizing the query to reduce state size.",
-        });
-      }
-
-      if (message.includes("timeout") || message.includes("Timeout")) {
-        issues.push({
-          type: "timeout",
-          severity: "medium",
-          description: `Timeout detected: ${message}`,
-          suggestion:
-            "Check network connectivity and source/sink availability. Consider increasing timeout configurations.",
-        });
-      }
-
-      if (
-        message.includes("serialization") ||
-        message.includes("Serialization")
-      ) {
-        issues.push({
-          type: "serialization_error",
-          severity: "high",
-          description: `Serialization error: ${message}`,
-          suggestion:
-            "Check schema compatibility between source and sink. Ensure data types match expected formats.",
-        });
-      }
-
-      if (
-        message.includes("permission") ||
-        message.includes("Permission") ||
-        message.includes("Access denied")
-      ) {
-        issues.push({
-          type: "permission_error",
-          severity: "high",
-          description: `Permission error: ${message}`,
-          suggestion:
-            "Verify API keys and permissions for accessing Kafka topics and other resources.",
-        });
-      }
-
-      if (message.includes("not found") || message.includes("does not exist")) {
-        issues.push({
-          type: "resource_not_found",
-          severity: "high",
-          description: `Resource not found: ${message}`,
-          suggestion:
-            "Verify that all referenced tables, topics, and databases exist.",
-        });
-      }
-    }
-
-    // Check for exception frequency (multiple exceptions indicate ongoing issues)
-    if (exceptions.length >= 5) {
-      issues.push({
-        type: "frequent_exceptions",
-        severity: "medium",
-        description: `High exception frequency: ${exceptions.length} exceptions in recent history.`,
-        suggestion:
-          "The statement is experiencing repeated failures. Investigate the root cause before exceptions accumulate.",
-      });
-    }
-
-    // Query and analyze metrics if enabled and compute pool is available
-    let metricsSummary = "";
-    if (includeMetrics && compute_pool_id) {
-      const metricsResult = await getStatementMetrics(clientManager, {
+    const { summary: metricsSummary, issues: metricsIssues } =
+      await analyzeStatementMetrics(
+        clientManager,
         statementName,
-        computePoolId: compute_pool_id,
-        intervalMinutes: 5,
-      });
-
-      if (metricsResult.success && metricsResult.metrics) {
-        const analysis = analyzeMetrics(metricsResult.metrics);
-        metricsSummary = analysis.summary;
-
-        // Add metrics-based issues
-        for (const metricsIssue of analysis.issues) {
-          issues.push(metricsIssue);
-        }
-      } else if (metricsResult.error) {
-        // Include metrics error in response but don't fail the whole request
-        metricsSummary = `Metrics unavailable: ${metricsResult.error}`;
-      }
-    }
+        compute_pool_id,
+        includeMetrics,
+      );
+    issues.push(...metricsIssues);
 
     if (issues.length === 0 && phase === "RUNNING") {
       const msg = metricsSummary
@@ -330,4 +173,235 @@ export class DetectIssuesHandler extends FlinkToolHandler {
       annotations: READ_ONLY,
     };
   }
+}
+
+/**
+ * A single Flink statement exception as returned by the exceptions endpoint.
+ */
+interface StatementException {
+  message?: string;
+  name?: string;
+}
+
+// Phases whose own issue already conveys the failure, so a status-detail
+// warning on top would be redundant. STOPPED is deliberately absent — a
+// stopped statement with error-like detail still warrants the extra warning.
+const DETAIL_WARNING_SUPPRESSING_PHASES = new Set([
+  "FAILED",
+  "DEGRADED",
+  "FAILING",
+]);
+
+const STATUS_DETAIL_ERROR_KEYWORDS = [
+  "error",
+  "fail",
+  "issue",
+  "problem",
+  "attention",
+  "contact support",
+];
+
+/**
+ * Builds the issue for a terminal/non-running phase. Returns undefined for
+ * phases that carry no phase-derived issue (e.g. RUNNING, COMPLETED).
+ */
+function buildPhaseIssue(
+  phase: string,
+  detail: string,
+): DetectedIssue | undefined {
+  switch (phase) {
+    case "FAILED":
+      return {
+        type: "statement_failed",
+        severity: "critical",
+        description: `Statement has failed: ${detail}`,
+        suggestion:
+          "Check the exceptions for root cause. Consider fixing the SQL or configuration and resubmitting.",
+      };
+    case "FAILING":
+      return {
+        type: "statement_failing",
+        severity: "high",
+        description: `Statement is in a failing state and may stop soon.${detail ? ` Detail: ${detail}` : ""}`,
+        suggestion:
+          "Investigate exceptions immediately. The statement may recover or fail completely.",
+      };
+    case "DEGRADED":
+      return {
+        type: "statement_degraded",
+        severity: "high",
+        description: `Statement is in a degraded state: ${detail || "Performance may be impacted."}`,
+        suggestion:
+          "This typically indicates an internal system issue. Contact Confluent support if the issue persists.",
+      };
+    case "STOPPED":
+      return {
+        type: "statement_stopped",
+        severity: "medium",
+        description: "Statement has been stopped.",
+        suggestion: "Resume the statement if processing should continue.",
+      };
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Derives issues from the statement's phase and status detail: the phase-based
+ * issue (if any) plus a warning when a non-failing phase carries error-like
+ * detail text.
+ */
+function detectStatusIssues(phase: string, detail: string): DetectedIssue[] {
+  const issues: DetectedIssue[] = [];
+
+  const phaseIssue = buildPhaseIssue(phase, detail);
+  if (phaseIssue) {
+    issues.push(phaseIssue);
+  }
+
+  if (detail && !DETAIL_WARNING_SUPPRESSING_PHASES.has(phase)) {
+    const lowerDetail = detail.toLowerCase();
+    const hasErrorKeyword = STATUS_DETAIL_ERROR_KEYWORDS.some((keyword) =>
+      lowerDetail.includes(keyword),
+    );
+    if (hasErrorKeyword) {
+      issues.push({
+        type: "status_warning",
+        severity: "medium",
+        description: `Status detail: ${detail}`,
+        suggestion: "Review the status message for potential issues.",
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Maps a single exception's message/name to the issues it signals — one per
+ * matched pattern, since an exception can trip several.
+ */
+function classifyException(message: string, name: string): DetectedIssue[] {
+  const issues: DetectedIssue[] = [];
+
+  if (message.includes("OutOfMemory") || name.includes("OutOfMemoryError")) {
+    issues.push({
+      type: "memory_issue",
+      severity: "high",
+      description: "Out of memory error detected.",
+      suggestion:
+        "Consider increasing compute pool resources or optimizing the query to reduce state size.",
+    });
+  }
+
+  if (message.includes("timeout") || message.includes("Timeout")) {
+    issues.push({
+      type: "timeout",
+      severity: "medium",
+      description: `Timeout detected: ${message}`,
+      suggestion:
+        "Check network connectivity and source/sink availability. Consider increasing timeout configurations.",
+    });
+  }
+
+  if (message.includes("serialization") || message.includes("Serialization")) {
+    issues.push({
+      type: "serialization_error",
+      severity: "high",
+      description: `Serialization error: ${message}`,
+      suggestion:
+        "Check schema compatibility between source and sink. Ensure data types match expected formats.",
+    });
+  }
+
+  if (
+    message.includes("permission") ||
+    message.includes("Permission") ||
+    message.includes("Access denied")
+  ) {
+    issues.push({
+      type: "permission_error",
+      severity: "high",
+      description: `Permission error: ${message}`,
+      suggestion:
+        "Verify API keys and permissions for accessing Kafka topics and other resources.",
+    });
+  }
+
+  if (message.includes("not found") || message.includes("does not exist")) {
+    issues.push({
+      type: "resource_not_found",
+      severity: "high",
+      description: `Resource not found: ${message}`,
+      suggestion:
+        "Verify that all referenced tables, topics, and databases exist.",
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * Derives issues from the exception list: the per-exception pattern matches
+ * plus a frequency warning once 5+ exceptions have accumulated.
+ */
+function detectExceptionIssues(
+  exceptions: StatementException[],
+): DetectedIssue[] {
+  const issues: DetectedIssue[] = [];
+
+  for (const exception of exceptions) {
+    issues.push(
+      ...classifyException(exception.message || "", exception.name || ""),
+    );
+  }
+
+  if (exceptions.length >= 5) {
+    issues.push({
+      type: "frequent_exceptions",
+      severity: "medium",
+      description: `High exception frequency: ${exceptions.length} exceptions in recent history.`,
+      suggestion:
+        "The statement is experiencing repeated failures. Investigate the root cause before exceptions accumulate.",
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * Queries and analyzes statement metrics when enabled and a compute pool is
+ * known. Returns an empty result (no summary, no issues) when metrics are
+ * disabled/unavailable, and folds a fetch error into the summary rather than
+ * failing the whole request.
+ */
+async function analyzeStatementMetrics(
+  clientManager: BaseClientManager,
+  statementName: string,
+  computePoolId: string | undefined,
+  includeMetrics: boolean,
+): Promise<{ summary: string; issues: DetectedIssue[] }> {
+  if (!includeMetrics || !computePoolId) {
+    return { summary: "", issues: [] };
+  }
+
+  const metricsResult = await getStatementMetrics(clientManager, {
+    statementName,
+    computePoolId,
+    intervalMinutes: 5,
+  });
+
+  if (metricsResult.success && metricsResult.metrics) {
+    const analysis = analyzeMetrics(metricsResult.metrics);
+    return { summary: analysis.summary, issues: analysis.issues };
+  }
+
+  if (metricsResult.error) {
+    return {
+      summary: `Metrics unavailable: ${metricsResult.error}`,
+      issues: [],
+    };
+  }
+
+  return { summary: "", issues: [] };
 }

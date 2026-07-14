@@ -226,7 +226,7 @@ function renderPaginationInfo(metadata: EnvironmentListMetadata): string {
     ["Next Page", metadata.next],
   ];
   const lines = links
-    .filter(([, value]) => value)
+    .filter(([, value]) => value !== undefined)
     .map(([label, value]) => `\n  ${label}: ${value}`)
     .join("");
   return `

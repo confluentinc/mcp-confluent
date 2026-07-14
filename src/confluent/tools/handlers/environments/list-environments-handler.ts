@@ -60,7 +60,6 @@ export type Environment = z.infer<typeof environmentSchema>;
 export type EnvironmentList = z.infer<typeof environmentListSchema>;
 
 export class ListEnvironmentsHandler extends BaseToolHandler {
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#659)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
@@ -92,75 +91,49 @@ export class ListEnvironmentsHandler extends BaseToolHandler {
         );
       }
 
-      try {
-        const validatedResponse = environmentListSchema.parse(
-          response,
-        ) as EnvironmentList;
-        const environments = validatedResponse.data.map((env) => ({
-          id: env.id,
-          name: env.display_name,
-          created_at: env.metadata.created_at,
-          updated_at: env.metadata.updated_at,
-          deleted_at: env.metadata.deleted_at,
-          resource_name: env.metadata.resource_name,
-          stream_governance: env.stream_governance_config?.package,
-        }));
-
-        // Format environment details for display
-        const environmentDetails = environments
-          .map(
-            (env) => `
-Environment: ${env.name}
-  ID: ${env.id}
-  Resource Name: ${env.resource_name}
-  Created At: ${env.created_at}
-  Updated At: ${env.updated_at}${env.deleted_at ? `\n  Deleted At: ${env.deleted_at}` : ""}${env.stream_governance ? `\n  Stream Governance Package: ${env.stream_governance}` : ""}
-`,
-          )
-          .join("\n");
-
-        const metadata = validatedResponse.metadata;
-        const paginationInfo = metadata
-          ? `
-Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_size}` : ""}${metadata.first ? `\n  First Page: ${metadata.first}` : ""}${metadata.last ? `\n  Last Page: ${metadata.last}` : ""}${metadata.prev ? `\n  Previous Page: ${metadata.prev}` : ""}${metadata.next ? `\n  Next Page: ${metadata.next}` : ""}
-`
-          : "";
-
-        return this.createResponse(
-          `Successfully retrieved ${environments.length} environments:\n${environmentDetails}\n${paginationInfo}`,
-          false,
-          {
-            environments,
-            total: metadata?.total_size,
-            pagination: metadata
-              ? {
-                  first: metadata.first,
-                  last: metadata.last,
-                  prev: metadata.prev,
-                  next: metadata.next,
-                }
-              : undefined,
-          },
-        );
-      } catch (validationError) {
-        logger.error(
-          { error: validationError },
-          "Environment list validation error",
-        );
-        return this.createResponse(
-          `Invalid environment list data: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
-          true,
-          { error: validationError },
-        );
-      }
+      return this.buildEnvironmentListResponse(response);
     } catch (error) {
       logger.error({ error }, "Error in ListEnvironmentsHandler");
       return this.createResponse(
-        `Failed to fetch environments: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to fetch environments: ${errorMessage(error)}`,
         true,
-        { error: error instanceof Error ? error.message : String(error) },
+        { error: errorMessage(error) },
       );
     }
+  }
+
+  /**
+   * Validates the raw environment-list payload and renders the success response,
+   * returning a validation-error response when the payload doesn't match the schema.
+   */
+  private buildEnvironmentListResponse(response: unknown): CallToolResult {
+    let validatedResponse: EnvironmentList;
+    try {
+      validatedResponse = environmentListSchema.parse(response);
+    } catch (validationError) {
+      logger.error(
+        { error: validationError },
+        "Environment list validation error",
+      );
+      return this.createResponse(
+        `Invalid environment list data: ${errorMessage(validationError)}`,
+        true,
+        { error: validationError },
+      );
+    }
+
+    const environments = validatedResponse.data.map(toEnvironmentSummary);
+    const metadata = validatedResponse.metadata;
+
+    return this.createResponse(
+      `Successfully retrieved ${environments.length} environments:\n${renderEnvironmentDetails(environments)}\n${renderPaginationInfo(metadata)}`,
+      false,
+      {
+        environments,
+        total: metadata?.total_size,
+        pagination: toPaginationMeta(metadata),
+      },
+    );
   }
 
   getToolConfig(): ToolConfig {
@@ -174,4 +147,103 @@ Pagination:${metadata.total_size ? `\n  Total Environments: ${metadata.total_siz
   }
   readonly category = ToolCategory.ConfluentCloud;
   readonly predicate = hasConfluentCloudOrOAuth;
+}
+
+type EnvironmentListMetadata = EnvironmentList["metadata"];
+
+/**
+ * Flattened view of an environment for both the rendered text and the _meta payload.
+ */
+type EnvironmentSummary = {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | undefined;
+  resource_name: string;
+  stream_governance: string | undefined;
+};
+
+/**
+ * Extracts a message from an unknown throw/error value without assuming it is an Error.
+ */
+function errorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : String(value);
+}
+
+/**
+ * Projects a validated environment onto the flat summary shape callers see.
+ */
+function toEnvironmentSummary(env: Environment): EnvironmentSummary {
+  return {
+    id: env.id,
+    name: env.display_name,
+    created_at: env.metadata.created_at,
+    updated_at: env.metadata.updated_at,
+    deleted_at: env.metadata.deleted_at,
+    resource_name: env.metadata.resource_name,
+    stream_governance: env.stream_governance_config?.package,
+  };
+}
+
+/**
+ * Renders the per-environment text block; deleted-at and stream-governance lines
+ * appear only when populated.
+ */
+function renderEnvironmentDetails(environments: EnvironmentSummary[]): string {
+  return environments
+    .map((env) => {
+      const deletedLine = env.deleted_at
+        ? `\n  Deleted At: ${env.deleted_at}`
+        : "";
+      const governanceLine = env.stream_governance
+        ? `\n  Stream Governance Package: ${env.stream_governance}`
+        : "";
+      return `
+Environment: ${env.name}
+  ID: ${env.id}
+  Resource Name: ${env.resource_name}
+  Created At: ${env.created_at}
+  Updated At: ${env.updated_at}${deletedLine}${governanceLine}
+`;
+    })
+    .join("\n");
+}
+
+/**
+ * Renders the pagination text block. A present-but-empty metadata object still
+ * emits the header; absent metadata emits nothing.
+ */
+function renderPaginationInfo(metadata: EnvironmentListMetadata): string {
+  if (!metadata) {
+    return "";
+  }
+  const links: Array<[string, string | number | undefined]> = [
+    ["Total Environments", metadata.total_size],
+    ["First Page", metadata.first],
+    ["Last Page", metadata.last],
+    ["Previous Page", metadata.prev],
+    ["Next Page", metadata.next],
+  ];
+  const lines = links
+    .filter(([, value]) => value)
+    .map(([label, value]) => `\n  ${label}: ${value}`)
+    .join("");
+  return `
+Pagination:${lines}
+`;
+}
+
+/**
+ * Builds the _meta pagination object, or undefined when no metadata was returned.
+ */
+function toPaginationMeta(metadata: EnvironmentListMetadata) {
+  return metadata
+    ? {
+        first: metadata.first,
+        last: metadata.last,
+        prev: metadata.prev,
+        next: metadata.next,
+      }
+    : undefined;
 }

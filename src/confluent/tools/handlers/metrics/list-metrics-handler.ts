@@ -44,8 +44,8 @@ interface ResourceDescriptor {
   labels: Array<{ key: string; description: string }>;
 }
 
-interface DescriptorResponse {
-  data?: MetricDescriptor[] | ResourceDescriptor[];
+interface DescriptorResponse<T> {
+  data?: T[];
   errors?: Array<{ detail?: string }>;
 }
 
@@ -210,20 +210,16 @@ async function fetchDescriptors(telemetryClient: ConfluentRestClient): Promise<{
       {
         params: { path: { dataset: "cloud" } },
       } as never,
-    ) as Promise<{ data?: DescriptorResponse }>,
+    ) as Promise<{ data?: DescriptorResponse<MetricDescriptor> }>,
     telemetryClient.GET(
       "/v2/metrics/{dataset}/descriptors/resources" as never,
       { params: { path: { dataset: "cloud" } } } as never,
-    ) as Promise<{ data?: DescriptorResponse }>,
+    ) as Promise<{ data?: DescriptorResponse<ResourceDescriptor> }>,
   ]);
 
   return {
-    metrics: (metricsResponse.data as DescriptorResponse)?.data as
-      | MetricDescriptor[]
-      | undefined,
-    resources: (resourcesResponse.data as DescriptorResponse)?.data as
-      | ResourceDescriptor[]
-      | undefined,
+    metrics: metricsResponse.data?.data,
+    resources: resourcesResponse.data?.data,
   };
 }
 
@@ -291,22 +287,15 @@ function formatMetricsSection(
   filteredMetrics: MetricDescriptor[],
   resourceType: ResourceType,
 ): string[] {
-  const lines = [
-    `Available Metrics${resourceType ? ` (${resourceType})` : ""}: ${filteredMetrics.length}`,
-    "",
-  ];
+  const scope = resourceType ? ` (${resourceType})` : "";
+  const lines = [`Available Metrics${scope}: ${filteredMetrics.length}`, ""];
 
   for (const m of filteredMetrics) {
-    lines.push(`${m.name}`);
-    lines.push(`  ${m.description}`);
-    lines.push(
-      `  Type: ${m.type} | Unit: ${m.unit} | Resources: ${m.resources.join(", ")}`,
-    );
-    if (m.labels.length > 0) {
-      const labelKeys = m.labels.map((l) => `metric.${l.key}`).join(", ");
-      lines.push(`  Filter/group_by labels: ${labelKeys}`);
-    }
-    lines.push("");
+    const detail = `  Type: ${m.type} | Unit: ${m.unit} | Resources: ${m.resources.join(", ")}`;
+    const labelKeys = m.labels.map((l) => `metric.${l.key}`).join(", ");
+    const labelLine =
+      m.labels.length > 0 ? [`  Filter/group_by labels: ${labelKeys}`] : [];
+    lines.push(`${m.name}`, `  ${m.description}`, detail, ...labelLine, "");
   }
   return lines;
 }

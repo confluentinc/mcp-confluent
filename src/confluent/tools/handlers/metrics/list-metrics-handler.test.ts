@@ -239,6 +239,34 @@ describe("list-metrics-handler.ts", () => {
         expect(text).not.toContain("No metrics descriptors available");
       });
 
+      it("should still list metrics when only the resources descriptors call fails (resources are best-effort)", async () => {
+        telemetryRest.GET.mockImplementation(((path: string) => {
+          if (path.includes("/descriptors/metrics")) {
+            return Promise.resolve({
+              data: { data: [FLINK_METRIC_DESCRIPTOR] },
+            });
+          }
+          if (path.includes("/descriptors/resources")) {
+            return Promise.resolve({
+              error: { errors: [{ detail: "forbidden" }] },
+              response: { status: 403 },
+            });
+          }
+          throw new Error(`unexpected path ${path}`);
+        }) as MockedRestClient["GET"]);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { resource_type: "flink_statement" },
+        );
+
+        const text = textOf(result);
+        expect(result.isError).toBe(false);
+        expect(text).toContain("io.confluent.flink/num_records_in");
+        expect(text).not.toContain("Resource Types and Filter Fields:");
+        expect(text).not.toContain("Failed to list metrics");
+      });
+
       it("should preserve an Error payload's message rather than JSON-stringifying it to {}", async () => {
         telemetryRest.GET.mockResolvedValue({
           error: new Error("token expired"),

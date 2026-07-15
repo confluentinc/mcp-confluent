@@ -208,7 +208,10 @@ interface DescriptorFetchResult<T> {
 
 /**
  * Fetch the metrics and resources descriptor lists from the Telemetry API in
- * parallel, unwrapping each response's nested `data.data` payload.
+ * parallel. Metrics descriptors are essential — an HTTP failure there throws so
+ * `handle()` surfaces the real cause. Resources descriptors are best-effort:
+ * they only feed the optional "Resource Types" section, so a failure there is
+ * logged and the section is omitted rather than failing the whole call.
  */
 async function fetchDescriptors(telemetryClient: ConfluentRestClient): Promise<{
   metrics?: MetricDescriptor[];
@@ -228,8 +231,8 @@ async function fetchDescriptors(telemetryClient: ConfluentRestClient): Promise<{
   ]);
 
   return {
-    metrics: unwrapDescriptors("metrics", metricsResult),
-    resources: unwrapDescriptors("resources", resourcesResult),
+    metrics: requireDescriptors("metrics", metricsResult),
+    resources: optionalDescriptors("resources", resourcesResult),
   };
 }
 
@@ -238,18 +241,39 @@ async function fetchDescriptors(telemetryClient: ConfluentRestClient): Promise<{
  * Telemetry API reported an HTTP-level failure so `handle()` surfaces the real
  * cause instead of a misleading "no descriptors available" message.
  */
-function unwrapDescriptors<T>(
+function requireDescriptors<T>(
   kind: string,
   result: DescriptorFetchResult<T>,
 ): T[] | undefined {
   if (result.error !== undefined) {
-    const status = result.response?.status;
-    const statusPart = status === undefined ? "" : ` (HTTP ${status})`;
-    throw new Error(
-      `Telemetry API error fetching ${kind} descriptors${statusPart}: ${describeDescriptorError(result.error)}`,
-    );
+    throw new Error(descriptorErrorMessage(kind, result));
   }
   return result.data?.data;
+}
+
+/**
+ * Return the descriptor payload, or `undefined` (with a logged warning) when
+ * the Telemetry API reported an HTTP-level failure — for best-effort sections
+ * that should degrade gracefully rather than fail the whole call.
+ */
+function optionalDescriptors<T>(
+  kind: string,
+  result: DescriptorFetchResult<T>,
+): T[] | undefined {
+  if (result.error !== undefined) {
+    logger.warn(descriptorErrorMessage(kind, result));
+    return undefined;
+  }
+  return result.data?.data;
+}
+
+function descriptorErrorMessage<T>(
+  kind: string,
+  result: DescriptorFetchResult<T>,
+): string {
+  const status = result.response?.status;
+  const statusPart = status === undefined ? "" : ` (HTTP ${status})`;
+  return `Telemetry API error fetching ${kind} descriptors${statusPart}: ${describeDescriptorError(result.error)}`;
 }
 
 function describeDescriptorError(error: unknown): string {

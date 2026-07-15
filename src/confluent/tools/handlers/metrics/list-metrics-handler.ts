@@ -173,7 +173,7 @@ export class ListMetricsHandler extends BaseToolHandler {
 
       return this.createResponse(lines.join("\n").trimEnd());
     } catch (error) {
-      logger.error({ error }, "Error in ListMetricsHandler");
+      logger.error({ err: error }, "Error in ListMetricsHandler");
       return this.createResponse(
         `Failed to list metrics: ${error instanceof Error ? error.message : String(error)}`,
         true,
@@ -246,7 +246,11 @@ function requireDescriptors<T>(
   result: DescriptorFetchResult<T>,
 ): T[] | undefined {
   if (result.error !== undefined) {
-    throw new Error(descriptorErrorMessage(kind, result));
+    const status = result.response?.status;
+    const statusPart = status === undefined ? "" : ` (HTTP ${status})`;
+    throw new Error(
+      `Telemetry API error fetching ${kind} descriptors${statusPart}: ${describeDescriptorError(result.error)}`,
+    );
   }
   return result.data?.data;
 }
@@ -261,19 +265,13 @@ function optionalDescriptors<T>(
   result: DescriptorFetchResult<T>,
 ): T[] | undefined {
   if (result.error !== undefined) {
-    logger.warn(descriptorErrorMessage(kind, result));
+    logger.warn(
+      { err: result.error, status: result.response?.status, kind },
+      "Telemetry API descriptors request failed; omitting best-effort section",
+    );
     return undefined;
   }
   return result.data?.data;
-}
-
-function descriptorErrorMessage<T>(
-  kind: string,
-  result: DescriptorFetchResult<T>,
-): string {
-  const status = result.response?.status;
-  const statusPart = status === undefined ? "" : ` (HTTP ${status})`;
-  return `Telemetry API error fetching ${kind} descriptors${statusPart}: ${describeDescriptorError(result.error)}`;
 }
 
 function describeDescriptorError(error: unknown): string {

@@ -108,6 +108,10 @@ below affect source-code edits too, so they're called out here:
   `vi.fn()`.
 - **Test-only helpers belong in test files.** Functions that exist solely to support tests (builders, factories, convenience wrappers around production code) must live in `*.test.ts` files or under `tests/`. Do not export them from production source files — they bloat the public API surface and obscure what the module actually provides to callers.
 
+## Logging Conventions
+
+Log through Pino (`@src/logger.js`) with the error under the `err` key (Pino's default serializer captures the stack only for that key) and other identifiers as their own fields — never string-interpolate an error into the message. Full rule at `.claude/rules/logging.md` (auto-loads when editing `src/**/*.ts`).
+
 ## Integration Test Conventions
 
 Integration tests spawn the real MCP server as a child process and exercise it against a real Confluent Cloud account over both stdio and streamable HTTP transports. Full rule at `.claude/rules/integration-tests.md` (auto-loads when editing `*.integration.test.ts` or `tests/harness/**`).

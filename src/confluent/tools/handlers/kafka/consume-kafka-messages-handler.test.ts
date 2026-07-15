@@ -1919,6 +1919,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             fakeRegistry,
             SerdeType.VALUE,
             undefined,
+            // deserializerCache: consume doesn't pass one (search does).
+            undefined,
           );
         });
 
@@ -1949,6 +1951,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             fakeRegistry,
             SerdeType.VALUE,
             headers,
+            // deserializerCache: consume doesn't pass one (search does).
+            undefined,
           );
         });
 
@@ -2057,6 +2061,8 @@ describe("consume-kafka-messages-handler.ts", () => {
             "AVRO",
             fakeRegistry,
             SerdeType.KEY,
+            undefined,
+            // deserializerCache: consume doesn't pass one (search does).
             undefined,
           );
         });

@@ -1,13 +1,7 @@
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
-import {
-  KEY_SCHEMA_ID_HEADER,
-  SchemaRegistryClient,
-  SerdeType,
-  VALUE_SCHEMA_ID_HEADER,
-} from "@confluentinc/schemaregistry";
+import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
-import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
 import { CallToolResult } from "@src/confluent/schema.js";
 import {
   BaseToolHandler,
@@ -25,6 +19,13 @@ import {
   kafkaBootstrapOrOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
 import {
+  type KeyOptions,
+  type ProcessedMessage,
+  processMessage,
+  schemaRegistryOptions,
+  type ValueOptions,
+} from "@src/confluent/tools/handlers/kafka/message-processing.js";
+import {
   createWatermarkCache,
   type WatermarkCache,
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
@@ -33,39 +34,13 @@ import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
-const schemaRegistryOptions = z
-  .object({
-    disableSchemaRegistry: z
-      .boolean()
-      .optional()
-      .default(false)
-      .describe(
-        "Set to true to skip Schema Registry decoding and return raw UTF-8 bytes. " +
-          "When false (the default), messages are auto-decoded via the registered " +
-          "AVRO / JSON / PROTOBUF schema if the connection has Schema Registry " +
-          "configured and a schema exists for the subject; otherwise left as raw bytes.",
-      ),
-    subject: z
-      .string()
-      .optional()
-      .describe(
-        "Schema registry subject. Defaults to '<topic>-value' or '<topic>-key'.",
-      ),
-  })
-  // The optional() + default() wrapping lives here on the shared
-  // schema so `valueFormat` and `keyFormat` declarations downstream
-  // are bare references — one place to change if the omit-by-default
-  // contract ever evolves.
-  .optional()
-  .default({ disableSchemaRegistry: false });
-
-// `ValueOptions` and `KeyOptions` are structurally identical to
-// `schemaRegistryOptions` — they exist as named types only to make the
-// value-side vs key-side distinction explicit at `processMessage`'s
-// signature. The schema fields below use `schemaRegistryOptions` directly;
-// no separate runtime schema is needed for each side.
-type ValueOptions = z.infer<typeof schemaRegistryOptions>;
-type KeyOptions = z.infer<typeof schemaRegistryOptions>;
+// Re-exported so existing importers (and the colocated test) can keep
+// sourcing these from the consume handler module after the
+// deserialization plumbing moved to `message-processing.ts`.
+export {
+  formatMessageTimestamp,
+  type ProcessedMessage,
+} from "@src/confluent/tools/handlers/kafka/message-processing.js";
 
 /**
  * Per-entry "where to start consuming" tagged union. Collapses the prior
@@ -213,99 +188,6 @@ export const consumeKafkaMessagesArgs = z.object({
       "Confluent Cloud environment ID (env-...) that owns the cluster. Discover via list-environments.",
     ),
 });
-
-export interface ProcessedMessage {
-  key: unknown;
-  value: unknown;
-  /**
-   * Message timestamp, normalized by {@link formatMessageTimestamp}.
-   * Usual case: an ISO 8601 UTC string like `"2026-03-01T17:00:00.000Z"`
-   * — surfaced in this format so an LLM consumer can immediately spot
-   * mismatches between a requested `start: {timestamp}` filter and the
-   * delivered records (ms-since-epoch makes such drift invisible
-   * without arithmetic). Two non-ISO outcomes are possible:
-   *
-   * - The literal sentinel `"(no timestamp)"` when the underlying
-   *   Kafka message has no timestamp (Kafka's `-1` sentinel for
-   *   pre-0.10.0 message formats, or any record whose producer didn't
-   *   set one).
-   * - The raw input string passed through unchanged when
-   *   `Number(input)` is non-finite — a defensive escape hatch for
-   *   degenerate library inputs.
-   */
-  timestamp: string;
-  offset: string;
-  /**
-   * Record headers echoed back to the caller. Kafka headers are an ordered
-   * list whose keys may repeat, so a repeated key is preserved as a
-   * `string[]` (multiplicity intact) while a single-occurrence key stays a
-   * scalar `string` — mirroring the per-key shape the underlying client
-   * surfaces. The schema-id headers decode to their GUID; every other value
-   * is stringified element-wise (see {@link echoHeaderValue}).
-   */
-  headers?: Record<string, string | string[]>;
-  topic: string;
-  partition: number;
-}
-
-/**
- * Format a Kafka message's `message.timestamp` (a string of ms-since-epoch
- * per kafkajs) into an ISO 8601 UTC string. Returns `"(no timestamp)"` for
- * undefined or Kafka's `-1` sentinel (message format pre-0.10.0 or
- * timestamp unset by the producer). Exported for direct unit-test coverage
- * of the four branches plus the empty-string edge case (`Number("")` is
- * `0`, which is finite, so an empty timestamp string formats as epoch).
- */
-export function formatMessageTimestamp(ts: string | undefined): string {
-  if (ts === undefined || ts === "-1") return "(no timestamp)";
-  const ms = Number(ts);
-  if (!Number.isFinite(ms)) return ts;
-  return new Date(ms).toISOString();
-}
-
-const SCHEMA_ID_HEADER_KEYS: ReadonlySet<string> = new Set([
-  VALUE_SCHEMA_ID_HEADER,
-  KEY_SCHEMA_ID_HEADER,
-]);
-
-/**
- * Render a record header for the echoed consume response, preserving
- * multiplicity: a repeated-key header (surfaced by the client as an array)
- * maps element-wise to a `string[]`, while a single-occurrence header stays a
- * scalar `string`. Joining the array via `Array.prototype.toString` would
- * collapse `["a", "b"]` to the lossy `"a,b"` — indistinguishable from a
- * single value literally containing a comma (#597).
- */
-function echoHeaderValue(
-  key: string,
-  value: Buffer | string | (Buffer | string)[] | undefined,
-): string | string[] {
-  if (Array.isArray(value)) {
-    return value.map((element) => echoSingleHeaderValue(key, element));
-  }
-  return echoSingleHeaderValue(key, value);
-}
-
-/**
- * Stringify one header occurrence. The schema-id headers
- * (__value_schema_id / __key_schema_id) carry the schema GUID as raw bytes;
- * decode them to the canonical GUID string so callers see the same schema
- * identifier the CCloud UI and VS Code extension surface. Every other
- * value — and any schema-id header whose bytes don't decode to a GUID — is
- * stringified as-is.
- */
-function echoSingleHeaderValue(
-  key: string,
-  value: Buffer | string | undefined,
-): string {
-  if (SCHEMA_ID_HEADER_KEYS.has(key) && Buffer.isBuffer(value)) {
-    const guid = schemaRegistryHelper.decodeSchemaGuidHeader(value);
-    if (guid !== null) {
-      return guid;
-    }
-  }
-  return value?.toString() || "";
-}
 
 /**
  * Internal normalized form for the per-topic consume options. Each parsed
@@ -993,7 +875,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
    * @param keyOptions - Options for key-side deserialization
    * @returns A processed message with deserialized key and value
    */
-  async processMessage(
+  processMessage(
     topic: string,
     partition: number,
     message: KafkaMessage,
@@ -1001,81 +883,14 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     valueOptions: ValueOptions,
     keyOptions: KeyOptions,
   ): Promise<ProcessedMessage> {
-    let processedKey: unknown = message.key?.toString();
-    let processedValue: unknown = message.value?.toString();
-
-    const deserializeWithOptions = async (
-      buffer: Buffer | undefined,
-      options: ValueOptions | KeyOptions,
-      serdeType: SerdeType,
-    ): Promise<unknown> => {
-      // A null/undefined payload (Kafka tombstone, or an absent key/value)
-      // can't be decoded — short-circuit before any SR lookup so the
-      // deserializer is never handed a non-Buffer and no spurious error is
-      // logged on the inevitable failure.
-      if (buffer == null) {
-        return undefined;
-      }
-      if (options.disableSchemaRegistry || !registry) {
-        return buffer.toString();
-      }
-      const subject =
-        options.subject ||
-        `${topic}-${serdeType === SerdeType.KEY ? "key" : "value"}`;
-      const schema = await schemaRegistryHelper.getLatestSchemaIfExists(
-        registry,
-        subject,
-      );
-      if (!schema || !schema.schemaType) {
-        return buffer.toString();
-      }
-      try {
-        return await schemaRegistryHelper.deserializeMessage(
-          topic,
-          buffer,
-          schema.schemaType,
-          registry,
-          serdeType,
-          message.headers,
-        );
-      } catch (err) {
-        logger.error(
-          { error: err, topic, schemaType: schema.schemaType, serdeType },
-          `Error deserializing message ${serdeType} for topic ${topic}`,
-        );
-        return buffer.toString();
-      }
-    };
-
-    processedValue = await deserializeWithOptions(
-      message.value as Buffer,
-      valueOptions,
-      SerdeType.VALUE,
-    );
-    if (message.key) {
-      processedKey = await deserializeWithOptions(
-        message.key as Buffer,
-        keyOptions,
-        SerdeType.KEY,
-      );
-    }
-
-    return {
-      key: processedKey,
-      value: processedValue,
-      timestamp: formatMessageTimestamp(message.timestamp),
-      offset: message.offset,
-      headers: message.headers
-        ? Object.fromEntries(
-            Object.entries(message.headers).map(([key, value]) => [
-              key,
-              echoHeaderValue(key, value),
-            ]),
-          )
-        : undefined,
+    return processMessage(
       topic,
       partition,
-    };
+      message,
+      registry,
+      valueOptions,
+      keyOptions,
+    );
   }
 
   /**

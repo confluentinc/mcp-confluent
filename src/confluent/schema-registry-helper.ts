@@ -654,9 +654,51 @@ async function serializeProtobufMessage(
 }
 
 /**
+ * Per-invocation memo of `${schemaType}:${serdeType}` → reusable
+ * {@link Deserializer}. A `Deserializer` is keyed only by its schema type,
+ * serde side, and registry client — none of which vary across the messages of
+ * a single consume/search call — yet each instance carries its own LRU of
+ * parsed schema types (`schemaToTypeCache`). Constructing a fresh deserializer
+ * per message (the prior behavior) threw that cache away every record, forcing
+ * the serde library to re-parse/compile the writer schema for each one. Pass a
+ * cache into {@link deserializeMessage} to collapse that to one compile per
+ * `(schemaType, serdeType)` for the life of the cache. Scope it to a single
+ * `handle()` call so a schema change between invocations is always picked up.
+ *
+ * A single AvroDeserializer (etc.) correctly handles every subject/schema seen
+ * during the scan: it reads each message's schema id from the payload/header
+ * and resolves the writer schema itself, so one instance per type is enough
+ * even when a search spans multiple topics with different schemas.
+ */
+export type DeserializerCache = Map<string, Deserializer>;
+
+/**
+ * Get a {@link Deserializer} from `cache` (creating and memoizing it on a
+ * miss) or build a one-off when no cache is supplied. See
+ * {@link DeserializerCache} for why per-message construction is wasteful.
+ */
+function getOrCreateDeserializer(
+  schemaType: SchemaType,
+  registry: SchemaRegistryClient,
+  serdeType: SerdeType,
+  cache?: DeserializerCache,
+): Deserializer {
+  if (!cache) {
+    return getDeserializer(schemaType, registry, serdeType);
+  }
+  const key = `${schemaType}:${serdeType}`;
+  let deserializer = cache.get(key);
+  if (!deserializer) {
+    deserializer = getDeserializer(schemaType, registry, serdeType);
+    cache.set(key, deserializer);
+  }
+  return deserializer;
+}
+
+/**
  * Deserializes a message using Schema Registry.
  * This function:
- * 1. Creates the appropriate deserializer
+ * 1. Obtains the appropriate deserializer (reused via `deserializerCache` when supplied)
  * 2. Deserializes the message using the schema from the registry
  *
  * @param topic - The Kafka topic name
@@ -667,6 +709,10 @@ async function serializeProtobufMessage(
  * @param headers - Raw record headers. When present, the default dual
  *   deserializer reads a header-located schema ID (__value_schema_id /
  *   __key_schema_id) before falling back to the magic-byte prefix.
+ * @param deserializerCache - Optional per-invocation {@link DeserializerCache}.
+ *   When supplied, the deserializer for this `(schemaType, serdeType)` is built
+ *   once and reused, keeping its parsed-schema cache warm across messages. Omit
+ *   it to construct a fresh deserializer each call (the prior behavior).
  * @returns The deserialized object
  * @throws Error if deserialization fails
  */
@@ -677,9 +723,15 @@ export async function deserializeMessage(
   registry: SchemaRegistryClient,
   serdeType: SerdeType,
   headers?: IHeaders,
+  deserializerCache?: DeserializerCache,
 ): Promise<unknown> {
   try {
-    const deserializer = getDeserializer(schemaType, registry, serdeType);
+    const deserializer = getOrCreateDeserializer(
+      schemaType,
+      registry,
+      serdeType,
+      deserializerCache,
+    );
     return await deserializer.deserialize(topic, message, headers);
   } catch (err) {
     throw new Error(`Failed to deserialize message: ${err}`);

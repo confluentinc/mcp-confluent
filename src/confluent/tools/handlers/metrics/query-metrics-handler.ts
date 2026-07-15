@@ -386,7 +386,7 @@ function formatPoint(timestamp: unknown, value: unknown): string {
   const ts = timestamp
     ? new Date(timestamp as string).toISOString()
     : "unknown";
-  const val = value !== undefined ? formatValue(value as number) : "N/A";
+  const val = value === undefined ? "N/A" : formatValue(value as number);
   return `  ${ts}: ${val}`;
 }
 

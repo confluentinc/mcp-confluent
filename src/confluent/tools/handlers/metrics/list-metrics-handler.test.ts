@@ -220,6 +220,25 @@ describe("list-metrics-handler.ts", () => {
         });
       });
 
+      it("should surface the HTTP status and error detail when the descriptors endpoint returns an openapi-fetch error instead of throwing", async () => {
+        telemetryRest.GET.mockResolvedValue({
+          error: { errors: [{ detail: "authentication failed" }] },
+          response: { status: 403 },
+        } as never);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+
+        const text = textOf(result);
+        expect(result.isError).toBe(true);
+        expect(text).toContain("Failed to list metrics");
+        expect(text).toContain("HTTP 403");
+        expect(text).toContain("authentication failed");
+        expect(text).not.toContain("No metrics descriptors available");
+      });
+
       it("should stringify non-Error thrown values in the failure message", async () => {
         telemetryRest.GET.mockRejectedValue("string failure");
 

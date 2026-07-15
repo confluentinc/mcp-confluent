@@ -1331,7 +1331,7 @@ async function resolveConsumeRegistry(
     return await clientManager.getSchemaRegistrySdkClient(envId);
   } catch (error: unknown) {
     logger.warn(
-      { error, connId },
+      { err: error, connId },
       "Schema Registry client unavailable; consuming as raw bytes.",
     );
     return undefined;
@@ -1385,6 +1385,6 @@ async function disconnectConsumerQuietly(
   try {
     await consumer.disconnect();
   } catch (error) {
-    logger.error({ error }, "Error cleaning up consumer");
+    logger.error({ err: error }, "Error cleaning up consumer");
   }
 }

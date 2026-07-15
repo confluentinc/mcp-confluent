@@ -239,6 +239,42 @@ describe("list-metrics-handler.ts", () => {
         expect(text).not.toContain("No metrics descriptors available");
       });
 
+      it("should preserve an Error payload's message rather than JSON-stringifying it to {}", async () => {
+        telemetryRest.GET.mockResolvedValue({
+          error: new Error("token expired"),
+          response: { status: 500 },
+        } as never);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+
+        const text = textOf(result);
+        expect(result.isError).toBe(true);
+        expect(text).toContain("HTTP 500");
+        expect(text).toContain("token expired");
+        expect(text).not.toContain("{}");
+      });
+
+      it("should not throw when the descriptor error payload is a circular structure", async () => {
+        const circular: Record<string, unknown> = {};
+        circular.self = circular;
+        telemetryRest.GET.mockResolvedValue({
+          error: circular,
+          response: { status: 500 },
+        } as never);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain("Failed to list metrics");
+        expect(textOf(result)).toContain("HTTP 500");
+      });
+
       it("should stringify non-Error thrown values in the failure message", async () => {
         telemetryRest.GET.mockRejectedValue("string failure");
 

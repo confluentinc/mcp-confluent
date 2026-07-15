@@ -244,7 +244,7 @@ function unwrapDescriptors<T>(
 ): T[] | undefined {
   if (result.error !== undefined) {
     const status = result.response?.status;
-    const statusPart = status !== undefined ? ` (HTTP ${status})` : "";
+    const statusPart = status === undefined ? "" : ` (HTTP ${status})`;
     throw new Error(
       `Telemetry API error fetching ${kind} descriptors${statusPart}: ${describeDescriptorError(result.error)}`,
     );
@@ -258,7 +258,25 @@ function describeDescriptorError(error: unknown): string {
     ?.map((e) => e.detail)
     .filter(Boolean)
     .join("; ");
-  return details && details.length > 0 ? details : JSON.stringify(error);
+  if (details && details.length > 0) {
+    return details;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return safeStringify(error);
+}
+
+/**
+ * Stringify an arbitrary error payload without ever throwing (e.g. on circular
+ * structures) or returning `undefined` (e.g. for values JSON.stringify omits).
+ */
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function filterMetricsByResourceType(

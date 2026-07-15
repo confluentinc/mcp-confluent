@@ -402,15 +402,21 @@ describe("query-metrics-handler.ts", () => {
 
         const text = textOf(result);
         expect(result.isError).toBe(false);
-        expect(text).toContain("Metrics Query Results");
-        expect(text).toContain(`Metric: ${KAFKA_SERVER_METRIC}`);
-        expect(text).toContain(
-          'Filter: {"resource.kafka.id":"lkc-from-config"}',
+        expect(text).toBe(
+          [
+            "Metrics Query Results",
+            `  Metric: ${KAFKA_SERVER_METRIC}`,
+            "  Aggregation: SUM",
+            "  Granularity: PT1M",
+            "  Interval: 2024-06-01T11:00:00Z/2024-06-01T12:00:00Z",
+            '  Filter: {"resource.kafka.id":"lkc-from-config"}',
+            "",
+            "Data Points: 3",
+            `  2024-06-01T12:00:00.000Z: ${(1234567).toLocaleString()}`,
+            "  2024-06-01T12:01:00.000Z: 0.1235",
+            "  2024-06-01T12:02:00.000Z: N/A",
+          ].join("\n"),
         );
-        expect(text).toContain("Data Points: 3");
-        expect(text).toContain((1234567).toLocaleString());
-        expect(text).toContain("0.1235");
-        expect(text).toContain("2024-06-01T12:02:00.000Z: N/A");
         expect(result._meta).toEqual({
           metric: KAFKA_SERVER_METRIC,
           dataset: "cloud",
@@ -453,13 +459,25 @@ describe("query-metrics-handler.ts", () => {
         );
 
         const text = textOf(result);
-        expect(text).toContain("Group by: metric.topic");
-        expect(text).toContain("Groups: 2");
-        expect(text).toContain("Group: metric.topic=orders");
-        expect(text).toContain("42");
-        expect(text).toContain("2024-06-01T12:01:00.000Z: N/A");
-        expect(text).toContain("Group: metric.topic=shipments");
-        expect(text).toContain("(no data points)");
+        expect(text).toBe(
+          [
+            "Metrics Query Results",
+            `  Metric: ${KAFKA_SERVER_METRIC}`,
+            "  Aggregation: SUM",
+            "  Granularity: PT1M",
+            "  Interval: 2024-06-01T11:00:00Z/2024-06-01T12:00:00Z",
+            "  Group by: metric.topic",
+            "",
+            "Groups: 2",
+            "",
+            "Group: metric.topic=orders",
+            "  2024-06-01T12:00:00.000Z: 42",
+            "  2024-06-01T12:01:00.000Z: N/A",
+            "",
+            "Group: metric.topic=shipments",
+            "  (no data points)",
+          ].join("\n"),
+        );
       });
     });
 

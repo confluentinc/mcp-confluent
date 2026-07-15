@@ -220,6 +220,89 @@ describe("list-metrics-handler.ts", () => {
         });
       });
 
+      it("should surface the HTTP status and error detail when the descriptors endpoint returns an openapi-fetch error instead of throwing", async () => {
+        telemetryRest.GET.mockResolvedValue({
+          error: { errors: [{ detail: "authentication failed" }] },
+          response: { status: 403 },
+        } as never);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+
+        const text = textOf(result);
+        expect(result.isError).toBe(true);
+        expect(text).toContain("Failed to list metrics");
+        expect(text).toContain("HTTP 403");
+        expect(text).toContain("authentication failed");
+        expect(text).not.toContain("No metrics descriptors available");
+      });
+
+      it("should still list metrics when only the resources descriptors call fails (resources are best-effort)", async () => {
+        telemetryRest.GET.mockImplementation(((path: string) => {
+          if (path.includes("/descriptors/metrics")) {
+            return Promise.resolve({
+              data: { data: [FLINK_METRIC_DESCRIPTOR] },
+            });
+          }
+          if (path.includes("/descriptors/resources")) {
+            return Promise.resolve({
+              error: { errors: [{ detail: "forbidden" }] },
+              response: { status: 403 },
+            });
+          }
+          throw new Error(`unexpected path ${path}`);
+        }) as MockedRestClient["GET"]);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { resource_type: "flink_statement" },
+        );
+
+        const text = textOf(result);
+        expect(result.isError).toBe(false);
+        expect(text).toContain("io.confluent.flink/num_records_in");
+        expect(text).not.toContain("Resource Types and Filter Fields:");
+        expect(text).not.toContain("Failed to list metrics");
+      });
+
+      it("should preserve an Error payload's message rather than JSON-stringifying it to {}", async () => {
+        telemetryRest.GET.mockResolvedValue({
+          error: new Error("token expired"),
+          response: { status: 500 },
+        } as never);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+
+        const text = textOf(result);
+        expect(result.isError).toBe(true);
+        expect(text).toContain("HTTP 500");
+        expect(text).toContain("token expired");
+        expect(text).not.toContain("{}");
+      });
+
+      it("should not throw when the descriptor error payload is a circular structure", async () => {
+        const circular: Record<string, unknown> = {};
+        circular.self = circular;
+        telemetryRest.GET.mockResolvedValue({
+          error: circular,
+          response: { status: 500 },
+        } as never);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          {},
+        );
+
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain("Failed to list metrics");
+        expect(textOf(result)).toContain("HTTP 500");
+      });
+
       it("should stringify non-Error thrown values in the failure message", async () => {
         telemetryRest.GET.mockRejectedValue("string failure");
 

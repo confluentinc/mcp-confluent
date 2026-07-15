@@ -197,6 +197,16 @@ export class ListMetricsHandler extends BaseToolHandler {
 type ResourceType = z.infer<typeof listMetricsArguments>["resource_type"];
 
 /**
+ * openapi-fetch surfaces a non-2xx response through `error` rather than
+ * throwing, so an unchecked call treats an HTTP failure as an empty body.
+ */
+interface DescriptorFetchResult<T> {
+  data?: DescriptorResponse<T>;
+  error?: unknown;
+  response?: { status?: number };
+}
+
+/**
  * Fetch the metrics and resources descriptor lists from the Telemetry API in
  * parallel, unwrapping each response's nested `data.data` payload.
  */
@@ -204,23 +214,51 @@ async function fetchDescriptors(telemetryClient: ConfluentRestClient): Promise<{
   metrics?: MetricDescriptor[];
   resources?: ResourceDescriptor[];
 }> {
-  const [metricsResponse, resourcesResponse] = await Promise.all([
+  const [metricsResult, resourcesResult] = await Promise.all([
     telemetryClient.GET(
       "/v2/metrics/{dataset}/descriptors/metrics" as never,
       {
         params: { path: { dataset: "cloud" } },
       } as never,
-    ) as Promise<{ data?: DescriptorResponse<MetricDescriptor> }>,
+    ) as Promise<DescriptorFetchResult<MetricDescriptor>>,
     telemetryClient.GET(
       "/v2/metrics/{dataset}/descriptors/resources" as never,
       { params: { path: { dataset: "cloud" } } } as never,
-    ) as Promise<{ data?: DescriptorResponse<ResourceDescriptor> }>,
+    ) as Promise<DescriptorFetchResult<ResourceDescriptor>>,
   ]);
 
   return {
-    metrics: metricsResponse.data?.data,
-    resources: resourcesResponse.data?.data,
+    metrics: unwrapDescriptors("metrics", metricsResult),
+    resources: unwrapDescriptors("resources", resourcesResult),
   };
+}
+
+/**
+ * Return the descriptor payload, throwing an actionable error when the
+ * Telemetry API reported an HTTP-level failure so `handle()` surfaces the real
+ * cause instead of a misleading "no descriptors available" message.
+ */
+function unwrapDescriptors<T>(
+  kind: string,
+  result: DescriptorFetchResult<T>,
+): T[] | undefined {
+  if (result.error !== undefined) {
+    const status = result.response?.status;
+    const statusPart = status !== undefined ? ` (HTTP ${status})` : "";
+    throw new Error(
+      `Telemetry API error fetching ${kind} descriptors${statusPart}: ${describeDescriptorError(result.error)}`,
+    );
+  }
+  return result.data?.data;
+}
+
+function describeDescriptorError(error: unknown): string {
+  const envelope = error as { errors?: Array<{ detail?: string }> } | null;
+  const details = envelope?.errors
+    ?.map((e) => e.detail)
+    .filter(Boolean)
+    .join("; ");
+  return details && details.length > 0 ? details : JSON.stringify(error);
 }
 
 function filterMetricsByResourceType(

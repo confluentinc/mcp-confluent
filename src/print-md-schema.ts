@@ -112,7 +112,8 @@ function describeBounded(
   ]
     .filter(Boolean)
     .join(", ");
-  return `${label}${constraints ? ` (${constraints})` : ""}`;
+  const suffix = constraints ? ` (${constraints})` : "";
+  return `${label}${suffix}`;
 }
 
 // Generate markdown table from schema and print to console

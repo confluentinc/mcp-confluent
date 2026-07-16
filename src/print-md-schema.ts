@@ -76,26 +76,11 @@ function formatTableRow(key: string, schema: z.ZodTypeAny): string {
   return `| ${key} | ${description} | ${defaultValue} | ${isRequired ? "Yes" : "No"} |\n`;
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#668)
 function getTypeInfo(schema: z.ZodTypeAny): string {
-  if (schema instanceof z.ZodString) {
-    const constraints = [
-      schema.minLength !== null && `min: ${schema.minLength}`,
-      schema.maxLength !== null && `max: ${schema.maxLength}`,
-    ]
-      .filter(Boolean)
-      .join(", ");
-    return `string${constraints ? ` (${constraints})` : ""}`;
-  }
-  if (schema instanceof z.ZodNumber) {
-    const constraints = [
-      schema.minValue !== null && `min: ${schema.minValue}`,
-      schema.maxValue !== null && `max: ${schema.maxValue}`,
-    ]
-      .filter(Boolean)
-      .join(", ");
-    return `number${constraints ? ` (${constraints})` : ""}`;
-  }
+  if (schema instanceof z.ZodString)
+    return describeBounded("string", schema.minLength, schema.maxLength);
+  if (schema instanceof z.ZodNumber)
+    return describeBounded("number", schema.minValue, schema.maxValue);
   if (schema instanceof z.ZodBoolean) return "boolean";
   if (schema instanceof z.ZodEnum) return `enum: ${schema.options.join(" | ")}`;
   if (schema instanceof z.ZodArray)
@@ -107,6 +92,27 @@ function getTypeInfo(schema: z.ZodTypeAny): string {
   if (schema instanceof z.ZodUnion)
     return `union: ${schema.options.map((opt) => getTypeInfo(opt as z.ZodTypeAny)).join(" | ")}`;
   return schema.constructor.name.replace("Zod", "").toLowerCase();
+}
+
+/**
+ * Render a scalar type label with any min/max bounds appended as
+ * `label (min: X, max: Y)`, omitting absent bounds and the parenthetical
+ * entirely when neither is present. Shared by the string- and number-length
+ * arms of getTypeInfo, whose only difference is the label and which pair of
+ * bound accessors they read.
+ */
+function describeBounded(
+  label: string,
+  min: number | null,
+  max: number | null,
+): string {
+  const constraints = [
+    min !== null && `min: ${min}`,
+    max !== null && `max: ${max}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return `${label}${constraints ? ` (${constraints})` : ""}`;
 }
 
 // Generate markdown table from schema and print to console

@@ -71,16 +71,9 @@ export class ListSchemasHandler extends BaseToolHandler {
       );
       return this.createResponse(JSON.stringify(result));
     } catch (error) {
-      logger.error(
-        {
-          error: error instanceof Error ? error.message : JSON.stringify(error),
-        },
-        "Failed to list schemas",
-      );
-      return this.createResponse(
-        `Failed to list schemas: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
-        true,
-      );
+      const message = describeError(error);
+      logger.error({ error: message }, "Failed to list schemas");
+      return this.createResponse(`Failed to list schemas: ${message}`, true);
     }
   }
 
@@ -98,10 +91,23 @@ export class ListSchemasHandler extends BaseToolHandler {
 
 /**
  * Narrow an unknown thrown value to a message, tolerating the SR SDK's habit of
- * rejecting with non-Error values.
+ * rejecting with non-Error values: a string passes through verbatim, an Error
+ * yields its message, and any other value is JSON-serialized so objects keep
+ * their detail instead of collapsing to "[object Object]". String() is the last
+ * resort for values JSON.stringify refuses (circular references, BigInt).
  */
 function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  if (typeof err === "string") {
+    return err;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
 }
 
 /**

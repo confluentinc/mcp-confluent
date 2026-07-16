@@ -454,6 +454,38 @@ describe("list-schemas-handler.ts", () => {
           orders: { error: "[object Object]" },
         });
       });
+
+      // JSON.stringify returns the value undefined (not a string) for bare
+      // undefined, functions, and symbols without throwing, so the try/catch
+      // never fires. Left unguarded, describeError would return undefined, the
+      // per-subject entry would collapse to {} (the error key silently dropped),
+      // and describeError would violate its string return contract.
+      it.each([
+        { label: "bare undefined", value: undefined, expected: "undefined" },
+        { label: "a symbol", value: Symbol("boom"), expected: "Symbol(boom)" },
+      ])(
+        "should fall back to String() when a per-subject rejection serializes to undefined via JSON.stringify ($label)",
+        async ({ value, expected }) => {
+          sr.getAllSubjects.mockResolvedValue(["orders"]);
+          sr.getLatestSchemaMetadata.mockRejectedValue(value);
+
+          const result = await assertHandleCase({
+            handler,
+            runtime: runtimeWithDecoy(
+              SR_CONN,
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args: {},
+            outcome: { resolves: '"orders":', isError: false },
+            clientManager,
+          });
+
+          expect(JSON.parse(textOf(result!))).toEqual({
+            orders: { error: expected },
+          });
+        },
+      );
     });
 
     describe("getToolConfig()", () => {

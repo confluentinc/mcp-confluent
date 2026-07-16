@@ -72,7 +72,7 @@ export class ListSchemasHandler extends BaseToolHandler {
       return this.createResponse(JSON.stringify(result));
     } catch (error) {
       const message = describeError(error);
-      logger.error({ error: message }, "Failed to list schemas");
+      logger.error({ err: error, message }, "Failed to list schemas");
       return this.createResponse(`Failed to list schemas: ${message}`, true);
     }
   }
@@ -94,7 +94,10 @@ export class ListSchemasHandler extends BaseToolHandler {
  * rejecting with non-Error values: a string passes through verbatim, an Error
  * yields its message, and any other value is JSON-serialized so objects keep
  * their detail instead of collapsing to "[object Object]". String() is the last
- * resort for values JSON.stringify refuses (circular references, BigInt).
+ * resort for the two cases JSON.stringify won't hand back a string: values it
+ * throws on (circular references, BigInt) and values it returns `undefined` for
+ * without throwing (bare undefined, functions, symbols). Either way the return
+ * is always a string.
  */
 function describeError(err: unknown): string {
   if (typeof err === "string") {
@@ -104,7 +107,7 @@ function describeError(err: unknown): string {
     return err.message;
   }
   try {
-    return JSON.stringify(err);
+    return JSON.stringify(err) ?? String(err);
   } catch {
     return String(err);
   }
@@ -152,7 +155,7 @@ async function fetchLatestSchema(
     };
   } catch (err) {
     logger.warn(
-      { subject, error: describeError(err) },
+      { subject, err, message: describeError(err) },
       "Failed to fetch latest schema metadata",
     );
     return { error: describeError(err) };
@@ -173,7 +176,7 @@ async function fetchAllVersions(
     versions = await registry.getAllVersions(subject);
   } catch (err) {
     logger.warn(
-      { subject, error: describeError(err) },
+      { subject, err, message: describeError(err) },
       "Failed to fetch all versions for subject",
     );
     return { error: describeError(err) };
@@ -210,7 +213,7 @@ async function fetchVersion(
     };
   } catch (err) {
     logger.warn(
-      { subject, version, error: describeError(err) },
+      { subject, version, err, message: describeError(err) },
       "Failed to fetch schema metadata for version",
     );
     return { version, error: describeError(err) };

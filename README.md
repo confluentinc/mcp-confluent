@@ -11,6 +11,8 @@ It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tabl
 > Confluent offers a [fully managed MCP server](https://docs.confluent.io/cloud/current/ai/ai-tools/managed-mcp-server.html) with no local server to run and no dependencies to install.
 > It provides access to your Confluent Cloud resources with AI-powered connector diagnostics, governed by your existing RBAC permissions.
 > Use this open-source server if you need Confluent Platform / self-managed Kafka support, or want to customize and extend the toolset.
+> 
+> **NOTE:** The open-source MCP server is a community-supported project. Confluent doesn’t provide dedicated support for it, and support is best-effort only, with no service level commitments. If you run into an issue or want to contribute, open an issue or pull request directly in this repository.
 
 ## Quick Start
 

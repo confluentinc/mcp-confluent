@@ -298,12 +298,34 @@ describe("list-schemas-handler.ts", () => {
         });
       });
 
-      // The handler narrows every rejection with `err instanceof Error ? err.message : ...`.
-      // The SR SDK can reject with a non-Error value, so the four cases below pin the
-      // fallback arm of each catch block (String(err) inside the loops, JSON.stringify at
-      // the top level) rather than letting it rot as untested defensive code.
+      // Every rejection flows through describeError(): a string passes through
+      // verbatim, an Error surrenders its message, and any other value is
+      // JSON.stringify'd (falling back to String() only if stringification itself
+      // throws). The SR SDK can reject with any of these, so the cases below pin
+      // each arm at every seam that catches — the top-level catch plus the three
+      // per-subject / per-version loops — rather than letting them rot as
+      // untested defensive code.
 
-      it("should JSON.stringify a non-Error rejection from getAllSubjects in the top-level catch", async () => {
+      it("should pass a string rejection from getAllSubjects through verbatim in the top-level catch", async () => {
+        sr.getAllSubjects.mockRejectedValue("registry unreachable");
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: {
+            resolves: "Failed to list schemas: registry unreachable",
+            isError: true,
+          },
+          clientManager,
+        });
+      });
+
+      it("should JSON.stringify a non-Error object rejection from getAllSubjects in the top-level catch", async () => {
         sr.getAllSubjects.mockRejectedValue({ code: 503 });
 
         await assertHandleCase({
@@ -322,7 +344,7 @@ describe("list-schemas-handler.ts", () => {
         });
       });
 
-      it("should String()-coerce a non-Error rejection from getLatestSchemaMetadata into the per-subject error entry", async () => {
+      it("should pass a string rejection from getLatestSchemaMetadata through verbatim in the per-subject error entry", async () => {
         sr.getAllSubjects.mockResolvedValue(["orders"]);
         sr.getLatestSchemaMetadata.mockRejectedValue("registry exploded");
 
@@ -343,10 +365,34 @@ describe("list-schemas-handler.ts", () => {
         });
       });
 
-      it("should String()-coerce a non-Error rejection from getSchemaMetadata into the per-version error entry", async () => {
+      it("should JSON.stringify a non-Error object rejection from getLatestSchemaMetadata into the per-subject error entry", async () => {
+        sr.getAllSubjects.mockResolvedValue(["orders"]);
+        sr.getLatestSchemaMetadata.mockRejectedValue({
+          code: 404,
+          detail: "no schema",
+        });
+
+        const result = await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: { resolves: '"orders":{"error":', isError: false },
+          clientManager,
+        });
+
+        expect(JSON.parse(textOf(result!))).toEqual({
+          orders: { error: '{"code":404,"detail":"no schema"}' },
+        });
+      });
+
+      it("should JSON.stringify a non-Error object rejection from getSchemaMetadata into the per-version error entry", async () => {
         sr.getAllSubjects.mockResolvedValue(["orders"]);
         sr.getAllVersions.mockResolvedValue([1]);
-        sr.getSchemaMetadata.mockRejectedValue("version exploded");
+        sr.getSchemaMetadata.mockRejectedValue({ status: "GONE" });
 
         const result = await assertHandleCase({
           handler,
@@ -356,18 +402,18 @@ describe("list-schemas-handler.ts", () => {
             clientManager,
           ),
           args: { latestOnly: false },
-          outcome: { resolves: "version exploded", isError: false },
+          outcome: { resolves: '"version":1', isError: false },
           clientManager,
         });
 
         expect(JSON.parse(textOf(result!))).toEqual({
-          orders: [{ version: 1, error: "version exploded" }],
+          orders: [{ version: 1, error: '{"status":"GONE"}' }],
         });
       });
 
-      it("should String()-coerce a non-Error rejection from getAllVersions into the per-subject error entry", async () => {
+      it("should JSON.stringify a non-Error object rejection from getAllVersions into the per-subject error entry", async () => {
         sr.getAllSubjects.mockResolvedValue(["orders"]);
-        sr.getAllVersions.mockRejectedValue("versions exploded");
+        sr.getAllVersions.mockRejectedValue({ status: 500 });
 
         const result = await assertHandleCase({
           handler,
@@ -382,9 +428,64 @@ describe("list-schemas-handler.ts", () => {
         });
 
         expect(JSON.parse(textOf(result!))).toEqual({
-          orders: { error: "versions exploded" },
+          orders: { error: '{"status":500}' },
         });
       });
+
+      it("should fall back to String() when a rejection cannot be JSON.stringify'd (circular reference)", async () => {
+        const circular: Record<string, unknown> = {};
+        circular.self = circular;
+        sr.getAllSubjects.mockResolvedValue(["orders"]);
+        sr.getLatestSchemaMetadata.mockRejectedValue(circular);
+
+        const result = await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            SR_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: {},
+          outcome: { resolves: '"orders":{"error":', isError: false },
+          clientManager,
+        });
+
+        expect(JSON.parse(textOf(result!))).toEqual({
+          orders: { error: "[object Object]" },
+        });
+      });
+
+      // JSON.stringify returns the value undefined (not a string) for bare
+      // undefined, functions, and symbols without throwing, so the try/catch
+      // never fires. Left unguarded, describeError would return undefined, the
+      // per-subject entry would collapse to {} (the error key silently dropped),
+      // and describeError would violate its string return contract.
+      it.each([
+        { label: "bare undefined", value: undefined, expected: "undefined" },
+        { label: "a symbol", value: Symbol("boom"), expected: "Symbol(boom)" },
+      ])(
+        "should fall back to String() when a per-subject rejection serializes to undefined via JSON.stringify ($label)",
+        async ({ value, expected }) => {
+          sr.getAllSubjects.mockResolvedValue(["orders"]);
+          sr.getLatestSchemaMetadata.mockRejectedValue(value);
+
+          const result = await assertHandleCase({
+            handler,
+            runtime: runtimeWithDecoy(
+              SR_CONN,
+              DEFAULT_CONNECTION_ID,
+              clientManager,
+            ),
+            args: {},
+            outcome: { resolves: '"orders":', isError: false },
+            clientManager,
+          });
+
+          expect(JSON.parse(textOf(result!))).toEqual({
+            orders: { error: expected },
+          });
+        },
+      );
     });
 
     describe("getToolConfig()", () => {

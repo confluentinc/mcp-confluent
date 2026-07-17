@@ -17,6 +17,11 @@ describe("html-to-markdown.ts", () => {
       expect(htmlToMarkdown("<h3>Sub-heading</h3>")).toBe("### Sub-heading");
     });
 
+    it("should drop empty headings instead of emitting a bare ###", () => {
+      const html = '<h3 id="spacer"> </h3><p>Body.</p>';
+      expect(htmlToMarkdown(html)).toBe("Body.");
+    });
+
     it("should render bold, italic, and inline code", () => {
       const html =
         "<p>Some <b>bold</b>, <i>italic</i>, and <code>inline.code</code> text.</p>";

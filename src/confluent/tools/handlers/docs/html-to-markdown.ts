@@ -120,8 +120,12 @@ function renderHeading(
   el: AnyNode,
   tag: string,
 ): string {
+  const text = renderInlineChildren($, el).trim();
+  // Drop empty headings (e.g. Zendesk spacer elements like `<h3> </h3>`)
+  // instead of emitting a bare, meaningless `###`.
+  if (!text) return "";
   const level = Number(tag[1]);
-  return `${"#".repeat(level)} ${renderInlineChildren($, el).trim()}`;
+  return `${"#".repeat(level)} ${text}`;
 }
 
 function renderBlockquote(

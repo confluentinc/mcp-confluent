@@ -220,12 +220,12 @@ function renderInlineNode($: cheerio.CheerioAPI, node: AnyNode): string {
   switch (tag) {
     case "strong":
     case "b":
-      return `**${renderInlineChildren($, node).trim()}**`;
+      return wrapInline(renderInlineChildren($, node).trim(), "**");
     case "em":
     case "i":
-      return `_${renderInlineChildren($, node).trim()}_`;
+      return wrapInline(renderInlineChildren($, node).trim(), "_");
     case "code":
-      return `\`${$(node).text()}\``;
+      return wrapInline($(node).text(), "`");
     case "a":
       return renderLink($, node);
     case "img":
@@ -239,6 +239,13 @@ function renderInlineNode($: cheerio.CheerioAPI, node: AnyNode): string {
     default:
       return renderInlineChildren($, node);
   }
+}
+
+// Drops empty inline elements (e.g. decorative CSS-only icons like
+// `<i class="scroll-indicator"></i>`) instead of emitting bare delimiters
+// such as `__` or `` `` ``.
+function wrapInline(text: string, delimiter: string): string {
+  return text ? `${delimiter}${text}${delimiter}` : "";
 }
 
 function renderLink($: cheerio.CheerioAPI, el: AnyNode): string {

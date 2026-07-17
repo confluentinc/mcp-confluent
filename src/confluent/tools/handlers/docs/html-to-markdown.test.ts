@@ -30,6 +30,12 @@ describe("html-to-markdown.ts", () => {
       );
     });
 
+    it("should drop empty bold, italic, and code tags instead of emitting bare delimiters", () => {
+      const html =
+        '<p>Scroll<i class="scroll-indicator"></i> down<b></b> for <code></code>more.</p>';
+      expect(htmlToMarkdown(html)).toBe("Scroll down for more.");
+    });
+
     it("should render a link", () => {
       const html = '<p>See <a href="https://example.com">the docs</a>.</p>';
       expect(htmlToMarkdown(html)).toBe("See [the docs](https://example.com).");

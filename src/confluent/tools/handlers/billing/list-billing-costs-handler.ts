@@ -6,6 +6,10 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
+import {
+  renderPaginationSection,
+  toPaginationMeta,
+} from "@src/confluent/tools/pagination.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -125,7 +129,6 @@ const billingCostsSchema = z.object({
 });
 
 type BillingCostsList = z.infer<typeof billingCostsSchema>;
-type BillingCostsMetadata = BillingCostsList["metadata"];
 
 export class ListBillingCostsHandler extends BaseToolHandler {
   async handle(
@@ -204,7 +207,7 @@ Cost Summary (${startDate} to ${endDate}):
 `;
       const productBreakdown = formatProductBreakdown(productCosts);
       const metadata = validatedResponse.metadata;
-      const paginationInfo = formatPaginationSection(metadata);
+      const paginationInfo = renderPaginationSection(metadata, "Total Items");
 
       return this.createResponse(
         `Successfully retrieved billing costs:\n${costSummary}${productBreakdown}${paginationInfo}`,
@@ -223,14 +226,7 @@ Cost Summary (${startDate} to ${endDate}):
           },
           product_breakdown: Object.fromEntries(productCosts),
           total: metadata?.total_size,
-          pagination: metadata
-            ? {
-                first: metadata.first,
-                last: metadata.last,
-                prev: metadata.prev,
-                next: metadata.next,
-              }
-            : undefined,
+          pagination: toPaginationMeta(metadata),
         },
       );
     } catch (validationError) {
@@ -311,29 +307,5 @@ function formatProductBreakdown(productCosts: Map<string, number>): string {
   return `
 Product Breakdown:
 ${lines}
-`;
-}
-
-/**
- * Render the pagination section, omitting individual rows whose value is absent.
- * Empty string when the response carried no metadata block at all.
- */
-function formatPaginationSection(metadata: BillingCostsMetadata): string {
-  if (!metadata) {
-    return "";
-  }
-  const rows: ReadonlyArray<[string, string | number | undefined]> = [
-    ["Total Items", metadata.total_size],
-    ["First Page", metadata.first],
-    ["Last Page", metadata.last],
-    ["Previous Page", metadata.prev],
-    ["Next Page", metadata.next],
-  ];
-  const body = rows
-    .filter(([, value]) => Boolean(value))
-    .map(([label, value]) => `\n  ${label}: ${value}`)
-    .join("");
-  return `
-Pagination:${body}
 `;
 }

@@ -204,6 +204,32 @@ describe("list-environments-handler.ts", () => {
         });
       });
 
+      it("should render a Total Environments line of 0 when total_size is zero", async () => {
+        const clientManager = getMockedClientManager();
+        configureGet(clientManager, {
+          data: {
+            api_version: "org/v2",
+            kind: "EnvironmentList",
+            metadata: { total_size: 0 },
+            data: [],
+          },
+        });
+
+        const result = await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            CCLOUD_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          outcome: { resolves: "Total Environments: 0", isError: false },
+          clientManager,
+        });
+
+        expect(textOf(result!)).toContain("Total Environments: 0");
+        expect(result!._meta).toMatchObject({ total: 0 });
+      });
+
       it("should render deleted-at, stream-governance, and every pagination link for a fully-populated response", async () => {
         const clientManager = getMockedClientManager();
         configureGet(clientManager, {

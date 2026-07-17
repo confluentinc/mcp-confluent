@@ -201,6 +201,27 @@ describe("list-billing-costs-handler.ts", () => {
         });
       });
 
+      it("should render a Total Items line of 0 when total_size is zero", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({
+          data: {
+            api_version: "v1",
+            kind: "CostList",
+            metadata: { total_size: 0 },
+            data: [],
+          },
+        });
+
+        const result = await handler.handle(
+          runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          VALID_ARGS,
+        );
+
+        expect(result.isError).toBe(false);
+        expect(textOf(result)).toContain("Total Items: 0");
+        expect((result._meta as { total: unknown }).total).toBe(0);
+      });
+
       it("should omit the pagination section and leave _meta.pagination undefined when metadata is absent", async () => {
         const clientManager = getMockedClientManager();
         clientManager.getConfluentCloudRestClient().GET.mockResolvedValue({

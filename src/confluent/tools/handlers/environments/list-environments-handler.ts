@@ -6,6 +6,10 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
+import {
+  renderPaginationSection,
+  toPaginationMeta,
+} from "@src/confluent/tools/pagination.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
@@ -126,7 +130,7 @@ export class ListEnvironmentsHandler extends BaseToolHandler {
     const metadata = validatedResponse.metadata;
 
     return this.createResponse(
-      `Successfully retrieved ${environments.length} environments:\n${renderEnvironmentDetails(environments)}\n${renderPaginationInfo(metadata)}`,
+      `Successfully retrieved ${environments.length} environments:\n${renderEnvironmentDetails(environments)}\n${renderPaginationSection(metadata, "Total Environments")}`,
       false,
       {
         environments,
@@ -148,8 +152,6 @@ export class ListEnvironmentsHandler extends BaseToolHandler {
   readonly category = ToolCategory.ConfluentCloud;
   readonly predicate = hasConfluentCloudOrOAuth;
 }
-
-type EnvironmentListMetadata = EnvironmentList["metadata"];
 
 /**
  * Flattened view of an environment for both the rendered text and the _meta payload.
@@ -208,42 +210,4 @@ Environment: ${env.name}
 `;
     })
     .join("\n");
-}
-
-/**
- * Renders the pagination text block. A present-but-empty metadata object still
- * emits the header; absent metadata emits nothing.
- */
-function renderPaginationInfo(metadata: EnvironmentListMetadata): string {
-  if (!metadata) {
-    return "";
-  }
-  const links: Array<[string, string | number | undefined]> = [
-    ["Total Environments", metadata.total_size],
-    ["First Page", metadata.first],
-    ["Last Page", metadata.last],
-    ["Previous Page", metadata.prev],
-    ["Next Page", metadata.next],
-  ];
-  const lines = links
-    .filter(([, value]) => value !== undefined)
-    .map(([label, value]) => `\n  ${label}: ${value}`)
-    .join("");
-  return `
-Pagination:${lines}
-`;
-}
-
-/**
- * Builds the _meta pagination object, or undefined when no metadata was returned.
- */
-function toPaginationMeta(metadata: EnvironmentListMetadata) {
-  return metadata
-    ? {
-        first: metadata.first,
-        last: metadata.last,
-        prev: metadata.prev,
-        next: metadata.next,
-      }
-    : undefined;
 }

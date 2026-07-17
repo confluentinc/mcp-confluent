@@ -125,9 +125,9 @@ const billingCostsSchema = z.object({
 });
 
 type BillingCostsList = z.infer<typeof billingCostsSchema>;
+type BillingCostsMetadata = BillingCostsList["metadata"];
 
 export class ListBillingCostsHandler extends BaseToolHandler {
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- baselined pre-existing complexity; reduce below 15 (#657)
   async handle(
     runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
@@ -163,97 +163,85 @@ export class ListBillingCostsHandler extends BaseToolHandler {
         );
       }
 
-      try {
-        const validatedResponse = billingCostsSchema.parse(
-          response,
-        ) as BillingCostsList;
-
-        // Calculate totals and group by product
-        const productCosts = new Map<string, number>();
-        let totalAmount = 0;
-        let totalOriginalAmount = 0;
-        let totalDiscountAmount = 0;
-
-        validatedResponse.data.forEach((item) => {
-          totalAmount += item.amount;
-          totalOriginalAmount += item.original_amount;
-          totalDiscountAmount += item.discount_amount || 0;
-
-          const currentProductCost = productCosts.get(item.product) || 0;
-          productCosts.set(item.product, currentProductCost + item.amount);
-        });
-
-        // Format cost details for display
-        const costSummary = `
-Cost Summary (${startDate} to ${endDate}):
-  Total Amount: $${totalAmount.toFixed(2)}
-  Original Amount: $${totalOriginalAmount.toFixed(2)}
-  Total Discount: $${totalDiscountAmount.toFixed(2)}
-  Total Line Items: ${validatedResponse.data.length}
-`;
-
-        const productBreakdown =
-          productCosts.size > 0
-            ? `
-Product Breakdown:
-${Array.from(productCosts.entries())
-  .sort((a, b) => b[1] - a[1])
-  .map(([product, amount]) => `  ${product}: $${amount.toFixed(2)}`)
-  .join("\n")}
-`
-            : "";
-
-        const metadata = validatedResponse.metadata;
-        const paginationInfo = metadata
-          ? `
-Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : ""}${metadata.first ? `\n  First Page: ${metadata.first}` : ""}${metadata.last ? `\n  Last Page: ${metadata.last}` : ""}${metadata.prev ? `\n  Previous Page: ${metadata.prev}` : ""}${metadata.next ? `\n  Next Page: ${metadata.next}` : ""}
-`
-          : "";
-
-        return this.createResponse(
-          `Successfully retrieved billing costs:\n${costSummary}${productBreakdown}${paginationInfo}`,
-          false,
-          {
-            costs: validatedResponse.data,
-            summary: {
-              total_amount: totalAmount,
-              original_amount: totalOriginalAmount,
-              discount_amount: totalDiscountAmount,
-              line_item_count: validatedResponse.data.length,
-              date_range: {
-                start: startDate,
-                end: endDate,
-              },
-            },
-            product_breakdown: Object.fromEntries(productCosts),
-            total: metadata?.total_size,
-            pagination: metadata
-              ? {
-                  first: metadata.first,
-                  last: metadata.last,
-                  prev: metadata.prev,
-                  next: metadata.next,
-                }
-              : undefined,
-          },
-        );
-      } catch (validationError) {
-        logger.error(
-          { error: validationError },
-          "Billing costs validation error",
-        );
-        return this.createResponse(
-          `Invalid billing costs data: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
-          true,
-          { error: validationError },
-        );
-      }
+      return this.renderCostsResponse(response, startDate, endDate);
     } catch (error) {
       logger.error({ error }, "Error in ListBillingCostsHandler");
       return this.createResponse(
         `Failed to fetch billing costs: ${error instanceof Error ? error.message : String(error)}`,
         true,
         { error: error instanceof Error ? error.message : String(error) },
+      );
+    }
+  }
+
+  /**
+   * Validate the raw costs payload and turn it into the tool's text + structured
+   * response, or an error response when the payload fails schema validation.
+   */
+  private renderCostsResponse(
+    response: unknown,
+    startDate: string,
+    endDate: string,
+  ): CallToolResult {
+    try {
+      const validatedResponse = billingCostsSchema.parse(
+        response,
+      ) as BillingCostsList;
+
+      const {
+        productCosts,
+        totalAmount,
+        totalOriginalAmount,
+        totalDiscountAmount,
+      } = summarizeCosts(validatedResponse.data);
+
+      const costSummary = `
+Cost Summary (${startDate} to ${endDate}):
+  Total Amount: $${totalAmount.toFixed(2)}
+  Original Amount: $${totalOriginalAmount.toFixed(2)}
+  Total Discount: $${totalDiscountAmount.toFixed(2)}
+  Total Line Items: ${validatedResponse.data.length}
+`;
+      const productBreakdown = formatProductBreakdown(productCosts);
+      const metadata = validatedResponse.metadata;
+      const paginationInfo = formatPaginationSection(metadata);
+
+      return this.createResponse(
+        `Successfully retrieved billing costs:\n${costSummary}${productBreakdown}${paginationInfo}`,
+        false,
+        {
+          costs: validatedResponse.data,
+          summary: {
+            total_amount: totalAmount,
+            original_amount: totalOriginalAmount,
+            discount_amount: totalDiscountAmount,
+            line_item_count: validatedResponse.data.length,
+            date_range: {
+              start: startDate,
+              end: endDate,
+            },
+          },
+          product_breakdown: Object.fromEntries(productCosts),
+          total: metadata?.total_size,
+          pagination: metadata
+            ? {
+                first: metadata.first,
+                last: metadata.last,
+                prev: metadata.prev,
+                next: metadata.next,
+              }
+            : undefined,
+        },
+      );
+    } catch (validationError) {
+      logger.error(
+        { error: validationError },
+        "Billing costs validation error",
+      );
+      return this.createResponse(
+        `Invalid billing costs data: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
+        true,
+        { error: validationError },
       );
     }
   }
@@ -269,4 +257,83 @@ Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : "
   }
   readonly category = ToolCategory.Billing;
   readonly predicate = hasConfluentCloudOrOAuth;
+}
+
+/**
+ * Running totals plus per-product amounts accumulated across billing line items.
+ */
+interface CostTotals {
+  productCosts: Map<string, number>;
+  totalAmount: number;
+  totalOriginalAmount: number;
+  totalDiscountAmount: number;
+}
+
+/**
+ * Sum line-item amounts and bucket them by product in a single pass.
+ */
+function summarizeCosts(data: BillingCostsList["data"]): CostTotals {
+  const productCosts = new Map<string, number>();
+  let totalAmount = 0;
+  let totalOriginalAmount = 0;
+  let totalDiscountAmount = 0;
+
+  for (const item of data) {
+    totalAmount += item.amount;
+    totalOriginalAmount += item.original_amount;
+    totalDiscountAmount += item.discount_amount ?? 0;
+    productCosts.set(
+      item.product,
+      (productCosts.get(item.product) ?? 0) + item.amount,
+    );
+  }
+
+  return {
+    productCosts,
+    totalAmount,
+    totalOriginalAmount,
+    totalDiscountAmount,
+  };
+}
+
+/**
+ * Render the product-breakdown section, highest amount first; empty string when
+ * there are no products so the summary text collapses cleanly.
+ */
+function formatProductBreakdown(productCosts: Map<string, number>): string {
+  if (productCosts.size === 0) {
+    return "";
+  }
+  const lines = Array.from(productCosts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([product, amount]) => `  ${product}: $${amount.toFixed(2)}`)
+    .join("\n");
+  return `
+Product Breakdown:
+${lines}
+`;
+}
+
+/**
+ * Render the pagination section, omitting individual rows whose value is absent.
+ * Empty string when the response carried no metadata block at all.
+ */
+function formatPaginationSection(metadata: BillingCostsMetadata): string {
+  if (!metadata) {
+    return "";
+  }
+  const rows: ReadonlyArray<[string, string | number | undefined]> = [
+    ["Total Items", metadata.total_size],
+    ["First Page", metadata.first],
+    ["Last Page", metadata.last],
+    ["Previous Page", metadata.prev],
+    ["Next Page", metadata.next],
+  ];
+  const body = rows
+    .filter(([, value]) => Boolean(value))
+    .map(([label, value]) => `\n  ${label}: ${value}`)
+    .join("");
+  return `
+Pagination:${body}
+`;
 }

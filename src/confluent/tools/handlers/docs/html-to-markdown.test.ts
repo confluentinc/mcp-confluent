@@ -56,6 +56,27 @@ describe("html-to-markdown.ts", () => {
       );
     });
 
+    it("should widen the fence when the code block itself contains a ``` run", () => {
+      const html = "<pre><code>```js\nconsole.log(1)\n```</code></pre>";
+      expect(htmlToMarkdown(html)).toBe(
+        "````\n```js\nconsole.log(1)\n```\n````",
+      );
+    });
+
+    it("should widen the inline code delimiter when the content contains a backtick", () => {
+      expect(htmlToMarkdown("<p><code>a`b</code></p>")).toBe("``a`b``");
+    });
+
+    it("should pad the inline code delimiter when content starts or ends with a backtick", () => {
+      expect(htmlToMarkdown("<p><code>`code`</code></p>")).toBe("`` `code` ``");
+    });
+
+    it("should render <br> as a CommonMark hard break, not a soft break", () => {
+      expect(htmlToMarkdown("<p>Line one<br>Line two</p>")).toBe(
+        "Line one  \nLine two",
+      );
+    });
+
     it("should render an unordered list", () => {
       const html = "<ul><li>Item one</li><li>Item two</li></ul>";
       expect(htmlToMarkdown(html)).toBe("- Item one\n- Item two");
@@ -104,6 +125,20 @@ describe("html-to-markdown.ts", () => {
         "<tr><td>retention.ms</td><td>604800000</td></tr></table>";
       expect(htmlToMarkdown(html)).toBe(
         "| Config | Default |\n| --- | --- |\n| retention.ms | 604800000 |",
+      );
+    });
+
+    it("should not let a nested table's rows/cells leak into the outer table", () => {
+      const html =
+        "<table><tr><th>Outer1</th><th>Outer2</th></tr>" +
+        "<tr><td>Cell</td><td><table><tr><th>Inner1</th></tr>" +
+        "<tr><td>InnerVal</td></tr></table></td></tr></table>";
+      // The outer table keeps exactly one header + one body row (not three,
+      // which is what find("tr") would produce without scoping); the nested
+      // table's own content isn't rendered as proper Markdown, that's an
+      // accepted limitation, but it must not corrupt the outer table's shape.
+      expect(htmlToMarkdown(html)).toBe(
+        "| Outer1 | Outer2 |\n| --- | --- |\n| Cell | Inner1InnerVal |",
       );
     });
 

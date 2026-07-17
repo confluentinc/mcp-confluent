@@ -146,7 +146,16 @@ function renderCodeBlock($: cheerio.CheerioAPI, el: AnyNode): string {
     /\n+$/,
     "",
   );
-  return "```\n" + text + "\n```";
+  const fence = backtickFence(text, 3);
+  return `${fence}\n${text}\n${fence}`;
+}
+
+// A fence longer than any backtick run in the content, so a ``` inside the
+// code itself can't be misread as the closing fence.
+function backtickFence(text: string, minLength: number): string {
+  const runs = text.match(/`+/g) ?? [];
+  const longestRun = Math.max(0, ...runs.map((run) => run.length));
+  return "`".repeat(Math.max(minLength, longestRun + 1));
 }
 
 function renderList(
@@ -187,13 +196,20 @@ function renderTable($: cheerio.CheerioAPI, el: AnyNode): string {
   // Real-world tables vary: proper <thead>/<th>, <th> rows with no <thead>
   // wrapper, and Zendesk's plain <td>-only markup. All three are just "first
   // row is the header, the rest is body", so there's no need to special-case <thead>.
+  // find() over-matches into nested tables, so rows/cells are filtered back
+  // down to the ones whose nearest table/row is this element.
+  const directRows = $(el)
+    .find("tr")
+    .toArray()
+    .filter((tr) => $(tr).closest("table").get(0) === el);
   const rowCells = (tr: AnyNode) =>
     $(tr)
       .find("th, td")
       .toArray()
+      .filter((cell) => $(cell).closest("tr").get(0) === tr)
       .map((cell) => renderInlineChildren($, cell).trim());
 
-  const [headerRow, ...bodyRows] = $(el).find("tr").toArray();
+  const [headerRow, ...bodyRows] = directRows;
   if (!headerRow) return "";
   const header = rowCells(headerRow);
   if (header.length === 0) return "";
@@ -225,13 +241,15 @@ function renderInlineNode($: cheerio.CheerioAPI, node: AnyNode): string {
     case "i":
       return wrapInline(renderInlineChildren($, node).trim(), "_");
     case "code":
-      return wrapInline($(node).text(), "`");
+      return wrapCode($(node).text());
     case "a":
       return renderLink($, node);
     case "img":
       return `![${$(node).attr("alt") ?? ""}](${$(node).attr("src") ?? ""})`;
     case "br":
-      return "\n";
+      // CommonMark hard break: a bare "\n" is a soft break (usually
+      // rendered as a space), losing the explicit <br> line break.
+      return "  \n";
     case "script":
     case "style":
     case "noscript":
@@ -246,6 +264,16 @@ function renderInlineNode($: cheerio.CheerioAPI, node: AnyNode): string {
 // such as `__` or `` `` ``.
 function wrapInline(text: string, delimiter: string): string {
   return text ? `${delimiter}${text}${delimiter}` : "";
+}
+
+// Inline code needs its own delimiter length (per CommonMark, longer than
+// any backtick run in the content) plus a padding space when the content
+// itself starts or ends with a backtick, so the delimiter reads unambiguously.
+function wrapCode(text: string): string {
+  if (!text) return "";
+  const fence = backtickFence(text, 1);
+  const needsPadding = text.startsWith("`") || text.endsWith("`");
+  return needsPadding ? `${fence} ${text} ${fence}` : `${fence}${text}${fence}`;
 }
 
 function renderLink($: cheerio.CheerioAPI, el: AnyNode): string {

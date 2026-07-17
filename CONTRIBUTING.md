@@ -1,4 +1,4 @@
-# Contributing to `confluent-kafka-javascript`
+# Contributing to `mcp-confluent`
 
 :+1::tada: First off, thanks for taking the time to contribute! :tada::+1:
 

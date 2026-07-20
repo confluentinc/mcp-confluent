@@ -13,7 +13,7 @@ import {
 } from "@src/mcp/transports/ping.js";
 import type { ServerConfig } from "@src/mcp/transports/types.js";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
-import { default as Fastify } from "fastify";
+import Fastify from "fastify";
 
 /**
  * Configuration for the HTTP server

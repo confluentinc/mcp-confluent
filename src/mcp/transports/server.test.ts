@@ -1,4 +1,4 @@
-import { AuthConfig } from "@src/mcp/transports/auth.js";
+import type { AuthConfig } from "@src/mcp/transports/auth.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

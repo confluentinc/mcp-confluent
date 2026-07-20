@@ -1,4 +1,4 @@
-import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 
 /**
  * Flink statement metrics from the Confluent Cloud Telemetry API.

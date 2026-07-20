@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
-import { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   hasKafka,
   kafkaBootstrapOrOAuth,
@@ -10,14 +10,15 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
 import { createMcpServer, type ToolCallProps } from "@src/mcp/server.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import {
   ccloudOAuthRuntime,
   localPlusOAuthRuntime,
   runtimeWith,
   runtimeWithConnections,
 } from "@tests/factories/runtime.js";
-import { createTestServer, TestServerContext } from "@tests/server.js";
+import type { TestServerContext } from "@tests/server.js";
+import { createTestServer } from "@tests/server.js";
 import { createMockInstance, StubHandler } from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

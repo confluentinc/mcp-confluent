@@ -1,19 +1,19 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import type { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   KEY_SCHEMA_ID_HEADER,
-  SchemaRegistryClient,
   SerdeType,
   VALUE_SCHEMA_ID_HEADER,
 } from "@confluentinc/schemaregistry";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolCategory,
-  ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
   disposeIfOAuth,
@@ -30,7 +30,7 @@ import {
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const schemaRegistryOptions = z

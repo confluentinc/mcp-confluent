@@ -1,9 +1,9 @@
 import { DescribeTableHandler } from "@src/confluent/tools/handlers/flink/catalog/describe-table-handler.js";
 import { textOf } from "@tests/call-tool-result.js";
+import type { HandleCaseWithConn } from "@tests/factories/runtime.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
-  HandleCaseWithConn,
   runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";

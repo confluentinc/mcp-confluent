@@ -1,7 +1,7 @@
 import { GetTopicConfigHandler } from "@src/confluent/tools/handlers/kafka/get-topic-config.js";
+import type { HandleCaseWithConn } from "@tests/factories/runtime.js";
 import {
   DEFAULT_CONNECTION_ID,
-  HandleCaseWithConn,
   KAFKA_CONN,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";

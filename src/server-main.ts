@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
+import type { CLIOptions } from "@src/cli.js";
 import {
-  CLIOptions,
   DisplayedCommandLineUsageError,
   getFilteredToolNames,
   getPackageVersion,
@@ -16,13 +16,16 @@ import {
 import { buildConfigTelemetry } from "@src/confluent/config-telemetry.js";
 import { buildConfig, fs, path } from "@src/confluent/node-deps.js";
 import { TelemetryEvent, TelemetryService } from "@src/confluent/telemetry.js";
-import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
+import type {
+  ToolCategory,
+  ToolHandler,
+} from "@src/confluent/tools/base-tools.js";
 import { groupDisabledToolsByReason } from "@src/confluent/tools/tool-availability.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
 import { logger, setLogLevel } from "@src/logger.js";
-import { CreateMcpServerOptions } from "@src/mcp/server.js";
+import type { CreateMcpServerOptions } from "@src/mcp/server.js";
 import { generateApiKey, TransportManager } from "@src/mcp/transports/index.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 

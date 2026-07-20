@@ -4,7 +4,7 @@ import {
   type DirectConnectionConfig,
   MCPServerConfiguration,
 } from "@src/config/models.js";
-import { TransportType } from "@src/mcp/transports/types.js";
+import type { TransportType } from "@src/mcp/transports/types.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

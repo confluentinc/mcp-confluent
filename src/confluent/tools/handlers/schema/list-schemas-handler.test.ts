@@ -1,4 +1,4 @@
-import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
+import type { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { ListSchemasHandler } from "@src/confluent/tools/handlers/schema/list-schemas-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";

@@ -1,8 +1,8 @@
 import { CreateFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/create-flink-statement-handler.js";
+import type { HandleCaseWithConn } from "@tests/factories/runtime.js";
 import {
   FLINK_CONN as BASE_FLINK_CONN,
   DEFAULT_CONNECTION_ID,
-  HandleCaseWithConn,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {

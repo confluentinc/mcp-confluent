@@ -1,9 +1,9 @@
 import { ReadTableFlowCatalogIntegrationHandler } from "@src/confluent/tools/handlers/tableflow/catalog/read-tableflow-catalog-integration-handler.js";
+import type { TableflowHandleCase } from "@tests/factories/runtime.js";
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWithDecoy,
   TABLEFLOW_CONN,
-  TableflowHandleCase,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,

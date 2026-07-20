@@ -393,17 +393,17 @@ export class QueryProfilerHandler extends FlinkToolHandler {
         recordsOut: task.recordsOut,
         stateBytes: task.stateBytes,
         busyPercent:
-          task.busyPercent !== undefined
-            ? `${task.busyPercent.toFixed(1)}%`
-            : undefined,
+          task.busyPercent === undefined
+            ? undefined
+            : `${task.busyPercent.toFixed(1)}%`,
         idlePercent:
-          task.idlePercent !== undefined
-            ? `${task.idlePercent.toFixed(1)}%`
-            : undefined,
+          task.idlePercent === undefined
+            ? undefined
+            : `${task.idlePercent.toFixed(1)}%`,
         backpressurePercent:
-          task.backpressurePercent !== undefined
-            ? `${task.backpressurePercent.toFixed(1)}%`
-            : undefined,
+          task.backpressurePercent === undefined
+            ? undefined
+            : `${task.backpressurePercent.toFixed(1)}%`,
         inputWatermark: task.inputWatermarkMs
           ? new Date(task.inputWatermarkMs).toISOString()
           : undefined,

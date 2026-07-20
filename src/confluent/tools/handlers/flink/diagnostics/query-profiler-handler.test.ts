@@ -202,6 +202,34 @@ describe("query-profiler-handler.ts", () => {
         });
       });
 
+      it("should format busyPercent and idlePercent as percentages when telemetry reports them", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: JSON.stringify(TASK_GRAPH) },
+        });
+        // task/busy_time_ms_per_second at 456 ms/s → 45.6%;
+        // task/idle_time_ms_per_second at 123 ms/s → 12.3%
+        wireFlinkTelemetry(cm, {
+          "task/busy_time": [{ value: 456, taskId: "task-1" }],
+          "task/idle_time": [{ value: 123, taskId: "task-1" }],
+        });
+        const result = await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: '"busyPercent": "45.6%"' },
+          clientManager: cm,
+        });
+        const text = result?.content
+          .map((c) => ("text" in c ? c.text : ""))
+          .join("");
+        expect(text).toContain('"idlePercent": "12.3%"');
+      });
+
       it("should detect high consumer lag from summary pendingRecords", async () => {
         const cm = getMockedClientManager();
         cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({

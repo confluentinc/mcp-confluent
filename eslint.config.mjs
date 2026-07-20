@@ -105,12 +105,18 @@ export default [
   // `recommended` set) to avoid a flood of unrelated findings on existing code.
   // Scoped to non-test src to match `sonar.exclusions` (tests and generated
   // `.d.ts` are excluded from SonarQube analysis).
+  //
+  // `no-negated-condition` mirrors SonarQube's "Unexpected negated condition"
+  // check (delegates to this same core ESLint rule, no new plugin needed) —
+  // added after PR #694 pushed a negated ternary that SonarCloud caught only
+  // after the round-trip through CI (#698).
   {
     files: ["src/**/*.ts"],
     ignores: ["**/*.test.ts", "**/*.d.ts"],
     plugins: { sonarjs },
     rules: {
       "sonarjs/cognitive-complexity": ["error", 15],
+      "no-negated-condition": "error",
     },
   },
 ];

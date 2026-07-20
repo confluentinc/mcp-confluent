@@ -1,5 +1,7 @@
-import type { MCPServerConfiguration } from "@src/config/index.js";
-import { type OAuthConnectionConfig } from "@src/config/index.js";
+import type {
+  MCPServerConfiguration,
+  OAuthConnectionConfig,
+} from "@src/config/index.js";
 import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { constructDirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";

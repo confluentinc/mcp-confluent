@@ -3,7 +3,7 @@
  * REST/Schema-Registry surfaces inherited from {@link BaseClientManager}.
  */
 
-import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
+import type { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
 import {
   CONFLUENT_CLOUD_DEFAULT_ENDPOINT,
   type DirectConnectionConfig,

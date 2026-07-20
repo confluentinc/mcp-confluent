@@ -1,8 +1,8 @@
 import { CreateConnectorHandler } from "@src/confluent/tools/handlers/connect/create-connector-handler.js";
+import type { ConnectHandleCase } from "@tests/factories/runtime.js";
 import {
   CCLOUD_CONN,
   CONNECT_CONN_WITH_AUTH,
-  ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";

@@ -23,7 +23,7 @@ import {
   resolveAllowedToolNames,
   resolveTelemetryWriteKey,
 } from "@src/server-main.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import {
   ccloudOAuthRuntime,
   runtimeWith,

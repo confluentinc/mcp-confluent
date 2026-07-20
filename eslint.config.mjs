@@ -98,6 +98,19 @@ export default [
       ],
     },
   },
+  // Require `import type { … }` for symbols referenced only in type position.
+  // `fixStyle: "separate-type-imports"` keeps the codebase's existing separate-line
+  // `import type { … } from "…"` style, and `eslint --fix` (pre-commit hook) auto-corrects
+  // future drift.
+  {
+    files: ["**/*.ts"],
+    rules: {
+      "@typescript-eslint/consistent-type-imports": [
+        "error",
+        { fixStyle: "separate-type-imports" },
+      ],
+    },
+  },
   // Mirror SonarQube's cognitive-complexity quality gate (rule
   // typescript:S3776, default threshold 15) locally, so `pnpm run lint` and the
   // pre-push hook flag an over-complex function before it reaches the

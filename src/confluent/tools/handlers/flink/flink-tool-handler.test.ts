@@ -1,14 +1,13 @@
-import {
+import type {
   DirectConnectionConfig,
   FlinkDirectConfig,
   OAuthConnectionConfig,
 } from "@src/config/models.js";
-import { CallToolResult } from "@src/confluent/schema.js";
-import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
-import {
-  FlinkRoutingArgs,
-  FlinkToolHandler,
-} from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
+import type { FlinkRoutingArgs } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
+import { FlinkToolHandler } from "@src/confluent/tools/handlers/flink/flink-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { FLINK_CONN } from "@tests/factories/runtime.js";
 import { describe, expect, it } from "vitest";

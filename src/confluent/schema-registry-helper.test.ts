@@ -1,5 +1,5 @@
-import { MutableRegistry } from "@bufbuild/protobuf";
-import { IHeaders } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import type { MutableRegistry } from "@bufbuild/protobuf";
+import type { IHeaders } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import {
   KEY_SCHEMA_ID_HEADER,
   SchemaId,

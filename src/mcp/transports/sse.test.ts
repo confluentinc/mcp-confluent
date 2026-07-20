@@ -1,8 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import type { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
-import { SessionRegistry } from "@src/mcp/transports/session-registry.js";
+import type { SessionRegistry } from "@src/mcp/transports/session-registry.js";
 import { SseTransport } from "@src/mcp/transports/sse.js";
 import {
   createMockInstance,
@@ -10,8 +10,9 @@ import {
   createMockSseServerTransport,
   MOCK_SESSION_ID,
 } from "@tests/stubs/index.js";
-import Fastify, { FastifyInstance } from "fastify";
-import { ServerResponse } from "node:http";
+import type { FastifyInstance } from "fastify";
+import Fastify from "fastify";
+import type { ServerResponse } from "node:http";
 import {
   afterEach,
   beforeEach,

@@ -1,6 +1,7 @@
 import type { OAuthConnectionConfig } from "@src/config/models.js";
-import { CallToolResult } from "@src/confluent/schema.js";
-import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { directConnectionOf } from "@tests/factories/config.js";

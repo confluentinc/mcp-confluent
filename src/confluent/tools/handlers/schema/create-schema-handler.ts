@@ -1,15 +1,15 @@
-import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { SchemaRegistryClient } from "@confluentinc/schemaregistry";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
   BaseToolHandler,
   CREATE_UPDATE,
   ToolCategory,
-  ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasSchemaRegistryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const createSchemaArguments = z.object({

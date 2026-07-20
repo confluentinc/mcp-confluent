@@ -1,4 +1,4 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import { DescribeConsumerGroupHandler } from "@src/confluent/tools/handlers/kafka/describe-consumer-group-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";

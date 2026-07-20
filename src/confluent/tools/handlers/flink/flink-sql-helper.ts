@@ -1,7 +1,8 @@
-import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import type { components, paths } from "@src/confluent/openapi-schema.js";
 import { logger } from "@src/logger.js";
-import { PathBasedClient, wrapAsPathBasedClient } from "openapi-fetch";
+import type { PathBasedClient } from "openapi-fetch";
+import { wrapAsPathBasedClient } from "openapi-fetch";
 
 export interface FlinkSqlResult {
   success: boolean;

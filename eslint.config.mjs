@@ -9,6 +9,8 @@ import tseslint from "typescript-eslint";
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   { files: ["**/*.{js,mjs,cjs,ts}"] },
+  // Any `eslint-disable*` comment that no longer suppresses a finding fails the build
+  { linterOptions: { reportUnusedDisableDirectives: "error" } },
   { languageOptions: { globals: globals.browser } },
   {
     ignores: [

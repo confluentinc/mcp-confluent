@@ -1,4 +1,4 @@
-import { ConnectionConfig } from "@src/config/models.js";
+import type { ConnectionConfig } from "@src/config/models.js";
 import {
   BaseToolHandler,
   ToolCategory,

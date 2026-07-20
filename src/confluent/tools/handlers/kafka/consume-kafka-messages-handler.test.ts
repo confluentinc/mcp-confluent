@@ -1,12 +1,12 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import type {
   EachMessagePayload,
   KafkaMessage,
 } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import type { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   KEY_SCHEMA_ID_HEADER,
   SchemaId,
-  SchemaRegistryClient,
   SerdeType,
   VALUE_SCHEMA_ID_HEADER,
 } from "@confluentinc/schemaregistry";

@@ -1,4 +1,4 @@
-import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
+import type { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import { CREATE_UPDATE } from "@src/confluent/tools/base-tools.js";
 import { CreateSchemaHandler } from "@src/confluent/tools/handlers/schema/create-schema-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";

@@ -1,8 +1,8 @@
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import { logger } from "@src/logger.js";
+import type { AuthConfig } from "@src/mcp/transports/auth.js";
 import {
-  AuthConfig,
   CFLT_MCP_API_KEY_HEADER,
   createAuthHook,
 } from "@src/mcp/transports/auth.js";
@@ -11,12 +11,9 @@ import {
   pingRequestSchema,
   pingResponseSchema,
 } from "@src/mcp/transports/ping.js";
-import { ServerConfig } from "@src/mcp/transports/types.js";
-import {
-  default as Fastify,
-  FastifyBaseLogger,
-  FastifyInstance,
-} from "fastify";
+import type { ServerConfig } from "@src/mcp/transports/types.js";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
+import Fastify from "fastify";
 
 /**
  * Configuration for the HTTP server

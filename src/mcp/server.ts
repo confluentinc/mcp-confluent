@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ToolHandler } from "@src/confluent/tools/base-tools.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import type { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 
 /** Properties recorded for each tool invocation. */
 export interface ToolCallProps {

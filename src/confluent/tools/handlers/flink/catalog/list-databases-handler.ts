@@ -1,12 +1,13 @@
-import { CallToolResult } from "@src/confluent/schema.js";
-import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { FlinkCatalogToolHandler } from "@src/confluent/tools/handlers/flink/catalog/flink-catalog-tool-handler.js";
 import {
   executeFlinkSql,
   type FlinkStatementMeta,
 } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const listDatabasesArguments = z.object({

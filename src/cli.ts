@@ -4,7 +4,8 @@ import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { TransportType } from "@src/mcp/transports/types.js";
 
-import { getProperties, KeyValuePairObject } from "properties-file";
+import type { KeyValuePairObject } from "properties-file";
+import { getProperties } from "properties-file";
 import pkg from "../package.json" with { type: "json" };
 
 /**

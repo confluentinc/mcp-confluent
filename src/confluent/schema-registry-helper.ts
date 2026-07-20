@@ -4,34 +4,36 @@
  * using various schema formats (AVRO, JSON, PROTOBUF).
  */
 
+import type { MutableRegistry } from "@bufbuild/protobuf";
 import {
   createFileRegistry,
   createMutableRegistry,
   fromBinary,
   fromJson,
-  MutableRegistry,
 } from "@bufbuild/protobuf";
 import {
   FileDescriptorProtoSchema,
   FileDescriptorSetSchema,
 } from "@bufbuild/protobuf/wkt";
-import { IHeaders } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import type { IHeaders } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import type {
+  Deserializer,
+  DeserializerConfig,
+  ProtobufSerializerConfig,
+  SchemaRegistryClient,
+  Serializer,
+  SerializerConfig,
+} from "@confluentinc/schemaregistry";
 import {
   AvroDeserializer,
   AvroSerializer,
-  Deserializer,
-  DeserializerConfig,
   HeaderSchemaIdSerializer,
   JsonDeserializer,
   JsonSerializer,
   ProtobufDeserializer,
   ProtobufSerializer,
-  ProtobufSerializerConfig,
   SchemaId,
-  SchemaRegistryClient,
   SerdeType,
-  Serializer,
-  SerializerConfig,
 } from "@confluentinc/schemaregistry";
 import { logger } from "@src/logger.js";
 import protobuf from "protobufjs";

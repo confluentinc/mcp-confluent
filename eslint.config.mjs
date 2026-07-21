@@ -114,8 +114,8 @@ export default [
     plugins: { sonarjs, "@eslint-community/eslint-comments": eslintComments },
     rules: {
       "sonarjs/cognitive-complexity": ["error", 15],
-      // Prevent turning off complexity guard or generic any guard: no-restricted-disable
-      // rejects any disable directive naming the complexity rule, and no-unlimited-disable
+      // Prevent turning off the complexity guard: no-restricted-disable rejects
+      // any disable directive naming the complexity rule, and no-unlimited-disable
       // closes the nameless-directive escape hatch (a bare `eslint-disable-next-line`
       // suppresses all rules, including this one, and would otherwise slip
       // past no-restricted-disable).

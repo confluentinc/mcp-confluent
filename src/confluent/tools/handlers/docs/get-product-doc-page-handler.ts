@@ -7,11 +7,11 @@ import {
   ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { alwaysEnabled } from "@src/confluent/tools/connection-predicates.js";
+import { htmlToMarkdown } from "@src/confluent/tools/handlers/docs/html-to-markdown.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import { ServerRuntime } from "@src/server-runtime.js";
 import * as cheerio from "cheerio";
-import TurndownService from "turndown";
 import { z } from "zod";
 
 type Source =
@@ -37,12 +37,6 @@ const getProductDocPageArguments = z.object({
 });
 
 export class GetProductDocPageHandler extends BaseToolHandler {
-  private readonly turndown = new TurndownService({
-    headingStyle: "atx",
-    codeBlockStyle: "fenced",
-    bulletListMarker: "-",
-  });
-
   async handle(
     _runtime: ServerRuntime,
     toolArguments: Record<string, unknown>,
@@ -258,7 +252,7 @@ export class GetProductDocPageHandler extends BaseToolHandler {
   }
 
   private toMarkdown(html: string | null): string {
-    return this.turndown.turndown(html ?? "").trim();
+    return htmlToMarkdown(html);
   }
 
   private formatResponse(

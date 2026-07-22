@@ -126,7 +126,7 @@ function projectErrorSummary(
     (payload.override_message?.trim() ? payload.override_message.trim() : "") ||
     (payload.error_summary?.trim() ? payload.error_summary.trim() : "");
   const connectorTraceHead =
-    state !== "RUNNING" ? truncateTrace(payload.connector?.trace) : undefined;
+    state === "RUNNING" ? undefined : truncateTrace(payload.connector?.trace);
 
   const projection: ErrorSummaryProjection = {
     connectorName,

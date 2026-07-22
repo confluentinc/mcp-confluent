@@ -1,3 +1,4 @@
+import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import pluginJs from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
@@ -9,6 +10,8 @@ import tseslint from "typescript-eslint";
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   { files: ["**/*.{js,mjs,cjs,ts}"] },
+  // Any `eslint-disable*` comment that no longer suppresses a finding fails the build
+  { linterOptions: { reportUnusedDisableDirectives: "error" } },
   { languageOptions: { globals: globals.browser } },
   {
     ignores: [
@@ -121,9 +124,19 @@ export default [
   {
     files: ["src/**/*.ts"],
     ignores: ["**/*.test.ts", "**/*.d.ts"],
-    plugins: { sonarjs },
+    plugins: { sonarjs, "@eslint-community/eslint-comments": eslintComments },
     rules: {
       "sonarjs/cognitive-complexity": ["error", 15],
+      // Prevent turning off the complexity guard: no-restricted-disable rejects
+      // any disable directive naming the complexity rule, and no-unlimited-disable
+      // closes the nameless-directive escape hatch (a bare `eslint-disable-next-line`
+      // suppresses all rules, including this one, and would otherwise slip
+      // past no-restricted-disable).
+      "@eslint-community/eslint-comments/no-restricted-disable": [
+        "error",
+        "sonarjs/cognitive-complexity",
+      ],
+      "@eslint-community/eslint-comments/no-unlimited-disable": "error",
     },
   },
 ];

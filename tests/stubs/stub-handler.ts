@@ -6,8 +6,8 @@ import {
   ToolCategory,
   type ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
+import type { ConnectionPredicate } from "@src/confluent/tools/connection-predicates.js";
 import {
-  ConnectionPredicate,
   ToolDisabledReason,
   alwaysEnabled,
 } from "@src/confluent/tools/connection-predicates.js";

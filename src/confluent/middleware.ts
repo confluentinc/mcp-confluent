@@ -1,5 +1,5 @@
 import { logger } from "@src/logger.js";
-import { Middleware } from "openapi-fetch";
+import type { Middleware } from "openapi-fetch";
 import pkg from "../../package.json" with { type: "json" };
 
 /**

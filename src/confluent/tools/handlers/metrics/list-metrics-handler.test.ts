@@ -1,4 +1,4 @@
-import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
+import type { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { ListMetricsHandler } from "@src/confluent/tools/handlers/metrics/list-metrics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";

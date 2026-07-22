@@ -1,6 +1,6 @@
 import * as nodeDeps from "@src/confluent/node-deps.js";
+import type { AuthConfig } from "@src/mcp/transports/auth.js";
 import {
-  AuthConfig,
   CFLT_MCP_API_KEY_HEADER,
   createAuthHook,
   generateApiKey,

@@ -4,10 +4,10 @@ import type {
   GroupDescription,
   LibrdKafkaError,
 } from "@confluentinc/kafka-javascript/types/rdkafka.js";
+import type { GetConsumerGroupLagResponse } from "@src/confluent/tools/handlers/kafka/get-consumer-group-lag-handler.js";
 import {
   getConsumerGroupLagArgs,
   GetConsumerGroupLagHandler,
-  GetConsumerGroupLagResponse,
 } from "@src/confluent/tools/handlers/kafka/get-consumer-group-lag-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";

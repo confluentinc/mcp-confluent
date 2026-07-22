@@ -1,9 +1,6 @@
-import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  READ_ONLY,
-  ToolCategory,
-  ToolConfig,
-} from "@src/confluent/tools/base-tools.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY, ToolCategory } from "@src/confluent/tools/base-tools.js";
 import {
   alwaysEnabled,
   ToolDisabledReason,
@@ -11,7 +8,7 @@ import {
 import { buildConnectionCard } from "@src/confluent/tools/handlers/diagnostics/describe-fields.js";
 import { ToolMetadataHandler } from "@src/confluent/tools/tool-metadata-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { quoteJoinIds } from "@src/utils/quote-join-ids.js";
 import { z } from "zod";
 

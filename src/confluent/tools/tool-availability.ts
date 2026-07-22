@@ -1,7 +1,10 @@
-import { ToolCategory, ToolHandler } from "@src/confluent/tools/base-tools.js";
-import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type {
+  ToolCategory,
+  ToolHandler,
+} from "@src/confluent/tools/base-tools.js";
+import type { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
+import type { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 
 /**
  * One bucket of disabled tools sharing a single bucket key. The key field

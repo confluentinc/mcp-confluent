@@ -1,10 +1,10 @@
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { FlinkGetCase } from "@tests/factories/runtime.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_TELEMETRY_CONN,
-  FlinkGetCase,
   runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";

@@ -1,13 +1,10 @@
-import { DirectConnectionConfig } from "@src/config/models.js";
-import { CallToolResult } from "@src/confluent/schema.js";
-import {
-  CREATE_UPDATE,
-  READ_ONLY,
-  ToolHandler,
-} from "@src/confluent/tools/base-tools.js";
+import type { DirectConnectionConfig } from "@src/config/models.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { CREATE_UPDATE, READ_ONLY } from "@src/confluent/tools/base-tools.js";
+import type { ConnectionPredicate } from "@src/confluent/tools/connection-predicates.js";
 import {
   alwaysEnabled,
-  ConnectionPredicate,
   hasCCloudCatalogSupport,
   hasConfluentCloud,
   hasFlink,

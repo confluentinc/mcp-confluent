@@ -9,7 +9,8 @@
  * `SASL_PLAINTEXT` there), exactly as the production client resolves it.
  */
 
-import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
+import type { GlobalConfig } from "@confluentinc/kafka-javascript";
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { type DirectConnectionConfig } from "@src/config/models.js";
 
 /**

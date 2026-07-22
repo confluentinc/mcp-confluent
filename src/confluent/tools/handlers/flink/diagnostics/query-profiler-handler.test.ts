@@ -158,6 +158,27 @@ describe("query-profiler-handler.ts", () => {
         });
       });
 
+      it("should return an error response when Graph parses but has no tasks array", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudFlinkRestClient()
+          .GET.mockResolvedValue({ data: { Graph: '{"unexpected":true}' } });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: {
+            resolves: "Task graph payload is missing its tasks array",
+            isError: true,
+          },
+          clientManager,
+        });
+      });
+
       it("should detect high backpressure per-task when backpressurePercent exceeds 50%", async () => {
         const cm = getMockedClientManager();
         cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
@@ -313,6 +334,53 @@ describe("query-profiler-handler.ts", () => {
           .join("");
         expect(text).not.toContain("detectedIssues");
         expect(text).not.toContain("issueCount");
+      });
+
+      it('should render stateSizeMB as "0.00" when summary stateBytes is 0', async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: '{"tasks":[]}' },
+        });
+        // A statement with no keyed state legitimately reports 0 bytes; the
+        // rendered summary must keep it, not drop it as if the metric were
+        // absent.
+        wireFlinkTelemetry(cm, {
+          "operator/state_size_bytes": [{ value: 0 }],
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: '"stateSizeMB": "0.00"' },
+          clientManager: cm,
+        });
+      });
+
+      it("should render a watermark of 0 as the Unix epoch, not drop it", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: '{"tasks":[]}' },
+        });
+        // 0 is a real epoch-ms watermark (1970-01-01); only the Long.MIN_VALUE
+        // sentinel means "no watermark", so 0 must render.
+        wireFlinkTelemetry(cm, {
+          current_input_watermark_milliseconds: [{ value: 0 }],
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: '"inputWatermark": "1970-01-01T00:00:00.000Z"' },
+          clientManager: cm,
+        });
       });
     });
   });

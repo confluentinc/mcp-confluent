@@ -330,6 +330,28 @@ describe("query-metrics-handler.ts", () => {
         });
       });
 
+      it("should surface the HTTP status and error detail when the query endpoint returns an openapi-fetch error instead of throwing", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTelemetryRestClient()
+          .POST.mockResolvedValue({
+            error: { errors: [{ detail: "authentication failed" }] },
+            response: { status: 403 },
+          } as never);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { metric: KAFKA_SERVER_METRIC },
+        );
+
+        const text = textOf(result);
+        expect(result.isError).toBe(true);
+        expect(text).toContain("Failed to query metrics");
+        expect(text).toContain("HTTP 403");
+        expect(text).toContain("authentication failed");
+        expect(text).not.toContain("No data returned");
+      });
+
       it("should return a flagged error when the telemetry client throws", async () => {
         const clientManager = getMockedClientManager();
         clientManager

@@ -36,6 +36,12 @@ describe("telemetry-error.ts", () => {
       expect(() => describeTelemetryError(circular)).not.toThrow();
     });
 
+    it("should not throw when errors is present but not an array, falling back to stringifying the payload", () => {
+      const payload = { errors: "not an array" };
+      expect(() => describeTelemetryError(payload)).not.toThrow();
+      expect(describeTelemetryError(payload)).toBe(JSON.stringify(payload));
+    });
+
     it("should stringify a plain non-Error value", () => {
       expect(describeTelemetryError("boom")).toBe('"boom"');
     });

@@ -10,12 +10,14 @@ export function formatHttpStatusPart(status: number | undefined): string {
 }
 
 export function describeTelemetryError(error: unknown): string {
-  const envelope = error as { errors?: Array<{ detail?: string }> } | null;
-  const details = envelope?.errors
-    ?.map((e) => e.detail)
-    .filter(Boolean)
-    .join("; ");
-  if (details && details.length > 0) {
+  const envelope = error as { errors?: unknown } | null;
+  const details = Array.isArray(envelope?.errors)
+    ? envelope.errors
+        .map((e: { detail?: string }) => e?.detail)
+        .filter(Boolean)
+        .join("; ")
+    : "";
+  if (details.length > 0) {
     return details;
   }
   if (error instanceof Error) {

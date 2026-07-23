@@ -1,8 +1,8 @@
 import { GetFlinkExceptionsHandler } from "@src/confluent/tools/handlers/flink/get-flink-exceptions-handler.js";
+import type { FlinkGetCase } from "@tests/factories/runtime.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
-  FlinkGetCase,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {

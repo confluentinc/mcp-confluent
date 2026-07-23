@@ -1,5 +1,5 @@
 import type { DirectConnectionConfig } from "@src/config/index.js";
-import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { executeFlinkSql } from "@src/confluent/tools/handlers/flink/flink-sql-helper.js";
 
 /**

@@ -1,8 +1,8 @@
 import { DeleteConnectorHandler } from "@src/confluent/tools/handlers/connect/delete-connector-handler.js";
+import type { ConnectHandleCase } from "@tests/factories/runtime.js";
 import {
   CCLOUD_CONN,
   CONNECT_CONN,
-  ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";

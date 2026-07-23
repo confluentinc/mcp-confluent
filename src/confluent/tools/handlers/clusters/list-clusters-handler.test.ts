@@ -1,11 +1,11 @@
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { ListClustersHandler } from "@src/confluent/tools/handlers/clusters/list-clusters-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { HandleCaseWithConn } from "@tests/factories/runtime.js";
 import {
   CCLOUD_CONN,
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
-  HandleCaseWithConn,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {

@@ -1,4 +1,4 @@
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
 
 /**
  * Flatten the text segments of a {@link CallToolResult} into a single string.

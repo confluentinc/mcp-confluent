@@ -1,4 +1,4 @@
-import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
+import type { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import {
   buildEffectiveFilter,
@@ -8,10 +8,10 @@ import {
 } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
+import type { HandleCaseWithConn } from "@tests/factories/runtime.js";
 import {
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
-  HandleCaseWithConn,
   runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";

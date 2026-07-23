@@ -1,8 +1,6 @@
-import {
-  BaseToolHandler,
-  ToolHandler,
-} from "@src/confluent/tools/base-tools.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { BaseToolHandler } from "@src/confluent/tools/base-tools.js";
+import type { ToolName } from "@src/confluent/tools/tool-name.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
 
 /**

@@ -7,9 +7,9 @@ import {
   REFRESH_TOKEN_IDLE_LIFETIME_MS,
 } from "@src/confluent/oauth/token-lifetimes.js";
 import type { ConfluentTokenSet } from "@src/confluent/oauth/types.js";
+import type { MockedFetch } from "@tests/stubs/index.js";
 import {
   jsonResponse,
-  MockedFetch,
   mockFetch,
   stubAuth0Ok,
   stubCpOk,

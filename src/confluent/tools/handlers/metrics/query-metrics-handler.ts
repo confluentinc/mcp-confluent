@@ -1,14 +1,18 @@
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolCategory,
-  ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasTelemetryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
+import {
+  describeTelemetryError,
+  formatHttpStatusPart,
+} from "@src/confluent/tools/handlers/metrics/telemetry-error.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const queryMetricsArguments = z.object({
@@ -124,9 +128,20 @@ export class QueryMetricsHandler extends BaseToolHandler {
           params: { path: { dataset } },
           body,
         } as never,
-      )) as { data?: TelemetryResponse; error?: unknown };
+      )) as {
+        data?: TelemetryResponse;
+        error?: unknown;
+        response?: { status?: number };
+      };
 
-      const data = response.data as TelemetryResponse;
+      if (response.error !== undefined) {
+        const statusPart = formatHttpStatusPart(response.response?.status);
+        throw new Error(
+          `Telemetry API error querying metrics${statusPart}: ${describeTelemetryError(response.error)}`,
+        );
+      }
+
+      const data = response.data;
 
       if (data?.errors && data.errors.length > 0) {
         const errorDetails = data.errors
@@ -164,7 +179,7 @@ export class QueryMetricsHandler extends BaseToolHandler {
         result_count: data.data.length,
       });
     } catch (error) {
-      logger.error({ error }, "Error in QueryMetricsHandler");
+      logger.error({ err: error }, "Error in QueryMetricsHandler");
       return this.createResponse(
         `Failed to query metrics: ${error instanceof Error ? error.message : String(error)}`,
         true,
@@ -291,13 +306,37 @@ function formatMetricsResponse(
   filter?: Record<string, string>,
   groupBy?: string[],
 ): string {
-  const lines: string[] = [];
+  const lines = [
+    ...formatQueryHeader(
+      metric,
+      aggregation,
+      granularity,
+      interval,
+      filter,
+      groupBy,
+    ),
+    ...(isFlatResponse(data)
+      ? formatFlatPoints(data)
+      : formatGroupedPoints(data)),
+  ];
+  return lines.join("\n").trimEnd();
+}
 
-  lines.push(`Metrics Query Results`);
-  lines.push(`  Metric: ${metric}`);
-  lines.push(`  Aggregation: ${aggregation}`);
-  lines.push(`  Granularity: ${granularity}`);
-  lines.push(`  Interval: ${interval}`);
+function formatQueryHeader(
+  metric: string,
+  aggregation: string,
+  granularity: string,
+  interval: string,
+  filter?: Record<string, string>,
+  groupBy?: string[],
+): string[] {
+  const lines = [
+    "Metrics Query Results",
+    `  Metric: ${metric}`,
+    `  Aggregation: ${aggregation}`,
+    `  Granularity: ${granularity}`,
+    `  Interval: ${interval}`,
+  ];
   if (filter && Object.keys(filter).length > 0) {
     lines.push(`  Filter: ${JSON.stringify(filter)}`);
   }
@@ -305,61 +344,65 @@ function formatMetricsResponse(
     lines.push(`  Group by: ${groupBy.join(", ")}`);
   }
   lines.push("");
+  return lines;
+}
 
-  // Detect format: flat responses have timestamp/value at top level,
-  // grouped responses have a points array
+/**
+ * Flat responses carry `timestamp`/`value` at the top level of each element;
+ * grouped responses instead nest a `points` array under group labels.
+ */
+function isFlatResponse(data: Array<Record<string, unknown>>): boolean {
   const firstItem = data[0];
-  const isFlat =
-    firstItem !== undefined && "timestamp" in firstItem && "value" in firstItem;
+  return (
+    firstItem !== undefined && "timestamp" in firstItem && "value" in firstItem
+  );
+}
 
-  if (isFlat) {
-    lines.push(`Data Points: ${data.length}`);
-    for (const point of data) {
-      const ts = point.timestamp
-        ? new Date(point.timestamp as string).toISOString()
-        : "unknown";
-      const val =
-        point.value !== undefined ? formatValue(point.value as number) : "N/A";
-      lines.push(`  ${ts}: ${val}`);
-    }
-  } else {
-    lines.push(`Groups: ${data.length}`);
-    lines.push("");
-    for (const group of data) {
-      const labels: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(group)) {
-        if (key !== "points") {
-          labels[key] = value;
-        }
-      }
+function formatFlatPoints(data: Array<Record<string, unknown>>): string[] {
+  return [
+    `Data Points: ${data.length}`,
+    ...data.map((point) => formatPoint(point.timestamp, point.value)),
+  ];
+}
 
-      if (Object.keys(labels).length > 0) {
-        const labelStr = Object.entries(labels)
-          .map(([k, v]) => `${k}=${v}`)
-          .join(", ");
-        lines.push(`Group: ${labelStr}`);
-      }
+function formatGroupedPoints(data: Array<Record<string, unknown>>): string[] {
+  return [
+    `Groups: ${data.length}`,
+    "",
+    ...data.flatMap((group) => formatGroup(group)),
+  ];
+}
 
-      const points = group.points as
-        | Array<{ timestamp?: string; value?: number }>
-        | undefined;
-      if (points && points.length > 0) {
-        for (const point of points) {
-          const ts = point.timestamp
-            ? new Date(point.timestamp).toISOString()
-            : "unknown";
-          const val =
-            point.value !== undefined ? formatValue(point.value) : "N/A";
-          lines.push(`  ${ts}: ${val}`);
-        }
-      } else {
-        lines.push("  (no data points)");
-      }
-      lines.push("");
-    }
-  }
+function formatGroup(group: Record<string, unknown>): string[] {
+  const labelStr = formatGroupLabels(group);
+  const header = labelStr ? [`Group: ${labelStr}`] : [];
+  const points = group.points as
+    | Array<{ timestamp?: string; value?: number }>
+    | undefined;
+  const pointLines =
+    points && points.length > 0
+      ? points.map((point) => formatPoint(point.timestamp, point.value))
+      : ["  (no data points)"];
+  return [...header, ...pointLines, ""];
+}
 
-  return lines.join("\n").trimEnd();
+/**
+ * Renders a group's non-`points` label entries as `key=value` pairs, or an
+ * empty string when the group carries no labels.
+ */
+function formatGroupLabels(group: Record<string, unknown>): string {
+  return Object.entries(group)
+    .filter(([key]) => key !== "points")
+    .map(([k, v]) => `${k}=${v}`)
+    .join(", ");
+}
+
+function formatPoint(timestamp: unknown, value: unknown): string {
+  const ts = timestamp
+    ? new Date(timestamp as string).toISOString()
+    : "unknown";
+  const val = value === undefined ? "N/A" : formatValue(value as number);
+  return `  ${ts}: ${val}`;
 }
 
 /**

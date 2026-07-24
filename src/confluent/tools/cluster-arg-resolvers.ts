@@ -12,9 +12,9 @@
  */
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
-import { ConnectionConfig } from "@src/config/models.js";
+import type { ConnectionConfig } from "@src/config/models.js";
 import { logger } from "@src/logger.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 
 /**
  * Resolves a required string from an explicit arg, falling back to a

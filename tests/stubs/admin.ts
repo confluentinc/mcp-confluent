@@ -1,4 +1,4 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import { type Mock, vi } from "vitest";
 
 /** {@link KafkaJS.Admin} with all methods replaced by {@link Mock mocks}. */

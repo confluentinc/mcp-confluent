@@ -1,7 +1,9 @@
 import { ListCatalogsHandler } from "@src/confluent/tools/handlers/flink/catalog/list-catalogs-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
+  statementNamesFromMeta,
   trackStatementsFromMeta,
+  waitForFlinkStatementAbsent,
   withSharedFlinkStatementCleanup,
 } from "@tests/harness/flink.js";
 import { integrationConnection } from "@tests/harness/runtime.js";
@@ -61,6 +63,23 @@ describe(
         trackStatementsFromMeta(result, createdStatements);
 
         expect(textContent(result)).toMatch(/^Catalogs:/);
+      });
+
+      it("should delete the internal query statement it created", async () => {
+        const result = await server.client.callTool({
+          name: ToolName.LIST_FLINK_CATALOGS,
+          arguments: {},
+        });
+        trackStatementsFromMeta(result, createdStatements);
+
+        const names = statementNamesFromMeta(result);
+        expect(
+          names.length,
+          "handler did not surface a created statement name on _meta",
+        ).toBeGreaterThan(0);
+        for (const name of names) {
+          await waitForFlinkStatementAbsent(name);
+        }
       });
     });
   },

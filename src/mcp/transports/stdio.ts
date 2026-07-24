@@ -1,7 +1,7 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { logger } from "@src/logger.js";
-import { Transport } from "@src/mcp/transports/types.js";
+import type { Transport } from "@src/mcp/transports/types.js";
 
 export class StdioTransport implements Transport {
   constructor(private server: McpServer) {}

@@ -11,10 +11,12 @@ It provides 50+ tools across Kafka, Flink SQL, Schema Registry, Connectors, Tabl
 > Confluent offers a [fully managed MCP server](https://docs.confluent.io/cloud/current/ai/ai-tools/managed-mcp-server.html) with no local server to run and no dependencies to install.
 > It provides access to your Confluent Cloud resources with AI-powered connector diagnostics, governed by your existing RBAC permissions.
 > Use this open-source server if you need Confluent Platform / self-managed Kafka support, or want to customize and extend the toolset.
+> 
+> **NOTE:** The open-source MCP server is a community-supported project. Confluent doesn’t provide dedicated support for it, and support is best-effort only, with no service level commitments. If you run into an issue or want to contribute, open an issue or pull request directly in this repository.
 
 ## Quick Start
 
-> **Prerequisites:** [Node.js 22+](https://nodejs.org/).
+> **Prerequisites:** [Node.js 22.19.0+](https://nodejs.org/).
 > If you want to interact with [Confluent Cloud](https://confluent.cloud/), you need to create an account first.
 
 1. Generate a quick `config.yaml` file in your project root:
@@ -148,7 +150,7 @@ The matching integration tests are tagged `@cp` and live next to their handlers 
 docker compose -f docker-compose.cp-test.yml up -d
 # Wait ~30s for Kafka + SR to become ready, then:
 CP_KAFKA_USERNAME=mcp CP_KAFKA_PASSWORD=mcp-secret \
-  pnpm run test:integration -- --tags-filter=@cp
+  pnpm run test:integration --tags-filter=@cp
 docker compose -f docker-compose.cp-test.yml down -v
 ```
 
@@ -158,7 +160,7 @@ The tests skip cleanly when those env vars are unset, so `pnpm run test:unit` an
 
 ### Prerequisites
 
-- **Node.js 22 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
+- **Node.js 22.19.0 or later** -- we recommend using [NVM](https://github.com/nvm-sh/nvm) to manage versions:
   ```bash
   nvm install 22
   nvm use 22
@@ -475,7 +477,7 @@ See [telemetry.md](telemetry.md) for full details on what is collected and what 
 
 ## Troubleshooting
 
-**"Node.js version not supported"** -- This project requires Node.js 22 or later.
+**"Node.js version not supported"** -- This project requires Node.js 22.19.0 or later.
 Check your version with `node -v` and upgrade if needed.
 
 **Tools not appearing** -- Each tool requires specific service blocks in your `config.yaml`.

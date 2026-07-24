@@ -1,12 +1,14 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logger } from "@src/logger.js";
-import { createMcpServer, CreateMcpServerOptions } from "@src/mcp/server.js";
-import { AuthConfig } from "@src/mcp/transports/auth.js";
+import type { CreateMcpServerOptions } from "@src/mcp/server.js";
+import { createMcpServer } from "@src/mcp/server.js";
+import type { AuthConfig } from "@src/mcp/transports/auth.js";
 import { HttpTransport } from "@src/mcp/transports/http.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
 import { SseTransport } from "@src/mcp/transports/sse.js";
 import { StdioTransport } from "@src/mcp/transports/stdio.js";
-import { Transport, TransportType } from "@src/mcp/transports/types.js";
+import type { Transport } from "@src/mcp/transports/types.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 
 /**
  * Configuration for the transport manager

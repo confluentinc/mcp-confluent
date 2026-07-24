@@ -158,6 +158,56 @@ export async function waitForFlinkStatementPhase(
 }
 
 /**
+ * Polls a GET on the named statement until CCloud reports it gone — a 404
+ * response, or a body whose phase is DELETED. Throws on timeout so a statement
+ * the catalog tools were meant to clean up surfaces as a clear leak in CI
+ * rather than a silent pass.
+ *
+ * Distinct from {@linkcode waitForFlinkStatementPhase}, which treats any GET
+ * error (including the 404 this helper waits for) as fatal.
+ */
+export async function waitForFlinkStatementAbsent(
+  name: string,
+  opts: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<void> {
+  const { timeoutMs = 30_000, intervalMs = 2_000 } = opts;
+  const scope = getFlinkScope();
+  const client = newTestFlinkClient(scope);
+  const deadline = Date.now() + timeoutMs;
+  let lastPhase: string | undefined;
+  while (Date.now() < deadline) {
+    const { data, error, response } = await client.GET(
+      "/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements/{statement_name}",
+      {
+        params: {
+          path: {
+            organization_id: scope.organizationId,
+            environment_id: scope.environmentId,
+            statement_name: name,
+          },
+        },
+      },
+    );
+    if (response.status === 404) {
+      return;
+    }
+    if (error) {
+      throw new Error(
+        `failed to GET flink statement ${name} (status ${response.status}): ${JSON.stringify(error)}`,
+      );
+    }
+    lastPhase = data?.status?.phase;
+    if (lastPhase === "DELETED") {
+      return;
+    }
+    await sleep(intervalMs);
+  }
+  throw new Error(
+    `flink statement ${name} still present after ${timeoutMs}ms (last phase: ${lastPhase ?? "unknown"}); catalog cleanup did not remove it`,
+  );
+}
+
+/**
  * DELETE the named statement. Tolerates 404 silently because the
  * delete-statement test deletes via the tool, so teardown's 404 isn't a real
  * failure. Logs other failures to stderr; {@linkcode withSharedFlinkStatementCleanup}
@@ -204,6 +254,16 @@ export function withSharedFlinkStatementCleanup(): {
 }
 
 /**
+ * Extracts the statement names a catalog handler surfaced on
+ * `_meta.flinkStatementsCreated`, filtered to strings.
+ */
+export function statementNamesFromMeta(result: CallToolResponse): string[] {
+  const names = (result._meta as Partial<FlinkStatementMeta> | undefined)
+    ?.flinkStatementsCreated;
+  return Array.isArray(names) ? names.filter((n) => typeof n === "string") : [];
+}
+
+/**
  * Reads `_meta.flinkStatementsCreated` from a tool-call result and pushes names onto
  * {@linkcode createdStatements} for sweep by {@linkcode withSharedFlinkStatementCleanup}'s `afterAll`.
  */
@@ -211,11 +271,7 @@ export function trackStatementsFromMeta(
   result: CallToolResponse,
   createdStatements: string[],
 ): void {
-  const names = (result._meta as Partial<FlinkStatementMeta> | undefined)
-    ?.flinkStatementsCreated;
-  if (Array.isArray(names) && names.length > 0) {
-    createdStatements.push(...names.filter((n) => typeof n === "string"));
-  }
+  createdStatements.push(...statementNamesFromMeta(result));
 }
 
 /**

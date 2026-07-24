@@ -1,14 +1,14 @@
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolCategory,
-  ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 

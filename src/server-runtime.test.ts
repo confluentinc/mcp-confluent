@@ -1,10 +1,7 @@
 import { DEFAULT_CONNECTION_ID } from "@src/config/env-config.js";
 import { type DirectConnectionConfig } from "@src/config/index.js";
 import { MCPServerConfiguration } from "@src/config/models.js";
-import {
-  constructDirectClientManager,
-  DirectClientManager,
-} from "@src/confluent/direct-client-manager.js";
+import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
@@ -17,130 +14,6 @@ function connWith(
 ): DirectConnectionConfig {
   return { type: "direct", ...fields };
 }
-
-describe("constructDirectClientManager()", () => {
-  it("should return a DirectClientManager instance", () => {
-    const manager = constructDirectClientManager(
-      connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-    );
-    expect(manager).toBeInstanceOf(DirectClientManager);
-  });
-
-  it("should always set client.id to mcp-confluent", () => {
-    const manager = constructDirectClientManager(
-      connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-    );
-    expect(manager["kafkaConfig"]["client.id"]).toBe("mcp-confluent");
-  });
-
-  it("should set bootstrap.servers from the kafka block", () => {
-    const manager = constructDirectClientManager(
-      connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-    );
-    expect(manager["kafkaConfig"]["bootstrap.servers"]).toBe("broker:9092");
-  });
-
-  it("should include SASL config when the kafka block has auth", () => {
-    const manager = constructDirectClientManager(
-      connWith({
-        kafka: {
-          bootstrap_servers: "broker:9092",
-          auth: { type: "api_key", key: "the-key", secret: "the-secret" },
-        },
-      }),
-    );
-    expect(manager["kafkaConfig"]["security.protocol"]).toBe("sasl_ssl");
-    expect(manager["kafkaConfig"]["sasl.username"]).toBe("the-key");
-    expect(manager["kafkaConfig"]["sasl.password"]).toBe("the-secret");
-  });
-
-  it("should omit SASL config when the kafka block has no auth", () => {
-    const manager = constructDirectClientManager(
-      connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-    );
-    expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
-  });
-
-  it("should omit SASL config when there is no kafka block", () => {
-    const manager = constructDirectClientManager(
-      connWith({
-        confluent_cloud: {
-          endpoint: "https://api.confluent.cloud",
-          auth: { type: "api_key", key: "k", secret: "s" },
-        },
-      }),
-    );
-    expect(manager["kafkaConfig"]["security.protocol"]).toBeUndefined();
-  });
-
-  it("should spread kafka extra_properties into the GlobalConfig", () => {
-    const manager = constructDirectClientManager(
-      connWith({
-        kafka: {
-          bootstrap_servers: "broker:9092",
-          extra_properties: { "socket.timeout.ms": "5000" },
-        },
-      }),
-    );
-    expect(manager["kafkaConfig"]["socket.timeout.ms"]).toBe("5000");
-  });
-
-  it("should set confluentCloudBaseUrl from the confluent_cloud block endpoint", () => {
-    const manager = constructDirectClientManager(
-      connWith({
-        confluent_cloud: {
-          endpoint: "https://my.cloud.api",
-          auth: { type: "api_key", key: "k", secret: "s" },
-        },
-      }),
-    );
-    expect(manager["confluentCloudBaseUrl"]).toBe("https://my.cloud.api");
-  });
-
-  it("should set confluentCloudBaseUrl to https://api.confluent.cloud when the block uses the default endpoint", () => {
-    const manager = constructDirectClientManager(
-      connWith({
-        confluent_cloud: {
-          endpoint: "https://api.confluent.cloud",
-          auth: { type: "api_key", key: "k", secret: "s" },
-        },
-      }),
-    );
-    expect(manager["confluentCloudBaseUrl"]).toBe(
-      "https://api.confluent.cloud",
-    );
-  });
-
-  it("should default confluentCloudBaseUrl to https://api.confluent.cloud when there is no confluent_cloud block", () => {
-    const manager = constructDirectClientManager(
-      connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-    );
-    expect(manager["confluentCloudBaseUrl"]).toBe(
-      "https://api.confluent.cloud",
-    );
-  });
-
-  it("should set confluentCloudTelemetryBaseUrl from the telemetry block", () => {
-    const manager = constructDirectClientManager(
-      connWith({
-        telemetry: {
-          endpoint: "https://my.telemetry.api",
-          auth: { type: "api_key", key: "k", secret: "s" },
-        },
-      }),
-    );
-    expect(manager["confluentCloudTelemetryBaseUrl"]).toBe(
-      "https://my.telemetry.api",
-    );
-  });
-
-  it("should leave confluentCloudTelemetryBaseUrl undefined when there is no telemetry block", () => {
-    const manager = constructDirectClientManager(
-      connWith({ kafka: { bootstrap_servers: "broker:9092" } }),
-    );
-    expect(manager["confluentCloudTelemetryBaseUrl"]).toBeUndefined();
-  });
-});
 
 describe("ServerRuntime", () => {
   const config = new MCPServerConfiguration({

@@ -1,12 +1,12 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
 import { createMcpServer } from "@src/mcp/server.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 
 export interface TestServerContext {
   server: McpServer;

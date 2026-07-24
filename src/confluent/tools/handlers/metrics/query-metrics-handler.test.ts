@@ -1,4 +1,4 @@
-import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
+import type { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import {
   buildEffectiveFilter,
@@ -8,10 +8,10 @@ import {
 } from "@src/confluent/tools/handlers/metrics/query-metrics-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { textOf } from "@tests/call-tool-result.js";
+import type { HandleCaseWithConn } from "@tests/factories/runtime.js";
 import {
   ccloudOAuthRuntime,
   DEFAULT_CONNECTION_ID,
-  HandleCaseWithConn,
   runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
@@ -330,6 +330,28 @@ describe("query-metrics-handler.ts", () => {
         });
       });
 
+      it("should surface the HTTP status and error detail when the query endpoint returns an openapi-fetch error instead of throwing", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudTelemetryRestClient()
+          .POST.mockResolvedValue({
+            error: { errors: [{ detail: "authentication failed" }] },
+            response: { status: 403 },
+          } as never);
+
+        const result = await handler.handle(
+          runtimeWith(TELEMETRY_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { metric: KAFKA_SERVER_METRIC },
+        );
+
+        const text = textOf(result);
+        expect(result.isError).toBe(true);
+        expect(text).toContain("Failed to query metrics");
+        expect(text).toContain("HTTP 403");
+        expect(text).toContain("authentication failed");
+        expect(text).not.toContain("No data returned");
+      });
+
       it("should return a flagged error when the telemetry client throws", async () => {
         const clientManager = getMockedClientManager();
         clientManager
@@ -402,15 +424,21 @@ describe("query-metrics-handler.ts", () => {
 
         const text = textOf(result);
         expect(result.isError).toBe(false);
-        expect(text).toContain("Metrics Query Results");
-        expect(text).toContain(`Metric: ${KAFKA_SERVER_METRIC}`);
-        expect(text).toContain(
-          'Filter: {"resource.kafka.id":"lkc-from-config"}',
+        expect(text).toBe(
+          [
+            "Metrics Query Results",
+            `  Metric: ${KAFKA_SERVER_METRIC}`,
+            "  Aggregation: SUM",
+            "  Granularity: PT1M",
+            "  Interval: 2024-06-01T11:00:00Z/2024-06-01T12:00:00Z",
+            '  Filter: {"resource.kafka.id":"lkc-from-config"}',
+            "",
+            "Data Points: 3",
+            `  2024-06-01T12:00:00.000Z: ${(1234567).toLocaleString()}`,
+            "  2024-06-01T12:01:00.000Z: 0.1235",
+            "  2024-06-01T12:02:00.000Z: N/A",
+          ].join("\n"),
         );
-        expect(text).toContain("Data Points: 3");
-        expect(text).toContain((1234567).toLocaleString());
-        expect(text).toContain("0.1235");
-        expect(text).toContain("2024-06-01T12:02:00.000Z: N/A");
         expect(result._meta).toEqual({
           metric: KAFKA_SERVER_METRIC,
           dataset: "cloud",
@@ -453,13 +481,25 @@ describe("query-metrics-handler.ts", () => {
         );
 
         const text = textOf(result);
-        expect(text).toContain("Group by: metric.topic");
-        expect(text).toContain("Groups: 2");
-        expect(text).toContain("Group: metric.topic=orders");
-        expect(text).toContain("42");
-        expect(text).toContain("2024-06-01T12:01:00.000Z: N/A");
-        expect(text).toContain("Group: metric.topic=shipments");
-        expect(text).toContain("(no data points)");
+        expect(text).toBe(
+          [
+            "Metrics Query Results",
+            `  Metric: ${KAFKA_SERVER_METRIC}`,
+            "  Aggregation: SUM",
+            "  Granularity: PT1M",
+            "  Interval: 2024-06-01T11:00:00Z/2024-06-01T12:00:00Z",
+            "  Group by: metric.topic",
+            "",
+            "Groups: 2",
+            "",
+            "Group: metric.topic=orders",
+            "  2024-06-01T12:00:00.000Z: 42",
+            "  2024-06-01T12:01:00.000Z: N/A",
+            "",
+            "Group: metric.topic=shipments",
+            "  (no data points)",
+          ].join("\n"),
+        );
       });
     });
 

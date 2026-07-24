@@ -1,10 +1,10 @@
+import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
 import {
   CREATE_UPDATE,
   ToolCategory,
-  ToolHandler,
 } from "@src/confluent/tools/base-tools.js";
+import type { ConnectionPredicate } from "@src/confluent/tools/connection-predicates.js";
 import {
-  ConnectionPredicate,
   ToolDisabledReason,
   alwaysEnabled,
   hasKafka,

@@ -7,7 +7,8 @@
  * (integration.cp.yaml) via {@linkcode cpIntegrationRuntime}.
  */
 
-import { GlobalConfig, KafkaJS } from "@confluentinc/kafka-javascript";
+import type { GlobalConfig } from "@confluentinc/kafka-javascript";
+import { KafkaJS } from "@confluentinc/kafka-javascript";
 import { cpIntegrationRuntime } from "@tests/harness/cp-runtime.js";
 import { afterAll, beforeAll } from "vitest";
 

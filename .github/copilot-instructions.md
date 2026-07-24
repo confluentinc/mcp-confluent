@@ -12,7 +12,7 @@ assistants. The tool surface splits into two groups:
   `tableflow:`) is present in a connection's resolved config (from YAML or, during the
   migration, legacy env vars + CLI args).
 
-Built with TypeScript, Node.js ≥22, and the `@modelcontextprotocol/sdk`. Ships as an npm package
+Built with TypeScript, Node.js ≥22.19.0, and the `@modelcontextprotocol/sdk`. Ships as an npm package
 and a Docker image; supports stdio, Streamable HTTP, and (for backwards compatibility with older
 MCP clients) the legacy HTTP+SSE transport.
 

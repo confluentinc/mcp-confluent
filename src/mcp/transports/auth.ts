@@ -1,7 +1,7 @@
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
 import { timingSafeEqual } from "crypto";
-import { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 
 /**
  * HTTP header name carrying the MCP API key. Confluent custom-header

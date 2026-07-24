@@ -13,12 +13,12 @@ import {
   type ConfluentRestClient,
   type SchemaRegistryClientHandler,
 } from "@src/confluent/client-manager.js";
-import {
+import type {
   ConfluentAuth,
   ConfluentEndpoints,
-  createAuthMiddleware,
 } from "@src/confluent/middleware.js";
-import { paths } from "@src/confluent/openapi-schema.js";
+import { createAuthMiddleware } from "@src/confluent/middleware.js";
+import type { paths } from "@src/confluent/openapi-schema.js";
 import { Lazy } from "@src/lazy.js";
 import { logger } from "@src/logger.js";
 import createClient from "openapi-fetch";

@@ -1,4 +1,4 @@
-import type { ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { nodeHttp, nodeOpen } from "@src/confluent/node-deps.js";
 import {
@@ -90,6 +90,252 @@ function buildAuthorizationUrl(
   return `https://${auth0Config.domain}/authorize?${params.toString()}`;
 }
 
+type CallbackServer = ReturnType<typeof nodeHttp.createServer>;
+
+/**
+ * Mutable state shared across the PKCE callback server's request handlers,
+ * threaded explicitly instead of closure capture so those handlers can live
+ * as module-level functions (see the cognitive-complexity note on
+ * {@link runPkceLogin}).
+ */
+interface PkceCallbackState {
+  readonly oauthState: string;
+  readonly streamClients: Set<ServerResponse>;
+  readonly resolveCode: (code: string) => void;
+  readonly rejectFlow: (err: PkceLoginError) => void;
+  successServed: boolean;
+  serverClosed: boolean;
+  bound: boolean;
+  lifetimeTimer?: ReturnType<typeof setTimeout>;
+}
+
+function closeServerOnce(server: CallbackServer, state: PkceCallbackState) {
+  if (state.serverClosed || !state.bound) return;
+  state.serverClosed = true;
+  if (state.lifetimeTimer) {
+    clearTimeout(state.lifetimeTimer);
+    state.lifetimeTimer = undefined;
+  }
+  for (const client of state.streamClients) client.end();
+  state.streamClients.clear();
+  server.close();
+}
+
+function handleSkillsHintCopiedRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  state: PkceCallbackState,
+): void {
+  // Only reachable once we've served the success page. Anything earlier
+  // would be a stray request on localhost, not a copy of the install hint.
+  if (!state.successServed) {
+    res.writeHead(404);
+    res.end();
+    return;
+  }
+  if (req.method !== "POST") {
+    res.writeHead(405, { Allow: "POST" });
+    res.end();
+    return;
+  }
+  try {
+    TelemetryService.getInstance().track(
+      TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
+      {},
+    );
+  } catch (err) {
+    logger.warn({ err }, "Failed to track agent-skills hint copied event");
+  }
+  res.writeHead(204);
+  res.end();
+}
+
+function handleSkillsHintStreamRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  server: CallbackServer,
+  state: PkceCallbackState,
+): void {
+  // Same gate as the beacon: the stream only makes sense once the success
+  // page has been served. Pre-auth requests get a 404.
+  if (!state.successServed) {
+    res.writeHead(404);
+    res.end();
+    return;
+  }
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+  // Flush headers so the browser considers the EventSource "open".
+  res.write(": connected\n\n");
+  state.streamClients.add(res);
+  req.on("close", () => {
+    state.streamClients.delete(res);
+    // When the last tab closes and auth already succeeded, the listener
+    // has no further reason to exist.
+    if (state.successServed && state.streamClients.size === 0) {
+      closeServerOnce(server, state);
+    }
+  });
+}
+
+function handleOAuthRedirectRequest(
+  res: ServerResponse,
+  parsed: URL,
+  state: PkceCallbackState,
+): void {
+  const receivedState = parsed.searchParams.get("state");
+  if (receivedState !== state.oauthState) {
+    sendHtml(res, 400, renderErrorPage("State mismatch"));
+    return;
+  }
+  const errorParam = parsed.searchParams.get("error");
+  if (errorParam) {
+    sendHtml(res, 400, renderErrorPage(`Authentication failed: ${errorParam}`));
+    state.rejectFlow(
+      new PkceLoginError(
+        "user_aborted",
+        `Auth0 redirect carried error=${errorParam}`,
+      ),
+    );
+    return;
+  }
+  const code = parsed.searchParams.get("code");
+  if (!code) {
+    sendHtml(res, 400, renderErrorPage("Missing authorization code"));
+    return;
+  }
+  sendHtml(
+    res,
+    200,
+    renderSuccessPage({
+      copiedPath: SKILLS_HINT_COPIED_PATH,
+      streamPath: SKILLS_HINT_STREAM_PATH,
+    }),
+  );
+  state.successServed = true;
+  state.resolveCode(code);
+}
+
+function createCallbackRequestListener(
+  server: CallbackServer,
+  state: PkceCallbackState,
+) {
+  return (req: IncomingMessage, res: ServerResponse): void => {
+    const parsed = new URL(req.url ?? "", "http://127.0.0.1");
+    if (parsed.pathname === SKILLS_HINT_COPIED_PATH) {
+      handleSkillsHintCopiedRequest(req, res, state);
+      return;
+    }
+    if (parsed.pathname === SKILLS_HINT_STREAM_PATH) {
+      handleSkillsHintStreamRequest(req, res, server, state);
+      return;
+    }
+    if (parsed.pathname !== OAUTH_CALLBACK_PATH) {
+      sendHtml(res, 404, renderErrorPage("Not found"));
+      return;
+    }
+    handleOAuthRedirectRequest(res, parsed, state);
+  };
+}
+
+function bindCallbackServer(
+  server: CallbackServer,
+  state: PkceCallbackState,
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const onBindError = (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        reject(
+          new PkceLoginError(
+            "port_in_use",
+            `Port ${OAUTH_CALLBACK_PORT} is already in use; another mcp-confluent OAuth session may be active`,
+          ),
+        );
+      } else {
+        reject(
+          new PkceLoginError(
+            "configuration",
+            `Failed to bind PKCE callback server on ${OAUTH_CALLBACK_HOST}:${OAUTH_CALLBACK_PORT}: ${err.message}`,
+          ),
+        );
+      }
+    };
+    server.on("error", onBindError);
+    server.listen(OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_HOST, () => {
+      state.bound = true;
+      server.off("error", onBindError);
+      // Post-bind socket errors must reject the in-flight flow, not just warn: if the listener
+      // dies mid-callback (EMFILE, broken TLS upgrade, etc.) the user would otherwise hang on
+      // `codePromise` until `PKCE_LOGIN_TIMEOUT_MS` (minutes) instead of failing fast.
+      server.on("error", (err) => {
+        logger.warn({ err }, "PKCE callback server post-bind error");
+        state.rejectFlow(
+          new PkceLoginError(
+            "callback_server_error",
+            `PKCE callback listener errored after bind: ${err.message}`,
+          ),
+        );
+      });
+      resolve();
+    });
+  });
+}
+
+async function openBrowserOrThrow(
+  authUrl: string,
+  abortPromise: Promise<never>,
+): Promise<void> {
+  try {
+    await Promise.race([nodeOpen.open(authUrl), abortPromise]);
+  } catch (err) {
+    // Preserve user_aborted from the race; wrap any other open() failure.
+    if (err instanceof PkceLoginError) throw err;
+    throw new PkceLoginError(
+      "configuration",
+      `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+function teardownCallbackServer(
+  server: CallbackServer,
+  state: PkceCallbackState,
+): void {
+  if (!state.bound) return;
+  if (state.successServed) {
+    // The success page's EventSource keeps the listener alive while the
+    // browser tab is open; stream-disconnect calls closeServerOnce. The
+    // timer + unref'd server are the "tab left open" backstop so this
+    // listener can never keep the process alive on its own.
+    server.unref?.();
+    state.lifetimeTimer = setTimeout(
+      () => closeServerOnce(server, state),
+      SUCCESS_PAGE_MAX_LIFETIME_MS,
+    );
+    state.lifetimeTimer.unref?.();
+  } else {
+    closeServerOnce(server, state);
+  }
+}
+
+async function exchangeTokensOrThrow(
+  auth0Config: Auth0Config,
+  authCode: string,
+  codeVerifier: string,
+): Promise<TokenChainResult> {
+  try {
+    return await executeFullTokenChain(auth0Config, authCode, codeVerifier);
+  } catch (err) {
+    throw new PkceLoginError(
+      "auth0_unreachable",
+      `Token chain failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
 /**
  * Runs the PKCE flow end-to-end:
  *  - generates verifier / challenge / state
@@ -121,7 +367,7 @@ export async function runPkceLogin(
 
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
-  const state = generateOpaqueToken();
+  const oauthState = generateOpaqueToken();
 
   let resolveCode: (code: string) => void = () => undefined;
   let rejectFlow: (err: PkceLoginError) => void = () => undefined;
@@ -134,154 +380,22 @@ export async function runPkceLogin(
   // lifetime is driven by the success page's EventSource: it stays bound while
   // the tab is open and closes when the stream disconnects (or when the safety
   // timer fires).
-  let successServed = false;
-  let serverClosed = false;
-  let lifetimeTimer: ReturnType<typeof setTimeout> | undefined;
-  const streamClients = new Set<ServerResponse>();
-
-  const closeServerOnce = (): void => {
-    if (serverClosed || !bound) return;
-    serverClosed = true;
-    if (lifetimeTimer) {
-      clearTimeout(lifetimeTimer);
-      lifetimeTimer = undefined;
-    }
-    for (const client of streamClients) client.end();
-    streamClients.clear();
-    server.close();
+  const state: PkceCallbackState = {
+    oauthState,
+    streamClients: new Set<ServerResponse>(),
+    resolveCode,
+    rejectFlow,
+    successServed: false,
+    serverClosed: false,
+    bound: false,
   };
 
-  const server = nodeHttp.createServer((req, res) => {
-    const reqUrl = req.url ?? "";
-    const parsed = new URL(reqUrl, "http://127.0.0.1");
-    if (parsed.pathname === SKILLS_HINT_COPIED_PATH) {
-      // Only reachable once we've served the success page. Anything earlier
-      // would be a stray request on localhost, not a copy of the install hint.
-      if (!successServed) {
-        res.writeHead(404);
-        res.end();
-        return;
-      }
-      if (req.method !== "POST") {
-        res.writeHead(405, { Allow: "POST" });
-        res.end();
-        return;
-      }
-      try {
-        TelemetryService.getInstance().track(
-          TelemetryEvent.AGENT_SKILLS_HINT_COPIED,
-          {},
-        );
-      } catch (err) {
-        logger.warn({ err }, "Failed to track agent-skills hint copied event");
-      }
-      res.writeHead(204);
-      res.end();
-      return;
-    }
-    if (parsed.pathname === SKILLS_HINT_STREAM_PATH) {
-      // Same gate as the beacon: the stream only makes sense once the success
-      // page has been served. Pre-auth requests get a 404.
-      if (!successServed) {
-        res.writeHead(404);
-        res.end();
-        return;
-      }
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      });
-      // Flush headers so the browser considers the EventSource "open".
-      res.write(": connected\n\n");
-      streamClients.add(res);
-      req.on("close", () => {
-        streamClients.delete(res);
-        // When the last tab closes and auth already succeeded, the listener
-        // has no further reason to exist.
-        if (successServed && streamClients.size === 0) closeServerOnce();
-      });
-      return;
-    }
-    if (parsed.pathname !== OAUTH_CALLBACK_PATH) {
-      sendHtml(res, 404, renderErrorPage("Not found"));
-      return;
-    }
-    const receivedState = parsed.searchParams.get("state");
-    if (receivedState !== state) {
-      sendHtml(res, 400, renderErrorPage("State mismatch"));
-      return;
-    }
-    const errorParam = parsed.searchParams.get("error");
-    if (errorParam) {
-      sendHtml(
-        res,
-        400,
-        renderErrorPage(`Authentication failed: ${errorParam}`),
-      );
-      rejectFlow(
-        new PkceLoginError(
-          "user_aborted",
-          `Auth0 redirect carried error=${errorParam}`,
-        ),
-      );
-      return;
-    }
-    const code = parsed.searchParams.get("code");
-    if (!code) {
-      sendHtml(res, 400, renderErrorPage("Missing authorization code"));
-      return;
-    }
-    sendHtml(
-      res,
-      200,
-      renderSuccessPage({
-        copiedPath: SKILLS_HINT_COPIED_PATH,
-        streamPath: SKILLS_HINT_STREAM_PATH,
-      }),
-    );
-    successServed = true;
-    resolveCode(code);
-  });
-
-  let bound = false;
-  const bindResult = new Promise<void>((resolve, reject) => {
-    const onBindError = (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE") {
-        reject(
-          new PkceLoginError(
-            "port_in_use",
-            `Port ${OAUTH_CALLBACK_PORT} is already in use; another mcp-confluent OAuth session may be active`,
-          ),
-        );
-      } else {
-        reject(
-          new PkceLoginError(
-            "configuration",
-            `Failed to bind PKCE callback server on ${OAUTH_CALLBACK_HOST}:${OAUTH_CALLBACK_PORT}: ${err.message}`,
-          ),
-        );
-      }
-    };
-    server.on("error", onBindError);
-    server.listen(OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_HOST, () => {
-      bound = true;
-      server.off("error", onBindError);
-      // Post-bind socket errors must reject the in-flight flow, not just warn: if the listener
-      // dies mid-callback (EMFILE, broken TLS upgrade, etc.) the user would otherwise hang on
-      // `codePromise` until `PKCE_LOGIN_TIMEOUT_MS` (minutes) instead of failing fast.
-      server.on("error", (err) => {
-        logger.warn({ err }, "PKCE callback server post-bind error");
-        rejectFlow(
-          new PkceLoginError(
-            "callback_server_error",
-            `PKCE callback listener errored after bind: ${err.message}`,
-          ),
-        );
-      });
-      resolve();
-    });
-  });
+  // `server` is referenced inside its own request listener (to close itself
+  // once the success-page stream disconnects); the listener closure only
+  // runs once a request arrives, well after this `const` is initialized.
+  const server: CallbackServer = nodeHttp.createServer((req, res) =>
+    createCallbackRequestListener(server, state)(req, res),
+  );
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -306,22 +420,17 @@ export async function runPkceLogin(
 
   let authCode: string;
   try {
-    await Promise.race([bindResult, abortPromise]);
-    const authUrl = buildAuthorizationUrl(auth0Config, codeChallenge, state);
+    await Promise.race([bindCallbackServer(server, state), abortPromise]);
+    const authUrl = buildAuthorizationUrl(
+      auth0Config,
+      codeChallenge,
+      oauthState,
+    );
     // log the URL so users whose default browser misbehaves can open it manually. safe to log:
     // the URL carries only the one-time PKCE code_challenge + state, both bound to this single
     // login attempt and discarded once the callback resolves.
     logger.info({ authUrl }, "Opening Auth0 authorization URL");
-    try {
-      await Promise.race([nodeOpen.open(authUrl), abortPromise]);
-    } catch (err) {
-      // Preserve user_aborted from the race; wrap any other open() failure.
-      if (err instanceof PkceLoginError) throw err;
-      throw new PkceLoginError(
-        "configuration",
-        `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+    await openBrowserOrThrow(authUrl, abortPromise);
     authCode = await Promise.race([codePromise, timeoutPromise, abortPromise]);
   } finally {
     // Remove the abort listener if the race resolved via something other
@@ -330,31 +439,9 @@ export async function runPkceLogin(
       signal.removeEventListener("abort", abortListener);
     }
     clearTimeout(timer);
-    if (bound) {
-      if (successServed) {
-        // The success page's EventSource keeps the listener alive while the
-        // browser tab is open; stream-disconnect calls closeServerOnce. The
-        // timer + unref'd server are the "tab left open" backstop so this
-        // listener can never keep the process alive on its own.
-        server.unref?.();
-        lifetimeTimer = setTimeout(
-          closeServerOnce,
-          SUCCESS_PAGE_MAX_LIFETIME_MS,
-        );
-        lifetimeTimer.unref?.();
-      } else {
-        closeServerOnce();
-      }
-    }
+    teardownCallbackServer(server, state);
   }
 
   logger.info("PKCE auth code received; exchanging for token chain");
-  try {
-    return await executeFullTokenChain(auth0Config, authCode, codeVerifier);
-  } catch (err) {
-    throw new PkceLoginError(
-      "auth0_unreachable",
-      `Token chain failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
+  return exchangeTokensOrThrow(auth0Config, authCode, codeVerifier);
 }

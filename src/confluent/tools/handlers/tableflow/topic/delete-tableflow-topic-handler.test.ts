@@ -1,9 +1,9 @@
 import { DeleteTableFlowTopicHandler } from "@src/confluent/tools/handlers/tableflow/topic/delete-tableflow-topic-handler.js";
+import type { TableflowHandleCase } from "@tests/factories/runtime.js";
 import {
   DEFAULT_CONNECTION_ID,
   runtimeWithDecoy,
   TABLEFLOW_CONN,
-  TableflowHandleCase,
 } from "@tests/factories/runtime.js";
 import {
   assertHandleCase,

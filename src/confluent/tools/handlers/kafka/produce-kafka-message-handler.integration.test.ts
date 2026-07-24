@@ -1,4 +1,4 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import { VALUE_SCHEMA_ID_HEADER } from "@confluentinc/schemaregistry";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";

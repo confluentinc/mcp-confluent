@@ -1,12 +1,12 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { sdkTransports } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
-import { HttpServer } from "@src/mcp/transports/server.js";
+import type { HttpServer } from "@src/mcp/transports/server.js";
 import { SessionRegistry } from "@src/mcp/transports/session-registry.js";
-import { Transport } from "@src/mcp/transports/types.js";
-import { FastifyReply, FastifyRequest } from "fastify";
-import { ServerResponse } from "node:http";
+import type { Transport } from "@src/mcp/transports/types.js";
+import type { FastifyReply, FastifyRequest } from "fastify";
+import type { ServerResponse } from "node:http";
 
 interface SseMessageRequest {
   Querystring: {

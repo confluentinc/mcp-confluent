@@ -1,10 +1,10 @@
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { QueryProfilerHandler } from "@src/confluent/tools/handlers/flink/diagnostics/query-profiler-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { FlinkGetCase } from "@tests/factories/runtime.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_TELEMETRY_CONN,
-  FlinkGetCase,
   runtimeWith,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
@@ -158,14 +158,37 @@ describe("query-profiler-handler.ts", () => {
         });
       });
 
+      it("should return an error response when Graph parses but has no tasks array", async () => {
+        const clientManager = getMockedClientManager();
+        clientManager
+          .getConfluentCloudFlinkRestClient()
+          .GET.mockResolvedValue({ data: { Graph: '{"unexpected":true}' } });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: {
+            resolves: "Task graph payload is missing its tasks array",
+            isError: true,
+          },
+          clientManager,
+        });
+      });
+
       it("should detect high backpressure per-task when backpressurePercent exceeds 50%", async () => {
         const cm = getMockedClientManager();
         cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
           data: { Graph: JSON.stringify(TASK_GRAPH) },
         });
-        // task/backpressure_time at 600 ms/s → 60% → medium severity
+        // task/backpressure_time_ms_per_second at 600 ms/s → 60% → medium severity
         wireFlinkTelemetry(cm, {
-          "task/backpressure_time": [{ value: 600, taskId: "task-1" }],
+          "task/backpressure_time_ms_per_second": [
+            { value: 600, taskId: "task-1" },
+          ],
         });
         await assertHandleCase({
           handler,
@@ -187,7 +210,9 @@ describe("query-profiler-handler.ts", () => {
         });
         // 900 ms/s → 90% → "high"
         wireFlinkTelemetry(cm, {
-          "task/backpressure_time": [{ value: 900, taskId: "task-1" }],
+          "task/backpressure_time_ms_per_second": [
+            { value: 900, taskId: "task-1" },
+          ],
         });
         await assertHandleCase({
           handler,
@@ -200,6 +225,34 @@ describe("query-profiler-handler.ts", () => {
           outcome: { resolves: '"severity": "high"' },
           clientManager: cm,
         });
+      });
+
+      it("should format busyPercent and idlePercent as percentages when telemetry reports them", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: JSON.stringify(TASK_GRAPH) },
+        });
+        // task/busy_time_ms_per_second at 456 ms/s → 45.6%;
+        // task/idle_time_ms_per_second at 123 ms/s → 12.3%
+        wireFlinkTelemetry(cm, {
+          "task/busy_time_ms_per_second": [{ value: 456, taskId: "task-1" }],
+          "task/idle_time_ms_per_second": [{ value: 123, taskId: "task-1" }],
+        });
+        const result = await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: '"busyPercent": "45.6%"' },
+          clientManager: cm,
+        });
+        const text = result?.content
+          .map((c) => ("text" in c ? c.text : ""))
+          .join("");
+        expect(text).toContain('"idlePercent": "12.3%"');
       });
 
       it("should detect high consumer lag from summary pendingRecords", async () => {
@@ -285,6 +338,53 @@ describe("query-profiler-handler.ts", () => {
           .join("");
         expect(text).not.toContain("detectedIssues");
         expect(text).not.toContain("issueCount");
+      });
+
+      it('should render stateSizeMB as "0.00" when summary stateBytes is 0', async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: '{"tasks":[]}' },
+        });
+        // A statement with no keyed state legitimately reports 0 bytes; the
+        // rendered summary must keep it, not drop it as if the metric were
+        // absent.
+        wireFlinkTelemetry(cm, {
+          "operator/state_size_bytes": [{ value: 0 }],
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: '"stateSizeMB": "0.00"' },
+          clientManager: cm,
+        });
+      });
+
+      it("should render a watermark of 0 as the Unix epoch, not drop it", async () => {
+        const cm = getMockedClientManager();
+        cm.getConfluentCloudFlinkRestClient().GET.mockResolvedValue({
+          data: { Graph: '{"tasks":[]}' },
+        });
+        // 0 is a real epoch-ms watermark (1970-01-01); only the Long.MIN_VALUE
+        // sentinel means "no watermark", so 0 must render.
+        wireFlinkTelemetry(cm, {
+          current_input_watermark_milliseconds: [{ value: 0 }],
+        });
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_TELEMETRY_CONN,
+            DEFAULT_CONNECTION_ID,
+            cm,
+          ),
+          args: { statementName: STATEMENT_NAME },
+          outcome: { resolves: '"inputWatermark": "1970-01-01T00:00:00.000Z"' },
+          clientManager: cm,
+        });
       });
     });
   });

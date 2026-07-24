@@ -2,7 +2,9 @@ import { DescribeTableHandler } from "@src/confluent/tools/handlers/flink/catalo
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import {
   findFriendlySchemaName,
+  statementNamesFromMeta,
   trackStatementsFromMeta,
+  waitForFlinkStatementAbsent,
   withSharedFlinkStatementCleanup,
 } from "@tests/harness/flink.js";
 import {
@@ -123,6 +125,28 @@ describe(
           )
           .toContain(`Table '${tableName}' schema:`);
       }, 120_000);
+
+      it("should delete both statements created on the lkc-* (two-statement) path", async () => {
+        // Passing the kafka cluster id (lkc-*) as databaseName forces the
+        // handler through getSchemaMapping (statement 1) + the COLUMNS query
+        // (statement 2). The schema-mapping lookup runs whether or not the
+        // table is catalogued yet, so this proves both-statement cleanup
+        // without waiting on CCloud's table auto-discovery.
+        const result = await server.client.callTool({
+          name: ToolName.DESCRIBE_FLINK_TABLE,
+          arguments: { tableName, databaseName: getTestClusterId() },
+        });
+        const names = statementNamesFromMeta(result);
+        createdStatements.push(...names);
+
+        expect(
+          names.length,
+          "lkc-* path should create exactly two statements (schema-mapping + columns)",
+        ).toBe(2);
+        for (const name of names) {
+          await waitForFlinkStatementAbsent(name);
+        }
+      });
     });
   },
 );

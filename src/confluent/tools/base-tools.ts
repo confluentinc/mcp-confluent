@@ -4,18 +4,21 @@ import type {
   DirectConnectionConfig,
 } from "@src/config/models.js";
 import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type {
+  ConnectionPredicate,
+  PredicateResult,
+} from "@src/confluent/tools/connection-predicates.js";
 import {
   alwaysEnabled,
-  ConnectionPredicate,
   ENABLED,
-  PredicateResult,
   ToolDisabledReason,
 } from "@src/confluent/tools/connection-predicates.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { quoteJoinIds } from "@src/utils/quote-join-ids.js";
-import { z, ZodRawShape } from "zod";
+import type { ZodRawShape } from "zod";
+import { z } from "zod";
 
 /**
  * Standard MCP tool annotations.

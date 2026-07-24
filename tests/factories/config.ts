@@ -1,7 +1,5 @@
-import {
-  type DirectConnectionConfig,
-  MCPServerConfiguration,
-} from "@src/config/models.js";
+import type { MCPServerConfiguration } from "@src/config/models.js";
+import { type DirectConnectionConfig } from "@src/config/models.js";
 import { DEFAULT_CONNECTION_ID } from "@tests/factories/runtime.js";
 
 /**

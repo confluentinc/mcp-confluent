@@ -1,9 +1,10 @@
-import { CallToolResult } from "@src/confluent/schema.js";
-import { CREATE_UPDATE, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { CREATE_UPDATE } from "@src/confluent/tools/base-tools.js";
 import { canCreateDirectConnector } from "@src/confluent/tools/connection-predicates.js";
 import { ConnectToolHandler } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 

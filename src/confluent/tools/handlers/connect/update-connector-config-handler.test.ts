@@ -1,10 +1,10 @@
 import { CREATE_UPDATE } from "@src/confluent/tools/base-tools.js";
 import { UpdateConnectorConfigHandler } from "@src/confluent/tools/handlers/connect/update-connector-config-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { ConnectHandleCase } from "@tests/factories/runtime.js";
 import {
   CCLOUD_CONN,
   CONNECT_CONN,
-  ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";

@@ -1,15 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ToolHandler } from "@src/confluent/tools/base-tools.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { CreateMcpServerOptions } from "@src/mcp/server.js";
+import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import type { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { CreateMcpServerOptions } from "@src/mcp/server.js";
 import { HttpTransport } from "@src/mcp/transports/http.js";
-import {
-  HttpStartOptions,
-  TransportManager,
-} from "@src/mcp/transports/manager.js";
-import { HttpServer } from "@src/mcp/transports/server.js";
+import type { HttpStartOptions } from "@src/mcp/transports/manager.js";
+import { TransportManager } from "@src/mcp/transports/manager.js";
+import type { HttpServer } from "@src/mcp/transports/server.js";
 import { SseTransport } from "@src/mcp/transports/sse.js";
-import { Transport, TransportType } from "@src/mcp/transports/types.js";
+import type { Transport } from "@src/mcp/transports/types.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 import { runtimeWith } from "@tests/factories/runtime.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

@@ -41,7 +41,7 @@ function fakeMember(overrides: Partial<MemberDescription>): MemberDescription {
     clientHost: "/10.0.0.1",
     memberAssignment: Buffer.from([0x01, 0x02, 0x03]),
     memberMetadata: Buffer.from([0x04, 0x05]),
-    assignment: [],
+    assignment: { topicPartitions: [] },
     ...overrides,
   };
 }
@@ -207,19 +207,23 @@ describe("describe-consumer-group-handler.ts", () => {
                 memberId: "m1",
                 clientId: "orders-c1",
                 clientHost: "/10.0.0.1",
-                assignment: [
-                  { topic: "orders", partition: 0 },
-                  { topic: "orders", partition: 1 },
-                ],
+                assignment: {
+                  topicPartitions: [
+                    { topic: "orders", partition: 0 },
+                    { topic: "orders", partition: 1 },
+                  ],
+                },
               }),
               fakeMember({
                 memberId: "m2",
                 clientId: "orders-c2",
                 clientHost: "/10.0.0.2",
-                assignment: [
-                  { topic: "orders", partition: 2 },
-                  { topic: "orders", partition: 3 },
-                ],
+                assignment: {
+                  topicPartitions: [
+                    { topic: "orders", partition: 2 },
+                    { topic: "orders", partition: 3 },
+                  ],
+                },
               }),
             ],
           }),
@@ -514,12 +518,12 @@ describe("describe-consumer-group-handler.ts", () => {
               fakeMember({
                 memberId: "static-1",
                 groupInstanceId: "deployment-pod-1",
-                assignment: [{ topic: "t", partition: 0 }],
+                assignment: { topicPartitions: [{ topic: "t", partition: 0 }] },
               }),
               fakeMember({
                 memberId: "dynamic-1",
                 // no groupInstanceId
-                assignment: [{ topic: "t", partition: 1 }],
+                assignment: { topicPartitions: [{ topic: "t", partition: 1 }] },
               }),
             ],
           }),
@@ -558,12 +562,14 @@ describe("describe-consumer-group-handler.ts", () => {
             members: [
               fakeMember({
                 memberId: "single-fat-member",
-                assignment: [
-                  { topic: "orders", partition: 0 },
-                  { topic: "orders", partition: 1 },
-                  { topic: "payments", partition: 0 },
-                  { topic: "shipments", partition: 5 },
-                ],
+                assignment: {
+                  topicPartitions: [
+                    { topic: "orders", partition: 0 },
+                    { topic: "orders", partition: 1 },
+                    { topic: "payments", partition: 0 },
+                    { topic: "shipments", partition: 5 },
+                  ],
+                },
               }),
             ],
           }),
@@ -599,17 +605,19 @@ describe("describe-consumer-group-handler.ts", () => {
           fakeGroupDescription({
             members: [
               fakeMember({
-                assignment: [
-                  // Upstream TopicPartition is typed with optional
-                  // `leaderEpoch` and `error`; the handler must strip
-                  // them so the response shape stays the two-field
-                  // pair the issue spec promised.
-                  {
-                    topic: "orders",
-                    partition: 0,
-                    leaderEpoch: 42,
-                  },
-                ],
+                assignment: {
+                  topicPartitions: [
+                    // Upstream TopicPartition is typed with optional
+                    // `leaderEpoch` and `error`; the handler must strip
+                    // them so the response shape stays the two-field
+                    // pair the issue spec promised.
+                    {
+                      topic: "orders",
+                      partition: 0,
+                      leaderEpoch: 42,
+                    },
+                  ],
+                },
               }),
             ],
           }),
@@ -634,95 +642,6 @@ describe("describe-consumer-group-handler.ts", () => {
       expect("error" in assignment[0]!).toBe(false);
     });
 
-    it("should unwrap the {topicPartitions: TopicPartition[]} shape the native binding actually returns (despite the .d.ts claiming a flat array)", async () => {
-      // Discovered via live MCP usage (May 2026): the kafkajs
-      // .d.ts declares `assignment: TopicPartition[]` (flat array),
-      // but the C++ binding in
-      // node_modules/@confluentinc/kafka-javascript/src/common.cc →
-      // FromMemberDescription actually returns
-      // `assignment: { topicPartitions: TopicPartition[] }` (wrapped
-      // object). The handler must unwrap this shape; the cast lets
-      // the test fixture express the real runtime shape past the
-      // upstream type lie.
-      const clientManager = getMockedClientManager();
-      const admin = await clientManager.getAdminClient();
-      admin.describeGroups.mockResolvedValue({
-        groups: [
-          fakeGroupDescription({
-            members: [
-              fakeMember({
-                memberId: "wrapped-member",
-                assignment: {
-                  topicPartitions: [
-                    { topic: "orders", partition: 0 },
-                    { topic: "orders", partition: 1 },
-                  ],
-                },
-              } as unknown as Partial<MemberDescription>),
-            ],
-          }),
-        ],
-      });
-
-      const result = await assertHandleCase({
-        handler,
-        runtime: decoyRuntime(clientManager),
-        args: { groupId: "g" },
-        outcome: { resolves: 'Consumer group "g" is' },
-        clientManager,
-      });
-
-      const member = (
-        result!.structuredContent as {
-          members: Array<{
-            assignment: Array<{ topic: string; partition: number }>;
-          }>;
-        }
-      ).members[0]!;
-      expect(member.assignment).toEqual([
-        { topic: "orders", partition: 0 },
-        { topic: "orders", partition: 1 },
-      ]);
-    });
-
-    it("should fall through to an empty assignment (the Wacky branch) for an unrecognized assignment shape", async () => {
-      // Negative pin: if the binding ever delivers a third shape we
-      // haven't seen (a Buffer, a string, etc.), the handler must
-      // return a usable response with an empty assignment rather
-      // than crashing. The Wacky log line provides the visibility.
-      const clientManager = getMockedClientManager();
-      const admin = await clientManager.getAdminClient();
-      admin.describeGroups.mockResolvedValue({
-        groups: [
-          fakeGroupDescription({
-            members: [
-              fakeMember({
-                memberId: "unknown-shape-member",
-                assignment: Buffer.from([
-                  0xde, 0xad, 0xbe, 0xef,
-                ]) as unknown as MemberDescription["assignment"],
-              }),
-            ],
-          }),
-        ],
-      });
-
-      const result = await assertHandleCase({
-        handler,
-        runtime: decoyRuntime(clientManager),
-        args: { groupId: "g" },
-        outcome: { resolves: 'Consumer group "g" is', isError: false },
-        clientManager,
-      });
-
-      const member = (
-        result!.structuredContent as {
-          members: Array<{ assignment: unknown[] }>;
-        }
-      ).members[0]!;
-      expect(member.assignment).toEqual([]);
-    });
-
     it("should drop the raw memberAssignment / memberMetadata Buffer fields the upstream type carries", async () => {
       const clientManager = getMockedClientManager();
       const admin = await clientManager.getAdminClient();
@@ -730,7 +649,7 @@ describe("describe-consumer-group-handler.ts", () => {
         groups: [
           fakeGroupDescription({
             groupId: "g",
-            members: [fakeMember({ assignment: [] })],
+            members: [fakeMember({ assignment: { topicPartitions: [] } })],
           }),
         ],
       });

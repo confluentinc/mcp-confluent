@@ -1,4 +1,4 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import {
   GetPartitionOffsetsHandler,
   type GetPartitionOffsetsResponse,

@@ -1,14 +1,18 @@
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolCategory,
-  ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import { hasConfluentCloudOrOAuth } from "@src/confluent/tools/connection-predicates.js";
+import {
+  renderPaginationSection,
+  toPaginationMeta,
+} from "@src/confluent/tools/pagination.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 import { z } from "zod";
 
@@ -162,97 +166,78 @@ export class ListBillingCostsHandler extends BaseToolHandler {
         );
       }
 
-      try {
-        const validatedResponse = billingCostsSchema.parse(
-          response,
-        ) as BillingCostsList;
-
-        // Calculate totals and group by product
-        const productCosts = new Map<string, number>();
-        let totalAmount = 0;
-        let totalOriginalAmount = 0;
-        let totalDiscountAmount = 0;
-
-        validatedResponse.data.forEach((item) => {
-          totalAmount += item.amount;
-          totalOriginalAmount += item.original_amount;
-          totalDiscountAmount += item.discount_amount || 0;
-
-          const currentProductCost = productCosts.get(item.product) || 0;
-          productCosts.set(item.product, currentProductCost + item.amount);
-        });
-
-        // Format cost details for display
-        const costSummary = `
-Cost Summary (${startDate} to ${endDate}):
-  Total Amount: $${totalAmount.toFixed(2)}
-  Original Amount: $${totalOriginalAmount.toFixed(2)}
-  Total Discount: $${totalDiscountAmount.toFixed(2)}
-  Total Line Items: ${validatedResponse.data.length}
-`;
-
-        const productBreakdown =
-          productCosts.size > 0
-            ? `
-Product Breakdown:
-${Array.from(productCosts.entries())
-  .sort((a, b) => b[1] - a[1])
-  .map(([product, amount]) => `  ${product}: $${amount.toFixed(2)}`)
-  .join("\n")}
-`
-            : "";
-
-        const metadata = validatedResponse.metadata;
-        const paginationInfo = metadata
-          ? `
-Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : ""}${metadata.first ? `\n  First Page: ${metadata.first}` : ""}${metadata.last ? `\n  Last Page: ${metadata.last}` : ""}${metadata.prev ? `\n  Previous Page: ${metadata.prev}` : ""}${metadata.next ? `\n  Next Page: ${metadata.next}` : ""}
-`
-          : "";
-
-        return this.createResponse(
-          `Successfully retrieved billing costs:\n${costSummary}${productBreakdown}${paginationInfo}`,
-          false,
-          {
-            costs: validatedResponse.data,
-            summary: {
-              total_amount: totalAmount,
-              original_amount: totalOriginalAmount,
-              discount_amount: totalDiscountAmount,
-              line_item_count: validatedResponse.data.length,
-              date_range: {
-                start: startDate,
-                end: endDate,
-              },
-            },
-            product_breakdown: Object.fromEntries(productCosts),
-            total: metadata?.total_size,
-            pagination: metadata
-              ? {
-                  first: metadata.first,
-                  last: metadata.last,
-                  prev: metadata.prev,
-                  next: metadata.next,
-                }
-              : undefined,
-          },
-        );
-      } catch (validationError) {
-        logger.error(
-          { error: validationError },
-          "Billing costs validation error",
-        );
-        return this.createResponse(
-          `Invalid billing costs data: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
-          true,
-          { error: validationError },
-        );
-      }
+      return this.renderCostsResponse(response, startDate, endDate);
     } catch (error) {
       logger.error({ error }, "Error in ListBillingCostsHandler");
       return this.createResponse(
         `Failed to fetch billing costs: ${error instanceof Error ? error.message : String(error)}`,
         true,
         { error: error instanceof Error ? error.message : String(error) },
+      );
+    }
+  }
+
+  /**
+   * Validate the raw costs payload and turn it into the tool's text + structured
+   * response, or an error response when the payload fails schema validation.
+   */
+  private renderCostsResponse(
+    response: unknown,
+    startDate: string,
+    endDate: string,
+  ): CallToolResult {
+    try {
+      const validatedResponse = billingCostsSchema.parse(
+        response,
+      ) as BillingCostsList;
+
+      const {
+        productCosts,
+        totalAmount,
+        totalOriginalAmount,
+        totalDiscountAmount,
+      } = summarizeCosts(validatedResponse.data);
+
+      const costSummary = `
+Cost Summary (${startDate} to ${endDate}):
+  Total Amount: $${totalAmount.toFixed(2)}
+  Original Amount: $${totalOriginalAmount.toFixed(2)}
+  Total Discount: $${totalDiscountAmount.toFixed(2)}
+  Total Line Items: ${validatedResponse.data.length}
+`;
+      const productBreakdown = formatProductBreakdown(productCosts);
+      const metadata = validatedResponse.metadata;
+      const paginationInfo = renderPaginationSection(metadata, "Total Items");
+
+      return this.createResponse(
+        `Successfully retrieved billing costs:\n${costSummary}${productBreakdown}${paginationInfo}`,
+        false,
+        {
+          costs: validatedResponse.data,
+          summary: {
+            total_amount: totalAmount,
+            original_amount: totalOriginalAmount,
+            discount_amount: totalDiscountAmount,
+            line_item_count: validatedResponse.data.length,
+            date_range: {
+              start: startDate,
+              end: endDate,
+            },
+          },
+          product_breakdown: Object.fromEntries(productCosts),
+          total: metadata?.total_size,
+          pagination: toPaginationMeta(metadata),
+        },
+      );
+    } catch (validationError) {
+      logger.error(
+        { error: validationError },
+        "Billing costs validation error",
+      );
+      return this.createResponse(
+        `Invalid billing costs data: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
+        true,
+        { error: validationError },
       );
     }
   }
@@ -268,4 +253,59 @@ Pagination:${metadata.total_size ? `\n  Total Items: ${metadata.total_size}` : "
   }
   readonly category = ToolCategory.Billing;
   readonly predicate = hasConfluentCloudOrOAuth;
+}
+
+/**
+ * Running totals plus per-product amounts accumulated across billing line items.
+ */
+interface CostTotals {
+  productCosts: Map<string, number>;
+  totalAmount: number;
+  totalOriginalAmount: number;
+  totalDiscountAmount: number;
+}
+
+/**
+ * Sum line-item amounts and bucket them by product in a single pass.
+ */
+function summarizeCosts(data: BillingCostsList["data"]): CostTotals {
+  const productCosts = new Map<string, number>();
+  let totalAmount = 0;
+  let totalOriginalAmount = 0;
+  let totalDiscountAmount = 0;
+
+  for (const item of data) {
+    totalAmount += item.amount;
+    totalOriginalAmount += item.original_amount;
+    totalDiscountAmount += item.discount_amount ?? 0;
+    productCosts.set(
+      item.product,
+      (productCosts.get(item.product) ?? 0) + item.amount,
+    );
+  }
+
+  return {
+    productCosts,
+    totalAmount,
+    totalOriginalAmount,
+    totalDiscountAmount,
+  };
+}
+
+/**
+ * Render the product-breakdown section, highest amount first; empty string when
+ * there are no products so the summary text collapses cleanly.
+ */
+function formatProductBreakdown(productCosts: Map<string, number>): string {
+  if (productCosts.size === 0) {
+    return "";
+  }
+  const lines = Array.from(productCosts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([product, amount]) => `  ${product}: $${amount.toFixed(2)}`)
+    .join("\n");
+  return `
+Product Breakdown:
+${lines}
+`;
 }

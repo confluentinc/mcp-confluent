@@ -1,9 +1,9 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import type { ConsumerBuildOptions } from "@src/confluent/base-client-manager.js";
 import { DirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { kafkaDeps } from "@src/confluent/node-deps.js";
-import { paths } from "@src/confluent/openapi-schema.js";
+import type { paths } from "@src/confluent/openapi-schema.js";
 import type { Client } from "openapi-fetch";
 import { type Mock, type MockInstance, type Mocked, vi } from "vitest";
 import { createMockInstance } from "./mock-instance.js";

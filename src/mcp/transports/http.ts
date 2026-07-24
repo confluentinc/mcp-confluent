@@ -1,13 +1,13 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { sdkTransports } from "@src/confluent/node-deps.js";
 import { logger } from "@src/logger.js";
-import { HttpServer } from "@src/mcp/transports/server.js";
+import type { HttpServer } from "@src/mcp/transports/server.js";
 import { SessionRegistry } from "@src/mcp/transports/session-registry.js";
-import { Transport } from "@src/mcp/transports/types.js";
+import type { Transport } from "@src/mcp/transports/types.js";
 import { randomUUID } from "crypto";
-import { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 
 interface McpRequestHeaders {
   "mcp-session-id"?: string;

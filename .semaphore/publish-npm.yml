@@ -10,7 +10,7 @@ execution_time_limit:
 global_job_config:
   prologue:
     commands:
-      - sem-version node 22
+      - sem-version node 22.22.1
       - checkout
 
 blocks:

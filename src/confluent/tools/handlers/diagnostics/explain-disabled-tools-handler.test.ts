@@ -1,4 +1,4 @@
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
 import { READ_ONLY, ToolCategory } from "@src/confluent/tools/base-tools.js";
 import { ToolDisabledReason } from "@src/confluent/tools/connection-predicates.js";
 import { ExplainDisabledToolsHandler } from "@src/confluent/tools/handlers/diagnostics/explain-disabled-tools-handler.js";

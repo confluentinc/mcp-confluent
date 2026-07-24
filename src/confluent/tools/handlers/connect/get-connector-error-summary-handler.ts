@@ -1,11 +1,12 @@
-import { CallToolResult } from "@src/confluent/schema.js";
-import { READ_ONLY, ToolConfig } from "@src/confluent/tools/base-tools.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
+import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import {
   ConnectToolHandler,
   connectorByNameArguments,
 } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
 
 const HEALTHY_TASK_STATES = new Set(["RUNNING", "PROVISIONING", "UNASSIGNED"]);
@@ -126,7 +127,7 @@ function projectErrorSummary(
     (payload.override_message?.trim() ? payload.override_message.trim() : "") ||
     (payload.error_summary?.trim() ? payload.error_summary.trim() : "");
   const connectorTraceHead =
-    state !== "RUNNING" ? truncateTrace(payload.connector?.trace) : undefined;
+    state === "RUNNING" ? undefined : truncateTrace(payload.connector?.trace);
 
   const projection: ErrorSummaryProjection = {
     connectorName,

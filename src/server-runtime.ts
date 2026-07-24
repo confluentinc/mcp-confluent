@@ -1,12 +1,12 @@
-import {
-  type OAuthConnectionConfig,
+import type {
   MCPServerConfiguration,
+  OAuthConnectionConfig,
 } from "@src/config/index.js";
-import { BaseClientManager } from "@src/confluent/base-client-manager.js";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { constructDirectClientManager } from "@src/confluent/direct-client-manager.js";
 import { OAuthClientManager } from "@src/confluent/oauth-client-manager.js";
 import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
-import { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { ToolName } from "@src/confluent/tools/tool-name.js";
 
 /**
  * Aggregate of all runtime state threaded through the server.

@@ -1,10 +1,10 @@
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { GetConnectorTasksHandler } from "@src/confluent/tools/handlers/connect/get-connector-tasks-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { ConnectHandleCase } from "@tests/factories/runtime.js";
 import {
   CCLOUD_CONN,
   CONNECT_CONN,
-  ConnectHandleCase,
   DEFAULT_CONNECTION_ID,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";

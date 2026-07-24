@@ -9,11 +9,9 @@
  */
 
 import { loadConfigFromYaml } from "@src/config/index.js";
-import {
-  type ConnectionConfig,
-  MCPServerConfiguration,
-} from "@src/config/models.js";
-import { TransportType } from "@src/mcp/transports/types.js";
+import type { MCPServerConfiguration } from "@src/config/models.js";
+import { type ConnectionConfig } from "@src/config/models.js";
+import type { TransportType } from "@src/mcp/transports/types.js";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";

@@ -1,10 +1,10 @@
 import { READ_ONLY } from "@src/confluent/tools/base-tools.js";
 import { DetectIssuesHandler } from "@src/confluent/tools/handlers/flink/diagnostics/detect-issues-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import type { FlinkGetCase } from "@tests/factories/runtime.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
-  FlinkGetCase,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {
@@ -368,6 +368,31 @@ describe("detect-issues-handler.ts", () => {
           ),
           args: { statementName: STATEMENT_NAME, includeMetrics: true },
           outcome: { resolves: "high_lag" },
+          clientManager,
+        });
+      });
+
+      it("should fold a metrics query error into the summary without failing the request", async () => {
+        const clientManager = getMockedClientManager();
+        wireFlinkPair(clientManager, { status: { phase: "RUNNING" } });
+        clientManager.getConfluentCloudTelemetryRestClient.mockImplementation(
+          () => {
+            throw new Error("telemetry unreachable");
+          },
+        );
+
+        await assertHandleCase({
+          handler,
+          runtime: runtimeWithDecoy(
+            FLINK_CONN,
+            DEFAULT_CONNECTION_ID,
+            clientManager,
+          ),
+          args: { statementName: STATEMENT_NAME, includeMetrics: true },
+          outcome: {
+            resolves:
+              "Metrics: Metrics unavailable: Failed to query metrics: telemetry unreachable",
+          },
           clientManager,
         });
       });

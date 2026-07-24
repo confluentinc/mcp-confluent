@@ -1,10 +1,10 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolCategory,
-  ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
   disposeIfOAuth,
@@ -20,7 +20,7 @@ import {
   typeName,
 } from "@src/confluent/tools/handlers/kafka/consumer-group-enums.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 export const listConsumerGroupsArgs = z.object({

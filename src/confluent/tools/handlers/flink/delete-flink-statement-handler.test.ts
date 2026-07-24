@@ -1,8 +1,8 @@
 import { DeleteFlinkStatementHandler } from "@src/confluent/tools/handlers/flink/delete-flink-statement-handler.js";
+import type { HandleCaseWithConn } from "@tests/factories/runtime.js";
 import {
   DEFAULT_CONNECTION_ID,
   FLINK_CONN,
-  HandleCaseWithConn,
   runtimeWithDecoy,
 } from "@tests/factories/runtime.js";
 import {

@@ -1,16 +1,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import * as nodeDeps from "@src/confluent/node-deps.js";
 import { HttpTransport } from "@src/mcp/transports/http.js";
 import { HttpServer } from "@src/mcp/transports/server.js";
-import { SessionRegistry } from "@src/mcp/transports/session-registry.js";
+import type { SessionRegistry } from "@src/mcp/transports/session-registry.js";
 import {
   createMockHttpServerTransport,
   createMockInstance,
   createMockSessionRegistry,
   MOCK_SESSION_ID,
 } from "@tests/stubs/index.js";
-import Fastify, { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
+import Fastify from "fastify";
 import {
   afterEach,
   beforeEach,

@@ -1,19 +1,21 @@
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { KafkaMessage } from "@confluentinc/kafka-javascript/types/kafkajs.js";
+import type { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import {
   KEY_SCHEMA_ID_HEADER,
-  SchemaRegistryClient,
   SerdeType,
   VALUE_SCHEMA_ID_HEADER,
 } from "@confluentinc/schemaregistry";
+import type { ConnectionConfig } from "@src/config/models.js";
+import type { BaseClientManager } from "@src/confluent/base-client-manager.js";
 import { nodeCrypto } from "@src/confluent/node-deps.js";
 import * as schemaRegistryHelper from "@src/confluent/schema-registry-helper.js";
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
+import type { ToolConfig } from "@src/confluent/tools/base-tools.js";
 import {
   BaseToolHandler,
   READ_ONLY,
   ToolCategory,
-  ToolConfig,
 } from "@src/confluent/tools/base-tools.js";
 import {
   disposeIfOAuth,
@@ -28,10 +30,9 @@ import {
   createWatermarkCache,
   type WatermarkCache,
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
-import { normalizeFetchTopicMetadataResponse } from "@src/confluent/tools/handlers/kafka/topic-metadata.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
-import { ServerRuntime } from "@src/server-runtime.js";
+import type { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
 const schemaRegistryOptions = z
@@ -470,17 +471,15 @@ function guardScopedStartRequiresPartition(
 /**
  * Fetch partition counts for the supplied topics via
  * `admin.fetchTopicMetadata`. Throws if any requested topic returned no
- * metadata (typically: the topic doesn't exist on this cluster). The
- * upstream type/runtime mismatch on the response shape is handled by
- * {@link normalizeFetchTopicMetadataResponse}.
+ * metadata (typically: the topic doesn't exist on this cluster).
  */
 async function fetchPartitionCounts(
   admin: KafkaJS.Admin,
   topicNames: string[],
 ): Promise<Map<string, number>> {
-  const topicMetadata = normalizeFetchTopicMetadataResponse(
-    await admin.fetchTopicMetadata({ topics: topicNames }),
-  );
+  const topicMetadata = await admin.fetchTopicMetadata({
+    topics: topicNames,
+  });
   const counts = new Map<string, number>();
   for (const t of topicMetadata) {
     counts.set(t.name, t.partitions.length);
@@ -1116,65 +1115,35 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
     );
     const resolved = resolveKafkaClusterArgs(parsed, runtime, connId);
 
-    // Auto-decode when SR is reachable on this connection (OAuth always; direct
-    // requires a `schema_registry` block — single source of truth lives in the
-    // `hasSchemaRegistryOrOAuth` predicate) and the caller hasn't opted out on
-    // BOTH sides. Either side wanting decode triggers the SR fetch.
-    const userDisabled =
-      valueFormat.disableSchemaRegistry && keyFormat.disableSchemaRegistry;
-    const srReachable = hasSchemaRegistryOrOAuth(conn).enabled;
-
-    let registry: SchemaRegistryClient | undefined;
-    if (!userDisabled && srReachable) {
-      try {
-        registry = await clientManager.getSchemaRegistrySdkClient(
-          resolved.envId,
-        );
-      } catch (error: unknown) {
-        // Graceful fallback: user didn't explicitly opt in, so an SR-transport
-        // failure shouldn't fail an otherwise-satisfiable consume. Per-message
-        // decode errors already fall back to raw inside processMessage.
-        logger.warn(
-          { error, connId },
-          "Schema Registry client unavailable; consuming as raw bytes.",
-        );
-      }
-    }
+    const registry = await resolveConsumeRegistry(
+      conn,
+      clientManager,
+      resolved.envId,
+      connId,
+      valueFormat,
+      keyFormat,
+    );
 
     const targets = normalizeTopicTargets(parsed);
     const offsetReset = deriveConsumerOffsetReset(targets);
     const needsPreflight = planNeedsPreflight(targets, offsetReset);
 
     let plan: PreflightPlan;
-    if (needsPreflight) {
-      // `admin` is acquired INSIDE the try so a failed
-      // getKafkaAdminClient() (auth/network) becomes a tool-error
-      // response rather than propagating up unhandled. The finally
-      // guards against running disposeIfOAuth on an undefined admin
-      // (which would happen if the acquisition itself threw).
-      let admin: KafkaJS.Admin | undefined;
-      try {
-        admin = await clientManager.getKafkaAdminClient(
-          resolved.clusterId,
-          resolved.envId,
-        );
-        plan = await buildPreflightPlan(admin, targets, offsetReset);
-      } catch (error: unknown) {
-        return this.createResponse(
-          `Failed to consume messages: ${formatKafkaError(error)}`,
-          true,
-        );
-      } finally {
-        if (admin !== undefined) {
-          await disposeIfOAuth(runtime, connId, admin);
-        }
-      }
-    } else {
-      plan = {
-        topicNames: [...new Set(targets.map((t) => t.name))],
-        keepPartitions: new Map(),
-        seeks: [],
-      };
+    try {
+      plan = await buildConsumePlan(
+        clientManager,
+        runtime,
+        connId,
+        resolved,
+        targets,
+        offsetReset,
+        needsPreflight,
+      );
+    } catch (error: unknown) {
+      return this.createResponse(
+        `Failed to consume messages: ${formatKafkaError(error)}`,
+        true,
+      );
     }
 
     const consumedMessages: ProcessedMessage[] = [];
@@ -1314,11 +1283,7 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
       );
     } finally {
       if (consumer) {
-        try {
-          await consumer.disconnect();
-        } catch (error) {
-          logger.error({ error }, "Error cleaning up consumer");
-        }
+        await disconnectConsumerQuietly(consumer);
       }
     }
   }
@@ -1336,4 +1301,90 @@ export class ConsumeKafkaMessagesHandler extends BaseToolHandler {
 
   readonly category = ToolCategory.Kafka;
   readonly predicate = kafkaBootstrapOrOAuth;
+}
+
+/**
+ * Resolve the Schema Registry client used for auto-decode, or `undefined`
+ * when decoding is off or unavailable. Auto-decode fires only when SR is
+ * reachable on the connection (OAuth always; direct requires a
+ * `schema_registry` block — single source of truth is the
+ * `hasSchemaRegistryOrOAuth` predicate) AND the caller hasn't opted out on
+ * BOTH sides; either side wanting decode triggers the fetch. A transport
+ * failure degrades to raw bytes with a warning rather than failing the
+ * consume: the caller didn't explicitly opt in, and per-message decode
+ * errors already fall back to raw inside `processMessage`.
+ */
+async function resolveConsumeRegistry(
+  conn: ConnectionConfig,
+  clientManager: BaseClientManager,
+  envId: string | undefined,
+  connId: string,
+  valueFormat: ValueOptions,
+  keyFormat: KeyOptions,
+): Promise<SchemaRegistryClient | undefined> {
+  const userDisabled =
+    valueFormat.disableSchemaRegistry && keyFormat.disableSchemaRegistry;
+  if (userDisabled || !hasSchemaRegistryOrOAuth(conn).enabled) {
+    return undefined;
+  }
+  try {
+    return await clientManager.getSchemaRegistrySdkClient(envId);
+  } catch (error: unknown) {
+    logger.warn(
+      { err: error, connId },
+      "Schema Registry client unavailable; consuming as raw bytes.",
+    );
+    return undefined;
+  }
+}
+
+/**
+ * Build the preflight plan. A call that needs no admin round-trip (no
+ * partition restriction and no offset/timestamp/tail seek, with a `start`
+ * direction the consumer's `auto.offset.reset` already honors) gets an
+ * empty plan positioned entirely by that reset. Otherwise acquire an admin
+ * client, run the seek/pause preflight, and dispose it afterwards (OAuth
+ * connections own the admin's lifetime). Errors — whether from acquiring
+ * the admin or building the plan — propagate to the caller, which renders
+ * them as a tool-error response.
+ */
+async function buildConsumePlan(
+  clientManager: BaseClientManager,
+  runtime: ServerRuntime,
+  connId: string,
+  resolved: { clusterId: string | undefined; envId: string | undefined },
+  targets: NormalizedTopicTarget[],
+  offsetReset: "earliest" | "latest",
+  needsPreflight: boolean,
+): Promise<PreflightPlan> {
+  if (!needsPreflight) {
+    return {
+      topicNames: [...new Set(targets.map((t) => t.name))],
+      keepPartitions: new Map(),
+      seeks: [],
+    };
+  }
+  const admin = await clientManager.getKafkaAdminClient(
+    resolved.clusterId,
+    resolved.envId,
+  );
+  try {
+    return await buildPreflightPlan(admin, targets, offsetReset);
+  } finally {
+    await disposeIfOAuth(runtime, connId, admin);
+  }
+}
+
+/**
+ * Disconnect a consumer, swallowing (but logging) any disconnect error so a
+ * cleanup failure never masks the handler's real result.
+ */
+async function disconnectConsumerQuietly(
+  consumer: KafkaJS.Consumer,
+): Promise<void> {
+  try {
+    await consumer.disconnect();
+  } catch (error) {
+    logger.error({ err: error }, "Error cleaning up consumer");
+  }
 }

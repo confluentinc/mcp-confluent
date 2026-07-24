@@ -5,7 +5,7 @@
  * for api-key auth + native Kafka, plus the OAuth variant) alongside it.
  */
 
-import { KafkaJS } from "@confluentinc/kafka-javascript";
+import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { SchemaRegistryClient } from "@confluentinc/schemaregistry";
 import type { paths } from "@src/confluent/openapi-schema.js";
 import type { Client } from "openapi-fetch";

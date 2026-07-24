@@ -43,7 +43,7 @@ import {
   getFlinkRestUrlForRegion,
   getTelemetryRestUrlForEnv,
 } from "@src/confluent/oauth/auth0-config.js";
-import { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
+import type { OAuthHolder } from "@src/confluent/oauth/oauth-holder.js";
 import type { Auth0Environment } from "@src/confluent/oauth/types.js";
 import type { paths } from "@src/confluent/openapi-schema.js";
 import { kafkaLogger } from "@src/logger.js";

@@ -1,4 +1,4 @@
-import { CallToolResult } from "@src/confluent/schema.js";
+import type { CallToolResult } from "@src/confluent/schema.js";
 import { GetProductDocPageHandler } from "@src/confluent/tools/handlers/docs/get-product-doc-page-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { bareRuntime } from "@tests/factories/runtime.js";

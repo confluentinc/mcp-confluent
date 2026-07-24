@@ -1,20 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// `sentry.ts` keeps module-level init state, so each test re-imports it (and
-// its node-deps dependency) fresh via resetModules to avoid cross-test leakage.
-type NodeDeps = typeof import("@src/confluent/node-deps.js");
-type SentryModule = typeof import("@src/confluent/sentry.js");
+// sentry.ts keeps module-level init state, so each test re-imports it fresh via
+// resetModules to avoid cross-test leakage.
+const importNodeDeps = () => import("@src/confluent/node-deps.js");
+const importSentry = () => import("@src/confluent/sentry.js");
 
 describe("Sentry integration", () => {
-  let nodeDeps: NodeDeps;
-  let mod: SentryModule;
+  let nodeDeps: Awaited<ReturnType<typeof importNodeDeps>>;
+  let mod: Awaited<ReturnType<typeof importSentry>>;
   let initStub: ReturnType<typeof vi.spyOn>;
   let captureStub: ReturnType<typeof vi.spyOn>;
   let closeStub: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     vi.resetModules();
-    nodeDeps = await import("@src/confluent/node-deps.js");
+    nodeDeps = await importNodeDeps();
     initStub = vi
       .spyOn(nodeDeps.sentry, "init")
       .mockImplementation(() => undefined);
@@ -22,7 +22,7 @@ describe("Sentry integration", () => {
       .spyOn(nodeDeps.sentry, "captureException")
       .mockImplementation(() => "id");
     closeStub = vi.spyOn(nodeDeps.sentry, "close").mockResolvedValue(true);
-    mod = await import("@src/confluent/sentry.js");
+    mod = await importSentry();
   });
 
   afterEach(() => vi.restoreAllMocks());

@@ -7,6 +7,10 @@ import {
   ToolCategory,
 } from "@src/confluent/tools/base-tools.js";
 import { hasTelemetryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
+import {
+  describeTelemetryError,
+  formatHttpStatusPart,
+} from "@src/confluent/tools/handlers/metrics/telemetry-error.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
@@ -246,10 +250,9 @@ function requireDescriptors<T>(
   result: DescriptorFetchResult<T>,
 ): T[] | undefined {
   if (result.error !== undefined) {
-    const status = result.response?.status;
-    const statusPart = status === undefined ? "" : ` (HTTP ${status})`;
+    const statusPart = formatHttpStatusPart(result.response?.status);
     throw new Error(
-      `Telemetry API error fetching ${kind} descriptors${statusPart}: ${describeDescriptorError(result.error)}`,
+      `Telemetry API error fetching ${kind} descriptors${statusPart}: ${describeTelemetryError(result.error)}`,
     );
   }
   return result.data?.data;
@@ -272,33 +275,6 @@ function optionalDescriptors<T>(
     return undefined;
   }
   return result.data?.data;
-}
-
-function describeDescriptorError(error: unknown): string {
-  const envelope = error as { errors?: Array<{ detail?: string }> } | null;
-  const details = envelope?.errors
-    ?.map((e) => e.detail)
-    .filter(Boolean)
-    .join("; ");
-  if (details && details.length > 0) {
-    return details;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return safeStringify(error);
-}
-
-/**
- * Stringify an arbitrary error payload without ever throwing (e.g. on circular
- * structures) or returning `undefined` (e.g. for values JSON.stringify omits).
- */
-function safeStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value) ?? String(value);
-  } catch {
-    return String(value);
-  }
 }
 
 function filterMetricsByResourceType(

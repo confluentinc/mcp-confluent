@@ -6,6 +6,10 @@ import {
   ToolCategory,
 } from "@src/confluent/tools/base-tools.js";
 import { hasTelemetryOrOAuth } from "@src/confluent/tools/connection-predicates.js";
+import {
+  describeTelemetryError,
+  formatHttpStatusPart,
+} from "@src/confluent/tools/handlers/metrics/telemetry-error.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
@@ -124,9 +128,20 @@ export class QueryMetricsHandler extends BaseToolHandler {
           params: { path: { dataset } },
           body,
         } as never,
-      )) as { data?: TelemetryResponse; error?: unknown };
+      )) as {
+        data?: TelemetryResponse;
+        error?: unknown;
+        response?: { status?: number };
+      };
 
-      const data = response.data as TelemetryResponse;
+      if (response.error !== undefined) {
+        const statusPart = formatHttpStatusPart(response.response?.status);
+        throw new Error(
+          `Telemetry API error querying metrics${statusPart}: ${describeTelemetryError(response.error)}`,
+        );
+      }
+
+      const data = response.data;
 
       if (data?.errors && data.errors.length > 0) {
         const errorDetails = data.errors
@@ -164,7 +179,7 @@ export class QueryMetricsHandler extends BaseToolHandler {
         result_count: data.data.length,
       });
     } catch (error) {
-      logger.error({ error }, "Error in QueryMetricsHandler");
+      logger.error({ err: error }, "Error in QueryMetricsHandler");
       return this.createResponse(
         `Failed to query metrics: ${error instanceof Error ? error.message : String(error)}`,
         true,

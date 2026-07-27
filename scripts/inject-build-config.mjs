@@ -14,10 +14,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const distFile = join(__dirname, "..", "dist", "build-config.js");
 
 const TELEMETRY_WRITE_KEY = process.env.TELEMETRY_WRITE_KEY ?? "";
+const SENTRY_DSN = process.env.SENTRY_DSN ?? "";
 
 const content = [
   "// build-time values injected by scripts/inject-build-config.mjs during `npm pack`",
   `export const TELEMETRY_WRITE_KEY = ${JSON.stringify(TELEMETRY_WRITE_KEY)};`,
+  `export const SENTRY_DSN = ${JSON.stringify(SENTRY_DSN)};`,
   "",
 ].join("\n");
 
@@ -25,3 +27,5 @@ writeFileSync(distFile, content, "utf-8");
 
 const status = TELEMETRY_WRITE_KEY ? "set" : "empty (env var not provided)";
 console.log(`inject-build-config: TELEMETRY_WRITE_KEY ${status}`);
+const sentryStatus = SENTRY_DSN ? "set" : "empty (env var not provided)";
+console.log(`inject-build-config: SENTRY_DSN ${sentryStatus}`);

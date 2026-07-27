@@ -19,6 +19,8 @@ export type TrackToolCall = (props: ToolCallProps) => void;
 
 const noopTrack: TrackToolCall = () => {};
 
+const noopCaptureError = (): void => {};
+
 export interface CreateMcpServerOptions {
   /** Surfaced via {@linkcode McpServer.server.getServerVersion}. */
   serverVersion: string;
@@ -28,6 +30,8 @@ export interface CreateMcpServerOptions {
   runtime: ServerRuntime;
   /** Per-tool-call telemetry hook. Defaults to a no-op. */
   track?: TrackToolCall;
+  /** Reports a handler throw to crash reporting. Defaults to a no-op. */
+  captureError?: (error: unknown, toolName: ToolName) => void;
 }
 
 /** Builds a fresh {@link McpServer} with every supplied {@linkcode ToolHandler} registered. */
@@ -36,6 +40,7 @@ export function createMcpServer({
   toolHandlers,
   runtime,
   track = noopTrack,
+  captureError = noopCaptureError,
 }: CreateMcpServerOptions): McpServer {
   const srv = new McpServer({
     name: "confluent",
@@ -95,6 +100,11 @@ export function createMcpServer({
             durationMs: Date.now() - startTime,
             status: "error",
           });
+          try {
+            captureError(error, name);
+          } catch {
+            // Ignore crash-reporting failures to avoid masking the original tool error.
+          }
           throw error;
         }
       },

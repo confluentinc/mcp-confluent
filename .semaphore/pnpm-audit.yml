@@ -1,5 +1,5 @@
 version: v1.0
-name: npm-audit
+name: pnpm-audit
 agent:
   machine:
     type: s1-prod-ubuntu24-04-amd64-1
@@ -95,7 +95,7 @@ blocks:
 
               \`package.json\` is left untouched, so this PR has no dependency-range changes. Fixes needing a wider range, and advisories with no published fix, are excluded and take a manual bump.
 
-              Created and updated by the [\`scheduled-npm-audit\`](https://github.com/confluentinc/mcp-confluent/blob/${TARGET_BRANCH}/.semaphore/npm-audit.yml) Semaphore task.
+              Created and updated by the [\`scheduled-pnpm-audit\`](https://github.com/confluentinc/mcp-confluent/blob/${TARGET_BRANCH}/.semaphore/pnpm-audit.yml) Semaphore task.
               EOF
               )
                   gh pr create \

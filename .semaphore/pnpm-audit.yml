@@ -1,0 +1,106 @@
+version: v1.0
+name: pnpm-audit
+agent:
+  machine:
+    type: s1-prod-ubuntu24-04-amd64-1
+
+execution_time_limit:
+  hours: 1
+
+global_job_config:
+  prologue:
+    commands:
+      - sem-version node 22.22.1
+      - checkout
+      # Install any recent pnpm after checkout so the repo's `.npmrc` governs the
+      # install; pnpm reads package.json's `packageManager` field and self-switches
+      # to the pinned version (no version pin or Corepack needed).
+      - npm install --global pnpm
+      - . vault-setup --version v3 --role mcp-confluent
+      - |
+        TARGET_BRANCH="${TARGET_BRANCH:-main}"
+        if [ "$TARGET_BRANCH" != "$SEMAPHORE_GIT_BRANCH" ]; then
+          git fetch origin "$TARGET_BRANCH:$TARGET_BRANCH"
+          git checkout "$TARGET_BRANCH"
+        fi
+      - pnpm config set store-dir ~/.pnpm-store
+      # fuzzy-match since pnpm-lock.yaml will change
+      - cache restore pnpm-store-$(checksum pnpm-lock.yaml),pnpm-store-
+  epilogue:
+    always:
+      commands:
+        - cache store pnpm-store-$(checksum pnpm-lock.yaml) ~/.pnpm-store
+
+blocks:
+  - name: "pnpm audit fix"
+    dependencies: []
+    task:
+      jobs:
+        - name: "Run audit and create/update PR"
+          commands:
+            - pnpm install --frozen-lockfile
+            # the fix method has to be explicit; bare `--fix` errors under pnpm 11.
+            # https://pnpm.io/cli/audit
+            #
+            # `|| true` because audit exits non-zero whenever advisories remain. the grep is
+            # what separates that from audit failing outright, which the exit code does not.
+            - |
+              # pipefail scoped to the subshell so the pipe reports audit's status, not tee's.
+              (set -o pipefail; pnpm audit --fix=update 2>&1 | tee /tmp/pnpm-audit.log) || true
+              if grep -q "ERR_PNPM_" /tmp/pnpm-audit.log; then
+                echo "pnpm audit could not run; see the ERR_PNPM_ error above." >&2
+                exit 1
+              fi
+            # `--fix=update` also rewrites package.json ranges; log and drop them to keep the PR
+            # lockfile-scoped. emptying node_modules is load-bearing: if it is still current,
+            # the install short-circuits instead of re-resolving against the restored ranges.
+            - |
+              set -e
+              git --no-pager diff -- package.json
+              git checkout -- package.json
+              rm -rf node_modules
+              pnpm install --no-frozen-lockfile
+            - |
+              if git diff --quiet -- pnpm-workspace.yaml pnpm-lock.yaml; then
+                echo "No changes after pnpm audit --fix=update; nothing to do."
+                exit 0
+              fi
+            # parameterize the head branch by TARGET_BRANCH so a single
+            # long-lived PR accumulates audit updates per base branch.
+            # running against v1.2.x auto-gets chore/pnpm-audit-fix-v1.2.x.
+            - |
+              set -e
+              TARGET_BRANCH="${TARGET_BRANCH:-main}"
+              BRANCH="chore/pnpm-audit-fix-${TARGET_BRANCH}"
+              TITLE="[${TARGET_BRANCH}] chore(deps): pnpm audit fix"
+
+              git checkout -b "$BRANCH"
+              git add pnpm-workspace.yaml pnpm-lock.yaml
+              git commit -m "$TITLE"
+              git push --force -u origin "$BRANCH"
+
+              if [ -n "$(gh pr list --head "$BRANCH" --state open --json number -q '.[].number')" ]; then
+                echo "PR already open for $BRANCH; the force-push updated it in place."
+                exit 0
+              fi
+
+              # body must sit at the block's base indentation or the markdown renders indented
+              BODY=$(cat <<EOF
+              Automated security update produced by \`pnpm audit --fix=update\` on \`${TARGET_BRANCH}\`.
+
+              What to review:
+
+              - \`pnpm-lock.yaml\` - vulnerable dependencies moved to fixed versions within the ranges package.json already declares.
+              - \`pnpm-workspace.yaml\` - each new \`minimumReleaseAgeExclude\` entry waives pnpm's minimum release age so a just-published patch can install. Drop any whose version is already old enough, or is no longer in \`pnpm-lock.yaml\`.
+
+              \`package.json\` is left untouched, so this PR has no dependency-range changes. Fixes needing a wider range, and advisories with no published fix, are excluded and take a manual bump.
+
+              Created and updated by the [\`scheduled-pnpm-audit\`](https://github.com/confluentinc/mcp-confluent/blob/${TARGET_BRANCH}/.semaphore/pnpm-audit.yml) Semaphore task.
+              EOF
+              )
+
+              gh pr create \
+                --base "$TARGET_BRANCH" \
+                --head "$BRANCH" \
+                --title "$TITLE" \
+                --body "$BODY"

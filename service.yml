@@ -81,9 +81,9 @@ semaphore:
             - "direct"
             - "oauth"
           description: 'Connection type to exercise. all (default) runs both direct and oauth sequentially in each job; direct or oauth limits the run to that single mode.'
-    - name: scheduled-npm-audit
+    - name: scheduled-pnpm-audit
       branch: main
-      pipeline_file: .semaphore/npm-audit.yml
+      pipeline_file: .semaphore/pnpm-audit.yml
       scheduled: true
       at: '0 6 * * *' # Daily at 06:00 UTC
       parameters:

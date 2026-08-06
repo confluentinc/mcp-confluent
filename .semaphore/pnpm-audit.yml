@@ -60,32 +60,32 @@ blocks:
               git checkout -- package.json
               rm -rf node_modules
               pnpm install --no-frozen-lockfile
-            - |
-              if git diff --quiet -- pnpm-workspace.yaml pnpm-lock.yaml; then
-                echo "No changes after pnpm audit --fix=update; nothing to do."
-                exit 0
-              fi
-            # parameterize the head branch by TARGET_BRANCH so a single
-            # long-lived PR accumulates audit updates per base branch.
-            # running against v1.2.x auto-gets chore/pnpm-audit-fix-v1.2.x.
+            # one block, no early exit: every command in a job shares one shell, so an `exit` on
+            # a success path kills it and fails the job anyway. the paths nest instead.
+            # https://docs.semaphore.io/using-semaphore/jobs
+            #
+            # the head branch is parameterized by TARGET_BRANCH so a single long-lived PR
+            # accumulates audit updates per base branch: v1.2.x auto-gets
+            # chore/pnpm-audit-fix-v1.2.x.
             - |
               set -e
-              TARGET_BRANCH="${TARGET_BRANCH:-main}"
-              BRANCH="chore/pnpm-audit-fix-${TARGET_BRANCH}"
-              TITLE="[${TARGET_BRANCH}] chore(deps): pnpm audit fix"
+              if git diff --quiet -- pnpm-workspace.yaml pnpm-lock.yaml; then
+                echo "No changes after pnpm audit --fix=update; nothing to do."
+              else
+                TARGET_BRANCH="${TARGET_BRANCH:-main}"
+                BRANCH="chore/pnpm-audit-fix-${TARGET_BRANCH}"
+                TITLE="[${TARGET_BRANCH}] chore(deps): pnpm audit fix"
 
-              git checkout -b "$BRANCH"
-              git add pnpm-workspace.yaml pnpm-lock.yaml
-              git commit -m "$TITLE"
-              git push --force -u origin "$BRANCH"
+                git checkout -b "$BRANCH"
+                git add pnpm-workspace.yaml pnpm-lock.yaml
+                git commit -m "$TITLE"
+                git push --force -u origin "$BRANCH"
 
-              if [ -n "$(gh pr list --head "$BRANCH" --state open --json number -q '.[].number')" ]; then
-                echo "PR already open for $BRANCH; the force-push updated it in place."
-                exit 0
-              fi
-
-              # body must sit at the block's base indentation or the markdown renders indented
-              BODY=$(cat <<EOF
+                if [ -n "$(gh pr list --head "$BRANCH" --state open --json number -q '.[].number')" ]; then
+                  echo "PR already open for $BRANCH; the force-push updated it in place."
+                else
+                  # body must sit at the block's base indentation or the markdown renders indented
+                  BODY=$(cat <<EOF
               Automated security update produced by \`pnpm audit --fix=update\` on \`${TARGET_BRANCH}\`.
 
               What to review:
@@ -98,9 +98,10 @@ blocks:
               Created and updated by the [\`scheduled-pnpm-audit\`](https://github.com/confluentinc/mcp-confluent/blob/${TARGET_BRANCH}/.semaphore/pnpm-audit.yml) Semaphore task.
               EOF
               )
-
-              gh pr create \
-                --base "$TARGET_BRANCH" \
-                --head "$BRANCH" \
-                --title "$TITLE" \
-                --body "$BODY"
+                  gh pr create \
+                    --base "$TARGET_BRANCH" \
+                    --head "$BRANCH" \
+                    --title "$TITLE" \
+                    --body "$BODY"
+                fi
+              fi

@@ -1,4 +1,5 @@
 import type { MutableRegistry } from "@bufbuild/protobuf";
+import { fromBinary } from "@bufbuild/protobuf";
 import type { IHeaders } from "@confluentinc/kafka-javascript/types/kafkajs.js";
 import {
   KEY_SCHEMA_ID_HEADER,
@@ -18,6 +19,7 @@ import {
   protobufMessageFrom,
   protobufRegistryFromProto,
   protobufRegistryFromSerialized,
+  protobufRegistryFromStoredSchema,
   serializeMessage,
 } from "@src/confluent/schema-registry-helper.js";
 import { getMockedSchemaRegistry } from "@tests/stubs/index.js";
@@ -247,6 +249,52 @@ describe("schema-registry-helper.ts", () => {
         email: "alice@example.com",
         age: 30,
       });
+    });
+
+    it("uses the latest registered schema when it was registered as .proto text via the REST API (issue #720)", async () => {
+      // Seed the subject directly via registry.register() with literal .proto
+      // text, bypassing the ProtobufSerializer entirely — this is what the
+      // standard Schema Registry REST API stores, as opposed to the base64
+      // FileDescriptorProto the SDK's own serializer writes. A use-latest
+      // produce against such a subject previously failed because the
+      // use-latest path always assumed the serialized format.
+      const registry = newRegistry();
+      const topic = "proto-text-latest";
+      const subject = `${topic}-value`;
+      await registry.register(subject, {
+        schema: PROTO_USER,
+        schemaType: "PROTOBUF",
+      });
+
+      const bytes = await serializeMessage(
+        topic,
+        {
+          message: { user_id: "USR-009", name: "Bob" },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+      expect(Buffer.isBuffer(bytes)).toBe(true);
+
+      // The real Confluent Cloud Schema Registry transparently converts a
+      // stored .proto-text schema to the serialized FileDescriptorProto format
+      // on request (the `format` query param), which is what lets
+      // ProtobufDeserializer — which unconditionally base64-decodes whatever
+      // it's handed — read it back. The mock:// client doesn't implement that
+      // conversion, so decode manually here against the same descriptor
+      // instead, to prove the produced bytes are valid Protobuf for the schema.
+      const schemaId = new SchemaId("PROTOBUF");
+      const bytesRead = schemaId.fromBytes(bytes as Buffer);
+      const messageDesc =
+        protobufRegistryFromProto(PROTO_USER).getMessage("com.example.User")!;
+      const decoded = fromBinary(
+        messageDesc,
+        (bytes as Buffer).subarray(bytesRead),
+      );
+      expect(decoded).toMatchObject({ userId: "USR-009", name: "Bob" });
     });
 
     it("uses the latest registered schema when no schema is supplied", async () => {
@@ -483,6 +531,47 @@ describe("schema-registry-helper.ts", () => {
       expect(() =>
         protobufRegistryFromSerialized("not-valid-base64$$"),
       ).toThrow(/Failed to decode registered Protobuf schema/);
+    });
+  });
+
+  describe("protobufRegistryFromStoredSchema()", () => {
+    it("parses a serialized (base64 FileDescriptorProto) stored schema, as written by this SDK's own serializer", async () => {
+      const registry = SchemaRegistryClient.newClient({
+        baseURLs: ["mock://"],
+      }) as SchemaRegistryClient;
+      // Registering with a schema present drives the same serialized-format
+      // write path the ProtobufSerializer uses on a normal produce.
+      await serializeMessage(
+        "proto-stored-schema",
+        {
+          message: { user_id: "USR-000", name: "Seed" },
+          useSchemaRegistry: true,
+          schemaType: "PROTOBUF",
+          schema: PROTO_USER,
+          messageName: "com.example.User",
+        },
+        SerdeType.VALUE,
+        registry,
+      );
+      const latest = await registry.getLatestSchemaMetadata(
+        "proto-stored-schema-value",
+      );
+
+      const stored = protobufRegistryFromStoredSchema(latest.schema!);
+      expect(stored.getMessage("com.example.User")).not.toBeUndefined();
+    });
+
+    it("falls back to .proto text parsing when the stored schema is literal .proto text (REST-API-registered subject)", () => {
+      const registry = protobufRegistryFromStoredSchema(PROTO_USER);
+      expect(registry.getMessage("com.example.User")).not.toBeUndefined();
+    });
+
+    it("throws a combined error when the stored schema matches neither format", () => {
+      expect(() =>
+        protobufRegistryFromStoredSchema("not-valid-base64$$"),
+      ).toThrow(
+        /Failed to parse registered Protobuf schema as either a serialized FileDescriptorProto .* or \.proto text/,
+      );
     });
   });
 

@@ -551,5 +551,112 @@ describe(
         });
       },
     );
+
+    describe(
+      "with a Protobuf subject registered as .proto text via the REST API (issue #720)",
+      { tags: [Tag.REQUIRES_SCHEMA_REGISTRY_CONFIG] },
+      () => {
+        if (!activeConnectionTypes.includes(ConnectionType.DIRECT)) {
+          it.skip(CONNECTION_TYPE_DIRECT_FILTERED_REASON, () => {});
+          return;
+        }
+        if (skipIfDisabled(handler, integrationConnection())) {
+          return;
+        }
+        const connection = integrationConnection();
+        if (connection.type !== "direct" || !connection.schema_registry) {
+          it.skip("requires schema_registry config", () => {});
+          return;
+        }
+
+        // The standard Schema Registry REST API stores a Protobuf schema as
+        // literal .proto source text, distinct from the base64
+        // FileDescriptorProto this SDK's own ProtobufSerializer writes on a
+        // caller-supplied-schema produce. Registering directly via the SR
+        // client (rather than through PRODUCE_MESSAGE) reproduces that shape
+        // for the use-latest produce path under test.
+        const PROTO_USER = `syntax = "proto3";
+package com.example;
+
+message User {
+  string user_id = 1;
+  string name = 2;
+}`;
+
+        let admin: KafkaJS.Admin;
+        const topic = uniqueName("produce-proto-text");
+        const subject = `${topic}-value`;
+        const { client, createdSubjects } = withSharedSrClient();
+
+        beforeAll(async () => {
+          admin = await connectTestAdmin();
+          await admin.createTopics({ topics: [{ topic, numPartitions: 1 }] });
+          createdSubjects.push(subject);
+          await client().register(subject, {
+            schema: PROTO_USER,
+            schemaType: "PROTOBUF",
+          });
+        });
+
+        afterAll(async () => {
+          await admin.deleteTopics({ topics: [topic] }).catch(() => {
+            // teardown-only; a cleanup failure shouldn't fail an already-asserted test
+          });
+          await admin.disconnect();
+        });
+
+        describe.each(activeTransports)("via %s transport", (transport) => {
+          let server: StartedServer;
+
+          beforeAll(async () => {
+            server = await startServer({ transport });
+          });
+
+          afterAll(async () => {
+            await server?.stop();
+          });
+
+          it("should produce via the use-latest path and decode back through consume-messages", async () => {
+            // unique per transport so this iteration's decoded record is
+            // unambiguous even though the topic (and its earlier messages)
+            // is shared across the describe.each transports
+            const userId = `USR-${transport}`;
+
+            const produceResult = await server.client.callTool({
+              name: ToolName.PRODUCE_MESSAGE,
+              arguments: {
+                topicName: topic,
+                value: {
+                  message: { user_id: userId, name: "Bob" },
+                  useSchemaRegistry: true,
+                  schemaType: "PROTOBUF",
+                  messageName: "com.example.User",
+                },
+              },
+            });
+            const produceText = textContent(produceResult);
+            expect(produceText).toMatch(
+              /Message produced successfully to \[Topic: /,
+            );
+
+            // consume-messages auto-decodes via Schema Registry; asserting the
+            // rendered JSON field values (rather than mere byte-string
+            // containment) proves a real decode happened rather than the
+            // handler's silent raw-string fallback on a deserialize failure.
+            const consumeResult = await server.client.callTool({
+              name: ToolName.CONSUME_MESSAGES,
+              arguments: {
+                topics: [{ name: topic, start: "earliest" }],
+                maxMessages: 10,
+                timeoutMs: 15_000,
+              },
+            });
+            const consumeText = textContent(consumeResult);
+            expect(consumeText).toContain(`"userId": "${userId}"`);
+            expect(consumeText).toContain('"name": "Bob"');
+          });
+        });
+      },
+    );
   },
 );

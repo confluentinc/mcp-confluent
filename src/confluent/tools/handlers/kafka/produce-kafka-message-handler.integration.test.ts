@@ -2,6 +2,7 @@ import type { KafkaJS } from "@confluentinc/kafka-javascript";
 import { VALUE_SCHEMA_ID_HEADER } from "@confluentinc/schemaregistry";
 import { ProduceKafkaMessageHandler } from "@src/confluent/tools/handlers/kafka/produce-kafka-message-handler.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
+import { TransportType } from "@src/mcp/transports/types.js";
 import { getTestEnvironmentId } from "@tests/harness/confluent-cloud.js";
 import {
   activeConnectionTypes,
@@ -605,7 +606,16 @@ message User {
           await admin.disconnect();
         });
 
-        describe.each(activeTransports)("via %s transport", (transport) => {
+        // Stdio-only: this fix lives in schema/serialization logic shared by
+        // every transport, so exercising it on all three would just re-pay
+        // the CCloud round-trip tax without adding coverage. Filtering (vs.
+        // hard-coding TransportType.STDIO) still honors a forced
+        // INTEGRATION_TEST_TRANSPORT=http|sse by skipping cleanly.
+        describe.each(
+          activeTransports.filter(
+            (transport) => transport === TransportType.STDIO,
+          ),
+        )("via %s transport", (transport) => {
           let server: StartedServer;
 
           beforeAll(async () => {
@@ -617,10 +627,7 @@ message User {
           });
 
           it("should produce via the use-latest path and decode back through consume-messages", async () => {
-            // unique per transport so this iteration's decoded record is
-            // unambiguous even though the topic (and its earlier messages)
-            // is shared across the describe.each transports
-            const userId = `USR-${transport}`;
+            const userId = "USR-001";
 
             const produceResult = await server.client.callTool({
               name: ToolName.PRODUCE_MESSAGE,

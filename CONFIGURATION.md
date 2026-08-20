@@ -261,6 +261,7 @@ The currently-supported list:
 A self-managed cluster — plain open-source Apache Kafka, Confluent Platform, or a Docker broker on your laptop — is not a distinct mode in mcp-confluent.
 It is a `type: direct` connection whose `kafka` and `schema_registry` blocks point at your own endpoints instead of Confluent Cloud's.
 No `confluent_cloud`, `flink`, `tableflow`, or `telemetry` block applies, so the tools those blocks gate stay disabled — you get the Kafka and Schema Registry tool set only.
+The `bootstrap_servers` example below enables the native Kafka tools (`list-topics`, `produce-message`, etc.); the Kafka REST tools (`get-topic-config`, `alter-topic-config`) additionally need `kafka.rest_endpoint` and `kafka.auth` and stay disabled on a bootstrap-only setup.
 
 ```yaml
 connections:
@@ -287,7 +288,14 @@ A ready-to-use starter for the SASL/PLAIN case is [`sample_configs/confluent-pla
 ### SASL mechanism (PLAIN vs. SCRAM)
 
 When `kafka.auth` is present, mcp-confluent defaults the underlying client to `security.protocol: sasl_ssl` and `sasl.mechanisms: PLAIN`, with `kafka.auth.key` / `kafka.auth.secret` becoming `sasl.username` / `sasl.password`.
-If your cluster uses PLAIN, no override is needed — the block above already works.
+If your cluster uses PLAIN over TLS (`SASL_SSL`), no override is needed — the block above already works.
+Self-managed brokers (including this repo's Confluent Platform integration fixture) often run PLAIN over plaintext (`SASL_PLAINTEXT`) instead; for that case, override `security.protocol` through `kafka.extra_properties`:
+
+```yaml
+kafka:
+  extra_properties:
+    security.protocol: "SASL_PLAINTEXT"
+```
 
 If your cluster uses SCRAM, keep `kafka.auth` for the username/password and override the mechanism through `kafka.extra_properties`:
 

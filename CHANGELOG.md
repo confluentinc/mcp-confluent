@@ -4,6 +4,10 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- **`produce-message` (PROTOBUF, use-latest).** Producing to a PROTOBUF subject registered as `.proto` text via the standard Schema Registry REST API no longer fails with "Failed to decode registered Protobuf schema".
+
 ## 1.5.0
 
 ### Added
@@ -35,7 +39,6 @@ All notable changes to this MCP server will be documented in this file.
 #### Observability
 
 - **Error reporting (Sentry):** runtime errors are reported to [Sentry](https://sentry.io) (credentials redacted), on by default and disabled by the same `DO_NOT_TRACK` switch as usage analytics. See [telemetry.md](telemetry.md).
-
 
 ### Changed
 

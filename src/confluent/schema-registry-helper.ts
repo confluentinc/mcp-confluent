@@ -422,6 +422,39 @@ export function protobufRegistryFromSerialized(
 }
 
 /**
+ * Builds a descriptor registry from a Protobuf schema as stored in Schema
+ * Registry, regardless of which client registered it. Two formats are in the
+ * wild for the same subject: this SDK's own serializer stores a base64
+ * `FileDescriptorProto` (see {@link protobufRegistryFromSerialized}), while the
+ * standard Schema Registry REST API (and other clients) store literal `.proto`
+ * source text (see {@link protobufRegistryFromProto}). The stored schema
+ * carries no explicit tag for which one it is, so this tries the serialized
+ * form first and falls back to `.proto` text parsing on failure.
+ *
+ * @param storedSchema - The schema string as returned by the registry for the
+ *   subject (either base64 `FileDescriptorProto` or `.proto` text)
+ * @returns A mutable descriptor registry the serializer can consume
+ * @throws Error if the stored schema matches neither format
+ */
+export function protobufRegistryFromStoredSchema(
+  storedSchema: string,
+): MutableRegistry {
+  try {
+    return protobufRegistryFromSerialized(storedSchema);
+  } catch (serializedErr) {
+    try {
+      return protobufRegistryFromProto(storedSchema);
+    } catch (protoErr) {
+      throw new Error(
+        "Failed to parse registered Protobuf schema as either a serialized " +
+          `FileDescriptorProto (${serializedErr instanceof Error ? serializedErr.message : String(serializedErr)}) ` +
+          `or .proto text (${protoErr instanceof Error ? protoErr.message : String(protoErr)}).`,
+      );
+    }
+  }
+}
+
+/**
  * Converts a plain JS payload into a typed `@bufbuild/protobuf` message (carrying
  * the `$typeName` the ProtobufSerializer requires) using a descriptor registry.
  *
@@ -562,8 +595,10 @@ export async function serializeMessage(
  * format the SDK's deserializer can read back.
  *
  * - When no schema is supplied (use-latest), the previously-registered schema is
- *   fetched, its descriptor rebuilt from the stored serialized form, and the
- *   serializer uses the latest version.
+ *   fetched, its descriptor rebuilt from the stored form (serialized
+ *   `FileDescriptorProto` or `.proto` text, whichever it turns out to be — see
+ *   {@link protobufRegistryFromStoredSchema}), and the serializer uses the
+ *   latest version.
  *
  * The payload is always converted into a typed `@bufbuild/protobuf` message
  * (carrying `$typeName`) before serialization.
@@ -614,13 +649,15 @@ async function serializeProtobufMessage(
       subjectNameStrategy: () => subject,
     };
   } else {
-    // Use-latest path: rebuild the descriptor from the stored serialized schema.
+    // Use-latest path: rebuild the descriptor from the stored schema, which may
+    // be either this SDK's serialized format or literal .proto text registered
+    // via the REST API (issue #720).
     const latest = await getLatestSchemaOfTypeOrThrow(
       registry,
       subject,
       "PROTOBUF",
     );
-    protobufRegistry = protobufRegistryFromSerialized(latest.schema);
+    protobufRegistry = protobufRegistryFromStoredSchema(latest.schema);
     serializerConfig = {
       useLatestVersion: true,
       subjectNameStrategy: () => subject,

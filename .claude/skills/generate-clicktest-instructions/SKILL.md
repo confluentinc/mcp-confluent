@@ -89,11 +89,14 @@ For an integration-style manual run instead, non-secret config lives in
 
 Never read or print a value that looks like a secret from `.env` or `.env.integration` - not even
 "just to check" it.
-A presence-only check is always enough:
+Never load env vars by sourcing the file (`source .env` / `. .env`) either - that executes the
+file's contents as shell code, which is an unnecessary code-execution footgun in a doc meant to be
+copy-pasted.
+Pull only the specific line(s) you need with `grep`, which never executes file contents:
 
 ```bash
-set -a; source .env; set +a
-echo "endpoint set: $([ -n "$SCHEMA_REGISTRY_ENDPOINT" ] && echo yes || echo no)"
+schema_registry_endpoint=$(grep '^SCHEMA_REGISTRY_ENDPOINT=' .env | cut -d= -f2-)
+echo "endpoint set: $([ -n "$schema_registry_endpoint" ] && echo yes || echo no)"
 ```
 
 Confluent Cloud issues **three separate key pairs** that all look like `<KEY>:<SECRET>` in an
@@ -102,11 +105,16 @@ a Cloud API key.
 A `401` from Schema Registry, or a Kafka `broker transport failure`, encountered mid-clicktest is
 very often the wrong key pair in the wrong variable, or a key that was since regenerated/revoked -
 not a bug in the branch under test.
-Isolate this with a cheap, side-effect-free probe before assuming the code is broken:
+Isolate this with a cheap, side-effect-free probe before assuming the code is broken, again
+pulling credentials with `grep` rather than sourcing the file:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" "$SCHEMA_REGISTRY_ENDPOINT/subjects" \
-  -u "$SCHEMA_REGISTRY_API_KEY:$SCHEMA_REGISTRY_API_SECRET"
+schema_registry_endpoint=$(grep '^SCHEMA_REGISTRY_ENDPOINT=' .env | cut -d= -f2-)
+schema_registry_api_key=$(grep '^SCHEMA_REGISTRY_API_KEY=' .env | cut -d= -f2-)
+schema_registry_api_secret=$(grep '^SCHEMA_REGISTRY_API_SECRET=' .env | cut -d= -f2-)
+
+curl -s -o /dev/null -w "%{http_code}\n" "$schema_registry_endpoint/subjects" \
+  -u "$schema_registry_api_key:$schema_registry_api_secret"
 ```
 
 A non-`200` here means fix the credentials (regenerate the key in the Confluent Cloud console for
@@ -159,7 +167,8 @@ manual clicktest instructions), scoped to what Steps 1-3 actually found:
    Schema Registry REST `curl` call to register a schema in a shape this SDK's own client would
    never produce, when the bug is specifically about reading state created by another client.
    Use real, inlined, non-secret values (topic/subject names, schema text) and reference secret
-   env vars by name only, sourced from the user's existing `.env` / `.env.integration`.
+   env vars by name only, read from the user's existing `.env` / `.env.integration` via `grep`
+   (never by sourcing the file - see Step 2).
 4. The exact tool call(s) to make - tool name, and the literal JSON for each field - calling out
    any Step 3 UI quirk that applies to this specific tool's schema (e.g. "leave `key` blank; if
    the web UI still sends `{}`, switch to `--cli` mode for this call").
@@ -167,6 +176,21 @@ manual clicktest instructions), scoped to what Steps 1-3 actually found:
 5. A regression check when the fix touches one of several code paths - the pre-existing path(s)
    must keep working, not just the new one.
 6. Cleanup: delete any topics/subjects/environments created for the test.
+
+## Step 5: Reprint the full instructions on every round-trip
+
+Manual clicktesting is a back-and-forth: the user runs a command, hits a credential problem, a
+schema mismatch, or an Inspector UI quirk, and reports the result.
+When that happens, never reply with just the isolated fix in place of the fix in context - repost
+the complete, updated sequence of remaining steps with the fix folded in, so the user always has
+one current, copy-paste-ready block rather than having to reconstruct the current state of the
+test from fragments scattered across several turns.
+
+This applies on every turn of the exchange, not only once at the end of troubleshooting: after
+the user reports an error, after they report a fix (like rotating a credential), and after each
+successful step that leads into another.
+A reply that says only "now run X" without reprinting the steps around it is not sufficient - if
+step 3 changed, reprint steps 3 through the end, in full, every time.
 
 ## Anti-patterns to refuse
 
@@ -177,6 +201,8 @@ manual clicktest instructions), scoped to what Steps 1-3 actually found:
 - Printing secret values from `.env` / `.env.integration`, even for troubleshooting.
 - Hard-coding Inspector flag syntax or UI behavior without checking the currently-installed/
   documented version first.
+- Answering a mid-troubleshooting message with only the isolated fix instead of the full,
+  updated instructions - see Step 5.
 
 ## Tips
 

@@ -12,6 +12,7 @@ It covers the YAML config file (`-c config.yaml`), the legacy env-var path (`-e 
 - [`${VAR}` interpolation](#var-interpolation)
 - [How env vars and `.env` files fit into the YAML world](#how-env-vars-and-env-files-fit-into-the-yaml-world)
 - [Authentication modes](#authentication-modes)
+- [Connecting to self-managed Apache Kafka](#connecting-to-self-managed-apache-kafka)
 - [HTTP/SSE transport security](#httpsse-transport-security)
 - [Tool enablement: which block lights up what](#tool-enablement-which-block-lights-up-what)
 - [Legacy env-var configuration (deprecated)](#legacy-env-var-configuration-deprecated)
@@ -255,6 +256,95 @@ The currently-supported list:
 | Organizations, Environments & Clusters | `list-organizations`, `list-environments`, `read-environment`, `list-clusters`         | —                                                                                                                                             |
 | Billing                                | `list-billing-costs`                                                                   | —                                                                                                                                             |
 
+## Connecting to self-managed Apache Kafka
+
+A self-managed cluster — plain open-source Apache Kafka, Confluent Platform, or a Docker broker on your laptop — is not a distinct mode in mcp-confluent.
+It is a `type: direct` connection whose `kafka` and `schema_registry` blocks point at your own endpoints instead of Confluent Cloud's.
+No `confluent_cloud`, `flink`, `tableflow`, or `telemetry` block applies, so the tools those blocks gate stay disabled — you get the Kafka and Schema Registry tool set only.
+The `bootstrap_servers` example below enables the native Kafka tools (`list-topics`, `produce-message`, etc.); the Kafka REST tools (`get-topic-config`, `alter-topic-config`) additionally need `kafka.rest_endpoint` and `kafka.auth` and stay disabled on a bootstrap-only setup.
+
+```yaml
+connections:
+  self-managed:
+    type: direct
+    kafka:
+      bootstrap_servers: "broker1.internal:9092,broker2.internal:9092"
+      auth:
+        type: api_key
+        key: "${KAFKA_API_KEY}"
+        secret: "${KAFKA_API_SECRET}"
+    schema_registry:
+      endpoint: "https://sr.internal:8081"
+      auth:
+        type: api_key
+        key: "${SCHEMA_REGISTRY_API_KEY}"
+        secret: "${SCHEMA_REGISTRY_API_SECRET}"
+```
+
+The only real differences from a Confluent Cloud setup are authentication and TLS, and the defaults mcp-confluent assumes may not match your cluster.
+The rest of this section covers the three cases that come up most: SASL/PLAIN (the default), SASL/SCRAM, and mutual TLS.
+A ready-to-use starter for the SASL/PLAIN case is [`sample_configs/confluent-platform.yaml`](sample_configs/confluent-platform.yaml).
+
+### SASL mechanism (PLAIN vs. SCRAM)
+
+When `kafka.auth` is present, mcp-confluent defaults the underlying client to `security.protocol: sasl_ssl` and `sasl.mechanisms: PLAIN`, with `kafka.auth.key` / `kafka.auth.secret` becoming `sasl.username` / `sasl.password`.
+If your cluster uses PLAIN over TLS (`SASL_SSL`), no override is needed — the block above already works.
+Self-managed brokers (including this repo's Confluent Platform integration fixture) often run PLAIN over plaintext (`SASL_PLAINTEXT`) instead; for that case, override `security.protocol` through `kafka.extra_properties`:
+
+```yaml
+kafka:
+  extra_properties:
+    security.protocol: "SASL_PLAINTEXT"
+```
+
+If your cluster uses SCRAM, keep `kafka.auth` for the username/password and override the mechanism through `kafka.extra_properties`:
+
+```yaml
+kafka:
+  bootstrap_servers: "broker.internal:19092"
+  auth:
+    type: api_key
+    key: "${KAFKA_API_KEY}"
+    secret: "${KAFKA_API_SECRET}"
+  extra_properties:
+    sasl.mechanisms: "SCRAM-SHA-512"
+```
+
+`extra_properties` is a pass-through map of raw librdkafka properties and always wins over the built-in defaults, so any key you set there — `security.protocol`, `sasl.mechanisms`, or anything else librdkafka accepts — overrides what `auth` would otherwise imply.
+It cannot carry `bootstrap.servers`, `sasl.username`, or `sasl.password` — use the named fields above for those.
+
+### Mutual TLS (mTLS)
+
+mTLS clusters authenticate by certificate, not by username/password, so omit `kafka.auth` entirely and supply the certificate paths through `extra_properties`:
+
+```yaml
+kafka:
+  bootstrap_servers: "broker.internal:29092"
+  extra_properties:
+    security.protocol: "SSL"
+    ssl.ca.location: "/path/to/ca.pem"
+    ssl.certificate.location: "/path/to/client-cert.pem"
+    ssl.key.location: "/path/to/client-key.pem"
+```
+
+Omitting `auth` matters here: mcp-confluent only sets `security.protocol` / `sasl.*` defaults when `kafka.auth` is present, so an mTLS-only block must set `security.protocol` itself, as above.
+If your Schema Registry also requires mTLS, most self-managed setups still front it with HTTP Basic Auth (`schema_registry.auth`); check your cluster's Schema Registry configuration if that is not the case.
+
+### TLS trust (internal CAs)
+
+Self-managed brokers and Schema Registry deployments often sit behind an internal CA that Node does not trust by default.
+A TLS handshake failure against either endpoint usually means the CA bundle is missing, not that the credentials are wrong.
+Point Node at your CA bundle when starting the server:
+
+```bash
+NODE_EXTRA_CA_CERTS=/path/to/internal-ca.pem npx @confluentinc/mcp-confluent --config ./config.yaml
+```
+
+### Schema Registry endpoint scheme
+
+Use `https://` in `schema_registry.endpoint` when your Schema Registry serves TLS, and `http://` when it does not — this is a plain endpoint scheme, not something mcp-confluent infers from the Kafka auth method.
+Mixing them up produces a connection-refused or protocol error that looks unrelated to the URL itself, so check the scheme first if Schema Registry calls fail while Kafka calls succeed.
+
 ## HTTP/SSE transport security
 
 HTTP and SSE transports require API-key authentication by default to prevent unauthorized access and DNS rebinding.
@@ -380,6 +470,8 @@ For a side-by-side, every `${VAR:-...}` placeholder in `config.example.yaml` nam
 You can keep secrets in your existing `.env` and reference them via `${VAR}` from the YAML — that is job 1 above, and is the recommended migration target.
 
 ## Troubleshooting
+
+**Self-managed Kafka: TLS or auth failures.** See [Connecting to self-managed Apache Kafka](#connecting-to-self-managed-apache-kafka) for SASL/SCRAM, mTLS, and internal-CA setups.
 
 **Tools not appearing.** The tool's required service block is not present in your resolved config.
 Run `--list-tools` to see the live set, or call the `explain-disabled-tools` MCP tool from your client — it prints exactly which YAML block or field is missing for each disabled tool.

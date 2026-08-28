@@ -50,23 +50,30 @@ const listBillingCostsObject = z.object({
 });
 
 const listBillingCostsArguments = listBillingCostsObject
-  .refine(
-    ({ startDate, endDate }) =>
-      isValidCalendarDate(startDate) && isValidCalendarDate(endDate),
-    {
-      error: (issue) => {
-        const { startDate, endDate } = issue.input as {
-          startDate: string;
-          endDate: string;
-        };
-        const invalid = isValidCalendarDate(startDate)
-          ? `endDate=${endDate}`
-          : `startDate=${startDate}`;
-        return `Date must be a valid calendar date (got ${invalid}).`;
-      },
-      path: ["endDate"],
-    },
-  )
+  .check((payload) => {
+    const { startDate, endDate } = payload.value;
+
+    if (!isValidCalendarDate(startDate)) {
+      payload.issues.push({
+        code: "custom",
+        message: `Date must be a valid calendar date (got startDate=${startDate}).`,
+        path: ["startDate"],
+        input: startDate,
+        continue: false,
+      });
+      return;
+    }
+
+    if (!isValidCalendarDate(endDate)) {
+      payload.issues.push({
+        code: "custom",
+        message: `Date must be a valid calendar date (got endDate=${endDate}).`,
+        path: ["endDate"],
+        input: endDate,
+        continue: false,
+      });
+    }
+  })
   .refine(
     ({ startDate, endDate }) => Date.parse(endDate) >= Date.parse(startDate),
     {

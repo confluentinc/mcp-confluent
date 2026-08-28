@@ -366,40 +366,59 @@ describe("list-billing-costs-handler.ts", () => {
       it.each([
         {
           label: "an impossible start date",
-          args: { startDate: "2026-02-30", endDate: "2026-03-02" },
-          errorMessage:
-            "Date must be a valid calendar date (got startDate=2026-02-30).",
+          args: { startDate: "2026-02-30", endDate: "2026-02-28" },
+          expectedIssue: {
+            code: "custom",
+            path: ["startDate"],
+            message:
+              "Date must be a valid calendar date (got startDate=2026-02-30).",
+          },
         },
         {
           label: "an impossible end date",
           args: { startDate: "2026-04-01", endDate: "2026-04-31" },
-          errorMessage:
-            "Date must be a valid calendar date (got endDate=2026-04-31).",
+          expectedIssue: {
+            code: "custom",
+            path: ["endDate"],
+            message:
+              "Date must be a valid calendar date (got endDate=2026-04-31).",
+          },
         },
         {
           label: "an invalid month",
           args: { startDate: "2026-01-01", endDate: "2026-13-01" },
-          errorMessage:
-            "Date must be a valid calendar date (got endDate=2026-13-01).",
+          expectedIssue: {
+            code: "custom",
+            path: ["endDate"],
+            message:
+              "Date must be a valid calendar date (got endDate=2026-13-01).",
+          },
         },
         {
           label: "February 29 in a non-leap year",
-          args: { startDate: "2026-02-29", endDate: "2026-03-01" },
-          errorMessage:
-            "Date must be a valid calendar date (got startDate=2026-02-29).",
+          args: { startDate: "2026-02-29", endDate: "2026-02-28" },
+          expectedIssue: {
+            code: "custom",
+            path: ["startDate"],
+            message:
+              "Date must be a valid calendar date (got startDate=2026-02-29).",
+          },
         },
       ])(
-        "should reject $label with a calendar-date error",
-        async ({ args, errorMessage }) => {
+        "should reject $label with only a calendar-date error",
+        async ({ args, expectedIssue }) => {
           const clientManager = getMockedClientManager();
           const restClient = clientManager.getConfluentCloudRestClient();
 
-          await expect(
-            handler.handle(
+          const thrown = await handler
+            .handle(
               runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
               args,
-            ),
-          ).rejects.toThrowError(errorMessage);
+            )
+            .catch((error: unknown) => error);
+
+          expect(thrown).toBeInstanceOf(ZodError);
+          expect((thrown as ZodError).issues).toEqual([expectedIssue]);
 
           expect(restClient.GET).not.toHaveBeenCalled();
         },

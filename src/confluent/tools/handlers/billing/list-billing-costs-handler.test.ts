@@ -346,14 +346,6 @@ describe("list-billing-costs-handler.ts", () => {
           label: "endDate is before startDate",
           args: { startDate: "2026-02-01", endDate: "2026-01-01" },
         },
-        {
-          label: "startDate matches the format but is not a real calendar date",
-          args: { startDate: "2026-02-30", endDate: "2026-02-28" },
-        },
-        {
-          label: "endDate matches the format but is not a real calendar date",
-          args: { startDate: "2026-01-01", endDate: "2026-13-01" },
-        },
       ])(
         "should throw a ZodError and not call the API when $label",
         async ({ args }) => {
@@ -370,6 +362,64 @@ describe("list-billing-costs-handler.ts", () => {
           expect(restClient.GET).not.toHaveBeenCalled();
         },
       );
+
+      it.each([
+        {
+          label: "an impossible start date",
+          args: { startDate: "2026-02-30", endDate: "2026-03-02" },
+          errorMessage:
+            "Date must be a valid calendar date (got startDate=2026-02-30).",
+        },
+        {
+          label: "an impossible end date",
+          args: { startDate: "2026-04-01", endDate: "2026-04-31" },
+          errorMessage:
+            "Date must be a valid calendar date (got endDate=2026-04-31).",
+        },
+        {
+          label: "an invalid month",
+          args: { startDate: "2026-01-01", endDate: "2026-13-01" },
+          errorMessage:
+            "Date must be a valid calendar date (got endDate=2026-13-01).",
+        },
+        {
+          label: "February 29 in a non-leap year",
+          args: { startDate: "2026-02-29", endDate: "2026-03-01" },
+          errorMessage:
+            "Date must be a valid calendar date (got startDate=2026-02-29).",
+        },
+      ])(
+        "should reject $label with a calendar-date error",
+        async ({ args, errorMessage }) => {
+          const clientManager = getMockedClientManager();
+          const restClient = clientManager.getConfluentCloudRestClient();
+
+          await expect(
+            handler.handle(
+              runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
+              args,
+            ),
+          ).rejects.toThrowError(errorMessage);
+
+          expect(restClient.GET).not.toHaveBeenCalled();
+        },
+      );
+
+      it("should accept February 29 in a leap year", async () => {
+        const clientManager = getMockedClientManager();
+        const restClient = clientManager.getConfluentCloudRestClient();
+        restClient.GET.mockResolvedValue({
+          data: { api_version: "v1", kind: "CostList", data: [] },
+        });
+
+        const result = await handler.handle(
+          runtimeWith(CCLOUD_CONN, DEFAULT_CONNECTION_ID, clientManager),
+          { startDate: "2024-02-29", endDate: "2024-02-29" },
+        );
+
+        expect(result.isError).toBe(false);
+        expect(restClient.GET).toHaveBeenCalledOnce();
+      });
 
       it("should name the 31-day cap and the actual span in the ZodError message", async () => {
         const clientManager = getMockedClientManager();

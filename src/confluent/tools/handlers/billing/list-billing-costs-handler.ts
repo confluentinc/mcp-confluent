@@ -19,6 +19,14 @@ import { z } from "zod";
 const BILLING_RANGE_MAX_DAYS = 31;
 const MS_PER_DAY = 86_400_000;
 
+function isValidCalendarDate(date: string): boolean {
+  const timestamp = Date.parse(date);
+  return (
+    Number.isFinite(timestamp) &&
+    new Date(timestamp).toISOString().slice(0, 10) === date
+  );
+}
+
 const listBillingCostsObject = z.object({
   startDate: z
     .string()
@@ -44,15 +52,14 @@ const listBillingCostsObject = z.object({
 const listBillingCostsArguments = listBillingCostsObject
   .refine(
     ({ startDate, endDate }) =>
-      Number.isFinite(Date.parse(startDate)) &&
-      Number.isFinite(Date.parse(endDate)),
+      isValidCalendarDate(startDate) && isValidCalendarDate(endDate),
     {
       error: (issue) => {
         const { startDate, endDate } = issue.input as {
           startDate: string;
           endDate: string;
         };
-        const invalid = Number.isFinite(Date.parse(startDate))
+        const invalid = isValidCalendarDate(startDate)
           ? `endDate=${endDate}`
           : `startDate=${startDate}`;
         return `Date must be a valid calendar date (got ${invalid}).`;

@@ -9,6 +9,7 @@ import {
   ConnectToolHandler,
   connectorByNameArguments,
 } from "@src/confluent/tools/handlers/connect/connect-tool-handler.js";
+import { ToolInputError } from "@src/confluent/tools/tool-input-error.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
 import { wrapAsPathBasedClient } from "openapi-fetch";
@@ -201,7 +202,7 @@ async function resolveLogsBearerToken(
   }
   const ccAuth = conn.confluent_cloud?.auth;
   if (!ccAuth) {
-    throw new Error(
+    throw new ToolInputError(
       "confluent_cloud.auth is required to authenticate against the logging API.",
     );
   }

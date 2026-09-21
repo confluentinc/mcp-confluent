@@ -4,6 +4,8 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+## 1.6.0
+
 ### Fixed
 
 - **`produce-message` (PROTOBUF, use-latest).** Producing to a PROTOBUF subject registered as `.proto` text via the standard Schema Registry REST API no longer fails with "Failed to decode registered Protobuf schema".

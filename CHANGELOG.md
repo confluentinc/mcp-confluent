@@ -6,9 +6,14 @@ All notable changes to this MCP server will be documented in this file.
 
 ## 1.6.0
 
+### Added
+
+- **Documentation for connecting to self-managed Apache Kafka.** [CONFIGURATION.md → Connecting to self-managed Apache Kafka](CONFIGURATION.md#connecting-to-self-managed-apache-kafka) covers pointing a `type: direct` connection at your own Kafka/Schema Registry endpoints instead of Confluent Cloud's, including SASL/PLAIN vs. SASL/SCRAM, mutual TLS, and internal-CA trust setups.
+
 ### Fixed
 
 - **`produce-message` (PROTOBUF, use-latest).** Producing to a PROTOBUF subject registered as `.proto` text via the standard Schema Registry REST API no longer fails with "Failed to decode registered Protobuf schema".
+- **Flink `INFORMATION_SCHEMA` statement leaks.** The schema-mapping and `COLUMNS` lookup statements issued internally by `describe-flink-table` (and other tools that resolve a table's schema) are now reliably cleaned up instead of occasionally being left running.
 
 ## 1.5.0
 

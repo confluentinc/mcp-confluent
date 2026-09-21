@@ -14,6 +14,7 @@ import {
   ENABLED,
   ToolDisabledReason,
 } from "@src/confluent/tools/connection-predicates.js";
+import { ToolInputError } from "@src/confluent/tools/tool-input-error.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
 import { quoteJoinIds } from "@src/utils/quote-join-ids.js";
@@ -531,7 +532,7 @@ export abstract class BaseToolHandler implements ToolHandler {
     label: string,
   ): string {
     const resolved = argValue?.trim() || configValue?.trim();
-    if (!resolved) throw new Error(`${label} is required`);
+    if (!resolved) throw new ToolInputError(`${label} is required`);
     return resolved;
   }
 

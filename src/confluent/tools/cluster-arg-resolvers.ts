@@ -13,6 +13,7 @@
 
 import { KafkaJS } from "@confluentinc/kafka-javascript";
 import type { ConnectionConfig } from "@src/config/models.js";
+import { ToolInputError } from "@src/confluent/tools/tool-input-error.js";
 import { logger } from "@src/logger.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
 
@@ -29,7 +30,7 @@ function requireParam(
   label: string,
 ): string {
   const resolved = argValue?.trim() || configValue?.trim();
-  if (!resolved) throw new Error(`${label} is required`);
+  if (!resolved) throw new ToolInputError(`${label} is required`);
   return resolved;
 }
 
@@ -58,7 +59,7 @@ export function resolveEnvAndClusterArgs(
     const environment_id = envIdArg?.trim();
     const kafka_cluster_id = clusterIdArg?.trim();
     if (!environment_id || !kafka_cluster_id) {
-      throw new Error(
+      throw new ToolInputError(
         "environmentId and clusterId are required under OAuth connection type. " +
           "Discover via list-environments, then call list-clusters " +
           "with environmentId to discover clusterId.",
@@ -92,7 +93,7 @@ export function resolveKafkaClusterArgs(
   }
 
   if (args.cluster_id === undefined || args.environment_id === undefined) {
-    throw new Error(
+    throw new ToolInputError(
       "cluster_id and environment_id are required under OAuth connection type. " +
         "Discover the environment via list-environments, then call list-clusters " +
         "with environment_id and pass the cluster's `id` and `spec.environment.id`.",
@@ -126,7 +127,7 @@ export function resolveKafkaRestArgs(
   if (conn.type === "direct") {
     const clusterId = args.clusterId ?? conn.kafka?.cluster_id;
     if (!clusterId) {
-      throw new Error(
+      throw new ToolInputError(
         "clusterId is required: pass it as a tool argument or set kafka.cluster_id in the connection config.",
       );
     }
@@ -134,7 +135,7 @@ export function resolveKafkaRestArgs(
   }
 
   if (!args.clusterId || !args.environmentId) {
-    throw new Error(
+    throw new ToolInputError(
       "clusterId and environmentId are required under OAuth connection type. " +
         "Discover the environment via list-environments, then call list-clusters " +
         "with environmentId and pass the cluster's `id` and `spec.environment.id`.",
@@ -164,7 +165,7 @@ export function resolveEnvArg(
   const fallback = conn.type === "direct" ? conn.kafka?.env_id : undefined;
   const resolved = args.environmentId ?? fallback;
   if (!resolved) {
-    throw new Error(
+    throw new ToolInputError(
       "environmentId is required: pass it as a tool argument or " +
         (conn.type === "direct"
           ? "set kafka.env_id in the connection config."

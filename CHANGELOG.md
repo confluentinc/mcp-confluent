@@ -4,6 +4,10 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- **`describe-flink-table` (cluster-id database).** Passing a Kafka cluster id as `databaseName` no longer incorrectly reports the table as not found. The internal lookup that maps a cluster id or environment id to its friendly Flink database/catalog name was parsing statement results in the wrong shape and always came back empty, so the cluster id was used unresolved and never matched.
+
 ## 1.6.0
 
 ### Added

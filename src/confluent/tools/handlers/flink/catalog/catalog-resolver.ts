@@ -80,61 +80,16 @@ export interface SchemaMapping {
  * handler can emit it via `_meta.flinkStatementsCreated` for test-side
  * cleanup.
  */
-export interface CatalogMappingResult {
-  mappings: CatalogMapping[];
-  statementName?: string;
-}
-
 export interface SchemaMappingResult {
   mappings: SchemaMapping[];
   statementName?: string;
 }
 
 /**
- * Looks up catalog mappings from INFORMATION_SCHEMA.CATALOGS.
- * Returns a 1:1 mapping between environment IDs (CATALOG_ID) and friendly names (CATALOG_NAME).
- */
-export async function getCatalogMapping(
-  clientManager: BaseClientManager,
-  catalogName: string,
-  options: {
-    organizationId: string;
-    environmentId: string;
-    computePoolId: string;
-  },
-): Promise<CatalogMappingResult> {
-  const sql = `SELECT \`CATALOG_ID\`, \`CATALOG_NAME\` FROM \`${catalogName}\`.\`INFORMATION_SCHEMA\`.\`CATALOGS\``;
-
-  const result = await executeFlinkSql(clientManager, sql, {
-    organizationId: options.organizationId,
-    environmentId: options.environmentId,
-    computePoolId: options.computePoolId,
-  });
-
-  if (!result.success || !result.data) {
-    return { mappings: [], statementName: result.statementName };
-  }
-
-  const mappings: CatalogMapping[] = [];
-  for (const row of result.data) {
-    // The Flink Statement Results API returns each row as a positional array
-    // under a `row` key, in the same order as the SELECT list above:
-    // row.row[0] is CATALOG_ID, row.row[1] is CATALOG_NAME.
-    const cells = (row as { row?: unknown[] })?.row;
-    const catalogId = cells?.[0];
-    const catalogNameValue = cells?.[1];
-    if (typeof catalogId === "string" && typeof catalogNameValue === "string") {
-      mappings.push({ catalogId, catalogName: catalogNameValue });
-    }
-  }
-  return { mappings, statementName: result.statementName };
-}
-
-/**
  * Resolves a catalog identifier (could be env ID or friendly name) to the friendly CATALOG_NAME.
  *
  * @param catalogInput - The catalog identifier (env-xxxxx or friendly name)
- * @param mappings - The catalog mappings from getCatalogMapping()
+ * @param mappings - The catalog mappings to resolve against
  * @returns The friendly CATALOG_NAME to use in queries, or the original input if no mapping found
  */
 export function resolveToCatalogName(

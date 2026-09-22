@@ -1,5 +1,4 @@
 import {
-  getCatalogMapping,
   getSchemaMapping,
   resolveCatalogName,
   resolveDatabaseName,
@@ -151,75 +150,6 @@ describe("catalog-resolver.ts", () => {
       expect(resolveToSchemaName("orders_cluster", mappings)).toBe(
         "orders_cluster",
       );
-    });
-  });
-
-  describe("getCatalogMapping()", () => {
-    let clientManager: MockedClientManager;
-    let flinkRest: MockedRestClient;
-
-    beforeEach(() => {
-      clientManager = getMockedClientManager();
-      flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-    });
-
-    it("should map CATALOG_ID/CATALOG_NAME rows from INFORMATION_SCHEMA.CATALOGS", async () => {
-      const rows = [
-        { row: ["env-abc123", "production"] },
-        { row: ["env-def456", "staging"] },
-      ];
-      flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
-      flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });
-
-      const result = await getCatalogMapping(
-        clientManager,
-        "env-abc123",
-        SQL_OPTIONS,
-      );
-
-      expect(result.mappings).toEqual([
-        { catalogId: "env-abc123", catalogName: "production" },
-        { catalogId: "env-def456", catalogName: "staging" },
-      ]);
-      expect(result.statementName).toMatch(/^mcp-query-/);
-    });
-
-    it("should drop rows whose CATALOG_ID or CATALOG_NAME is not a string", async () => {
-      const rows = [
-        { row: ["env-abc123", "production"] },
-        { row: [42, "numeric-id"] },
-        { row: ["env-ghi789", null] },
-      ];
-      flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
-      flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });
-
-      const result = await getCatalogMapping(
-        clientManager,
-        "env-abc123",
-        SQL_OPTIONS,
-      );
-
-      expect(result.mappings).toEqual([
-        { catalogId: "env-abc123", catalogName: "production" },
-      ]);
-    });
-
-    it("should return no mappings but still surface the statement name when the query fails", async () => {
-      const failed = {
-        status: { phase: "FAILED", detail: "synthetic failure" },
-        results: { data: [] },
-      };
-      flinkRest.POST.mockResolvedValue({ data: failed });
-      flinkRest.GET.mockResolvedValue({ data: failed });
-
-      const result = await getCatalogMapping(
-        clientManager,
-        "env-abc123",
-        SQL_OPTIONS,
-      );
-
-      expect(result.mappings).toEqual([]);
-      expect(result.statementName).toMatch(/^mcp-query-/);
     });
   });
 

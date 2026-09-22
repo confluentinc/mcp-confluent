@@ -165,8 +165,8 @@ describe("catalog-resolver.ts", () => {
 
     it("should map CATALOG_ID/CATALOG_NAME rows from INFORMATION_SCHEMA.CATALOGS", async () => {
       const rows = [
-        { CATALOG_ID: "env-abc123", CATALOG_NAME: "production" },
-        { CATALOG_ID: "env-def456", CATALOG_NAME: "staging" },
+        { row: ["env-abc123", "production"] },
+        { row: ["env-def456", "staging"] },
       ];
       flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
       flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });
@@ -186,9 +186,9 @@ describe("catalog-resolver.ts", () => {
 
     it("should drop rows whose CATALOG_ID or CATALOG_NAME is not a string", async () => {
       const rows = [
-        { CATALOG_ID: "env-abc123", CATALOG_NAME: "production" },
-        { CATALOG_ID: 42, CATALOG_NAME: "numeric-id" },
-        { CATALOG_ID: "env-ghi789", CATALOG_NAME: null },
+        { row: ["env-abc123", "production"] },
+        { row: [42, "numeric-id"] },
+        { row: ["env-ghi789", null] },
       ];
       flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
       flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });
@@ -234,8 +234,8 @@ describe("catalog-resolver.ts", () => {
 
     it("should map SCHEMA_ID/SCHEMA_NAME rows from INFORMATION_SCHEMA.SCHEMATA", async () => {
       const rows = [
-        { SCHEMA_ID: "lkc-abc123", SCHEMA_NAME: "orders_cluster" },
-        { SCHEMA_ID: "lkc-def456", SCHEMA_NAME: "events_cluster" },
+        { row: ["lkc-abc123", "orders_cluster"] },
+        { row: ["lkc-def456", "events_cluster"] },
       ];
       flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
       flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });
@@ -255,9 +255,9 @@ describe("catalog-resolver.ts", () => {
 
     it("should drop rows whose SCHEMA_ID or SCHEMA_NAME is not a string", async () => {
       const rows = [
-        { SCHEMA_ID: "lkc-abc123", SCHEMA_NAME: "orders_cluster" },
-        { SCHEMA_ID: 7, SCHEMA_NAME: "numeric-id" },
-        { SCHEMA_ID: "lkc-ghi789", SCHEMA_NAME: undefined },
+        { row: ["lkc-abc123", "orders_cluster"] },
+        { row: [7, "numeric-id"] },
+        { row: ["lkc-ghi789", undefined] },
       ];
       flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
       flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });

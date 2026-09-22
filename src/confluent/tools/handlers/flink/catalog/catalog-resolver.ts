@@ -117,9 +117,12 @@ export async function getCatalogMapping(
 
   const mappings: CatalogMapping[] = [];
   for (const row of result.data) {
-    const r = row as Record<string, unknown>;
-    const catalogId = r?.CATALOG_ID;
-    const catalogNameValue = r?.CATALOG_NAME;
+    // The Flink Statement Results API returns each row as a positional array
+    // under a `row` key, in the same order as the SELECT list above:
+    // row.row[0] is CATALOG_ID, row.row[1] is CATALOG_NAME.
+    const cells = (row as { row?: unknown[] })?.row;
+    const catalogId = cells?.[0];
+    const catalogNameValue = cells?.[1];
     if (typeof catalogId === "string" && typeof catalogNameValue === "string") {
       mappings.push({ catalogId, catalogName: catalogNameValue });
     }
@@ -177,9 +180,12 @@ export async function getSchemaMapping(
 
   const mappings: SchemaMapping[] = [];
   for (const row of result.data) {
-    const r = row as Record<string, unknown>;
-    const schemaId = r?.SCHEMA_ID;
-    const schemaName = r?.SCHEMA_NAME;
+    // The Flink Statement Results API returns each row as a positional array
+    // under a `row` key, in the same order as the SELECT list above:
+    // row.row[0] is SCHEMA_ID, row.row[1] is SCHEMA_NAME.
+    const cells = (row as { row?: unknown[] })?.row;
+    const schemaId = cells?.[0];
+    const schemaName = cells?.[1];
     if (typeof schemaId === "string" && typeof schemaName === "string") {
       mappings.push({ schemaId, schemaName });
     }

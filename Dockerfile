@@ -1,5 +1,5 @@
 # https://hub.docker.com/layers/library/node/22-alpine
-ARG NODE_IMAGE=node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+ARG NODE_IMAGE=node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
 FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
@@ -32,6 +32,14 @@ RUN pnpm prune --prod --ignore-scripts
 # Production stage
 FROM ${NODE_IMAGE}
 WORKDIR /app
+
+# the base image ships npm, npx, corepack and yarn, none of which the runtime
+# uses (the entrypoint is plain `node`). Remove them so CVEs in their bundled
+# dependencies (e.g. npm's copy of tar) don't fail the image scan or widen the
+# attack surface. The builder stage keeps them to bootstrap pnpm.
+RUN rm -rf /usr/local/lib/node_modules \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/dist ./dist

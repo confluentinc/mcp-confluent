@@ -6,7 +6,7 @@ git:
 codeowners:
   enable: true
 renovatebot:
-  enable: false
+  enable: true
 sonarqube:
   enable: true
   languages:

@@ -33,6 +33,14 @@ RUN pnpm prune --prod --ignore-scripts
 FROM ${NODE_IMAGE}
 WORKDIR /app
 
+# the base image ships npm, npx, corepack and yarn, none of which the runtime
+# uses (the entrypoint is plain `node`). Remove them so CVEs in their bundled
+# dependencies (e.g. npm's copy of tar) don't fail the image scan or widen the
+# attack surface. The builder stage keeps them to bootstrap pnpm.
+RUN rm -rf /usr/local/lib/node_modules \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
+
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/assets ./assets

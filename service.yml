@@ -1,6 +1,6 @@
 name: mcp-confluent
 lang: node
-lang_version: "22"
+lang_version: '22'
 git:
   enable: true
 codeowners:
@@ -13,13 +13,13 @@ sonarqube:
     - javascript
     - typescript
   coverage_sources:
-    - "src"
-  coverage_exclusions:
-    - "src/**/*.test.ts"
-    - "src/**/*.d.ts"
+    - src
   coverage_reports:
-    - "coverage/lcov.info"
+    - coverage/lcov.info
   main_branch: main
+  analysis_exclusions:
+    - src/**/*.test.ts
+    - src/**/*.d.ts
 semaphore:
   enable: true
   pipeline_enable: false
@@ -32,67 +32,64 @@ semaphore:
         - name: IS_PRERELEASE
           required: true
           options:
-            - "true"
-            - "false"
-          default_value: "true"
-          description: 'Whether the release is a pre-release (true/false).'
+            - 'true'
+            - 'false'
+          default_value: 'true'
+          description: Whether the release is a pre-release (true/false).
         - name: TARGET_BRANCH
           required: true
-          default_value: "main"
-          description: 'The target branch to create the release from, must be a valid branch.'
+          default_value: main
+          description: The target branch to create the release from, must be a valid branch.
         - name: RELEASE_NAME
           required: true
-          description: 'The name of the GitHub Release (and tag) to create (e.g., v1.2.0). Do not include -pre suffixes for prereleases; set IS_PRERELEASE to true instead.'
+          description: The name of the GitHub Release (and tag) to create (e.g., v1.2.0). Do not include -pre suffixes for prereleases; set IS_PRERELEASE to true instead.
         - name: COMMIT_SHA
           required: true
-          description: 'The commit SHA to create the release and tag from, must be a valid SHA/tag/branch.'
+          description: The commit SHA to create the release and tag from, must be a valid SHA/tag/branch.
         - name: PREVIOUS_RELEASE_TAG
           required: false
-          description: 'The previous release tag for generating release notes. If not provided, will use the latest (non-prerelease) GitHub Release.'
+          description: The previous release tag for generating release notes. If not provided, will use the latest (non-prerelease) GitHub Release.
     - name: publish-npm
       branch: main
       pipeline_file: .semaphore/publish-npm.yml
       parameters:
         - name: RELEASE_NAME
           required: true
-          description: 'The name of the existing GitHub Release (and tag) whose .tgz asset will be downloaded and published to npm (e.g., v1.2.0).'
+          description: The name of the existing GitHub Release (and tag) whose .tgz asset will be downloaded and published to npm (e.g., v1.2.0).
         - name: CONFIRM_PUBLISH
           required: true
           options:
-            - "no"
-            - "yes"
-          default_value: "no"
-          description: 'Safety guard against accidental publishing. Must be set to "yes" to actually publish to npm.'
+            - no
+            - yes
+          default_value: no
+          description: Safety guard against accidental publishing. Must be set to "yes" to actually publish to npm.
     - name: scheduled-integration-tests
       branch: main
       pipeline_file: .semaphore/integration.yml
-      scheduled: true
-      at: "0 5 * * *" # Every day at 05:00 UTC
+      at: 0 5 * * *   # Every day at 05:00 UTC
       parameters:
         - name: SERVICE_CONFIGS
           required: true
-          default_value: "@smoke|@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config"
-          description: 'Pipe-separated tags. One block per service-config tag, plus @smoke to include the cross-cutting transport-layer smoke tests.'
+          default_value: '@smoke|@requires-kafka-config|@requires-schema-registry-config|@requires-confluent-cloud-config|@requires-flink-config|@requires-tableflow-config|@requires-telemetry-config'
+          description: Pipe-separated tags. One block per service-config tag, plus @smoke to include the cross-cutting transport-layer smoke tests.
         - name: CONNECTION_TYPE
           required: true
-          default_value: "all"
+          default_value: all
           options:
-            - "all"
-            - "direct"
-            - "oauth"
-          description: 'Connection type to exercise. all (default) runs both direct and oauth sequentially in each job; direct or oauth limits the run to that single mode.'
+            - all
+            - direct
+            - oauth
+          description: Connection type to exercise. all (default) runs both direct and oauth sequentially in each job; direct or oauth limits the run to that single mode.
     - name: scheduled-pnpm-audit
       branch: main
       pipeline_file: .semaphore/pnpm-audit.yml
-      scheduled: true
-      at: '0 6 * * *' # Daily at 06:00 UTC
+      at: 0 6 * * *   # Daily at 06:00 UTC
       parameters:
         - name: TARGET_BRANCH
           required: false
-          default_value: 'main'
-          description: 'The branch to audit and base the PR against. Defaults to main; override for release branches like v1.2.x.'
+          default_value: main
+          description: The branch to audit and base the PR against. Defaults to main; override for release branches like v1.2.x.
     - name: scheduled-docker-image-scan
       branch: main
       pipeline_file: .semaphore/docker-image-scan.yml
-      scheduled: true
-      at: "0 12 * * *" # Daily at 12:00 UTC
+      at: 0 12 * * *   # Daily at 12:00 UTC

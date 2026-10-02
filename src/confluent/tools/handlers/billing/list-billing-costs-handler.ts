@@ -19,6 +19,14 @@ import { z } from "zod";
 const BILLING_RANGE_MAX_DAYS = 31;
 const MS_PER_DAY = 86_400_000;
 
+function isValidCalendarDate(date: string): boolean {
+  const timestamp = Date.parse(date);
+  return (
+    Number.isFinite(timestamp) &&
+    new Date(timestamp).toISOString().slice(0, 10) === date
+  );
+}
+
 const listBillingCostsObject = z.object({
   startDate: z
     .string()
@@ -42,24 +50,30 @@ const listBillingCostsObject = z.object({
 });
 
 const listBillingCostsArguments = listBillingCostsObject
-  .refine(
-    ({ startDate, endDate }) =>
-      Number.isFinite(Date.parse(startDate)) &&
-      Number.isFinite(Date.parse(endDate)),
-    {
-      error: (issue) => {
-        const { startDate, endDate } = issue.input as {
-          startDate: string;
-          endDate: string;
-        };
-        const invalid = Number.isFinite(Date.parse(startDate))
-          ? `endDate=${endDate}`
-          : `startDate=${startDate}`;
-        return `Date must be a valid calendar date (got ${invalid}).`;
-      },
-      path: ["endDate"],
-    },
-  )
+  .check((payload) => {
+    const { startDate, endDate } = payload.value;
+
+    if (!isValidCalendarDate(startDate)) {
+      payload.issues.push({
+        code: "custom",
+        message: `Date must be a valid calendar date (got startDate=${startDate}).`,
+        path: ["startDate"],
+        input: startDate,
+        continue: false,
+      });
+      return;
+    }
+
+    if (!isValidCalendarDate(endDate)) {
+      payload.issues.push({
+        code: "custom",
+        message: `Date must be a valid calendar date (got endDate=${endDate}).`,
+        path: ["endDate"],
+        input: endDate,
+        continue: false,
+      });
+    }
+  })
   .refine(
     ({ startDate, endDate }) => Date.parse(endDate) >= Date.parse(startDate),
     {

@@ -4,6 +4,10 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- **`search-product-docs` (docs.confluent.io backend).** The Swiftype engine key is now read from docs.confluent.io at run time (cached per server, re-read once when Swiftype rejects it) instead of being hard-coded. The hard-coded key had been disabled on Swiftype's side, so every docs.confluent.io search failed with `Swiftype 402 Payment Required` and only developer.confluent.io and support.confluent.io hits came back ([#742](https://github.com/confluentinc/mcp-confluent/issues/742)).
+
 ## 1.6.0
 
 ### Added

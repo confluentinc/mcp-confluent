@@ -51,6 +51,24 @@ describe(
           );
         }
       });
+
+      // The docs.confluent.io backend once failed silently for months while
+      // developer and support still answered (#742): require it explicitly.
+      it("should return at least one docs.confluent.io hit for a documentation query", async () => {
+        const result = await server.client.callTool({
+          name: ToolName.SEARCH_PRODUCT_DOCS,
+          arguments: { query: "Materialized Tables", limit: 10 },
+        });
+
+        expect(result.isError, textContent(result)).not.toBe(true);
+        const payload = JSON.parse(textContent(result)) as SearchPayload;
+        expect(
+          payload.warnings.filter((w) => w.startsWith("docs.confluent.io")),
+        ).toEqual([]);
+        expect(
+          payload.results.some((hit) => hit.source === "docs.confluent.io"),
+        ).toBe(true);
+      });
     });
   },
 );

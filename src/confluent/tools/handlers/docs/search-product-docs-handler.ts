@@ -12,8 +12,18 @@ import { logger } from "@src/logger.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
 import { z } from "zod";
 
-// Public search-only key from docs.confluent.io frontend; safe to hardcode.
-const SWIFTYPE_ENGINE_KEY = "FbBthqzRNii8B32is9R2";
+// Swiftype engine key: a public, search-only key that every docs.confluent.io
+// page prints (`window.SWIFTYPE_CONFIG.engineKey`). Confluent changes it when
+// the docs site changes its Swiftype engine (the key hard-coded until 1.6.0
+// answers "402 Payment Required" since the engine behind it was disabled), so
+// it is read from the docs search page at run time and cached for the life of
+// the server; the constant below is only the fallback when that page cannot
+// be read.
+const SWIFTYPE_FALLBACK_ENGINE_KEY = "VS5CWUJgxrS_i_xbvZSR";
+const SWIFTYPE_ENGINE_KEY_PAGE_URL = "https://docs.confluent.io/search.html";
+const SWIFTYPE_ENGINE_KEY_PATTERN = /engineKey\s*:\s*["']([A-Za-z0-9_-]+)["']/;
+// Statuses Swiftype answers with when the engine key is no longer valid.
+const SWIFTYPE_KEY_REJECTED_STATUSES = new Set([401, 402]);
 const SWIFTYPE_SEARCH_URL =
   "https://search-api.swiftype.com/api/v1/public/engines/search.json";
 const DEVELOPER_SEARCH_URL = "https://developer.confluent.io/api/search";
@@ -119,22 +129,84 @@ export class SearchProductDocsHandler extends BaseToolHandler {
     );
   }
 
-  private async searchSwiftype(
+  /** Engine key read from docs.confluent.io, cached for the life of the server. */
+  private swiftypeEngineKey: string | null = null;
+
+  private async resolveSwiftypeEngineKey(refresh = false): Promise<string> {
+    if (this.swiftypeEngineKey !== null && !refresh) {
+      return this.swiftypeEngineKey;
+    }
+    try {
+      const html = await fetchSourceText(
+        SWIFTYPE_ENGINE_KEY_PAGE_URL,
+        { headers: { "user-agent": USER_AGENT, accept: "text/html" } },
+        "docs.confluent.io search page",
+      );
+      const match = SWIFTYPE_ENGINE_KEY_PATTERN.exec(html);
+      if (match?.[1]) {
+        this.swiftypeEngineKey = match[1];
+        return this.swiftypeEngineKey;
+      }
+      logger.warn(
+        { url: SWIFTYPE_ENGINE_KEY_PAGE_URL },
+        "search-product-docs: no Swiftype engine key on the docs search page, using the fallback key",
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        { url: SWIFTYPE_ENGINE_KEY_PAGE_URL, reason },
+        "search-product-docs: could not read the docs search page, using the fallback key",
+      );
+    }
+    this.swiftypeEngineKey = SWIFTYPE_FALLBACK_ENGINE_KEY;
+    return this.swiftypeEngineKey;
+  }
+
+  private async querySwiftype(
     query: string,
     limit: number,
-  ): Promise<NormalizedResult[]> {
+    engineKey: string,
+  ): Promise<SwiftypeResponse> {
     // Over-fetch: host-filtering may drop hits before we reach `limit`.
     const params = new URLSearchParams({
-      engine_key: SWIFTYPE_ENGINE_KEY,
+      engine_key: engineKey,
       q: query,
       per_page: String(Math.min(50, limit * 3)),
       page: "1",
     });
-    const json = await fetchSourceJson<SwiftypeResponse>(
+    return fetchSourceJson<SwiftypeResponse>(
       `${SWIFTYPE_SEARCH_URL}?${params.toString()}`,
       { headers: { "user-agent": USER_AGENT, accept: "application/json" } },
       "Swiftype",
     );
+  }
+
+  private async searchSwiftype(
+    query: string,
+    limit: number,
+  ): Promise<NormalizedResult[]> {
+    let json: SwiftypeResponse;
+    try {
+      json = await this.querySwiftype(
+        query,
+        limit,
+        await this.resolveSwiftypeEngineKey(),
+      );
+    } catch (err) {
+      // The cached key no longer matches the docs site's engine: re-read the
+      // page and retry once. Any other failure surfaces as before.
+      if (
+        !(err instanceof SourceHttpError) ||
+        !SWIFTYPE_KEY_REJECTED_STATUSES.has(err.status)
+      ) {
+        throw err;
+      }
+      json = await this.querySwiftype(
+        query,
+        limit,
+        await this.resolveSwiftypeEngineKey(true),
+      );
+    }
     const hits = json.records?.page ?? [];
     return hits
       .map((h): NormalizedResult | null => {
@@ -277,12 +349,43 @@ interface ZendeskSearchResponse {
   results?: ZendeskSearchHit[];
 }
 
+/** Non-2xx answer of a source, with the status kept for the caller to inspect. */
+class SourceHttpError extends Error {
+  constructor(
+    label: string,
+    readonly status: number,
+    statusText: string,
+  ) {
+    super(`${label} ${status} ${statusText}`);
+    this.name = "SourceHttpError";
+  }
+}
+
 /** Fetches JSON with a timeout. Errors are rethrown prefixed with `label`. */
 async function fetchSourceJson<T>(
   url: string,
   init: RequestInit,
   label: string,
 ): Promise<T> {
+  const response = await fetchSource(url, init, label);
+  return (await response.json()) as T;
+}
+
+/** Fetches a text body with a timeout. Errors are rethrown prefixed with `label`. */
+async function fetchSourceText(
+  url: string,
+  init: RequestInit,
+  label: string,
+): Promise<string> {
+  const response = await fetchSource(url, init, label);
+  return response.text();
+}
+
+async function fetchSource(
+  url: string,
+  init: RequestInit,
+  label: string,
+): Promise<Response> {
   let response: Response;
   try {
     response = await nodeFetch.fetch(url, {
@@ -296,9 +399,9 @@ async function fetchSourceJson<T>(
     throw err;
   }
   if (!response.ok) {
-    throw new Error(`${label} ${response.status} ${response.statusText}`);
+    throw new SourceHttpError(label, response.status, response.statusText);
   }
-  return (await response.json()) as T;
+  return response;
 }
 
 function extractResults(

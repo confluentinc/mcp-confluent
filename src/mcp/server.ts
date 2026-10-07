@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolHandler } from "@src/confluent/tools/base-tools.js";
+import { isExpectedToolError } from "@src/confluent/tools/tool-input-error.js";
 import type { ToolName } from "@src/confluent/tools/tool-name.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
 
@@ -100,10 +101,12 @@ export function createMcpServer({
             durationMs: Date.now() - startTime,
             status: "error",
           });
-          try {
-            captureError(error, name);
-          } catch {
-            // Ignore crash-reporting failures to avoid masking the original tool error.
+          if (!isExpectedToolError(error)) {
+            try {
+              captureError(error, name);
+            } catch {
+              // Ignore crash-reporting failures to avoid masking the original tool error.
+            }
           }
           throw error;
         }

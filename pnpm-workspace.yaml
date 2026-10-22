@@ -32,7 +32,7 @@ minimumReleaseAgeExclude:
   - fastify@5.12.1 || 5.12.5
   - joi@17.13.5 || 17.13.6 || 17.13.8
   - vitest@4.1.11
-  - '@vitest/mocker@4.1.11'
+  - '@vitest/mocker@4.1.11 || 4.1.12'
   - '@grpc/grpc-js@1.14.5'
   - braces@3.0.4
   - proxy-addr@2.0.8

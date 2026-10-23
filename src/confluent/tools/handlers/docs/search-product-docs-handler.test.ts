@@ -6,6 +6,8 @@ import { type MockedFetch, mockFetch } from "@tests/stubs/index.js";
 import { beforeEach, describe, expect, it } from "vitest";
 
 const SWIFTYPE_URL_PREFIX = "https://search-api.swiftype.com/";
+const SWIFTYPE_KEY_PAGE_URL = "https://docs.confluent.io/search.html";
+const TEST_ENGINE_KEY = "TestEngineKey_123";
 const DEVELOPER_URL = "https://developer.confluent.io/api/search";
 const SUPPORT_URL_PREFIX = "https://support.confluent.io/";
 
@@ -16,6 +18,19 @@ interface SourceResponses {
   swiftypeStatus?: number;
   developerStatus?: number;
   supportStatus?: number;
+  /** HTML of the docs search page; `null` makes that page answer 503. */
+  keyPage?: string | null;
+}
+
+function keyPageHtml(engineKey: string): string {
+  return `<script>window.SWIFTYPE_CONFIG = { engineKey: '${engineKey}', host: 'https://api.swiftype.com', siteId: 1 };</script>`;
+}
+
+function htmlResponse(body: string, status = 200): Response {
+  return new Response(body, {
+    status,
+    headers: { "content-type": "text/html" },
+  });
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -33,17 +48,24 @@ function getText(result: CallToolResult): string {
 
 describe("search-product-docs-handler.ts", () => {
   describe("SearchProductDocsHandler", () => {
-    const handler = new SearchProductDocsHandler();
+    // A fresh handler per test: the engine key is cached on the instance.
+    let handler: SearchProductDocsHandler;
     const runtime = bareRuntime();
     let fetchSpy: MockedFetch;
 
     beforeEach(() => {
+      handler = new SearchProductDocsHandler();
       fetchSpy = mockFetch();
     });
 
     function setupAllSources(opts: SourceResponses): void {
       fetchSpy.mockImplementation(async (input) => {
         const url = String(input);
+        if (url === SWIFTYPE_KEY_PAGE_URL) {
+          return opts.keyPage === null
+            ? htmlResponse("Service Unavailable", 503)
+            : htmlResponse(opts.keyPage ?? keyPageHtml(TEST_ENGINE_KEY));
+        }
         if (url.startsWith(SWIFTYPE_URL_PREFIX)) {
           return jsonResponse(opts.swiftype ?? {}, opts.swiftypeStatus ?? 200);
         }
@@ -129,7 +151,8 @@ describe("search-product-docs-handler.ts", () => {
         });
 
         expect(result.isError).toBeFalsy();
-        expect(fetchSpy).toHaveBeenCalledTimes(3);
+        // Three backends plus one read of the docs search page for the engine key.
+        expect(fetchSpy).toHaveBeenCalledTimes(4);
         const parsed = JSON.parse(getText(result)) as {
           results: Array<{
             title: string;
@@ -403,10 +426,122 @@ describe("search-product-docs-handler.ts", () => {
         expect(call).toBeDefined();
         const url = new URL(String(call![0]));
         expect(url.searchParams.get("q")).toBe("kafka topics");
-        expect(url.searchParams.get("engine_key")).toBe("FbBthqzRNii8B32is9R2");
+        expect(url.searchParams.get("engine_key")).toBe(TEST_ENGINE_KEY);
         // Over-fetch by 3x so host filtering still yields `limit` results.
         expect(url.searchParams.get("per_page")).toBe("15");
         expect(url.searchParams.get("page")).toBe("1");
+      });
+
+      it("should read the Swiftype engine key from the docs search page once and reuse it", async () => {
+        setupAllSources({});
+
+        await handler.handle(runtime, { query: "kafka", limit: 5 });
+        await handler.handle(runtime, { query: "flink", limit: 5 });
+
+        const keyPageReads = fetchSpy.mock.calls.filter(
+          ([input]) => String(input) === SWIFTYPE_KEY_PAGE_URL,
+        );
+        expect(keyPageReads).toHaveLength(1);
+        const swiftypeCalls = fetchSpy.mock.calls.filter(([input]) =>
+          String(input).startsWith(SWIFTYPE_URL_PREFIX),
+        );
+        expect(swiftypeCalls).toHaveLength(2);
+        for (const [input] of swiftypeCalls) {
+          expect(new URL(String(input)).searchParams.get("engine_key")).toBe(
+            TEST_ENGINE_KEY,
+          );
+        }
+      });
+
+      it("should fall back to the built-in engine key when the docs search page cannot be read", async () => {
+        setupAllSources({ keyPage: null });
+
+        const result = await handler.handle(runtime, {
+          query: "kafka",
+          limit: 5,
+        });
+
+        const call = fetchSpy.mock.calls.find(([input]) =>
+          String(input).startsWith(SWIFTYPE_URL_PREFIX),
+        );
+        expect(call).toBeDefined();
+        const engineKey = new URL(String(call![0])).searchParams.get(
+          "engine_key",
+        );
+        expect(engineKey).toMatch(/^[A-Za-z0-9_-]+$/);
+        expect(engineKey).not.toBe(TEST_ENGINE_KEY);
+        // The unreadable page is not a search failure: no warning is recorded.
+        const parsed = JSON.parse(getText(result)) as { warnings: string[] };
+        expect(parsed.warnings).toEqual([]);
+      });
+
+      it("should re-read the engine key and retry once when Swiftype rejects it with 402", async () => {
+        const docsHit = {
+          title: "Kafka Quick Start",
+          url: "https://docs.confluent.io/platform/quickstart.html",
+          body: "Get started with Kafka",
+        };
+        let keyPageReads = 0;
+        fetchSpy.mockImplementation(async (input) => {
+          const url = String(input);
+          if (url === SWIFTYPE_KEY_PAGE_URL) {
+            keyPageReads += 1;
+            // The docs site rotated its engine between the two reads.
+            return htmlResponse(
+              keyPageHtml(keyPageReads === 1 ? "StaleKey" : "FreshKey"),
+            );
+          }
+          if (url.startsWith(SWIFTYPE_URL_PREFIX)) {
+            const engineKey = new URL(url).searchParams.get("engine_key");
+            return engineKey === "FreshKey"
+              ? jsonResponse({ records: { page: [docsHit] } })
+              : jsonResponse(
+                  { error: "API access for your account has been disabled." },
+                  402,
+                );
+          }
+          return jsonResponse({});
+        });
+
+        const result = await handler.handle(runtime, {
+          query: "kafka",
+          limit: 5,
+        });
+
+        const parsed = JSON.parse(getText(result)) as {
+          results: Array<{ url: string }>;
+          warnings: string[];
+        };
+        expect(parsed.warnings).toEqual([]);
+        expect(parsed.results.map((r) => r.url)).toEqual([docsHit.url]);
+        expect(keyPageReads).toBe(2);
+        const swiftypeKeys = fetchSpy.mock.calls
+          .map(([input]) => String(input))
+          .filter((url) => url.startsWith(SWIFTYPE_URL_PREFIX))
+          .map((url) => new URL(url).searchParams.get("engine_key"));
+        expect(swiftypeKeys).toEqual(["StaleKey", "FreshKey"]);
+      });
+
+      it("should give up after one retry when Swiftype keeps rejecting the key", async () => {
+        setupAllSources({
+          swiftype: { error: "API access for your account has been disabled." },
+          swiftypeStatus: 402,
+        });
+
+        const result = await handler.handle(runtime, {
+          query: "kafka",
+          limit: 5,
+        });
+
+        const parsed = JSON.parse(getText(result)) as { warnings: string[] };
+        expect(parsed.warnings).toHaveLength(1);
+        expect(parsed.warnings[0]).toMatch(
+          /^docs\.confluent\.io search failed: Swiftype 402/,
+        );
+        const swiftypeCalls = fetchSpy.mock.calls.filter(([input]) =>
+          String(input).startsWith(SWIFTYPE_URL_PREFIX),
+        );
+        expect(swiftypeCalls).toHaveLength(2);
       });
 
       it("should POST a JSON body to the developer.confluent.io search proxy", async () => {

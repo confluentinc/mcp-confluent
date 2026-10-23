@@ -26,13 +26,13 @@ minimumReleaseAgeExclude:
   - '@fastify/static@10.1.1 || 10.1.2'
   - postcss@8.5.18 || 8.5.23
   - undici@6.28.0 || 6.28.1 || 8.9.0 || 8.10.2
-  - ip-address@10.2.1 || 10.2.2 || 10.3.1 || 10.5.1 || 10.7.1
+  - ip-address@10.2.1 || 10.2.2 || 10.3.1 || 10.5.1 || 10.7.1 || 10.7.4
   - '@humanfs/node@0.16.8'
   - qs@6.15.4 || 6.16.0
-  - fastify@5.12.1 || 5.12.5
+  - fastify@5.12.1 || 5.12.5 || 5.12.6
   - joi@17.13.5 || 17.13.6 || 17.13.8
   - vitest@4.1.11
-  - '@vitest/mocker@4.1.11'
+  - '@vitest/mocker@4.1.11 || 4.1.12'
   - '@grpc/grpc-js@1.14.5'
   - braces@3.0.4
   - proxy-addr@2.0.8

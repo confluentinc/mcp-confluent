@@ -2,6 +2,17 @@
 
 All notable changes to this MCP server will be documented in this file.
 
+## 1.6.1
+
+### Changed
+
+- **Updated** minimum nodejs version.
+
+### Fixed
+
+- **Fix for `describe-flink-table`.** Fix Flink catalog/schema mapping row-shape parsing resulting in erroneous "not found" from `describe-flink-table` when Flink database name is provided with its Kafka cluster id `lkc-xxxxx`.
+- **Sentry error logging.** Stop reporting caller-fixable tool errors to Sentry.
+
 ## 1.6.0
 
 ### Added

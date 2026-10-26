@@ -26,7 +26,7 @@
  * friendly error survives where the server graph cannot.
  *
  * If you're a new dev wondering why this indirection exists at all: it's the
- * difference between a user seeing "mcp-confluent requires Node.js 22.19.0 or
+ * difference between a user seeing "mcp-confluent requires Node.js 22.23.4 or
  * newer" and a user seeing a JSON-import-attribute parse error from a file
  * they've never heard of. Don't fold this back into server-main.ts. See issue
  * #455 for the original report.

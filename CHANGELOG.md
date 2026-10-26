@@ -2,6 +2,12 @@
 
 All notable changes to this MCP server will be documented in this file.
 
+## 1.6.1
+
+### Changed
+
+- **Updated** minimum nodejs version.
+
 ## 1.6.0
 
 ### Added

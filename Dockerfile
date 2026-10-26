@@ -1,5 +1,5 @@
-# https://hub.docker.com/layers/library/node/22-alpine
-ARG NODE_IMAGE=node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+# https://hub.docker.com/layers/library/node/22.23.4-alpine
+ARG NODE_IMAGE=node:22.23.4-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
 FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app

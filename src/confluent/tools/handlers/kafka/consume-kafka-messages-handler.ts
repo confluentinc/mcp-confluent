@@ -30,6 +30,7 @@ import {
   createWatermarkCache,
   type WatermarkCache,
 } from "@src/confluent/tools/handlers/kafka/partition-watermarks.js";
+import { ToolInputError } from "@src/confluent/tools/tool-input-error.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { logger } from "@src/logger.js";
 import type { ServerRuntime } from "@src/server-runtime.js";
@@ -446,14 +447,14 @@ function guardScopedStartRequiresPartition(
 ): void {
   for (const t of targets) {
     if (t.start.kind === "offset" && t.partition === undefined) {
-      throw new Error(
+      throw new ToolInputError(
         `Topic "${t.name}" has an explicit offset (${t.start.value}) but no partition. ` +
           `Absolute offsets are partition-scoped — different partitions have different offset spaces. ` +
           `Either also supply a partition for this entry, or use a timestamp (which resolves per-partition).`,
       );
     }
     if (t.start.kind === "tail" && t.partition === undefined) {
-      throw new Error(
+      throw new ToolInputError(
         `Topic "${t.name}" requested tail of ${t.start.count} messages but no partition. ` +
           `Tail is partition-scoped — different partitions have different message counts, and ` +
           `cross-partition freshness ordering is not defined for this tool. ` +
@@ -486,7 +487,7 @@ async function fetchPartitionCounts(
   }
   for (const name of topicNames) {
     if (!counts.has(name)) {
-      throw new Error(
+      throw new ToolInputError(
         `Topic "${name}" returned no partition metadata (does it exist on this cluster?).`,
       );
     }
@@ -507,7 +508,7 @@ function validateRequestedPartitions(
     if (t.partition !== undefined) {
       const numParts = numPartitionsByTopic.get(t.name)!;
       if (t.partition >= numParts) {
-        throw new Error(
+        throw new ToolInputError(
           `Topic "${t.name}" has ${numParts} partition(s) (0..${numParts - 1}); ` +
             `requested partition ${t.partition} is out of range.`,
         );
@@ -546,14 +547,14 @@ function validateAndBuildKeepPartitions(
     const allPartitioned = explicit.length === list.length;
     const nonePartitioned = explicit.length === 0;
     if (!allPartitioned && !nonePartitioned) {
-      throw new Error(
+      throw new ToolInputError(
         `Topic "${topic}" mixes entries with explicit partitions and entries without one. ` +
           `Pick one mode per topic: either every entry restricts to a partition, or none do.`,
       );
     }
     if (nonePartitioned) {
       if (list.length > 1) {
-        throw new Error(
+        throw new ToolInputError(
           `Topic "${topic}" has ${list.length} entries without partition restrictions; ` +
             `specify each topic at most once at the unrestricted level (or restrict each entry to a distinct partition).`,
         );
@@ -563,7 +564,7 @@ function validateAndBuildKeepPartitions(
     const seen = new Set<number>();
     for (const p of explicit) {
       if (seen.has(p)) {
-        throw new Error(
+        throw new ToolInputError(
           `Topic "${topic}" has multiple entries for partition ${p}; ` +
             `specify each (topic, partition) pair at most once.`,
         );
@@ -598,7 +599,7 @@ async function resolveExplicitOffsetSeek(
   const high = BigInt(partOffsets.high);
   const target = BigInt(offset);
   if (target < low || target >= high) {
-    throw new Error(
+    throw new ToolInputError(
       `Topic "${topic}" partition ${partition} offset ${offset} is out of range ` +
         `[low=${partOffsets.low}, high=${partOffsets.high}). ` +
         `An empty partition has low === high; pick an offset already on the partition.`,
@@ -716,7 +717,7 @@ async function resolveTimestampSeeks(
       restrictToPartition === undefined
         ? "every partition"
         : `partition ${restrictToPartition}`;
-    throw new Error(
+    throw new ToolInputError(
       `Topic "${topic}" has no messages at or after timestamp ` +
         `${new Date(timestampMs).toISOString()} ` +
         `(${scopePhrase} has no record produced past that point). ` +

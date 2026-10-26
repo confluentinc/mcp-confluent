@@ -8,6 +8,7 @@ import {
   ToolCategory,
 } from "@src/confluent/tools/base-tools.js";
 import { hasFlinkOrOAuth } from "@src/confluent/tools/connection-predicates.js";
+import { ToolInputError } from "@src/confluent/tools/tool-input-error.js";
 
 /** Arguments routed into a Flink REST call, in tool-arg (camelCase) form. */
 export interface FlinkRoutingArgs {
@@ -93,7 +94,7 @@ export abstract class FlinkToolHandler extends BaseToolHandler {
       const environment_id = args.environmentId?.trim();
       const compute_pool_id = args.computePoolId?.trim();
       if (!organization_id || !environment_id || !compute_pool_id) {
-        throw new Error(
+        throw new ToolInputError(
           "organizationId, environmentId, and computePoolId are required under OAuth connection type. " +
             "Discover the organization via list-organizations and the environment via list-environments. " +
             "The compute pool id (lfcp-...) must be specified by the user.",

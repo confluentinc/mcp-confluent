@@ -6,6 +6,7 @@ import {
   hasKafka,
   kafkaBootstrapOrOAuth,
 } from "@src/confluent/tools/connection-predicates.js";
+import { ToolInputError } from "@src/confluent/tools/tool-input-error.js";
 import { ToolName } from "@src/confluent/tools/tool-name.js";
 import { ToolHandlerRegistry } from "@src/confluent/tools/tool-registry.js";
 import { initEnv } from "@src/env.js";
@@ -21,6 +22,7 @@ import type { TestServerContext } from "@tests/server.js";
 import { createTestServer } from "@tests/server.js";
 import { createMockInstance, StubHandler } from "@tests/stubs/index.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const ALL_TOOL_NAMES = Object.values(ToolName);
 
@@ -272,6 +274,35 @@ describe("createMcpServer error capture", () => {
     expect(result.isError).toBe(true);
     expect(captureError).toHaveBeenCalledWith(boom, ToolName.LIST_TOPICS);
   });
+
+  it.each([
+    ["ToolInputError", () => new ToolInputError("missing environment_id")],
+    ["ZodError", () => z.object({ a: z.string() }).safeParse({}).error!],
+  ])(
+    "should not report an expected %s to captureError, but still surface an error result",
+    async (_label, makeError) => {
+      const captureError = vi.fn();
+      const expected = makeError();
+      const handler = new StubHandler({ predicate: hasKafka });
+      vi.spyOn(handler, "handle").mockRejectedValue(expected);
+
+      const { client, shutdown } = await startServerWith(
+        new Map([[ToolName.LIST_TOPICS, handler]]),
+        runtimeWith({ kafka: { bootstrap_servers: "a:9092" } }),
+        undefined,
+        captureError,
+      );
+      activeShutdown = shutdown;
+
+      const result = await client.callTool({
+        name: ToolName.LIST_TOPICS,
+        arguments: {},
+      });
+
+      expect(result.isError).toBe(true);
+      expect(captureError).not.toHaveBeenCalled();
+    },
+  );
 
   it("should surface the original error even if captureError throws", async () => {
     const boom = new Error("handler exploded");

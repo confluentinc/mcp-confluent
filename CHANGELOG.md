@@ -4,6 +4,13 @@ All notable changes to this MCP server will be documented in this file.
 
 ## Unreleased
 
+## 1.6.1
+
+### Changed
+
+- **Updated** minimum nodejs version.
+- **Updated** `proxy-addr` transitive dependency from 2.0.7 to 2.0.8.
+
 ## 1.6.0
 
 ### Added

@@ -1,5 +1,4 @@
 import {
-  getCatalogMapping,
   getSchemaMapping,
   resolveCatalogName,
   resolveDatabaseName,
@@ -154,75 +153,6 @@ describe("catalog-resolver.ts", () => {
     });
   });
 
-  describe("getCatalogMapping()", () => {
-    let clientManager: MockedClientManager;
-    let flinkRest: MockedRestClient;
-
-    beforeEach(() => {
-      clientManager = getMockedClientManager();
-      flinkRest = clientManager.getConfluentCloudFlinkRestClient();
-    });
-
-    it("should map CATALOG_ID/CATALOG_NAME rows from INFORMATION_SCHEMA.CATALOGS", async () => {
-      const rows = [
-        { CATALOG_ID: "env-abc123", CATALOG_NAME: "production" },
-        { CATALOG_ID: "env-def456", CATALOG_NAME: "staging" },
-      ];
-      flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
-      flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });
-
-      const result = await getCatalogMapping(
-        clientManager,
-        "env-abc123",
-        SQL_OPTIONS,
-      );
-
-      expect(result.mappings).toEqual([
-        { catalogId: "env-abc123", catalogName: "production" },
-        { catalogId: "env-def456", catalogName: "staging" },
-      ]);
-      expect(result.statementName).toMatch(/^mcp-query-/);
-    });
-
-    it("should drop rows whose CATALOG_ID or CATALOG_NAME is not a string", async () => {
-      const rows = [
-        { CATALOG_ID: "env-abc123", CATALOG_NAME: "production" },
-        { CATALOG_ID: 42, CATALOG_NAME: "numeric-id" },
-        { CATALOG_ID: "env-ghi789", CATALOG_NAME: null },
-      ];
-      flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
-      flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });
-
-      const result = await getCatalogMapping(
-        clientManager,
-        "env-abc123",
-        SQL_OPTIONS,
-      );
-
-      expect(result.mappings).toEqual([
-        { catalogId: "env-abc123", catalogName: "production" },
-      ]);
-    });
-
-    it("should return no mappings but still surface the statement name when the query fails", async () => {
-      const failed = {
-        status: { phase: "FAILED", detail: "synthetic failure" },
-        results: { data: [] },
-      };
-      flinkRest.POST.mockResolvedValue({ data: failed });
-      flinkRest.GET.mockResolvedValue({ data: failed });
-
-      const result = await getCatalogMapping(
-        clientManager,
-        "env-abc123",
-        SQL_OPTIONS,
-      );
-
-      expect(result.mappings).toEqual([]);
-      expect(result.statementName).toMatch(/^mcp-query-/);
-    });
-  });
-
   describe("getSchemaMapping()", () => {
     let clientManager: MockedClientManager;
     let flinkRest: MockedRestClient;
@@ -234,8 +164,8 @@ describe("catalog-resolver.ts", () => {
 
     it("should map SCHEMA_ID/SCHEMA_NAME rows from INFORMATION_SCHEMA.SCHEMATA", async () => {
       const rows = [
-        { SCHEMA_ID: "lkc-abc123", SCHEMA_NAME: "orders_cluster" },
-        { SCHEMA_ID: "lkc-def456", SCHEMA_NAME: "events_cluster" },
+        { row: ["lkc-abc123", "orders_cluster"] },
+        { row: ["lkc-def456", "events_cluster"] },
       ];
       flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
       flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });
@@ -255,9 +185,9 @@ describe("catalog-resolver.ts", () => {
 
     it("should drop rows whose SCHEMA_ID or SCHEMA_NAME is not a string", async () => {
       const rows = [
-        { SCHEMA_ID: "lkc-abc123", SCHEMA_NAME: "orders_cluster" },
-        { SCHEMA_ID: 7, SCHEMA_NAME: "numeric-id" },
-        { SCHEMA_ID: "lkc-ghi789", SCHEMA_NAME: undefined },
+        { row: ["lkc-abc123", "orders_cluster"] },
+        { row: [7, "numeric-id"] },
+        { row: ["lkc-ghi789", undefined] },
       ];
       flinkRest.POST.mockResolvedValue({ data: sqlResponse(rows) });
       flinkRest.GET.mockResolvedValue({ data: sqlResponse(rows) });

@@ -1,3 +1,16 @@
 {
-  "enabled": false
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Scoped to the Dockerfile base image only; npm deps are handled by the pnpm-audit pipeline. Renovate was disabled wholesale in #103 for being too noisy.",
+  "enabledManagers": ["dockerfile"],
+  "dependencyDashboard": false,
+  "semanticCommits": "enabled",
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "description": "Stay on Node 22; moving to a new major is a deliberate change (engines field, native addons).",
+      "matchManagers": ["dockerfile"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ]
 }

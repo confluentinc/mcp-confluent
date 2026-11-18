@@ -44,6 +44,7 @@ minimumReleaseAgeExclude:
   - minimatch@11.0.1
   - glob@14.0.2
   - fast-xml-parser@5.11.3
+  - picomatch@4.0.8
 overrides:
   form-data@>=4.0.0 <4.0.6: ">=4.0.6"
   hono@<4.12.25: ">=4.12.25"
